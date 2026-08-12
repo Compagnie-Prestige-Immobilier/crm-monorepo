@@ -1,0 +1,149 @@
+name: cpi_go
+description: "CPI GO — prospection terrain hors ligne (Android)."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Libellés Material en français (dates, sélecteurs, boutons système).
+  flutter_localizations:
+    sdk: flutter
+
+  # ── État ────────────────────────────────────────────────────────────────────
+  flutter_riverpod: ^3.0.0
+
+  # ── Navigation ──────────────────────────────────────────────────────────────
+  go_router: ^17.0.0
+
+  # ── Base locale ─────────────────────────────────────────────────────────────
+  # sqlite3_flutter_libs n'est PAS ajouté : depuis 0.6.0+eol c'est un shim vide.
+  # drift_flutter tire `sqlite3`, qui embarque désormais ses propres natifs.
+  # Épinglé au même palier que drift_dev : drift 2.34 introduit l'API
+  # `drift3_preview` que l'outillage de schéma de drift_dev 2.34.0 ne sait pas
+  # encore compiler. Dépareillés, `drift_dev schema dump` ne s'exécute plus et
+  # le golden de migration devient impossible à produire.
+  drift: '>=2.33.0 <2.34.0'
+  drift_flutter: ^0.3.1
+  # Tiré par drift_flutter, mais importé directement par database.dart pour le
+  # type `CommonDatabase` du callback de PRAGMAs : une dépendance utilisée
+  # explicitement se déclare explicitement.
+  sqlite3: ^3.5.0
+
+  # ── Stockage sécurisé (jetons) ──────────────────────────────────────────────
+  # 10.3.1 et non 11.x : la 11 impose `compileSdk = 37` à tout le projet, alors
+  # que la cible convenue est 36. Le chiffrement est identique dans les deux
+  # (AES-256-GCM, clé enveloppée RSA-OAEP dans l'Android KeyStore).
+  flutter_secure_storage: '>=10.3.1 <11.0.0'
+
+  # ── Réseau ──────────────────────────────────────────────────────────────────
+  # Client généré depuis apps/api/openapi.json. Dépendance de CHEMIN et non de
+  # version : le contrat et l'app avancent dans le même commit, et un client
+  # publié séparément se désynchroniserait du serveur sans que rien ne le dise.
+  crm_api_client:
+    path: ../../packages/api-client-dart
+  # Tiré par crm_api_client, mais déclaré explicitement : `lib/core/network/`
+  # construit lui-même l'unique instance Dio et écrit ses intercepteurs.
+  dio: ^5.7.0
+
+  # État d'interface réseau. Déclencheur UNIQUEMENT, jamais un verrou : sur les
+  # réseaux mobiles sénégalais un lien dégradé rapporte `mobile` alors que rien
+  # ne route. `connectivity_plus` mesure l'interface, pas l'accessibilité.
+  connectivity_plus: ^7.0.0
+
+  # ── Arrière-plan ────────────────────────────────────────────────────────────
+  # Complément, pas chemin principal : les ROM Transsion et Xiaomi — majoritaires
+  # au Sénégal — tuent les tâches de fond quoi qu'en dise AOSP.
+  workmanager: ^0.10.0
+
+  # ── Divers ──────────────────────────────────────────────────────────────────
+  phosphor_flutter: ^2.1.0
+  # Numéro de build : la restauration de route n'est valable que pour la version
+  # qui l'a écrite. Restaurer `/x/y?draft=z` après une mise à jour qui a déplacé
+  # cette route ouvrirait un écran d'erreur au démarrage.
+  package_info_plus: ^10.0.0
+  # Ouvre les réglages d'optimisation de batterie du constructeur. Il n'existe
+  # pas d'API Flutter pour ça ; un Intent Android explicite est la seule voie.
+  android_intent_plus: ^6.0.0
+  uuid: ^4.6.0
+  intl: ^0.20.2
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  shared_preferences: ^2.5.0
+  collection: ^1.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  build_runner: ^2.4.13
+  drift_dev: '>=2.33.0 <2.34.0'
+  # riverpod_lint / custom_lint sont volontairement absents : custom_lint 0.8.x
+  # est cloué sur analyzer ^8, drift_dev 2.34 exige analyzer ^13. Les deux ne
+  # peuvent pas cohabiter aujourd'hui ; la base locale prime sur le linter.
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/brand/
+
+  # Polices EMPAQUETÉES dans l'APK. Pas de `google_fonts` : un premier lancement
+  # sur réseau faible afficherait une police de repli pendant dix secondes.
+  fonts:
+    - family: Bricolage Grotesque
+      fonts:
+        - asset: assets/fonts/BricolageGrotesque-Light.ttf
+          weight: 300
+        - asset: assets/fonts/BricolageGrotesque-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/BricolageGrotesque-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/BricolageGrotesque-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/BricolageGrotesque-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/BricolageGrotesque-ExtraBold.ttf
+          weight: 800
+    - family: Plus Jakarta Sans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-Light.ttf
+          weight: 300
+        - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-Bold.ttf
+          weight: 700
+
+# ── Icône de lanceur ──────────────────────────────────────────────────────────
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/brand/icon-512.png"
+  min_sdk_android: 24
+  adaptive_icon_background: "#630210"
+  adaptive_icon_foreground: "assets/brand/icon-512.png"
+  adaptive_icon_foreground_inset: 22
+
+# ── Écran de démarrage ────────────────────────────────────────────────────────
+flutter_native_splash:
+  color: "#630210"
+  image: assets/brand/cpi-header.png
+  android_12:
+    color: "#630210"
+    image: assets/brand/icon-512.png
+    icon_background_color: "#630210"
+  android: true
+  ios: false
+  web: false
+  fullscreen: false

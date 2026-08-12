@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG UNIQUEMENT. Ce fichier vit dans `src/debug/`, donc il n'entre jamais dans
+  un APK de release.
+
+  Depuis Android 9 (API 28), le trafic en clair est refusé par défaut, et la
+  cible est `targetSdk = 36`. Le serveur de développement, lui, écoute en HTTP
+  sur `10.0.2.2:3001` — l'alias de la machine hôte vu depuis l'émulateur. Sans
+  cette exception, toutes les requêtes échouent en `CLEARTEXT_NOT_PERMITTED`,
+  qui remonte comme une simple erreur de connexion et se confond avec « pas de
+  réseau ».
+
+  L'exception est nominative : deux hôtes, pas `cleartextTrafficPermitted` global.
+  Un drapeau global en debug finirait par masquer une URL de production restée en
+  HTTP dans une configuration de test.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- L'hôte, vu depuis l'émulateur Android. -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- Appareil physique relié par `adb reverse`. -->
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

@@ -1,0 +1,1214 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
+import 'package:cpi_go/core/sync/api_port.dart';
+import 'package:cpi_go/core/sync/clock.dart';
+import 'package:cpi_go/core/sync/outbox_status.dart';
+import 'package:cpi_go/core/sync/stub_api.dart';
+import 'package:cpi_go/core/sync/sync_engine.dart';
+import 'package:cpi_go/core/sync/sync_engine_factory.dart';
+import 'package:cpi_go/core/sync/token_store.dart';
+import 'package:cpi_go/data/local/database.dart';
+import 'package:crm_api_client/crm_api_client.dart';
+// `isNull`/`isNotNull` existent des deux côtés : ici on parle de matchers, pas
+// d'expressions SQL.
+import 'package:drift/drift.dart' hide isNotNull, isNull;
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../support/db_fixture.dart';
+import '../support/fake_api.dart';
+
+void main() {
+  group('pureté de lib/core/sync', () {
+    // Contrainte d'architecture vérifiée mécaniquement plutôt que par revue :
+    // le worker WorkManager n'a ni arbre de widgets, ni conteneur Riverpod, ni
+    // plugins. Un import Flutter glissé ici ne casserait rien avant la
+    // production, sur un appareil hors ligne.
+    test('aucun fichier n\'importe flutter ni flutter_riverpod', () {
+      final Directory dir = Directory('lib/core/sync');
+      expect(dir.existsSync(), isTrue, reason: 'exécuter depuis apps/mobile');
+
+      final List<String> offenders = <String>[];
+      for (final FileSystemEntity entity in dir.listSync(recursive: true)) {
+        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        for (final String line in entity.readAsLinesSync()) {
+          final String trimmed = line.trim();
+          if (!trimmed.startsWith('import ') && !trimmed.startsWith('export ')) {
+            continue;
+          }
+          if (trimmed.contains('package:flutter/') ||
+              trimmed.contains('package:flutter_riverpod/') ||
+              trimmed.contains('package:flutter_localizations/') ||
+              trimmed.contains('package:drift_flutter/') ||
+              trimmed.contains('package:flutter_secure_storage/') ||
+              trimmed.contains('package:shared_preferences/')) {
+            offenders.add('${entity.path}: $trimmed');
+          }
+        }
+      }
+      expect(offenders, isEmpty);
+    });
+
+    test('la base elle-même reste ouvrable hors Flutter', () {
+      final File file = File('lib/data/local/database.dart');
+      final String source = file.readAsStringSync();
+      expect(source, isNot(contains('package:flutter/')));
+      expect(source, isNot(contains('package:drift_flutter/')));
+    });
+  });
+
+  group('buildSyncEngine', () {
+    late AppDatabase db;
+
+    setUp(() => db = AppDatabase(NativeDatabase.memory()));
+    tearDown(() => db.close());
+
+    test('assemble le moteur à partir des quatre collaborateurs', () {
+      final SyncEngine engine = buildSyncEngine(
+        database: db,
+        api: const StubApi(),
+        tokens: InMemoryTokenStore(),
+        clock: FakeClock(DateTime.utc(2026, 8, 12)),
+      );
+      expect(engine.database, same(db));
+      expect(engine.api, isA<StubApi>());
+      expect(engine.tokens, isA<InMemoryTokenStore>());
+      expect(engine.clock, isA<FakeClock>());
+      expect(engine.maxBatchOps, 200);
+      expect(engine.maxBatchBytes, 512 * 1024);
+      expect(engine.maxAttempts, 8);
+    });
+
+    test('sans session, le cycle ne touche pas au réseau', () async {
+      final SyncEngine engine = buildSyncEngine(
+        database: db,
+        api: const ExplodingApi(),
+        tokens: InMemoryTokenStore(),
+        clock: const SystemClock(),
+      );
+      final SyncOutcome outcome = await engine.runOnce();
+      expect(outcome.status, SyncRunStatus.skipped);
+      expect(outcome.reason, 'no_session');
+    });
+
+    test('une file vide ne produit aucun lot', () async {
+      final FakeApi api = FakeApi();
+      final SyncEngine engine = buildSyncEngine(
+        database: db,
+        api: api,
+        tokens: InMemoryTokenStore(refreshToken: 'jeton', userId: 'me'),
+        clock: const SystemClock(),
+      );
+      final SyncOutcome outcome = await engine.runOnce();
+      expect(outcome.isOk, isTrue);
+      expect(outcome.pushed, 0);
+      expect(api.calls, isEmpty);
+    });
+  });
+
+  group('sélection : une clé empoisonnée ne bloque qu\'elle-même', () {
+    late AppDatabase db;
+    late FakeApi api;
+    late FakeClock clock;
+    late SyncEngine engine;
+
+    setUp(() async {
+      db = await openTestDatabase();
+      api = FakeApi();
+      clock = FakeClock(t0);
+      engine = SyncEngine(
+        database: db,
+        api: api,
+        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        clock: clock,
+        random: Random(1),
+      );
+    });
+    tearDown(() => db.close());
+
+    /// Deux représentants, deux prospects chacun. `dependencyKey` = l'id du
+    /// représentant, y compris pour les prospects — c'est la convention de
+    /// `WriteRepository`.
+    Future<void> seedTwoChains() async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await insertRepresentant(db, id: 'repB', phone: '+221770000002');
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+      await queueOp(
+        db,
+        id: 'A2',
+        entityType: 'prospect',
+        entityId: 'pA1',
+        dependencyKey: 'repA',
+      );
+      await queueOp(db, id: 'B1', entityType: 'representant', entityId: 'repB');
+      await queueOp(
+        db,
+        id: 'B2',
+        entityType: 'prospect',
+        entityId: 'pB1',
+        dependencyKey: 'repB',
+      );
+    }
+
+    test('une tête `failed` retire toute sa clé du lot, les autres passent',
+        () async {
+      await seedTwoChains();
+      // repA est empoisonné : sa tête a définitivement échoué.
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1'))).write(
+        const OutboxCompanion(status: Value<String>(OutboxStatus.failed)),
+      );
+
+      final List<OutboxData> batch = await engine.selectBatch();
+      expect(
+        batch.map((OutboxData o) => o.id),
+        <String>['B1', 'B2'],
+        reason: 'A2 est pending et dû, mais sa clé est empoisonnée',
+      );
+    });
+
+    test('une tête `conflict` retire toute sa clé du lot', () async {
+      await seedTwoChains();
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1'))).write(
+        const OutboxCompanion(status: Value<String>(OutboxStatus.conflict)),
+      );
+      final List<OutboxData> batch = await engine.selectBatch();
+      expect(batch.map((OutboxData o) => o.id), <String>['B1', 'B2']);
+    });
+
+    test('la vidange draine les autres clés et ne touche jamais la clé morte',
+        () async {
+      await seedTwoChains();
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1'))).write(
+        const OutboxCompanion(status: Value<String>(OutboxStatus.failed)),
+      );
+
+      final int acknowledged = await engine.drain();
+
+      expect(acknowledged, 2);
+      expect(api.receivedOpIds, <String>['B1', 'B2']);
+      // A2 est intact : ni tentative consommée, ni statut changé. Lui brûler ses
+      // essais pour la faute de son parent la tuerait pour rien.
+      final OutboxData a2 = await outboxById(db, 'A2');
+      expect(a2.status, OutboxStatus.pending);
+      expect(a2.attempts, 0);
+      expect((await outboxById(db, 'B1')).status, OutboxStatus.done);
+      expect((await outboxById(db, 'B2')).status, OutboxStatus.done);
+    });
+
+    test('le préfixe est CONTIGU : une opération non due arrête sa chaîne',
+        () async {
+      await seedTwoChains();
+      // A1 est dû, A2 attend son back-off. A2 ne doit pas passer devant A1…
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A2'))).write(
+        OutboxCompanion(
+          nextAttemptAt: Value<DateTime>(t0.add(const Duration(minutes: 5))),
+        ),
+      );
+      final List<OutboxData> batch = await engine.selectBatch();
+      expect(batch.map((OutboxData o) => o.id), <String>['A1', 'B1', 'B2']);
+    });
+
+    test('une tête non due gèle sa clé sans gêner les voisines', () async {
+      await seedTwoChains();
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1'))).write(
+        OutboxCompanion(
+          nextAttemptAt: Value<DateTime>(t0.add(const Duration(minutes: 5))),
+        ),
+      );
+      expect(
+        (await engine.selectBatch()).map((OutboxData o) => o.id),
+        <String>['B1', 'B2'],
+      );
+      // Le back-off expire : la clé repart entière, dans l'ordre.
+      clock.advance(const Duration(minutes: 6));
+      expect(
+        (await engine.selectBatch()).map((OutboxData o) => o.id),
+        <String>['A1', 'A2', 'B1', 'B2'],
+      );
+    });
+
+    test('un prospect ne peut structurellement pas précéder son représentant',
+        () async {
+      await seedTwoChains();
+      final List<OutboxData> batch = await engine.selectBatch();
+      final List<String> chainA = batch
+          .where((OutboxData o) => o.dependencyKey == 'repA')
+          .map((OutboxData o) => o.id)
+          .toList();
+      expect(chainA, <String>['A1', 'A2']);
+      expect(batch.map((OutboxData o) => o.seq).toList(), isA<List<int>>());
+    });
+
+    test('une opération sans dependencyKey est sa propre partition', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await db
+          .into(db.outbox)
+          .insert(
+            OutboxCompanion.insert(
+              id: 'solo',
+              dependencyKey: const Value<String?>(null),
+              entityType: 'representant',
+              entityId: 'repA',
+              op: 'update',
+              payload: '{}',
+              nextAttemptAt: t0,
+              createdAt: t0,
+            ),
+          );
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1'))).write(
+        const OutboxCompanion(status: Value<String>(OutboxStatus.failed)),
+      );
+      // `solo` n'a pas de clé : l'échec d'A1 ne la concerne pas.
+      expect(
+        (await engine.selectBatch()).map((OutboxData o) => o.id),
+        contains('solo'),
+      );
+    });
+
+    test('le lot s\'arrête au plafond d\'opérations', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      for (int i = 0; i < 5; i++) {
+        await queueOp(
+          db,
+          id: 'op$i',
+          entityType: 'representant',
+          entityId: 'repA',
+          dependencyKey: 'k$i',
+        );
+      }
+      final SyncEngine small = SyncEngine(
+        database: db,
+        api: api,
+        tokens: InMemoryTokenStore(refreshToken: 'r'),
+        clock: clock,
+        maxBatchOps: 2,
+      );
+      expect(await small.selectBatch(), hasLength(2));
+    });
+  });
+
+  group('bail et récupération', () {
+    late AppDatabase db;
+    late FakeApi api;
+    late FakeClock clock;
+    late SyncEngine engine;
+
+    setUp(() async {
+      db = await openTestDatabase();
+      api = FakeApi();
+      clock = FakeClock(t0);
+      engine = SyncEngine(
+        database: db,
+        api: api,
+        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        clock: clock,
+        random: Random(3),
+      );
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+    });
+    tearDown(() => db.close());
+
+    test('un bail expiré revient en file', () async {
+      await queueOp(
+        db,
+        id: 'A1',
+        entityType: 'representant',
+        entityId: 'repA',
+        status: OutboxStatus.syncing,
+        leaseUntil: t0.subtract(const Duration(seconds: 1)),
+      );
+      expect(await engine.reclaimExpiredLeases(), 1);
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.pending);
+      expect(row.leaseUntil, isNull);
+    });
+
+    test('un bail encore valide reste pris', () async {
+      await queueOp(
+        db,
+        id: 'A1',
+        entityType: 'representant',
+        entityId: 'repA',
+        status: OutboxStatus.syncing,
+        leaseUntil: t0.add(const Duration(minutes: 1)),
+      );
+      expect(await engine.reclaimExpiredLeases(), 0);
+      expect((await outboxById(db, 'A1')).status, OutboxStatus.syncing);
+    });
+
+    test('deux vidanges concurrentes n\'émettent qu\'un seul lot', () async {
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+      final List<int> counts = await Future.wait(<Future<int>>[
+        engine.drain(),
+        engine.drain(),
+      ]);
+      // Sans le garde de vol unique, le même lot partirait deux fois sous deux
+      // clés d'idempotence différentes — que le serveur ne peut pas rapprocher.
+      expect(api.calls, hasLength(1));
+      expect(counts.reduce((int a, int b) => a + b), 1);
+    });
+  });
+
+  group('rejeu idempotent', () {
+    late AppDatabase db;
+    late FakeApi api;
+    late FakeClock clock;
+    late SyncEngine engine;
+
+    setUp(() async {
+      db = await openTestDatabase();
+      api = FakeApi();
+      clock = FakeClock(t0);
+      engine = SyncEngine(
+        database: db,
+        api: api,
+        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        clock: clock,
+        random: Random(5),
+      );
+    });
+    tearDown(() => db.close());
+
+    test('le même lot envoyé deux fois ne produit qu\'une ligne', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await queueOp(
+        db,
+        id: 'A1',
+        entityType: 'representant',
+        entityId: 'repA',
+        payload: <String, Object?>{
+          'fullName': 'Awa Sy',
+          'phone': '+221770000001',
+          'departementId': 'dep-1',
+        },
+      );
+
+      // Premier envoi : le serveur applique, la réponse se perd au retour. C'est
+      // le seul scénario qui produit un doublon si l'idempotence est cassée.
+      api.loseNextResponse = true;
+      await engine.drain();
+
+      expect(api.calls, hasLength(1));
+      expect(api.rows.keys, <String>['repA']);
+      final OutboxData afterLoss = await outboxById(db, 'A1');
+      expect(afterLoss.status, OutboxStatus.pending);
+      expect(afterLoss.attempts, 1);
+
+      // Le back-off s'écoule, le cycle suivant repart.
+      clock.advance(const Duration(minutes: 30));
+      await engine.drain();
+
+      expect(api.calls, hasLength(2));
+      expect(api.receivedOpIds, <String>['A1', 'A1']);
+      expect(
+        api.rows,
+        hasLength(1),
+        reason: 'le second envoi porte le même opId : aucune seconde ligne',
+      );
+      expect((await outboxById(db, 'A1')).status, OutboxStatus.done);
+    });
+
+    test('un verdict `duplicate` est un succès, pas un échec', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+      api.verdicts['A1'] = SyncOperationResultDto(
+        opId: 'A1',
+        status: SyncOpStatus.duplicate,
+        entityId: 'repA',
+        rev: 4,
+        serverUpdatedAt: t0,
+        errorCode: null,
+        error: null,
+      );
+      await engine.drain();
+      expect((await outboxById(db, 'A1')).status, OutboxStatus.done);
+      final Representant rep = await (db.select(
+        db.representants,
+      )..where((Representants t) => t.id.equals('repA'))).getSingle();
+      expect(rep.rev, 4);
+      expect(rep.serverUpdatedAt, t0);
+    });
+
+    test('le batchId change à chaque tentative, l\'opId jamais', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+      api.loseNextResponse = true;
+      await engine.drain();
+      clock.advance(const Duration(minutes: 30));
+      await engine.drain();
+      expect(api.calls[0].batchId, isNot(api.calls[1].batchId));
+      expect(api.calls[0].opIds, api.calls[1].opIds);
+      expect(api.calls[0].payloadVersion, SyncEngine.payloadVersion);
+    });
+  });
+
+  group('409 sur téléphone : fusion automatique et remappage', () {
+    late AppDatabase db;
+    late FakeApi api;
+    late FakeClock clock;
+    late SyncEngine engine;
+
+    setUp(() async {
+      db = await openTestDatabase();
+      api = FakeApi();
+      clock = FakeClock(t0);
+      engine = SyncEngine(
+        database: db,
+        api: api,
+        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        clock: clock,
+        random: Random(11),
+      );
+    });
+    tearDown(() => db.close());
+
+    /// Un représentant saisi hors ligne, deux prospects sous lui, un brouillon
+    /// en cours qui pointe vers lui.
+    Future<void> seedLocalChain() async {
+      await insertRepresentant(db, id: 'local-rep', phone: '+221770000001');
+      await insertProspect(
+        db,
+        id: 'p1',
+        representantId: 'local-rep',
+        phone: '+221780000001',
+      );
+      await insertProspect(
+        db,
+        id: 'p2',
+        representantId: 'local-rep',
+        phone: '+221780000002',
+      );
+      await queueOp(
+        db,
+        id: 'R1',
+        entityType: 'representant',
+        entityId: 'local-rep',
+        payload: <String, Object?>{
+          'fullName': 'Awa Sy',
+          'phone': '+221770000001',
+          'departementId': 'dep-1',
+        },
+      );
+      await queueOp(
+        db,
+        id: 'P1',
+        entityType: 'prospect',
+        entityId: 'p1',
+        dependencyKey: 'local-rep',
+        payload: <String, Object?>{
+          'nom': 'Diallo',
+          'prenom': 'Mamadou',
+          'phone': '+221780000001',
+          'banqueId': 'bq-1',
+          'syndicatId': 'sy-1',
+          'representantId': 'local-rep',
+        },
+      );
+      await queueOp(
+        db,
+        id: 'P2',
+        entityType: 'prospect',
+        entityId: 'p2',
+        dependencyKey: 'local-rep',
+        payload: <String, Object?>{
+          'nom': 'Ba',
+          'prenom': 'Fatou',
+          'phone': '+221780000002',
+          'banqueId': 'bq-1',
+          'syndicatId': 'sy-1',
+          'representantId': 'local-rep',
+        },
+      );
+      await db
+          .into(db.formDrafts)
+          .insert(
+            FormDraftsCompanion.insert(
+              draftId: 'd1',
+              formKey: 'prospect.create',
+              parentId: const Value<String?>('local-rep'),
+              payload: jsonEncode(<String, Object?>{
+                'nom': 'Sow',
+                'representantId': 'local-rep',
+              }),
+              updatedAt: t0,
+            ),
+          );
+    }
+
+    test('fiche du MÊME commercial : fusion silencieuse, tout suit', () async {
+      await seedLocalChain();
+      api.verdicts['R1'] = conflictOn('R1');
+      api.onLookup = (String phone) => RepresentantLookup(
+        found: true,
+        phoneE164: phone,
+        representant: representantDto(id: 'server-rep', phoneE164: phone),
+        ownedByCommercialId: 'me',
+        ownedByCommercialName: 'Awa Sy',
+      );
+
+      await engine.drain();
+
+      expect(api.lookups, <String>['+221770000001']);
+
+      // 1. l'identifiant du représentant est réécrit
+      final List<Representant> reps = await db.select(db.representants).get();
+      expect(reps.map((Representant r) => r.id), <String>['server-rep']);
+
+      // 2. ON UPDATE CASCADE a emporté les prospects
+      final List<Prospect> prospects = await db.select(db.prospects).get();
+      expect(
+        prospects.map((Prospect p) => p.representantId).toSet(),
+        <String>{'server-rep'},
+      );
+
+      // 3. outbox.entityId
+      expect((await outboxById(db, 'R1')).entityId, 'server-rep');
+
+      // 4. outbox.dependencyKey — sans ça les prospects tombent dans une
+      //    partition orpheline et ne partent jamais.
+      for (final String id in <String>['R1', 'P1', 'P2']) {
+        expect((await outboxById(db, id)).dependencyKey, 'server-rep');
+      }
+
+      // 5. le representantId À L'INTÉRIEUR de chaque payload en attente — aucune
+      //    cascade SQL n'atteint du JSON figé.
+      for (final String id in <String>['P1', 'P2']) {
+        final Map<String, Object?> payload =
+            jsonDecode((await outboxById(db, id)).payload)
+                as Map<String, Object?>;
+        expect(payload['representantId'], 'server-rep');
+      }
+
+      // 6. le brouillon en cours suit lui aussi
+      final FormDraft draft = await (db.select(
+        db.formDrafts,
+      )..where((FormDrafts t) => t.draftId.equals('d1'))).getSingle();
+      expect(draft.parentId, 'server-rep');
+      expect(
+        (jsonDecode(draft.payload) as Map<String, Object?>)['representantId'],
+        'server-rep',
+      );
+
+      // 7. l'opération de création en conflit est marquée appliquée : la fiche
+      //    existe déjà côté serveur, la recréer n'a plus de sens.
+      final OutboxData r1 = await outboxById(db, 'R1');
+      expect(r1.status, OutboxStatus.done);
+      expect(r1.lastErrorCode, isNull);
+    });
+
+    test('fiche d\'un AUTRE commercial : aucune fusion, le propriétaire est nommé',
+        () async {
+      await seedLocalChain();
+      api.verdicts['R1'] = conflictOn('R1');
+      api.onLookup = (String phone) => RepresentantLookup(
+        found: true,
+        phoneE164: phone,
+        representant: representantDto(
+          id: 'server-rep',
+          phoneE164: phone,
+          createdById: 'moussa',
+        ),
+        ownedByCommercialId: 'moussa',
+        ownedByCommercialName: 'Moussa Fall',
+      );
+
+      await engine.drain();
+
+      // L'attribution détermine la commission : rattacher en silence les
+      // prospects d'Awa à Moussa produirait une paie fausse que personne ne
+      // remonterait jusqu'à une fusion faite six semaines plus tôt.
+      final OutboxData r1 = await outboxById(db, 'R1');
+      expect(r1.status, OutboxStatus.conflict);
+      expect(r1.entityId, 'local-rep');
+      expect(r1.lastErrorCode, ServerErrorCodes.representantPhoneConflict);
+      expect(r1.lastErrorMsg, isNotNull);
+
+      final List<Representant> reps = await db.select(db.representants).get();
+      expect(reps.map((Representant r) => r.id), <String>['local-rep']);
+      expect((await outboxById(db, 'P1')).dependencyKey, 'local-rep');
+
+      // Et la clé est maintenant empoisonnée : les prospects ne partiront pas
+      // vers un parent qui n'existe pas.
+      expect(await engine.selectBatch(), isEmpty);
+    });
+
+    test('lookup indisponible : on ne fusionne pas à l\'aveugle', () async {
+      await seedLocalChain();
+      api.verdicts['R1'] = conflictOn('R1');
+      api.onLookup = (String phone) =>
+          throw const ApiException('offline', kind: FailureKind.retryable);
+      // `onLookup` qui lève est traité comme « je ne sais pas » : sans savoir à
+      // qui appartient la fiche, la fusion est exactement ce qu'il ne faut pas
+      // tenter.
+      await engine.drain();
+      expect((await outboxById(db, 'R1')).status, OutboxStatus.conflict);
+      expect((await db.select(db.representants).get()).single.id, 'local-rep');
+    });
+
+    test('numéro inconnu du serveur : pas de fusion possible', () async {
+      await seedLocalChain();
+      api.verdicts['R1'] = conflictOn('R1');
+      api.onLookup = (String phone) =>
+          RepresentantLookup(found: false, phoneE164: phone);
+      await engine.drain();
+      expect((await outboxById(db, 'R1')).status, OutboxStatus.conflict);
+    });
+
+    test('un 409 sur un `update` ne se fusionne jamais', () async {
+      await insertRepresentant(
+        db,
+        id: 'repA',
+        phone: '+221770000001',
+        serverUpdatedAt: t0,
+      );
+      await queueOp(
+        db,
+        id: 'U1',
+        entityType: 'representant',
+        entityId: 'repA',
+        op: 'update',
+        payload: <String, Object?>{'phone': '+221770000001'},
+      );
+      api.verdicts['U1'] = conflictOn(
+        'U1',
+        errorCode: ServerErrorCodes.revConflict,
+      );
+      await engine.drain();
+      expect((await outboxById(db, 'U1')).status, OutboxStatus.conflict);
+      expect(api.lookups, isEmpty);
+    });
+  });
+
+  group('remapEntityId', () {
+    late AppDatabase db;
+    late SyncEngine engine;
+
+    setUp(() async {
+      db = await openTestDatabase();
+      engine = SyncEngine(
+        database: db,
+        api: FakeApi(),
+        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        clock: FakeClock(t0),
+        random: Random(13),
+      );
+    });
+    tearDown(() => db.close());
+
+    test('tout se fait dans UNE transaction : une erreur en aval annule tout',
+        () async {
+      await insertRepresentant(db, id: 'local-rep', phone: '+221770000001');
+      await insertProspect(
+        db,
+        id: 'p1',
+        representantId: 'local-rep',
+        phone: '+221780000001',
+      );
+      await queueOp(
+        db,
+        id: 'P1',
+        entityType: 'prospect',
+        entityId: 'p1',
+        dependencyKey: 'local-rep',
+        payload: <String, Object?>{'representantId': 'local-rep'},
+      );
+
+      // Interrompue au milieu, la suite de réécritures laisserait des prospects
+      // orphelins ou des opérations pointant vers un identifiant disparu. Elle
+      // doit donc participer à la transaction de l'appelant, pas committer par
+      // morceaux.
+      await expectLater(
+        db.transaction(() async {
+          await engine.remapEntityId('local-rep', 'server-rep');
+          throw const _Interrupted();
+        }),
+        throwsA(isA<_Interrupted>()),
+      );
+
+      expect((await db.select(db.representants).get()).single.id, 'local-rep');
+      expect(
+        (await db.select(db.prospects).get()).single.representantId,
+        'local-rep',
+      );
+      final OutboxData p1 = await outboxById(db, 'P1');
+      expect(p1.dependencyKey, 'local-rep');
+      expect(
+        (jsonDecode(p1.payload) as Map<String, Object?>)['representantId'],
+        'local-rep',
+      );
+    });
+
+    test('la fiche serveur déjà présente localement : on repointe puis on purge',
+        () async {
+      // Un pull a ramené la fiche serveur entre-temps. Renommer l'identifiant
+      // local violerait la clé primaire.
+      await insertRepresentant(db, id: 'local-rep', phone: '+221770000001');
+      await insertProspect(
+        db,
+        id: 'p1',
+        representantId: 'local-rep',
+        phone: '+221780000001',
+      );
+      await insertRepresentant(
+        db,
+        id: 'server-rep',
+        phone: '+221770000009',
+        serverUpdatedAt: t0,
+      );
+
+      await engine.remapEntityId('local-rep', 'server-rep');
+
+      final List<Representant> reps = await db.select(db.representants).get();
+      expect(reps.map((Representant r) => r.id), <String>['server-rep']);
+      expect(
+        (await db.select(db.prospects).get()).single.representantId,
+        'server-rep',
+      );
+    });
+
+    test('remapper vers soi-même est un no-op', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await engine.remapEntityId('repA', 'repA');
+      expect((await db.select(db.representants).get()).single.id, 'repA');
+    });
+  });
+
+  group('échecs de lot', () {
+    late AppDatabase db;
+    late FakeApi api;
+    late FakeClock clock;
+
+    SyncEngine build({int maxAttempts = 8, Random? random}) => SyncEngine(
+      database: db,
+      api: api,
+      tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+      clock: clock,
+      maxAttempts: maxAttempts,
+      random: random ?? Random(17),
+    );
+
+    setUp(() async {
+      db = await openTestDatabase();
+      api = FakeApi();
+      clock = FakeClock(t0);
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+    });
+    tearDown(() => db.close());
+
+    test('retryable : tentative comptée, back-off à gigue complète', () async {
+      api.failNextPush = const ApiException(
+        'timeout',
+        statusCode: 504,
+      );
+      // Tirage nul ⇒ délai nul. Une gigue ÉGALE aurait imposé un plancher.
+      await build(random: _ZeroRandom()).drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.pending);
+      expect(row.attempts, 1);
+      expect(row.nextAttemptAt, t0);
+      expect(row.lastErrorCode, 'timeout');
+    });
+
+    test('IDEMPOTENCY_IN_PROGRESS ne compte pas de tentative', () async {
+      api.failNextPush = const ApiException(
+        ServerErrorCodes.idempotencyInProgress,
+        statusCode: 409,
+        kind: FailureKind.idempotencyInProgress,
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.attempts, 0);
+      expect(row.nextAttemptAt, t0.add(const Duration(seconds: 2)));
+    });
+
+    test('session expirée : rien ne se consomme, tout repart tel quel', () async {
+      api.failNextPush = const ApiException(
+        'session_expired',
+        statusCode: 401,
+        kind: FailureKind.sessionExpired,
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.pending);
+      expect(row.attempts, 0);
+      expect(row.nextAttemptAt, t0);
+    });
+
+    test('429 : on écoute Retry-After plutôt que notre back-off', () async {
+      api.failNextPush = const ApiException(
+        'rate_limited',
+        statusCode: 429,
+        kind: FailureKind.throttled,
+        retryAfter: Duration(minutes: 4),
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.attempts, 1);
+      expect(row.nextAttemptAt, t0.add(const Duration(minutes: 4)));
+    });
+
+    test('terminal : l\'opération part en `failed` sans réessai', () async {
+      api.failNextPush = const ApiException(
+        'FORBIDDEN',
+        statusCode: 403,
+        kind: FailureKind.terminal,
+        message: 'Compte désactivé.',
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.failed);
+      expect(row.lastErrorCode, 'FORBIDDEN');
+    });
+
+    test('les tentatives épuisées font passer en `failed`', () async {
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1'))).write(
+        const OutboxCompanion(attempts: Value<int>(7)),
+      );
+      api.failNextPush = const ApiException('timeout', statusCode: 504);
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.failed);
+      expect(row.attempts, 8);
+      expect(row.lastErrorCode, 'timeout');
+    });
+
+    test('verdict `invalid` : échec visible dans « À corriger »', () async {
+      api.verdicts['A1'] = invalidOn('A1', message: 'Département inconnu.');
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.failed);
+      expect(row.lastErrorMsg, 'Département inconnu.');
+    });
+
+    test('parent en échec : remise en file SANS consommer de tentative',
+        () async {
+      api.verdicts['A1'] = SyncOperationResultDto(
+        opId: 'A1',
+        status: SyncOpStatus.skippedDependencyFailed,
+        entityId: null,
+        rev: null,
+        serverUpdatedAt: null,
+        errorCode: ServerErrorCodes.parentRepresentantFailed,
+        error: 'Le représentant n\'est pas passé.',
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.pending);
+      expect(row.attempts, 0);
+      expect(row.lastErrorCode, ServerErrorCodes.parentRepresentantFailed);
+    });
+
+    test('une opération sans verdict revient en file, visiblement', () async {
+      api.verdicts['A1'] = SyncOperationResultDto(
+        opId: 'inconnu',
+        status: SyncOpStatus.applied,
+        entityId: 'x',
+        rev: 1,
+        serverUpdatedAt: t0,
+        errorCode: null,
+        error: null,
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.lastErrorCode, ClientErrorCodes.noResult);
+      expect(row.attempts, 1);
+    });
+
+    test('un payload indécodable échoue proprement, sans exception en fond',
+        () async {
+      await db
+          .into(db.outbox)
+          .insert(
+            OutboxCompanion.insert(
+              id: 'BAD',
+              dependencyKey: const Value<String?>('repB'),
+              entityType: 'representant',
+              entityId: 'repB',
+              op: 'create',
+              payload: 'ceci n\'est pas du JSON',
+              nextAttemptAt: t0,
+              createdAt: t0,
+            ),
+          );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'BAD');
+      expect(row.status, OutboxStatus.failed);
+      expect(row.lastErrorCode, ClientErrorCodes.payloadSchemaMismatch);
+    });
+  });
+
+  group('pull', () {
+    late AppDatabase db;
+    late FakeApi api;
+    late SyncEngine engine;
+
+    setUp(() async {
+      db = await openTestDatabase();
+      api = FakeApi();
+      engine = SyncEngine(
+        database: db,
+        api: api,
+        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        clock: FakeClock(t0),
+        random: Random(19),
+      );
+    });
+    tearDown(() => db.close());
+
+    test('le curseur est unique et se relit', () async {
+      await engine.writeCursor('cur-1');
+      expect(await engine.readCursor(), 'cur-1');
+      final SyncStateData row = (await db.select(db.syncState).get()).single;
+      expect(row.collection, SyncEngine.cursorKey);
+    });
+
+    test('une page rejouée n\'écrase pas une révision plus récente', () async {
+      await insertRepresentant(
+        db,
+        id: 'repA',
+        phone: '+221770000001',
+        fullName: 'Nom récent',
+        rev: 9,
+        serverUpdatedAt: t0,
+      );
+      api.pullPages.add(
+        PullPage(
+          changes: SyncChangesDto(
+            departements: const <DepartementDto>[],
+            banques: const <BanqueDto>[],
+            syndicats: const <SyndicatDto>[],
+            representants: <RepresentantDto>[
+              representantDto(
+                id: 'repA',
+                phoneE164: '+221770000001',
+                fullName: 'Nom ancien',
+              ),
+            ],
+            prospects: const <ProspectDto>[],
+          ),
+          deletions: const <SyncDeletionDto>[],
+          nextCursor: 'cur-2',
+          hasMore: false,
+          serverTime: t0,
+        ),
+      );
+
+      await engine.pullChanges();
+
+      final Representant rep = (await db.select(db.representants).get()).single;
+      // `rev` 3 < 9 : le `WHERE excluded.rev > rev` porte tout. Sans lui, la
+      // modification de l'utilisateur disparaîtrait sans trace.
+      expect(rep.fullName, 'Nom récent');
+      expect(rep.rev, 9);
+      expect(await engine.readCursor(), 'cur-2');
+    });
+
+    test('une suppression serveur est logique, jamais physique', () async {
+      await insertRepresentant(
+        db,
+        id: 'repA',
+        phone: '+221770000001',
+        serverUpdatedAt: t0,
+      );
+      api.pullPages.add(
+        PullPage(
+          changes: SyncChangesDto(
+            departements: const <DepartementDto>[],
+            banques: const <BanqueDto>[],
+            syndicats: const <SyndicatDto>[],
+            representants: const <RepresentantDto>[],
+            prospects: const <ProspectDto>[],
+          ),
+          deletions: <SyncDeletionDto>[
+            SyncDeletionDto(
+              entity: SyncEntity.representant,
+              id: 'repA',
+              deletedAt: t0,
+            ),
+          ],
+          nextCursor: 'cur-3',
+          hasMore: false,
+          serverTime: t0,
+        ),
+      );
+      await engine.pullChanges();
+      final Representant rep = (await db.select(db.representants).get()).single;
+      expect(rep.deletedAt, t0);
+    });
+
+    test('un pull raté n\'annule pas un push réussi', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+      api.pullPages.add(
+        PullPage(
+          changes: SyncChangesDto(
+            departements: const <DepartementDto>[],
+            banques: const <BanqueDto>[],
+            syndicats: const <SyndicatDto>[],
+            representants: const <RepresentantDto>[],
+            prospects: const <ProspectDto>[],
+          ),
+          deletions: const <SyncDeletionDto>[],
+          nextCursor: '',
+          hasMore: false,
+          serverTime: t0,
+        ),
+      );
+      final SyncOutcome first = await engine.runOnce();
+      expect(first.isOk, isTrue);
+      expect(first.pushed, 1);
+    });
+  });
+
+  group('SyncOutcome', () {
+    test('un échec terminal ne demande pas de réessai au worker', () {
+      const SyncOutcome outcome = SyncOutcome.failed(
+        'FORBIDDEN',
+        kind: FailureKind.terminal,
+      );
+      expect(outcome.shouldRetry, isFalse);
+      expect(outcome.isOk, isFalse);
+    });
+
+    test('une session morte ne se réessaie pas non plus', () {
+      const SyncOutcome outcome = SyncOutcome.failed(
+        'session',
+        kind: FailureKind.sessionExpired,
+      );
+      expect(outcome.shouldRetry, isFalse);
+    });
+
+    test('une coupure réseau, si', () {
+      const SyncOutcome outcome = SyncOutcome.failed(
+        'timeout',
+        kind: FailureKind.retryable,
+        pushed: 3,
+      );
+      expect(outcome.shouldRetry, isTrue);
+      expect(outcome.pushed, 3);
+    });
+  });
+
+  group('StubApi', () {
+    const StubApi api = StubApi();
+
+    test('refuse des identifiants vides', () {
+      expect(
+        () => api.login(identifier: '  ', password: 'x'),
+        throwsA(isA<ApiException>()),
+      );
+      expect(
+        () => api.login(identifier: 'a', password: ''),
+        throwsA(isA<ApiException>()),
+      );
+    });
+
+    test('rend un couple de jetons pour du développement', () async {
+      final AuthTokens tokens = await api.login(
+        identifier: 'commercial',
+        password: 'secret',
+      );
+      expect(tokens.accessToken, startsWith('stub.'));
+      expect(tokens.refreshToken, startsWith('stub.'));
+      expect(tokens.expiresAt.isAfter(DateTime.now().toUtc()), isTrue);
+    });
+
+    test('push échoue explicitement au lieu de faire semblant', () {
+      expect(
+        () => api.push(
+          batchId: 'b1',
+          payloadVersion: SyncEngine.payloadVersion,
+          operations: const <SyncOperationDto>[],
+        ),
+        throwsA(
+          isA<ApiException>().having(
+            (ApiException e) => e.code,
+            'code',
+            'api_not_configured',
+          ),
+        ),
+      );
+    });
+
+    test('le lookup ne prétend jamais connaître un numéro', () async {
+      final RepresentantLookup lookup = await api.lookupRepresentantByPhone(
+        '+221770000001',
+      );
+      expect(lookup.found, isFalse);
+      expect(lookup.ownedByCommercialId, isNull);
+    });
+  });
+
+  group('ApiException', () {
+    test('seuls les échecs transitoires sont réessayables', () {
+      expect(
+        const ApiException('x', kind: FailureKind.retryable).retryable,
+        isTrue,
+      );
+      expect(
+        const ApiException('x', kind: FailureKind.throttled).retryable,
+        isTrue,
+      );
+      expect(
+        const ApiException(
+          'x',
+          kind: FailureKind.idempotencyInProgress,
+        ).retryable,
+        isTrue,
+      );
+      expect(
+        const ApiException('x', kind: FailureKind.terminal).retryable,
+        isFalse,
+      );
+      expect(
+        const ApiException('x', kind: FailureKind.sessionExpired).retryable,
+        isFalse,
+      );
+    });
+  });
+
+  group('InMemoryTokenStore', () {
+    test('le jeton d\'accès ne survit pas à clear()', () async {
+      final InMemoryTokenStore store = InMemoryTokenStore(userId: 'me');
+      await store.save(accessToken: 'a', refreshToken: 'r');
+      expect(store.accessToken, 'a');
+      expect(await store.readRefreshToken(), 'r');
+      expect(await store.readUserId(), 'me');
+      await store.clear();
+      expect(store.accessToken, isNull);
+      expect(await store.readRefreshToken(), isNull);
+      expect(await store.readUserId(), isNull);
+    });
+  });
+
+  group('FakeClock', () {
+    test('n\'avance que sur demande', () {
+      final FakeClock clock = FakeClock(DateTime.utc(2026, 1, 1));
+      final DateTime first = clock.now();
+      expect(clock.now(), first);
+      clock.advance(const Duration(hours: 3));
+      expect(clock.now(), first.add(const Duration(hours: 3)));
+    });
+  });
+}
+
+class _Interrupted implements Exception {
+  const _Interrupted();
+}
+
+/// Tirage nul : le délai de back-off vaut alors exactement zéro, ce qu'une gigue
+/// égale ne peut pas produire.
+class _ZeroRandom implements Random {
+  @override
+  bool nextBool() => false;
+
+  @override
+  double nextDouble() => 0;
+
+  @override
+  int nextInt(int max) => 0;
+}
