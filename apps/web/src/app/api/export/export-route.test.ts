@@ -127,7 +127,7 @@ describe('export en régime normal', () => {
 describe('export : échecs', () => {
   it('refuse sans session, sans appeler l’export', async () => {
     vi.resetModules();
-    mockCookies(); // aucun cookie
+    store = mockCookies(); // aucun cookie
     const { GET } = await import('@/app/api/export/prospects/route');
 
     const response = await GET(exportRequest());

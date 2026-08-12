@@ -10,6 +10,9 @@
       "dependsOn": ["^build"],
       "outputs": [".next/**", "dist/**", "!.next/cache/**"]
     },
+    "@crm/database#build": {
+      "dependsOn": ["db:generate"]
+    },
     "@crm/api-client#build": {
       "dependsOn": ["^build", "generate"],
       "outputs": ["dist/**"]

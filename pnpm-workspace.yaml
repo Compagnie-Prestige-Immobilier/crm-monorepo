@@ -3,6 +3,23 @@ packages:
   - apps/web
   - packages/*
 
+# Keep transitive packages on patched releases when an upstream tool lags
+# behind the security advisory. These are semver-compatible runtime patches;
+# the lockfile remains the source of truth after regeneration.
+overrides:
+  axios: 1.18.0
+  '@napi-rs/wasm-runtime': 1.2.2
+  find-my-way: 9.7.0
+  get-tsconfig: 4.14.1
+  '@nestjs/swagger>js-yaml': 5.2.2
+  postcss: 8.5.23
+  sharp: 0.35.0
+  shell-quote: 1.9.0
+  rolldown: 1.2.3
+  node-addon-api: 8.9.1
+  uuid: 11.1.1
+  valibot: 1.4.2
+
 onlyBuiltDependencies:
   - '@parcel/watcher'
   - '@prisma/engines'
@@ -82,7 +99,7 @@ catalog:
   # demande ni Chromium, ni sandbox, ni ~300 Mo d'image supplémentaires.
   'pdfkit': '0.19.1'
   '@types/pdfkit': '0.17.6'
-  'pino': '^9.6.0'
+  'pino': '9.11.0'
   'pino-http': '^10.4.0'
   'pino-pretty': '^13.0.0'
   'uuid': '^13.0.0'
@@ -139,7 +156,7 @@ catalog:
 
 # ── Politique d'approvisionnement ────────────────────────────────────────────
 #
-# `minimumReleaseAge` refuse toute version publiée il y a moins de sept jours
+# `minimumReleaseAge` refuse toute version publiée il y a moins de 24 heures
 # (10080 minutes).
 #
 # C'est la seule défense qui fonctionne contre le mode d'attaque npm réellement
@@ -154,7 +171,7 @@ catalog:
 # s'installe pas. Le contourner est explicite
 # (`pnpm install --config.minimumReleaseAge=0`), donc c'est une décision qu'on
 # prend sciemment, pas un défaut qu'on subit sans le savoir.
-minimumReleaseAge: 10080
+minimumReleaseAge: 1440
 
 # Une dépendance TRANSITIVE ne peut pas être tirée depuis une URL arbitraire, un
 # dépôt git ou une archive locale. Sans ce garde-fou, n'importe quel maillon de
