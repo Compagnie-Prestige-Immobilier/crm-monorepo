@@ -25,11 +25,46 @@ class TypeaheadOption {
 
   bool matches(String query) {
     if (query.isEmpty) return true;
-    final String q = query.toLowerCase();
-    if (label.toLowerCase().contains(q)) return true;
-    if (secondary != null && secondary!.toLowerCase().contains(q)) return true;
-    return keywords.any((String k) => k.toLowerCase().contains(q));
+    final String q = foldSearch(query);
+    if (foldSearch(label).contains(q)) return true;
+    if (secondary != null && foldSearch(secondary!).contains(q)) return true;
+    return keywords.any((String k) => foldSearch(k).contains(q));
   }
+}
+
+/// Table de repli des diacritiques présents dans les référentiels : noms de
+/// départements, de banques et de syndicats sénégalais.
+///
+/// Dart n'expose pas de normalisation Unicode (pas d'équivalent de
+/// `String.normalize('NFD')`), et tirer une dépendance entière pour une
+/// vingtaine de caractères serait disproportionné.
+const Map<String, String> _diacritics = <String, String>{
+  'à': 'a', 'á': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a',
+  'ç': 'c',
+  'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+  'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+  'ñ': 'n',
+  'ò': 'o', 'ó': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o',
+  'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u',
+  'ý': 'y', 'ÿ': 'y',
+};
+
+/// Réduit une chaîne à sa forme comparable : minuscules ET sans accents.
+///
+/// Sans le repli des accents, chercher « Thies » ne trouve pas « Thiès », et
+/// « Kedougou » ne trouve pas « Kédougou ». Or personne ne pose les accents en
+/// tapant vite sur un clavier de téléphone : le commercial conclut que le
+/// département n'existe pas, et ne peut plus enregistrer sa fiche.
+///
+/// Le repli s'applique des DEUX côtés de la comparaison, si bien que la saisie
+/// accentuée continue de fonctionner aussi.
+String foldSearch(String input) {
+  final StringBuffer out = StringBuffer();
+  for (final int rune in input.toLowerCase().runes) {
+    final String ch = String.fromCharCode(rune);
+    out.write(_diacritics[ch] ?? ch);
+  }
+  return out.toString();
 }
 
 /// Complétion **sur données locales uniquement**.

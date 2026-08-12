@@ -169,8 +169,19 @@ model User {
   // Démonstration
   appSettingsUpdated AppSetting[] @relation("AppSettingUpdatedBy")
 
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel — elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
   @@index([role, isActive])
   @@index([deletedAt])
+  @@index([isDemo])
   @@map("users")
 }
 
@@ -300,12 +311,23 @@ model Representant {
 
   prospects Prospect[]
 
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel — elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
   @@index([phoneE164])
   @@index([createdById])
   @@index([departementId])
   // Index de pagination du pull delta : keyset sur (updatedAt, id).
   @@index([updatedAt, id])
   @@index([deletedAt])
+  @@index([isDemo])
   @@map("representants")
 }
 
@@ -354,6 +376,16 @@ model Prospect {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel — elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
   callTasks    CallTask[]
   callAttempts CallAttempt[]
   bankCases    BankCase[]
@@ -373,6 +405,7 @@ model Prospect {
   @@index([syndicatId, banqueId])
   @@index([phase2Status])
   @@index([enrollmentMethod])
+  @@index([isDemo])
   @@map("prospects")
 }
 
@@ -493,7 +526,18 @@ model CallCampaign {
   tasks       CallTask[]
   attempts    CallAttempt[]
 
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel — elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
   @@index([status, createdAt])
+  @@index([isDemo])
   @@map("call_campaigns")
 }
 
@@ -541,10 +585,21 @@ model CallTask {
 
   attempts CallAttempt[]
 
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel — elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
   @@unique([campaignId, prospectId])
   @@unique([campaignId, assignedToId, position])
   @@index([assignedToId, status])
   @@index([prospectId])
+  @@index([isDemo])
   @@map("call_tasks")
 }
 
@@ -575,9 +630,20 @@ model CallAttempt {
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())
 
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel — elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
   @@index([prospectId, createdAt])
   @@index([performedById, createdAt])
   @@index([campaignId])
+  @@index([isDemo])
   @@map("call_attempts")
 }
 
@@ -684,12 +750,23 @@ model BankCase {
 
   transitions BankCaseTransition[]
 
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel — elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
   @@index([currentStageId])
   @@index([processingBankId])
   @@index([createdById])
   @@index([prospectId])
   @@index([createdAt])
   @@index([deletedAt])
+  @@index([isDemo])
   @@map("bank_cases")
 }
 
@@ -722,9 +799,20 @@ model BankCaseTransition {
   clientAt  DateTime?
   createdAt DateTime  @default(now())
 
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel — elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
   @@index([caseId, createdAt])
   @@index([performedById, createdAt])
   @@index([toStageId])
+  @@index([isDemo])
   @@map("bank_case_transitions")
 }
 
