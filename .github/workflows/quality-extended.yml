@@ -89,6 +89,7 @@ jobs:
       - working-directory: apps/mobile
         run: |
           flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
           flutter build apk --debug
       # `curl … | bash` remplacé par un téléchargement ÉPINGLÉ et VÉRIFIÉ.
       #
