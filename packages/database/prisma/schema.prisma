@@ -30,7 +30,10 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// L'URL vit dans prisma.config.ts, pas ici.
+// Pas d'`url` ici : Prisma 7 l'interdit dans le schéma et exige que la chaîne
+// de connexion vienne de `prisma.config.ts`. Ce fichier doit donc être présent
+// DANS L'IMAGE de production, sans quoi `migrate deploy` ne sait pas où se
+// connecter et l'API redémarre en boucle.
 datasource db {
   provider = "postgresql"
 }

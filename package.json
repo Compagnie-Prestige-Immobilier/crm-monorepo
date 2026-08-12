@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "turbo dev",
+    "dx": "node tools/dev/dx.mjs",
     "build": "turbo build",
     "lint": "turbo lint",
     "format": "prettier . --write",
