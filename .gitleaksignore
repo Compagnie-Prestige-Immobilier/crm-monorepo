@@ -1,0 +1,13 @@
+# Faux positifs vérifiés un par un. Chaque ligne est une empreinte
+# `fichier:règle:ligne` que gitleaks ne signalera plus.
+#
+# La règle : on n'ajoute JAMAIS une entrée ici sans avoir ouvert le fichier et
+# constaté que la valeur n'ouvre rien. Un fichier d'exclusion rempli par
+# commodité transforme le scanner en décoration, et le jour où une vraie clé
+# passe, elle passe en silence.
+
+# JWT factice de test : `header.<base64 de {"sub":"u1"}>.sig`. Ni signé, ni
+# émis par quoi que ce soit — il ne sert qu'à vérifier qu'aucun jeton ne
+# franchit la frontière serveur → navigateur autrement que par un cookie
+# httpOnly.
+apps/web/src/app/api/auth/auth-routes.test.ts:generic-api-key:16

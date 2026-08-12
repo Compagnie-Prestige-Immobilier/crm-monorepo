@@ -14,11 +14,11 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: pnpm/action-setup@v5
+    - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
       with:
         version: 11.15.1
 
-    - uses: actions/setup-node@v5
+    - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: 24.18.0
         cache: pnpm
@@ -26,7 +26,7 @@ runs:
     # Cache turbo local : les paquets inchangés ne sont pas reconstruits d'une
     # PR à l'autre. La clé inclut le SHA pour écrire une nouvelle entrée à
     # chaque commit, les restore-keys rattrapent la plus récente.
-    - uses: actions/cache@v4
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: .turbo
         key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}

@@ -135,3 +135,40 @@ catalog:
   'cmdk': '1.1.1'
   # Fait échouer le build si un module serveur est importé depuis un composant client.
   'server-only': '0.0.1'
+
+
+# ── Politique d'approvisionnement ────────────────────────────────────────────
+#
+# `minimumReleaseAge` refuse toute version publiée il y a moins de sept jours
+# (10080 minutes).
+#
+# C'est la seule défense qui fonctionne contre le mode d'attaque npm réellement
+# observé : compromission du compte d'un mainteneur, publication d'un patch
+# malveillant, exfiltration chez tous ceux qui installent dans les heures qui
+# suivent. Ces paquets sont dépubliés en général sous 24 à 72 h — mais après
+# avoir touché ceux qui ont installé les premiers. Sept jours est le seuil
+# recommandé parce qu'il couvre le délai de détection observé, pas seulement le
+# délai médian.
+#
+# Contrepartie assumée : un correctif de sécurité publié cette semaine ne
+# s'installe pas. Le contourner est explicite
+# (`pnpm install --config.minimumReleaseAge=0`), donc c'est une décision qu'on
+# prend sciemment, pas un défaut qu'on subit sans le savoir.
+minimumReleaseAge: 10080
+
+# Une dépendance TRANSITIVE ne peut pas être tirée depuis une URL arbitraire, un
+# dépôt git ou une archive locale. Sans ce garde-fou, n'importe quel maillon de
+# l'arbre fait installer du code qui ne vient pas du registre — donc que ni
+# l'audit, ni `osv-scanner`, ni le fichier de verrouillage ne décrivent
+# réellement.
+blockExoticSubdeps: true
+
+# `no-downgrade` : une mise à jour de paquet ne peut pas AFFAIBLIR les réglages
+# de sécurité en vigueur. C'est la parade au scénario où le paquet compromis
+# commence par désactiver les protections qui l'auraient arrêté.
+trustPolicy: no-downgrade
+
+# Aucun script d'installation exécuté par défaut. Les exceptions sont nommées
+# une par une dans `onlyBuiltDependencies` ci-dessus — c'est là que
+# `postinstall` devient un choix explicite et non un droit acquis.
+dangerouslyAllowAllBuilds: false

@@ -1,0 +1,125 @@
+name: quality-extended
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 3 * * 1-5'
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    name: Lighthouse — performance and accessibility
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.4
+        env:
+          POSTGRES_DB: crm
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U crm -d crm"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
+      JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
+      NODE_ENV: production
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-node
+      - run: pnpm db:generate
+      - run: pnpm db:deploy
+      - run: pnpm db:seed
+      - run: pnpm --filter @crm/api build
+      - run: pnpm --filter @crm/web build
+      - name: Start API and web
+        run: |
+          pnpm --filter @crm/api start > /tmp/cpi-api.log 2>&1 &
+          pnpm --filter @crm/web start > /tmp/cpi-web.log 2>&1 &
+          npx --yes wait-on http://127.0.0.1:3001/health/live http://127.0.0.1:3000
+      - name: Lighthouse CI
+        run: |
+          npx --yes @lhci/cli@0.15.x autorun --config=tools/perf/lighthouserc.json
+
+  k6:
+    name: k6 — API latency and availability
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.4
+        env:
+          POSTGRES_DB: crm
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U crm -d crm"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
+      JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-node
+      - run: pnpm db:generate
+      - run: pnpm db:deploy
+      - run: pnpm --filter @crm/api build
+      - run: pnpm --filter @crm/api start > /tmp/cpi-api.log 2>&1 &
+      - run: npx --yes wait-on http://127.0.0.1:3001/health/ready
+      - name: k6
+        uses: grafana/k6-action@e4714b734f2b0afaabeb7b4a69142745548ab9ec # v0.3.1
+        with:
+          filename: tools/perf/api-smoke.js
+
+  mobile-maestro:
+    name: Maestro — Android smoke journey
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.41.7
+          channel: stable
+          cache: true
+      - working-directory: apps/mobile
+        run: |
+          flutter pub get
+          flutter build apk --debug
+      # `curl … | bash` remplacé par un téléchargement ÉPINGLÉ et VÉRIFIÉ.
+      #
+      # Le script d'installation officiel exécute, avec les droits du runner,
+      # tout ce que `get.maestro.mobile.dev` sert à cet instant précis : un
+      # détournement DNS, un compte CDN compromis ou une simple modification
+      # amont fait tourner du code arbitraire dans un job qui a accès au dépôt
+      # et aux secrets. Rien dans le pipeline ne le remarquerait.
+      #
+      # Ici la version est figée et l'archive est comparée à son empreinte
+      # SHA-256. Une archive substituée fait échouer `sha256sum -c` avant que
+      # quoi que ce soit ne s'exécute. Mettre à jour Maestro devient un commit
+      # explicite — tag et empreinte ensemble — au lieu d'un changement
+      # invisible et non daté.
+      - name: Install Maestro (pinned + checksum)
+        env:
+          MAESTRO_TAG: cli-2.8.0
+          MAESTRO_SHA256: b3e561161904fb391875ca5834d5b22cf0b01c052dd1b408ad83e30d8f8951b3
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /tmp/maestro.zip \
+            "https://github.com/mobile-dev-inc/maestro/releases/download/${MAESTRO_TAG}/maestro.zip"
+          echo "${MAESTRO_SHA256}  /tmp/maestro.zip" | sha256sum -c -
+          unzip -q /tmp/maestro.zip -d "${HOME}/.maestro-dist"
+          echo "${HOME}/.maestro-dist/maestro/bin" >> "${GITHUB_PATH}"
+      - name: Android smoke journey
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            adb install apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
+            maestro test .maestro/smoke.yaml
