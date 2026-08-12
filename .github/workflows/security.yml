@@ -95,6 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-node
 
       # osv-scanner et non `pnpm audit` seul : il lit AUSSI `pubspec.lock`, donc
       # les dépendances Dart de l'application mobile. `pnpm audit` ne connaît que
