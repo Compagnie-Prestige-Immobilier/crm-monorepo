@@ -1,0 +1,48 @@
+version: 2
+
+# `cooldown` est l'équivalent Dependabot de `minimumReleaseAge` de
+# pnpm-workspace.yaml : sept jours avant qu'une version fraîchement publiée
+# puisse être proposée.
+#
+# Sans lui, les deux réglages se contredisent — pnpm refuse d'installer une
+# version de moins de sept jours, et Dependabot ouvre quand même une PR pour
+# elle. Résultat : une PR rouge à l'installation que personne ne comprend, et
+# l'habitude prise de la fusionner de force. La protection ne tient que si les
+# deux bouts de la chaîne portent le même seuil.
+#
+# `semver-major` reste à sept jours lui aussi : un majeur malveillant n'est pas
+# moins dangereux qu'un correctif malveillant, il est seulement plus visible.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+      semver-major-days: 7
+      semver-minor-days: 7
+      semver-patch-days: 7
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    versioning-strategy: increase
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+      semver-major-days: 7
+      semver-minor-days: 7
+      semver-patch-days: 7
+
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 7
+      semver-major-days: 7
+      semver-minor-days: 7
+      semver-patch-days: 7

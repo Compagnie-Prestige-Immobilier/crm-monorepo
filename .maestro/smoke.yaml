@@ -1,0 +1,9 @@
+appId: sn.cpi.go
+---
+- launchApp:
+    clearState: true
+- assertVisible: "CPI GO"
+- assertVisible: "Se connecter"
+- tapOn: "Se connecter"
+- assertVisible: "Saisissez votre identifiant."
+- assertVisible: "Saisissez votre mot de passe."

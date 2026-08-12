@@ -1,0 +1,125 @@
+name: security
+
+# Trois scanners, trois questions différentes — et c'est pour cela qu'ils sont
+# tous les trois là plutôt qu'un seul :
+#
+#   gitleaks    « un secret a-t-il été commis ? »        → historique git
+#   semgrep     « le code contient-il un motif dangereux ? » → source
+#   osv-scanner « une dépendance est-elle vulnérable ? »  → fichiers de verrou
+#
+# Aucun ne couvre le domaine d'un autre. Un dépôt qui n'exécute que `pnpm audit`
+# ne verra jamais une clé AWS commise, et un dépôt qui n'exécute que gitleaks ne
+# verra jamais une injection SQL.
+on:
+  pull_request:
+    branches: [dev, prod]
+  push:
+    branches: [dev]
+  # Une dépendance saine aujourd'hui est vulnérable demain sans qu'une seule
+  # ligne du dépôt n'ait bougé. Sans exécution planifiée, on ne l'apprend qu'au
+  # prochain commit — c'est-à-dire peut-être jamais sur une branche stable.
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: dependency review — changed packages
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+
+  secrets:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # L'historique COMPLET. Avec le clone superficiel par défaut, gitleaks
+          # ne voit que le dernier commit — or un secret retiré au commit
+          # suivant est toujours un secret publié, et c'est exactement celui
+          # qu'on cherche.
+          fetch-depth: 0
+
+      - name: gitleaks
+        run: |
+          VERSION=8.30.4
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+          /tmp/gitleaks detect --source . --no-banner --redact --exit-code 1
+
+  sast:
+    name: semgrep
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:1.145.0
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # `--error` fait échouer le job sur toute règle déclenchée. Un scanner qui
+      # rapporte sans bloquer produit un tableau de bord que personne ne lit.
+      #
+      # Pas de `p/dart` : ce paquet de règles n'existe pas sur le registre
+      # Semgrep (404) et sa présence faisait ABANDONNER le scan entier en
+      # rendant « 0 finding » — un vert qui ne voulait rien dire.
+      - name: semgrep
+        run: |
+          semgrep scan \
+            --config=p/default \
+            --config=p/secrets \
+            --config=p/typescript \
+            --config=p/nodejs \
+            --config=p/react \
+            --config=p/sql-injection \
+            --config=p/jwt \
+            --config=p/owasp-top-ten \
+            --exclude=node_modules --exclude=build \
+            --exclude='*.g.dart' --exclude=.dart_tool \
+            --metrics=off --error
+
+  dependencies:
+    name: osv-scanner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # osv-scanner et non `pnpm audit` seul : il lit AUSSI `pubspec.lock`, donc
+      # les dépendances Dart de l'application mobile. `pnpm audit` ne connaît que
+      # npm et laisserait la moitié du monorepo non couverte.
+      - name: osv-scanner
+        run: |
+          VERSION=2.3.2
+          curl -sSfL -o /tmp/osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/v${VERSION}/osv-scanner_linux_amd64"
+          chmod +x /tmp/osv-scanner
+          /tmp/osv-scanner scan source \
+            --lockfile=pnpm-lock.yaml \
+            --lockfile=apps/mobile/pubspec.lock
+      - name: pnpm audit
+        run: pnpm audit --audit-level=high --prod
+
+  containers:
+    name: trivy — filesystem and configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
