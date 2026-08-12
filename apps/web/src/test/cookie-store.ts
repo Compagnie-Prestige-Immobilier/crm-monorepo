@@ -56,6 +56,7 @@ export class FakeCookieStore {
  * `vi.mock` est hissé mais que le magasin doit être neuf à chaque test.
  */
 export function mockCookies(): FakeCookieStore {
+  vi.doUnmock('next/headers');
   const store = new FakeCookieStore();
   vi.doMock('next/headers', () => ({
     cookies: () => Promise.resolve(store),
