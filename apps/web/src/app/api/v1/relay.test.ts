@@ -84,7 +84,7 @@ describe('relais en régime normal', () => {
 
   it('répond 401 sans appeler l’API quand il n’y a pas de session', async () => {
     vi.resetModules();
-    mockCookies(); // magasin vierge : aucun cookie de session
+    store = mockCookies(); // magasin vierge : aucun cookie de session
     const { GET } = await import('@/app/api/v1/[...path]/route');
 
     const response = await GET(relayRequest(), params(['prospects']));
