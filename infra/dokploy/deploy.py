@@ -156,7 +156,9 @@ def call(procedure: str, payload: dict | None = None, *, method: str = "POST"):
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=180) as response:
+        # DOKPLOY_URL is an operator-controlled deployment endpoint, not user
+        # input; urllib is used here to keep the provisioning tool dependency-free.
+        with urllib.request.urlopen(request, timeout=180) as response:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
             body = json.loads(response.read().decode())
     except urllib.error.HTTPError as exc:
         try:
