@@ -1,0 +1,438 @@
+-- Schéma local de CPI GO — miroir hors ligne de packages/database/prisma/schema.prisma.
+--
+-- Écrit en SQL et non en tables Dart, pour trois raisons qui sont toutes des
+-- contraintes du serveur qu'on doit reproduire au caractère près :
+--   1. l'index UNIQUE **partiel** (`WHERE deleted_at IS NULL`) n'est pas
+--      exprimable dans le DSL Dart de drift ;
+--   2. `ON UPDATE CASCADE` sur prospects.representant_id est porteur (voir plus
+--      bas) et doit apparaître tel quel dans le DDL ;
+--   3. les vues dérivent `sync_status` par jointure sur l'outbox — c'est du SQL,
+--      pas un modèle objet.
+--
+-- Les identifiants sont des UUID v7 générés PAR LE CLIENT. C'est ce qui rend la
+-- saisie hors ligne possible : un prospect peut pointer vers son représentant
+-- avant que l'un ou l'autre n'ait jamais vu le serveur.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Référentiels — tirés du serveur, jamais écrits localement
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE departements (
+    id TEXT NOT NULL PRIMARY KEY,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    region_id TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    rev INTEGER NOT NULL DEFAULT 1,
+    local_updated_at DATETIME NOT NULL,
+    server_updated_at DATETIME NULL,
+    deleted_at DATETIME NULL
+);
+
+CREATE INDEX departements_active_idx ON departements (is_active, name);
+
+CREATE TABLE banques (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    short_name TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    rev INTEGER NOT NULL DEFAULT 1,
+    local_updated_at DATETIME NOT NULL,
+    server_updated_at DATETIME NULL,
+    deleted_at DATETIME NULL
+);
+
+CREATE INDEX banques_active_idx ON banques (is_active, sort_order, name);
+
+CREATE TABLE syndicats (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    sigle TEXT NOT NULL,
+    secteur TEXT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    rev INTEGER NOT NULL DEFAULT 1,
+    local_updated_at DATETIME NOT NULL,
+    server_updated_at DATETIME NULL,
+    deleted_at DATETIME NULL
+);
+
+CREATE INDEX syndicats_active_idx ON syndicats (is_active, sort_order, name);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Métier
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE representants (
+    id TEXT NOT NULL PRIMARY KEY,
+    full_name TEXT NOT NULL,
+    -- Téléphone normalisé E.164. Clé de déduplication métier ; la normalisation
+    -- doit être IDENTIQUE ici et côté serveur, sinon la contrainte devient
+    -- aléatoire d'un appareil à l'autre.
+    phone_e164 TEXT NOT NULL,
+    notes TEXT NULL,
+    departement_id TEXT NOT NULL REFERENCES departements (id) ON UPDATE CASCADE,
+    created_by_id TEXT NOT NULL,
+    -- Horodatage de la saisie sur le terrain, distinct de l'arrivée en base :
+    -- les deux peuvent être séparés de plusieurs jours hors ligne.
+    client_created_at DATETIME NOT NULL,
+    rev INTEGER NOT NULL DEFAULT 1,
+    local_updated_at DATETIME NOT NULL,
+    server_updated_at DATETIME NULL,
+    deleted_at DATETIME NULL
+);
+
+-- Index UNIQUE **partiel**, copie conforme du serveur. Un `UNIQUE` ordinaire
+-- réserverait le numéro à vie après une suppression logique : le commercial
+-- supprime une fiche saisie par erreur, puis ne peut plus jamais ressaisir ce
+-- numéro, sans message compréhensible.
+CREATE UNIQUE INDEX representants_phone_unique
+    ON representants (phone_e164) WHERE deleted_at IS NULL;
+
+CREATE INDEX representants_departement_idx ON representants (departement_id);
+CREATE INDEX representants_created_idx ON representants (client_created_at DESC);
+
+CREATE TABLE prospects (
+    id TEXT NOT NULL PRIMARY KEY,
+    nom TEXT NOT NULL,
+    prenom TEXT NOT NULL,
+    phone_e164 TEXT NOT NULL,
+    banque_id TEXT NOT NULL REFERENCES banques (id) ON UPDATE CASCADE,
+    syndicat_id TEXT NOT NULL REFERENCES syndicats (id) ON UPDATE CASCADE,
+    -- ON UPDATE CASCADE est PORTEUR, pas décoratif. Quand un représentant saisi
+    -- hors ligne s'avère être un doublon d'une fiche déjà en base, la résolution
+    -- consiste à réécrire l'identifiant local vers l'identifiant serveur. La
+    -- cascade fait suivre tous les prospects rattachés en UNE instruction, au
+    -- lieu d'une boucle de rattrapage manuelle qui laisserait des orphelins si
+    -- elle était interrompue.
+    representant_id TEXT NOT NULL
+        REFERENCES representants (id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    created_by_id TEXT NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'NOUVEAU'
+        CHECK (statut IN ('NOUVEAU', 'CONTACTE', 'CONVERTI', 'PERDU')),
+    client_created_at DATETIME NOT NULL,
+    rev INTEGER NOT NULL DEFAULT 1,
+    local_updated_at DATETIME NOT NULL,
+    server_updated_at DATETIME NULL,
+    deleted_at DATETIME NULL
+);
+
+CREATE UNIQUE INDEX prospects_phone_unique
+    ON prospects (phone_e164) WHERE deleted_at IS NULL;
+
+CREATE INDEX prospects_representant_idx ON prospects (representant_id);
+CREATE INDEX prospects_created_idx ON prospects (client_created_at DESC);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Mécanique de synchronisation
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- File d'attente d'écriture. Toute écriture métier passe par ici : la base
+-- locale est la source de vérité tant que le lot n'a pas été accepté.
+--
+-- `seq` est la clé primaire AUTOINCREMENT et non `id`, parce que SQLite ne
+-- permet AUTOINCREMENT que sur un INTEGER PRIMARY KEY. C'est la seule écriture
+-- possible de « id TEXT + seq monotone » : `id` reste la clé logique (UNIQUE) et
+-- `seq` garantit un ordre d'émission strictement croissant et jamais réutilisé,
+-- y compris après purge des lignes terminées.
+CREATE TABLE outbox (
+    seq INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL UNIQUE,
+    -- Deux opérations qui partagent une dependency_key doivent partir dans
+    -- l'ordre de `seq` : c'est ce qui garantit qu'un prospect n'est jamais
+    -- poussé avant le représentant dont il dépend.
+    dependency_key TEXT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    op TEXT NOT NULL CHECK (op IN ('create', 'update', 'delete')),
+    payload TEXT NOT NULL,
+    -- Version du format de `payload`. Une app restée hors ligne trois semaines
+    -- peut avoir empilé des opérations dans un format que le code courant ne
+    -- produit plus ; sans ce numéro on ne saurait pas les relire.
+    payload_version INTEGER NOT NULL DEFAULT 1,
+    -- `rev` connue au moment de la mise en file. Le serveur refuse l'écriture si
+    -- sa propre `rev` a bougé entre-temps : c'est la détection de conflit.
+    base_rev INTEGER NULL,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'syncing', 'done', 'conflict', 'failed')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at DATETIME NOT NULL,
+    -- Bail pris par l'isolat qui traite la ligne. Sans bail, l'isolat WorkManager
+    -- et l'isolat UI peuvent envoyer la même opération deux fois.
+    lease_until DATETIME NULL,
+    batch_id TEXT NULL,
+    last_error_code TEXT NULL,
+    last_error_msg TEXT NULL,
+    created_at DATETIME NOT NULL
+);
+
+-- Index de sélection du prochain lot. L'ordre des colonnes suit exactement
+-- l'ordre du WHERE + ORDER BY du sélecteur d'outbox.
+CREATE INDEX outbox_ready_idx
+    ON outbox (status, next_attempt_at, dependency_key, seq);
+
+CREATE INDEX outbox_entity_idx ON outbox (entity_type, entity_id, status);
+
+-- Brouillons de formulaire. Distincts de l'outbox : un brouillon n'est PAS une
+-- intention d'écriture, c'est une saisie inachevée qu'on ne veut pas perdre si
+-- l'app est tuée par le système au milieu d'un formulaire.
+CREATE TABLE form_drafts (
+    draft_id TEXT NOT NULL PRIMARY KEY,
+    form_key TEXT NOT NULL,
+    entity_id TEXT NULL,
+    parent_id TEXT NULL,
+    payload TEXT NOT NULL,
+    step INTEGER NOT NULL DEFAULT 0,
+    schema_version INTEGER NOT NULL DEFAULT 1,
+    updated_at DATETIME NOT NULL
+);
+
+CREATE INDEX form_drafts_key_idx ON form_drafts (form_key, updated_at DESC);
+
+-- Curseur de pull par collection (keyset sur (updated_at, id) côté serveur).
+CREATE TABLE sync_state (
+    collection TEXT NOT NULL PRIMARY KEY,
+    cursor TEXT NULL,
+    last_pulled_at DATETIME NULL
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Phase 2 — annuaire d'enrôlement
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- SIX COLONNES, JAMAIS UNE DE PLUS. C'est une frontière de confidentialité, pas
+-- une préférence de modélisation.
+--
+-- Cette table est répliquée sur le téléphone PERSONNEL de chaque commercial,
+-- hors ligne, et couvre l'intégralité du portefeuille — 50 000 à 500 000 lignes.
+-- Y ajouter le nom, la banque ou le syndicat reviendrait à distribuer la base
+-- nominative complète à chaque terminal : une seule perte d'appareil suffirait
+-- à la faire fuiter. Le commercial n'a besoin que de savoir quel numéro il
+-- vient de composer et si le dossier est déjà réglé — le programme papier, lui,
+-- ne porte que des numéros, délibérément.
+--
+-- Un test compare l'ensemble des colonnes à cette liste exacte : ajouter un
+-- champ ici doit être un acte délibéré qui casse ce test.
+--
+-- Pas de `local_updated_at` ni de `server_updated_at` comme sur les tables
+-- métier : rien n'est jamais écrit ici depuis le terrain à part le miroir
+-- optimiste d'une issue terminale, et `rev` suffit à arbitrer un pull rejoué.
+CREATE TABLE phase2_directory (
+    prospect_id TEXT NOT NULL PRIMARY KEY,
+    -- Téléphone normalisé E.164, normalisé EXACTEMENT comme le serveur. C'est
+    -- la seule clé de recherche de l'écran : la saisie est comparée en égalité
+    -- stricte après normalisation, jamais en `LIKE`. Un `LIKE '%…%'` sur
+    -- 500 000 lignes n'utilise aucun index et prend des secondes sur un
+    -- téléphone d'entrée de gamme — soit, à l'échelle d'une pile d'appels, une
+    -- minute perdue toutes les vingt recherches.
+    phone_e164 TEXT NOT NULL,
+    phase2_status TEXT NOT NULL DEFAULT 'PENDING'
+        CHECK (phase2_status IN ('PENDING', 'METHOD_OBTAINED', 'REFUSED', 'WRONG_NUMBER')),
+    -- Renseignée si et seulement si `phase2_status` vaut METHOD_OBTAINED, comme
+    -- côté serveur.
+    enrollment_method TEXT NULL
+        CHECK (enrollment_method IS NULL
+               OR enrollment_method IN ('PLATFORM', 'PHYSICAL', 'VOICE_OR_ELECTRONIC_MESSAGING')),
+    rev INTEGER NOT NULL DEFAULT 1,
+    updated_at DATETIME NOT NULL
+);
+
+-- UNIQUE et non un simple index : le serveur garantit un numéro par prospect,
+-- et un doublon local ferait rendre à la recherche exacte deux lignes
+-- contradictoires — l'écran devrait alors choisir, ce qu'il ne peut pas faire.
+-- Pas d'index partiel ici : l'annuaire n'a pas de suppression logique, une
+-- ligne retirée du périmètre disparaît au pull suivant.
+CREATE UNIQUE INDEX phase2_directory_phone_unique ON phase2_directory (phone_e164);
+
+CREATE INDEX phase2_directory_status_idx ON phase2_directory (phase2_status);
+
+-- Tentatives d'appel saisies sur CE téléphone.
+--
+-- Distincte de l'outbox : l'outbox décrit une intention d'écriture et se vide,
+-- alors que cette table est le journal de ce que le commercial a réellement
+-- saisi. C'est elle qui alimente sa progression personnelle, y compris pour des
+-- lignes déjà acquittées par le serveur.
+--
+-- Les trois CHECK reproduisent au caractère près les contraintes de
+-- `call_attempts` côté PostgreSQL. Les répliquer ici n'est pas de la ceinture et
+-- des bretelles : sans elles, une saisie invalide s'enregistre sur le terrain,
+-- part dans la file, et n'est refusée qu'à la synchronisation — c'est-à-dire
+-- potentiellement trois semaines plus tard, à un moment où le commercial ne se
+-- souvient plus de l'appel et ne peut plus rien corriger.
+CREATE TABLE call_attempts (
+    -- UUID v7 engendré par le client. C'est la clé d'idempotence du serveur.
+    id TEXT NOT NULL PRIMARY KEY,
+    prospect_id TEXT NOT NULL,
+    outcome TEXT NOT NULL CHECK (outcome IN (
+        'METHOD_OBTAINED', 'UNREACHABLE', 'CALLBACK', 'REFUSED', 'WRONG_NUMBER', 'OTHER'
+    )),
+    method TEXT NULL
+        CHECK (method IS NULL
+               OR method IN ('PLATFORM', 'PHYSICAL', 'VOICE_OR_ELECTRONIC_MESSAGING')),
+    comment TEXT NULL,
+    client_created_at DATETIME NOT NULL,
+    created_by_id TEXT NOT NULL,
+    -- Méthode si et seulement si METHOD_OBTAINED.
+    CHECK ((outcome = 'METHOD_OBTAINED') = (method IS NOT NULL)),
+    -- OTHER exige un commentaire non vide.
+    CHECK (outcome <> 'OTHER' OR (comment IS NOT NULL AND length(trim(comment)) > 0)),
+    CHECK (comment IS NULL OR length(comment) <= 2000)
+);
+
+CREATE INDEX call_attempts_prospect_idx
+    ON call_attempts (prospect_id, client_created_at DESC);
+
+CREATE INDEX call_attempts_created_idx ON call_attempts (client_created_at DESC);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Vues — le statut de synchronisation est DÉRIVÉ, jamais stocké
+-- ─────────────────────────────────────────────────────────────────────────────
+--
+-- Il serait tentant d'ajouter une colonne `sync_status` sur representants et
+-- prospects. Elle se désynchroniserait de l'outbox la première fois qu'un chemin
+-- de code oublierait de la mettre à jour — et ce chemin existe toujours (retry,
+-- expiration de bail, purge). Ici la vue lit l'outbox : il n'y a rien à tenir
+-- à jour, donc rien à oublier.
+--
+-- « Tête d'opération » = l'opération non terminée de plus petit `seq` pour
+-- l'entité. C'est celle qui partira ensuite, donc celle qui décrit l'état
+-- courant visible par l'utilisateur.
+
+CREATE VIEW representant_sync_view AS
+SELECT
+    r.*,
+    CASE
+        WHEN o.status IS NOT NULL THEN o.status
+        WHEN r.server_updated_at IS NULL THEN 'draft'
+        ELSE 'synced'
+    END AS sync_status
+FROM representants AS r
+LEFT JOIN outbox AS o
+    ON o.entity_type = 'representant'
+    AND o.entity_id = r.id
+    AND o.status IN ('pending', 'syncing', 'conflict', 'failed')
+    AND o.seq = (
+        SELECT MIN(o2.seq) FROM outbox AS o2
+        WHERE o2.entity_type = 'representant'
+          AND o2.entity_id = r.id
+          AND o2.status IN ('pending', 'syncing', 'conflict', 'failed')
+    );
+
+CREATE VIEW prospect_sync_view AS
+SELECT
+    p.*,
+    CASE
+        -- `blocked` : le prospect lui-même va bien, mais son représentant est
+        -- coincé. Le pousser maintenant produirait une clé étrangère orpheline
+        -- côté serveur, donc l'UI doit le dire au lieu de laisser croire à une
+        -- file qui avance.
+        WHEN po.status IN ('conflict', 'failed')
+             AND (o.status IS NULL OR o.status NOT IN ('conflict', 'failed'))
+            THEN 'blocked'
+        WHEN o.status IS NOT NULL THEN o.status
+        WHEN p.server_updated_at IS NULL THEN 'draft'
+        ELSE 'synced'
+    END AS sync_status
+FROM prospects AS p
+LEFT JOIN outbox AS o
+    ON o.entity_type = 'prospect'
+    AND o.entity_id = p.id
+    AND o.status IN ('pending', 'syncing', 'conflict', 'failed')
+    AND o.seq = (
+        SELECT MIN(o2.seq) FROM outbox AS o2
+        WHERE o2.entity_type = 'prospect'
+          AND o2.entity_id = p.id
+          AND o2.status IN ('pending', 'syncing', 'conflict', 'failed')
+    )
+LEFT JOIN outbox AS po
+    ON po.entity_type = 'representant'
+    AND po.entity_id = p.representant_id
+    AND po.status IN ('pending', 'syncing', 'conflict', 'failed')
+    AND po.seq = (
+        SELECT MIN(po2.seq) FROM outbox AS po2
+        WHERE po2.entity_type = 'representant'
+          AND po2.entity_id = p.representant_id
+          AND po2.status IN ('pending', 'syncing', 'conflict', 'failed')
+    );
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Requêtes nommées
+-- ─────────────────────────────────────────────────────────────────────────────
+
+countRepresentants:
+    SELECT COUNT(*) AS c FROM representants WHERE deleted_at IS NULL;
+
+countProspects:
+    SELECT COUNT(*) AS c FROM prospects WHERE deleted_at IS NULL;
+
+countPendingOutbox:
+    SELECT COUNT(*) AS c FROM outbox
+    WHERE status IN ('pending', 'syncing', 'conflict', 'failed');
+
+countOutboxByStatus:
+    SELECT status, COUNT(*) AS c FROM outbox GROUP BY status;
+
+-- Prochain lot à émettre. Une seule opération par dependency_key : la suivante
+-- de la même chaîne n'a de sens qu'une fois celle-ci acquittée.
+-- `unixepoch()` et non une comparaison directe : les DATETIME sont stockés en
+-- texte ISO-8601 (voir build.yaml), et comparer deux textes date à date est
+-- correct par chance, pas par construction — un jour où l'un des deux porterait
+-- un décalage horaire, l'ordre lexicographique mentirait sans rien signaler.
+claimableOutbox:
+    SELECT * FROM outbox
+    WHERE status = 'pending'
+      AND unixepoch(next_attempt_at) <= unixepoch(:now)
+      AND (lease_until IS NULL OR unixepoch(lease_until) < unixepoch(:now))
+    ORDER BY seq ASC
+    LIMIT :maxRows;
+
+representantsWithStatus:
+    SELECT * FROM representant_sync_view
+    WHERE deleted_at IS NULL
+    ORDER BY client_created_at DESC;
+
+prospectsForRepresentant:
+    SELECT * FROM prospect_sync_view
+    WHERE representant_id = :representantId AND deleted_at IS NULL
+    ORDER BY client_created_at DESC;
+
+-- ── Phase 2 ──────────────────────────────────────────────────────────────────
+
+-- Recherche exacte. `= :phone` et jamais `LIKE` : le paramètre est déjà
+-- normalisé en E.164 par le client avec les mêmes règles que le serveur, donc
+-- l'égalité stricte est à la fois correcte et la seule forme que
+-- `phase2_directory_phone_unique` sait servir en O(log n).
+phase2ByPhone:
+    SELECT * FROM phase2_directory WHERE phone_e164 = :phone;
+
+countPhase2Directory:
+    SELECT COUNT(*) AS c FROM phase2_directory;
+
+-- Écritures de phase 2 encore en file. Distinct de `countPendingOutbox` : sur
+-- l'écran de phase 2, la question est « mes appels sont-ils partis ? », et y
+-- mêler la file de phase 1 afficherait un chiffre que rien sur cet écran ne
+-- permet de faire baisser.
+countPhase2Pending:
+    SELECT COUNT(*) AS c FROM outbox
+    WHERE entity_type = 'call_attempt'
+      AND status IN ('pending', 'syncing', 'conflict', 'failed');
+
+-- Progression PERSONNELLE : ce que ce commercial a saisi sur CET appareil.
+-- Ce n'est pas l'avancement de la campagne, et l'écran ne le présente pas comme
+-- tel — le programme officiel est le PDF papier.
+countMyAttempts:
+    SELECT COUNT(*) AS c FROM call_attempts;
+
+countMyMethods:
+    SELECT COUNT(*) AS c FROM call_attempts WHERE outcome = 'METHOD_OBTAINED';
+
+-- Dossiers que mes appels ont clos : les trois issues terminales.
+countMyClosed:
+    SELECT COUNT(*) AS c FROM call_attempts
+    WHERE outcome IN ('METHOD_OBTAINED', 'REFUSED', 'WRONG_NUMBER');
+
+attemptsForProspect:
+    SELECT * FROM call_attempts
+    WHERE prospect_id = :prospectId
+    ORDER BY client_created_at DESC;

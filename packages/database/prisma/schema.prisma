@@ -1,0 +1,770 @@
+// CRM Prospection CPI — schéma de données.
+//
+// Deux invariants gouvernent ce schéma :
+//
+// 1. Les identifiants de Representant et de Prospect sont générés PAR LE CLIENT
+//    (UUID v7) et non par la base. L'app mobile crée des lignes hors ligne :
+//    si la base attribuait les identifiants, chaque ligne locale aurait besoin
+//    d'une réconciliation d'identifiant à la synchronisation, et toute
+//    référence locale (un prospect pointant vers son représentant) deviendrait
+//    caduque. UUID v7 donne en prime un ordre lexicographique = ordre temporel.
+//
+// 2. Le numéro de téléphone normalisé en E.164 est la clé de déduplication
+//    métier, pour les deux entités. La normalisation doit être identique côté
+//    serveur et côté mobile, sinon la contrainte devient aléatoire.
+//
+//    L'unicité est un index PARTIEL (`WHERE deleted_at IS NULL`), posé en SQL
+//    brut dans la migration parce que Prisma ne sait pas exprimer un index
+//    partiel. Un `@unique` ordinaire réserverait le numéro à vie après une
+//    suppression logique : le commercial supprime une fiche saisie par erreur,
+//    puis ne peut plus jamais ressaisir ce numéro, sans le moindre message
+//    compréhensible. Voir prisma/migrations/*/partial_unique_phone.sql.
+//
+// L'identifiant client ne supprime PAS toute réconciliation : il supprime la
+// réconciliation d'IDENTIFIANT. Deux commerciaux qui rencontrent le même
+// représentant produisent deux UUID pour une seule personne réelle — le
+// téléphone les réunit, et c'est le seul remappage d'identifiant du système
+// (voir le service de synchronisation).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// L'URL vit dans prisma.config.ts, pas ici.
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  COMMERCIAL
+  BANQUE_FINANCE
+}
+
+// Prospection générale (phase 1). NE PAS confondre avec Phase2Status : les deux
+// décrivent des dimensions différentes du même prospect et évoluent
+// séparément.
+enum ProspectStatut {
+  NOUVEAU
+  CONTACTE
+  CONVERTI
+  PERDU
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 2 — collecte des méthodes d'enrôlement
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Phase2Status {
+  PENDING
+  METHOD_OBTAINED
+  REFUSED
+  WRONG_NUMBER
+}
+
+enum EnrollmentMethod {
+  PLATFORM
+  PHYSICAL
+  VOICE_OR_ELECTRONIC_MESSAGING
+}
+
+// BDD1..BDD4 ne sont PAS quatre bases physiques : ce sont des segments calculés
+// sur une base consolidée unique, par croisement du syndicat et de la banque.
+//
+//   BDD1  syndicat CHUES        banque CBAO
+//   BDD2  syndicat CHUES        banque ≠ CBAO
+//   BDD3  syndicat ≠ CHUES      banque CBAO
+//   BDD4  syndicat ≠ CHUES      banque ≠ CBAO
+//
+// Le segment n'est volontairement pas stocké sur Prospect : il dépend de deux
+// clés étrangères, donc une colonne dénormalisée se désynchroniserait dès qu'un
+// admin corrige la banque d'un prospect. Il est calculé par le helper partagé
+// `segment.ts`, seule définition autorisée — listes, campagnes, statistiques et
+// exports en dépendent tous.
+enum BddSegment {
+  BDD1
+  BDD2
+  BDD3
+  BDD4
+}
+
+enum CampaignScope {
+  BDD1
+  BDD2
+  BDD3
+  BDD4
+  ALL
+}
+
+enum CampaignStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum CallTaskStatus {
+  OPEN
+  DONE
+  CANCELLED
+}
+
+enum CallOutcome {
+  METHOD_OBTAINED
+  UNREACHABLE
+  CALLBACK
+  REFUSED
+  WRONG_NUMBER
+  OTHER
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Banque & Finance
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum BankStageType {
+  OPEN
+  CASHED
+  REJECTED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Identité
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid(7))
+  email        String    @unique
+  username     String    @unique
+  passwordHash String
+  fullName     String
+  phoneE164    String?
+  role         Role      @default(COMMERCIAL)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  refreshTokens RefreshToken[]
+  representants Representant[]
+  prospects     Prospect[]
+  syncBatches   SyncBatch[]
+  auditLogs     AuditLog[]
+
+  // Phase 2
+  enrollmentsCaptured  Prospect[]               @relation("ProspectEnrollmentCapturedBy")
+  campaignsCreated     CallCampaign[]           @relation("CallCampaignCreatedBy")
+  campaignMemberships  CallCampaignCommercial[] @relation("CallCampaignCommercial")
+  callTasksAssigned    CallTask[]               @relation("CallTaskAssignedTo")
+  callAttempts         CallAttempt[]            @relation("CallAttemptPerformedBy")
+
+  // Banque & Finance
+  bankCasesCreated     BankCase[]           @relation("BankCaseCreatedBy")
+  bankCasesUpdated     BankCase[]           @relation("BankCaseUpdatedBy")
+  bankCaseTransitions  BankCaseTransition[] @relation("BankCaseTransitionBy")
+
+  // Démonstration
+  appSettingsUpdated AppSetting[] @relation("AppSettingUpdatedBy")
+
+  @@index([role, isActive])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+// Un refresh token n'est jamais stocké en clair : seul son SHA-256 l'est. Une
+// fuite de la table ne donne donc pas de session utilisable.
+//
+// `familyId` implémente la détection de rejeu : chaque rotation crée un nouveau
+// token dans la même famille. Si un token déjà consommé (`revokedAt` non nul)
+// est représenté, c'est qu'il a été volé — toute la famille est révoquée d'un
+// coup et l'utilisateur doit se reconnecter.
+model RefreshToken {
+  id        String    @id @default(uuid(7))
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  familyId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Référentiels — synchronisés en lecture seule vers le mobile
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Region {
+  id           String        @id @default(uuid(7))
+  code         String        @unique
+  name         String        @unique
+  departements Departement[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("regions")
+}
+
+model Departement {
+  id       String @id @default(uuid(7))
+  code     String @unique
+  name     String
+  regionId String
+  region   Region @relation(fields: [regionId], references: [id], onDelete: Restrict)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  representants Representant[]
+
+  @@unique([regionId, name])
+  @@index([updatedAt])
+  @@map("departements")
+}
+
+model Banque {
+  id        String   @id @default(uuid(7))
+  name      String   @unique
+  shortName String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prospects Prospect[]
+  bankCases BankCase[]
+
+  @@index([updatedAt])
+  @@map("banques")
+}
+
+model Syndicat {
+  id        String   @id @default(uuid(7))
+  name      String   @unique
+  sigle     String   @unique
+  secteur   String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prospects Prospect[]
+
+  @@index([updatedAt])
+  @@map("syndicats")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Métier
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Representant {
+  id        String  @id // UUID v7 généré par le client, jamais par la base
+  fullName  String
+  // Unicité posée en index partiel dans la migration, pas ici. Voir l'en-tête.
+  phoneE164 String
+  notes     String?
+
+  // Incrémenté à chaque écriture serveur. Sert au client à ignorer une page de
+  // pull plus ancienne que ce qu'il a déjà (`WHERE excluded.rev > rev`).
+  rev Int @default(1)
+
+  departementId String
+  departement   Departement @relation(fields: [departementId], references: [id], onDelete: Restrict)
+
+  // Le commercial qui l'a saisi le premier. Ne change pas si un autre commercial
+  // rattache ensuite des prospects au même représentant — la paternité de la
+  // ligne prospect suffit à tracer qui a apporté quoi.
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  // Horodatage de la saisie sur le terrain, distinct de `createdAt` qui est
+  // l'arrivée en base. Les deux peuvent être séparés de plusieurs jours si le
+  // commercial est resté hors ligne — les statistiques d'activité s'appuient
+  // sur `clientCreatedAt`.
+  clientCreatedAt DateTime
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  prospects Prospect[]
+
+  @@index([phoneE164])
+  @@index([createdById])
+  @@index([departementId])
+  // Index de pagination du pull delta : keyset sur (updatedAt, id).
+  @@index([updatedAt, id])
+  @@index([deletedAt])
+  @@map("representants")
+}
+
+model Prospect {
+  id        String @id // UUID v7 généré par le client
+  nom       String
+  prenom    String
+  // Unicité posée en index partiel dans la migration, pas ici.
+  phoneE164 String
+
+  rev Int @default(1)
+
+  banqueId   String
+  banque     Banque   @relation(fields: [banqueId], references: [id], onDelete: Restrict)
+  syndicatId String
+  syndicat   Syndicat @relation(fields: [syndicatId], references: [id], onDelete: Restrict)
+
+  // onUpdate: Cascade est porteur. Quand un représentant saisi hors ligne
+  // s'avère être un doublon d'une fiche déjà en base, la résolution consiste à
+  // réécrire l'identifiant local vers l'identifiant serveur. La cascade fait
+  // suivre les prospects rattachés en une instruction au lieu d'une boucle de
+  // rattrapage manuelle.
+  representantId String
+  representant   Representant @relation(fields: [representantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  statut ProspectStatut @default(NOUVEAU)
+
+  // ── Phase 2 : méthode d'enrôlement ──────────────────────────────────────
+  // Dimension indépendante de `statut`. Invariant applicatif, testé :
+  // `enrollmentMethod` est OBLIGATOIRE si et seulement si
+  // `phase2Status = METHOD_OBTAINED`, et NULL pour tous les autres statuts.
+  // Il est aussi posé en contrainte CHECK dans la migration, pour qu'aucun
+  // chemin d'écriture — y compris un correctif SQL manuel — ne puisse le violer.
+  phase2Status     Phase2Status      @default(PENDING)
+  enrollmentMethod EnrollmentMethod?
+  enrollmentCapturedAt   DateTime?
+  enrollmentCapturedById String?
+  enrollmentCapturedBy   User?       @relation("ProspectEnrollmentCapturedBy", fields: [enrollmentCapturedById], references: [id], onDelete: SetNull)
+
+  clientCreatedAt DateTime
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  callTasks    CallTask[]
+  callAttempts CallAttempt[]
+  bankCases    BankCase[]
+
+  @@index([phoneE164])
+  @@index([representantId])
+  @@index([createdById])
+  @@index([banqueId])
+  @@index([syndicatId])
+  @@index([statut])
+  @@index([clientCreatedAt])
+  @@index([updatedAt, id])
+  @@index([deletedAt])
+  // Le segment BDD est calculé par croisement (syndicatId, banqueId) : cet
+  // index composite sert le filtrage par segment sur 500 000 lignes sans
+  // dénormaliser une colonne qui se désynchroniserait.
+  @@index([syndicatId, banqueId])
+  @@index([phase2Status])
+  @@index([enrollmentMethod])
+  @@map("prospects")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mécanique de synchronisation
+// ─────────────────────────────────────────────────────────────────────────────
+
+// L'idempotence tient sur DEUX niveaux. Aucun des deux ne suffit seul.
+//
+// Niveau 1 — le lot. Le mobile envoie `Idempotency-Key: <batchId>`. Si le
+// réseau coupe après que le serveur a écrit mais avant que la réponse n'arrive,
+// le client rejoue le lot identique et retrouve ici la réponse mémorisée.
+//
+// Niveau 2 — l'opération (modèle SyncOperation). Indispensable parce que le
+// niveau 1 ne couvre PAS le cas réel suivant : 3 opérations sur 5 passent, le
+// client reconstitue un lot DIFFÉRENT sous un NOUVEAU batchId. La clé de lot ne
+// reconnaît rien ; seules les clés par opération rendent ce rejeu sûr.
+//
+// La clé primaire composite (userId, key) empêche le rejeu d'une clé volée par
+// un autre compte.
+//
+// `requestHash` détecte la réutilisation d'une clé avec un corps différent :
+// c'est un bug client, on refuse plutôt que de renvoyer silencieusement une
+// réponse sans rapport.
+//
+// L'insertion du marqueur `IN_PROGRESS` se fait dans sa PROPRE transaction,
+// AVANT la transaction de travail. Placée dedans, un rollback l'effacerait et
+// le rejeu réécrirait — c'est l'erreur classique sur ce motif.
+model SyncBatch {
+  key         String     @map("idempotency_key")
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestHash String
+  status      BatchStatus @default(IN_PROGRESS)
+  httpStatus  Int?
+  responseJson Json?
+  createdAt   DateTime   @default(now())
+  completedAt DateTime?
+  expiresAt   DateTime
+
+  operations SyncOperation[]
+
+  @@id([userId, key])
+  @@index([expiresAt])
+  @@map("sync_batches")
+}
+
+enum BatchStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum OperationResult {
+  APPLIED
+  DUPLICATE
+  CONFLICT
+  INVALID
+  SKIPPED_DEPENDENCY_FAILED
+}
+
+model SyncOperation {
+  opId       String          @id
+  userId     String
+  batchKey   String
+  batch      SyncBatch       @relation(fields: [userId, batchKey], references: [userId, key], onDelete: Cascade)
+  entityType String
+  entityId   String
+  result     OperationResult
+  resultJson Json?
+  appliedAt  DateTime        @default(now())
+
+  @@index([userId, appliedAt])
+  @@index([entityId])
+  @@map("sync_operations")
+}
+
+model AuditLog {
+  id       String   @id @default(uuid(7))
+  userId   String?
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action   String
+  entity   String
+  entityId String
+  before   Json?
+  after    Json?
+  at       DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId, at])
+  @@index([at])
+  @@map("audit_logs")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Phase 2 — campagnes d'appels et collecte des méthodes
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Une campagne fige une répartition. La graine de mélange est PERSISTÉE parce
+// que la répartition doit être reproductible et surtout stable : consulter la
+// campagne ou retélécharger un PDF ne doit jamais retirer au sort. Les
+// affectations sont matérialisées dans CallTask ; la graine ne sert qu'à
+// pouvoir rejouer et auditer le tirage.
+model CallCampaign {
+  id       String         @id @default(uuid(7))
+  name     String
+  scope    CampaignScope
+  seed     String
+  status   CampaignStatus @default(ACTIVE)
+
+  createdById String
+  createdBy   User   @relation("CallCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  closedAt  DateTime?
+
+  commerciaux CallCampaignCommercial[]
+  tasks       CallTask[]
+  attempts    CallAttempt[]
+
+  @@index([status, createdAt])
+  @@map("call_campaigns")
+}
+
+model CallCampaignCommercial {
+  id         String       @id @default(uuid(7))
+  campaignId String
+  campaign   CallCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User         @relation("CallCampaignCommercial", fields: [userId], references: [id], onDelete: Restrict)
+  // Rang dans le round-robin. Fige l'ordre de distribution, donc le contenu de
+  // chaque PDF, indépendamment de l'ordre de lecture en base.
+  position   Int
+
+  @@unique([campaignId, userId])
+  @@unique([campaignId, position])
+  @@map("call_campaign_commerciaux")
+}
+
+// Une tâche est une ligne du programme papier d'un commercial.
+//
+// `isActive` est une colonne dédiée plutôt qu'un simple `status = OPEN` : elle
+// porte l'index unique partiel qui interdit deux tâches actives sur le même
+// prospect. Sans lui, deux campagnes simultanées pourraient distribuer le même
+// numéro à deux commerciaux.
+model CallTask {
+  id         String       @id @default(uuid(7))
+  campaignId String
+  campaign   CallCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  prospectId String
+  prospect   Prospect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  assignedToId String
+  assignedTo   User   @relation("CallTaskAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+
+  // Rang dans le PDF du commercial, à partir de 1. L'ordre du PDF doit être
+  // exactement celui-ci : c'est ce qui rend le papier et l'écran cohérents.
+  position Int
+
+  status   CallTaskStatus @default(OPEN)
+  isActive Boolean        @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  attempts CallAttempt[]
+
+  @@unique([campaignId, prospectId])
+  @@unique([campaignId, assignedToId, position])
+  @@index([assignedToId, status])
+  @@index([prospectId])
+  @@map("call_tasks")
+}
+
+// Historique append-only des tentatives. Une tentative n'est jamais modifiée.
+//
+// `performedById` est le commercial qui a RÉELLEMENT passé l'appel, distinct de
+// `CallTask.assignedToId`. N'importe quel commercial authentifié peut compléter
+// un numéro trouvé dans l'annuaire, y compris un numéro attribué à un collègue :
+// il faut donc conserver les deux pour que l'attribution reste juste.
+model CallAttempt {
+  // UUID v7 généré par le mobile — sert aussi de clé d'idempotence.
+  id         String       @id
+  prospectId String
+  prospect   Prospect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  taskId     String?
+  task       CallTask?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  campaignId String?
+  campaign   CallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  performedById String
+  performedBy   User   @relation("CallAttemptPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+
+  outcome CallOutcome
+  method  EnrollmentMethod?
+  // Obligatoire quand outcome = OTHER, facultatif sinon. Contrainte CHECK.
+  comment String?
+
+  clientCreatedAt DateTime
+  createdAt       DateTime @default(now())
+
+  @@index([prospectId, createdAt])
+  @@index([performedById, createdAt])
+  @@index([campaignId])
+  @@map("call_attempts")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Banque & Finance
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Étapes du workflow, configurables par l'ADMIN — mais seulement les étapes
+// OPEN intermédiaires. Les trois étapes système (initiale, encaissé, rejeté)
+// portent des règles financières fixes et ne peuvent être ni supprimées ni
+// désactivées.
+//
+// Une étape n'est JAMAIS supprimée physiquement dès lors qu'elle apparaît dans
+// l'historique : la timeline d'un dossier clos doit rester lisible des années
+// après qu'une étape a été retirée du workflow courant.
+model BankCaseStage {
+  id       String        @id @default(uuid(7))
+  code     String        @unique
+  label    String
+  position Int
+  color    String
+  type     BankStageType
+
+  isActive  Boolean @default(true)
+  isInitial Boolean @default(false)
+  isSystem  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  casesCurrent    BankCase[]           @relation("BankCaseCurrentStage")
+  transitionsFrom BankCaseTransition[] @relation("BankCaseTransitionFrom")
+  transitionsTo   BankCaseTransition[] @relation("BankCaseTransitionTo")
+
+  @@index([type, isActive, position])
+  @@map("bank_case_stages")
+}
+
+// Référentiel des motifs de rejet, géré par l'ADMIN. En référentiel plutôt
+// qu'en texte libre parce que le tableau de bord affiche une répartition des
+// motifs : sur du texte saisi à la main, ce graphique serait illisible.
+// `BankCase.rejectionDetail` reste disponible pour la précision libre.
+model BankRejectionReason {
+  id        String   @id @default(uuid(7))
+  code      String   @unique
+  label     String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cases       BankCase[]
+  transitions BankCaseTransition[]
+
+  @@map("bank_rejection_reasons")
+}
+
+model BankCase {
+  id String @id @default(uuid(7))
+
+  // `reference` est la saisie de l'agent, affichée telle quelle.
+  // `referenceKey` est sa forme normalisée (majuscules, espaces compactés) et
+  // porte l'unicité globale : « ABC-123 » et « abc 123 » sont la même référence.
+  reference    String
+  referenceKey String @unique
+
+  prospectId String
+  prospect   Prospect @relation(fields: [prospectId], references: [id], onDelete: Restrict)
+
+  // Identité COPIÉE à la création, volontairement dénormalisée. Un dossier
+  // bancaire est une pièce à valeur historique : si un admin corrige plus tard
+  // le nom ou le téléphone du prospect, le dossier doit continuer de refléter
+  // ce qui a été transmis à la banque ce jour-là.
+  customerName      String
+  customerPhoneE164 String
+
+  processingBankId String
+  processingBank   Banque @relation(fields: [processingBankId], references: [id], onDelete: Restrict)
+
+  currentStageId String
+  currentStage   BankCaseStage @relation("BankCaseCurrentStage", fields: [currentStageId], references: [id], onDelete: Restrict)
+
+  // XOF n'a pas de décimales. Decimal(18,0) plutôt qu'un flottant, et exposé en
+  // chaîne dans l'API : un montant qui transite en JSON number peut perdre de
+  // la précision au-delà de 2^53.
+  amountXof Decimal? @db.Decimal(18, 0)
+
+  rejectionReasonId String?
+  rejectionReason   BankRejectionReason? @relation(fields: [rejectionReasonId], references: [id], onDelete: Restrict)
+  rejectionDetail   String?
+
+  // Concurrence optimiste. Deux agents sur la même révision : le second reçoit
+  // BANK_CASE_REV_CONFLICT et recharge au lieu d'écraser en silence.
+  rev Int @default(1)
+
+  createdById String
+  createdBy   User   @relation("BankCaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById String?
+  updatedBy   User?  @relation("BankCaseUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  transitions BankCaseTransition[]
+
+  @@index([currentStageId])
+  @@index([processingBankId])
+  @@index([createdById])
+  @@index([prospectId])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("bank_cases")
+}
+
+// Historique append-only. Chaque changement de statut écrit une transition ET
+// met à jour le dossier dans la MÊME transaction : un dossier ne peut pas
+// avancer sans laisser de trace, ni laisser une trace sans avoir avancé.
+model BankCaseTransition {
+  id     String   @id @default(uuid(7))
+  caseId String
+  case   BankCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  fromStageId String?
+  fromStage   BankCaseStage? @relation("BankCaseTransitionFrom", fields: [fromStageId], references: [id], onDelete: Restrict)
+  toStageId   String
+  toStage     BankCaseStage  @relation("BankCaseTransitionTo", fields: [toStageId], references: [id], onDelete: Restrict)
+
+  performedById String
+  performedBy   User   @relation("BankCaseTransitionBy", fields: [performedById], references: [id], onDelete: Restrict)
+
+  amountXof         Decimal?             @db.Decimal(18, 0)
+  rejectionReasonId String?
+  rejectionReason   BankRejectionReason? @relation(fields: [rejectionReasonId], references: [id], onDelete: Restrict)
+  rejectionDetail   String?
+  comment           String?
+
+  // Renseigné uniquement quand un ADMIN corrige un dossier terminal. Sa
+  // présence est ce qui distingue une correction d'une avancée normale.
+  correctionReason String?
+
+  clientAt  DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([caseId, createdAt])
+  @@index([performedById, createdAt])
+  @@index([toStageId])
+  @@map("bank_case_transitions")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Mode démonstration
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Réglages de la plateforme, en clé/valeur. Une table plutôt qu'une variable
+/// d'environnement : l'interrupteur se manœuvre depuis le panel admin, en
+/// production, sans redéploiement.
+model AppSetting {
+  key         String   @id
+  value       String
+  updatedById String?
+  updatedBy   User?    @relation("AppSettingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedAt   DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+/// Registre EXACT de tout ce que le semeur de démonstration a créé.
+///
+/// C'est la pièce qui rend l'interrupteur sûr. Désactiver le mode démo supprime
+/// précisément les identifiants listés ici, et rien d'autre.
+///
+/// L'alternative — supprimer par heuristique, « tout ce dont le nom commence
+/// par Démo » ou « tout ce qui a été créé après telle date » — est à proscrire :
+/// le jour où un vrai commercial saisit un prospect pendant une démonstration,
+/// l'heuristique l'efface, et personne ne comprend pourquoi la fiche a disparu.
+///
+/// `sequence` fixe l'ordre de création ; la suppression le parcourt à l'envers,
+/// ce qui satisfait les clés étrangères sans coder de tri topologique.
+model DemoEntity {
+  id         String   @id @default(uuid(7))
+  entityType String
+  entityId   String
+  sequence   Int
+  createdAt  DateTime @default(now())
+
+  @@unique([entityType, entityId])
+  @@index([sequence])
+  @@map("demo_entities")
+}

@@ -1,0 +1,47 @@
+name: deploy
+
+# Le déploiement ne se déclenche QUE sur `prod`.
+#
+# `prod` n'accepte aucun push direct — la règle de dépôt l'interdit, force push
+# compris — donc le seul chemin qui arrive ici est la fusion d'une pull request
+# dont la CI est passée. Le déclencheur et la protection de branche sont deux
+# moitiés de la même garantie : sans la protection, ce workflow déploierait
+# n'importe quel `git push --force` ; sans le déclencheur, la protection ne
+# servirait qu'à ralentir les fusions.
+on:
+  push:
+    branches: [prod]
+  # Rejouer un déploiement sans refaire une PR — après une panne d'un service
+  # externe, par exemple, où le commit est bon et c'est l'exécution qui a
+  # échoué.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Deux déploiements simultanés sur le même environnement se marchent dessus et
+# le gagnant est celui qui finit en dernier, pas celui qui porte le code le plus
+# récent. `cancel-in-progress: false` : on laisse le déploiement en cours finir
+# proprement plutôt que de l'interrompre à mi-parcours.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO(deploy): brancher la cible réelle (registre d'images, serveur,
+      # migrations Prisma). Laissé explicite plutôt que deviné : un workflow qui
+      # prétend déployer sans le faire est pire que pas de workflow du tout —
+      # il rend vert un déploiement qui n'a pas eu lieu.
+      - name: Cible de déploiement non configurée
+        run: |
+          echo "::error::Aucune cible de déploiement configurée."
+          echo "Renseigner les secrets de l'environnement 'production' puis"
+          echo "remplacer cette étape par le déploiement réel."
+          exit 1

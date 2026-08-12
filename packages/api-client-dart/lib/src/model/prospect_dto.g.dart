@@ -1,0 +1,610 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'prospect_dto.dart';
+
+// **************************************************************************
+// CopyWithGenerator
+// **************************************************************************
+
+abstract class _$ProspectDtoCWProxy {
+  ProspectDto id(String id);
+
+  ProspectDto nom(String nom);
+
+  ProspectDto prenom(String prenom);
+
+  ProspectDto phoneE164(String phoneE164);
+
+  ProspectDto rev(num rev);
+
+  ProspectDto statut(ProspectStatut statut);
+
+  ProspectDto banqueId(String banqueId);
+
+  ProspectDto banqueName(String banqueName);
+
+  ProspectDto syndicatId(String syndicatId);
+
+  ProspectDto syndicatSigle(String syndicatSigle);
+
+  ProspectDto representantId(String representantId);
+
+  ProspectDto representantName(String representantName);
+
+  ProspectDto representantPhoneE164(String representantPhoneE164);
+
+  ProspectDto departementId(String departementId);
+
+  ProspectDto departementName(String departementName);
+
+  ProspectDto ownedByCommercialId(String ownedByCommercialId);
+
+  ProspectDto ownedByCommercialName(String ownedByCommercialName);
+
+  ProspectDto segment(BddSegment segment);
+
+  ProspectDto phase2Status(Phase2Status phase2Status);
+
+  ProspectDto enrollmentMethod(EnrollmentMethod? enrollmentMethod);
+
+  ProspectDto enrollmentCapturedById(String? enrollmentCapturedById);
+
+  ProspectDto enrollmentCapturedByName(String? enrollmentCapturedByName);
+
+  ProspectDto enrollmentCapturedAt(DateTime? enrollmentCapturedAt);
+
+  ProspectDto lastOutcome(CallOutcome? lastOutcome);
+
+  ProspectDto lastComment(String? lastComment);
+
+  ProspectDto lastAttemptAt(DateTime? lastAttemptAt);
+
+  ProspectDto clientCreatedAt(DateTime clientCreatedAt);
+
+  ProspectDto createdAt(DateTime createdAt);
+
+  ProspectDto updatedAt(DateTime updatedAt);
+
+  ProspectDto deletedAt(DateTime? deletedAt);
+
+  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ProspectDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
+  ///
+  /// Usage
+  /// ```dart
+  /// ProspectDto(...).copyWith(id: 12, name: "My name")
+  /// ````
+  ProspectDto call({
+    String id,
+    String nom,
+    String prenom,
+    String phoneE164,
+    num rev,
+    ProspectStatut statut,
+    String banqueId,
+    String banqueName,
+    String syndicatId,
+    String syndicatSigle,
+    String representantId,
+    String representantName,
+    String representantPhoneE164,
+    String departementId,
+    String departementName,
+    String ownedByCommercialId,
+    String ownedByCommercialName,
+    BddSegment segment,
+    Phase2Status phase2Status,
+    EnrollmentMethod? enrollmentMethod,
+    String? enrollmentCapturedById,
+    String? enrollmentCapturedByName,
+    DateTime? enrollmentCapturedAt,
+    CallOutcome? lastOutcome,
+    String? lastComment,
+    DateTime? lastAttemptAt,
+    DateTime clientCreatedAt,
+    DateTime createdAt,
+    DateTime updatedAt,
+    DateTime? deletedAt,
+  });
+}
+
+/// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfProspectDto.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfProspectDto.copyWith.fieldName(...)`
+class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
+  const _$ProspectDtoCWProxyImpl(this._value);
+
+  final ProspectDto _value;
+
+  @override
+  ProspectDto id(String id) => this(id: id);
+
+  @override
+  ProspectDto nom(String nom) => this(nom: nom);
+
+  @override
+  ProspectDto prenom(String prenom) => this(prenom: prenom);
+
+  @override
+  ProspectDto phoneE164(String phoneE164) => this(phoneE164: phoneE164);
+
+  @override
+  ProspectDto rev(num rev) => this(rev: rev);
+
+  @override
+  ProspectDto statut(ProspectStatut statut) => this(statut: statut);
+
+  @override
+  ProspectDto banqueId(String banqueId) => this(banqueId: banqueId);
+
+  @override
+  ProspectDto banqueName(String banqueName) => this(banqueName: banqueName);
+
+  @override
+  ProspectDto syndicatId(String syndicatId) => this(syndicatId: syndicatId);
+
+  @override
+  ProspectDto syndicatSigle(String syndicatSigle) =>
+      this(syndicatSigle: syndicatSigle);
+
+  @override
+  ProspectDto representantId(String representantId) =>
+      this(representantId: representantId);
+
+  @override
+  ProspectDto representantName(String representantName) =>
+      this(representantName: representantName);
+
+  @override
+  ProspectDto representantPhoneE164(String representantPhoneE164) =>
+      this(representantPhoneE164: representantPhoneE164);
+
+  @override
+  ProspectDto departementId(String departementId) =>
+      this(departementId: departementId);
+
+  @override
+  ProspectDto departementName(String departementName) =>
+      this(departementName: departementName);
+
+  @override
+  ProspectDto ownedByCommercialId(String ownedByCommercialId) =>
+      this(ownedByCommercialId: ownedByCommercialId);
+
+  @override
+  ProspectDto ownedByCommercialName(String ownedByCommercialName) =>
+      this(ownedByCommercialName: ownedByCommercialName);
+
+  @override
+  ProspectDto segment(BddSegment segment) => this(segment: segment);
+
+  @override
+  ProspectDto phase2Status(Phase2Status phase2Status) =>
+      this(phase2Status: phase2Status);
+
+  @override
+  ProspectDto enrollmentMethod(EnrollmentMethod? enrollmentMethod) =>
+      this(enrollmentMethod: enrollmentMethod);
+
+  @override
+  ProspectDto enrollmentCapturedById(String? enrollmentCapturedById) =>
+      this(enrollmentCapturedById: enrollmentCapturedById);
+
+  @override
+  ProspectDto enrollmentCapturedByName(String? enrollmentCapturedByName) =>
+      this(enrollmentCapturedByName: enrollmentCapturedByName);
+
+  @override
+  ProspectDto enrollmentCapturedAt(DateTime? enrollmentCapturedAt) =>
+      this(enrollmentCapturedAt: enrollmentCapturedAt);
+
+  @override
+  ProspectDto lastOutcome(CallOutcome? lastOutcome) =>
+      this(lastOutcome: lastOutcome);
+
+  @override
+  ProspectDto lastComment(String? lastComment) =>
+      this(lastComment: lastComment);
+
+  @override
+  ProspectDto lastAttemptAt(DateTime? lastAttemptAt) =>
+      this(lastAttemptAt: lastAttemptAt);
+
+  @override
+  ProspectDto clientCreatedAt(DateTime clientCreatedAt) =>
+      this(clientCreatedAt: clientCreatedAt);
+
+  @override
+  ProspectDto createdAt(DateTime createdAt) => this(createdAt: createdAt);
+
+  @override
+  ProspectDto updatedAt(DateTime updatedAt) => this(updatedAt: updatedAt);
+
+  @override
+  ProspectDto deletedAt(DateTime? deletedAt) => this(deletedAt: deletedAt);
+
+  @override
+  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ProspectDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
+  ///
+  /// Usage
+  /// ```dart
+  /// ProspectDto(...).copyWith(id: 12, name: "My name")
+  /// ````
+  ProspectDto call({
+    Object? id = const $CopyWithPlaceholder(),
+    Object? nom = const $CopyWithPlaceholder(),
+    Object? prenom = const $CopyWithPlaceholder(),
+    Object? phoneE164 = const $CopyWithPlaceholder(),
+    Object? rev = const $CopyWithPlaceholder(),
+    Object? statut = const $CopyWithPlaceholder(),
+    Object? banqueId = const $CopyWithPlaceholder(),
+    Object? banqueName = const $CopyWithPlaceholder(),
+    Object? syndicatId = const $CopyWithPlaceholder(),
+    Object? syndicatSigle = const $CopyWithPlaceholder(),
+    Object? representantId = const $CopyWithPlaceholder(),
+    Object? representantName = const $CopyWithPlaceholder(),
+    Object? representantPhoneE164 = const $CopyWithPlaceholder(),
+    Object? departementId = const $CopyWithPlaceholder(),
+    Object? departementName = const $CopyWithPlaceholder(),
+    Object? ownedByCommercialId = const $CopyWithPlaceholder(),
+    Object? ownedByCommercialName = const $CopyWithPlaceholder(),
+    Object? segment = const $CopyWithPlaceholder(),
+    Object? phase2Status = const $CopyWithPlaceholder(),
+    Object? enrollmentMethod = const $CopyWithPlaceholder(),
+    Object? enrollmentCapturedById = const $CopyWithPlaceholder(),
+    Object? enrollmentCapturedByName = const $CopyWithPlaceholder(),
+    Object? enrollmentCapturedAt = const $CopyWithPlaceholder(),
+    Object? lastOutcome = const $CopyWithPlaceholder(),
+    Object? lastComment = const $CopyWithPlaceholder(),
+    Object? lastAttemptAt = const $CopyWithPlaceholder(),
+    Object? clientCreatedAt = const $CopyWithPlaceholder(),
+    Object? createdAt = const $CopyWithPlaceholder(),
+    Object? updatedAt = const $CopyWithPlaceholder(),
+    Object? deletedAt = const $CopyWithPlaceholder(),
+  }) {
+    return ProspectDto(
+      id: id == const $CopyWithPlaceholder()
+          ? _value.id
+          // ignore: cast_nullable_to_non_nullable
+          : id as String,
+      nom: nom == const $CopyWithPlaceholder()
+          ? _value.nom
+          // ignore: cast_nullable_to_non_nullable
+          : nom as String,
+      prenom: prenom == const $CopyWithPlaceholder()
+          ? _value.prenom
+          // ignore: cast_nullable_to_non_nullable
+          : prenom as String,
+      phoneE164: phoneE164 == const $CopyWithPlaceholder()
+          ? _value.phoneE164
+          // ignore: cast_nullable_to_non_nullable
+          : phoneE164 as String,
+      rev: rev == const $CopyWithPlaceholder()
+          ? _value.rev
+          // ignore: cast_nullable_to_non_nullable
+          : rev as num,
+      statut: statut == const $CopyWithPlaceholder()
+          ? _value.statut
+          // ignore: cast_nullable_to_non_nullable
+          : statut as ProspectStatut,
+      banqueId: banqueId == const $CopyWithPlaceholder()
+          ? _value.banqueId
+          // ignore: cast_nullable_to_non_nullable
+          : banqueId as String,
+      banqueName: banqueName == const $CopyWithPlaceholder()
+          ? _value.banqueName
+          // ignore: cast_nullable_to_non_nullable
+          : banqueName as String,
+      syndicatId: syndicatId == const $CopyWithPlaceholder()
+          ? _value.syndicatId
+          // ignore: cast_nullable_to_non_nullable
+          : syndicatId as String,
+      syndicatSigle: syndicatSigle == const $CopyWithPlaceholder()
+          ? _value.syndicatSigle
+          // ignore: cast_nullable_to_non_nullable
+          : syndicatSigle as String,
+      representantId: representantId == const $CopyWithPlaceholder()
+          ? _value.representantId
+          // ignore: cast_nullable_to_non_nullable
+          : representantId as String,
+      representantName: representantName == const $CopyWithPlaceholder()
+          ? _value.representantName
+          // ignore: cast_nullable_to_non_nullable
+          : representantName as String,
+      representantPhoneE164:
+          representantPhoneE164 == const $CopyWithPlaceholder()
+          ? _value.representantPhoneE164
+          // ignore: cast_nullable_to_non_nullable
+          : representantPhoneE164 as String,
+      departementId: departementId == const $CopyWithPlaceholder()
+          ? _value.departementId
+          // ignore: cast_nullable_to_non_nullable
+          : departementId as String,
+      departementName: departementName == const $CopyWithPlaceholder()
+          ? _value.departementName
+          // ignore: cast_nullable_to_non_nullable
+          : departementName as String,
+      ownedByCommercialId: ownedByCommercialId == const $CopyWithPlaceholder()
+          ? _value.ownedByCommercialId
+          // ignore: cast_nullable_to_non_nullable
+          : ownedByCommercialId as String,
+      ownedByCommercialName:
+          ownedByCommercialName == const $CopyWithPlaceholder()
+          ? _value.ownedByCommercialName
+          // ignore: cast_nullable_to_non_nullable
+          : ownedByCommercialName as String,
+      segment: segment == const $CopyWithPlaceholder()
+          ? _value.segment
+          // ignore: cast_nullable_to_non_nullable
+          : segment as BddSegment,
+      phase2Status: phase2Status == const $CopyWithPlaceholder()
+          ? _value.phase2Status
+          // ignore: cast_nullable_to_non_nullable
+          : phase2Status as Phase2Status,
+      enrollmentMethod: enrollmentMethod == const $CopyWithPlaceholder()
+          ? _value.enrollmentMethod
+          // ignore: cast_nullable_to_non_nullable
+          : enrollmentMethod as EnrollmentMethod?,
+      enrollmentCapturedById:
+          enrollmentCapturedById == const $CopyWithPlaceholder()
+          ? _value.enrollmentCapturedById
+          // ignore: cast_nullable_to_non_nullable
+          : enrollmentCapturedById as String?,
+      enrollmentCapturedByName:
+          enrollmentCapturedByName == const $CopyWithPlaceholder()
+          ? _value.enrollmentCapturedByName
+          // ignore: cast_nullable_to_non_nullable
+          : enrollmentCapturedByName as String?,
+      enrollmentCapturedAt: enrollmentCapturedAt == const $CopyWithPlaceholder()
+          ? _value.enrollmentCapturedAt
+          // ignore: cast_nullable_to_non_nullable
+          : enrollmentCapturedAt as DateTime?,
+      lastOutcome: lastOutcome == const $CopyWithPlaceholder()
+          ? _value.lastOutcome
+          // ignore: cast_nullable_to_non_nullable
+          : lastOutcome as CallOutcome?,
+      lastComment: lastComment == const $CopyWithPlaceholder()
+          ? _value.lastComment
+          // ignore: cast_nullable_to_non_nullable
+          : lastComment as String?,
+      lastAttemptAt: lastAttemptAt == const $CopyWithPlaceholder()
+          ? _value.lastAttemptAt
+          // ignore: cast_nullable_to_non_nullable
+          : lastAttemptAt as DateTime?,
+      clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
+          ? _value.clientCreatedAt
+          // ignore: cast_nullable_to_non_nullable
+          : clientCreatedAt as DateTime,
+      createdAt: createdAt == const $CopyWithPlaceholder()
+          ? _value.createdAt
+          // ignore: cast_nullable_to_non_nullable
+          : createdAt as DateTime,
+      updatedAt: updatedAt == const $CopyWithPlaceholder()
+          ? _value.updatedAt
+          // ignore: cast_nullable_to_non_nullable
+          : updatedAt as DateTime,
+      deletedAt: deletedAt == const $CopyWithPlaceholder()
+          ? _value.deletedAt
+          // ignore: cast_nullable_to_non_nullable
+          : deletedAt as DateTime?,
+    );
+  }
+}
+
+extension $ProspectDtoCopyWith on ProspectDto {
+  /// Returns a callable class that can be used as follows: `instanceOfProspectDto.copyWith(...)` or like so:`instanceOfProspectDto.copyWith.fieldName(...)`.
+  // ignore: library_private_types_in_public_api
+  _$ProspectDtoCWProxy get copyWith => _$ProspectDtoCWProxyImpl(this);
+}
+
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+ProspectDto _$ProspectDtoFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate('ProspectDto', json, ($checkedConvert) {
+  $checkKeys(
+    json,
+    requiredKeys: const [
+      'id',
+      'nom',
+      'prenom',
+      'phoneE164',
+      'rev',
+      'statut',
+      'banqueId',
+      'banqueName',
+      'syndicatId',
+      'syndicatSigle',
+      'representantId',
+      'representantName',
+      'representantPhoneE164',
+      'departementId',
+      'departementName',
+      'ownedByCommercialId',
+      'ownedByCommercialName',
+      'segment',
+      'phase2Status',
+      'enrollmentMethod',
+      'enrollmentCapturedById',
+      'enrollmentCapturedByName',
+      'enrollmentCapturedAt',
+      'lastOutcome',
+      'lastComment',
+      'lastAttemptAt',
+      'clientCreatedAt',
+      'createdAt',
+      'updatedAt',
+      'deletedAt',
+    ],
+  );
+  final val = ProspectDto(
+    id: $checkedConvert('id', (v) => v as String),
+    nom: $checkedConvert('nom', (v) => v as String),
+    prenom: $checkedConvert('prenom', (v) => v as String),
+    phoneE164: $checkedConvert('phoneE164', (v) => v as String),
+    rev: $checkedConvert('rev', (v) => v as num),
+    statut: $checkedConvert(
+      'statut',
+      (v) => $enumDecode(
+        _$ProspectStatutEnumMap,
+        v,
+        unknownValue: ProspectStatut.unknownDefaultOpenApi,
+      ),
+    ),
+    banqueId: $checkedConvert('banqueId', (v) => v as String),
+    banqueName: $checkedConvert('banqueName', (v) => v as String),
+    syndicatId: $checkedConvert('syndicatId', (v) => v as String),
+    syndicatSigle: $checkedConvert('syndicatSigle', (v) => v as String),
+    representantId: $checkedConvert('representantId', (v) => v as String),
+    representantName: $checkedConvert('representantName', (v) => v as String),
+    representantPhoneE164: $checkedConvert(
+      'representantPhoneE164',
+      (v) => v as String,
+    ),
+    departementId: $checkedConvert('departementId', (v) => v as String),
+    departementName: $checkedConvert('departementName', (v) => v as String),
+    ownedByCommercialId: $checkedConvert(
+      'ownedByCommercialId',
+      (v) => v as String,
+    ),
+    ownedByCommercialName: $checkedConvert(
+      'ownedByCommercialName',
+      (v) => v as String,
+    ),
+    segment: $checkedConvert(
+      'segment',
+      (v) => $enumDecode(
+        _$BddSegmentEnumMap,
+        v,
+        unknownValue: BddSegment.unknownDefaultOpenApi,
+      ),
+    ),
+    phase2Status: $checkedConvert(
+      'phase2Status',
+      (v) => $enumDecode(
+        _$Phase2StatusEnumMap,
+        v,
+        unknownValue: Phase2Status.unknownDefaultOpenApi,
+      ),
+    ),
+    enrollmentMethod: $checkedConvert(
+      'enrollmentMethod',
+      (v) => $enumDecodeNullable(
+        _$EnrollmentMethodEnumMap,
+        v,
+        unknownValue: EnrollmentMethod.unknownDefaultOpenApi,
+      ),
+    ),
+    enrollmentCapturedById: $checkedConvert(
+      'enrollmentCapturedById',
+      (v) => v as String?,
+    ),
+    enrollmentCapturedByName: $checkedConvert(
+      'enrollmentCapturedByName',
+      (v) => v as String?,
+    ),
+    enrollmentCapturedAt: $checkedConvert(
+      'enrollmentCapturedAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    lastOutcome: $checkedConvert(
+      'lastOutcome',
+      (v) => $enumDecodeNullable(
+        _$CallOutcomeEnumMap,
+        v,
+        unknownValue: CallOutcome.unknownDefaultOpenApi,
+      ),
+    ),
+    lastComment: $checkedConvert('lastComment', (v) => v as String?),
+    lastAttemptAt: $checkedConvert(
+      'lastAttemptAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    clientCreatedAt: $checkedConvert(
+      'clientCreatedAt',
+      (v) => DateTime.parse(v as String),
+    ),
+    createdAt: $checkedConvert('createdAt', (v) => DateTime.parse(v as String)),
+    updatedAt: $checkedConvert('updatedAt', (v) => DateTime.parse(v as String)),
+    deletedAt: $checkedConvert(
+      'deletedAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+  );
+  return val;
+});
+
+Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'nom': instance.nom,
+      'prenom': instance.prenom,
+      'phoneE164': instance.phoneE164,
+      'rev': instance.rev,
+      'statut': _$ProspectStatutEnumMap[instance.statut]!,
+      'banqueId': instance.banqueId,
+      'banqueName': instance.banqueName,
+      'syndicatId': instance.syndicatId,
+      'syndicatSigle': instance.syndicatSigle,
+      'representantId': instance.representantId,
+      'representantName': instance.representantName,
+      'representantPhoneE164': instance.representantPhoneE164,
+      'departementId': instance.departementId,
+      'departementName': instance.departementName,
+      'ownedByCommercialId': instance.ownedByCommercialId,
+      'ownedByCommercialName': instance.ownedByCommercialName,
+      'segment': _$BddSegmentEnumMap[instance.segment]!,
+      'phase2Status': _$Phase2StatusEnumMap[instance.phase2Status]!,
+      'enrollmentMethod': _$EnrollmentMethodEnumMap[instance.enrollmentMethod],
+      'enrollmentCapturedById': instance.enrollmentCapturedById,
+      'enrollmentCapturedByName': instance.enrollmentCapturedByName,
+      'enrollmentCapturedAt': instance.enrollmentCapturedAt?.toIso8601String(),
+      'lastOutcome': _$CallOutcomeEnumMap[instance.lastOutcome],
+      'lastComment': instance.lastComment,
+      'lastAttemptAt': instance.lastAttemptAt?.toIso8601String(),
+      'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
+      'createdAt': instance.createdAt.toIso8601String(),
+      'updatedAt': instance.updatedAt.toIso8601String(),
+      'deletedAt': instance.deletedAt?.toIso8601String(),
+    };
+
+const _$ProspectStatutEnumMap = {
+  ProspectStatut.NOUVEAU: 'NOUVEAU',
+  ProspectStatut.CONTACTE: 'CONTACTE',
+  ProspectStatut.CONVERTI: 'CONVERTI',
+  ProspectStatut.PERDU: 'PERDU',
+  ProspectStatut.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$BddSegmentEnumMap = {
+  BddSegment.BDD1: 'BDD1',
+  BddSegment.BDD2: 'BDD2',
+  BddSegment.BDD3: 'BDD3',
+  BddSegment.BDD4: 'BDD4',
+  BddSegment.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$Phase2StatusEnumMap = {
+  Phase2Status.PENDING: 'PENDING',
+  Phase2Status.METHOD_OBTAINED: 'METHOD_OBTAINED',
+  Phase2Status.REFUSED: 'REFUSED',
+  Phase2Status.WRONG_NUMBER: 'WRONG_NUMBER',
+  Phase2Status.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$EnrollmentMethodEnumMap = {
+  EnrollmentMethod.PLATFORM: 'PLATFORM',
+  EnrollmentMethod.PHYSICAL: 'PHYSICAL',
+  EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING:
+      'VOICE_OR_ELECTRONIC_MESSAGING',
+  EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$CallOutcomeEnumMap = {
+  CallOutcome.METHOD_OBTAINED: 'METHOD_OBTAINED',
+  CallOutcome.UNREACHABLE: 'UNREACHABLE',
+  CallOutcome.CALLBACK: 'CALLBACK',
+  CallOutcome.REFUSED: 'REFUSED',
+  CallOutcome.WRONG_NUMBER: 'WRONG_NUMBER',
+  CallOutcome.OTHER: 'OTHER',
+  CallOutcome.unknownDefaultOpenApi: 'unknown_default_open_api',
+};

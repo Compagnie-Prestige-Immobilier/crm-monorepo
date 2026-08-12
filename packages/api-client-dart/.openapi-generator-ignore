@@ -1,0 +1,27 @@
+# OBLIGATOIRE. openapi-generator écrit son propre pubspec.yaml, son propre
+# analysis_options.yaml, son propre README.md et son propre .gitignore à CHAQUE
+# exécution. Sans ce fichier, chaque `pnpm generate` écrase silencieusement les
+# versions épinglées de dio / json_serializable / equatable et remet les lints
+# du générateur — la régression n'apparaît qu'au prochain `flutter pub get`,
+# loin du commit qui l'a causée.
+#
+# Syntaxe identique à .gitignore. Chemins relatifs à outputDir.
+
+pubspec.yaml
+analysis_options.yaml
+README.md
+.gitignore
+
+# build.yaml aussi, et pour une raison de compatibilité ascendante, pas de
+# confort : le build.yaml écrit par le générateur pose
+# `disallow_unrecognized_keys: true`, qui fait LEVER une exception à tout
+# modèle recevant une clé JSON inconnue. Ajouter un champ à une réponse
+# serveur casserait alors instantanément toutes les versions installées sur le
+# terrain — exactement ce que `enumUnknownDefaultCase: true` cherche à éviter
+# au niveau des énumérations. Voir le commentaire dans build.yaml.
+build.yaml
+
+# Le contenu de ce paquet côté Node n'appartient pas au générateur.
+package.json
+openapi-config.yaml
+scripts/**

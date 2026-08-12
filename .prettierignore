@@ -1,0 +1,12 @@
+node_modules
+dist
+.next
+.turbo
+coverage
+pnpm-lock.yaml
+apps/mobile
+packages/database/prisma/migrations
+
+# Artefacts Dart : dart format en a la charge, et .dart_tool/ est du cache.
+packages/api-client-dart/.dart_tool
+packages/api-client-dart/lib

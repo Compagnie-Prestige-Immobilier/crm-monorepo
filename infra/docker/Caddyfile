@@ -1,0 +1,57 @@
+# Caddy — unique point d'entrée HTTPS.
+#
+# TLS automatique : Caddy demande et renouvelle seul un certificat Let's
+# Encrypt pour {$DOMAIN}. Prérequis : l'enregistrement A du domaine pointe sur
+# le VPS et les ports 80 et 443 sont ouverts (le défi HTTP-01 passe par le 80).
+#
+# Les certificats vivent dans le volume `caddy-data`. Ne pas le supprimer :
+# Let's Encrypt limite à 5 certificats par domaine et par semaine.
+
+{
+	email {$ACME_EMAIL}
+	# Décommenter pour mettre au point le déploiement sans consommer le quota
+	# de certificats de production (le navigateur affichera une alerte) :
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# --- API -----------------------------------------------------------------
+	# `handle_path` retire le préfixe /api avant de transmettre : le service
+	# NestJS reçoit /auth/login, pas /api/auth/login. Si l'API est montée sur
+	# un préfixe global côté Nest (setGlobalPrefix('api')), remplacer par
+	# `handle /api/*` pour le conserver.
+	handle_path /api/* {
+		reverse_proxy api:3001 {
+			# L'export Excel d'une grosse période peut être long ; le défaut
+			# de Caddy est plus court que le temps de génération.
+			transport http {
+				response_header_timeout 120s
+			}
+		}
+	}
+
+	# --- Panel admin ---------------------------------------------------------
+	handle {
+		reverse_proxy web:3000
+	}
+
+	# En-têtes que seul le terminaison TLS peut poser honnêtement.
+	header {
+		# HSTS : un an, sous-domaines compris. À n'activer qu'une fois le
+		# certificat obtenu et le domaine définitif — un navigateur qui a vu
+		# cet en-tête refusera le HTTP en clair pendant un an.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Ne pas annoncer la pile technique.
+		-Server
+		-X-Powered-By
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

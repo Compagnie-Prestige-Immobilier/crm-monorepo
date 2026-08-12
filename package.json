@@ -1,0 +1,40 @@
+{
+  "name": "cpi-crm",
+  "private": true,
+  "packageManager": "pnpm@11.15.1",
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "pnpm": "11.15.1"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:coverage": "turbo test:coverage",
+    "test:integration": "turbo test:integration",
+    "test:e2e": "turbo test:e2e",
+    "db:generate": "pnpm --filter @crm/database db:generate",
+    "db:migrate": "pnpm --filter @crm/database db:migrate",
+    "db:deploy": "pnpm --filter @crm/database db:deploy",
+    "db:studio": "pnpm --filter @crm/database db:studio",
+    "db:seed": "pnpm --filter @crm/database db:seed",
+    "db:reset": "pnpm --filter @crm/database db:reset",
+    "openapi:generate": "pnpm --filter @crm/api openapi:generate",
+    "mobile:client:generate": "node tools/dev/generate-dart-client.mjs",
+    "codegen": "turbo run generate",
+    "codegen:check": "pnpm codegen && git add -A --intent-to-add && git diff --exit-code -- apps/api/openapi.json packages/api-client/src/generated packages/api-client-dart/lib",
+    "verify:local": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm codegen:check"
+  },
+  "devDependencies": {
+    "@crm/eslint-config": "workspace:*",
+    "@crm/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "prettier": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:"
+  }
+}

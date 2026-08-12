@@ -1,0 +1,251 @@
+//
+// AUTO-GENERATED FILE, DO NOT MODIFY!
+//
+
+import 'dart:async';
+
+// ignore: unused_import
+import 'dart:convert';
+import 'package:crm_api_client/src/deserialize.dart';
+import 'package:dio/dio.dart';
+
+import 'dart:typed_data';
+import 'package:crm_api_client/src/model/bank_stage_type.dart';
+import 'package:crm_api_client/src/model/bdd_segment.dart';
+import 'package:crm_api_client/src/model/enrollment_method.dart';
+import 'package:crm_api_client/src/model/export_mode.dart';
+import 'package:crm_api_client/src/model/phase2_status.dart';
+import 'package:crm_api_client/src/model/prospect_statut.dart';
+
+class ExportApi {
+  final Dio _dio;
+
+  const ExportApi(this._dio);
+
+  /// Export Excel des dossiers bancaires, avec le filtre de la liste.
+  /// Trois feuilles : Dossiers (une ligne par dossier filtré), Historique (toutes les transitions de ces dossiers) et Synthèse (les mêmes agrégats que le tableau de bord).
+  ///
+  /// Parameters:
+  /// * [search] - Recherche libre sur la référence, le nom du client ou son téléphone.
+  /// * [stageId]
+  /// * [stageType]
+  /// * [bankId] - Banque de traitement du dossier.
+  /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
+  /// * [rejectionReasonId]
+  /// * [dateFrom] - Borne basse sur la création, incluse.
+  /// * [dateTo] - Borne haute sur la création, incluse.
+  /// * [amountMin] - Borne basse de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53.
+  /// * [amountMax] - Borne haute de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Uint8List] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Uint8List>> exportBankCasesXlsx({
+    String? search,
+    String? stageId,
+    BankStageType? stageType,
+    String? bankId,
+    String? agentId,
+    String? rejectionReasonId,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String? amountMin,
+    String? amountMax,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/export/bank-cases.xlsx';
+    final _options = Options(
+      method: r'GET',
+      responseType: ResponseType.bytes,
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (search != null) r'search': search,
+      if (stageId != null) r'stageId': stageId,
+      if (stageType != null) r'stageType': stageType,
+      if (bankId != null) r'bankId': bankId,
+      if (agentId != null) r'agentId': agentId,
+      if (rejectionReasonId != null) r'rejectionReasonId': rejectionReasonId,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (amountMin != null) r'amountMin': amountMin,
+      if (amountMax != null) r'amountMax': amountMax,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Uint8List? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null ? null : rawData as Uint8List;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Uint8List>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Export Excel des prospects, avec le même filtre que la liste.
+  /// Deux modes. &#x60;filtered&#x60; (défaut) : une feuille Prospects correspondant exactement aux filtres, plus Représentants et Synthèse. &#x60;consolidated&#x60; : exactement cinq feuilles — Consolidé, BDD1, BDD2, BDD3, BDD4.
+  ///
+  /// Parameters:
+  /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
+  /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
+  /// * [statut]
+  /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
+  /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
+  /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
+  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
+  /// * [mode] - `filtered` : une feuille correspondant aux filtres. `consolidated` : cinq feuilles (Consolidé, BDD1…BDD4) ; le paramètre `segment` y est sans effet, puisque c’est le classeur lui-même qui porte la segmentation.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Uint8List] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Uint8List>> exportProspectsXlsx({
+    String? search,
+    String? representantId,
+    String? banqueId,
+    String? syndicatId,
+    String? departementId,
+    String? commercialId,
+    ProspectStatut? statut,
+    BddSegment? segment,
+    Phase2Status? phase2Status,
+    EnrollmentMethod? enrollmentMethod,
+    String? campaignId,
+    String? enrollmentCapturedById,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? includeDeleted = false,
+    ExportMode? mode,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/export/prospects.xlsx';
+    final _options = Options(
+      method: r'GET',
+      responseType: ResponseType.bytes,
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (search != null) r'search': search,
+      if (representantId != null) r'representantId': representantId,
+      if (banqueId != null) r'banqueId': banqueId,
+      if (syndicatId != null) r'syndicatId': syndicatId,
+      if (departementId != null) r'departementId': departementId,
+      if (commercialId != null) r'commercialId': commercialId,
+      if (statut != null) r'statut': statut,
+      if (segment != null) r'segment': segment,
+      if (phase2Status != null) r'phase2Status': phase2Status,
+      if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
+      if (campaignId != null) r'campaignId': campaignId,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (includeDeleted != null) r'includeDeleted': includeDeleted,
+      if (mode != null) r'mode': mode,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Uint8List? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null ? null : rawData as Uint8List;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Uint8List>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+}

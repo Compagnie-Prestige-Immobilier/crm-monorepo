@@ -1,0 +1,34 @@
+node_modules
+.DS_Store
+.turbo
+.next
+dist
+build
+coverage
+playwright-report
+test-results
+*.tsbuildinfo
+*.log
+.env
+.env.*
+!.env.example
+
+# Prisma
+packages/database/generated
+
+# Flutter / Dart
+apps/mobile/.dart_tool
+apps/mobile/.fvm/flutter_sdk
+apps/mobile/build
+apps/mobile/android/.gradle
+apps/mobile/android/local.properties
+apps/mobile/android/key.properties
+apps/mobile/**/*.g.dart
+apps/mobile/**/*.freezed.dart
+apps/mobile/**/*.drift.dart
+apps/mobile/**/*.keystore
+apps/mobile/**/*.jks
+
+# OpenAPI generator scratch
+.openapi-generator-cli
+**/.openapi-generator
