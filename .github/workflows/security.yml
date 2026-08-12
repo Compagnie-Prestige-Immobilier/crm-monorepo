@@ -84,8 +84,8 @@ jobs:
             --config=p/sql-injection \
             --config=p/jwt \
             --config=p/owasp-top-ten \
-            --exclude-rule=package_managers.npm.npm-missing-minimum-release-age \
-            --exclude-rule=package_managers.pnpm.pnpm-missing-minimum-release-age \
+            --exclude-rule=package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age \
+            --exclude-rule=package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age \
             --exclude=node_modules --exclude=build \
             --exclude='*.g.dart' --exclude=.dart_tool \
             --metrics=off --error
