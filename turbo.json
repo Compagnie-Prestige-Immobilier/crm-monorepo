@@ -1,0 +1,71 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["DATABASE_URL", "NODE_ENV", "TURBO_TELEMETRY_DISABLED"],
+  "tasks": {
+    // `generate` n'est PAS une dépendance globale de `build`. Le faire créerait
+    // un cycle : @crm/database#build -> generate -> @crm/api#openapi:generate
+    // -> @crm/database#build. Seuls les deux paquets clients doivent générer
+    // avant de compiler, et c'est déclaré nommément plus bas.
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "dist/**", "!.next/cache/**"]
+    },
+    "@crm/api-client#build": {
+      "dependsOn": ["^build", "generate"],
+      "outputs": ["dist/**"]
+    },
+    "@crm/api-client-dart#build": {
+      "dependsOn": ["generate"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "test:integration": {
+      "dependsOn": ["^build"]
+    },
+    "test:coverage": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
+    "test:e2e": {},
+    "db:generate": {
+      "cache": false
+    },
+    "openapi:generate": {
+      // db:generate produit le client Prisma ; build produit le `dist` de
+      // @crm/database, que le boot headless importe. Sans la seconde arête, la
+      // génération du contrat échoue sur un `dist` absent ou périmé — et
+      // seulement sur une machine propre, jamais sur celle du développeur.
+      "dependsOn": ["@crm/database#db:generate", "@crm/database#build"],
+      "inputs": ["src/**/*.ts", "package.json", "tsconfig.json"],
+      "outputs": ["openapi.json"],
+      "env": ["OPENAPI_GENERATION"]
+    },
+    // Explicit task reference, NOT "^openapi:generate". `^` resolves over
+    // package dependencies, and neither client package depends on @crm/api —
+    // so `^` would silently resolve to the empty set and the edge would be a
+    // no-op, generating clients against a stale spec whenever the tasks were
+    // not run in the right order by hand.
+    "generate": {
+      "dependsOn": ["@crm/api#openapi:generate"],
+      "inputs": [
+        "../../apps/api/openapi.json",
+        "openapi-config.yaml",
+        "openapitools.json",
+        "scripts/**",
+        ".openapi-generator-ignore"
+      ],
+      "outputs": ["src/generated/**", "lib/**"]
+    }
+  }
+}

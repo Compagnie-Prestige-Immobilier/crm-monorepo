@@ -1,0 +1,24 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- The INTERNET permission is required for development. Specifically,
+         the Flutter tool needs it to communicate with the running application
+         to allow setting breakpoints, to provide hot reload, etc.
+    -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!--
+      Exception de trafic en clair, DEBUG UNIQUEMENT.
+
+      `tools:replace` est indispensable : le manifeste principal ne déclare pas
+      `networkSecurityConfig`, mais le fusionneur de manifestes refuse malgré
+      tout qu'une variante impose un attribut sur un élément déjà déclaré
+      ailleurs sans le dire explicitement. Sans lui, la fusion échoue et le
+      build de debug ne produit rien.
+
+      Le manifeste de release ne référence rien : la configuration par défaut
+      d'Android s'y applique, c'est-à-dire refus du trafic en clair.
+    -->
+    <application
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:replace="android:networkSecurityConfig" />
+</manifest>

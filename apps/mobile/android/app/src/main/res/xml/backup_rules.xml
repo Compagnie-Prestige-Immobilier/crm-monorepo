@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 et antérieurs (API 24–30), où `android:allowBackup="false"` suffit
+  déjà. Ce fichier est le filet de sécurité : si quelqu'un repasse un jour
+  `allowBackup` à `true` — pour restaurer une préférence, pour un test — la base
+  restera hors sauvegarde au lieu de partir vers Google Drive avec l'annuaire.
+
+  `minSdk` vaut 24, donc ce fichier couvre une part réelle du parc sénégalais et
+  n'est pas décoratif.
+-->
+<full-backup-content>
+    <exclude domain="database" />
+    <exclude domain="file" />
+    <exclude domain="sharedpref" />
+    <exclude domain="external" />
+    <exclude domain="file" path="cpi_go.sqlite" />
+    <exclude domain="file" path="cpi_go.sqlite-wal" />
+    <exclude domain="file" path="cpi_go.sqlite-shm" />
+</full-backup-content>

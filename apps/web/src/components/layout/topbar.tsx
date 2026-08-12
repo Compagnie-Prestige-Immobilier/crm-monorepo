@@ -1,0 +1,64 @@
+'use client';
+
+import { MenuIcon } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { useState } from 'react';
+
+import { navTitle } from '@/components/layout/nav-items';
+import { SidebarNav } from '@/components/layout/sidebar-nav';
+import { ThemeToggle } from '@/components/layout/theme-toggle';
+import { UserMenu } from '@/components/layout/user-menu';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import type { SessionUser } from '@/lib/types';
+
+/**
+ * Barre supérieure. Sous 768 px elle porte le déclencheur du tiroir de
+ * navigation : la sidebar fixe mangerait la moitié de la largeur utile sur un
+ * téléphone, et le tableau des prospects a besoin de toute la place.
+ */
+export function Topbar({ user }: { user: SessionUser }) {
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Le titre est dérivé de la route ET du rôle, pas passé en prop : le layout
+  // serveur ne connaît pas la page rendue, et deux sources de vérité pour un
+  // même libellé finissent toujours par diverger.
+  const title = navTitle(user.role, pathname);
+
+  return (
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-4 backdrop-blur-sm">
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            aria-label="Ouvrir la navigation"
+          >
+            <MenuIcon className="size-5" aria-hidden="true" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent
+          side="left"
+          className="w-[17rem] border-r-0 bg-sidebar p-0 text-sidebar-foreground"
+        >
+          <SheetTitle className="sr-only">Navigation principale</SheetTitle>
+          <SidebarNav
+            role={user.role}
+            onNavigate={() => {
+              setOpen(false);
+            }}
+          />
+        </SheetContent>
+      </Sheet>
+
+      <h1 className="min-w-0 flex-1 truncate font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
+        {title}
+      </h1>
+
+      <ThemeToggle />
+      <UserMenu user={user} />
+    </header>
+  );
+}

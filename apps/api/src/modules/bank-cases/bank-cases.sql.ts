@@ -1,0 +1,115 @@
+import { Prisma } from '@crm/database';
+
+import { tryNormalizePhone } from '../../common/phone.js';
+import { normalizeReferenceKey } from './reference-key.js';
+import { BankCaseSortField } from './dto.js';
+import type { BankCaseFilterDto } from './dto.js';
+import { SortOrder } from '../../common/dto/prospect-filter.dto.js';
+
+/**
+ * SOURCE UNIQUE du filtrage Banque & Finance.
+ *
+ * La liste, les agrégats et l'export Excel passent tous par ces mêmes
+ * conditions SQL — la liste va jusqu'à sélectionner ses identifiants par cette
+ * requête avant de les hydrater par Prisma. C'est ce qui rend vraie, et non
+ * seulement souhaitable, l'égalité entre les compteurs du tableau de bord et le
+ * contenu du tableau : il n'existe pas de seconde définition du filtre qui
+ * pourrait dériver.
+ *
+ * Chaque valeur passe par `Prisma.sql`, donc par une requête paramétrée ;
+ * aucun fragment n'est concaténé à la main.
+ */
+
+/**
+ * Jointure commune. L'étape courante est toujours jointe : elle porte le type
+ * (OPEN / CASHED / REJECTED) dont dépendent presque tous les compteurs.
+ */
+export const BANK_CASE_FROM = Prisma.sql`
+  FROM "bank_cases" c
+  INNER JOIN "bank_case_stages" s ON s."id" = c."currentStageId"
+`;
+
+export function bankCaseConditions(filter: BankCaseFilterDto): Prisma.Sql {
+  const conditions: Prisma.Sql[] = [Prisma.sql`c."deletedAt" IS NULL`];
+
+  if (filter.stageId) conditions.push(Prisma.sql`c."currentStageId" = ${filter.stageId}`);
+  if (filter.stageType) {
+    conditions.push(Prisma.sql`s."type" = ${filter.stageType}::"BankStageType"`);
+  }
+  if (filter.bankId) conditions.push(Prisma.sql`c."processingBankId" = ${filter.bankId}`);
+  if (filter.rejectionReasonId) {
+    conditions.push(Prisma.sql`c."rejectionReasonId" = ${filter.rejectionReasonId}`);
+  }
+  if (filter.agentId) {
+    // Créateur OU dernier intervenant : l'agent qui a fait avancer un dossier
+    // ouvert par un collègue doit le retrouver dans « mes dossiers ».
+    conditions.push(
+      Prisma.sql`(c."createdById" = ${filter.agentId} OR c."updatedById" = ${filter.agentId})`,
+    );
+  }
+  if (filter.dateFrom) conditions.push(Prisma.sql`c."createdAt" >= ${new Date(filter.dateFrom)}`);
+  if (filter.dateTo) conditions.push(Prisma.sql`c."createdAt" <= ${new Date(filter.dateTo)}`);
+
+  // Un filtre de montant ne peut pas retenir un dossier ouvert : son montant est
+  // NULL par construction, et NULL n'est ni supérieur ni inférieur à une borne.
+  if (filter.amountMin !== undefined) {
+    conditions.push(Prisma.sql`c."amountXof" >= ${filter.amountMin}::numeric`);
+  }
+  if (filter.amountMax !== undefined) {
+    conditions.push(Prisma.sql`c."amountXof" <= ${filter.amountMax}::numeric`);
+  }
+
+  const search = filter.search?.trim();
+  if (search) {
+    const like = `%${search}%`;
+    const referenceLike = `%${normalizeReferenceKey(search)}%`;
+    // Le téléphone est cherché sous sa forme normalisée quand la saisie en
+    // constitue une, sinon sur les seuls chiffres — « 77 12 » doit répondre.
+    //
+    // QUATRE CHIFFRES AU MOINS, et le seuil n'est pas cosmétique : une référence
+    // comme « BNK-2026-3 » laisse le résidu « 20263 », mais « DOS-3 » ne laisse
+    // que « 3 ». Sous un seuil plus bas, chercher une référence alphanumérique
+    // ferait joindre TOUS les numéros contenant ce chiffre, et la recherche par
+    // référence deviendrait un filtre au hasard. C'est le même seuil que
+    // l'autocomplétion des prospects, pour que les deux écrans répondent pareil.
+    const digits = search.replace(/\D/gu, '');
+    const normalized = tryNormalizePhone(search);
+    const phoneLike = `%${normalized ?? digits}%`;
+    const phoneCondition =
+      normalized !== undefined || digits.length >= 4
+        ? Prisma.sql`OR c."customerPhoneE164" LIKE ${phoneLike}`
+        : Prisma.sql``;
+
+    conditions.push(Prisma.sql`(
+      c."referenceKey" LIKE ${referenceLike}
+      OR unaccent(lower(c."customerName")) LIKE unaccent(lower(${like}))
+      ${phoneCondition}
+    )`);
+  }
+
+  return Prisma.join(conditions, ' AND ');
+}
+
+/** Colonne de tri. Fermée sur une énumération : jamais la chaîne reçue. */
+export function bankCaseOrderBy(
+  sortBy: BankCaseSortField | undefined,
+  sortOrder: SortOrder | undefined,
+): Prisma.Sql {
+  const column =
+    sortBy === BankCaseSortField.UPDATED_AT
+      ? Prisma.sql`c."updatedAt"`
+      : sortBy === BankCaseSortField.REFERENCE
+        ? Prisma.sql`c."referenceKey"`
+        : sortBy === BankCaseSortField.CUSTOMER_NAME
+          ? Prisma.sql`c."customerName"`
+          : sortBy === BankCaseSortField.AMOUNT
+            ? Prisma.sql`c."amountXof"`
+            : Prisma.sql`c."createdAt"`;
+
+  const direction = sortOrder === SortOrder.ASC ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+
+  // `c."id"` en second critère : sans lui, deux dossiers créés dans la même
+  // milliseconde peuvent changer de page entre deux requêtes et l'un des deux
+  // n'apparaît jamais.
+  return Prisma.sql`ORDER BY ${column} ${direction} NULLS LAST, c."id" ${direction}`;
+}

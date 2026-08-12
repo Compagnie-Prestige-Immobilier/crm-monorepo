@@ -1,0 +1,76 @@
+# syntax=docker/dockerfile:1.7
+#
+# Image du panel admin Next.js 16. Contexte de build : la RACINE du dépôt.
+#
+# PRÉREQUIS apps/web/next.config.ts :
+#
+#     const nextConfig = { output: 'standalone', /* ... */ };
+#
+# Sans `output: 'standalone'`, .next/standalone n'est pas produit et l'étape
+# finale échoue sur un COPY introuvable. Le mode standalone n'embarque que les
+# modules réellement importés, ce qui fait passer l'image de ~1,2 Go à ~200 Mo
+# — la différence entre un déploiement de trente secondes et de cinq minutes
+# sur la liaison d'un VPS.
+
+ARG NODE_VERSION=24.18.0
+ARG PNPM_VERSION=11.15.1
+ARG TURBO_VERSION=2.10.5
+
+# -----------------------------------------------------------------------------
+FROM node:${NODE_VERSION}-bookworm-slim AS base
+ARG PNPM_VERSION
+ENV PNPM_HOME=/pnpm \
+    PATH=/pnpm:$PATH \
+    CI=1 \
+    TURBO_TELEMETRY_DISABLED=1 \
+    NEXT_TELEMETRY_DISABLED=1 \
+    DO_NOT_TRACK=1
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+WORKDIR /repo
+
+# -----------------------------------------------------------------------------
+FROM base AS pruner
+ARG TURBO_VERSION
+RUN npm install -g turbo@${TURBO_VERSION}
+COPY . .
+RUN turbo prune @crm/web --docker
+
+# -----------------------------------------------------------------------------
+FROM base AS builder
+COPY --from=pruner /repo/out/json/ ./
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+COPY --from=pruner /repo/out/full/ ./
+
+# Figé dans le bundle client au moment du build — d'où un ARG et non une
+# variable d'environnement de runtime.
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+# pnpm et non turbo, même raison que pour l'API : la tâche turbo `build`
+# dépend de `generate` → `@crm/api#openapi:generate`, et apps/api n'est pas
+# dans le sous-ensemble élagué. Le client TypeScript généré est committé.
+RUN pnpm --filter @crm/api-client build \
+    && pnpm --filter @crm/web build
+
+# -----------------------------------------------------------------------------
+FROM node:${NODE_VERSION}-bookworm-slim AS runner
+ENV NODE_ENV=production \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0 \
+    NEXT_TELEMETRY_DISABLED=1
+WORKDIR /app
+
+# La sortie standalone embarque son propre node_modules minimal et son
+# server.js : ni pnpm ni le workspace ne sont nécessaires ici.
+COPY --from=builder --chown=node:node /repo/apps/web/.next/standalone ./
+# Les fichiers statiques et public/ ne sont volontairement PAS inclus dans
+# standalone par Next : ils doivent être copiés à côté, en respectant
+# l'arborescence du workspace que standalone reproduit.
+COPY --from=builder --chown=node:node /repo/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=node:node /repo/apps/web/public ./apps/web/public
+
+USER node
+EXPOSE 3000
+
+CMD ["node", "apps/web/server.js"]

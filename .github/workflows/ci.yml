@@ -1,0 +1,265 @@
+name: ci
+
+on:
+  # `dev` est la branche de travail : tout ce qui y atterrit est vérifié.
+  # `prod` ne reçoit que des PR — la CI y tourne donc AVANT la fusion, pas
+  # après, ce qui est le seul moment où son verdict peut encore empêcher un
+  # déploiement cassé.
+  pull_request:
+    branches: [dev, prod]
+  push:
+    branches: [dev]
+
+# Aucun job n'écrit dans le dépôt.
+permissions:
+  contents: read
+
+# Une PR poussée trois fois de suite n'occupe pas trois fois les runners.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: '1'
+  DO_NOT_TRACK: '1'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Qualité TypeScript : format, lint, types, tests, build.
+  # ---------------------------------------------------------------------------
+  node:
+    name: node — format, lint, types, tests, build
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
+      # Les deux secrets doivent faire au moins 32 caractères, sinon apps/api
+      # refuse de démarrer (cf. .env.example / src/env.ts).
+      JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
+      JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
+      BUSINESS_TIME_ZONE: Africa/Dakar
+      PHONE_DEFAULT_REGION: SN
+    services:
+      postgres:
+        image: postgres:18.4
+        env:
+          POSTGRES_DB: crm
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crm -d crm"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-node
+
+      - name: Client Prisma
+        run: pnpm db:generate
+
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test:coverage
+
+      - name: Migrations
+        run: pnpm db:deploy
+      - run: pnpm test:integration
+
+      # `pnpm build` passe par turbo : la tâche `build` dépend de `generate`,
+      # qui dépend de `@crm/api#openapi:generate`. Le contrat et le client TS
+      # sont donc régénérés dans le bon ordre sans qu'aucune ligne de ce
+      # fichier n'ait à le savoir. Voir le job `contract` pour le détail.
+      - run: pnpm build
+
+  # ---------------------------------------------------------------------------
+  # Le portillon central : le code généré committé correspond-il au contrat,
+  # et le contrat casse-t-il les clients déjà déployés ?
+  # ---------------------------------------------------------------------------
+  contract:
+    name: contrat — dérive du code généré + ruptures ascendantes
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
+      JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
+    steps:
+      # fetch-depth: 0 — oasdiff a besoin du contrat de la branche de base,
+      # que `git show origin/<base>:...` ne peut pas lire d'un clone superficiel.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-node
+        with:
+          install: 'false'
+
+      # openapi-generator 7.24.0 tourne sur la JVM.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # build_runner produit les *.g.dart du client Dart.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.7
+          channel: stable
+          cache: true
+
+      # Le jar du générateur pèse 30 Mo. `generator-cli.storageDir` le place
+      # dans l'arbre de travail (openapitools.json) précisément pour qu'il soit
+      # cachable ici et identique d'une exécution à l'autre — la version fait
+      # partie de la clé, donc un bump de générateur invalide le cache tout seul.
+      - name: Clé de cache du générateur
+        id: generator
+        run: |
+          version=$(node -p "require('./openapitools.json')['generator-cli'].version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/openapi-generator
+          key: openapi-generator-${{ steps.generator.outputs.version }}
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+
+      # `@crm/api#openapi:generate` boote l'app NestJS avec tsx, donc importe
+      # @crm/database — qui se résout sur son `dist`. La tâche turbo
+      # `openapi:generate` ne déclare que `@crm/database#db:generate` (le
+      # client Prisma), pas la compilation du paquet : sans cette ligne, la
+      # génération échoue sur un module introuvable.
+      - name: Compiler @crm/database (prérequis du contrat)
+        run: pnpm turbo run build --filter=@crm/database
+
+      # ---------------------------------------------------------------------
+      # UNE seule commande, volontairement.
+      #
+      # Le dépôt de référence enchaîne `pnpm openapi:generate` puis
+      # `pnpm api-client:generate` sur deux lignes consécutives, et ne
+      # fonctionne QUE grâce à cet ordre : son turbo.json déclare
+      # `dependsOn: ["^openapi:generate"]`, or `^` résout sur les dépendances
+      # de package et aucun paquet client ne dépend de l'API — l'ensemble
+      # résolu est vide et l'arête n'existe pas.
+      #
+      # Notre turbo.json utilise la référence explicite
+      # `@crm/api#openapi:generate`. `turbo run generate` suffit donc à
+      # ordonner contrat → client TS → client Dart. Ne PAS remplacer cette
+      # ligne par une suite de commandes : cela réintroduirait exactement la
+      # dépendance à l'ordre que la référence explicite supprime.
+      # ---------------------------------------------------------------------
+      - name: Régénérer le contrat et les deux clients
+        run: pnpm turbo run generate
+
+      # ---------------------------------------------------------------------
+      # `git add -A --intent-to-add` AVANT le diff.
+      #
+      # `git diff` ne regarde pas les fichiers non suivis. Un nouveau DTO
+      # produit des fichiers générés inédits : sans cette ligne, la CI passe au
+      # vert pendant que le dépôt est désynchronisé. C'est bénin côté
+      # TypeScript (schema.ts est un fichier unique déjà suivi) et fatal côté
+      # Dart, où chaque modèle est son propre fichier accompagné de son
+      # *.g.dart. `--intent-to-add` inscrit ces chemins dans l'index avec un
+      # contenu vide : ils apparaissent alors comme des ajouts dans le diff.
+      # ---------------------------------------------------------------------
+      - name: Portillon anti-dérive
+        run: |
+          set -euo pipefail
+          paths=(
+            apps/api/openapi.json
+            packages/api-client/src/generated
+            packages/api-client-dart/lib
+          )
+          # Un chemin généré absent n'est pas « pas de dérive » : c'est une
+          # génération qui n'a rien produit. `git add` échouerait de toute
+          # façon sur un pathspec vide, autant le dire clairement.
+          for path in "${paths[@]}"; do
+            if [ ! -e "$path" ]; then
+              echo "::error::$path n'a pas été produit par \`pnpm turbo run generate\`."
+              exit 1
+            fi
+          done
+          git add -A --intent-to-add -- "${paths[@]}"
+          if ! git diff --exit-code -- "${paths[@]}"; then
+            echo "::error::Le code généré committé ne correspond pas à apps/api/openapi.json."
+            echo "::error::Lancer \`pnpm turbo run generate\` puis committer le résultat (*.g.dart compris)."
+            exit 1
+          fi
+
+      # ---------------------------------------------------------------------
+      # Rupture de contrat. Les téléphones du terrain ne peuvent pas être mis
+      # à jour de force : un champ supprimé ou renommé est un incident de
+      # production, pas une remarque de revue. Le label `api-breaking` est le
+      # seul moyen de passer, et il laisse une trace.
+      #
+      # `--fail-on WARN`, et non `ERR`. Vérifié sur oasdiff v1.28.0 : la
+      # suppression d'un champ OPTIONNEL d'une réponse est classée `warning`,
+      # pas `error` — avec `--fail-on ERR` le portillon laisse donc passer
+      # exactement le cas pour lequel il a été construit. Un ajout
+      # rétrocompatible (nouveau champ) reste vert au niveau WARN, ce qui est
+      # la propriété qui rend ce réglage tenable au quotidien.
+      # ---------------------------------------------------------------------
+      - name: Ruptures ascendantes (oasdiff)
+        if: github.event_name == 'pull_request'
+        env:
+          BREAKING_ALLOWED: ${{ contains(github.event.pull_request.labels.*.name, 'api-breaking') }}
+          # Version épinglée : sur `latest`, une nouvelle règle de détection
+          # ferait échouer des PR sans rapport, un matin, sans qu'aucun commit
+          # du dépôt n'ait changé. Le bump est un acte délibéré.
+          OASDIFF_VERSION: v1.28.0
+        run: |
+          set -uo pipefail
+          if ! git show "origin/${GITHUB_BASE_REF}:apps/api/openapi.json" > /tmp/openapi.base.json 2>/dev/null; then
+            echo "::notice::Aucun contrat sur ${GITHUB_BASE_REF} — rien à comparer."
+            exit 0
+          fi
+          docker run --rm \
+            -v /tmp:/base:ro -v "${PWD}/apps/api:/head:ro" \
+            "tufin/oasdiff:${OASDIFF_VERSION}" breaking /base/openapi.base.json /head/openapi.json \
+            --fail-on WARN
+          status=$?
+          if [ "$status" -eq 0 ]; then exit 0; fi
+          if [ "${BREAKING_ALLOWED}" = "true" ]; then
+            echo "::warning::Ruptures de contrat détectées, acceptées via le label api-breaking."
+            exit 0
+          fi
+          echo "::error::Cette PR casse le contrat pour les clients déjà installés."
+          echo "::error::Soit le changement est rendu rétrocompatible, soit la PR porte le label \`api-breaking\` en connaissance de cause."
+          exit 1
+
+  # ---------------------------------------------------------------------------
+  # Mobile. Indépendant du job `contract` : le client Dart généré est committé,
+  # *.g.dart compris, donc `flutter analyze` n'a besoin ni de Node ni de Java.
+  # C'est précisément ce que le commit du code généré achète.
+  # ---------------------------------------------------------------------------
+  mobile:
+    name: flutter — analyze + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.7
+          channel: stable
+          cache: true
+
+      - name: Client Dart généré — analyse
+        working-directory: packages/api-client-dart
+        run: |
+          dart pub get
+          dart analyze
+          dart format --output=none --set-exit-if-changed .
+
+      - name: Application
+        working-directory: apps/mobile
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
