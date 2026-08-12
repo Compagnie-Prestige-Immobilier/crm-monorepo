@@ -106,6 +106,10 @@ COPY --from=builder   --chown=node:node /repo/apps/api/dist ./apps/api/dist
 # avant de démarrer, pour que l'image soit autonome là où il n'existe pas de
 # service de migration séparé (Dokploy, Railway…).
 COPY --from=builder   --chown=node:node /repo/packages/database/prisma ./packages/database/prisma
+# prisma.config.ts porte la chaîne de connexion : Prisma 7 l'interdit dans le
+# schéma et la lit UNIQUEMENT ici. Sans ce fichier, `migrate deploy` ne sait pas
+# où se connecter et le conteneur redémarre en boucle.
+COPY --from=builder   --chown=node:node /repo/packages/database/prisma.config.ts ./packages/database/prisma.config.ts
 COPY --chown=node:node infra/docker/api-entrypoint.sh /usr/local/bin/api-entrypoint.sh
 RUN chmod +x /usr/local/bin/api-entrypoint.sh
 
