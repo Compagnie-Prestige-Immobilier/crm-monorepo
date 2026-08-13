@@ -168,7 +168,7 @@ class _CorrectionCard extends ConsumerWidget {
                   .whereType<String>()
                   .join(' '))
         : '';
-    return name.isEmpty ? '$what — $verb' : '$what · $name';
+    return name.isEmpty ? '$what · $verb' : '$what · $name';
   }
 
   Object? get _payload {
@@ -181,7 +181,7 @@ class _CorrectionCard extends ConsumerWidget {
 
   String get _fallbackMessage => row.lastErrorCode == null
       ? 'Envoi impossible.'
-      : 'Refusé par le serveur (${row.lastErrorCode}).';
+      : 'Refusé (${row.lastErrorCode}).';
 
   Future<void> _openOwnership(BuildContext context, WidgetRef ref) async {
     final Object? decoded = _payload;
@@ -204,7 +204,7 @@ class _CorrectionCard extends ConsumerWidget {
 
   void _edit(BuildContext context) {
     if (row.entityType == 'representant') {
-      context.go('${Routes.newRepresentant}?id=${Uri.encodeComponent(row.entityId)}');
+      context.push('${Routes.newRepresentant}?id=${Uri.encodeComponent(row.entityId)}');
     } else {
       context.go(Routes.historique);
     }
@@ -223,9 +223,7 @@ class _CorrectionCard extends ConsumerWidget {
         title: const Text('Abandonner cet envoi ?'),
         content: Text(
           cascade > 1
-              ? 'Cette création entraîne $cascade opérations liées '
-                    '(ses prospects). Toutes seront supprimées, ici et '
-                    'définitivement.'
+              ? '$cascade opérations liées seront supprimées définitivement.'
               : 'Cette saisie sera supprimée définitivement.',
         ),
         actions: <Widget>[
@@ -274,14 +272,7 @@ class _Empty extends StatelessWidget {
             color: context.cpi.success,
           ),
           const SizedBox(height: CpiSpacing.md),
-          Text('Rien à corriger.', style: theme.textTheme.titleSmall),
-          const SizedBox(height: CpiSpacing.xs),
-          Text(
-            'Les saisies refusées par le serveur apparaîtront ici, '
-            'avec ce qu\'il faut faire.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall,
-          ),
+          Text('Rien à corriger', style: theme.textTheme.titleSmall),
         ],
       ),
     );

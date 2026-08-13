@@ -27,8 +27,15 @@ abstract final class Routes {
   /// File des opérations en `conflict` ou `failed`.
   static const String corrections = '/a-corriger';
 
+  /// Centre de notifications. C'est aussi la destination par défaut du tap
+  /// sur une notification qui ne porte pas de route.
+  static const String notifications = '/notifications';
+
   static const String reglages = '/reglages';
   static const String batteryHelp = '/reglages/autorisations';
+
+  /// « À propos » : version, environnement, serveur, informations de support.
+  static const String about = '/reglages/a-propos';
 
   /// Nom du paramètre de requête qui transporte la destination initiale.
   static const String nextParam = 'next';

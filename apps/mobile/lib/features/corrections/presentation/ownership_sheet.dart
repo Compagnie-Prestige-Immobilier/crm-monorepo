@@ -104,7 +104,7 @@ class _OwnershipSheet extends ConsumerWidget {
             OutlinedButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
-                context.go(
+                context.push(
                   '${Routes.newRepresentant}?id=${Uri.encodeComponent(row.entityId)}',
                 );
               },

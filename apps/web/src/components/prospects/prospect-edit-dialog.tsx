@@ -132,7 +132,7 @@ export function ProspectEditDialog({
         <DialogHeader>
           <DialogTitle>Modifier le prospect</DialogTitle>
           <DialogDescription>
-            Saisi le terrain par {prospect?.ownedByCommercialName ?? '—'}. La modification redescend
+            Saisi le terrain par {prospect?.ownedByCommercialName ?? '–'}. La modification redescend
             sur les téléphones à la prochaine synchronisation.
           </DialogDescription>
         </DialogHeader>

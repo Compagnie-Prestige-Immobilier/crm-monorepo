@@ -57,12 +57,6 @@ import { cn } from '@/lib/utils';
 export function ReferentielsView() {
   return (
     <div className="flex flex-col gap-6">
-      <p className="max-w-3xl text-[0.9375rem] text-muted-foreground">
-        Listes proposées à la saisie sur le terrain. Désactiver une valeur la retire des choix
-        mobiles <strong>sans supprimer</strong> les prospects qui la référencent&nbsp;: ceux-ci la
-        conservent et l’affichent «&nbsp;(retiré)&nbsp;».
-      </p>
-
       <Tabs defaultValue="banques">
         <TabsList>
           <TabsTrigger value="banques">Banques</TabsTrigger>
@@ -96,13 +90,11 @@ function useUsage(): { banques: UsageCounts; syndicats: UsageCounts; departement
 
 function TabShell({
   title,
-  description,
   onCreate,
   createLabel,
   children,
 }: {
   title: string;
-  description: string;
   onCreate: () => void;
   createLabel: string;
   children: ReactNode;
@@ -112,7 +104,6 @@ function TabShell({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{title}</h2>
-          <p className="text-[0.8125rem] text-muted-foreground">{description}</p>
         </div>
         <Button onClick={onCreate}>
           <PlusIcon aria-hidden="true" />
@@ -225,7 +216,6 @@ function BanquesTab() {
   return (
     <TabShell
       title="Banques"
-      description="Domiciliation bancaire déclarée par le prospect."
       createLabel="Nouvelle banque"
       onCreate={() => {
         setEditing(undefined);
@@ -427,7 +417,6 @@ function SyndicatsTab() {
   return (
     <TabShell
       title="Syndicats"
-      description="Appartenance syndicale déclarée par le prospect."
       createLabel="Nouveau syndicat"
       onCreate={() => {
         setEditing(undefined);
@@ -476,7 +465,7 @@ function SyndicatsTab() {
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{syndicat.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{syndicat.secteur ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{syndicat.secteur ?? '–'}</TableCell>
                   <TableCell className="text-right">
                     <UsageCell count={usage.syndicats[syndicat.id] ?? 0} />
                   </TableCell>
@@ -615,7 +604,6 @@ function DepartementsTab() {
   return (
     <TabShell
       title="Départements"
-      description="Découpage administratif. Triés par région, puis par nom — l’ordre n’est pas configurable."
       createLabel="Nouveau département"
       onCreate={() => {
         setEditing(undefined);

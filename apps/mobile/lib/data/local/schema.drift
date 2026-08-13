@@ -285,6 +285,51 @@ CREATE INDEX call_attempts_prospect_idx
 
 CREATE INDEX call_attempts_created_idx ON call_attempts (client_created_at DESC);
 
+-- ── Notifications push ───────────────────────────────────────────────────────
+
+-- Centre de notifications, en local.
+--
+-- Pourquoi dupliquer ici ce que l'API sait rendre : l'application est hors
+-- ligne par conception. Un commercial qui ouvre son centre de notifications
+-- dans une zone sans réseau doit y trouver ce qu'il a reçu, pas un indicateur
+-- de chargement. La liste est servie depuis SQLite ; l'API ne fait que la
+-- compléter quand elle est joignable.
+--
+-- `id` est l'identifiant SERVEUR de la notification, et c'est ce qui rend
+-- l'insertion idempotente : FCM remet volontiers deux fois le même message
+-- après une reprise de connexion, et deux lignes fausseraient le compteur de
+-- non-lues.
+CREATE TABLE notifications (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'ANNONCE',
+    -- Route interne ouverte au tap. Déjà validée à l'entrée : une valeur qui
+    -- n'est pas une route interne est effacée avant d'arriver ici, jamais
+    -- conservée « au cas où ».
+    route TEXT NULL,
+    payload TEXT NULL,
+    -- Non nul dès la première lecture, et jamais réécrit ensuite : une
+    -- notification relue ne redevient pas neuve.
+    read_at DATETIME NULL,
+    -- Horodatage d'ENVOI (serveur), qui gouverne l'ordre d'affichage.
+    created_at DATETIME NOT NULL,
+    -- Horodatage de RÉCEPTION sur cet appareil. Distinct du précédent : les
+    -- deux peuvent être séparés de plusieurs heures si le téléphone était
+    -- éteint, et l'ordre doit rester celui de l'envoi.
+    received_at DATETIME NOT NULL
+-- `AS StoredNotification` : sans ce renommage, drift engendrerait une classe
+-- `Notification`, qui entre en collision avec la `Notification` de
+-- `package:flutter/widgets.dart` dans tout écran qui importe Material. La
+-- collision ne se voit pas ici mais trois fichiers plus loin, sous forme d'une
+-- erreur de type incompréhensible.
+) AS StoredNotification;
+
+CREATE INDEX notifications_created_idx ON notifications (created_at);
+
+-- Sert la pastille de non-lues, qui est relue à chaque changement de la table.
+CREATE INDEX notifications_unread_idx ON notifications (read_at);
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Vues — le statut de synchronisation est DÉRIVÉ, jamais stocké
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -436,3 +481,9 @@ attemptsForProspect:
     SELECT * FROM call_attempts
     WHERE prospect_id = :prospectId
     ORDER BY client_created_at DESC;
+
+
+-- ── Notifications ────────────────────────────────────────────────────────────
+
+countUnreadNotifications:
+    SELECT COUNT(*) AS c FROM notifications WHERE read_at IS NULL;

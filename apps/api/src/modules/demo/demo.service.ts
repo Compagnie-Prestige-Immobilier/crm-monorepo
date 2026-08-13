@@ -94,17 +94,27 @@ export class DemoService {
   // Activation
   // ───────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Allume la bascule d'affichage.
+   *
+   * N'ensemence QUE si le jeu de démonstration n'existe pas encore. Une fois
+   * semé, il reste en base ; allumer et éteindre ne fait plus que changer sa
+   * visibilité. C'est ce qui rend l'interrupteur sans danger : il ne détruit
+   * rien, ni côté réel, ni côté démonstration.
+   */
   async enable(adminId: string): Promise<DemoStatusDto> {
     const guard = this.guard();
     if (!guard.allowed) {
       throw new ForbiddenException({ code: 'DEMO_MODE_NOT_ALLOWED', message: guard.reason });
     }
 
-    // Idempotent : réactiver alors que des données existent déjà ne double pas
-    // le jeu. L'administrateur qui appuie deux fois n'a pas à s'en inquiéter.
-    const existing = await this.prisma.demoEntity.count();
-    if (existing > 0) {
-      this.logger.log('Mode démonstration déjà actif — ensemencement ignoré.');
+    const alreadySeeded = await this.prisma.demoEntity.count();
+    if (alreadySeeded > 0) {
+      // Le jeu existe : on se contente d'allumer. Aucune écriture de données.
+      await this.prisma.$transaction(async (tx) => {
+        await this.setSetting(tx, DEMO_MODE_SETTING, 'true', adminId);
+      });
+      this.logger.log('Mode démonstration allumé (jeu déjà en place).');
       return this.status();
     }
 
@@ -113,9 +123,10 @@ export class DemoService {
       async (tx) => {
         await seedDemoData(tx, registry);
 
-        // Le registre est écrit DANS la même transaction que les données. Si
-        // celle-ci échoue, ni les données ni leurs traces ne subsistent : jamais
-        // l'une sans l'autre, ce qui laisserait des lignes intraçables.
+        // Le registre est écrit DANS la même transaction que les données. Il ne
+        // sert plus à la bascule — c'est la colonne `isDemo` qui porte la
+        // visibilité — mais il reste l'inventaire exact de ce qui a été créé,
+        // et donc la seule base sûre d'une suppression définitive.
         await tx.demoEntity.createMany({ data: registry.toRows() });
         await this.setSetting(tx, DEMO_MODE_SETTING, 'true', adminId);
         await this.setSetting(tx, DEMO_SEEDED_AT_SETTING, new Date().toISOString(), adminId);
@@ -123,7 +134,7 @@ export class DemoService {
       { timeout: DEMO_TRANSACTION_TIMEOUT_MS },
     );
 
-    this.logger.log(`Mode démonstration activé : ${String(registry.size)} entités créées.`);
+    this.logger.log(`Mode démonstration semé et allumé : ${String(registry.size)} entités.`);
     return this.status();
   }
 
@@ -132,19 +143,42 @@ export class DemoService {
   // ───────────────────────────────────────────────────────────────────────────
 
   /**
-   * Supprime EXACTEMENT ce que le registre liste.
+   * Éteint la bascule. NE SUPPRIME RIEN.
    *
-   * Aucune heuristique n'intervient : ni motif de nom, ni fenêtre de dates, ni
-   * appartenance à un compte. Une ligne absente du registre n'est jamais
-   * touchée, quelle que soit sa ressemblance avec une donnée de démonstration.
+   * Les lignes de démonstration restent en base, invisibles : aucune lecture ne
+   * les rend plus, export Excel compris. C'est ce qui empêche une fiche fictive
+   * de se retrouver dans un document transmis au siège.
+   *
+   * La suppression définitive est une action SÉPARÉE et explicite (`purge`) :
+   * confondre les deux, c'est risquer qu'un administrateur qui voulait
+   * simplement masquer la démonstration efface les données.
    */
   async disable(adminId: string): Promise<DemoStatusDto> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.setSetting(tx, DEMO_MODE_SETTING, 'false', adminId);
+    });
+    this.logger.log('Mode démonstration éteint — aucune donnée supprimée.');
+    return this.status();
+  }
+
+  /**
+   * Supprime DÉFINITIVEMENT le jeu de démonstration.
+   *
+   * Supprime exactement ce que le registre liste, dans l'ordre inverse de
+   * création. Aucune heuristique n'intervient : ni motif de nom, ni fenêtre de
+   * dates, ni appartenance à un compte. Une ligne absente du registre n'est
+   * jamais touchée, quelle que soit sa ressemblance avec une donnée de
+   * démonstration.
+   *
+   * Action distincte de `disable` : celle-ci est irréversible et l'interface
+   * doit la faire confirmer explicitement.
+   */
+  async purge(adminId: string): Promise<DemoStatusDto> {
     const entries = await this.prisma.demoEntity.findMany({
       orderBy: { sequence: 'desc' },
     });
 
     if (entries.length === 0) {
-      // Idempotent, comme l'activation.
       await this.prisma.$transaction(async (tx) => {
         await this.setSetting(tx, DEMO_MODE_SETTING, 'false', adminId);
       });
@@ -165,13 +199,10 @@ export class DemoService {
     await this.prisma.$transaction(
       async (tx) => {
         for (const group of groups) {
-          const deleter = DEMO_DELETERS[group.type];
-          // Un type inconnu signalerait un registre écrit par une version
-          // ultérieure : on refuse plutôt que d'abandonner des lignes derrière.
           if (!DEMO_ENTITY_TYPES.includes(group.type)) {
             throw new Error(`Type d’entité de démonstration inconnu : ${group.type}`);
           }
-          await deleter(tx, group.ids);
+          await DEMO_DELETERS[group.type](tx, group.ids);
         }
         await tx.demoEntity.deleteMany({});
         await this.setSetting(tx, DEMO_MODE_SETTING, 'false', adminId);
@@ -180,7 +211,7 @@ export class DemoService {
       { timeout: DEMO_TRANSACTION_TIMEOUT_MS },
     );
 
-    this.logger.log(`Mode démonstration désactivé : ${String(entries.length)} entités retirées.`);
+    this.logger.log(`Jeu de démonstration supprimé : ${String(entries.length)} entités.`);
     return this.status();
   }
 
@@ -190,10 +221,19 @@ export class DemoService {
     value: string,
     adminId: string,
   ): Promise<void> {
+    // `updatedById` est une information d'audit, pas une dépendance dure : si
+    // l'auteur a disparu entre-temps — typiquement l'administrateur de
+    // démonstration, supprimé par la purge en cours — le réglage doit tout de
+    // même s'écrire. Sans ce garde-fou, purger emporte l'auteur puis échoue en
+    // voulant enregistrer l'extinction, et le mode reste allumé sur une base
+    // vide.
+    const author = await tx.user.findUnique({ where: { id: adminId }, select: { id: true } });
+    const updatedById = author ? adminId : null;
+
     await tx.appSetting.upsert({
       where: { key },
-      create: { key, value, updatedById: adminId },
-      update: { value, updatedById: adminId },
+      create: { key, value, updatedById },
+      update: { value, updatedById },
     });
   }
 }

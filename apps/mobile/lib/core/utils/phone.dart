@@ -59,8 +59,8 @@ class PhoneInvalid extends PhoneResult {
 
   String get message => switch (reason) {
     PhoneProblem.empty => 'Le numéro est obligatoire.',
-    PhoneProblem.tooShort => 'Numéro incomplet — 9 chiffres attendus.',
-    PhoneProblem.tooLong => 'Numéro trop long — 9 chiffres attendus.',
+    PhoneProblem.tooShort => 'Numéro incomplet : 9 chiffres attendus.',
+    PhoneProblem.tooLong => 'Numéro trop long : 9 chiffres attendus.',
     PhoneProblem.unknownPrefix => 'Ce préfixe n\'existe pas au Sénégal.',
     PhoneProblem.notDigits => 'Le numéro ne doit contenir que des chiffres.',
   };
