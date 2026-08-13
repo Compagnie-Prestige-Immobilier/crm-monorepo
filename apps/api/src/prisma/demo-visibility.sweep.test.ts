@@ -97,10 +97,9 @@ async function walk(dir: string): Promise<string[]> {
 
 /** `true` si le fichier interroge un modèle porteur d'`isDemo`. */
 function readsDemoModel(source: string): boolean {
+  const methods = ['findMany', 'findFirst', 'findUnique', 'count', 'aggregate', 'groupBy'];
   return DEMO_MODELS.some((model) =>
-    new RegExp(`\\.${model}\\.(findMany|findFirst|findUnique|count|aggregate|groupBy)`).test(
-      source,
-    ),
+    methods.some((method) => source.includes(`.${model}.${method}(`)),
   );
 }
 
