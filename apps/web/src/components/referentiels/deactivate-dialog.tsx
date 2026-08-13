@@ -49,8 +49,7 @@ export function DeactivateReferentielDialog({
         <DialogHeader>
           <DialogTitle>Désactiver « {label} » ?</DialogTitle>
           <DialogDescription>
-            La valeur disparaît des listes de saisie de l’application mobile. Elle reste disponible
-            en filtre et en export.
+            Retirée des listes de saisie. Reste disponible en filtre et en export.
           </DialogDescription>
         </DialogHeader>
 
@@ -66,10 +65,8 @@ export function DeactivateReferentielDialog({
           <p className="flex items-start gap-2 rounded-md border border-accent-border/30 bg-accent-surface px-3 py-2.5 text-[0.8125rem]">
             <InfoIcon className="mt-0.5 size-4 shrink-0 text-accent-text" aria-hidden="true" />
             <span>
-              <strong>Aucun prospect n’est supprimé.</strong> Les {formatNumber(usageCount)}{' '}
-              {usageCount === 1 ? 'fiche conserve' : 'fiches conservent'} cette valeur et l’
-              {usageCount === 1 ? 'affichera' : 'afficheront'} suivie de «&nbsp;{RETIRED_SUFFIX}
-              &nbsp;». Réactiver la valeur annule entièrement l’opération.
+              <strong>Aucun prospect n’est supprimé.</strong> Les fiches existantes conservent cette
+              valeur et l’affichent suivie de «&nbsp;{RETIRED_SUFFIX}&nbsp;».
             </span>
           </p>
         </div>

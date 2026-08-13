@@ -192,11 +192,7 @@ class Phase2Controller extends Notifier<Phase2State> {
   /// `true` : une vibration de succès déclenchée à la pression, avant que la
   /// transaction soit commitée, affirmerait un enregistrement qui peut encore
   /// échouer. Un retour haptique qui ment est pire que pas de retour du tout.
-  Future<bool> record({
-    required String outcome,
-    String? method,
-    String? comment,
-  }) async {
+  Future<bool> record({required String outcome, String? method, String? comment}) async {
     final Phase2DirectoryData? entry = state.entry;
     if (entry == null) return false;
     final String? me = ref.read(authControllerProvider).userId;
@@ -268,8 +264,8 @@ class Phase2Controller extends Notifier<Phase2State> {
   }
 
   static String _downloadMessage(ApiException e) => switch (e.code) {
-    'NETWORK' || 'TIMEOUT' =>
-      'Réseau indisponible. L\'annuaire déjà téléchargé reste utilisable.',
+    'NETWORK' ||
+    'TIMEOUT' => 'Réseau indisponible. L\'annuaire déjà téléchargé reste utilisable.',
     'SESSION_EXPIRED' || 'UNAUTHORIZED' => 'Session expirée. Reconnectez-vous.',
     'FORBIDDEN' => 'Votre compte n\'a pas accès à l\'annuaire de phase 2.',
     _ => e.message ?? 'Téléchargement impossible pour le moment.',
@@ -277,17 +273,15 @@ class Phase2Controller extends Notifier<Phase2State> {
 
   /// Libellé humain d'une issue, pour la confirmation et pour la fiche en
   /// lecture seule.
-  static String labelForOutcome(String outcome, [String? method]) =>
-      switch (outcome) {
-        CallOutcomes.methodObtained =>
-          'Méthode obtenue : ${labelForMethod(method ?? '')}',
-        CallOutcomes.unreachable => 'Injoignable',
-        CallOutcomes.callback => 'À rappeler',
-        CallOutcomes.refused => 'Refus',
-        CallOutcomes.wrongNumber => 'Mauvais numéro',
-        CallOutcomes.other => 'Autre',
-        _ => outcome,
-      };
+  static String labelForOutcome(String outcome, [String? method]) => switch (outcome) {
+    CallOutcomes.methodObtained => 'Méthode obtenue : ${labelForMethod(method ?? '')}',
+    CallOutcomes.unreachable => 'Injoignable',
+    CallOutcomes.callback => 'À rappeler',
+    CallOutcomes.refused => 'Refus',
+    CallOutcomes.wrongNumber => 'Mauvais numéro',
+    CallOutcomes.other => 'Autre',
+    _ => outcome,
+  };
 
   static String labelForMethod(String method) => switch (method) {
     EnrollmentMethods.platform => 'Plateforme',

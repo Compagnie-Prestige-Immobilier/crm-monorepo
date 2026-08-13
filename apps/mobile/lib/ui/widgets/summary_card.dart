@@ -83,9 +83,7 @@ class SummaryCard extends StatelessWidget {
                       child: Text(
                         value,
                         key: ValueKey<String>(value),
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: accent,
-                        ),
+                        style: theme.textTheme.headlineSmall?.copyWith(color: accent),
                       ),
                     ),
                 ],

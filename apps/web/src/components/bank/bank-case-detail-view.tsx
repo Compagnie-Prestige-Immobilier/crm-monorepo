@@ -419,11 +419,11 @@ function AdvanceDialog({
           <DialogTitle>
             {isCashing ? 'Déclarer l’encaissement' : `Passer à « ${target?.label ?? ''} »`}
           </DialogTitle>
-          {isCashing ? (
-            <DialogDescription>
-              L’encaissement clôt le dossier. Correction possible ensuite par un administrateur.
-            </DialogDescription>
-          ) : null}
+          <DialogDescription>
+            {isCashing
+              ? 'L’encaissement clôt le dossier. Correction possible ensuite par un administrateur.'
+              : 'Étape suivante du flux ouvert.'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">

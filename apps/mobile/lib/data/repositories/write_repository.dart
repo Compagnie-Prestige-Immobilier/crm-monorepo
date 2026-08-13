@@ -26,8 +26,7 @@ enum CallAttemptProblem {
   String get message => switch (this) {
     CallAttemptProblem.unknownOutcome => 'Issue d\'appel inconnue.',
     CallAttemptProblem.unknownMethod => 'Méthode d\'enrôlement inconnue.',
-    CallAttemptProblem.methodRequired =>
-      'Choisissez la méthode d\'enrôlement obtenue.',
+    CallAttemptProblem.methodRequired => 'Choisissez la méthode d\'enrôlement obtenue.',
     CallAttemptProblem.methodNotAllowed =>
       'Une méthode ne se saisit que si elle a été obtenue.',
     CallAttemptProblem.commentRequired =>
@@ -107,7 +106,9 @@ class WriteRepository {
     final DateTime now = _clock.now();
 
     await _db.transaction(() async {
-      await _db.into(_db.representants).insert(
+      await _db
+          .into(_db.representants)
+          .insert(
             RepresentantsCompanion.insert(
               id: entityId,
               fullName: fullName,
@@ -148,21 +149,20 @@ class WriteRepository {
   }) async {
     final DateTime now = _clock.now();
     await _db.transaction(() async {
-      final Representant current =
-          await (_db.select(_db.representants)
-                ..where((Representants t) => t.id.equals(id)))
-              .getSingle();
-      await (_db.update(_db.representants)
-            ..where((Representants t) => t.id.equals(id)))
-          .write(
-            RepresentantsCompanion(
-              fullName: Value<String>(fullName),
-              phoneE164: Value<String>(phoneE164),
-              notes: Value<String?>(notes),
-              departementId: Value<String>(departementId),
-              localUpdatedAt: Value<DateTime>(now),
-            ),
-          );
+      final Representant current = await (_db.select(
+        _db.representants,
+      )..where((Representants t) => t.id.equals(id))).getSingle();
+      await (_db.update(
+        _db.representants,
+      )..where((Representants t) => t.id.equals(id))).write(
+        RepresentantsCompanion(
+          fullName: Value<String>(fullName),
+          phoneE164: Value<String>(phoneE164),
+          notes: Value<String?>(notes),
+          departementId: Value<String>(departementId),
+          localUpdatedAt: Value<DateTime>(now),
+        ),
+      );
       await _enqueue(
         dependencyKey: id,
         entityType: 'representant',
@@ -192,26 +192,22 @@ class WriteRepository {
   Future<void> deleteRepresentant(String id) async {
     final DateTime now = _clock.now();
     await _db.transaction(() async {
-      final Representant current =
-          await (_db.select(_db.representants)
-                ..where((Representants t) => t.id.equals(id)))
-              .getSingle();
-      await (_db.update(_db.representants)
-            ..where((Representants t) => t.id.equals(id)))
-          .write(
-            RepresentantsCompanion(
-              deletedAt: Value<DateTime?>(now),
-              localUpdatedAt: Value<DateTime>(now),
-            ),
-          );
+      final Representant current = await (_db.select(
+        _db.representants,
+      )..where((Representants t) => t.id.equals(id))).getSingle();
+      await (_db.update(
+        _db.representants,
+      )..where((Representants t) => t.id.equals(id))).write(
+        RepresentantsCompanion(
+          deletedAt: Value<DateTime?>(now),
+          localUpdatedAt: Value<DateTime>(now),
+        ),
+      );
       // Les prospects rattachés suivent : côté serveur la fiche parente
       // disparaît, et laisser localement des prospects visibles pointant vers un
       // représentant supprimé produirait une liste incohérente.
       await (_db.update(_db.prospects)
-            ..where(
-              (Prospects t) =>
-                  t.representantId.equals(id) & t.deletedAt.isNull(),
-            ))
+            ..where((Prospects t) => t.representantId.equals(id) & t.deletedAt.isNull()))
           .write(
             ProspectsCompanion(
               deletedAt: Value<DateTime?>(now),
@@ -247,7 +243,9 @@ class WriteRepository {
     final DateTime now = _clock.now();
 
     await _db.transaction(() async {
-      await _db.into(_db.prospects).insert(
+      await _db
+          .into(_db.prospects)
+          .insert(
             ProspectsCompanion.insert(
               id: entityId,
               nom: nom,
@@ -297,22 +295,21 @@ class WriteRepository {
   }) async {
     final DateTime now = _clock.now();
     await _db.transaction(() async {
-      final Prospect current =
-          await (_db.select(_db.prospects)..where((Prospects t) => t.id.equals(id)))
-              .getSingle();
-      await (_db.update(_db.prospects)..where((Prospects t) => t.id.equals(id)))
-          .write(
-            ProspectsCompanion(
-              nom: Value<String>(nom),
-              prenom: Value<String>(prenom),
-              phoneE164: Value<String>(phoneE164),
-              banqueId: Value<String>(banqueId),
-              syndicatId: Value<String>(syndicatId),
-              representantId: Value<String>(representantId),
-              statut: statut == null ? const Value.absent() : Value<String>(statut),
-              localUpdatedAt: Value<DateTime>(now),
-            ),
-          );
+      final Prospect current = await (_db.select(
+        _db.prospects,
+      )..where((Prospects t) => t.id.equals(id))).getSingle();
+      await (_db.update(_db.prospects)..where((Prospects t) => t.id.equals(id))).write(
+        ProspectsCompanion(
+          nom: Value<String>(nom),
+          prenom: Value<String>(prenom),
+          phoneE164: Value<String>(phoneE164),
+          banqueId: Value<String>(banqueId),
+          syndicatId: Value<String>(syndicatId),
+          representantId: Value<String>(representantId),
+          statut: statut == null ? const Value.absent() : Value<String>(statut),
+          localUpdatedAt: Value<DateTime>(now),
+        ),
+      );
       await _enqueue(
         dependencyKey: representantId,
         entityType: 'prospect',
@@ -337,16 +334,15 @@ class WriteRepository {
   Future<void> deleteProspect(String id) async {
     final DateTime now = _clock.now();
     await _db.transaction(() async {
-      final Prospect current =
-          await (_db.select(_db.prospects)..where((Prospects t) => t.id.equals(id)))
-              .getSingle();
-      await (_db.update(_db.prospects)..where((Prospects t) => t.id.equals(id)))
-          .write(
-            ProspectsCompanion(
-              deletedAt: Value<DateTime?>(now),
-              localUpdatedAt: Value<DateTime>(now),
-            ),
-          );
+      final Prospect current = await (_db.select(
+        _db.prospects,
+      )..where((Prospects t) => t.id.equals(id))).getSingle();
+      await (_db.update(_db.prospects)..where((Prospects t) => t.id.equals(id))).write(
+        ProspectsCompanion(
+          deletedAt: Value<DateTime?>(now),
+          localUpdatedAt: Value<DateTime>(now),
+        ),
+      );
       await _enqueue(
         dependencyKey: current.representantId,
         entityType: 'prospect',
@@ -404,7 +400,9 @@ class WriteRepository {
     final DateTime now = _clock.now();
 
     await _db.transaction(() async {
-      await _db.into(_db.callAttempts).insert(
+      await _db
+          .into(_db.callAttempts)
+          .insert(
             CallAttemptsCompanion.insert(
               id: entityId,
               prospectId: prospectId,
@@ -437,17 +435,17 @@ class WriteRepository {
       // Miroir optimiste. `rev` reste volontairement inchangée : c'est ce qui
       // permet au pull suivant de corriger si le serveur a tranché autrement.
       if (CallOutcomes.terminal.contains(outcome)) {
-        await (_db.update(_db.phase2Directory)
-              ..where((Phase2Directory t) => t.prospectId.equals(prospectId)))
-            .write(
-              Phase2DirectoryCompanion(
-                phase2Status: Value<String>(outcome),
-                enrollmentMethod: Value<String?>(
-                  outcome == CallOutcomes.methodObtained ? method : null,
-                ),
-                updatedAt: Value<DateTime>(now),
-              ),
-            );
+        await (_db.update(
+          _db.phase2Directory,
+        )..where((Phase2Directory t) => t.prospectId.equals(prospectId))).write(
+          Phase2DirectoryCompanion(
+            phase2Status: Value<String>(outcome),
+            enrollmentMethod: Value<String?>(
+              outcome == CallOutcomes.methodObtained ? method : null,
+            ),
+            updatedAt: Value<DateTime>(now),
+          ),
+        );
       }
     });
     return entityId;
@@ -502,7 +500,9 @@ class WriteRepository {
     required DateTime now,
     int? baseRev,
   }) {
-    return _db.into(_db.outbox).insert(
+    return _db
+        .into(_db.outbox)
+        .insert(
           OutboxCompanion.insert(
             id: Ids.newId(),
             dependencyKey: Value<String?>(dependencyKey),
@@ -524,9 +524,9 @@ class WriteRepository {
 
   Future<void> _dropDraft(String? draftId) async {
     if (draftId == null) return;
-    await (_db.delete(_db.formDrafts)
-          ..where((FormDrafts t) => t.draftId.equals(draftId)))
-        .go();
+    await (_db.delete(
+      _db.formDrafts,
+    )..where((FormDrafts t) => t.draftId.equals(draftId))).go();
   }
 
   // ── File « À corriger » ────────────────────────────────────────────────────
@@ -577,9 +577,9 @@ class WriteRepository {
   /// avec un badge « en attente » mensonger.
   Future<int> discardOperation(int seq) async {
     return _db.transaction(() async {
-      final OutboxData? row =
-          await (_db.select(_db.outbox)..where((Outbox o) => o.seq.equals(seq)))
-              .getSingleOrNull();
+      final OutboxData? row = await (_db.select(
+        _db.outbox,
+      )..where((Outbox o) => o.seq.equals(seq))).getSingleOrNull();
       if (row == null) return 0;
 
       // La cascade ne vaut QUE pour la création du représentant, tête de la
@@ -594,13 +594,12 @@ class WriteRepository {
           row.entityType == 'representant' &&
           row.dependencyKey != null) {
         victims =
-            await (_db.select(_db.outbox)
-                  ..where(
-                    (Outbox o) =>
-                        o.dependencyKey.equals(row.dependencyKey!) &
-                        o.seq.isBiggerOrEqualValue(row.seq) &
-                        o.status.isIn(OutboxStatus.open),
-                  ))
+            await (_db.select(_db.outbox)..where(
+                  (Outbox o) =>
+                      o.dependencyKey.equals(row.dependencyKey!) &
+                      o.seq.isBiggerOrEqualValue(row.seq) &
+                      o.status.isIn(OutboxStatus.open),
+                ))
                 .get();
       } else {
         victims = <OutboxData>[row];
@@ -609,9 +608,9 @@ class WriteRepository {
       for (final OutboxData victim in victims) {
         if (victim.op == 'create') {
           if (victim.entityType == 'prospect') {
-            await (_db.delete(_db.prospects)
-                  ..where((Prospects t) => t.id.equals(victim.entityId)))
-                .go();
+            await (_db.delete(
+              _db.prospects,
+            )..where((Prospects t) => t.id.equals(victim.entityId))).go();
           }
         }
       }
@@ -619,16 +618,15 @@ class WriteRepository {
       // un parent tant qu'un prospect le référence.
       for (final OutboxData victim in victims) {
         if (victim.op == 'create' && victim.entityType == 'representant') {
-          await (_db.delete(_db.representants)
-                ..where((Representants t) => t.id.equals(victim.entityId)))
-              .go();
+          await (_db.delete(
+            _db.representants,
+          )..where((Representants t) => t.id.equals(victim.entityId))).go();
         }
       }
 
-      await (_db.delete(_db.outbox)..where(
-            (Outbox o) => o.seq.isIn(victims.map((OutboxData v) => v.seq)),
-          ))
-          .go();
+      await (_db.delete(
+        _db.outbox,
+      )..where((Outbox o) => o.seq.isIn(victims.map((OutboxData v) => v.seq)))).go();
       return victims.length;
     });
   }

@@ -27,7 +27,7 @@ const bricolage = Bricolage_Grotesque({
 
 export const metadata: Metadata = {
   title: {
-    default: 'CPI GO — Administration',
+    default: 'CPI GO · Administration',
     template: '%s · CPI GO',
   },
   description:

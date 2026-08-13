@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
   BanknoteIcon,
@@ -18,6 +18,8 @@ import {
   type ClickableSlice,
 } from '@/components/bank/bank-charts';
 import { BankExportMenu } from '@/components/bank/bank-export-menu';
+import { LiveIndicator } from '@/components/live/live-indicator';
+import { useLive } from '@/components/live/use-live';
 import { BankFiltersBar } from '@/components/bank/bank-filters-bar';
 import { useBankFilters } from '@/components/bank/use-bank-filters';
 import { ChartCard } from '@/components/dashboard/chart-card';
@@ -26,6 +28,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchBankAnalytics } from '@/lib/data/bank-cases';
 import { formatDecimal, formatNumber } from '@/lib/format';
+import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
 import type { FilterOption } from '@/lib/types';
@@ -47,11 +50,18 @@ import type { FilterOption } from '@/lib/types';
 export function BankDashboardView() {
   const router = useRouter();
   const { filters, hrefWith } = useBankFilters();
+  const live = useLive();
 
-  const { data, isPending, isError, error, refetch } = useQuery({
+  const { data, isPending, isError, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: queryKeys.bankAnalytics(filters),
     queryFn: () => fetchBankAnalytics(filters),
+    // Rafraîchissement continu : les chiffres restent affichés pendant le
+    // cycle suivant, l'écran ne repasse jamais par son squelette.
+    refetchInterval: live.refetchInterval,
+    placeholderData: keepPreviousData,
   });
+
+  const hasData = data !== undefined;
 
   /** Va vers la liste, filtre appliqué. `push` et non `replace` : le bouton
    *  « Précédent » doit ramener au graphique. */
@@ -73,24 +83,26 @@ export function BankDashboardView() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Les mêmes filtres pilotent ces indicateurs, la liste des dossiers et le classeur exporté.
-          Cliquez une tranche de graphique pour ouvrir les dossiers correspondants.
-        </p>
+        <LiveIndicator
+          state={live.stateOf(isError)}
+          label={live.labelOf(isError)}
+          updatedAt={hasData ? dataUpdatedAt : null}
+          onTogglePause={live.togglePause}
+        />
         <BankExportMenu filters={filters} />
       </div>
 
       <BankFiltersBar agentOptions={agentOptions} />
 
-      {isError ? (
+      {shouldShowError({ isError, hasData }) ? (
         <QueryErrorState
           error={error}
           onRetry={() => {
             void refetch();
           }}
-          fallback="Les agrégats bancaires n’ont pas pu être calculés."
+          fallback="Les agrégats bancaires n’ont pas pu être calculés. Réessayez."
         />
-      ) : isPending ? (
+      ) : shouldShowSkeleton({ isPending, hasData }) || data === undefined ? (
         <BankDashboardSkeleton />
       ) : (
         <>
@@ -127,17 +139,14 @@ export function BankDashboardView() {
               hint={
                 data.totals.meanDelayHours === null
                   ? 'Aucun dossier encore clos'
-                  : `${formatNumber(Math.round(data.totals.meanDelayHours))} heures, ouverture → issue`
+                  : `${formatNumber(Math.round(data.totals.meanDelayHours))} heures entre ouverture et issue`
               }
               icon={ClockIcon}
             />
           </div>
 
           <div className="grid gap-4 xl:grid-cols-2">
-            <ChartCard
-              title="Dossiers par étape"
-              description="Cliquez une barre pour ouvrir la liste de cette étape"
-            >
+            <ChartCard title="Dossiers par étape">
               <BankRankChart
                 label="Dossiers"
                 items={data.byStage.map((stage): ClickableSlice => ({
@@ -150,15 +159,12 @@ export function BankDashboardView() {
 
             <ChartCard
               title="Encaissements dans le temps"
-              description="En nombre (barres) et en montant (courbe)"
+              description="Nombre (barres) et montant (courbe)"
             >
               <CashingsOverTimeChart buckets={data.cashingsOverTime} />
             </ChartCard>
 
-            <ChartCard
-              title="Par banque"
-              description="Cliquez une part pour ouvrir les dossiers de cette banque"
-            >
+            <ChartCard title="Par banque" description="Banque de traitement">
               <BankShareChart
                 items={data.byBank.map((bank): ClickableSlice => ({
                   label: bank.label,
@@ -168,10 +174,7 @@ export function BankDashboardView() {
               />
             </ChartCard>
 
-            <ChartCard
-              title="Motifs de rejet"
-              description="Cliquez un motif pour ouvrir les dossiers concernés"
-            >
+            <ChartCard title="Motifs de rejet" description="Dossiers rejetés uniquement">
               {data.byRejectionReason.length === 0 ? (
                 <EmptyChart message="Aucun dossier rejeté sur la période filtrée." />
               ) : (
@@ -190,10 +193,7 @@ export function BankDashboardView() {
               )}
             </ChartCard>
 
-            <ChartCard
-              title="Activité par agent"
-              description="Dossiers menés à l’encaissement — cliquez pour filtrer"
-            >
+            <ChartCard title="Activité par agent" description="Dossiers menés à l’encaissement">
               {data.byAgent.length === 0 ? (
                 <EmptyChart message="Aucune activité d’agent sur la période filtrée." />
               ) : (
@@ -208,12 +208,9 @@ export function BankDashboardView() {
               )}
             </ChartCard>
 
-            <ChartCard
-              title="Délai moyen par banque"
-              description="Heures entre l’ouverture et l’issue du dossier"
-            >
+            <ChartCard title="Délai moyen par banque" description="Heures entre ouverture et issue">
               {data.byBank.every((bank) => bank.meanProcessingHours === null) ? (
-                <EmptyChart message="Aucun dossier clos : le délai moyen n’est pas encore calculable." />
+                <EmptyChart message="Aucun dossier clos." />
               ) : (
                 <MeanDelayChart
                   items={data.byBank

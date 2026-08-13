@@ -168,17 +168,15 @@ class Phase2DirectorySync {
     String? method,
   }) async {
     if (!terminalOutcomes.contains(outcome)) return;
-    await (_db.update(_db.phase2Directory)
-          ..where((Phase2Directory t) => t.prospectId.equals(prospectId)))
-        .write(
-          Phase2DirectoryCompanion(
-            phase2Status: Value<String>(outcome),
-            enrollmentMethod: Value<String?>(
-              outcome == 'METHOD_OBTAINED' ? method : null,
-            ),
-            updatedAt: Value<DateTime>(_clock.now()),
-          ),
-        );
+    await (_db.update(
+      _db.phase2Directory,
+    )..where((Phase2Directory t) => t.prospectId.equals(prospectId))).write(
+      Phase2DirectoryCompanion(
+        phase2Status: Value<String>(outcome),
+        enrollmentMethod: Value<String?>(outcome == 'METHOD_OBTAINED' ? method : null),
+        updatedAt: Value<DateTime>(_clock.now()),
+      ),
+    );
   }
 
   Future<Phase2DirectoryData?> lookupByPhone(String phoneE164) =>
@@ -190,17 +188,15 @@ class Phase2DirectorySync {
 
   Future<DateTime?> lastPulledAt() async => (await _stateRow())?.lastPulledAt;
 
-  Stream<SyncStateData?> watchState() =>
-      (_db.select(_db.syncState)
-            ..where((SyncState t) => t.collection.equals(cursorKey)))
-          .watchSingleOrNull();
+  Stream<SyncStateData?> watchState() => (_db.select(
+    _db.syncState,
+  )..where((SyncState t) => t.collection.equals(cursorKey))).watchSingleOrNull();
 
   Future<String?> readCursor() async => (await _stateRow())?.cursor;
 
-  Future<SyncStateData?> _stateRow() =>
-      (_db.select(_db.syncState)
-            ..where((SyncState t) => t.collection.equals(cursorKey)))
-          .getSingleOrNull();
+  Future<SyncStateData?> _stateRow() => (_db.select(
+    _db.syncState,
+  )..where((SyncState t) => t.collection.equals(cursorKey))).getSingleOrNull();
 
   Future<void> writeCursor(String? cursor) async {
     await _db
@@ -230,12 +226,12 @@ class Phase2DirectorySync {
     await _db.transaction(() async {
       await _db.delete(_db.phase2Directory).go();
       await _db.delete(_db.callAttempts).go();
-      await (_db.delete(_db.outbox)
-            ..where((Outbox o) => o.entityType.equals(callAttemptEntity)))
-          .go();
-      await (_db.delete(_db.syncState)
-            ..where((SyncState t) => t.collection.equals(cursorKey)))
-          .go();
+      await (_db.delete(
+        _db.outbox,
+      )..where((Outbox o) => o.entityType.equals(callAttemptEntity))).go();
+      await (_db.delete(
+        _db.syncState,
+      )..where((SyncState t) => t.collection.equals(cursorKey))).go();
     });
   }
 }
@@ -268,11 +264,7 @@ abstract final class CallOutcomes {
 
   /// Les issues qui closent le dossier. `METHOD_OBTAINED` exige une méthode ;
   /// `REFUSED` et `WRONG_NUMBER` sont terminales sans méthode.
-  static const Set<String> terminal = <String>{
-    methodObtained,
-    refused,
-    wrongNumber,
-  };
+  static const Set<String> terminal = <String>{methodObtained, refused, wrongNumber};
 }
 
 /// Méthodes d'enrôlement.

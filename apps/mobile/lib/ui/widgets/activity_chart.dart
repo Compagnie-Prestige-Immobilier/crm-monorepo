@@ -7,11 +7,7 @@ import '../../core/theme/cpi_tokens.dart';
 /// Une journée de saisie.
 @immutable
 class ActivityDay {
-  const ActivityDay({
-    required this.day,
-    required this.synced,
-    required this.pending,
-  });
+  const ActivityDay({required this.day, required this.synced, required this.pending});
 
   final DateTime day;
 
@@ -47,7 +43,17 @@ class ActivityChart extends StatelessWidget {
 
   final List<ActivityDay> days;
 
+  /// Deux lettres et non une.
+  ///
+  /// « L M M J V S D » place deux M côte à côte : sur sept barres, on ne sait
+  /// plus laquelle est mardi et laquelle est mercredi, ce qui est exactement la
+  /// question qu'on se pose devant un graphe d'activité.
   static final DateFormat _weekday = DateFormat('E', 'fr');
+
+  static String _dayLetters(DateTime d) {
+    final String raw = _weekday.format(d).replaceAll('.', '');
+    return raw.length <= 2 ? raw : raw.substring(0, 2);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +90,12 @@ class ActivityChart extends StatelessWidget {
                   syncedColor: theme.colorScheme.primary,
                   pendingColor: cpi.accent,
                   pendingBorder: cpi.accentBorder,
-                  trackColor: theme.colorScheme.surfaceContainerHigh,
+                  // Piste très effacée : à pleine teinte, les jours vides se
+                  // lisaient comme des barres pleines et le graphe racontait
+                  // l'inverse de la réalité.
+                  trackColor: theme.colorScheme.surfaceContainerHigh.withValues(
+                    alpha: 0.45,
+                  ),
                 ),
               ),
             ),
@@ -94,7 +105,7 @@ class ActivityChart extends StatelessWidget {
                 for (final ActivityDay d in days)
                   Expanded(
                     child: Text(
-                      _weekday.format(d.day).substring(0, 1).toUpperCase(),
+                      _dayLetters(d.day),
                       textAlign: TextAlign.center,
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
@@ -217,21 +228,14 @@ class _BarsPainter extends CustomPainter {
       if (peak == 0 || d.total == 0) continue;
 
       final double fullHeight = size.height * (d.total / peak);
-      final double pendingHeight = d.total == 0
-          ? 0
-          : fullHeight * (d.pending / d.total);
+      final double pendingHeight = d.total == 0 ? 0 : fullHeight * (d.pending / d.total);
       final double syncedHeight = fullHeight - pendingHeight;
 
       if (syncedHeight > 0) {
         paint.color = syncedColor;
         canvas.drawRRect(
           RRect.fromRectAndCorners(
-            Rect.fromLTWH(
-              left,
-              size.height - syncedHeight,
-              barWidth,
-              syncedHeight,
-            ),
+            Rect.fromLTWH(left, size.height - syncedHeight, barWidth, syncedHeight),
             bottomLeft: radius,
             bottomRight: radius,
             topLeft: pendingHeight > 0 ? Radius.zero : radius,

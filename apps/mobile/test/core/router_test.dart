@@ -50,10 +50,7 @@ void main() {
 
     setUp(() async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      memory = RouteMemory(
-        await SharedPreferences.getInstance(),
-        buildNumber: '42',
-      );
+      memory = RouteMemory(await SharedPreferences.getInstance(), buildNumber: '42');
     });
 
     test('rien à restaurer au premier lancement', () {

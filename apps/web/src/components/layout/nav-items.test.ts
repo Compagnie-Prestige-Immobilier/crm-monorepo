@@ -38,6 +38,8 @@ describe('navigation d’un agent BANQUE_FINANCE', () => {
       '/campagnes',
       '/representants',
       '/commerciaux',
+      '/supervision',
+      '/statistiques',
       '/referentiels',
       '/parametres',
       '/dossiers/etapes',
@@ -57,6 +59,7 @@ describe('navigation d’un ADMIN', () => {
     const visible = hrefs('ADMIN');
     for (const expected of [
       '/tableau-de-bord',
+      '/statistiques',
       '/prospects',
       '/campagnes',
       '/dossiers',
@@ -65,6 +68,7 @@ describe('navigation d’un ADMIN', () => {
       '/dossiers/etapes',
       '/representants',
       '/commerciaux',
+      '/supervision',
       '/referentiels',
       '/parametres',
     ]) {
@@ -109,6 +113,14 @@ describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
     expect(navTitle('BANQUE_FINANCE', '/dossiers/nouveau')).toBe('Nouveau dossier');
     expect(navTitle('BANQUE_FINANCE', '/dossiers/export')).toBe('Export');
     expect(navTitle('ADMIN', '/dossiers/etapes')).toBe('Étapes bancaires');
+  });
+
+  it('nomme les téléconseillers par leur métier, pas par leur lieu', () => {
+    // L'application sert des téléconseillers sur place. « Commerciaux »
+    // décrivait un métier de terrain qui n'existe pas ici.
+    expect(navTitle('ADMIN', '/commerciaux')).toBe('Téléconseillers');
+    expect(navTitle('ADMIN', '/supervision')).toBe('Supervision');
+    expect(navTitle('ADMIN', '/statistiques')).toBe('Statistiques');
   });
 
   it('garde « Dossiers » sur le détail d’un dossier', () => {

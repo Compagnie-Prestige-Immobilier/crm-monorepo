@@ -61,11 +61,10 @@ export function BankExportMenu({ filters }: { filters: BankCaseFilters }) {
           <span className="flex min-w-0 flex-col">
             <span className="font-[600]">Classeur des dossiers filtrés</span>
             <span className="text-[0.75rem] text-muted-foreground">
-              Trois feuilles : Dossiers, Historique (toutes les transitions) et Synthèse (les
-              agrégats du tableau de bord).
+              Trois feuilles : Dossiers, Historique, Synthèse.
               {activeCount > 0
                 ? ` ${String(activeCount)} filtre${activeCount > 1 ? 's' : ''} appliqué${activeCount > 1 ? 's' : ''}.`
-                : ' Aucun filtre actif : tous les dossiers.'}
+                : ' Aucun filtre : tous les dossiers.'}
             </span>
           </span>
         </DropdownMenuItem>

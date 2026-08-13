@@ -58,10 +58,10 @@ abstract final class Routes {
     return Uri(path: newProspect, queryParameters: q).toString();
   }
 
-  static String newRepresentantWithDraft(String draftId) =>
-      Uri(path: newRepresentant, queryParameters: <String, String>{
-        draftParam: draftId,
-      }).toString();
+  static String newRepresentantWithDraft(String draftId) => Uri(
+    path: newRepresentant,
+    queryParameters: <String, String>{draftParam: draftId},
+  ).toString();
 
   /// `/login?next=<uri encodée>`.
   ///

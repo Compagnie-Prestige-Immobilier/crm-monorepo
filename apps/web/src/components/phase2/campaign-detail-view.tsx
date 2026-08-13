@@ -188,8 +188,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
           <Card>
             <CardContent>
               <p className="text-[0.875rem] text-muted-foreground">
-                Aucun appel n’a encore été remonté depuis le terrain. Les tentatives apparaissent
-                ici à la synchronisation des téléphones.
+                Aucune tentative enregistrée.
               </p>
             </CardContent>
           </Card>
@@ -263,8 +262,8 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                   la clôture annule les tâches en cours : les appels
                   disparaissent des téléphones des commerciaux, séance tenante. */}
               {data.progress.open > 0
-                ? `${formatNumber(data.progress.open)} tâche${data.progress.open > 1 ? 's sont' : ' est'} encore ouverte${data.progress.open > 1 ? 's' : ''} : elle${data.progress.open > 1 ? 's seront annulées' : ' sera annulée'} et disparaîtra${data.progress.open > 1 ? 'ont' : ''} des téléphones des commerciaux. Les prospects concernés redeviendront éligibles à une prochaine campagne.`
-                : 'Aucune tâche n’est encore ouverte : la clôture ne fera que figer la campagne. Les appels déjà aboutis sont conservés.'}
+                ? `${formatNumber(data.progress.open)} tâche${data.progress.open > 1 ? 's' : ''} ouverte${data.progress.open > 1 ? 's' : ''} ${data.progress.open > 1 ? 'seront annulées et retirées' : 'sera annulée et retirée'} des téléphones. Les prospects concernés redeviennent éligibles à une prochaine campagne.`
+                : 'Aucune tâche ouverte. Les appels aboutis sont conservés.'}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

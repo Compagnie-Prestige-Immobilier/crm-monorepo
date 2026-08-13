@@ -5,7 +5,12 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 
 import '@/components/dashboard/chart-setup';
 
-import { seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
+import {
+  seriesBorderColor,
+  seriesColor,
+  useChartTheme,
+  type ChartTheme,
+} from '@/lib/chart-theme';
 import { formatNumber, formatShortDate } from '@/lib/format';
 import type { NamedCount, TimeSeriePoint } from '@/lib/types';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
@@ -107,6 +112,11 @@ export function RankBarChart({ items, label }: { items: readonly NamedCount[]; l
             label,
             data: items.map((item) => item.value),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
+            // §2.6 : la série or ne tient que par son contour `accent-border`.
+            borderColor: items.map((_, index) =>
+              seriesBorderColor(theme, index, seriesColor(theme, index)),
+            ),
+            borderWidth: 1,
             borderRadius: 6,
             borderSkipped: false,
             barThickness: 18,
@@ -144,6 +154,11 @@ export function CategoryBarChart({
             label,
             data: items.map((item) => item.value),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
+            // §2.6 : la série or ne tient que par son contour `accent-border`.
+            borderColor: items.map((_, index) =>
+              seriesBorderColor(theme, index, seriesColor(theme, index)),
+            ),
+            borderWidth: 1,
             borderRadius: 6,
             borderSkipped: false,
             maxBarThickness: 42,
@@ -202,8 +217,12 @@ export function ShareDoughnutChart({ items }: { items: readonly NamedCount[] }) 
             data: items.map((item) => item.value),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
             // La bordure reprend la couleur de la carte : elle sépare les parts
-            // sans introduire une teinte qui n'est dans aucun token.
-            borderColor: theme.tooltipBackground,
+            // sans introduire une teinte qui n'est dans aucun token. Seule la
+            // part or fait exception et prend `accent-border` (§2.6) : un
+            // séparateur blanc ne la délimiterait pas sur un fond blanc.
+            borderColor: items.map((_, index) =>
+              seriesBorderColor(theme, index, theme.tooltipBackground),
+            ),
             borderWidth: 2,
           },
         ],

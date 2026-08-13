@@ -63,18 +63,19 @@ class RetryInterceptor extends Interceptor {
     await Future<void>.delayed(Duration(milliseconds: _random.nextInt(ceiling + 1)));
 
     try {
-      final Response<dynamic> response = await Dio(
-        BaseOptions(
-          baseUrl: request.baseUrl,
-          connectTimeout: request.connectTimeout,
-          sendTimeout: request.sendTimeout,
-          receiveTimeout: request.receiveTimeout,
-        ),
-      ).fetch<dynamic>(
-        request.copyWith(
-          extra: <String, dynamic>{...request.extra, _attemptKey: attempt + 1},
-        ),
-      );
+      final Response<dynamic> response =
+          await Dio(
+            BaseOptions(
+              baseUrl: request.baseUrl,
+              connectTimeout: request.connectTimeout,
+              sendTimeout: request.sendTimeout,
+              receiveTimeout: request.receiveTimeout,
+            ),
+          ).fetch<dynamic>(
+            request.copyWith(
+              extra: <String, dynamic>{...request.extra, _attemptKey: attempt + 1},
+            ),
+          );
       handler.resolve(response);
     } on DioException catch (e) {
       handler.next(e);

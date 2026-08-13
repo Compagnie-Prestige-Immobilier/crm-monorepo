@@ -83,10 +83,7 @@ class CpiGoApp extends ConsumerWidget {
         return MediaQuery(
           data: media.copyWith(
             textScaler: TextScaler.linear(
-              resolveTextScaleFactor(
-                system: media.textScaler,
-                choice: display.textScale,
-              ),
+              resolveTextScaleFactor(system: media.textScaler, choice: display.textScale),
             ),
             // « Réduire les animations » emprunte le chemin de code système :
             // `CpiMotion.of` lit `MediaQuery.maybeDisableAnimationsOf` et ramène
@@ -104,10 +101,7 @@ class CpiGoApp extends ConsumerWidget {
   }
 }
 
-const List<Locale> _supportedLocales = <Locale>[
-  Locale('fr', 'SN'),
-  Locale('fr'),
-];
+const List<Locale> _supportedLocales = <Locale>[Locale('fr', 'SN'), Locale('fr')];
 
 const List<LocalizationsDelegate<dynamic>> _localizationsDelegates =
     <LocalizationsDelegate<dynamic>>[

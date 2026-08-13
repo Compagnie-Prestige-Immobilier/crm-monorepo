@@ -39,7 +39,7 @@ export function AndroidPreview({
 }) {
   const shownTitle = previewClamp(title === '' ? 'Titre de la notification' : title, TITLE_CLAMP);
   const shownBody = previewClamp(
-    body === '' ? 'Le corps du message apparaîtra ici.' : body,
+    body === '' ? 'Corps du message' : body,
     BODY_CLAMP,
   );
   const isPlaceholder = title === '' && body === '';
@@ -86,18 +86,18 @@ export function AndroidPreview({
         {shownTitle.truncated || shownBody.truncated ? (
           <p role="status" className="text-warning">
             {shownTitle.truncated && shownBody.truncated
-              ? 'Le titre et le corps seront coupés tant que la notification n’est pas dépliée.'
+              ? 'Titre et corps coupés une fois repliés.'
               : shownTitle.truncated
-                ? 'Le titre sera coupé sur l’écran de verrouillage.'
-                : 'Le corps sera coupé tant que la notification n’est pas dépliée.'}
+                ? 'Titre coupé une fois replié.'
+                : 'Corps coupé une fois replié.'}
           </p>
         ) : null}
         <p>
           {route === null || route === undefined || route === '' ? (
-            'Sans lien : le tap ouvre le centre de notifications.'
+            'Sans lien : ouvre le centre de notifications.'
           ) : (
             <>
-              Le tap ouvre <code className="font-mono text-foreground">{route}</code>.
+              Ouvre <code className="font-mono text-foreground">{route}</code>.
             </>
           )}
         </p>

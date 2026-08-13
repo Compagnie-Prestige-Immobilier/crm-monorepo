@@ -142,7 +142,7 @@ export function UserFormDialog({
     onError: (error) => {
       toastApiError(
         error,
-        isEdit ? 'La modification du compte a échoué.' : 'La création du compte a échoué.',
+        isEdit ? 'Modification impossible. Réessayez.' : 'Création impossible. Réessayez.',
       );
     },
   });
@@ -156,8 +156,8 @@ export function UserFormDialog({
           <DialogTitle>{isEdit ? 'Modifier le commercial' : 'Nouveau commercial'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? 'Le mot de passe se réinitialise depuis le menu de la ligne, pas ici.'
-              : 'Le compte sert à se connecter à l’application mobile CPI GO, pas à ce panneau.'}
+              ? 'Le mot de passe n’est pas modifiable ici.'
+              : 'Compte de connexion à l’application mobile CPI GO.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -183,7 +183,7 @@ export function UserFormDialog({
           <Field
             label="Identifiant"
             required
-            description="Utilisé pour se connecter, en plus de l’e-mail."
+            description="Utilisé pour la connexion, avec l’e-mail."
             error={formState.errors.username?.message}
           >
             {(props) => (
@@ -198,7 +198,7 @@ export function UserFormDialog({
 
           <Field
             label="Téléphone"
-            description="Saisie libre : le serveur normalise en +221…"
+            description="Format libre."
             error={formState.errors.phone?.message}
           >
             {(props) => (
@@ -233,7 +233,7 @@ export function UserFormDialog({
             <Field
               label="Mot de passe"
               required
-              description="12 caractères minimum. Communiquez-le au commercial par un autre canal."
+              description="12 caractères minimum."
               error={formState.errors.password?.message}
             >
               {(props) => (

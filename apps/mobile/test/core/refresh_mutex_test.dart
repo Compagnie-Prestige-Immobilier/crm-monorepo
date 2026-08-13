@@ -76,16 +76,15 @@ void main() {
       // rendra — l'isolat tué en vol. API typée et non SQL brut : le format de
       // stockage des dates appartient à drift, pas au test.
       await abandoned.protect<void>(() async {});
-      await (db.update(db.syncState)..where(
-            (SyncState t) => t.collection.equals(DatabaseRefreshMutex.lockKey),
-          ))
-          .write(
-            SyncStateCompanion(
-              lastPulledAt: Value<DateTime?>(
-                DateTime.now().add(const Duration(milliseconds: 30)),
-              ),
-            ),
-          );
+      await (db.update(
+        db.syncState,
+      )..where((SyncState t) => t.collection.equals(DatabaseRefreshMutex.lockKey))).write(
+        SyncStateCompanion(
+          lastPulledAt: Value<DateTime?>(
+            DateTime.now().add(const Duration(milliseconds: 30)),
+          ),
+        ),
+      );
 
       bool ran = false;
       await next.protect<void>(() async => ran = true);

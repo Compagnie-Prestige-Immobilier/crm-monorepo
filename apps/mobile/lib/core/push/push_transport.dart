@@ -127,7 +127,8 @@ class FakePushTransport implements PushTransport {
   bool tokenDeleted = false;
   bool initialMessageConsumed = false;
 
-  final StreamController<PushMessage> _foreground = StreamController<PushMessage>.broadcast();
+  final StreamController<PushMessage> _foreground =
+      StreamController<PushMessage>.broadcast();
   final StreamController<PushMessage> _opened = StreamController<PushMessage>.broadcast();
   final StreamController<String> _tokens = StreamController<String>.broadcast();
 

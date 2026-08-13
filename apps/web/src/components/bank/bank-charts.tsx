@@ -16,7 +16,12 @@ import { Chart } from '@/components/dashboard/chart-setup';
  */
 Chart.register(BarController, LineController);
 
-import { seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
+import {
+  seriesBorderColor,
+  seriesColor,
+  useChartTheme,
+  type ChartTheme,
+} from '@/lib/chart-theme';
 import { formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof, xofToChartNumber } from '@/lib/money';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
@@ -134,6 +139,11 @@ export function BankRankChart({
             label,
             data: items.map((item) => item.value),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
+            // §2.6 : la série or ne tient que par son contour `accent-border`.
+            borderColor: items.map((_, index) =>
+              seriesBorderColor(theme, index, seriesColor(theme, index)),
+            ),
+            borderWidth: 1,
             borderRadius: 6,
             borderSkipped: false,
             barThickness: 18,
@@ -192,7 +202,11 @@ export function BankShareChart({ items }: { items: readonly ClickableSlice[] }) 
           {
             data: items.map((item) => item.value),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
-            borderColor: theme.tooltipBackground,
+            // La part or prend `accent-border` (§2.6) : un séparateur couleur
+            // carte ne la délimiterait pas sur un fond clair.
+            borderColor: items.map((_, index) =>
+              seriesBorderColor(theme, index, theme.tooltipBackground),
+            ),
             borderWidth: 2,
           },
         ],
@@ -275,6 +289,8 @@ export function CashingsOverTimeChart({
         label: 'Encaissements',
         data: buckets.map((point) => point.cases),
         backgroundColor: seriesColor(theme, 0),
+        borderColor: seriesBorderColor(theme, 0, seriesColor(theme, 0)),
+        borderWidth: 1,
         borderRadius: 6,
         borderSkipped: false,
         maxBarThickness: 28,
@@ -285,7 +301,9 @@ export function CashingsOverTimeChart({
         type: 'line' as const,
         label: 'Montant',
         data: buckets.map((point) => xofToChartNumber(point.amountXof)),
-        borderColor: seriesColor(theme, 1),
+        // Le trait de la courbe EST son contour : il prend donc
+        // `accent-border`, seule teinte or autorisée pour un tracé (§2.6).
+        borderColor: seriesBorderColor(theme, 1, seriesColor(theme, 1)),
         backgroundColor: seriesColor(theme, 1),
         borderWidth: 2,
         tension: 0.3,
@@ -333,6 +351,11 @@ export function MeanDelayChart({ items }: { items: readonly { label: string; hou
             label: 'Heures',
             data: items.map((item) => item.hours),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
+            // §2.6 : la série or ne tient que par son contour `accent-border`.
+            borderColor: items.map((_, index) =>
+              seriesBorderColor(theme, index, seriesColor(theme, index)),
+            ),
+            borderWidth: 1,
             borderRadius: 6,
             borderSkipped: false,
             barThickness: 18,

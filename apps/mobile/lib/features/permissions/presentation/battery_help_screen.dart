@@ -42,70 +42,73 @@ class BatteryHelpScreen extends StatelessWidget {
     return CpiPopScope(
       fallback: Routes.reglages,
       child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Autorisations et batterie'),
-        leading: const CpiBackButton(fallback: Routes.reglages),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(CpiSpacing.md),
-        children: <Widget>[
-          Container(
-            padding: const EdgeInsets.all(CpiSpacing.sm),
-            decoration: BoxDecoration(
-              color: cpi.infoSurface,
-              borderRadius: CpiRadius.brMd,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Icon(PhosphorIconsRegular.info, size: 20, color: cpi.info),
-                const SizedBox(width: CpiSpacing.xs),
-                Expanded(
-                  child: Text(
-                    'Ces réglages permettent l\'envoi pendant que l\'app est '
-                    'fermée.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: cpi.info),
+        appBar: AppBar(
+          title: const Text('Autorisations et batterie'),
+          leading: const CpiBackButton(fallback: Routes.reglages),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(CpiSpacing.md),
+          children: <Widget>[
+            Container(
+              padding: const EdgeInsets.all(CpiSpacing.sm),
+              decoration: BoxDecoration(
+                color: cpi.infoSurface,
+                borderRadius: CpiRadius.brMd,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Icon(PhosphorIconsRegular.info, size: 20, color: cpi.info),
+                  const SizedBox(width: CpiSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      'Ces réglages permettent l\'envoi pendant que l\'app est '
+                      'fermée.',
+                      style: theme.textTheme.bodySmall?.copyWith(color: cpi.info),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: CpiSpacing.lg),
-          Text('Trois réglages', style: theme.textTheme.titleSmall),
-          const SizedBox(height: CpiSpacing.xs),
-          const _Step(
-            index: 1,
-            title: 'Optimisation de la batterie',
-            body: 'Réglages → Batterie → Optimisation de la batterie → CPI GO → '
-                '« Ne pas optimiser ».',
-          ),
-          const _Step(
-            index: 2,
-            title: 'Démarrage automatique (Xiaomi, Tecno, Infinix, itel)',
-            body: 'Sécurité → Autorisations → Démarrage automatique → activer '
-                'CPI GO.',
-          ),
-          const _Step(
-            index: 3,
-            title: 'Verrouiller l\'app dans les tâches récentes',
-            body: 'Ouvrez les applications récentes, puis touchez le cadenas '
-                'sur CPI GO. Sur beaucoup de ROM, seul ce cadenas empêche la '
-                'fermeture automatique.',
-          ),
-          const SizedBox(height: CpiSpacing.lg),
-          FilledButton.icon(
-            onPressed: _openBatterySettings,
-            icon: const Icon(PhosphorIconsRegular.gear, size: 20),
-            label: const Text('Ouvrir les réglages de batterie'),
-          ),
-          const SizedBox(height: CpiSpacing.xs),
-          OutlinedButton.icon(
-            onPressed: _openAppSettings,
-            icon: const Icon(PhosphorIconsRegular.slidersHorizontal, size: 20),
-            label: const Text('Ouvrir la fiche de l\'application'),
-          ),
-        ],
-      ),
+            const SizedBox(height: CpiSpacing.lg),
+            Text('Trois réglages', style: theme.textTheme.titleSmall),
+            const SizedBox(height: CpiSpacing.xs),
+            const _Step(
+              index: 1,
+              title: 'Optimisation de la batterie',
+              body:
+                  'Réglages → Batterie → Optimisation de la batterie → CPI GO → '
+                  '« Ne pas optimiser ».',
+            ),
+            const _Step(
+              index: 2,
+              title: 'Démarrage automatique (Xiaomi, Tecno, Infinix, itel)',
+              body:
+                  'Sécurité → Autorisations → Démarrage automatique → activer '
+                  'CPI GO.',
+            ),
+            const _Step(
+              index: 3,
+              title: 'Verrouiller l\'app dans les tâches récentes',
+              body:
+                  'Ouvrez les applications récentes, puis touchez le cadenas '
+                  'sur CPI GO. Sur beaucoup de ROM, seul ce cadenas empêche la '
+                  'fermeture automatique.',
+            ),
+            const SizedBox(height: CpiSpacing.lg),
+            FilledButton.icon(
+              onPressed: _openBatterySettings,
+              icon: const Icon(PhosphorIconsRegular.gear, size: 20),
+              label: const Text('Ouvrir les réglages de batterie'),
+            ),
+            const SizedBox(height: CpiSpacing.xs),
+            OutlinedButton.icon(
+              onPressed: _openAppSettings,
+              icon: const Icon(PhosphorIconsRegular.slidersHorizontal, size: 20),
+              label: const Text('Ouvrir la fiche de l\'application'),
+            ),
+          ],
+        ),
       ),
     );
   }

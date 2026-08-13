@@ -54,7 +54,9 @@ void main() {
     String? method,
     int rev = 1,
   }) {
-    return db.into(db.phase2Directory).insert(
+    return db
+        .into(db.phase2Directory)
+        .insert(
           Phase2DirectoryCompanion.insert(
             prospectId: prospectId,
             phoneE164: phone,
@@ -80,12 +82,13 @@ void main() {
     //
     // Ajouter une colonne doit donc casser ici, bruyamment, et obliger celui qui
     // le fait à écrire pourquoi.
-    test('phase2_directory ne stocke exactement que les six champs autorisés',
-        () async {
-      final List<QueryRow> columns =
-          await db.customSelect('PRAGMA table_info(phase2_directory)').get();
-      final Set<String> names =
-          columns.map((QueryRow r) => r.read<String>('name')).toSet();
+    test('phase2_directory ne stocke exactement que les six champs autorisés', () async {
+      final List<QueryRow> columns = await db
+          .customSelect('PRAGMA table_info(phase2_directory)')
+          .get();
+      final Set<String> names = columns
+          .map((QueryRow r) => r.read<String>('name'))
+          .toSet();
 
       expect(names, <String>{
         'prospect_id',
@@ -98,10 +101,12 @@ void main() {
     });
 
     test('aucune colonne nominative n\'a été glissée dans call_attempts', () async {
-      final List<QueryRow> columns =
-          await db.customSelect('PRAGMA table_info(call_attempts)').get();
-      final Set<String> names =
-          columns.map((QueryRow r) => r.read<String>('name')).toSet();
+      final List<QueryRow> columns = await db
+          .customSelect('PRAGMA table_info(call_attempts)')
+          .get();
+      final Set<String> names = columns
+          .map((QueryRow r) => r.read<String>('name'))
+          .toSet();
 
       // Le journal local désigne le dossier par son identifiant. Ni nom, ni
       // téléphone, ni banque : la jointure vers l'annuaire suffit à l'affichage,
@@ -157,8 +162,7 @@ void main() {
     // désignent le même abonné et DOIVENT retrouver la même ligne : sans cela,
     // il conclurait « ce numéro n'est pas dans mon annuaire » et sauterait un
     // dossier, sans que rien ne le signale.
-    test('les trois écritures d\'un même numéro retrouvent la même ligne',
-        () async {
+    test('les trois écritures d\'un même numéro retrouvent la même ligne', () async {
       await seedDirectory(phone: '+221771234567');
 
       for (final String typed in const <String>[
@@ -177,11 +181,7 @@ void main() {
         expect(e164, '+221771234567', reason: 'normalisation de « $typed »');
 
         final Phase2DirectoryData? found = await directory.lookupByPhone(e164!);
-        expect(
-          found?.prospectId,
-          'pros-1',
-          reason: '« $typed » doit retrouver la ligne',
-        );
+        expect(found?.prospectId, 'pros-1', reason: '« $typed » doit retrouver la ligne');
       }
     });
 
@@ -199,10 +199,7 @@ void main() {
         api: const ExplodingApi(),
         clock: clock,
       );
-      expect(
-        (await offline.lookupByPhone('+221771234567'))?.prospectId,
-        'pros-1',
-      );
+      expect((await offline.lookupByPhone('+221771234567'))?.prospectId, 'pros-1');
     });
 
     test('deux prospects ne peuvent pas partager un numéro', () async {
@@ -252,8 +249,10 @@ void main() {
       expect(await directory.readCursor(), 'c2');
 
       // Le curseur de la deuxième page est bien celui rendu par la première.
-      expect(api.directoryCalls.map((({String? cursor, int limit}) c) => c.cursor),
-          <String?>[null, 'c1']);
+      expect(
+        api.directoryCalls.map((({String? cursor, int limit}) c) => c.cursor),
+        <String?>[null, 'c1'],
+      );
     });
 
     test('reprend au curseur enregistré après une coupure', () async {
@@ -276,11 +275,7 @@ void main() {
       api.directoryPages.add(
         directoryPage(
           entries: <Phase2DirectoryEntry>[
-            directoryEntry(
-              prospectId: 'p1',
-              phoneE164: '+221770000001',
-              rev: 2,
-            ),
+            directoryEntry(prospectId: 'p1', phoneE164: '+221770000001', rev: 2),
           ],
         ),
       );
@@ -293,8 +288,7 @@ void main() {
       expect(row.phase2Status, Phase2Statuses.methodObtained);
     });
 
-    test('à révision égale, le serveur l\'emporte sur le miroir optimiste',
-        () async {
+    test('à révision égale, le serveur l\'emporte sur le miroir optimiste', () async {
       // Le scénario de réconciliation : on a marqué localement « refus », le
       // serveur a refusé l'écriture (dossier déjà clos par un collègue) et n'a
       // donc pas bougé sa `rev`. Sans `>=`, ce pull ne corrigerait jamais rien.
@@ -343,8 +337,7 @@ void main() {
   // ───────────────────────────────────────────────────────────────────────────
 
   group('saisie d\'une tentative', () {
-    test('écrit la ligne, la met en file et ferme le dossier localement',
-        () async {
+    test('écrit la ligne, la met en file et ferme le dossier localement', () async {
       await seedDirectory();
 
       final String attemptId = await writes.recordCallAttempt(
@@ -354,9 +347,9 @@ void main() {
         createdById: 'me',
       );
 
-      final CallAttempt attempt = await (db.select(db.callAttempts)
-            ..where((CallAttempts a) => a.id.equals(attemptId)))
-          .getSingle();
+      final CallAttempt attempt = await (db.select(
+        db.callAttempts,
+      )..where((CallAttempts a) => a.id.equals(attemptId))).getSingle();
       expect(attempt.outcome, CallOutcomes.methodObtained);
       expect(attempt.method, EnrollmentMethods.platform);
 
@@ -368,8 +361,7 @@ void main() {
       // numéro partent dans l'ordre de saisie.
       expect(op.dependencyKey, 'phase2:pros-1');
 
-      final Map<String, Object?> payload =
-          jsonDecode(op.payload) as Map<String, Object?>;
+      final Map<String, Object?> payload = jsonDecode(op.payload) as Map<String, Object?>;
       expect(payload['prospectId'], 'pros-1');
       expect(payload['outcome'], CallOutcomes.methodObtained);
       expect(payload['method'], EnrollmentMethods.platform);
@@ -416,10 +408,7 @@ void main() {
         (await directory.lookupByPhone('+221770000001'))?.phase2Status,
         Phase2Statuses.refused,
       );
-      expect(
-        (await directory.lookupByPhone('+221770000002'))?.enrollmentMethod,
-        isNull,
-      );
+      expect((await directory.lookupByPhone('+221770000002'))?.enrollmentMethod, isNull);
     });
 
     group('validation locale', () {
@@ -470,9 +459,9 @@ void main() {
           comment: '  Le mari répond à sa place.  ',
           createdById: 'me',
         );
-        final CallAttempt attempt = await (db.select(db.callAttempts)
-              ..where((CallAttempts a) => a.id.equals(id)))
-            .getSingle();
+        final CallAttempt attempt = await (db.select(
+          db.callAttempts,
+        )..where((CallAttempts a) => a.id.equals(id))).getSingle();
         expect(attempt.comment, 'Le mari répond à sa place.');
       });
 
@@ -528,8 +517,7 @@ void main() {
         );
       });
 
-      test('la base refuse elle aussi, si un chemin de code contournait Dart',
-          () async {
+      test('la base refuse elle aussi, si un chemin de code contournait Dart', () async {
         // La validation Dart donne le message ; le CHECK garantit qu'aucun
         // chemin ne peut l'esquiver.
         await expectLater(
@@ -661,9 +649,9 @@ void main() {
 
       // La saisie locale, elle, n'est PAS effacée : c'est la trace de ce qu'il a
       // réellement fait, et seul un ADMIN peut trancher depuis le web.
-      final CallAttempt kept = await (db.select(db.callAttempts)
-            ..where((CallAttempts a) => a.id.equals(attemptId)))
-          .getSingle();
+      final CallAttempt kept = await (db.select(
+        db.callAttempts,
+      )..where((CallAttempts a) => a.id.equals(attemptId))).getSingle();
       expect(kept.outcome, CallOutcomes.methodObtained);
     });
 
@@ -687,8 +675,7 @@ void main() {
       }
 
       final List<OutboxData> batch = await engine.selectBatch();
-      final Set<String?> keys =
-          batch.map((OutboxData o) => o.dependencyKey).toSet();
+      final Set<String?> keys = batch.map((OutboxData o) => o.dependencyKey).toSet();
       expect(keys.length, lessThanOrEqualTo(engine.maxBatchGroups));
 
       // La vidange complète les emporte quand même, en plusieurs lots.
@@ -697,15 +684,16 @@ void main() {
       expect(api.rawCalls.length, greaterThan(1));
       for (final RawPushCall call in api.rawCalls) {
         final Set<Object?> callKeys = call.operations
-            .map((Map<String, Object?> o) =>
-                (o['data']! as Map<String, Object?>)['prospectId'])
+            .map(
+              (Map<String, Object?> o) =>
+                  (o['data']! as Map<String, Object?>)['prospectId'],
+            )
             .toSet();
         expect(callKeys.length, lessThanOrEqualTo(25));
       }
     });
 
-    test('un lot est homogène : phase 1 et phase 2 ne se mélangent jamais',
-        () async {
+    test('un lot est homogène : phase 1 et phase 2 ne se mélangent jamais', () async {
       // Les deux familles empruntent deux transports différents tant que le
       // client généré ignore `call_attempt`. Un lot mixte n'aurait aucun chemin.
       await insertRepresentant(db, id: 'rep-1', phone: '+221770000009');
@@ -724,8 +712,7 @@ void main() {
       );
 
       final List<OutboxData> batch = await engine.selectBatch();
-      final Set<String> families =
-          batch.map((OutboxData o) => o.entityType).toSet();
+      final Set<String> families = batch.map((OutboxData o) => o.entityType).toSet();
       expect(families, hasLength(1));
 
       await engine.drain();

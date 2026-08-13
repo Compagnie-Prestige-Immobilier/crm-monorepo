@@ -31,8 +31,7 @@ void main() {
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
 
-    final String location = router.routerDelegate.currentConfiguration.uri
-        .toString();
+    final String location = router.routerDelegate.currentConfiguration.uri.toString();
     expect(
       Uri.parse(location).queryParameters[Routes.draftParam],
       'draft-42',
@@ -47,8 +46,7 @@ void main() {
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
 
-    final String location = router.routerDelegate.currentConfiguration.uri
-        .toString();
+    final String location = router.routerDelegate.currentConfiguration.uri.toString();
     // Publier une URL que la liste blanche rejette reviendrait à ne rien
     // publier du tout.
     expect(RouteMemory.isRestorable(location), isTrue);
@@ -100,8 +98,7 @@ class _CreateForm extends StatefulWidget {
   State<_CreateForm> createState() => _CreateFormState();
 }
 
-class _CreateFormState extends State<_CreateForm>
-    with DraftFormMixin<_CreateForm> {
+class _CreateFormState extends State<_CreateForm> with DraftFormMixin<_CreateForm> {
   late final String _draftId = widget.draftIdFromUrl ?? 'draft-42';
 
   @override
@@ -120,9 +117,8 @@ class _CreateFormState extends State<_CreateForm>
   Map<String, Object?> collectDraftValues() => const <String, Object?>{};
 
   @override
-  String? draftRouteWithId() => widget.draftIdFromUrl == null
-      ? Routes.newRepresentantWithDraft(_draftId)
-      : null;
+  String? draftRouteWithId() =>
+      widget.draftIdFromUrl == null ? Routes.newRepresentantWithDraft(_draftId) : null;
 
   @override
   Widget build(BuildContext context) => const Scaffold(body: SizedBox.shrink());

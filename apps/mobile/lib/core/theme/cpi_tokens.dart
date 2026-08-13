@@ -156,7 +156,8 @@ class CpiMotion extends ThemeExtension<CpiMotion> {
   }
 
   @override
-  CpiMotion lerp(covariant CpiMotion? other, double t) => t < 0.5 ? this : (other ?? this);
+  CpiMotion lerp(covariant CpiMotion? other, double t) =>
+      t < 0.5 ? this : (other ?? this);
 }
 
 /// Rendu d'un statut de synchronisation : icône + couleur + libellé.

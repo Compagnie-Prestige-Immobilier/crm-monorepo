@@ -54,11 +54,15 @@ void main() {
   // ───────────────────────────────────────────────────────────────────────────
   group('analyse d’un message', () {
     test('lit l’identifiant, le titre et la route', () {
-      final PushMessage? message = PushMessage.fromData(<String, String>{
-        'notificationId': 'ntf-1',
-        'route': '/phase2',
-        'category': 'RAPPEL',
-      }, notificationTitle: 'Appels en attente', notificationBody: 'Il vous reste 3 fiches.');
+      final PushMessage? message = PushMessage.fromData(
+        <String, String>{
+          'notificationId': 'ntf-1',
+          'route': '/phase2',
+          'category': 'RAPPEL',
+        },
+        notificationTitle: 'Appels en attente',
+        notificationBody: 'Il vous reste 3 fiches.',
+      );
 
       expect(message, isNotNull);
       expect(message!.id, 'ntf-1');
@@ -157,15 +161,18 @@ void main() {
       expect(await store.watchUnreadCount().first, 1);
     });
 
-    test('une remise en double NE REND PAS une notification lue à nouveau non lue', () async {
-      await store.upsert(message('ntf-1'));
-      await store.markRead('ntf-1');
-      await store.upsert(message('ntf-1'));
+    test(
+      'une remise en double NE REND PAS une notification lue à nouveau non lue',
+      () async {
+        await store.upsert(message('ntf-1'));
+        await store.markRead('ntf-1');
+        await store.upsert(message('ntf-1'));
 
-      // Sans cette garantie, la pastille remonte toute seule et l'utilisateur
-      // cesse de lui faire confiance.
-      expect(await store.watchUnreadCount().first, 0);
-    });
+        // Sans cette garantie, la pastille remonte toute seule et l'utilisateur
+        // cesse de lui faire confiance.
+        expect(await store.watchUnreadCount().first, 0);
+      },
+    );
 
     test('la lecture est idempotente : la première l’emporte', () async {
       final DateTime first = t0;
@@ -203,18 +210,20 @@ void main() {
       await store.upsert(message('ntf-1'));
       await store.markRead('ntf-1', at: localRead);
 
-      await store.upsertAll(<PushMessage>[
-        message('ntf-1'),
-      ], readStates: <String, DateTime?>{'ntf-1': serverRead});
+      await store.upsertAll(
+        <PushMessage>[message('ntf-1')],
+        readStates: <String, DateTime?>{'ntf-1': serverRead},
+      );
 
       expect((await store.byId('ntf-1'))!.readAt, localRead);
     });
 
     test('la fusion serveur applique une lecture faite ailleurs', () async {
       await store.upsert(message('ntf-1'));
-      await store.upsertAll(<PushMessage>[
-        message('ntf-1'),
-      ], readStates: <String, DateTime?>{'ntf-1': t0});
+      await store.upsertAll(
+        <PushMessage>[message('ntf-1')],
+        readStates: <String, DateTime?>{'ntf-1': t0},
+      );
 
       expect(await store.watchUnreadCount().first, 0);
     });

@@ -86,14 +86,6 @@ class _OwnershipSheet extends ConsumerWidget {
               'Ce numéro est déjà enregistré par $owner$where.',
               style: theme.textTheme.bodyMedium,
             ),
-            const SizedBox(height: CpiSpacing.xxs),
-            Text(
-              'Nous ne rattachons rien automatiquement : c\'est vous qui décidez '
-              'à qui reviennent ces prospects.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
             const SizedBox(height: CpiSpacing.lg),
             FilledButton.icon(
               onPressed: () => _attach(context, ref),

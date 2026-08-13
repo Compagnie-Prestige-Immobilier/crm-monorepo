@@ -56,7 +56,10 @@ Future<void> cpiPushBackgroundHandler(RemoteMessage message) async {
     database = openAppDatabase();
     await PushInboxStore(database).upsert(push);
 
-    developer.log('Notification ${push.id} enregistrée hors premier plan.', name: 'cpi.push');
+    developer.log(
+      'Notification ${push.id} enregistrée hors premier plan.',
+      name: 'cpi.push',
+    );
   } on Object catch (error, stack) {
     developer.log(
       'Gestionnaire push d’arrière-plan en échec (la notification reste '

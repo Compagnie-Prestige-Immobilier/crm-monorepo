@@ -13,7 +13,8 @@ void main() {
     String label, {
     String? secondary,
     List<String> keywords = const <String>[],
-  }) => TypeaheadOption(id: label, label: label, secondary: secondary, keywords: keywords);
+  }) =>
+      TypeaheadOption(id: label, label: label, secondary: secondary, keywords: keywords);
 
   group('foldSearch', () {
     test('replie les accents des référentiels sénégalais', () {

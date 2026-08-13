@@ -52,8 +52,7 @@ class ReferenceRepository {
   Future<Representant?> findRepresentantByPhone(String phoneE164) {
     return (_db.select(_db.representants)
           ..where(
-            (Representants t) =>
-                t.phoneE164.equals(phoneE164) & t.deletedAt.isNull(),
+            (Representants t) => t.phoneE164.equals(phoneE164) & t.deletedAt.isNull(),
           )
           ..limit(1))
         .getSingleOrNull();
@@ -61,17 +60,15 @@ class ReferenceRepository {
 
   Future<Prospect?> findProspectByPhone(String phoneE164) {
     return (_db.select(_db.prospects)
-          ..where(
-            (Prospects t) => t.phoneE164.equals(phoneE164) & t.deletedAt.isNull(),
-          )
+          ..where((Prospects t) => t.phoneE164.equals(phoneE164) & t.deletedAt.isNull())
           ..limit(1))
         .getSingleOrNull();
   }
 
   Future<Departement?> departementById(String id) {
-    return (_db.select(_db.departements)
-          ..where((Departements t) => t.id.equals(id)))
-        .getSingleOrNull();
+    return (_db.select(
+      _db.departements,
+    )..where((Departements t) => t.id.equals(id))).getSingleOrNull();
   }
 
   /// Représentants avec leur statut de synchronisation, filtrés côté SQL.
@@ -144,20 +141,21 @@ class ReferenceRepository {
   }
 
   Future<Representant?> representantById(String id) {
-    return (_db.select(_db.representants)
-          ..where((Representants t) => t.id.equals(id)))
-        .getSingleOrNull();
+    return (_db.select(
+      _db.representants,
+    )..where((Representants t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<Prospect?> prospectById(String id) {
-    return (_db.select(_db.prospects)..where((Prospects t) => t.id.equals(id)))
-        .getSingleOrNull();
+    return (_db.select(
+      _db.prospects,
+    )..where((Prospects t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<DateTime?> lastPulledAt() async {
-    final SyncStateData? row = await (_db.select(_db.syncState)
-          ..where((SyncState t) => t.collection.equals('all')))
-        .getSingleOrNull();
+    final SyncStateData? row = await (_db.select(
+      _db.syncState,
+    )..where((SyncState t) => t.collection.equals('all'))).getSingleOrNull();
     return row?.lastPulledAt;
   }
 }

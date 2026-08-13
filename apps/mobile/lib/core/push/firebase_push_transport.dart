@@ -61,7 +61,10 @@ class FirebasePushTransport implements PushTransport {
       final NotificationSettings settings = await messaging.requestPermission();
       return _map(settings.authorizationStatus);
     } on Object catch (error) {
-      developer.log('Demande d’autorisation refusée par la plateforme : $error', name: 'cpi.push');
+      developer.log(
+        'Demande d’autorisation refusée par la plateforme : $error',
+        name: 'cpi.push',
+      );
       return PushPermission.unavailable;
     }
   }
@@ -100,7 +103,10 @@ class FirebasePushTransport implements PushTransport {
   @override
   Stream<PushMessage> get foregroundMessages {
     if (!_available) return const Stream<PushMessage>.empty();
-    return FirebaseMessaging.onMessage.map(toPushMessage).where(_isUsable).cast<PushMessage>();
+    return FirebaseMessaging.onMessage
+        .map(toPushMessage)
+        .where(_isUsable)
+        .cast<PushMessage>();
   }
 
   @override

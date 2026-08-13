@@ -268,7 +268,7 @@ export function PurgeCard() {
             </ul>
 
             <p className="rounded-md border border-border px-3 py-2.5 text-[0.875rem]">
-              Votre compte reste en place. Les autres comptes administrateurs aussi.
+              Les comptes administrateurs sont conservés.
             </p>
 
             <div className="flex flex-col gap-2">

@@ -24,7 +24,9 @@ final Provider<PushTransport> pushTransportProvider = Provider<PushTransport>((R
   return const NullPushTransport();
 });
 
-final Provider<PushInboxStore> pushInboxStoreProvider = Provider<PushInboxStore>((Ref ref) {
+final Provider<PushInboxStore> pushInboxStoreProvider = Provider<PushInboxStore>((
+  Ref ref,
+) {
   return PushInboxStore(ref.watch(appDatabaseProvider));
 });
 
@@ -114,7 +116,8 @@ class PendingPushRouteController extends Notifier<PendingPushRoute?> {
   void clear() => state = null;
 }
 
-final NotifierProvider<PendingPushRouteController, PendingPushRoute?> pendingPushRouteProvider =
+final NotifierProvider<PendingPushRouteController, PendingPushRoute?>
+pendingPushRouteProvider =
     NotifierProvider<PendingPushRouteController, PendingPushRoute?>(
       PendingPushRouteController.new,
     );
@@ -145,14 +148,18 @@ class PushPermissionController extends Notifier<PushPermission> {
   /// entièrement utilisable, la boîte de réception se remplit depuis l'API, et
   /// l'écran propose simplement d'ouvrir les réglages système.
   Future<PushPermission> request() async {
-    final PushPermission result = await ref.read(pushTransportProvider).requestPermission();
+    final PushPermission result = await ref
+        .read(pushTransportProvider)
+        .requestPermission();
     state = result;
     return result;
   }
 }
 
 final NotifierProvider<PushPermissionController, PushPermission> pushPermissionProvider =
-    NotifierProvider<PushPermissionController, PushPermission>(PushPermissionController.new);
+    NotifierProvider<PushPermissionController, PushPermission>(
+      PushPermissionController.new,
+    );
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Coordination
@@ -206,7 +213,10 @@ class PushCoordinator extends Notifier<bool> {
   ///
   /// Une seule fois par démarrage : `_startedUp` garde contre une double
   /// consommation si le coordinateur était reconstruit.
-  Future<void> _consumeLaunchMessage(PushTransport transport, PushInboxStore inbox) async {
+  Future<void> _consumeLaunchMessage(
+    PushTransport transport,
+    PushInboxStore inbox,
+  ) async {
     if (_startedUp) return;
     _startedUp = true;
 

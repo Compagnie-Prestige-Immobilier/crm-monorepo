@@ -10,31 +10,37 @@ final DateTime t0 = DateTime.utc(2026, 8, 12, 9);
 Future<AppDatabase> _open() async {
   final AppDatabase db = AppDatabase(NativeDatabase.memory());
   await db.customStatement('PRAGMA foreign_keys = ON;');
-  await db.into(db.departements).insert(
-    DepartementsCompanion.insert(
-      id: 'dep-1',
-      code: 'DK',
-      name: 'Dakar',
-      regionId: 'reg-1',
-      localUpdatedAt: t0,
-    ),
-  );
-  await db.into(db.banques).insert(
-    BanquesCompanion.insert(
-      id: 'bq-1',
-      name: 'Banque Test',
-      shortName: 'BT',
-      localUpdatedAt: t0,
-    ),
-  );
-  await db.into(db.syndicats).insert(
-    SyndicatsCompanion.insert(
-      id: 'sy-1',
-      name: 'Syndicat Test',
-      sigle: 'ST',
-      localUpdatedAt: t0,
-    ),
-  );
+  await db
+      .into(db.departements)
+      .insert(
+        DepartementsCompanion.insert(
+          id: 'dep-1',
+          code: 'DK',
+          name: 'Dakar',
+          regionId: 'reg-1',
+          localUpdatedAt: t0,
+        ),
+      );
+  await db
+      .into(db.banques)
+      .insert(
+        BanquesCompanion.insert(
+          id: 'bq-1',
+          name: 'Banque Test',
+          shortName: 'BT',
+          localUpdatedAt: t0,
+        ),
+      );
+  await db
+      .into(db.syndicats)
+      .insert(
+        SyndicatsCompanion.insert(
+          id: 'sy-1',
+          name: 'Syndicat Test',
+          sigle: 'ST',
+          localUpdatedAt: t0,
+        ),
+      );
   return db;
 }
 
@@ -45,19 +51,21 @@ Future<void> _insertRepresentant(
   DateTime? serverUpdatedAt,
   DateTime? deletedAt,
 }) {
-  return db.into(db.representants).insert(
-    RepresentantsCompanion.insert(
-      id: id,
-      fullName: 'Représentant $id',
-      phoneE164: phone,
-      departementId: 'dep-1',
-      createdById: 'user-1',
-      clientCreatedAt: t0,
-      localUpdatedAt: t0,
-      serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
-      deletedAt: Value<DateTime?>(deletedAt),
-    ),
-  );
+  return db
+      .into(db.representants)
+      .insert(
+        RepresentantsCompanion.insert(
+          id: id,
+          fullName: 'Représentant $id',
+          phoneE164: phone,
+          departementId: 'dep-1',
+          createdById: 'user-1',
+          clientCreatedAt: t0,
+          localUpdatedAt: t0,
+          serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
+          deletedAt: Value<DateTime?>(deletedAt),
+        ),
+      );
 }
 
 Future<void> _insertProspect(
@@ -67,21 +75,23 @@ Future<void> _insertProspect(
   required String phone,
   DateTime? serverUpdatedAt,
 }) {
-  return db.into(db.prospects).insert(
-    ProspectsCompanion.insert(
-      id: id,
-      nom: 'Nom',
-      prenom: 'Prénom',
-      phoneE164: phone,
-      banqueId: 'bq-1',
-      syndicatId: 'sy-1',
-      representantId: representantId,
-      createdById: 'user-1',
-      clientCreatedAt: t0,
-      localUpdatedAt: t0,
-      serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
-    ),
-  );
+  return db
+      .into(db.prospects)
+      .insert(
+        ProspectsCompanion.insert(
+          id: id,
+          nom: 'Nom',
+          prenom: 'Prénom',
+          phoneE164: phone,
+          banqueId: 'bq-1',
+          syndicatId: 'sy-1',
+          representantId: representantId,
+          createdById: 'user-1',
+          clientCreatedAt: t0,
+          localUpdatedAt: t0,
+          serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
+        ),
+      );
 }
 
 Future<void> _queueOp(
@@ -93,18 +103,20 @@ Future<void> _queueOp(
   String status = 'pending',
   DateTime? nextAttemptAt,
 }) {
-  return db.into(db.outbox).insert(
-    OutboxCompanion.insert(
-      id: id,
-      entityType: entityType,
-      entityId: entityId,
-      op: op,
-      payload: '{}',
-      status: Value<String>(status),
-      nextAttemptAt: nextAttemptAt ?? t0,
-      createdAt: t0,
-    ),
-  );
+  return db
+      .into(db.outbox)
+      .insert(
+        OutboxCompanion.insert(
+          id: id,
+          entityType: entityType,
+          entityId: entityId,
+          op: op,
+          payload: '{}',
+          status: Value<String>(status),
+          nextAttemptAt: nextAttemptAt ?? t0,
+          createdAt: t0,
+        ),
+      );
 }
 
 void main() {
@@ -126,12 +138,7 @@ void main() {
       // C'est TOUT l'intérêt de l'index partiel : un `UNIQUE` ordinaire
       // réserverait ce numéro à vie et le commercial ne pourrait plus jamais
       // ressaisir la fiche qu'il vient de supprimer par erreur.
-      await _insertRepresentant(
-        db,
-        id: 'r1',
-        phone: '+221770000001',
-        deletedAt: t0,
-      );
+      await _insertRepresentant(db, id: 'r1', phone: '+221770000001', deletedAt: t0);
       await _insertRepresentant(db, id: 'r2', phone: '+221770000001');
       final List<Representant> rows = await db.select(db.representants).get();
       expect(rows, hasLength(2));
@@ -156,31 +163,24 @@ void main() {
 
       // Résolution d'un doublon : le serveur a renvoyé son propre identifiant.
       // Une seule instruction, pas une boucle de rattrapage.
-      await db.customStatement(
-        'UPDATE representants SET id = ? WHERE id = ?',
-        <Object?>['server-uuid', 'local-uuid'],
-      );
+      await db.customStatement('UPDATE representants SET id = ? WHERE id = ?', <Object?>[
+        'server-uuid',
+        'local-uuid',
+      ]);
 
       final List<Prospect> prospects = await db.select(db.prospects).get();
       expect(prospects, hasLength(2));
-      expect(
-        prospects.map((Prospect p) => p.representantId).toSet(),
-        <String>{'server-uuid'},
-      );
+      expect(prospects.map((Prospect p) => p.representantId).toSet(), <String>{
+        'server-uuid',
+      });
     });
 
     test('un représentant référencé ne peut pas être supprimé physiquement', () async {
       await _insertRepresentant(db, id: 'r1', phone: '+221770000020');
-      await _insertProspect(
-        db,
-        id: 'p1',
-        representantId: 'r1',
-        phone: '+221780000010',
-      );
+      await _insertProspect(db, id: 'p1', representantId: 'r1', phone: '+221780000010');
       expect(
-        () => db.customStatement('DELETE FROM representants WHERE id = ?', <Object?>[
-          'r1',
-        ]),
+        () =>
+            db.customStatement('DELETE FROM representants WHERE id = ?', <Object?>['r1']),
         throwsA(isA<SqliteException>()),
       );
     });
@@ -209,28 +209,19 @@ void main() {
     test('le statut suit l\'opération de tête', () async {
       await _insertRepresentant(db, id: 'r1', phone: '+221770000032');
       await _queueOp(db, id: 'op1', entityType: 'representant', entityId: 'r1');
-      expect(
-        (await db.representantsWithStatus().get()).single.syncStatus,
-        'pending',
-      );
+      expect((await db.representantsWithStatus().get()).single.syncStatus, 'pending');
 
-      await db.customStatement(
-        'UPDATE outbox SET status = ? WHERE id = ?',
-        <Object?>['syncing', 'op1'],
-      );
-      expect(
-        (await db.representantsWithStatus().get()).single.syncStatus,
+      await db.customStatement('UPDATE outbox SET status = ? WHERE id = ?', <Object?>[
         'syncing',
-      );
+        'op1',
+      ]);
+      expect((await db.representantsWithStatus().get()).single.syncStatus, 'syncing');
 
-      await db.customStatement(
-        'UPDATE outbox SET status = ? WHERE id = ?',
-        <Object?>['conflict', 'op1'],
-      );
-      expect(
-        (await db.representantsWithStatus().get()).single.syncStatus,
+      await db.customStatement('UPDATE outbox SET status = ? WHERE id = ?', <Object?>[
         'conflict',
-      );
+        'op1',
+      ]);
+      expect((await db.representantsWithStatus().get()).single.syncStatus, 'conflict');
     });
 
     test('la tête est la plus ancienne opération non terminée', () async {
@@ -256,10 +247,7 @@ void main() {
       );
       // op2 est plus récente, mais op1 n'est pas passée : c'est elle qui décrit
       // la réalité pour l'utilisateur.
-      expect(
-        (await db.representantsWithStatus().get()).single.syncStatus,
-        'failed',
-      );
+      expect((await db.representantsWithStatus().get()).single.syncStatus, 'failed');
     });
 
     test('une opération terminée ne compte plus', () async {
@@ -276,22 +264,14 @@ void main() {
         entityId: 'r1',
         status: 'done',
       );
-      expect(
-        (await db.representantsWithStatus().get()).single.syncStatus,
-        'synced',
-      );
+      expect((await db.representantsWithStatus().get()).single.syncStatus, 'synced');
     });
   });
 
   group('prospect_sync_view', () {
     setUp(() async {
       await _insertRepresentant(db, id: 'r1', phone: '+221770000040');
-      await _insertProspect(
-        db,
-        id: 'p1',
-        representantId: 'r1',
-        phone: '+221780000020',
-      );
+      await _insertProspect(db, id: 'p1', representantId: 'r1', phone: '+221780000020');
     });
 
     Future<String?> statusOfP1() async {
@@ -359,9 +339,9 @@ void main() {
       await _queueOp(db, id: 'op1', entityType: 'representant', entityId: 'r1');
       await _queueOp(db, id: 'op2', entityType: 'representant', entityId: 'r2');
       final List<OutboxData> first = await db.select(db.outbox).get();
-      final int maxSeq = first.map((OutboxData o) => o.seq).reduce(
-        (int a, int b) => a > b ? a : b,
-      );
+      final int maxSeq = first
+          .map((OutboxData o) => o.seq)
+          .reduce((int a, int b) => a > b ? a : b);
 
       await db.customStatement('DELETE FROM outbox');
       await _queueOp(db, id: 'op3', entityType: 'representant', entityId: 'r3');
@@ -431,12 +411,7 @@ void main() {
   group('compteurs', () {
     test('les lignes supprimées logiquement ne comptent pas', () async {
       await _insertRepresentant(db, id: 'r1', phone: '+221770000050');
-      await _insertRepresentant(
-        db,
-        id: 'r2',
-        phone: '+221770000051',
-        deletedAt: t0,
-      );
+      await _insertRepresentant(db, id: 'r2', phone: '+221770000051', deletedAt: t0);
       expect(await db.countRepresentants().getSingle(), 1);
     });
 
@@ -462,14 +437,16 @@ void main() {
 
   group('brouillons et curseurs', () {
     test('un brouillon se relit par sa clé', () async {
-      await db.into(db.formDrafts).insert(
-        FormDraftsCompanion.insert(
-          draftId: 'd1',
-          formKey: 'representant',
-          payload: '{"fullName":"A"}',
-          updatedAt: t0,
-        ),
-      );
+      await db
+          .into(db.formDrafts)
+          .insert(
+            FormDraftsCompanion.insert(
+              draftId: 'd1',
+              formKey: 'representant',
+              payload: '{"fullName":"A"}',
+              updatedAt: t0,
+            ),
+          );
       final FormDraft draft = (await db.select(db.formDrafts).get()).single;
       expect(draft.formKey, 'representant');
       expect(draft.step, 0);
@@ -477,13 +454,15 @@ void main() {
     });
 
     test('le curseur de pull se stocke par collection', () async {
-      await db.into(db.syncState).insert(
-        SyncStateCompanion.insert(
-          collection: 'representants',
-          cursor: const Value<String?>('2026-08-12T09:00:00.000Z|r1'),
-          lastPulledAt: Value<DateTime?>(t0),
-        ),
-      );
+      await db
+          .into(db.syncState)
+          .insert(
+            SyncStateCompanion.insert(
+              collection: 'representants',
+              cursor: const Value<String?>('2026-08-12T09:00:00.000Z|r1'),
+              lastPulledAt: Value<DateTime?>(t0),
+            ),
+          );
       final SyncStateData row = (await db.select(db.syncState).get()).single;
       expect(row.cursor, '2026-08-12T09:00:00.000Z|r1');
     });

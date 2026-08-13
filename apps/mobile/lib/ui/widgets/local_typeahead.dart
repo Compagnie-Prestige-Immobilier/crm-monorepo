@@ -39,14 +39,33 @@ class TypeaheadOption {
 /// `String.normalize('NFD')`), et tirer une dépendance entière pour une
 /// vingtaine de caractères serait disproportionné.
 const Map<String, String> _diacritics = <String, String>{
-  'à': 'a', 'á': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a',
+  'à': 'a',
+  'á': 'a',
+  'â': 'a',
+  'ä': 'a',
+  'ã': 'a',
+  'å': 'a',
   'ç': 'c',
-  'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
-  'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+  'è': 'e',
+  'é': 'e',
+  'ê': 'e',
+  'ë': 'e',
+  'ì': 'i',
+  'í': 'i',
+  'î': 'i',
+  'ï': 'i',
   'ñ': 'n',
-  'ò': 'o', 'ó': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o',
-  'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u',
-  'ý': 'y', 'ÿ': 'y',
+  'ò': 'o',
+  'ó': 'o',
+  'ô': 'o',
+  'ö': 'o',
+  'õ': 'o',
+  'ù': 'u',
+  'ú': 'u',
+  'û': 'u',
+  'ü': 'u',
+  'ý': 'y',
+  'ÿ': 'y',
 };
 
 /// Réduit une chaîne à sa forme comparable : minuscules ET sans accents.
@@ -260,7 +279,10 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                   child: results.isEmpty
                       ? Padding(
                           padding: const EdgeInsets.all(CpiSpacing.md),
-                          child: Text(widget.emptyHint, style: theme.textTheme.bodyMedium),
+                          child: Text(
+                            widget.emptyHint,
+                            style: theme.textTheme.bodyMedium,
+                          ),
                         )
                       // `shrinkWrap` avec une hauteur bornée : le panneau prend
                       // la place de son contenu tant qu'il tient, et **défile**
@@ -279,8 +301,7 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                                 // (docs/design.md §1).
                                 minVerticalPadding: CpiSpacing.sm,
                                 selected: current,
-                                selectedTileColor:
-                                    theme.colorScheme.secondaryContainer,
+                                selectedTileColor: theme.colorScheme.secondaryContainer,
                                 title: Text(option.label),
                                 subtitle: option.secondary == null
                                     ? null

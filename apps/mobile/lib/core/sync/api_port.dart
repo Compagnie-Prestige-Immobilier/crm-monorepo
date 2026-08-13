@@ -208,10 +208,7 @@ class ApiException implements Exception {
 
 /// Le port. Une implémentation = un transport.
 abstract interface class ApiPort {
-  Future<AuthTokens> login({
-    required String identifier,
-    required String password,
-  });
+  Future<AuthTokens> login({required String identifier, required String password});
 
   Future<AuthTokens> refresh({required String refreshToken});
 

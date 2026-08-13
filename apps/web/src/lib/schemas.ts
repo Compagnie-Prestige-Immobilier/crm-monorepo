@@ -16,7 +16,7 @@ export const loginSchema = z.object({
   identifier: z
     .string()
     .trim()
-    .min(1, 'Renseignez votre e-mail ou votre identifiant.')
+    .min(1, 'E-mail ou identifiant obligatoire.')
     .max(160, 'Identifiant trop long.'),
   password: z
     .string()
@@ -41,7 +41,7 @@ const usernameField = z
   .max(40, 'Identifiant trop long.')
   .regex(
     /^[a-zA-Z0-9._]+$/,
-    'Lettres, chiffres, point et tiret bas uniquement — pas d’espace ni d’accent.',
+    'Lettres, chiffres, point et tiret bas uniquement, sans espace ni accent.',
   );
 
 const userBaseSchema = z.object({

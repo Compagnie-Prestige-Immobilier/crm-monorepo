@@ -43,7 +43,7 @@ export function SidebarNav({
         >
           <Image
             src="/brand/cpi-header.png"
-            alt="CPI GO — retour à l’accueil"
+            alt="CPI GO, retour à l’accueil"
             width={489}
             height={200}
             priority
@@ -62,7 +62,7 @@ export function SidebarNav({
                  de dérouler onze liens sans structure. */
               <h2
                 id={`nav-section-${String(index)}`}
-                className="px-3 pb-1.5 text-[0.6875rem] font-[600] uppercase tracking-wide opacity-70"
+                className="eyebrow px-3 pb-1.5 text-sidebar-muted-foreground"
               >
                 {section.title}
               </h2>
@@ -83,11 +83,20 @@ export function SidebarNav({
                       onClick={onNavigate}
                       aria-current={isActive ? 'page' : undefined}
                       className={cn(
-                        'flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-[0.875rem] font-[600]',
+                        // `relative` : porte le filet or de l'élément actif.
+                        'relative flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-[0.875rem] font-[600]',
                         'transition-colors duration-150',
                         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring',
                         isActive
-                          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                          ? [
+                              'bg-sidebar-accent text-sidebar-accent-foreground',
+                              // Le marqueur or : un filet de 3 px à gauche, le
+                              // même geste que `.rail` sur les titres d'écran.
+                              // L'aplat seul se lisait mal, les deux teintes de
+                              // sidebar étant proches ; le filet, lui, se voit.
+                              'before:absolute before:inset-y-1.5 before:left-0 before:w-[3px]',
+                              'before:rounded-full before:bg-accent before:content-[""]',
+                            ]
                           : 'text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
                       )}
                     >
@@ -106,10 +115,11 @@ export function SidebarNav({
       </nav>
 
       <div className="border-t border-sidebar-border px-5 py-4">
-        <p className="text-[0.6875rem] uppercase tracking-wide opacity-70">CPI GO</p>
-        {/* `opacity-60` donnait 4,39:1 en clair, sous les 4,5:1 d'un texte de
-            12 px. `opacity-70` (5,60:1) garde la hiérarchie sans échouer. */}
-        <p className="text-[0.75rem] opacity-70">
+        <p className="eyebrow text-sidebar-muted-foreground">CPI GO</p>
+        {/* Token explicite, plus d'`opacity`. Une opacité posée sur une couleur
+            déjà atténuée ne se mesure dans aucun tableau de tokens : c'est
+            précisément le défaut qui a délavé le panel. 7,07:1 en clair. */}
+        <p className="text-caption text-sidebar-muted-foreground">
           {role === 'BANQUE_FINANCE' ? 'Espace Banque & Finance' : 'Panneau d’administration'}
         </p>
       </div>
