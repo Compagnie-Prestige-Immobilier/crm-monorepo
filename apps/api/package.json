@@ -25,6 +25,7 @@
     "@nestjs/core": "catalog:",
     "@nestjs/jwt": "catalog:",
     "@nestjs/platform-fastify": "catalog:",
+    "@nestjs/schedule": "catalog:",
     "@nestjs/swagger": "catalog:",
     "@nestjs/throttler": "catalog:",
     "argon2": "catalog:",

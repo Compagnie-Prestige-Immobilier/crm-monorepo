@@ -14,13 +14,14 @@ if (existsSync(resolve(root, '.env'))) {
 }
 
 const children = new Set();
+let flutterProcess;
 let stopping = false;
 
 function run(command, args, cwd = root, options = {}) {
   const child = spawn(command, args, {
     cwd,
     env: process.env,
-    stdio: options.interactive ? ['ignore', 'inherit', 'inherit'] : 'inherit',
+    stdio: options.interactive ? ['pipe', 'inherit', 'inherit'] : 'inherit',
     detached: process.platform !== 'win32',
   });
   children.add(child);
@@ -44,15 +45,37 @@ function stopApps() {
 
 function startApps() {
   console.log('[dx] API : http://localhost:3001 · web : http://localhost:3000');
-  run('pnpm', ['--filter', '@crm/api', 'dev']);
-  run('pnpm', ['--filter', '@crm/web', 'dev']);
-  run('flutter', ['run', '-d', 'emulator-5554'], mobile, { interactive: true });
+  if (!isListening(3001)) run('pnpm', ['--filter', '@crm/api', 'dev']);
+  if (!isListening(3000)) run('pnpm', ['--filter', '@crm/web', 'dev']);
+  flutterProcess = run('flutter', ['run', '-d', 'emulator-5554'], mobile, { interactive: true });
 }
 
-function restart() {
-  console.log('[dx] redémarrage…');
-  stopApps();
-  setTimeout(startApps, 500);
+function isListening(port) {
+  const result = spawnSync('lsof', ['-nP', `-iTCP:${String(port)}`, '-sTCP:LISTEN'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  return result.status === 0 && result.stdout.trim().split('\n').length > 1;
+}
+
+function waitForAndroid() {
+  const adb = spawn('adb', ['wait-for-device'], { stdio: 'inherit' });
+  let started = false;
+  const launch = (message) => {
+    if (started || stopping) return;
+    started = true;
+    if (message) console.warn(message);
+    startApps();
+  };
+  const timeout = setTimeout(() => {
+    adb.kill('SIGTERM');
+    launch('[dx] Android non disponible après 15s; API et web démarrent quand même.');
+  }, 15_000);
+  adb.on('exit', (code) => {
+    if (stopping) return;
+    clearTimeout(timeout);
+    launch(code !== 0 ? '[dx] Android indisponible; API et web démarrent quand même.' : '');
+  });
 }
 
 console.log('[dx] démarrage de Postgres, migrations et seed…');
@@ -65,23 +88,27 @@ for (const [command, args] of [
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-const emulator = spawn('flutter', ['emulators', '--launch', 'Pixel_10_Pro_XL'], {
-  cwd: mobile,
-  env: process.env,
-  stdio: 'inherit',
-});
-children.add(emulator);
-emulator.on('exit', () => children.delete(emulator));
-emulator.on('exit', () => {
-  const adb = spawnSync('adb', ['wait-for-device'], { stdio: 'inherit' });
-  if (adb.status !== 0) console.warn('[dx] Android indisponible; Flutter sera relancé quand même.');
-  startApps();
-});
+const devices = spawnSync('adb', ['devices'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+if (/^emulator-\d+\s+device$/m.test(devices.stdout ?? '')) {
+  waitForAndroid();
+} else {
+  const emulator = spawn('flutter', ['emulators', '--launch', 'Pixel_10_Pro_XL'], {
+    cwd: mobile,
+    env: process.env,
+    stdio: 'inherit',
+  });
+  children.add(emulator);
+  emulator.on('exit', () => children.delete(emulator));
+  emulator.on('exit', waitForAndroid);
+}
 
 process.stdin.setRawMode?.(true);
 process.stdin.resume();
 process.stdin.on('data', (data) => {
-  if (data.toString().toLowerCase() === 'r') restart();
+  if (data.toString().toLowerCase() === 'r' && flutterProcess?.stdin.writable) {
+    console.log('[dx] hot restart Flutter…');
+    flutterProcess.stdin.write('R');
+  }
 });
 
 function shutdown() {

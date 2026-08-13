@@ -158,20 +158,25 @@ model User {
   auditLogs     AuditLog[]
 
   // Phase 2
-  enrollmentsCaptured  Prospect[]               @relation("ProspectEnrollmentCapturedBy")
-  campaignsCreated     CallCampaign[]           @relation("CallCampaignCreatedBy")
-  campaignMemberships  CallCampaignCommercial[] @relation("CallCampaignCommercial")
-  callTasksAssigned    CallTask[]               @relation("CallTaskAssignedTo")
-  callAttempts         CallAttempt[]            @relation("CallAttemptPerformedBy")
+  enrollmentsCaptured Prospect[]               @relation("ProspectEnrollmentCapturedBy")
+  campaignsCreated    CallCampaign[]           @relation("CallCampaignCreatedBy")
+  campaignMemberships CallCampaignCommercial[] @relation("CallCampaignCommercial")
+  callTasksAssigned   CallTask[]               @relation("CallTaskAssignedTo")
+  callAttempts        CallAttempt[]            @relation("CallAttemptPerformedBy")
 
   // Banque & Finance
-  bankCasesCreated     BankCase[]           @relation("BankCaseCreatedBy")
-  bankCasesUpdated     BankCase[]           @relation("BankCaseUpdatedBy")
-  bankCaseTransitions  BankCaseTransition[] @relation("BankCaseTransitionBy")
+  bankCasesCreated    BankCase[]           @relation("BankCaseCreatedBy")
+  bankCasesUpdated    BankCase[]           @relation("BankCaseUpdatedBy")
+  bankCaseTransitions BankCaseTransition[] @relation("BankCaseTransitionBy")
 
   // Démonstration
   appSettingsUpdated AppSetting[] @relation("AppSettingUpdatedBy")
 
+  // Notifications push
+  deviceTokens           DeviceToken[]          @relation("DeviceTokenUser")
+  notificationsCreated   Notification[]         @relation("NotificationCreatedBy")
+  notificationDeliveries NotificationDelivery[] @relation("NotificationDeliveryUser")
+  notificationTemplates  NotificationTemplate[] @relation("NotificationTemplateCreatedBy")
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -240,6 +245,7 @@ model Departement {
 
   users         User[]
   representants Representant[]
+  notifications Notification[] @relation("NotificationAudienceDepartement")
 
   @@unique([regionId, name])
   @@index([updatedAt])
@@ -314,7 +320,6 @@ model Representant {
 
   prospects Prospect[]
 
-
   /// Ligne appartenant au jeu de démonstration.
   ///
   /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
@@ -367,18 +372,17 @@ model Prospect {
   // `phase2Status = METHOD_OBTAINED`, et NULL pour tous les autres statuts.
   // Il est aussi posé en contrainte CHECK dans la migration, pour qu'aucun
   // chemin d'écriture — y compris un correctif SQL manuel — ne puisse le violer.
-  phase2Status     Phase2Status      @default(PENDING)
-  enrollmentMethod EnrollmentMethod?
+  phase2Status           Phase2Status      @default(PENDING)
+  enrollmentMethod       EnrollmentMethod?
   enrollmentCapturedAt   DateTime?
   enrollmentCapturedById String?
-  enrollmentCapturedBy   User?       @relation("ProspectEnrollmentCapturedBy", fields: [enrollmentCapturedById], references: [id], onDelete: SetNull)
+  enrollmentCapturedBy   User?             @relation("ProspectEnrollmentCapturedBy", fields: [enrollmentCapturedById], references: [id], onDelete: SetNull)
 
   clientCreatedAt DateTime
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
-
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -438,16 +442,16 @@ model Prospect {
 // AVANT la transaction de travail. Placée dedans, un rollback l'effacerait et
 // le rejeu réécrirait — c'est l'erreur classique sur ce motif.
 model SyncBatch {
-  key         String     @map("idempotency_key")
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  requestHash String
-  status      BatchStatus @default(IN_PROGRESS)
-  httpStatus  Int?
+  key          String      @map("idempotency_key")
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestHash  String
+  status       BatchStatus @default(IN_PROGRESS)
+  httpStatus   Int?
   responseJson Json?
-  createdAt   DateTime   @default(now())
-  completedAt DateTime?
-  expiresAt   DateTime
+  createdAt    DateTime    @default(now())
+  completedAt  DateTime?
+  expiresAt    DateTime
 
   operations SyncOperation[]
 
@@ -512,11 +516,11 @@ model AuditLog {
 // affectations sont matérialisées dans CallTask ; la graine ne sert qu'à
 // pouvoir rejouer et auditer le tirage.
 model CallCampaign {
-  id       String         @id @default(uuid(7))
-  name     String
-  scope    CampaignScope
-  seed     String
-  status   CampaignStatus @default(ACTIVE)
+  id     String         @id @default(uuid(7))
+  name   String
+  scope  CampaignScope
+  seed   String
+  status CampaignStatus @default(ACTIVE)
 
   createdById String
   createdBy   User   @relation("CallCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
@@ -528,7 +532,6 @@ model CallCampaign {
   commerciaux CallCampaignCommercial[]
   tasks       CallTask[]
   attempts    CallAttempt[]
-
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -588,7 +591,6 @@ model CallTask {
 
   attempts CallAttempt[]
 
-
   /// Ligne appartenant au jeu de démonstration.
   ///
   /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
@@ -614,11 +616,11 @@ model CallTask {
 // il faut donc conserver les deux pour que l'attribution reste juste.
 model CallAttempt {
   // UUID v7 généré par le mobile — sert aussi de clé d'idempotence.
-  id         String       @id
+  id         String        @id
   prospectId String
-  prospect   Prospect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  prospect   Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
   taskId     String?
-  task       CallTask?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  task       CallTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
   campaignId String?
   campaign   CallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
@@ -632,7 +634,6 @@ model CallAttempt {
 
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())
-
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -743,16 +744,15 @@ model BankCase {
   rev Int @default(1)
 
   createdById String
-  createdBy   User   @relation("BankCaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy   User    @relation("BankCaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedById String?
-  updatedBy   User?  @relation("BankCaseUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedBy   User?   @relation("BankCaseUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   transitions BankCaseTransition[]
-
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -801,7 +801,6 @@ model BankCaseTransition {
 
   clientAt  DateTime?
   createdAt DateTime  @default(now())
-
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -858,4 +857,242 @@ model DemoEntity {
   @@unique([entityType, entityId])
   @@index([sequence])
   @@map("demo_entities")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Notifications push
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Nature du message. Sert au filtrage de la boîte de réception et au choix du
+/// canal Android (un rappel n'a pas à réveiller l'écran comme une annonce).
+enum NotificationCategory {
+  ANNONCE
+  RAPPEL
+  CAMPAGNE
+  DOSSIER
+  SYSTEME
+}
+
+/// À qui la notification s'adresse. Le public est figé À L'ENVOI dans les
+/// lignes NotificationDelivery : muter un utilisateur de département après coup
+/// ne réécrit pas l'histoire de ce qui a été expédié.
+enum NotificationAudience {
+  ALL
+  ROLE
+  DEPARTEMENT
+  USERS
+}
+
+enum NotificationStatus {
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELLED
+}
+
+/// Cycle de vie d'un envoi vers UN destinataire.
+///
+/// `SENT` signifie « accepté par FCM », pas « affiché ». `DELIVERED` n'est
+/// atteignable que si l'appareil le confirme. La distinction compte : un taux
+/// de SENT à 100 % avec zéro READ décrit un problème, pas un succès.
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
+/// Jeton FCM d'un appareil.
+///
+/// `token` est unique SANS être rattaché durablement à un utilisateur : les
+/// téléphones se prêtent. À l'enregistrement, le jeton est DÉTACHÉ de son
+/// propriétaire précédent au lieu d'être dupliqué — sans quoi l'ancien
+/// utilisateur continuerait de recevoir sur un appareil qui n'est plus le sien,
+/// ce qui est une fuite de données, pas une imperfection.
+model DeviceToken {
+  id     String @id @default(uuid(7))
+  userId String
+  user   User   @relation("DeviceTokenUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  token      String         @unique
+  platform   DevicePlatform @default(ANDROID)
+  appVersion String?
+
+  lastSeenAt DateTime  @default(now())
+  // Non nul dès la déconnexion, ou dès que FCM répond UNREGISTERED. Un jeton
+  // mort le reste : le réessayer indéfiniment pollue les métriques d'échec.
+  revokedAt  DateTime?
+
+  /// Nombre d'écritures encore dans la file d'attente locale, RAPPORTÉ par
+  /// l'appareil à chaque enregistrement.
+  ///
+  /// Le serveur ne peut pas deviner ce que contient une file locale. La
+  /// solution paresseuse — « ce commercial n'a rien poussé depuis N jours » —
+  /// confond un téléphone en panne avec un commercial en congé, et réveille le
+  /// second toutes les nuits. Ici l'appareil déclare son propre retard : le
+  /// rappel ne part que s'il y a réellement quelque chose à synchroniser.
+  pendingOps   Int       @default(0)
+  /// Depuis quand la file est non vide. Remis à NULL dès qu'elle se vide.
+  pendingSince DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Ligne appartenant au jeu de démonstration.
+  isDemo Boolean @default(false)
+
+  @@index([userId, revokedAt])
+  @@index([revokedAt])
+  @@index([isDemo])
+  @@map("device_tokens")
+}
+
+/// Gabarit réutilisable, éditable par l'ADMIN.
+///
+/// Les variables sont écrites `{{nom}}` dans le titre comme dans le corps.
+/// `variables` documente celles que le gabarit attend : c'est ce que le
+/// compositeur web affiche à l'auteur. Une variable manquante à la substitution
+/// n'est pas une erreur fatale — le texte est rendu sans elle et le nom manquant
+/// est remonté à l'appelant, parce qu'un rappel amputé vaut mieux qu'un rappel
+/// non envoyé.
+model NotificationTemplate {
+  id       String               @id @default(uuid(7))
+  name     String               @unique
+  category NotificationCategory @default(ANNONCE)
+
+  titleTemplate String
+  bodyTemplate  String
+  route         String?
+  variables     String[] @default([])
+
+  isActive Boolean @default(true)
+
+  createdById String?
+  createdBy   User?   @relation("NotificationTemplateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notifications Notification[]
+
+  /// Ligne appartenant au jeu de démonstration.
+  isDemo Boolean @default(false)
+
+  @@index([category])
+  @@index([isDemo])
+  @@map("notification_templates")
+}
+
+/// Un envoi, immédiat ou programmé.
+///
+/// `reminderKey` + `period` portent l'idempotence des rappels récurrents : le
+/// couple est unique, donc deux instances de l'API qui déclenchent le même
+/// rappel à la même minute produisent une insertion et un conflit, pas deux
+/// notifications. Les envois manuels laissent les deux à NULL — en PostgreSQL
+/// les NULL ne se heurtent jamais dans un index unique, ce qui laisse le
+/// compositeur libre de renvoyer deux fois le même texte.
+model Notification {
+  id       String               @id @default(uuid(7))
+  title    String
+  body     String
+  category NotificationCategory @default(ANNONCE)
+
+  /// Route applicative ouverte au tap, ex. `/phase2?phone=+221771234567`.
+  /// Volontairement une route interne et non une URL : le mobile la donne
+  /// telle quelle à go_router, sans jamais ouvrir de navigateur.
+  route   String?
+  payload Json?
+
+  audience              NotificationAudience @default(ALL)
+  audienceRole          Role?
+  audienceDepartementId String?
+  audienceDepartement   Departement?         @relation("NotificationAudienceDepartement", fields: [audienceDepartementId], references: [id], onDelete: SetNull)
+  audienceUserIds       String[]             @default([])
+
+  status       NotificationStatus @default(SENT)
+  scheduledFor DateTime?
+  sentAt       DateTime?
+  cancelledAt  DateTime?
+
+  /// Renseigné quand aucun transport n'était configuré : les lignes de
+  /// livraison existent, la remise n'a pas eu lieu. L'admin doit le voir.
+  transportStatus String?
+
+  templateId String?
+  template   NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?   @relation("NotificationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  reminderKey String?
+  period      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveries NotificationDelivery[]
+
+  /// Ligne appartenant au jeu de démonstration.
+  isDemo Boolean @default(false)
+
+  @@unique([reminderKey, period])
+  @@index([status, scheduledFor])
+  @@index([createdAt])
+  @@index([category])
+  @@index([createdById])
+  @@index([isDemo])
+  @@map("notifications")
+}
+
+/// Une ligne par destinataire. C'est cette table, et elle seule, qui rend
+/// « qui a réellement reçu ? » répondable.
+///
+/// `reminderKey`/`period` y sont RECOPIÉS pour porter la contrainte
+/// `(reminderKey, userId, period)` : même si un rappel était recréé, un
+/// utilisateur ne peut pas recevoir deux fois le même rappel sur la même
+/// période. La garantie est dans l'index, pas dans la discipline de l'appelant.
+model NotificationDelivery {
+  id             String       @id @default(uuid(7))
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("NotificationDeliveryUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  status NotificationDeliveryStatus @default(PENDING)
+
+  /// Jeton effectivement visé. Conservé en texte et non en clé étrangère : le
+  /// jeton peut être élagué ensuite, l'historique de l'envoi ne doit pas
+  /// disparaître avec lui.
+  deviceToken String?
+  error       String?
+
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  failedAt    DateTime?
+
+  reminderKey String?
+  period      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Ligne appartenant au jeu de démonstration.
+  isDemo Boolean @default(false)
+
+  @@unique([notificationId, userId])
+  @@unique([reminderKey, userId, period])
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([notificationId, status])
+  @@index([isDemo])
+  @@map("notification_deliveries")
 }
