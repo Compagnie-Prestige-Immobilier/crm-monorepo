@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -18,6 +19,14 @@ async function login(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Se connecter' }).click();
   await page.waitForURL('**/tableau-de-bord');
 }
+
+test('l’écran de connexion ne présente aucune violation axe', async ({ page }) => {
+  await page.goto('/connexion');
+  await expect(page.getByRole('heading', { name: 'Connexion', level: 1 })).toBeVisible();
+
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations, JSON.stringify(results.violations)).toEqual([]);
+});
 
 test('la connexion pose une session utilisable et mène au tableau de bord', async ({ page }) => {
   await login(page);
