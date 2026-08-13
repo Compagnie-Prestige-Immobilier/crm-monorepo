@@ -26,6 +26,7 @@ import { demoScope } from '../../prisma/demo-visibility.js';
 
 export const REPRESENTANT_INCLUDE = {
   departement: { select: { name: true } },
+  ief: { select: { name: true } },
   createdBy: { select: { id: true, fullName: true } },
   _count: { select: { prospects: { where: { deletedAt: null } } } },
 } satisfies Prisma.RepresentantInclude;
@@ -43,6 +44,8 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     rev: row.rev,
     departementId: row.departementId,
     departementName: row.departement.name,
+    iefId: row.iefId,
+    iefName: row.ief?.name ?? null,
     createdById: row.createdById,
     createdByName: row.createdBy.fullName,
     clientCreatedAt: row.clientCreatedAt.toISOString(),
@@ -78,6 +81,7 @@ export class RepresentantsService {
           : '__aucun__';
     }
     if (query.departementId) where.departementId = query.departementId;
+    if (query.iefId) where.iefId = query.iefId;
 
     const search = query.search?.trim();
     if (search) {
@@ -171,6 +175,7 @@ export class RepresentantsService {
         phoneE164,
         ...(input.notes ? { notes: input.notes } : {}),
         departementId: input.departementId,
+        iefId: input.iefId ?? null,
         createdById: user.id,
         clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
       },
@@ -203,6 +208,7 @@ export class RepresentantsService {
         ...(phoneE164 ? { phoneE164 } : {}),
         ...(input.notes !== undefined ? { notes: input.notes || null } : {}),
         ...(input.departementId ? { departementId: input.departementId } : {}),
+        ...(input.iefId === undefined ? {} : { iefId: input.iefId }),
         ...(input.clientCreatedAt ? { clientCreatedAt: new Date(input.clientCreatedAt) } : {}),
         rev: { increment: 1 },
       },

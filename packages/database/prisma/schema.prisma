@@ -245,11 +245,40 @@ model Departement {
 
   users         User[]
   representants Representant[]
+  iefs          Ief[]
   notifications Notification[] @relation("NotificationAudienceDepartement")
 
   @@unique([regionId, name])
   @@index([updatedAt])
   @@map("departements")
+}
+
+/// Inspection de l'Éducation et de la Formation.
+///
+/// Découpage SCOLAIRE, distinct du découpage administratif. Les feuilles de
+/// route CHUES sont bâties dessus : un téléconseiller reçoit « IEF Almadies »,
+/// jamais « Dakar ». 59 IEF pour 46 départements — Dakar en porte quatre.
+///
+/// Le rattachement au représentant est FACULTATIF, et le restera : les fiches
+/// déjà saisies n'en portent pas, et une colonne obligatoire les rendrait
+/// invalides rétroactivement. Le département reste, lui, obligatoire — il est
+/// déductible de l'IEF, jamais l'inverse.
+model Ief {
+  id            String      @id @default(uuid(7))
+  code          String      @unique
+  name          String
+  departementId String
+  departement   Departement @relation(fields: [departementId], references: [id], onDelete: Restrict)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  representants Representant[]
+
+  @@unique([departementId, name])
+  @@index([updatedAt])
+  @@map("iefs")
 }
 
 model Banque {
@@ -301,6 +330,10 @@ model Representant {
 
   departementId String
   departement   Departement @relation(fields: [departementId], references: [id], onDelete: Restrict)
+
+  /// IEF de rattachement, facultative. Voir le modele `Ief`.
+  iefId String?
+  ief   Ief?    @relation(fields: [iefId], references: [id], onDelete: Restrict)
 
   // Le commercial qui l'a saisi le premier. Ne change pas si un autre commercial
   // rattache ensuite des prospects au même représentant — la paternité de la

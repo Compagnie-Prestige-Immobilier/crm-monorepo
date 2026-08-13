@@ -30,6 +30,24 @@ export class DepartementDto {
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
 
+/**
+ * Une IEF — Inspection de l'Éducation et de la Formation.
+ *
+ * `departementName` accompagne l'identifiant parce que le libellé seul est
+ * ambigu à l'écran : « Bignona 1 » et « Bignona 2 » ne se distinguent qu'au
+ * département, et il y a quatre IEF dans le seul département de Dakar.
+ */
+export class IefDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() code!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty({ format: 'uuid' }) departementId!: string;
+  @ApiProperty() departementName!: string;
+  @ApiProperty() regionName!: string;
+  @ApiProperty({ type: Boolean }) isActive!: boolean;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
 export class BanqueDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() name!: string;

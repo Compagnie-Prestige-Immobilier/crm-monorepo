@@ -1,5 +1,12 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Role } from '@crm/database';
 
 import { Roles } from '../../common/decorators/roles.decorator.js';
@@ -10,6 +17,7 @@ import {
   CreateDepartementDto,
   CreateSyndicatDto,
   DepartementDto,
+  IefDto,
   ReferentielQueryDto,
   ReferentielsBundleDto,
   RegionDto,
@@ -55,6 +63,24 @@ export class ReferentielsController {
   @ApiResponse({ status: 200, type: [DepartementDto] })
   listDepartements(@Query() query: ReferentielQueryDto): Promise<DepartementDto[]> {
     return this.referentiels.listDepartements(query);
+  }
+
+  @Get('iefs')
+  @ApiOperation({
+    operationId: 'listIefs',
+    summary: 'Liste des IEF, éventuellement restreinte à un département.',
+    description:
+      'L’IEF est le découpage SCOLAIRE, distinct du découpage administratif : ' +
+      '59 IEF pour 46 départements. Les feuilles de route sont bâties dessus, ' +
+      'et quatre IEF partagent le seul département de Dakar.',
+  })
+  @ApiQuery({ name: 'departementId', required: false, format: 'uuid' })
+  @ApiResponse({ status: 200, type: [IefDto] })
+  listIefs(
+    @Query() query: ReferentielQueryDto,
+    @Query('departementId') departementId?: string,
+  ): Promise<IefDto[]> {
+    return this.referentiels.listIefs(query, departementId);
   }
 
   @Get('regions')

@@ -6,6 +6,7 @@ import type {
   Banque,
   Departement,
   FilterOption,
+  Ief,
   ReferenceData,
   Region,
   Syndicat,
@@ -24,8 +25,15 @@ import type {
 export async function fetchReferenceData(
   client: ApiClient = getApiClient(),
 ): Promise<ReferenceData> {
-  const [bundle, users, representants, campaigns] = await Promise.all([
+  const [bundle, iefs, users, representants, campaigns] = await Promise.all([
     client.GET('/api/v1/referentiels', { params: { query: { activeOnly: false } } }),
+    /**
+     * Les IEF ne sont pas dans le lot `/referentiels` : elles y ajouteraient
+     * 59 lignes à une réponse déjà tirée par tous les écrans, alors qu'un seul
+     * s'en sert. Requête séparée, mais dans le MÊME `Promise.all` — la barre de
+     * filtre ne doit pas afficher six listes prêtes et une septième en attente.
+     */
+    client.GET('/api/v1/referentiels/iefs', { params: { query: { activeOnly: false } } }),
     // 200 : au-delà, l'API plafonne. CPI compte une dizaine de commerciaux ;
     // une pagination de la liste de filtre serait de la complexité gratuite.
     client.GET('/api/v1/users', { params: { query: { role: 'COMMERCIAL', pageSize: 200 } } }),
@@ -45,6 +53,7 @@ export async function fetchReferenceData(
   return {
     regions: referentiels.regions,
     departements: referentiels.departements,
+    iefs: unwrap(iefs),
     banques: referentiels.banques,
     syndicats: referentiels.syndicats,
     commerciaux: unwrap(users).items.map((user): FilterOption => ({
@@ -67,6 +76,19 @@ export async function fetchReferenceData(
       hint: `${campaign.scope} · ${campaign.status === 'ACTIVE' ? 'en cours' : 'clôturée'}`,
     })),
   };
+}
+
+export async function fetchIefs(
+  departementId?: string,
+  client: ApiClient = getApiClient(),
+): Promise<Ief[]> {
+  return unwrap(
+    await client.GET('/api/v1/referentiels/iefs', {
+      params: {
+        query: { activeOnly: false, ...(departementId === undefined ? {} : { departementId }) },
+      },
+    }),
+  );
 }
 
 export async function fetchDepartements(

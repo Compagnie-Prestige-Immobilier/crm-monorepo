@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Banque, Departement, Prisma, Region, Syndicat } from '@crm/database';
+import type { Banque, Departement, Ief, Prisma, Region, Syndicat } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type {
@@ -8,6 +8,7 @@ import type {
   CreateDepartementDto,
   CreateSyndicatDto,
   DepartementDto,
+  IefDto,
   ReferentielQueryDto,
   ReferentielsBundleDto,
   RegionDto,
@@ -45,6 +46,21 @@ const toDepartement = (row: DepartementRow): DepartementDto => ({
   name: row.name,
   regionId: row.regionId,
   regionName: row.region?.name ?? '',
+  isActive: row.isActive,
+  updatedAt: row.updatedAt.toISOString(),
+});
+
+type IefRow = Ief & {
+  departement?: (Pick<Departement, 'name'> & { region?: Pick<Region, 'name'> | null }) | null;
+};
+
+const toIef = (row: IefRow): IefDto => ({
+  id: row.id,
+  code: row.code,
+  name: row.name,
+  departementId: row.departementId,
+  departementName: row.departement?.name ?? '',
+  regionName: row.departement?.region?.name ?? '',
   isActive: row.isActive,
   updatedAt: row.updatedAt.toISOString(),
 });
@@ -101,6 +117,25 @@ export class ReferentielsService {
       orderBy: [{ name: 'asc' }],
     });
     return rows.map(toDepartement);
+  }
+
+  /**
+   * Les IEF, éventuellement restreintes à un département.
+   *
+   * Le tri est (département, nom) et non (nom) seul : une liste alphabétique
+   * globale placerait « Bignona 1 » entre deux IEF de Dakar, et le sélecteur
+   * deviendrait illisible dès qu'on cherche par zone.
+   */
+  async listIefs(query: ReferentielQueryDto, departementId?: string): Promise<IefDto[]> {
+    const rows = await this.prisma.ief.findMany({
+      where: {
+        ...activeFilter(query),
+        ...(departementId === undefined ? {} : { departementId }),
+      },
+      include: { departement: { select: { name: true, region: { select: { name: true } } } } },
+      orderBy: [{ departement: { name: 'asc' } }, { name: 'asc' }],
+    });
+    return rows.map(toIef);
   }
 
   async listRegions(): Promise<RegionDto[]> {

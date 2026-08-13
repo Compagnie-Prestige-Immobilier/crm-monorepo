@@ -98,6 +98,8 @@ class WriteRepository {
     required String phoneE164,
     required String departementId,
     required String createdById,
+    /// IEF de rattachement, facultative. Voir `iefs` dans `schema.drift`.
+    String? iefId,
     String? notes,
     String? id,
     String? draftId,
@@ -115,6 +117,7 @@ class WriteRepository {
               phoneE164: phoneE164,
               notes: Value<String?>(notes),
               departementId: departementId,
+              iefId: Value<String?>(iefId),
               createdById: createdById,
               clientCreatedAt: now,
               localUpdatedAt: now,
@@ -129,6 +132,7 @@ class WriteRepository {
           'fullName': fullName,
           'phone': phoneE164,
           'departementId': departementId,
+          'iefId': ?iefId,
           if (notes != null && notes.isNotEmpty) 'notes': notes,
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
@@ -144,6 +148,7 @@ class WriteRepository {
     required String fullName,
     required String phoneE164,
     required String departementId,
+    String? iefId,
     String? notes,
     String? draftId,
   }) async {
@@ -160,6 +165,7 @@ class WriteRepository {
           phoneE164: Value<String>(phoneE164),
           notes: Value<String?>(notes),
           departementId: Value<String>(departementId),
+          iefId: Value<String?>(iefId),
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
@@ -176,6 +182,7 @@ class WriteRepository {
           'fullName': fullName,
           'phone': phoneE164,
           'departementId': departementId,
+          'iefId': iefId,
           'notes': notes,
         },
         now: now,

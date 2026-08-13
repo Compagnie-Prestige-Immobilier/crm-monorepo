@@ -217,6 +217,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/referentiels/iefs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Liste des IEF, éventuellement restreinte à un département.
+     * @description L’IEF est le découpage SCOLAIRE, distinct du découpage administratif : 59 IEF pour 46 départements. Les feuilles de route sont bâties dessus, et quatre IEF partagent le seul département de Dakar.
+     */
+    get: operations['listIefs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/referentiels/regions': {
     parameters: {
       query?: never;
@@ -1577,6 +1597,19 @@ export interface components {
       departements: components['schemas']['DepartementDto'][];
       regions: components['schemas']['RegionDto'][];
     };
+    IefDto: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      name: string;
+      /** Format: uuid */
+      departementId: string;
+      departementName: string;
+      regionName: string;
+      isActive: boolean;
+      /** Format: date-time */
+      updatedAt: string;
+    };
     RegionWithDepartementsDto: {
       /** Format: uuid */
       id: string;
@@ -1649,6 +1682,9 @@ export interface components {
       departementId: string;
       departementName: string;
       /** Format: uuid */
+      iefId: string | null;
+      iefName: string | null;
+      /** Format: uuid */
       createdById: string;
       createdByName: string;
       /** Format: date-time */
@@ -1687,6 +1723,11 @@ export interface components {
       phone: string;
       /** Format: uuid */
       departementId: string;
+      /**
+       * Format: uuid
+       * @description IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire — il se déduit de l’IEF, jamais l’inverse.
+       */
+      iefId?: string;
       notes?: string;
       /**
        * Format: date-time
@@ -1708,6 +1749,11 @@ export interface components {
       phone?: string;
       /** Format: uuid */
       departementId?: string;
+      /**
+       * Format: uuid
+       * @description IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire — il se déduit de l’IEF, jamais l’inverse.
+       */
+      iefId?: string;
       notes?: string;
       /**
        * Format: date-time
@@ -1917,6 +1963,11 @@ export interface components {
       departementId?: string;
       /**
        * Format: uuid
+       * @description Représentant : IEF de rattachement, facultative. Une version ancienne de l’application ne l’envoie pas ; l’absence du champ laisse la valeur en place et ne l’efface pas.
+       */
+      iefId?: string;
+      /**
+       * Format: uuid
        * @description Prospect : banque.
        */
       banqueId?: string;
@@ -2007,6 +2058,7 @@ export interface components {
     };
     SyncChangesDto: {
       departements: components['schemas']['DepartementDto'][];
+      iefs: components['schemas']['IefDto'][];
       banques: components['schemas']['BanqueDto'][];
       syndicats: components['schemas']['SyndicatDto'][];
       representants: components['schemas']['RepresentantDto'][];
@@ -3357,6 +3409,29 @@ export interface operations {
       };
     };
   };
+  listIefs: {
+    parameters: {
+      query?: {
+        /** @description Ne renvoyer que les entrées actives. */
+        activeOnly?: boolean;
+        departementId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IefDto'][];
+        };
+      };
+    };
+  };
   listRegions: {
     parameters: {
       query?: never;
@@ -3478,6 +3553,8 @@ export interface operations {
       query?: {
         search?: string;
         departementId?: string;
+        /** @description Filtre par IEF. */
+        iefId?: string;
         /** @description Réservé à l’ADMIN. */
         commercialId?: string;
         page?: number;

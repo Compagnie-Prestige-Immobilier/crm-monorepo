@@ -45,6 +45,18 @@ export class CreateRepresentantDto {
   @IsUUID()
   departementId!: string;
 
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ' +
+      'ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait ' +
+      'rétroactivement. Le département reste obligatoire — il se déduit de l’IEF, ' +
+      'jamais l’inverse.',
+  })
+  @IsOptional()
+  @IsUUID()
+  iefId?: string;
+
   @ApiPropertyOptional({ type: String, maxLength: 2000 })
   @IsOptional()
   @IsString()
@@ -72,6 +84,8 @@ export class RepresentantDto {
   rev!: number;
   @ApiProperty({ format: 'uuid' }) departementId!: string;
   @ApiProperty() departementName!: string;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) iefId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) iefName!: string | null;
   @ApiProperty({ format: 'uuid' }) createdById!: string;
   @ApiProperty() createdByName!: string;
   @ApiProperty({ type: String, format: 'date-time' }) clientCreatedAt!: string;
@@ -96,6 +110,11 @@ export class RepresentantQueryDto {
   @IsOptional()
   @IsUUID()
   departementId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Filtre par IEF.' })
+  @IsOptional()
+  @IsUUID()
+  iefId?: string;
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Réservé à l’ADMIN.' })
   @IsOptional()

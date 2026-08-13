@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'generated_migrations/schema.dart';
 import 'generated_migrations/schema_v1.dart' as v1;
 import 'generated_migrations/schema_v2.dart' as v2;
+import 'generated_migrations/schema_v3.dart' as v3;
 
 /// Test doré de migration.
 ///
@@ -228,6 +229,91 @@ void main() {
     // changement de la table.
     expect(names, contains('notifications_created_idx'));
     expect(names, contains('notifications_unread_idx'));
+
+    await db.close();
+  });
+
+  // ── v3 → v4 : référentiel IEF ──────────────────────────────────────────────
+  //
+  // Ce palier est le premier à AJOUTER UNE COLONNE à une table qui contient
+  // déjà des saisies. Les précédents ne créaient que des tables neuves, où rien
+  // ne pouvait être perdu. Ici la table `representants` porte des fiches pas
+  // encore synchronisées : la recréer les emporterait, et l'appareil ne dirait
+  // rien. C'est exactement le scénario que ce fichier existe pour interdire.
+
+  test('v3 -> v4 ajoute ief_id SANS toucher aux fiches non synchronisées', () async {
+    final schema = await verifier.schemaAt(3);
+
+    // Une base de v3 avec une fiche saisie hors ligne et son opération en file.
+    final v3.DatabaseAtV3 old = v3.DatabaseAtV3(schema.newConnection());
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO departements (id, code, name, region_id, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?)',
+      <Object?>['dep-1', 'DK-DAK', 'Dakar', 'reg-1', _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, departement_id, created_by_id, '
+      ' client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['rep-4', 'Fiche hors ligne', '+221771112233', 'dep-1', 'me', _iso, _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-4', 'representant', 'rep-4', 'create', '{}', _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 4);
+
+    // La fiche a traversé, et son opération aussi.
+    final List<QueryRow> fiches = await db
+        .customSelect('SELECT id, ief_id FROM representants')
+        .get();
+    expect(fiches, hasLength(1));
+    expect(fiches.single.read<String>('id'), 'rep-4');
+    expect(
+      fiches.single.read<String?>('ief_id'),
+      isNull,
+      reason: 'une fiche ancienne n’a pas d’IEF, et ce n’est pas une erreur',
+    );
+
+    final List<QueryRow> pending = await db
+        .customSelect('SELECT id FROM outbox WHERE status = \'pending\'')
+        .get();
+    expect(pending, hasLength(1));
+
+    // La table des IEF existe et démarre vide : un référentiel ne se fabrique
+    // pas par migration, il se télécharge.
+    final List<QueryRow> iefs = await db
+        .customSelect('SELECT COUNT(*) AS c FROM iefs')
+        .get();
+    expect(iefs.single.read<int>('c'), 0);
+
+    await db.close();
+  });
+
+  test('v3 -> v4 crée les index des IEF', () async {
+    final schema = await verifier.schemaAt(3);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 4);
+
+    final List<QueryRow> indexes = await db
+        .customSelect(
+          'SELECT name FROM sqlite_master '
+          'WHERE type = \'index\' AND tbl_name = \'iefs\'',
+        )
+        .get();
+    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+
+    // `iefs_active_idx` sert le sélecteur de saisie, relu à chaque frappe ;
+    // `iefs_departement_idx` sert la restriction au département choisi.
+    expect(names, contains('iefs_active_idx'));
+    expect(names, contains('iefs_departement_idx'));
 
     await db.close();
   });

@@ -27,6 +27,8 @@ class UpdateRepresentantDto {
 
     this.departementId,
 
+    this.iefId,
+
     this.notes,
 
     this.clientCreatedAt,
@@ -46,6 +48,10 @@ class UpdateRepresentantDto {
   @JsonKey(name: r'departementId', required: false, includeIfNull: false)
   final String? departementId;
 
+  /// IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire — il se déduit de l’IEF, jamais l’inverse.
+  @JsonKey(name: r'iefId', required: false, includeIfNull: false)
+  final String? iefId;
+
   @JsonKey(name: r'notes', required: false, includeIfNull: false)
   final String? notes;
 
@@ -58,12 +64,21 @@ class UpdateRepresentantDto {
         other is UpdateRepresentantDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [id, fullName, phone, departementId, notes, clientCreatedAt],
+              [
+                id,
+                fullName,
+                phone,
+                departementId,
+                iefId,
+                notes,
+                clientCreatedAt,
+              ],
               [
                 other.id,
                 other.fullName,
                 other.phone,
                 other.departementId,
+                other.iefId,
                 other.notes,
                 other.clientCreatedAt,
               ],
@@ -78,6 +93,7 @@ class UpdateRepresentantDto {
         fullName,
         phone,
         departementId,
+        iefId,
         notes,
         clientCreatedAt,
       ]);
