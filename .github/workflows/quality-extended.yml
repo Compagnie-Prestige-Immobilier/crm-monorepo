@@ -27,6 +27,9 @@ jobs:
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
       JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
       JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
+      SEED_ADMIN_EMAIL: admin@cpi.sn
+      SEED_ADMIN_USERNAME: admin
+      SEED_ADMIN_PASSWORD: ci-admin-password-2026
       NODE_ENV: production
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -63,6 +66,9 @@ jobs:
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
       JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
       JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
+      SEED_ADMIN_EMAIL: admin@cpi.sn
+      SEED_ADMIN_USERNAME: admin
+      SEED_ADMIN_PASSWORD: ci-admin-password-2026
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: ./.github/actions/setup-node
