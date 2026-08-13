@@ -153,11 +153,7 @@ export function TemplateManager() {
         </div>
       )}
 
-      <TemplateFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        template={editing}
-      />
+      <TemplateFormDialog open={formOpen} onOpenChange={setFormOpen} template={editing} />
     </div>
   );
 }

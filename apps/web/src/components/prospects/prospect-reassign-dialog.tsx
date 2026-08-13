@@ -74,11 +74,7 @@ export function ProspectReassignDialog({
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.representantsRoot });
-      toast.success(
-        result.updated === 0
-          ? 'Rattachement inchangé.'
-          : 'Prospect réaffecté.',
-      );
+      toast.success(result.updated === 0 ? 'Rattachement inchangé.' : 'Prospect réaffecté.');
       onOpenChange(false);
     },
     onError: (error) => {

@@ -16,12 +16,7 @@ import { Chart } from '@/components/dashboard/chart-setup';
  */
 Chart.register(BarController, LineController);
 
-import {
-  seriesBorderColor,
-  seriesColor,
-  useChartTheme,
-  type ChartTheme,
-} from '@/lib/chart-theme';
+import { seriesBorderColor, seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
 import { formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof, xofToChartNumber } from '@/lib/money';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';

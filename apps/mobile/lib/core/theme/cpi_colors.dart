@@ -55,7 +55,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
   });
 
   /// Palette claire auditée. Seule palette du mobile : l'app est verrouillée en
-  /// clair (docs/design.md §3), elle sert en extérieur au soleil.
+  /// clair (docs/design.md §3), qui réserve le mode sombre au panel web.
   static const CpiColors light = CpiColors(
     success: Color(0xFF1A6B44),
     onSuccess: Color(0xFFFFFFFF),

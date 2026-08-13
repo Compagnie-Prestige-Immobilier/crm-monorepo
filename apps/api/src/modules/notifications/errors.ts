@@ -93,7 +93,9 @@ export const routeInvalid = (): UnprocessableEntityException =>
     message: 'Le lien profond doit être une route interne commençant par « / ».',
   });
 
-export const templateVariablesMissing = (missing: readonly string[]): UnprocessableEntityException =>
+export const templateVariablesMissing = (
+  missing: readonly string[],
+): UnprocessableEntityException =>
   new UnprocessableEntityException({
     code: NotificationError.TEMPLATE_VARIABLES_MISSING,
     message: `Variables non fournies : ${missing.join(', ')}.`,

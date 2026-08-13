@@ -5,11 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
 import { prospectConditions, PROSPECT_FROM } from './analytics.sql.js';
-import type {
-  AnalyticsFinanceDto,
-  AnalyticsFunnelDto,
-  FunnelStageDto,
-} from './funnel.dto.js';
+import type { AnalyticsFinanceDto, AnalyticsFunnelDto, FunnelStageDto } from './funnel.dto.js';
 
 /**
  * L'entonnoir et l'argent.
@@ -26,10 +22,7 @@ export class FunnelService {
   async funnel(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<AnalyticsFunnelDto> {
     const where = prospectConditions(user, filter);
 
-    const [stages, finance] = await Promise.all([
-      this.stages(where),
-      this.finance(where),
-    ]);
+    const [stages, finance] = await Promise.all([this.stages(where), this.finance(where)]);
 
     return { etapes: stages, finance };
   }
@@ -133,8 +126,7 @@ export class FunnelService {
       // l'encaissement. On ne l'invente pas — annoncer un « en cours » chiffré
       // sur des dossiers sans montant serait une prévision déguisée en fait.
       montantEnCours: '0',
-      encaissementMoyen:
-        encaisses === 0 ? '0' : (BigInt(montant) / BigInt(encaisses)).toString(),
+      encaissementMoyen: encaisses === 0 ? '0' : (BigInt(montant) / BigInt(encaisses)).toString(),
       montantEncaisse30Jours: row?.montant30 ?? '0',
       dossiers,
       dossiersOuverts: row?.ouverts ?? 0,

@@ -7,7 +7,7 @@ import 'clock.dart';
 /// Réplication de l'annuaire de phase 2 — **Dart pur**.
 ///
 /// Volontairement séparée de `SyncEngine` et de son cycle de 60 secondes. Trois
-/// raisons, toutes de terrain :
+/// raisons :
 ///
 /// 1. **Le volume n'a rien à voir.** Le pull métier ramène quelques dizaines de
 ///    lignes ; l'annuaire en compte 50 000 à 500 000 au premier téléchargement.

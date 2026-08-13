@@ -1,7 +1,13 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDownIcon, RotateCcwIcon, SearchIcon, SlidersHorizontalIcon, XIcon } from 'lucide-react';
+import {
+  ChevronDownIcon,
+  RotateCcwIcon,
+  SearchIcon,
+  SlidersHorizontalIcon,
+  XIcon,
+} from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { buildAdvancedChips } from '@/components/filters/advanced-chips';

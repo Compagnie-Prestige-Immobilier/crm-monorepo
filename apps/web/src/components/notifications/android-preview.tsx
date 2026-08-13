@@ -38,10 +38,7 @@ export function AndroidPreview({
   className?: string | undefined;
 }) {
   const shownTitle = previewClamp(title === '' ? 'Titre de la notification' : title, TITLE_CLAMP);
-  const shownBody = previewClamp(
-    body === '' ? 'Corps du message' : body,
-    BODY_CLAMP,
-  );
+  const shownBody = previewClamp(body === '' ? 'Corps du message' : body, BODY_CLAMP);
   const isPlaceholder = title === '' && body === '';
 
   return (

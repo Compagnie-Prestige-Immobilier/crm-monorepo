@@ -22,7 +22,7 @@ import '../../../ui/widgets/phone_field.dart';
 ///
 /// ## Ce que « rapide » veut dire ici
 ///
-/// Un commercial saisit une liste de dix à quarante personnes d'affilée, debout,
+/// Un téléconseiller saisit une liste de dix à quarante personnes d'affilée,
 /// pendant qu'un délégué syndical lui dicte des noms. Les trois quarts de ces
 /// personnes partagent la même banque et le même syndicat.
 ///

@@ -131,9 +131,7 @@ export function ProspectEditDialog({
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Modifier le prospect</DialogTitle>
-          <DialogDescription>
-            Saisi par {prospect?.ownedByCommercialName ?? '–'}.
-          </DialogDescription>
+          <DialogDescription>Saisi par {prospect?.ownedByCommercialName ?? '–'}.</DialogDescription>
         </DialogHeader>
 
         <form
