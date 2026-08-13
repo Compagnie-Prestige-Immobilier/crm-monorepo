@@ -422,8 +422,8 @@ test('la configuration des étapes se réordonne au clavier, sans glisser-dépos
 
   // Les boutons NOMMENT l'étape déplacée : « Monter » seul, répété six fois,
   // ne dit pas quoi on déplace.
-  await expect(page.getByRole('button', { name: /^Monter « / }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Descendre « / }).first()).toBeVisible();
+  await expect(page.locator('button[aria-label^="Monter « "]').first()).toBeVisible();
+  await expect(page.locator('button[aria-label^="Descendre « "]').first()).toBeVisible();
 
   // L'étape initiale ne bouge pas : l'API refuserait, autant le dire par un
   // bouton désactivé.
