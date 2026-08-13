@@ -378,13 +378,13 @@ def cmd_provision() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _api_env(s: dict[str, str]) -> str:
+def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
     return "\n".join(
         [
             "NODE_ENV=production",
             "PORT=3001",
             "LOG_LEVEL=info",
-            f"DATABASE_URL=postgresql://crm:{s['PG_PASSWORD']}@{PG_NAME}:5432/crm?schema=public",
+            f"DATABASE_URL=postgresql://crm:{s['PG_PASSWORD']}@{names['postgres']}:5432/crm?schema=public",
             f"JWT_ACCESS_SECRET={s['JWT_ACCESS']}",
             f"JWT_REFRESH_SECRET={s['JWT_REFRESH']}",
             "JWT_ACCESS_TTL=15m",
@@ -413,18 +413,46 @@ def _api_env(s: dict[str, str]) -> str:
     )
 
 
-def _web_env() -> str:
+def _web_env(names: dict[str, str]) -> str:
     return "\n".join(
         [
             "NODE_ENV=production",
             "PORT=3000",
             # De serveur à serveur, dans le réseau Docker : ni TLS ni passage
             # par l'internet public.
-            f"API_URL=http://{API_NAME}:3001",
-            f"API_INTERNAL_URL=http://{API_NAME}:3001",
+            f"API_URL=http://{names['api']}:3001",
+            f"API_INTERNAL_URL=http://{names['api']}:3001",
             f"NEXT_PUBLIC_API_URL=https://{API_DOMAIN}",
         ]
     )
+
+
+def service_app_names(ids: dict[str, str]) -> dict[str, str]:
+    """Noms de service RÉELS, tels que Docker les résout.
+
+    Dokploy suffixe chaque `appName` d'un identifiant court — `cpi-go-postgres`
+    devient `cpi-go-postgres-cmsq36`. C'est ce nom suffixé, et lui seul, qui
+    résout dans le réseau Docker. Écrire le nom court dans DATABASE_URL fait
+    échouer la résolution DNS : `migrate deploy` ne trouve pas la base, le point
+    d'entrée refuse de démarrer, et le conteneur redémarre en boucle avec un
+    build pourtant vert.
+    """
+    names = {"postgres": PG_NAME, "api": API_NAME, "web": WEB_NAME}
+    try:
+        if ids.get("POSTGRES_ID"):
+            db = call(
+                "postgres.one", {"postgresId": ids["POSTGRES_ID"]}, method="GET"
+            ) or {}
+            names["postgres"] = db.get("appName") or PG_NAME
+        for key, slot in (("API_ID", "api"), ("WEB_ID", "web")):
+            if ids.get(key):
+                app = call(
+                    "application.one", {"applicationId": ids[key]}, method="GET"
+                ) or {}
+                names[slot] = app.get("appName") or names[slot]
+    except DokployError as exc:
+        warn(f"noms de service non résolus ({exc}) — noms courts utilisés")
+    return names
 
 
 def cmd_configure() -> None:
@@ -489,7 +517,9 @@ def cmd_configure() -> None:
     ok("Web — infra/docker/Dockerfile.web")
 
     step("Variables d'environnement")
-    api_env = _api_env(secrets_)
+    names = service_app_names(ids)
+    info(f"service base : {names['postgres']}")
+    api_env = _api_env(secrets_, names)
     call(
         "application.saveEnvironment",
         {
@@ -502,7 +532,7 @@ def cmd_configure() -> None:
     )
     ok(f"API — {len(api_env.splitlines())} variables")
 
-    web_env = _web_env()
+    web_env = _web_env(names)
     call(
         "application.saveEnvironment",
         {
