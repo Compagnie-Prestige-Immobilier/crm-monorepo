@@ -90,6 +90,7 @@ async function cleanupData(): Promise<void> {
   });
   await prisma.bankCase.deleteMany({ where: { referenceKey: { startsWith: TAG } } });
   await prisma.prospect.deleteMany({ where: { nom: { startsWith: TAG } } });
+  await prisma.representant.deleteMany({ where: { fullName: { startsWith: TAG } } });
   await prisma.bankCaseStage.deleteMany({ where: { code: { startsWith: TAG } } });
 }
 
@@ -163,8 +164,38 @@ afterAll(async () => {
 beforeEach(async () => {
   await cleanupData();
 
-  const representant = await prisma.representant.findFirst({ where: { deletedAt: null } });
-  const modele = await prisma.prospect.findFirstOrThrow({ where: { deletedAt: null } });
+  let representant = await prisma.representant.findFirst({ where: { deletedAt: null } });
+  let modele: Awaited<ReturnType<typeof prisma.prospect.create>>;
+
+  // La CI part d'une base vide hors référentiels : ne pas rendre le test
+  // dépendant d'un prospect métier absent du seed.
+  if (!representant) {
+    const departement = await prisma.departement.findFirstOrThrow();
+    representant = await prisma.representant.create({
+      data: {
+        id: uuidv7(),
+        fullName: `${TAG} Représentant fixture`,
+        phoneE164: '+221770000001',
+        departementId: departement.id,
+        createdById: admin.id,
+        clientCreatedAt: new Date('2026-07-01T08:00:00.000Z'),
+      },
+    });
+  }
+  const syndicat = await prisma.syndicat.findFirstOrThrow();
+  modele = await prisma.prospect.create({
+    data: {
+      id: uuidv7(),
+      nom: `${TAG} Modèle`,
+      prenom: 'Fixture',
+      phoneE164: '+221770000000',
+      banqueId: banqueA,
+      syndicatId: syndicat.id,
+      representantId: representant.id,
+      createdById: admin.id,
+      clientCreatedAt: new Date('2026-07-01T08:00:00.000Z'),
+    },
+  });
 
   // La base impose `enrollmentMethod IS NOT NULL` exactement quand
   // `phase2Status = METHOD_OBTAINED` : la contrainte `prospects_enrollment_
