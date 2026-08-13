@@ -20,6 +20,9 @@
     "@crm/api-client-dart#build": {
       "dependsOn": ["generate"]
     },
+    "@crm/database#lint": {
+      "dependsOn": ["build"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
