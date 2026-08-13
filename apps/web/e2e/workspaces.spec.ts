@@ -407,9 +407,9 @@ test('le tableau de bord bancaire mène à la liste filtrée depuis un graphique
   await expect(page.getByRole('heading', { name: 'CPI GO', level: 1 })).toBeVisible();
   await expectNoErrorState(page);
 
-  await expect(page.getByText('Taux de rejet')).toBeVisible();
-  await expect(page.getByText('Délai moyen')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Dossiers par étape' })).toBeVisible();
+  await expect(page.getByText('Taux de rejet', { exact: true })).toBeVisible();
+  await expect(page.getByText('Délai moyen', { exact: true })).toBeVisible();
+  await expect(page.getByText('Dossiers par étape', { exact: true })).toBeVisible();
   // Les montants sont rendus en FCFA, jamais en nombre brut.
   await expect(page.getByText(/FCFA/).first()).toBeVisible();
 });
