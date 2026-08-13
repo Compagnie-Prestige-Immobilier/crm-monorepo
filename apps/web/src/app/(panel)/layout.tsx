@@ -1,8 +1,9 @@
-import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import { redirect, unstable_rethrow } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { DemoBanner } from '@/components/layout/demo-banner';
-import { SidebarNav } from '@/components/layout/sidebar-nav';
+import { SIDEBAR_COOKIE, SidebarShell } from '@/components/layout/sidebar-shell';
 import { Topbar } from '@/components/layout/topbar';
 import { QueryErrorState } from '@/components/query-error-state';
 import { getServerApiClient } from '@/lib/api/server';
@@ -20,6 +21,30 @@ import type { Role } from '@/lib/types';
  */
 
 /**
+ * JAMAIS de prérendu, JAMAIS de cache partagé — pour tout le panel.
+ *
+ * Défaut observé en production, et le plus grave rencontré sur ce projet :
+ * `next build` prérendait ces pages, et Next les servait ensuite depuis le
+ * cache pleine-route avec `s-maxage=31536000`, la même réponse pour tout le
+ * monde, cookie ou pas.
+ *
+ * Deux conséquences, de gravité croissante :
+ *
+ *  1. Au build, l'API n'existe pas. `readSession()` échouait, la branche
+ *     « Serveur injoignable » était rendue — et FIGÉE pour un an. L'écran
+ *     n'était donc pas une panne passagère : c'était du HTML mort en cache.
+ *  2. Si le build AVAIT joint l'API, la page prérendue aurait contenu les
+ *     données d'une session, et cette page-là aurait été servie à un visiteur
+ *     anonyme. Une coquille authentifiée n'est pas un contenu statique.
+ *
+ * `force-dynamic` répond aux deux : chaque requête est rendue avec ses propres
+ * cookies, et rien n'est mis en cache. Le coût est nul ici — aucune page du
+ * panel n'a de sens sans session.
+ */
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+/**
  * État du mode démonstration, pour le bandeau global.
  *
  * `GET /admin/demo` est réservé à l'ADMIN côté API : un agent BANQUE_FINANCE
@@ -33,7 +58,12 @@ async function demoSeededAt(role: Role): Promise<string | null> {
   try {
     const status = await fetchDemoStatus(getServerApiClient());
     return status.enabled ? (seededAtOrNull(status) ?? '') : null;
-  } catch {
+  } catch (error) {
+    // `unstable_rethrow` D'ABORD : Next signale la redirection, le `notFound()`
+    // et la bascule en rendu dynamique en LEVANT une erreur de contrôle. Un
+    // `catch` nu les avale et transforme un signal du framework en « pas de
+    // bandeau » — ou, comme ici en production, en page prérendue à tort.
+    unstable_rethrow(error);
     return null;
   }
 }
@@ -60,16 +90,15 @@ export default async function PanelLayout({ children }: { children: ReactNode })
 
   const user = session.user;
   const seededAt = await demoSeededAt(user.role);
+  const sidebarCollapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === '1';
 
   return (
     <div className="flex min-h-dvh">
       {/* Sidebar fixe à partir de 768 px ; en dessous elle devient un Sheet
-          déclenché depuis la Topbar. */}
-      <aside className="hidden w-[17rem] shrink-0 md:block">
-        <div className="fixed inset-y-0 left-0 w-[17rem]">
-          <SidebarNav role={user.role} />
-        </div>
-      </aside>
+          déclenché depuis la Topbar. Son état de repli est lu ICI, côté
+          serveur : le premier octet de HTML porte déjà la bonne largeur, et la
+          barre ne saute pas d'une largeur à l'autre à l'hydratation. */}
+      <SidebarShell role={user.role} defaultCollapsed={sidebarCollapsed} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         {seededAt !== null ? (

@@ -2,6 +2,7 @@ import 'package:crm_api_client/src/model/analytics_finance_dto.dart';
 import 'package:crm_api_client/src/model/analytics_funnel_dto.dart';
 import 'package:crm_api_client/src/model/analytics_series_dto.dart';
 import 'package:crm_api_client/src/model/analytics_totals_dto.dart';
+import 'package:crm_api_client/src/model/app_update_dto.dart';
 import 'package:crm_api_client/src/model/audience_preview_dto.dart';
 import 'package:crm_api_client/src/model/auth_tokens_dto.dart';
 import 'package:crm_api_client/src/model/auth_user_dto.dart';
@@ -161,6 +162,8 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'AnalyticsTotalsDto':
       return AnalyticsTotalsDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'AppUpdateDto':
+      return AppUpdateDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'AudiencePreviewDto':
       return AudiencePreviewDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;

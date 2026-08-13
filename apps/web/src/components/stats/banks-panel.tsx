@@ -24,6 +24,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { fetchBankAnalytics } from '@/lib/data/bank-cases';
 import { formatDecimal, formatNumber } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import { ExactAmountsToggle, MoneyText } from '@/components/money/exact-amounts';
 import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
 import { hoursToDays } from '@/lib/data/statistics';
@@ -80,7 +81,8 @@ export function BanksPanel() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <ExactAmountsToggle />
         <LiveIndicator
           state={live.stateOf(isError)}
           label={live.labelOf(isError)}
@@ -103,7 +105,7 @@ export function BanksPanel() {
           stat="bankCashed"
           label="Encaissés"
           value={data.totals.encaisses}
-          hint={formatXof(data.totals.totalAmountCashed, '0 FCFA')}
+          hint={<MoneyText value={data.totals.totalAmountCashed} placeholder="0 FCFA" />}
           icon={BanknoteIcon}
           tone="success"
         />

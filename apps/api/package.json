@@ -18,6 +18,7 @@
     "@crm/database": "workspace:*",
     "@fastify/cors": "catalog:",
     "@fastify/helmet": "catalog:",
+    "@fastify/multipart": "9.2.1",
     "@fastify/rate-limit": "catalog:",
     "@fastify/static": "catalog:",
     "@nestjs/common": "catalog:",

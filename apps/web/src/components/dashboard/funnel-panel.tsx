@@ -41,61 +41,79 @@ import { cn } from '@/lib/utils';
 
 // ─── L'argent ────────────────────────────────────────────────────────────────
 
+/**
+ * La taille et la couleur vivent sur DEUX éléments, et ce n'est pas un caprice.
+ *
+ * `cn()` passe par `tailwind-merge`, qui range `text-display` et
+ * `text-primary-text` dans le même groupe — il ne connaît que l'échelle de
+ * tailles par défaut, et classe donc notre `text-display` comme une COULEUR.
+ * Réunies sur un même élément, la dernière écrase la première : le chiffre de
+ * tête sortait à la taille du corps de texte, plus petit que les tuiles
+ * secondaires posées à côté de lui. Le défaut est silencieux — aucune erreur,
+ * juste une hiérarchie inversée — et il ne se voit qu'à l'écran.
+ */
 function MoneyHeadline({ finance }: { finance: Funnel['finance'] }) {
   return (
-    <Card className="animate-rise justify-center border-primary/25">
-      <CardContent className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
+    <Card className="animate-rise border-primary/25">
+      <CardContent className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
+        <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
-            <span className="truncate">Encaissé</span>
+            Encaissé
             <StatInfo stat="moneyCashed" label="Encaissé" />
           </p>
 
-          {/* Le chiffre de la page. `tabular-nums` pour que la carte ne se
-              décale pas quand le montant change de largeur en cours de cycle. */}
-          <MoneyText
-            value={finance.montantEncaisse}
-            placeholder="0 FCFA"
-            className="mt-2 block font-display text-display font-[800] leading-none tracking-[-0.02em] text-primary-text"
-          />
+          {/* Le chiffre de la page : le plus gros de l'écran, et le premier
+              lisible. Tout le reste de la chaîne le prépare. */}
+          <p className="mt-2 font-display text-display font-[800] leading-none tracking-[-0.02em]">
+            <MoneyText
+              value={finance.montantEncaisse}
+              placeholder="0 FCFA"
+              className="text-primary-text"
+            />
+          </p>
+        </div>
 
-          <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5 text-[0.75rem]">
-            <div className="flex items-baseline gap-1.5">
-              <dt className="text-muted-foreground">Dossiers encaissés</dt>
-              <dd className="font-[600] tabular-nums">
+        <div className="flex items-center gap-8">
+          <dl className="flex flex-wrap gap-x-8 gap-y-2">
+            <div className="flex flex-col gap-1">
+              <dt className="text-[0.75rem] text-muted-foreground">Dossiers encaissés</dt>
+              <dd className="font-display text-[1.25rem] font-[700] leading-none tabular-nums">
                 {formatNumber(finance.dossiersEncaisses)} sur {formatNumber(finance.dossiers)}
               </dd>
             </div>
-            <div className="flex items-baseline gap-1.5">
-              <dt className="text-muted-foreground">En cours</dt>
-              <dd>
-                <MoneyText
-                  value={finance.montantEnCours}
-                  placeholder="0 FCFA"
-                  className="font-[600]"
-                />
+            <div className="flex flex-col gap-1">
+              <dt className="text-[0.75rem] text-muted-foreground">En cours</dt>
+              <dd className="font-display text-[1.25rem] font-[700] leading-none">
+                <MoneyText value={finance.montantEnCours} placeholder="0 FCFA" />
               </dd>
             </div>
           </dl>
-        </div>
 
-        <span
-          aria-hidden="true"
-          className="flex size-11 shrink-0 items-center justify-center rounded-md bg-secondary text-primary"
-        >
-          <BanknoteIcon className="size-6" />
-        </span>
+          <span
+            aria-hidden="true"
+            className="flex size-12 shrink-0 items-center justify-center rounded-md bg-secondary text-primary"
+          >
+            <BanknoteIcon className="size-6" />
+          </span>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
+/**
+ * Le chiffre de tête occupe SA PROPRE ligne, pleine largeur.
+ *
+ * Serré dans une colonne à côté des trois tuiles, il tombait à la même taille
+ * qu'elles et « 7,6 M FCFA » passait à la ligne au milieu des cartes : le
+ * montant le plus important de l'écran devenait le moins lisible.
+ */
 export function MoneyBand({ finance }: { finance: Funnel['finance'] }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+    <div className="flex flex-col gap-4">
       <MoneyHeadline finance={finance} />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatTile
           index={1}
           stat="moneyCashed30Days"

@@ -86,6 +86,31 @@ export async function apiFetch<T>(
   }
 }
 
+/** Multipart relay for the few admin actions that carry binary files. */
+export async function apiUpload<T>(
+  path: string,
+  form: FormData,
+  parse: (value: unknown) => T,
+): Promise<T> {
+  const response = await fetch(`${API_PREFIX}${path}`, {
+    method: 'POST',
+    body: form,
+    cache: 'no-store',
+  });
+  const body = await parseBody(response);
+  if (!response.ok) {
+    if (response.status === 401) redirectToLogin();
+    throw new ApiError(body, response);
+  }
+  try {
+    return parse(body);
+  } catch (error) {
+    throw new Error(
+      `Réponse inattendue de ${path} : ${error instanceof Error ? error.message : 'forme invalide'}`,
+    );
+  }
+}
+
 // ─── Petits validateurs ──────────────────────────────────────────────────────
 //
 // Volontairement écrits à la main plutôt qu'avec un schéma : ils tiennent en
