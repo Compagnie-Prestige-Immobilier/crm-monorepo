@@ -35,13 +35,64 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      # TODO(deploy): brancher la cible réelle (registre d'images, serveur,
-      # migrations Prisma). Laissé explicite plutôt que deviné : un workflow qui
-      # prétend déployer sans le faire est pire que pas de workflow du tout —
-      # il rend vert un déploiement qui n'a pas eu lieu.
-      - name: Cible de déploiement non configurée
+      - name: Vérifier la configuration VPS
+        env:
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          PRODUCTION_PATH: ${{ secrets.PRODUCTION_PATH }}
+          PRODUCTION_SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          PRODUCTION_KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
         run: |
-          echo "::error::Aucune cible de déploiement configurée."
-          echo "Renseigner les secrets de l'environnement 'production' puis"
-          echo "remplacer cette étape par le déploiement réel."
-          exit 1
+          set -euo pipefail
+          missing=()
+          for name in PRODUCTION_HOST PRODUCTION_USER PRODUCTION_PATH PRODUCTION_SSH_KEY PRODUCTION_KNOWN_HOSTS; do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+          done
+          if ((${#missing[@]})); then
+            echo "::error::Secrets production manquants : ${missing[*]}"
+            echo "Créer ces secrets dans Settings > Environments > production."
+            exit 1
+          fi
+          if [[ ! "$PRODUCTION_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::PRODUCTION_PATH doit être un chemin absolu sans espace ni caractère shell."
+            exit 1
+          fi
+
+      - name: Préparer SSH
+        env:
+          PRODUCTION_SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          PRODUCTION_KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PRODUCTION_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$PRODUCTION_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Déployer la stack Docker sur le VPS
+        env:
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          PRODUCTION_PATH: ${{ secrets.PRODUCTION_PATH }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes "$PRODUCTION_USER@$PRODUCTION_HOST" \
+            "cd '$PRODUCTION_PATH' && \
+             git fetch --prune origin prod && \
+             git checkout --force prod && \
+             git reset --hard origin/prod && \
+             docker compose -f infra/docker/docker-compose.prod.yml up -d --build && \
+             docker compose -f infra/docker/docker-compose.prod.yml ps"
+
+      - name: Vérifier la santé HTTP production
+        env:
+          PRODUCTION_HEALTHCHECK_URL: ${{ secrets.PRODUCTION_HEALTHCHECK_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$PRODUCTION_HEALTHCHECK_URL" ]]; then
+            echo "PRODUCTION_HEALTHCHECK_URL absent : vérification HTTP ignorée."
+            exit 0
+          fi
+          curl --fail --silent --show-error --retry 10 --retry-delay 5 \
+            --retry-all-errors --output /dev/null "$PRODUCTION_HEALTHCHECK_URL"
