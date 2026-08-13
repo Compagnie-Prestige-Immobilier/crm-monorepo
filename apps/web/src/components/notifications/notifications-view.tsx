@@ -286,9 +286,7 @@ function NotificationDetailDialog({ id, onClose }: { id: string | null; onClose:
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{detail.data?.notification.title ?? 'Détail de l’envoi'}</DialogTitle>
-          <DialogDescription>
-            Une ligne par destinataire.
-          </DialogDescription>
+          <DialogDescription>Une ligne par destinataire.</DialogDescription>
         </DialogHeader>
 
         {detail.isPending && id !== null ? (
@@ -307,7 +305,9 @@ function NotificationDetailDialog({ id, onClose }: { id: string | null; onClose:
           />
         ) : detail.data ? (
           <>
-            <p className="text-[0.9375rem] text-muted-foreground">{detail.data.notification.body}</p>
+            <p className="text-[0.9375rem] text-muted-foreground">
+              {detail.data.notification.body}
+            </p>
             <div className="overflow-hidden rounded-lg border border-border">
               <Table>
                 <TableHeader>

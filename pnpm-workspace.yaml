@@ -160,7 +160,6 @@ catalog:
   # Fait échouer le build si un module serveur est importé depuis un composant client.
   'server-only': '0.0.1'
 
-
 # ── Politique d'approvisionnement ────────────────────────────────────────────
 #
 # `minimumReleaseAge` refuse toute version publiée il y a moins de 24 heures

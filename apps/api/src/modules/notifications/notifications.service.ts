@@ -535,9 +535,7 @@ export class NotificationsService {
 
   // ───────────────────────────────────────────────────────────────────────────
 
-  private async countsFor(
-    ids: readonly string[],
-  ): Promise<Map<string, ReturnType<typeof tally>>> {
+  private async countsFor(ids: readonly string[]): Promise<Map<string, ReturnType<typeof tally>>> {
     const result = new Map<string, ReturnType<typeof tally>>();
     if (!ids.length) return result;
 

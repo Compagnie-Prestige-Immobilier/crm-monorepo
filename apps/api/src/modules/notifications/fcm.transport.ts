@@ -1,7 +1,11 @@
 import { createSign } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 
-import { parseServiceAccount, readNotificationsEnv, type FcmServiceAccount } from './notifications.env.js';
+import {
+  parseServiceAccount,
+  readNotificationsEnv,
+  type FcmServiceAccount,
+} from './notifications.env.js';
 
 /**
  * Transport FCM — API HTTP v1.
@@ -100,7 +104,10 @@ const base64Url = (input: Buffer | string): string =>
  * corps de message invalide — donc il n'élague PAS : détruire les jetons d'une
  * campagne entière à cause d'une charge utile mal formée serait irréversible.
  */
-export const classifyFcmError = (errorCode: string | undefined, httpStatus: number): FcmFailureKind => {
+export const classifyFcmError = (
+  errorCode: string | undefined,
+  httpStatus: number,
+): FcmFailureKind => {
   switch (errorCode) {
     case 'UNREGISTERED':
     case 'NOT_FOUND':
@@ -173,7 +180,9 @@ export class FcmHttpTransport implements FcmTransport {
       // `warn` et non `error` : c'est l'état nominal tant que le projet
       // Firebase n'existe pas. Le message doit nommer la variable, sinon la
       // personne qui déploie cherche pendant une heure.
-      this.logger.warn(`${this.reason} Les notifications sont stockées et mises en file, pas remises.`);
+      this.logger.warn(
+        `${this.reason} Les notifications sont stockées et mises en file, pas remises.`,
+      );
     } else {
       this.logger.log(`Transport FCM HTTP v1 actif sur le projet ${this.projectId ?? '?'}.`);
     }

@@ -96,7 +96,6 @@ async function rotateRefreshTokenOnce(
   refreshToken: string,
   fetchImpl: typeof globalThis.fetch,
 ): Promise<RotatedTokens | null> {
-
   let response: Response;
   try {
     response = await fetchImpl(`${origin}${API_PREFIX}/auth/refresh`, {

@@ -15,11 +15,11 @@ The repository has two levels of verification:
 The Sonar job is activated only when the repository variable `SONAR_ENABLED` is
 `true`. Configure these values in GitHub repository settings:
 
-| Type | Name | Value |
-|---|---|---|
-| Secret | `SONAR_TOKEN` | token created in SonarQube Cloud |
-| Variable | `SONAR_ENABLED` | `true` |
-| Variable | `SONAR_PROJECT_KEY` | project key from SonarQube Cloud |
+| Type     | Name                 | Value                                 |
+| -------- | -------------------- | ------------------------------------- |
+| Secret   | `SONAR_TOKEN`        | token created in SonarQube Cloud      |
+| Variable | `SONAR_ENABLED`      | `true`                                |
+| Variable | `SONAR_PROJECT_KEY`  | project key from SonarQube Cloud      |
 | Variable | `SONAR_ORGANIZATION` | organization key from SonarQube Cloud |
 
 The scan waits for the Sonar quality gate. Recommended gate conditions:

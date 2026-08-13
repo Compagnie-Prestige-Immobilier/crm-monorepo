@@ -25,15 +25,15 @@ ont été mesurés paire par paire. Base structurelle : **Material Design 3**.
 
 ### 2.1 Base
 
-| Token               | Hex                  | Rôle                         |
-| ------------------- | -------------------- | ---------------------------- |
-| `background`        | `#FFFFFF`            | Fond d'application           |
-| `foreground`        | `#1C0810`            | Texte courant                |
-| `card` / `popover`  | `#FBFBFC`            | Surfaces élevées             |
-| `border`            | `rgba(99,2,16,0.12)` | Séparateurs décoratifs       |
-| `input-background`  | `#F5ECEE`            | Fond de champ                |
-| `input-border`      | `#AF7D84`            | Contour de champ — 3,24:1    |
-| `switch-background` | `#C4A0AA`            | Piste d'interrupteur         |
+| Token               | Hex                  | Rôle                      |
+| ------------------- | -------------------- | ------------------------- |
+| `background`        | `#FFFFFF`            | Fond d'application        |
+| `foreground`        | `#1C0810`            | Texte courant             |
+| `card` / `popover`  | `#FBFBFC`            | Surfaces élevées          |
+| `border`            | `rgba(99,2,16,0.12)` | Séparateurs décoratifs    |
+| `input-background`  | `#F5ECEE`            | Fond de champ             |
+| `input-border`      | `#AF7D84`            | Contour de champ — 3,24:1 |
+| `switch-background` | `#C4A0AA`            | Piste d'interrupteur      |
 
 ### 2.2 Bordeaux CPI — primaire
 

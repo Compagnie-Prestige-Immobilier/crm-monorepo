@@ -151,7 +151,10 @@ describe('résolution du public', () => {
 
   it('refuse une programmation dans le passé', async () => {
     const error = await refusal(() =>
-      service.create(admin, { ...baseBody, scheduledFor: new Date(Date.now() - 60_000).toISOString() }),
+      service.create(admin, {
+        ...baseBody,
+        scheduledFor: new Date(Date.now() - 60_000).toISOString(),
+      }),
     );
     expect(codeOf(error)).toBe(NotificationError.SCHEDULE_IN_PAST);
   });
@@ -304,7 +307,9 @@ describe('éventail', () => {
     expect(message?.data.route).toBe('/phase2?phone=%2B221771234567');
     expect(message?.data.notificationId).toBeTruthy();
     // FCM refuse le message entier si une valeur de `data` n'est pas une chaîne.
-    expect(Object.values(message?.data ?? {}).every((value) => typeof value === 'string')).toBe(true);
+    expect(Object.values(message?.data ?? {}).every((value) => typeof value === 'string')).toBe(
+      true,
+    );
   });
 });
 
@@ -587,7 +592,12 @@ describe('découpage et classement FCM', () => {
     const payload = {
       error: {
         status: 'NOT_FOUND',
-        details: [{ '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError', errorCode: 'UNREGISTERED' }],
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError',
+            errorCode: 'UNREGISTERED',
+          },
+        ],
       },
     };
     expect(readFcmErrorCode(payload)).toBe('UNREGISTERED');

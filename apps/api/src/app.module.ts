@@ -65,9 +65,7 @@ const env = readEnv();
       },
     }),
     ThrottlerModule.forRoot({
-      throttlers: [
-        { name: 'default', ttl: seconds(60), limit: env.API_GLOBAL_RATE_LIMIT },
-      ],
+      throttlers: [{ name: 'default', ttl: seconds(60), limit: env.API_GLOBAL_RATE_LIMIT }],
     }),
     PrismaModule,
     AuthModule,

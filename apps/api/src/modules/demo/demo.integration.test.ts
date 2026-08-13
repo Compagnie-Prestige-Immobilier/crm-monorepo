@@ -181,9 +181,17 @@ describe('mode démonstration', () => {
     // démonstration non taguée resterait visible mode éteint, et sortirait donc
     // dans un export Excel transmis au siège.
     const nonTaguées = await prisma.prospect.count({
-      where: { id: { in: (await prisma.demoEntity.findMany({
-        where: { entityType: 'prospect' }, select: { entityId: true },
-      })).map((e) => e.entityId) }, isDemo: false },
+      where: {
+        id: {
+          in: (
+            await prisma.demoEntity.findMany({
+              where: { entityType: 'prospect' },
+              select: { entityId: true },
+            })
+          ).map((e) => e.entityId),
+        },
+        isDemo: false,
+      },
     });
     expect(nonTaguées).toBe(0);
   });

@@ -82,7 +82,8 @@ abstract final class CpiStateOpacity {
   static const double disabledContainer = 0.12;
 }
 
-/// Cible tactile minimale. L'app se tient debout, au soleil, parfois à une main.
+/// Cible tactile minimale (docs/design.md §1). Le plancher, jamais la cible :
+/// un contrôle qui porte une décision se dimensionne bien au-delà.
 const double kCpiMinTouchTarget = 44;
 
 /// Tokens de mouvement (docs/design.md §7).

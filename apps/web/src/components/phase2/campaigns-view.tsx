@@ -59,11 +59,13 @@ export function CampaignsView() {
         aria-label="Filtrer par statut"
         className="inline-flex h-11 w-fit items-center justify-center rounded-md bg-secondary p-1 text-muted-foreground"
       >
-        {([
-          ['TOUTES', 'Toutes'],
-          ['ACTIVE', 'En cours'],
-          ['CLOSED', 'Clôturées'],
-        ] as const).map(([value, label]) => (
+        {(
+          [
+            ['TOUTES', 'Toutes'],
+            ['ACTIVE', 'En cours'],
+            ['CLOSED', 'Clôturées'],
+          ] as const
+        ).map(([value, label]) => (
           <button
             key={value}
             type="button"

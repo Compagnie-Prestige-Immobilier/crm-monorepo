@@ -68,9 +68,7 @@ export type NotificationsEnv = z.infer<typeof notificationsEnvSchema>;
  * ci-dessus. Le seul cas réellement silencieux serait un JSON de compte de
  * service malformé — il est traité, et journalisé, par `FcmTransport`.
  */
-export const readNotificationsEnv = (
-  source: NodeJS.ProcessEnv = process.env,
-): NotificationsEnv => {
+export const readNotificationsEnv = (source: NodeJS.ProcessEnv = process.env): NotificationsEnv => {
   const parsed = notificationsEnvSchema.safeParse(source);
   return parsed.success ? parsed.data : notificationsEnvSchema.parse({});
 };

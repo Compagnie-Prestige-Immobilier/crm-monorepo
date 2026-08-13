@@ -54,7 +54,7 @@ class Phase2State {
   /// Le numéro normalisé qui a servi à chercher, tel qu'on veut le réafficher.
   final String? searchedPhone;
 
-  /// Erreur de saisie, en français, destinée à être lue debout dans la rue.
+  /// Erreur de saisie, en français, lisible d'un coup d'œil entre deux appels.
   final String? errorMessage;
 
   /// Ce qui vient d'être enregistré, pour le libellé de confirmation.

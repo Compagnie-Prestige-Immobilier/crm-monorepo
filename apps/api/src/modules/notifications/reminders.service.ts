@@ -141,7 +141,8 @@ export class RemindersService {
       }
     }
 
-    if (dispatched) this.logger.log(`${String(dispatched)} notification(s) programmée(s) expédiée(s).`);
+    if (dispatched)
+      this.logger.log(`${String(dispatched)} notification(s) programmée(s) expédiée(s).`);
     return dispatched;
   }
 
@@ -219,7 +220,9 @@ export class RemindersService {
       variables: {
         nom: row.fullName,
         nombre: String(row.pendingOps),
-        jours: String(Math.max(1, Math.floor((now.getTime() - row.pendingSince.getTime()) / 86_400_000))),
+        jours: String(
+          Math.max(1, Math.floor((now.getTime() - row.pendingSince.getTime()) / 86_400_000)),
+        ),
       },
     }));
 
@@ -271,7 +274,10 @@ export class RemindersService {
       .map((group) => ({
         userId: group.assignedToId,
         fullName: nameById.get(group.assignedToId) ?? '',
-        variables: { nom: nameById.get(group.assignedToId) ?? '', nombre: String(group._count._all) },
+        variables: {
+          nom: nameById.get(group.assignedToId) ?? '',
+          nombre: String(group._count._all),
+        },
       }));
 
     return this.emit({

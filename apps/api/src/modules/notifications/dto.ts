@@ -367,7 +367,8 @@ export class DeviceTokenDto {
   @ApiProperty({ type: String, format: 'date-time' }) lastSeenAt!: string;
   @ApiProperty({
     type: Boolean,
-    description: 'Faux quand aucun transport n’est configuré : le jeton est stocké, rien n’est remis.',
+    description:
+      'Faux quand aucun transport n’est configuré : le jeton est stocké, rien n’est remis.',
   })
   pushEnabled!: boolean;
 }

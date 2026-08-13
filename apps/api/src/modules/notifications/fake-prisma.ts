@@ -121,23 +121,40 @@ const uniqueViolation = (target: string[]): Prisma.PrismaClientKnownRequestError
   });
 
 /** Égalité, `null`, `{ in }`, `{ lte }`, `{ gt }`, et le `where` imbriqué `user`/`notification`. */
-const matches = (row: Record<string, unknown>, where: Record<string, unknown> | undefined, db: FakePrisma): boolean => {
+const matches = (
+  row: Record<string, unknown>,
+  where: Record<string, unknown> | undefined,
+  db: FakePrisma,
+): boolean => {
   if (!where) return true;
   for (const [key, expected] of Object.entries(where)) {
     if (expected === undefined) continue;
 
     if (key === 'user') {
       const user = db.users.find((candidate) => candidate.id === row.userId);
-      if (!user || !matches(user as unknown as Record<string, unknown>, expected as Record<string, unknown>, db)) {
+      if (
+        !user ||
+        !matches(
+          user as unknown as Record<string, unknown>,
+          expected as Record<string, unknown>,
+          db,
+        )
+      ) {
         return false;
       }
       continue;
     }
     if (key === 'notification') {
-      const notification = db.notifications.find((candidate) => candidate.id === row.notificationId);
+      const notification = db.notifications.find(
+        (candidate) => candidate.id === row.notificationId,
+      );
       if (
         !notification ||
-        !matches(notification as unknown as Record<string, unknown>, expected as Record<string, unknown>, db)
+        !matches(
+          notification as unknown as Record<string, unknown>,
+          expected as Record<string, unknown>,
+          db,
+        )
       ) {
         return false;
       }
@@ -164,7 +181,8 @@ const matches = (row: Record<string, unknown>, where: Record<string, unknown> | 
       if (filter.lte !== undefined) {
         if (!(actual instanceof Date) || actual.getTime() > filter.lte.getTime()) return false;
       }
-      if (filter.gt !== undefined && !(typeof actual === 'number' && actual > filter.gt)) return false;
+      if (filter.gt !== undefined && !(typeof actual === 'number' && actual > filter.gt))
+        return false;
       if ('not' in filter && actual === filter.not) return false;
       continue;
     }
@@ -228,7 +246,11 @@ export class FakePrisma {
   get user() {
     return {
       findMany: (args: { where?: Record<string, unknown> }) =>
-        Promise.resolve(this.users.filter((row) => matches(row as unknown as Record<string, unknown>, args.where, this))),
+        Promise.resolve(
+          this.users.filter((row) =>
+            matches(row as unknown as Record<string, unknown>, args.where, this),
+          ),
+        ),
     };
   }
 
@@ -240,7 +262,9 @@ export class FakePrisma {
         );
         if (args.distinct?.includes('userId')) {
           const seen = new Set<string>();
-          rows = rows.filter((row) => (seen.has(row.userId) ? false : (seen.add(row.userId), true)));
+          rows = rows.filter((row) =>
+            seen.has(row.userId) ? false : (seen.add(row.userId), true),
+          );
         }
         return Promise.resolve(
           rows.map((row) => ({ ...row, user: this.users.find((user) => user.id === row.userId) })),
@@ -303,7 +327,8 @@ export class FakePrisma {
           id: nextId('ntf'),
           title: String(data.title),
           body: String(data.body),
-          category: (data.category as NotificationCategory | undefined) ?? NotificationCategory.ANNONCE,
+          category:
+            (data.category as NotificationCategory | undefined) ?? NotificationCategory.ANNONCE,
           route: (data.route as string | null | undefined) ?? null,
           payload: data.payload ?? null,
           audience: (data.audience as NotificationAudience | undefined) ?? NotificationAudience.ALL,
@@ -484,7 +509,8 @@ export class FakePrisma {
           matches(row as unknown as Record<string, unknown>, args.where, this),
         );
         const buckets = new Map<string, number>();
-        for (const row of rows) buckets.set(row.assignedToId, (buckets.get(row.assignedToId) ?? 0) + 1);
+        for (const row of rows)
+          buckets.set(row.assignedToId, (buckets.get(row.assignedToId) ?? 0) + 1);
         return Promise.resolve(
           [...buckets.entries()].map(([assignedToId, count]) => ({
             assignedToId,

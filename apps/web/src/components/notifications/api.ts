@@ -106,7 +106,9 @@ export function cancelNotification(id: string): Promise<NotificationRow> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function fetchTemplates(includeInactive = false): Promise<{ items: NotificationTemplate[] }> {
+export function fetchTemplates(
+  includeInactive = false,
+): Promise<{ items: NotificationTemplate[] }> {
   return request<{ items: NotificationTemplate[] }>(
     `/notification-templates${search({ includeInactive: includeInactive ? true : undefined })}`,
   );

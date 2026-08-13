@@ -9,7 +9,8 @@ const mobile = resolve(root, 'apps/mobile');
 if (existsSync(resolve(root, '.env'))) {
   for (const line of readFileSync(resolve(root, '.env'), 'utf8').split('\n')) {
     const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
-    if (match && process.env[match[1]] === undefined) process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
+    if (match && process.env[match[1]] === undefined)
+      process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
   }
 }
 
@@ -88,7 +89,10 @@ for (const [command, args] of [
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-const devices = spawnSync('adb', ['devices'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+const devices = spawnSync('adb', ['devices'], {
+  encoding: 'utf8',
+  stdio: ['ignore', 'pipe', 'ignore'],
+});
 if (/^emulator-\d+\s+device$/m.test(devices.stdout ?? '')) {
   waitForAndroid();
 } else {

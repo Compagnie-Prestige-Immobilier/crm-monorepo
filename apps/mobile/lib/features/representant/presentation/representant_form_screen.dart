@@ -561,7 +561,7 @@ class _ResumeBanner extends StatelessWidget {
 
 /// Barre d'action ancrée en bas.
 ///
-/// En bas et pleine largeur : l'app se tient d'une main, debout ; une action
+/// En bas et pleine largeur : l'app se tient souvent d'une main ; une action
 /// posée en haut d'un écran de 6,5 pouces est hors d'atteinte du pouce.
 class _SaveBar extends StatelessWidget {
   const _SaveBar({

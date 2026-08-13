@@ -14,6 +14,24 @@ bash infra/dokploy/03-deploy.sh       # démarrage
 La clé n'est **jamais** écrite dans un fichier : elle ne vit que dans la variable
 d'environnement, le temps de la session.
 
+## Pas de workflow GitHub de déploiement
+
+Il n'y en a volontairement aucun. Dokploy possède déjà le dépôt, la clé de
+déploiement, les variables et les domaines : un workflow ne ferait que lui
+demander de reconstruire, en dupliquant un secret d'API et des identifiants
+pour rien.
+
+Le déploiement se lance d'ici :
+
+```bash
+export DOKPLOY_KEY='…'
+python3 infra/dokploy/deploy.py deploy
+```
+
+Un workflow SSH lançant `docker-compose.prod.yml` sur ce VPS serait pire que
+rien : il démarrerait Caddy sur les ports 80 et 443, déjà tenus par le Traefik
+de Dokploy, et l'un des deux ne monterait pas.
+
 ## Pourquoi pas `docker-compose.prod.yml`
 
 Le compose de production lance Caddy sur les ports 80 et 443. Sur un hôte
@@ -62,10 +80,10 @@ partie privée dans Dokploy → **SSH Keys**.
 
 ### 3. DNS
 
-| Type | Nom | Contenu | Proxy |
-|---|---|---|---|
-| A | `go.cpi-chues.com` | `72.61.198.237` | orange |
-| A | `go-admin.cpi-chues.com` | `72.61.198.237` | orange |
+| Type | Nom                      | Contenu         | Proxy  |
+| ---- | ------------------------ | --------------- | ------ |
+| A    | `go.cpi-chues.com`       | `72.61.198.237` | orange |
+| A    | `go-admin.cpi-chues.com` | `72.61.198.237` | orange |
 
 ## Après le déploiement
 
@@ -84,10 +102,10 @@ Les données de démonstration s'activent depuis le panel web
 
 ## Fichiers engendrés — jamais commités
 
-| Fichier | Contenu |
-|---|---|
+| Fichier              | Contenu                                                |
+| -------------------- | ------------------------------------------------------ |
 | `.secrets.generated` | mot de passe Postgres, secrets JWT, mot de passe admin |
-| `.ids.generated` | identifiants Dokploy des trois services |
+| `.ids.generated`     | identifiants Dokploy des trois services                |
 
 Les deux sont en `chmod 600` et listés dans le `.gitignore` local. Les secrets
 sont engendrés une seule fois : une relance les relit, sinon les mots de passe
