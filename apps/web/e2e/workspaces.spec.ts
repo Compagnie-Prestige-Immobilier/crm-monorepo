@@ -258,7 +258,7 @@ async function createCase(page: Page, reference: string): Promise<void> {
 
   // Le résumé compact confirme QUI a été retenu : ouvrir un dossier sur le
   // mauvais homonyme ne se découvre qu'à l'encaissement.
-  await expect(page.getByText(/Le nom et le téléphone sont COPIÉS/)).toBeVisible();
+  await expect(page.getByText(/Nom et téléphone sont copiés/)).toBeVisible();
 
   await page.getByLabel('Référence bancaire').fill(reference);
   await page.getByRole('button', { name: 'Ouvrir le dossier' }).click();
@@ -302,7 +302,7 @@ test('un dossier peut être mené jusqu’à l’encaissement', async ({ page })
 
   // Le montant est rendu formaté, et le dossier est verrouillé.
   await expect(page.getByText(/12\s*400\s*000 FCFA/u).first()).toBeVisible();
-  await expect(page.getByText(/étape terminale/)).toBeVisible();
+  await expect(page.getByText(/Étape terminale/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Rejeter le dossier' })).toHaveCount(0);
 
   // L'historique conserve la trace des trois transitions.
@@ -331,8 +331,8 @@ test('un dossier peut être rejeté, et le rejet annonce « Montant : 0 FCFA »'
   await confirm.click();
 
   await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 30_000 });
-  await expect(page.getByText(/Rejeté — Document manquant/)).toBeVisible();
-  await expect(page.getByText(/étape terminale/)).toBeVisible();
+  await expect(page.getByText(/Rejeté : Document manquant/)).toBeVisible();
+  await expect(page.getByText(/Étape terminale/)).toBeVisible();
 });
 
 test('le motif « Autre » exige une précision', async ({ page }) => {
@@ -369,7 +369,7 @@ test('la référence dupliquée est signalée au flou, avec un lien vers le doss
   // Le contrôle part au FLOU, pas à chaque frappe.
   await page.getByLabel('Référence bancaire').blur();
 
-  const alert = page.getByRole('alert').filter({ hasText: 'est déjà portée' });
+  const alert = page.getByRole('alert').filter({ hasText: 'existe déjà' });
   await expect(alert).toBeVisible({ timeout: 30_000 });
   await expect(alert.getByRole('link', { name: 'Ouvrir ce dossier' })).toBeVisible();
 });

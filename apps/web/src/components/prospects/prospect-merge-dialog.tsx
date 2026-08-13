@@ -98,7 +98,7 @@ export function ProspectMergeDialog({
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.representantsRoot });
-      toast.success(`Fusion effectuée. La fiche conservée est ${survivor.prenom} ${survivor.nom}.`);
+      toast.success(`Fusion effectuée. Fiche conservée : ${survivor.prenom} ${survivor.nom}.`);
       onOpenChange(false);
     },
     onError: (error) => {
@@ -122,8 +122,7 @@ export function ProspectMergeDialog({
         <DialogHeader>
           <DialogTitle>Fusionner deux doublons</DialogTitle>
           <DialogDescription>
-            Choisissez la fiche à conserver. L’autre est absorbée : ses prospects rattachés suivent,
-            puis elle est supprimée.
+            Choisissez la fiche à conserver. L’autre est supprimée, son historique suit.
           </DialogDescription>
         </DialogHeader>
 
@@ -141,7 +140,7 @@ export function ProspectMergeDialog({
               onChange={(event) => {
                 setSearchDraft(event.target.value);
               }}
-              placeholder="Chercher par nom ou téléphone (2 caractères minimum)…"
+              placeholder="Nom ou téléphone (2 caractères minimum)…"
               className="pl-9"
             />
           </div>

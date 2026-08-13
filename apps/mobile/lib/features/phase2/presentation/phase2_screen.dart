@@ -12,6 +12,7 @@ import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
 import '../../../data/repositories/write_repository.dart';
+import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../phase2_controller.dart';
 
@@ -114,11 +115,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     _phoneFocus.requestFocus();
   }
 
-  Future<void> _record({
-    required String outcome,
-    String? method,
-    String? comment,
-  }) async {
+  Future<void> _record({required String outcome, String? method, String? comment}) async {
     final bool ok = await ref
         .read(phase2ControllerProvider.notifier)
         .record(outcome: outcome, method: method, comment: comment);
@@ -142,80 +139,75 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     // restaurée au démarrage à froid). C'est le bug signalé sur Phase 2.
     return CpiPopScope(
       child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Phase 2'),
-        leading: const CpiBackButton(),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            const _StatusStrip(),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  CpiSpacing.md,
-                  CpiSpacing.sm,
-                  CpiSpacing.md,
-                  CpiSpacing.xl,
-                ),
-                children: <Widget>[
-                  _PhoneBlock(
-                    controller: _phone,
-                    focusNode: _phoneFocus,
-                    enabled: phase2.stage != Phase2Stage.confirmed,
+        appBar: AppBar(title: const Text('Phase 2'), leading: const CpiBackButton()),
+        body: SafeArea(
+          child: Column(
+            children: <Widget>[
+              const _StatusStrip(),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                    CpiSpacing.md,
+                    CpiSpacing.sm,
+                    CpiSpacing.md,
+                    CpiSpacing.xl,
                   ),
-                  const SizedBox(height: CpiSpacing.md),
-                  // `AnimatedSwitcher` et non trois `if` : le passage
-                  // recherche → résultat → confirmation est le seul mouvement de
-                  // cet écran, et il porte une information — quelque chose a
-                  // changé sous les doigts. `CpiMotion.of` ramène la durée à
-                  // zéro quand `MediaQuery.disableAnimations` est actif ; la
-                  // logique, elle, ne change pas.
-                  AnimatedSwitcher(
-                    duration: motion.component,
-                    switchInCurve: motion.easeOut,
-                    switchOutCurve: motion.easeOut,
-                    child: KeyedSubtree(
-                      key: ValueKey<String>(
-                        '${phase2.stage.name}:${phase2.entry?.prospectId ?? ''}',
-                      ),
-                      child: switch (phase2.stage) {
-                        Phase2Stage.search => _SearchHint(
-                          message: phase2.errorMessage,
-                        ),
-                        Phase2Stage.notFound => _NotFound(
-                          phone: phase2.searchedPhone,
-                          onClear: _resetForNext,
-                        ),
-                        Phase2Stage.alreadyClosed => _AlreadyClosed(
-                          entry: phase2.entry!,
-                          onNext: _resetForNext,
-                        ),
-                        Phase2Stage.capture => _Capture(
-                          state: phase2,
-                          onMethod: (String method) => _record(
-                            outcome: CallOutcomes.methodObtained,
-                            method: method,
-                          ),
-                          onNegative: _openNegativeSheet,
-                        ),
-                        Phase2Stage.confirmed => _Confirmed(
-                          label: phase2.confirmation,
-                          onNext: _resetForNext,
-                        ),
-                      },
+                  children: <Widget>[
+                    _PhoneBlock(
+                      controller: _phone,
+                      focusNode: _phoneFocus,
+                      enabled: phase2.stage != Phase2Stage.confirmed,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: CpiSpacing.md),
+                    // `AnimatedSwitcher` et non trois `if` : le passage
+                    // recherche → résultat → confirmation est le seul mouvement de
+                    // cet écran, et il porte une information — quelque chose a
+                    // changé sous les doigts. `CpiMotion.of` ramène la durée à
+                    // zéro quand `MediaQuery.disableAnimations` est actif ; la
+                    // logique, elle, ne change pas.
+                    AnimatedSwitcher(
+                      duration: motion.component,
+                      switchInCurve: motion.easeOut,
+                      switchOutCurve: motion.easeOut,
+                      child: KeyedSubtree(
+                        key: ValueKey<String>(
+                          '${phase2.stage.name}:${phase2.entry?.prospectId ?? ''}',
+                        ),
+                        child: switch (phase2.stage) {
+                          Phase2Stage.search => _SearchHint(message: phase2.errorMessage),
+                          Phase2Stage.notFound => _NotFound(
+                            phone: phase2.searchedPhone,
+                            onClear: _resetForNext,
+                          ),
+                          Phase2Stage.alreadyClosed => _AlreadyClosed(
+                            entry: phase2.entry!,
+                            onNext: _resetForNext,
+                          ),
+                          Phase2Stage.capture => _Capture(
+                            state: phase2,
+                            onMethod: (String method) => _record(
+                              outcome: CallOutcomes.methodObtained,
+                              method: method,
+                            ),
+                            onNegative: _openNegativeSheet,
+                          ),
+                          Phase2Stage.confirmed => _Confirmed(
+                            label: phase2.confirmation,
+                            onNext: _resetForNext,
+                          ),
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            // Action ancrée en zone de pouce quand l'annuaire est vide : sans
-            // elle, le seul « Télécharger » était en haut de l'écran, hors
-            // d'atteinte à une main.
-            const _DownloadBar(),
-          ],
+              // Action ancrée en zone de pouce quand l'annuaire est vide : sans
+              // elle, le seul « Télécharger » était en haut de l'écran, hors
+              // d'atteinte à une main.
+              const _DownloadBar(),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -252,11 +244,11 @@ class _StatusStrip extends ConsumerWidget {
     final CpiColors cpi = context.cpi;
     final Phase2State phase2 = ref.watch(phase2ControllerProvider);
     final int directory = ref.watch(phase2DirectoryCountProvider).value ?? 0;
-    final SyncStateData? syncState =
-        ref.watch(phase2DirectoryStateProvider).value;
+    final SyncStateData? syncState = ref.watch(phase2DirectoryStateProvider).value;
     final int pending = ref.watch(phase2PendingCountProvider).value ?? 0;
-    final ({int attempts, int closed, int methods})? progress =
-        ref.watch(phase2ProgressProvider).value;
+    final ({int attempts, int closed, int methods})? progress = ref
+        .watch(phase2ProgressProvider)
+        .value;
 
     return Container(
       width: double.infinity,
@@ -464,8 +456,9 @@ class _DirectoryLine extends ConsumerWidget {
     }
 
     final DateTime? when = lastPulledAt;
-    final String freshness =
-        when == null ? 'jamais téléchargé' : 'mis à jour ${_relative(when)}';
+    final String freshness = when == null
+        ? 'jamais téléchargé'
+        : 'mis à jour ${_relative(when)}';
 
     return Row(
       children: <Widget>[
@@ -483,9 +476,7 @@ class _DirectoryLine extends ConsumerWidget {
                 ? 'Annuaire non téléchargé'
                 : 'Annuaire : ${_number.format(directory)} numéros · $freshness',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: directory == 0
-                  ? cpi.accentText
-                  : theme.colorScheme.onSurfaceVariant,
+              color: directory == 0 ? cpi.accentText : theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -532,8 +523,7 @@ class _PhoneBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final String? downloadError =
-        ref.watch(phase2ControllerProvider).downloadError;
+    final String? downloadError = ref.watch(phase2ControllerProvider).downloadError;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -750,11 +740,7 @@ class _AlreadyClosed extends StatelessWidget {
 
 /// Les trois cartes de méthode, plus l'issue négative.
 class _Capture extends StatelessWidget {
-  const _Capture({
-    required this.state,
-    required this.onMethod,
-    required this.onNegative,
-  });
+  const _Capture({required this.state, required this.onMethod, required this.onNegative});
 
   final Phase2State state;
   final ValueChanged<String> onMethod;
@@ -768,10 +754,7 @@ class _Capture extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text(
-          'Méthode d\'enrôlement obtenue',
-          style: theme.textTheme.titleMedium,
-        ),
+        Text('Méthode d\'enrôlement obtenue', style: theme.textTheme.titleMedium),
         const SizedBox(height: CpiSpacing.xxs),
         Text(
           'Une seule réponse.',
@@ -875,56 +858,52 @@ class _MethodCard extends StatelessWidget {
       onTap: enabled ? choose : null,
       label: 'Méthode obtenue : $title. $subtitle',
       child: ExcludeSemantics(
-        child: Material(
-          color: theme.colorScheme.surfaceContainerLowest,
-          borderRadius: CpiRadius.brLg,
-          child: InkWell(
-            borderRadius: CpiRadius.brLg,
-            onTap: enabled ? choose : null,
-            child: Container(
-              // 72 dp : bien au-delà des 48 dp minimum. Une carte qui porte la
-              // décision de tout l'écran ne se dimensionne pas au plancher.
-              constraints: const BoxConstraints(minHeight: 72),
-              padding: const EdgeInsets.all(CpiSpacing.md),
-              decoration: BoxDecoration(
-                borderRadius: CpiRadius.brLg,
-                border: Border.all(color: cpi.borderSubtle),
-              ),
-              child: Row(
-                children: <Widget>[
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.secondary,
-                      borderRadius: CpiRadius.brMd,
-                    ),
-                    child: Icon(icon, size: 22, color: theme.colorScheme.primary),
+        child: CpiPressable(
+          onTap: enabled ? choose : null,
+          child: Container(
+            // 72 dp : bien au-delà des 48 dp minimum. Une carte qui porte la
+            // décision de tout l'écran ne se dimensionne pas au plancher.
+            constraints: const BoxConstraints(minHeight: 72),
+            padding: const EdgeInsets.all(CpiSpacing.md),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLowest,
+              borderRadius: CpiRadius.brLg,
+              border: Border.all(color: cpi.borderSubtle),
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondary,
+                    borderRadius: CpiRadius.brMd,
                   ),
-                  const SizedBox(width: CpiSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(title, style: theme.textTheme.titleMedium),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                  child: Icon(icon, size: 22, color: theme.colorScheme.primary),
+                ),
+                const SizedBox(width: CpiSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(title, style: theme.textTheme.titleMedium),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  Icon(
-                    PhosphorIconsRegular.caretRight,
-                    size: 18,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
+                ),
+                Icon(
+                  PhosphorIconsRegular.caretRight,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
             ),
           ),
         ),
@@ -958,10 +937,15 @@ class _Confirmed extends StatelessWidget {
               ),
               child: Row(
                 children: <Widget>[
-                  Icon(
-                    PhosphorIconsFill.checkCircle,
-                    size: 28,
-                    color: cpi.success,
+                  // Rebond léger sur la coche : c'est LA confirmation que
+                  // l'écriture est passée, et docs/design.md §7 réserve
+                  // `ease-spring` exactement à ce cas.
+                  _SpringIn(
+                    child: Icon(
+                      PhosphorIconsFill.checkCircle,
+                      size: 30,
+                      color: cpi.success,
+                    ),
                   ),
                   const SizedBox(width: CpiSpacing.sm),
                   Expanded(
@@ -1102,9 +1086,7 @@ class _NegativeSheetState extends State<_NegativeSheet> {
         // La feuille ne dépasse jamais 90 % de la hauteur : au-delà, elle
         // couvrirait le numéro qu'on est en train de traiter et on ne saurait
         // plus pour qui on saisit.
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
-        ),
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1264,11 +1246,7 @@ class _NegativeSheetState extends State<_NegativeSheet> {
 }
 
 class _OutcomeTile extends StatelessWidget {
-  const _OutcomeTile({
-    required this.option,
-    required this.selected,
-    required this.onTap,
-  });
+  const _OutcomeTile({required this.option, required this.selected, required this.onTap});
 
   final ({String outcome, String title, String subtitle, IconData icon}) option;
   final bool selected;
@@ -1381,6 +1359,53 @@ class _Notice extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Entrée avec rebond léger (`ease-spring`, docs/design.md §7).
+///
+/// Réservée aux **confirmations** : c'est la seule catégorie de mouvement que
+/// §7 autorise à dépasser, et elle ne s'applique qu'à une icône, jamais à un
+/// bloc de texte qu'on cherche à lire.
+class _SpringIn extends StatefulWidget {
+  const _SpringIn({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_SpringIn> createState() => _SpringInState();
+}
+
+class _SpringInState extends State<_SpringIn> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(vsync: this);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final Duration duration = CpiMotion.of(context).component;
+    _controller.duration = duration;
+    if (duration == Duration.zero) {
+      _controller.value = 1;
+    } else if (!_controller.isAnimating && _controller.value == 0) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: CurvedAnimation(
+        parent: _controller,
+        curve: CpiMotion.of(context).easeSpring,
+      ),
+      child: widget.child,
     );
   }
 }

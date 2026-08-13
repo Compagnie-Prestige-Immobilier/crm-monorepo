@@ -93,7 +93,7 @@ export function TemplateManager() {
         <EmptyState
           icon={FileTextIcon}
           title="Aucun gabarit"
-          description="Un gabarit est un texte réutilisable où les valeurs changeantes s’écrivent {{entre_accolades}}. Il évite de réécrire le même message chaque semaine."
+          description="Textes réutilisables à variables."
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
@@ -232,9 +232,7 @@ function TemplateFormDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Modifier le gabarit' : 'Nouveau gabarit'}</DialogTitle>
           <DialogDescription>
-            Écrivez les valeurs changeantes entre doubles accolades, par exemple{' '}
-            <code className="font-mono">{'{{nom}}'}</code>. Elles seront demandées au moment de
-            composer.
+            Variables entre doubles accolades : <code className="font-mono">{'{{nom}}'}</code>.
           </DialogDescription>
         </DialogHeader>
 
@@ -245,7 +243,6 @@ function TemplateFormDialog({
                 <Input
                   {...props}
                   value={name}
-                  placeholder="Rappel hebdomadaire"
                   onChange={(event) => {
                     setName(event.target.value);
                   }}
@@ -293,7 +290,7 @@ function TemplateFormDialog({
                 <Textarea
                   {...props}
                   value={bodyTemplate}
-                  placeholder="Il vous reste {{nombre}} fiches à appeler cette semaine."
+                  placeholder="{{nombre}} fiches à appeler."
                   onChange={(event) => {
                     setBodyTemplate(event.target.value);
                   }}
@@ -322,9 +319,7 @@ function TemplateFormDialog({
               <p className="text-[0.75rem] font-[600]">Variables détectées</p>
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {variables.length === 0 ? (
-                  <span className="text-[0.8125rem] text-muted-foreground">
-                    Aucune. Ce gabarit produira toujours le même texte.
-                  </span>
+                  <span className="text-[0.8125rem] text-muted-foreground">Aucune</span>
                 ) : (
                   variables.map((variable) => (
                     <Badge key={variable} variant="secondary" className="font-mono">

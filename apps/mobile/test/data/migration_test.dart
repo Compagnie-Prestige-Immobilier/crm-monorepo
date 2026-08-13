@@ -120,8 +120,9 @@ void main() {
     await verifier.migrateAndValidate(db, 2);
 
     // La saisie a traversé.
-    final List<QueryRow> representants =
-        await db.customSelect('SELECT id FROM representants').get();
+    final List<QueryRow> representants = await db
+        .customSelect('SELECT id FROM representants')
+        .get();
     expect(representants.map((QueryRow r) => r.read<String>('id')), <String>['rep-1']);
     final List<QueryRow> pending = await db
         .customSelect('SELECT id FROM outbox WHERE status = \'pending\'')
@@ -130,11 +131,13 @@ void main() {
 
     // Les deux tables de phase 2 existent et sont vides — un annuaire ne se
     // fabrique pas par migration, il se télécharge.
-    final List<QueryRow> directory =
-        await db.customSelect('SELECT COUNT(*) AS c FROM phase2_directory').get();
+    final List<QueryRow> directory = await db
+        .customSelect('SELECT COUNT(*) AS c FROM phase2_directory')
+        .get();
     expect(directory.single.read<int>('c'), 0);
-    final List<QueryRow> attempts =
-        await db.customSelect('SELECT COUNT(*) AS c FROM call_attempts').get();
+    final List<QueryRow> attempts = await db
+        .customSelect('SELECT COUNT(*) AS c FROM call_attempts')
+        .get();
     expect(attempts.single.read<int>('c'), 0);
 
     await db.close();
@@ -151,8 +154,7 @@ void main() {
           'WHERE type = \'index\' AND tbl_name IN (\'phase2_directory\', \'call_attempts\')',
         )
         .get();
-    final Set<String> names =
-        indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
 
     // `phase2_directory_phone_unique` est le seul index qui rende la recherche
     // par téléphone tenable : sans lui, chaque numéro tapé déclenche un balayage
@@ -193,12 +195,17 @@ void main() {
     final List<QueryRow> pending = await db
         .customSelect('SELECT id FROM outbox WHERE status = \'pending\'')
         .get();
-    expect(pending, hasLength(1), reason: 'la file ne doit pas être vidée par une migration');
+    expect(
+      pending,
+      hasLength(1),
+      reason: 'la file ne doit pas être vidée par une migration',
+    );
 
     // La table existe et démarre vide : un historique de notifications ne se
     // fabrique pas par migration, il se retélécharge.
-    final List<QueryRow> inbox =
-        await db.customSelect('SELECT COUNT(*) AS c FROM notifications').get();
+    final List<QueryRow> inbox = await db
+        .customSelect('SELECT COUNT(*) AS c FROM notifications')
+        .get();
     expect(inbox.single.read<int>('c'), 0);
 
     await db.close();

@@ -42,8 +42,7 @@ export function CampaignsView() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Phase 2 : chaque campagne tire les prospects encore en attente sur son périmètre et les
-          répartit en tourniquet entre les commerciaux choisis. Le tirage est définitif.
+          Répartition des prospects en attente entre les commerciaux choisis. Tirage définitif.
         </p>
         <Button
           type="button"
@@ -93,7 +92,7 @@ export function CampaignsView() {
           }
           description={
             filters.status === null
-              ? 'Créez une campagne pour distribuer les prospects en attente entre vos commerciaux. Un aperçu du nombre de fiches vous sera présenté avant confirmation.'
+              ? 'Créez une campagne pour répartir les prospects en attente.'
               : 'Changez d’onglet pour voir les autres campagnes.'
           }
           action={

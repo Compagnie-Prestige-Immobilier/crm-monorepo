@@ -111,9 +111,7 @@ export function BankStagesView() {
       invalidate();
       setDeactivating(null);
       toast.success(
-        stage.isActive
-          ? `« ${stage.label} » est réactivée : les dossiers peuvent de nouveau y passer.`
-          : `« ${stage.label} » est désactivée : elle est sautée par le flux.`,
+        stage.isActive ? `« ${stage.label} » réactivée.` : `« ${stage.label} » désactivée.`,
       );
     },
     onError: (error) => {
@@ -129,7 +127,7 @@ export function BankStagesView() {
         const code = (error.body as { code?: string }).code;
         if (code === 'BANK_STAGE_HAS_OPEN_CASES') {
           toast.error(
-            'Des dossiers stationnent encore sur cette étape. Faites-les avancer ou rejetez-les avant de la désactiver — sinon ils resteraient bloqués sur une étape que le flux ne parcourt plus.',
+            'Des dossiers occupent cette étape. Faites-les avancer ou rejetez-les avant de la désactiver.',
           );
           return;
         }
@@ -178,9 +176,8 @@ export function BankStagesView() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Les dossiers parcourent ces étapes dans l’ordre. Une étape désactivée est sautée : les
-          dossiers qui y stationnent restent lisibles et repartent vers la suivante encore active.
-          L’encaissement ne se déclare qu’à la dernière étape ouverte.
+          Les dossiers parcourent ces étapes dans l’ordre. Une étape désactivée est sautée.
+          L’encaissement se déclare à la dernière étape ouverte.
         </p>
         <Button
           type="button"
@@ -196,10 +193,7 @@ export function BankStagesView() {
       <Card>
         <CardHeader>
           <CardTitle>Étapes ouvertes</CardTitle>
-          <CardDescription>
-            Ordre du flux, de la première à la dernière. Les boutons Monter et Descendre sont
-            atteignables au clavier.
-          </CardDescription>
+          <CardDescription>Ordre du flux, de la première à la dernière.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <ol className="divide-y divide-border">
@@ -276,7 +270,7 @@ export function BankStagesView() {
                       disabled={stage.isSystem || stage.isInitial || toggleActive.isPending}
                       title={
                         stage.isSystem || stage.isInitial
-                          ? 'Une étape système ou initiale ne peut pas être désactivée : le flux n’aurait plus ni entrée ni sortie.'
+                          ? 'Étape système ou initiale : désactivation impossible.'
                           : undefined
                       }
                       onClick={() => {
@@ -301,9 +295,8 @@ export function BankStagesView() {
         <CardHeader>
           <CardTitle>Étapes terminales</CardTitle>
           <CardDescription>
-            Fixées par le système : leurs règles financières ne sont pas configurables. Un
-            encaissement exige un montant strictement positif ; un rejet exige un motif et force le
-            montant à zéro.
+            Non configurables. Encaissement : montant strictement positif. Rejet : motif
+            obligatoire, montant à zéro.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -351,9 +344,8 @@ export function BankStagesView() {
           <DialogHeader>
             <DialogTitle>Désactiver « {deactivating?.label ?? ''} » ?</DialogTitle>
             <DialogDescription>
-              L’étape disparaît du flux : les nouveaux dossiers la sauteront. Elle reste visible
-              dans l’historique des dossiers déjà passés par elle — rien n’est réécrit. La
-              désactivation sera refusée s’il reste des dossiers arrêtés sur cette étape.
+              L’étape est retirée du flux et l’historique reste intact. Refusé si des dossiers
+              occupent encore cette étape.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -465,8 +457,8 @@ function StageFormDialog({
           </DialogTitle>
           <DialogDescription>
             {mode === 'create'
-              ? 'L’étape est ajoutée à la fin du flux ouvert. Vous pourrez la déplacer ensuite.'
-              : 'Le code d’une étape ne change JAMAIS après création : il figure dans l’historique des dossiers déjà clos.'}
+              ? 'Ajoutée à la fin du flux ouvert, déplaçable ensuite.'
+              : 'Le code reste inchangé.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -493,8 +485,7 @@ function StageFormDialog({
                 }}
               />
               <p id={`${codeId}-aide`} className="text-[0.75rem] text-muted-foreground">
-                Majuscules, chiffres et tirets bas. Définitif : il identifie l’étape dans
-                l’historique et dans les exports.
+                Majuscules, chiffres et tirets bas. Définitif.
               </p>
             </div>
           ) : null}
@@ -533,10 +524,6 @@ function StageFormDialog({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[0.75rem] text-muted-foreground">
-              Un rôle du design system, pas une couleur libre : les contrastes sont déjà mesurés en
-              thème clair et sombre.
-            </p>
           </div>
         </div>
 

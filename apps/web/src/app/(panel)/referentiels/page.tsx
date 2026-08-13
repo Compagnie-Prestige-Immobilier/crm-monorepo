@@ -22,7 +22,7 @@ export default async function ReferentielsPage() {
       <EmptyState
         icon={ShieldAlertIcon}
         title="Accès réservé aux administrateurs"
-        description="Les référentiels descendent en lecture seule vers l’application mobile : leur modification est réservée aux administrateurs du siège."
+        description="Banques, syndicats et départements proposés à la saisie des prospects."
       />
     );
   }

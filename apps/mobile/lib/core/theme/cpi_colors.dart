@@ -30,6 +30,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
     required this.accentBorder,
     required this.accentOnDark,
     required this.accentSurface,
+    required this.destructiveOnDark,
     required this.navSurface,
     required this.navForeground,
     required this.navActive,
@@ -71,6 +72,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
     accentBorder: Color(0xFFA87A15),
     accentOnDark: Color(0xFFFFC65A),
     accentSurface: Color(0xFFFAF4E8),
+    destructiveOnDark: Color(0xFFF87171),
     navSurface: Color(0xFF3A010A),
     navForeground: Color(0xFFDFC0C8),
     navActive: Color(0xFF4A0110),
@@ -121,6 +123,16 @@ class CpiColors extends ThemeExtension<CpiColors> {
   final Color accentOnDark;
   final Color accentSurface;
 
+  /// Rouge d'erreur lisible SUR BORDEAUX — 4,91:1 sur `primary`.
+  ///
+  /// `destructive` (#B91C1C) ne fait que **2,10:1** sur `#630210` : il échoue
+  /// AA texte *et* le seuil 3:1 des éléments non textuels. Or l'écran de
+  /// connexion est bordeaux plein, et ses messages de validation s'y posaient
+  /// directement — ils étaient illisibles. C'est la déclinaison `destructive`
+  /// du mode sombre de docs/design.md §3, réutilisée ici pour la même raison
+  /// qu'elle existe là-bas : le rouge foncé ne passe pas sur fond foncé.
+  final Color destructiveOnDark;
+
   final Color navSurface;
   final Color navForeground;
   final Color navActive;
@@ -167,6 +179,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
     Color? accentBorder,
     Color? accentOnDark,
     Color? accentSurface,
+    Color? destructiveOnDark,
     Color? navSurface,
     Color? navForeground,
     Color? navActive,
@@ -205,6 +218,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
       accentBorder: accentBorder ?? this.accentBorder,
       accentOnDark: accentOnDark ?? this.accentOnDark,
       accentSurface: accentSurface ?? this.accentSurface,
+      destructiveOnDark: destructiveOnDark ?? this.destructiveOnDark,
       navSurface: navSurface ?? this.navSurface,
       navForeground: navForeground ?? this.navForeground,
       navActive: navActive ?? this.navActive,
@@ -249,6 +263,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
       accentBorder: l(accentBorder, other.accentBorder),
       accentOnDark: l(accentOnDark, other.accentOnDark),
       accentSurface: l(accentSurface, other.accentSurface),
+      destructiveOnDark: l(destructiveOnDark, other.destructiveOnDark),
       navSurface: l(navSurface, other.navSurface),
       navForeground: l(navForeground, other.navForeground),
       navActive: l(navActive, other.navActive),

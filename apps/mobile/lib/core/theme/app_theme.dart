@@ -41,10 +41,7 @@ abstract final class AppTheme {
     // `fromSeed` d'abord — il remplit correctement les rôles secondaires et les
     // niveaux `surfaceDim`/`surfaceBright` qu'on ne veut pas écrire à la main —
     // puis on écrase tout ce que docs/design.md fixe explicitement.
-    return ColorScheme.fromSeed(
-      seedColor: seed,
-      brightness: Brightness.light,
-    ).copyWith(
+    return ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light).copyWith(
       primary: _primary,
       onPrimary: _onPrimary,
       primaryContainer: _primaryContainer,
@@ -185,9 +182,7 @@ abstract final class AppTheme {
       ),
 
       iconButtonTheme: IconButtonThemeData(
-        style: IconButton.styleFrom(
-          minimumSize: const Size.square(kCpiMinTouchTarget),
-        ),
+        style: IconButton.styleFrom(minimumSize: const Size.square(kCpiMinTouchTarget)),
       ),
 
       inputDecorationTheme: InputDecorationTheme(
@@ -260,8 +255,7 @@ abstract final class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith<TextStyle?>((
           Set<WidgetState> states,
         ) {
-          final TextStyle base =
-              text.labelMedium ?? const TextStyle(fontSize: 14);
+          final TextStyle base = text.labelMedium ?? const TextStyle(fontSize: 14);
           return states.contains(WidgetState.selected)
               ? base.copyWith(color: scheme.primary, fontWeight: FontWeight.w700)
               : base.copyWith(color: scheme.onSurfaceVariant);

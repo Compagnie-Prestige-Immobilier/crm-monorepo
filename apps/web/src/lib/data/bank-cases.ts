@@ -307,7 +307,7 @@ export function primaryAction(
   current: BankCaseStage,
 ): PrimaryAction {
   if (current.type !== 'OPEN') {
-    return { kind: 'none', reason: 'Ce dossier est clos : son parcours est terminé.' };
+    return { kind: 'none', reason: 'Dossier clos.' };
   }
 
   const next = nextOpenStage(stages, current);
@@ -318,7 +318,6 @@ export function primaryAction(
 
   return {
     kind: 'none',
-    reason:
-      'Aucune étape suivante active n’est configurée. Un administrateur doit compléter le flux.',
+    reason: 'Aucune étape suivante active. Complétez le flux de traitement.',
   };
 }

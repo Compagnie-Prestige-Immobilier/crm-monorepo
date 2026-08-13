@@ -42,8 +42,7 @@ class RepresentantFormScreen extends ConsumerStatefulWidget {
   final String? representantId;
 
   @override
-  ConsumerState<RepresentantFormScreen> createState() =>
-      _RepresentantFormScreenState();
+  ConsumerState<RepresentantFormScreen> createState() => _RepresentantFormScreenState();
 }
 
 class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
@@ -85,15 +84,12 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
 
   @override
   bool get draftIsEmpty =>
-      _nom.text.trim().isEmpty &&
-      _phone.text.trim().isEmpty &&
-      _departementId == null;
+      _nom.text.trim().isEmpty && _phone.text.trim().isEmpty && _departementId == null;
 
   /// En création seulement : en modification, la fiche existe déjà et c'est son
   /// identifiant, pas un brouillon, qui porte la restauration.
   @override
-  String? draftRouteWithId() =>
-      widget.draftId == null && widget.representantId == null
+  String? draftRouteWithId() => widget.draftId == null && widget.representantId == null
       ? Routes.newRepresentantWithDraft(_draftId)
       : null;
 
@@ -110,11 +106,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     super.initState();
     // Vider sur perte de focus, en plus de la traîne : quitter un champ est le
     // moment où l'utilisateur considère sa valeur acquise.
-    for (final FocusNode node in <FocusNode>[
-      _nomFocus,
-      _phoneFocus,
-      _departementFocus,
-    ]) {
+    for (final FocusNode node in <FocusNode>[_nomFocus, _phoneFocus, _departementFocus]) {
       node.addListener(() {
         if (!node.hasFocus) unawaited(flushDraft());
       });
@@ -314,136 +306,133 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
 
     return CpiPopScope(
       child: Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.representantId == null
-              ? 'Nouveau représentant'
-              : 'Modifier le représentant',
+        appBar: AppBar(
+          title: Text(
+            widget.representantId == null
+                ? 'Nouveau représentant'
+                : 'Modifier le représentant',
+          ),
+          leading: const CpiBackButton(),
         ),
-        leading: const CpiBackButton(),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            if (_pendingRestore != null) _ResumeBanner(
-              label: (_pendingRestore!.values['fullName'] as String?)?.trim(),
-              onResume: () => _apply(_pendingRestore!),
-              onDiscard: () async {
-                await ref.read(draftRepositoryProvider).delete(_draftId);
-                if (mounted) setState(() => _pendingRestore = null);
-              },
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(CpiSpacing.md),
-                children: <Widget>[
-                  TextField(
-                    controller: _nom,
-                    focusNode: _nomFocus,
-                    autofocus: widget.representantId == null,
-                    textCapitalization: TextCapitalization.words,
-                    textInputAction: TextInputAction.next,
-                    onChanged: (String _) {
-                      markDraftDirty();
-                      setState(() {});
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Nom complet',
-                      hintText: 'Mamadou Diallo',
-                    ),
-                  ),
-                  const SizedBox(height: CpiSpacing.md),
-                  PhoneField(
-                    controller: _phone,
-                    focusNode: _phoneFocus,
-                    onChanged: (String _) {
-                      markDraftDirty();
-                      _scheduleLookup();
-                      setState(() {});
-                    },
-                  ),
-                  if (_duplicate != null) ...<Widget>[
-                    const SizedBox(height: CpiSpacing.sm),
-                    _DuplicateBanner(
-                      name: _duplicate!.name,
-                      owner: _duplicate!.owner,
-                      onAddProspects: _duplicate!.representantId == null
-                          ? null
-                          : () => context.pushReplacement(
-                              Routes.newProspectFor(_duplicate!.representantId!),
-                            ),
-                    ),
-                  ],
-                  const SizedBox(height: CpiSpacing.md),
-                  LocalTypeahead(
-                    controller: _departement,
-                    focusNode: _departementFocus,
-                    label: 'Département',
-                    hint: 'Dakar, Thiès, Mbour…',
-                    selectedId: _departementId,
-                    textInputAction: TextInputAction.done,
-                    emptyHint: departements.isEmpty
-                        ? 'Aucun département. Synchronisez.'
-                        : 'Aucun résultat',
-                    options: departements
-                        .map(
-                          (Departement d) => TypeaheadOption(
-                            id: d.id,
-                            label: d.name,
-                            secondary: d.code,
-                            keywords: <String>[d.code],
-                          ),
-                        )
-                        .toList(growable: false),
-                    onChanged: (String _) {
-                      // Retaper invalide la sélection : sans ça, corriger
-                      // « Dakar » en « Dagana » garderait l'identifiant de
-                      // Dakar tout en affichant Dagana.
-                      if (_departementId != null) {
-                        setState(() => _departementId = null);
-                      }
-                      markDraftDirty();
-                    },
-                    onSelected: (TypeaheadOption option) {
-                      setState(() => _departementId = option.id);
-                      markDraftDirty();
-                      unawaited(flushDraft());
-                    },
-                  ),
-                  if (_error != null) ...<Widget>[
-                    const SizedBox(height: CpiSpacing.md),
-                    Text(
-                      _error!,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.error,
+        body: SafeArea(
+          child: Column(
+            children: <Widget>[
+              if (_pendingRestore != null)
+                _ResumeBanner(
+                  label: (_pendingRestore!.values['fullName'] as String?)?.trim(),
+                  onResume: () => _apply(_pendingRestore!),
+                  onDiscard: () async {
+                    await ref.read(draftRepositoryProvider).delete(_draftId);
+                    if (mounted) setState(() => _pendingRestore = null);
+                  },
+                ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(CpiSpacing.md),
+                  children: <Widget>[
+                    TextField(
+                      controller: _nom,
+                      focusNode: _nomFocus,
+                      autofocus: widget.representantId == null,
+                      textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.next,
+                      onChanged: (String _) {
+                        markDraftDirty();
+                        setState(() {});
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Nom complet',
+                        hintText: 'Mamadou Diallo',
                       ),
                     ),
+                    const SizedBox(height: CpiSpacing.md),
+                    PhoneField(
+                      controller: _phone,
+                      focusNode: _phoneFocus,
+                      onChanged: (String _) {
+                        markDraftDirty();
+                        _scheduleLookup();
+                        setState(() {});
+                      },
+                    ),
+                    if (_duplicate != null) ...<Widget>[
+                      const SizedBox(height: CpiSpacing.sm),
+                      _DuplicateBanner(
+                        name: _duplicate!.name,
+                        owner: _duplicate!.owner,
+                        onAddProspects: _duplicate!.representantId == null
+                            ? null
+                            : () => context.pushReplacement(
+                                Routes.newProspectFor(_duplicate!.representantId!),
+                              ),
+                      ),
+                    ],
+                    const SizedBox(height: CpiSpacing.md),
+                    LocalTypeahead(
+                      controller: _departement,
+                      focusNode: _departementFocus,
+                      label: 'Département',
+                      hint: 'Dakar, Thiès, Mbour…',
+                      selectedId: _departementId,
+                      textInputAction: TextInputAction.done,
+                      emptyHint: departements.isEmpty
+                          ? 'Aucun département. Synchronisez.'
+                          : 'Aucun résultat',
+                      options: departements
+                          .map(
+                            (Departement d) => TypeaheadOption(
+                              id: d.id,
+                              label: d.name,
+                              secondary: d.code,
+                              keywords: <String>[d.code],
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: (String _) {
+                        // Retaper invalide la sélection : sans ça, corriger
+                        // « Dakar » en « Dagana » garderait l'identifiant de
+                        // Dakar tout en affichant Dagana.
+                        if (_departementId != null) {
+                          setState(() => _departementId = null);
+                        }
+                        markDraftDirty();
+                      },
+                      onSelected: (TypeaheadOption option) {
+                        setState(() => _departementId = option.id);
+                        markDraftDirty();
+                        unawaited(flushDraft());
+                      },
+                    ),
+                    if (_error != null) ...<Widget>[
+                      const SizedBox(height: CpiSpacing.md),
+                      Text(
+                        _error!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            _SaveBar(
-              label: widget.representantId == null
-                  ? 'Enregistrer et saisir des prospects'
-                  : 'Enregistrer',
-              enabled: _canSave,
-              busy: _saving,
-              onPressed: _save,
-            ),
-          ],
+              _SaveBar(
+                label: widget.representantId == null
+                    ? 'Enregistrer et saisir des prospects'
+                    : 'Enregistrer',
+                enabled: _canSave,
+                busy: _saving,
+                onPressed: _save,
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 
   ({String name, String? owner, String? representantId})? get _duplicate {
     if (_localMatch != null) {
-      return (
-        name: _localMatch!.fullName,
-        owner: null,
-        representantId: _localMatch!.id,
-      );
+      return (name: _localMatch!.fullName, owner: null, representantId: _localMatch!.id);
     }
     final RepresentantLookup? remote = _remoteMatch;
     if (remote == null || remote.representant == null) return null;
@@ -499,9 +488,7 @@ class _DuplicateBanner extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       'Ce représentant existe déjà',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: cpi.accentText,
-                      ),
+                      style: theme.textTheme.titleSmall?.copyWith(color: cpi.accentText),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -536,11 +523,7 @@ class _DuplicateBanner extends StatelessWidget {
 /// est un obstacle avant même d'avoir compris ce qu'on regarde. Le bandeau
 /// laisse commencer à taper et disparaît tout seul.
 class _ResumeBanner extends StatelessWidget {
-  const _ResumeBanner({
-    required this.onResume,
-    required this.onDiscard,
-    this.label,
-  });
+  const _ResumeBanner({required this.onResume, required this.onDiscard, this.label});
 
   final String? label;
   final VoidCallback onResume;

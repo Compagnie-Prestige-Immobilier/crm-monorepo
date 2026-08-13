@@ -152,8 +152,7 @@ void main() {
       );
     }
 
-    test('une tête `failed` retire toute sa clé du lot, les autres passent',
-        () async {
+    test('une tête `failed` retire toute sa clé du lot, les autres passent', () async {
       await seedTwoChains();
       // repA est empoisonné : sa tête a définitivement échoué.
       await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1'))).write(
@@ -177,8 +176,7 @@ void main() {
       expect(batch.map((OutboxData o) => o.id), <String>['B1', 'B2']);
     });
 
-    test('la vidange draine les autres clés et ne touche jamais la clé morte',
-        () async {
+    test('la vidange draine les autres clés et ne touche jamais la clé morte', () async {
       await seedTwoChains();
       await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1'))).write(
         const OutboxCompanion(status: Value<String>(OutboxStatus.failed)),
@@ -197,8 +195,7 @@ void main() {
       expect((await outboxById(db, 'B2')).status, OutboxStatus.done);
     });
 
-    test('le préfixe est CONTIGU : une opération non due arrête sa chaîne',
-        () async {
+    test('le préfixe est CONTIGU : une opération non due arrête sa chaîne', () async {
       await seedTwoChains();
       // A1 est dû, A2 attend son back-off. A2 ne doit pas passer devant A1…
       await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A2'))).write(
@@ -217,20 +214,21 @@ void main() {
           nextAttemptAt: Value<DateTime>(t0.add(const Duration(minutes: 5))),
         ),
       );
-      expect(
-        (await engine.selectBatch()).map((OutboxData o) => o.id),
-        <String>['B1', 'B2'],
-      );
+      expect((await engine.selectBatch()).map((OutboxData o) => o.id), <String>[
+        'B1',
+        'B2',
+      ]);
       // Le back-off expire : la clé repart entière, dans l'ordre.
       clock.advance(const Duration(minutes: 6));
-      expect(
-        (await engine.selectBatch()).map((OutboxData o) => o.id),
-        <String>['A1', 'A2', 'B1', 'B2'],
-      );
+      expect((await engine.selectBatch()).map((OutboxData o) => o.id), <String>[
+        'A1',
+        'A2',
+        'B1',
+        'B2',
+      ]);
     });
 
-    test('un prospect ne peut structurellement pas précéder son représentant',
-        () async {
+    test('un prospect ne peut structurellement pas précéder son représentant', () async {
       await seedTwoChains();
       final List<OutboxData> batch = await engine.selectBatch();
       final List<String> chainA = batch
@@ -262,10 +260,7 @@ void main() {
         const OutboxCompanion(status: Value<String>(OutboxStatus.failed)),
       );
       // `solo` n'a pas de clé : l'échec d'A1 ne la concerne pas.
-      expect(
-        (await engine.selectBatch()).map((OutboxData o) => o.id),
-        contains('solo'),
-      );
+      expect((await engine.selectBatch()).map((OutboxData o) => o.id), contains('solo'));
     });
 
     test('le lot s\'arrête au plafond d\'opérations', () async {
@@ -559,10 +554,9 @@ void main() {
 
       // 2. ON UPDATE CASCADE a emporté les prospects
       final List<Prospect> prospects = await db.select(db.prospects).get();
-      expect(
-        prospects.map((Prospect p) => p.representantId).toSet(),
-        <String>{'server-rep'},
-      );
+      expect(prospects.map((Prospect p) => p.representantId).toSet(), <String>{
+        'server-rep',
+      });
 
       // 3. outbox.entityId
       expect((await outboxById(db, 'R1')).entityId, 'server-rep');
@@ -577,8 +571,7 @@ void main() {
       //    cascade SQL n'atteint du JSON figé.
       for (final String id in <String>['P1', 'P2']) {
         final Map<String, Object?> payload =
-            jsonDecode((await outboxById(db, id)).payload)
-                as Map<String, Object?>;
+            jsonDecode((await outboxById(db, id)).payload) as Map<String, Object?>;
         expect(payload['representantId'], 'server-rep');
       }
 
@@ -599,41 +592,43 @@ void main() {
       expect(r1.lastErrorCode, isNull);
     });
 
-    test('fiche d\'un AUTRE commercial : aucune fusion, le propriétaire est nommé',
-        () async {
-      await seedLocalChain();
-      api.verdicts['R1'] = conflictOn('R1');
-      api.onLookup = (String phone) => RepresentantLookup(
-        found: true,
-        phoneE164: phone,
-        representant: representantDto(
-          id: 'server-rep',
+    test(
+      'fiche d\'un AUTRE commercial : aucune fusion, le propriétaire est nommé',
+      () async {
+        await seedLocalChain();
+        api.verdicts['R1'] = conflictOn('R1');
+        api.onLookup = (String phone) => RepresentantLookup(
+          found: true,
           phoneE164: phone,
-          createdById: 'moussa',
-        ),
-        ownedByCommercialId: 'moussa',
-        ownedByCommercialName: 'Moussa Fall',
-      );
+          representant: representantDto(
+            id: 'server-rep',
+            phoneE164: phone,
+            createdById: 'moussa',
+          ),
+          ownedByCommercialId: 'moussa',
+          ownedByCommercialName: 'Moussa Fall',
+        );
 
-      await engine.drain();
+        await engine.drain();
 
-      // L'attribution détermine la commission : rattacher en silence les
-      // prospects d'Awa à Moussa produirait une paie fausse que personne ne
-      // remonterait jusqu'à une fusion faite six semaines plus tôt.
-      final OutboxData r1 = await outboxById(db, 'R1');
-      expect(r1.status, OutboxStatus.conflict);
-      expect(r1.entityId, 'local-rep');
-      expect(r1.lastErrorCode, ServerErrorCodes.representantPhoneConflict);
-      expect(r1.lastErrorMsg, isNotNull);
+        // L'attribution détermine la commission : rattacher en silence les
+        // prospects d'Awa à Moussa produirait une paie fausse que personne ne
+        // remonterait jusqu'à une fusion faite six semaines plus tôt.
+        final OutboxData r1 = await outboxById(db, 'R1');
+        expect(r1.status, OutboxStatus.conflict);
+        expect(r1.entityId, 'local-rep');
+        expect(r1.lastErrorCode, ServerErrorCodes.representantPhoneConflict);
+        expect(r1.lastErrorMsg, isNotNull);
 
-      final List<Representant> reps = await db.select(db.representants).get();
-      expect(reps.map((Representant r) => r.id), <String>['local-rep']);
-      expect((await outboxById(db, 'P1')).dependencyKey, 'local-rep');
+        final List<Representant> reps = await db.select(db.representants).get();
+        expect(reps.map((Representant r) => r.id), <String>['local-rep']);
+        expect((await outboxById(db, 'P1')).dependencyKey, 'local-rep');
 
-      // Et la clé est maintenant empoisonnée : les prospects ne partiront pas
-      // vers un parent qui n'existe pas.
-      expect(await engine.selectBatch(), isEmpty);
-    });
+        // Et la clé est maintenant empoisonnée : les prospects ne partiront pas
+        // vers un parent qui n'existe pas.
+        expect(await engine.selectBatch(), isEmpty);
+      },
+    );
 
     test('lookup indisponible : on ne fusionne pas à l\'aveugle', () async {
       await seedLocalChain();
@@ -651,8 +646,7 @@ void main() {
     test('numéro inconnu du serveur : pas de fusion possible', () async {
       await seedLocalChain();
       api.verdicts['R1'] = conflictOn('R1');
-      api.onLookup = (String phone) =>
-          RepresentantLookup(found: false, phoneE164: phone);
+      api.onLookup = (String phone) => RepresentantLookup(found: false, phoneE164: phone);
       await engine.drain();
       expect((await outboxById(db, 'R1')).status, OutboxStatus.conflict);
     });
@@ -672,10 +666,7 @@ void main() {
         op: 'update',
         payload: <String, Object?>{'phone': '+221770000001'},
       );
-      api.verdicts['U1'] = conflictOn(
-        'U1',
-        errorCode: ServerErrorCodes.revConflict,
-      );
+      api.verdicts['U1'] = conflictOn('U1', errorCode: ServerErrorCodes.revConflict);
       await engine.drain();
       expect((await outboxById(db, 'U1')).status, OutboxStatus.conflict);
       expect(api.lookups, isEmpty);
@@ -698,8 +689,7 @@ void main() {
     });
     tearDown(() => db.close());
 
-    test('tout se fait dans UNE transaction : une erreur en aval annule tout',
-        () async {
+    test('tout se fait dans UNE transaction : une erreur en aval annule tout', () async {
       await insertRepresentant(db, id: 'local-rep', phone: '+221770000001');
       await insertProspect(
         db,
@@ -729,10 +719,7 @@ void main() {
       );
 
       expect((await db.select(db.representants).get()).single.id, 'local-rep');
-      expect(
-        (await db.select(db.prospects).get()).single.representantId,
-        'local-rep',
-      );
+      expect((await db.select(db.prospects).get()).single.representantId, 'local-rep');
       final OutboxData p1 = await outboxById(db, 'P1');
       expect(p1.dependencyKey, 'local-rep');
       expect(
@@ -741,33 +728,32 @@ void main() {
       );
     });
 
-    test('la fiche serveur déjà présente localement : on repointe puis on purge',
-        () async {
-      // Un pull a ramené la fiche serveur entre-temps. Renommer l'identifiant
-      // local violerait la clé primaire.
-      await insertRepresentant(db, id: 'local-rep', phone: '+221770000001');
-      await insertProspect(
-        db,
-        id: 'p1',
-        representantId: 'local-rep',
-        phone: '+221780000001',
-      );
-      await insertRepresentant(
-        db,
-        id: 'server-rep',
-        phone: '+221770000009',
-        serverUpdatedAt: t0,
-      );
+    test(
+      'la fiche serveur déjà présente localement : on repointe puis on purge',
+      () async {
+        // Un pull a ramené la fiche serveur entre-temps. Renommer l'identifiant
+        // local violerait la clé primaire.
+        await insertRepresentant(db, id: 'local-rep', phone: '+221770000001');
+        await insertProspect(
+          db,
+          id: 'p1',
+          representantId: 'local-rep',
+          phone: '+221780000001',
+        );
+        await insertRepresentant(
+          db,
+          id: 'server-rep',
+          phone: '+221770000009',
+          serverUpdatedAt: t0,
+        );
 
-      await engine.remapEntityId('local-rep', 'server-rep');
+        await engine.remapEntityId('local-rep', 'server-rep');
 
-      final List<Representant> reps = await db.select(db.representants).get();
-      expect(reps.map((Representant r) => r.id), <String>['server-rep']);
-      expect(
-        (await db.select(db.prospects).get()).single.representantId,
-        'server-rep',
-      );
-    });
+        final List<Representant> reps = await db.select(db.representants).get();
+        expect(reps.map((Representant r) => r.id), <String>['server-rep']);
+        expect((await db.select(db.prospects).get()).single.representantId, 'server-rep');
+      },
+    );
 
     test('remapper vers soi-même est un no-op', () async {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
@@ -800,10 +786,7 @@ void main() {
     tearDown(() => db.close());
 
     test('retryable : tentative comptée, back-off à gigue complète', () async {
-      api.failNextPush = const ApiException(
-        'timeout',
-        statusCode: 504,
-      );
+      api.failNextPush = const ApiException('timeout', statusCode: 504);
       // Tirage nul ⇒ délai nul. Une gigue ÉGALE aurait imposé un plancher.
       await build(random: _ZeroRandom()).drain();
       final OutboxData row = await outboxById(db, 'A1');
@@ -884,8 +867,7 @@ void main() {
       expect(row.lastErrorMsg, 'Département inconnu.');
     });
 
-    test('parent en échec : remise en file SANS consommer de tentative',
-        () async {
+    test('parent en échec : remise en file SANS consommer de tentative', () async {
       api.verdicts['A1'] = SyncOperationResultDto(
         opId: 'A1',
         status: SyncOpStatus.skippedDependencyFailed,
@@ -918,8 +900,7 @@ void main() {
       expect(row.attempts, 1);
     });
 
-    test('un payload indécodable échoue proprement, sans exception en fond',
-        () async {
+    test('un payload indécodable échoue proprement, sans exception en fond', () async {
       await db
           .into(db.outbox)
           .insert(
@@ -1024,11 +1005,7 @@ void main() {
             prospects: const <ProspectDto>[],
           ),
           deletions: <SyncDeletionDto>[
-            SyncDeletionDto(
-              entity: SyncEntity.representant,
-              id: 'repA',
-              deletedAt: t0,
-            ),
+            SyncDeletionDto(entity: SyncEntity.representant, id: 'repA', deletedAt: t0),
           ],
           nextCursor: 'cur-3',
           hasMore: false,
@@ -1145,25 +1122,13 @@ void main() {
 
   group('ApiException', () {
     test('seuls les échecs transitoires sont réessayables', () {
+      expect(const ApiException('x', kind: FailureKind.retryable).retryable, isTrue);
+      expect(const ApiException('x', kind: FailureKind.throttled).retryable, isTrue);
       expect(
-        const ApiException('x', kind: FailureKind.retryable).retryable,
+        const ApiException('x', kind: FailureKind.idempotencyInProgress).retryable,
         isTrue,
       );
-      expect(
-        const ApiException('x', kind: FailureKind.throttled).retryable,
-        isTrue,
-      );
-      expect(
-        const ApiException(
-          'x',
-          kind: FailureKind.idempotencyInProgress,
-        ).retryable,
-        isTrue,
-      );
-      expect(
-        const ApiException('x', kind: FailureKind.terminal).retryable,
-        isFalse,
-      );
+      expect(const ApiException('x', kind: FailureKind.terminal).retryable, isFalse);
       expect(
         const ApiException('x', kind: FailureKind.sessionExpired).retryable,
         isFalse,

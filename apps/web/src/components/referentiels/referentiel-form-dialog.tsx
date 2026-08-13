@@ -94,7 +94,7 @@ export function BanqueFormDialog({
       onOpenChange(false);
     },
     onError: (error) => {
-      toastApiError(error, 'L’enregistrement a échoué.');
+      toastApiError(error, 'Enregistrement impossible. Réessayez.');
     },
   });
 
@@ -104,8 +104,7 @@ export function BanqueFormDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Modifier la banque' : 'Nouvelle banque'}</DialogTitle>
           <DialogDescription>
-            La liste redescend en lecture seule sur l’application mobile à la prochaine
-            synchronisation.
+            Banque de domiciliation proposée à la saisie des prospects.
           </DialogDescription>
         </DialogHeader>
 
@@ -134,7 +133,7 @@ export function BanqueFormDialog({
           <Field
             label="Ordre d’affichage"
             required
-            description="Plus le nombre est petit, plus la banque apparaît haut dans la liste mobile."
+            description="Le plus petit nombre apparaît en premier."
             error={formState.errors.sortOrder?.message}
           >
             {(props) => (
@@ -219,7 +218,7 @@ export function SyndicatFormDialog({
       onOpenChange(false);
     },
     onError: (error) => {
-      toastApiError(error, 'L’enregistrement a échoué.');
+      toastApiError(error, 'Enregistrement impossible. Réessayez.');
     },
   });
 
@@ -228,9 +227,7 @@ export function SyndicatFormDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Modifier le syndicat' : 'Nouveau syndicat'}</DialogTitle>
-          <DialogDescription>
-            Le sigle est ce que le commercial voit sur son téléphone.
-          </DialogDescription>
+          <DialogDescription>Le sigle est affiché dans les listes de saisie.</DialogDescription>
         </DialogHeader>
 
         <form
@@ -333,7 +330,7 @@ export function DepartementFormDialog({
       onOpenChange(false);
     },
     onError: (error) => {
-      toastApiError(error, 'L’enregistrement a échoué.');
+      toastApiError(error, 'Enregistrement impossible. Réessayez.');
     },
   });
 
@@ -345,7 +342,7 @@ export function DepartementFormDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Modifier le département' : 'Nouveau département'}</DialogTitle>
           <DialogDescription>
-            Les départements structurent les tournées et les statistiques géographiques.
+            Découpage administratif utilisé pour les statistiques géographiques.
           </DialogDescription>
         </DialogHeader>
 

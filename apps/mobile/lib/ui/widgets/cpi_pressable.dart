@@ -125,8 +125,7 @@ class _Entrance extends StatefulWidget {
   State<_Entrance> createState() => _EntranceState();
 }
 
-class _EntranceState extends State<_Entrance>
-    with SingleTickerProviderStateMixin {
+class _EntranceState extends State<_Entrance> with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: widget.duration,

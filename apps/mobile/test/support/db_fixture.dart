@@ -145,8 +145,6 @@ Future<int> queueOp(
 Future<OutboxData> outboxById(AppDatabase db, String id) =>
     (db.select(db.outbox)..where((Outbox o) => o.id.equals(id))).getSingle();
 
-Future<List<OutboxData>> allOutbox(AppDatabase db) =>
-    (db.select(db.outbox)..orderBy(<OrderClauseGenerator<Outbox>>[
-          (Outbox o) => OrderingTerm.asc(o.seq),
-        ]))
-        .get();
+Future<List<OutboxData>> allOutbox(AppDatabase db) => (db.select(
+  db.outbox,
+)..orderBy(<OrderClauseGenerator<Outbox>>[(Outbox o) => OrderingTerm.asc(o.seq)])).get();

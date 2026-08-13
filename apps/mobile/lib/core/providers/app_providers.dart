@@ -40,12 +40,13 @@ final Provider<AppDatabase> appDatabaseProvider = Provider<AppDatabase>((Ref ref
 
 /// Surchargé dans `main()` — la lecture des préférences est asynchrone et on ne
 /// veut pas d'un premier cadre incapable de restaurer la route.
-final Provider<SharedPreferences> sharedPreferencesProvider =
-    Provider<SharedPreferences>((Ref ref) {
-      throw UnimplementedError(
-        'sharedPreferencesProvider doit être surchargé dans main().',
-      );
-    });
+final Provider<SharedPreferences> sharedPreferencesProvider = Provider<SharedPreferences>(
+  (Ref ref) {
+    throw UnimplementedError(
+      'sharedPreferencesProvider doit être surchargé dans main().',
+    );
+  },
+);
 
 /// `versionCode` Android, surchargé dans `main()`. Il conditionne la
 /// restauration de route : une route enregistrée par une autre version peut ne
@@ -114,19 +115,13 @@ final Provider<Phase2DirectorySync> phase2DirectoryProvider =
 final Provider<WriteRepository> writeRepositoryProvider = Provider<WriteRepository>((
   Ref ref,
 ) {
-  return WriteRepository(
-    ref.watch(appDatabaseProvider),
-    clock: ref.watch(clockProvider),
-  );
+  return WriteRepository(ref.watch(appDatabaseProvider), clock: ref.watch(clockProvider));
 });
 
 final Provider<DraftRepository> draftRepositoryProvider = Provider<DraftRepository>((
   Ref ref,
 ) {
-  return DraftRepository(
-    ref.watch(appDatabaseProvider),
-    clock: ref.watch(clockProvider),
-  );
+  return DraftRepository(ref.watch(appDatabaseProvider), clock: ref.watch(clockProvider));
 });
 
 final Provider<ReferenceRepository> referenceRepositoryProvider =
@@ -250,10 +245,11 @@ final StreamProvider<List<Banque>> banquesProvider = StreamProvider<List<Banque>
   return ref.watch(referenceRepositoryProvider).watchBanques();
 });
 
-final StreamProvider<List<Syndicat>> syndicatsProvider =
-    StreamProvider<List<Syndicat>>((Ref ref) {
-      return ref.watch(referenceRepositoryProvider).watchSyndicats();
-    });
+final StreamProvider<List<Syndicat>> syndicatsProvider = StreamProvider<List<Syndicat>>((
+  Ref ref,
+) {
+  return ref.watch(referenceRepositoryProvider).watchSyndicats();
+});
 
 // ── Listes ───────────────────────────────────────────────────────────────────
 
@@ -284,12 +280,12 @@ final prospectsForRepresentantProvider =
       return ref.watch(referenceRepositoryProvider).watchProspectsFor(representantId);
     });
 
-final prospectCountForProvider =
-    StreamProvider.family<int, String>((Ref ref, String representantId) {
-      return ref
-          .watch(referenceRepositoryProvider)
-          .watchProspectCountFor(representantId);
-    });
+final prospectCountForProvider = StreamProvider.family<int, String>((
+  Ref ref,
+  String representantId,
+) {
+  return ref.watch(referenceRepositoryProvider).watchProspectCountFor(representantId);
+});
 
 // ── Phase 2 ──────────────────────────────────────────────────────────────────
 
@@ -311,22 +307,21 @@ final StreamProvider<SyncStateData?> phase2DirectoryStateProvider =
 /// tel. Le programme officiel est le PDF imprimé ; une app qui afficherait
 /// « 42 / 120 » se substituerait à lui et ferait sauter des numéros que le
 /// papier porte et qu'elle ignore.
-final StreamProvider<({int attempts, int methods, int closed})>
-    phase2ProgressProvider =
-        StreamProvider<({int attempts, int methods, int closed})>((Ref ref) {
-          final AppDatabase db = ref.watch(appDatabaseProvider);
-          // Trois flux fusionnés plutôt qu'une requête à trois sous-selects :
-          // drift ne réémet que le flux dont la table a bougé, et les trois
-          // portent sur la même table — la fusion coûte donc un rebuild, pas
-          // trois requêtes.
-          return db.countMyAttempts().watchSingle().asyncMap((int attempts) async {
-            return (
-              attempts: attempts,
-              methods: await db.countMyMethods().getSingle(),
-              closed: await db.countMyClosed().getSingle(),
-            );
-          });
-        });
+final StreamProvider<({int attempts, int methods, int closed})> phase2ProgressProvider =
+    StreamProvider<({int attempts, int methods, int closed})>((Ref ref) {
+      final AppDatabase db = ref.watch(appDatabaseProvider);
+      // Trois flux fusionnés plutôt qu'une requête à trois sous-selects :
+      // drift ne réémet que le flux dont la table a bougé, et les trois
+      // portent sur la même table — la fusion coûte donc un rebuild, pas
+      // trois requêtes.
+      return db.countMyAttempts().watchSingle().asyncMap((int attempts) async {
+        return (
+          attempts: attempts,
+          methods: await db.countMyMethods().getSingle(),
+          closed: await db.countMyClosed().getSingle(),
+        );
+      });
+    });
 
 /// Nombre d'écritures de phase 2 encore en file. Distinct du compteur global :
 /// sur cet écran, ce qui compte est « mes appels sont-ils partis ? », pas l'état

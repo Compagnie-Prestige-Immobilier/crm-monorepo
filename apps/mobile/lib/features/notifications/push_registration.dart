@@ -87,7 +87,10 @@ class PushRegistrationService {
     final String? token = await _transport.token();
     if (token != null && token.isNotEmpty) {
       try {
-        await _dio.post<dynamic>(_unregisterPath, data: <String, Object?>{'token': token});
+        await _dio.post<dynamic>(
+          _unregisterPath,
+          data: <String, Object?>{'token': token},
+        );
       } on Object catch (error) {
         // Une déconnexion serveur ratée ne doit pas retenir l'utilisateur sur
         // l'appareil : on efface localement quoi qu'il arrive.
@@ -140,7 +143,10 @@ class PushRegistrationService {
     } on Object catch (error) {
       // Hors ligne : la liste locale reste servie. C'est tout l'intérêt de
       // l'avoir persistée.
-      developer.log('Rafraîchissement de la boîte de réception échoué : $error', name: 'cpi.push');
+      developer.log(
+        'Rafraîchissement de la boîte de réception échoué : $error',
+        name: 'cpi.push',
+      );
       return 0;
     }
   }

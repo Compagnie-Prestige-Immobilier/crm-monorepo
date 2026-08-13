@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import 'package:flutter/services.dart';
+
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
+import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../shell/app_shell.dart';
 
@@ -51,7 +54,14 @@ class HistoriqueScreen extends ConsumerWidget {
         children: <Widget>[
           const PendingBanner(),
           Padding(
-            padding: const EdgeInsets.all(CpiSpacing.md),
+            // 12 dp en haut au lieu de 16 : le champ de recherche est le
+            // premier contenu utile, il n'a pas à commencer bas.
+            padding: const EdgeInsets.fromLTRB(
+              CpiSpacing.md,
+              CpiSpacing.sm,
+              CpiSpacing.md,
+              CpiSpacing.sm,
+            ),
             child: TextField(
               onChanged: (String value) =>
                   ref.read(historiqueSearchProvider.notifier).set(value),
@@ -68,14 +78,26 @@ class HistoriqueScreen extends ConsumerWidget {
                   Center(child: Text('Lecture impossible : $e')),
               data: (List<RepresentantSyncViewData> list) {
                 if (list.isEmpty) return const _EmptyHistorique();
-                return ListView.builder(
-                  padding: const EdgeInsets.only(bottom: CpiSpacing.xxl),
-                  itemCount: list.length,
-                  // La clé porte l'identifiant : sans elle, replier un
-                  // représentant réattribuerait l'état d'expansion au voisin
-                  // quand la liste se réordonne après une synchronisation.
-                  itemBuilder: (BuildContext context, int index) =>
-                      _RepresentantTile(key: ValueKey<String>(list[index].id), data: list[index]),
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    await HapticFeedback.selectionClick();
+                    await ref.read(syncCoordinatorProvider.notifier).run();
+                  },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: CpiSpacing.xxl),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: list.length,
+                    // La clé porte l'identifiant : sans elle, replier un
+                    // représentant réattribuerait l'état d'expansion au voisin
+                    // quand la liste se réordonne après une synchronisation.
+                    itemBuilder: (BuildContext context, int index) => CpiListEntrance(
+                      index: index,
+                      child: _RepresentantTile(
+                        key: ValueKey<String>(list[index].id),
+                        data: list[index],
+                      ),
+                    ),
+                  ),
                 );
               },
             ),
@@ -121,10 +143,7 @@ class _RepresentantTile extends ConsumerWidget {
         collapsedShape: const Border(),
         leading: _StatusButton(status: status, entityLabel: data.fullName),
         title: Text(data.fullName, style: theme.textTheme.titleSmall),
-        subtitle: Text(
-          Phone.format(data.phoneE164),
-          style: theme.textTheme.bodySmall,
-        ),
+        subtitle: Text(Phone.format(data.phoneE164), style: theme.textTheme.bodySmall),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
@@ -152,9 +171,7 @@ class _RepresentantTile extends ConsumerWidget {
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('Supprimer ce représentant ?'),
-        content: Text(
-          '$name et tous ses prospects seront supprimés.',
-        ),
+        content: Text('$name et tous ses prospects seront supprimés.'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -303,9 +320,7 @@ class _StatusButton extends ConsumerWidget {
       case SyncStatus.blocked:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Représentant bloqué. Résolvez-le dans « À corriger ».',
-            ),
+            content: Text('Représentant bloqué. Résolvez-le dans « À corriger ».'),
           ),
         );
       case SyncStatus.pending:

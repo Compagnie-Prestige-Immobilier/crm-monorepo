@@ -57,7 +57,10 @@ class PushInboxStore {
   /// Utilisé après un `GET /notifications/mine`. Les lignes locales absentes de
   /// la réponse sont CONSERVÉES : le serveur pagine, et effacer ce qui ne
   /// figure pas dans la page courante viderait l'historique hors ligne.
-  Future<void> upsertAll(Iterable<PushMessage> messages, {Map<String, DateTime?>? readStates}) async {
+  Future<void> upsertAll(
+    Iterable<PushMessage> messages, {
+    Map<String, DateTime?>? readStates,
+  }) async {
     await _db.transaction(() async {
       for (final PushMessage message in messages) {
         final StoredNotification? existing = await (_db.select(
@@ -100,13 +103,17 @@ class PushInboxStore {
   /// Marque une notification lue. Idempotent : la première lecture est la seule
   /// intéressante et n'est jamais réécrite.
   Future<void> markRead(String id, {DateTime? at}) async {
-    await (_db.update(_db.notifications)..where(
-      (Notifications t) => t.id.equals(id) & t.readAt.isNull(),
-    )).write(NotificationsCompanion(readAt: Value<DateTime?>(at ?? DateTime.now().toUtc())));
+    await (_db.update(
+      _db.notifications,
+    )..where((Notifications t) => t.id.equals(id) & t.readAt.isNull())).write(
+      NotificationsCompanion(readAt: Value<DateTime?>(at ?? DateTime.now().toUtc())),
+    );
   }
 
   Future<void> markAllRead({DateTime? at}) async {
-    await (_db.update(_db.notifications)..where((Notifications t) => t.readAt.isNull())).write(
+    await (_db.update(
+      _db.notifications,
+    )..where((Notifications t) => t.readAt.isNull())).write(
       NotificationsCompanion(readAt: Value<DateTime?>(at ?? DateTime.now().toUtc())),
     );
   }
@@ -114,15 +121,16 @@ class PushInboxStore {
   /// Flux de la liste, du plus récent au plus ancien.
   Stream<List<StoredNotification>> watchAll() {
     return (_db.select(_db.notifications)..orderBy(<OrderClauseGenerator<Notifications>>[
-      (Notifications t) => OrderingTerm.desc(t.createdAt),
-    ])).watch();
+          (Notifications t) => OrderingTerm.desc(t.createdAt),
+        ]))
+        .watch();
   }
 
   /// Flux du nombre de non-lues. Alimente la pastille de l'AppBar.
   Stream<int> watchUnreadCount() {
-    return (_db.select(
-      _db.notifications,
-    )..where((Notifications t) => t.readAt.isNull())).watch().map((List<StoredNotification> rows) => rows.length);
+    return (_db.select(_db.notifications)..where((Notifications t) => t.readAt.isNull()))
+        .watch()
+        .map((List<StoredNotification> rows) => rows.length);
   }
 
   Future<StoredNotification?> byId(String id) {

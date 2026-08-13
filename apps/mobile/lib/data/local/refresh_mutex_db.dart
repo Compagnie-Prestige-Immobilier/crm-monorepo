@@ -104,13 +104,10 @@ class DatabaseRefreshMutex implements RefreshMutex {
         await (_db.update(_db.syncState)..where(
               (SyncState t) =>
                   t.collection.equals(lockKey) &
-                  (t.lastPulledAt.isNull() |
-                      t.lastPulledAt.isSmallerOrEqualValue(now)),
+                  (t.lastPulledAt.isNull() | t.lastPulledAt.isSmallerOrEqualValue(now)),
             ))
             .write(
-              SyncStateCompanion(
-                lastPulledAt: Value<DateTime?>(now.add(leaseDuration)),
-              ),
+              SyncStateCompanion(lastPulledAt: Value<DateTime?>(now.add(leaseDuration))),
             );
     return changed == 1;
   }

@@ -15,7 +15,7 @@ import { toast } from 'sonner';
  */
 export function apiErrorText(error: unknown, fallback: string): string {
   if (!(error instanceof ApiError)) {
-    return 'Le serveur CPI est injoignable. Vérifiez votre connexion, puis réessayez.';
+    return 'Serveur injoignable. Vérifiez la connexion, puis réessayez.';
   }
 
   switch (error.status) {
@@ -25,11 +25,11 @@ export function apiErrorText(error: unknown, fallback: string): string {
       // aplatit déjà ce tableau en une phrase.
       return error.message;
     case 401:
-      return 'Votre session a expiré. Rechargez la page pour vous reconnecter.';
+      return 'Session expirée. Rechargez la page.';
     case 403:
       return 'Cette action est réservée à un administrateur.';
     case 404:
-      return "Cet élément n'existe plus. Rafraîchissez la liste.";
+      return 'Élément introuvable. Rafraîchissez la liste.';
     case 409:
       return error.message === ''
         ? 'Un enregistrement existe déjà avec ces valeurs.'
@@ -38,7 +38,7 @@ export function apiErrorText(error: unknown, fallback: string): string {
       return 'Trop de requêtes. Patientez quelques secondes.';
     default:
       return error.status >= 500
-        ? `Le serveur CPI a renvoyé une erreur (${String(error.status)}). Réessayez ; si cela persiste, prévenez la DSI.`
+        ? `Erreur serveur (${String(error.status)}). Réessayez.`
         : fallback;
   }
 }

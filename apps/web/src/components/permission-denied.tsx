@@ -38,12 +38,11 @@ export function PermissionDenied({
       </span>
       <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">Accès refusé</h2>
       <p className="max-w-md text-[0.9375rem] text-muted-foreground">
-        {what} est réservé à un autre rôle. Vous êtes connecté en tant que{' '}
-        <strong className="font-[600] text-foreground">{ROLE_LABELS[role]}</strong>. Demandez à un
-        administrateur de faire évoluer vos droits si vous en avez besoin.
+        {what} est réservé à un autre rôle. Rôle en cours :{' '}
+        <strong className="font-[600] text-foreground">{ROLE_LABELS[role]}</strong>.
       </p>
       <Button asChild variant="outline" className="mt-1">
-        <Link href={homePathForRole(role)}>Retour à mon accueil</Link>
+        <Link href={homePathForRole(role)}>Retour à l’accueil</Link>
       </Button>
     </Card>
   );

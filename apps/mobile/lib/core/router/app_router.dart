@@ -122,30 +122,26 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: Routes.notifications,
         name: 'notifications',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => const NotificationsScreen(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const NotificationsScreen(),
       ),
       GoRoute(
         path: Routes.batteryHelp,
         name: 'batteryHelp',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) =>
-            const BatteryHelpScreen(),
+        builder: (BuildContext context, GoRouterState state) => const BatteryHelpScreen(),
       ),
       GoRoute(
         path: Routes.about,
         name: 'about',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) =>
-            const AboutScreen(),
+        builder: (BuildContext context, GoRouterState state) => const AboutScreen(),
       ),
 
       StatefulShellRoute.indexedStack(
         builder:
-            (
-              BuildContext context,
-              GoRouterState state,
-              StatefulNavigationShell shell,
-            ) => AppShell(shell: shell),
+            (BuildContext context, GoRouterState state, StatefulNavigationShell shell) =>
+                AppShell(shell: shell),
         branches: <StatefulShellBranch>[
           StatefulShellBranch(
             routes: <RouteBase>[

@@ -98,12 +98,7 @@ class PendingBanner extends ConsumerWidget {
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(
-        CpiSpacing.md,
-        CpiSpacing.xs,
-        CpiSpacing.md,
-        0,
-      ),
+      margin: const EdgeInsets.fromLTRB(CpiSpacing.md, CpiSpacing.xs, CpiSpacing.md, 0),
       padding: const EdgeInsets.symmetric(
         horizontal: CpiSpacing.sm,
         vertical: CpiSpacing.xs,

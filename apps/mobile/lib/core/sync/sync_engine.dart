@@ -211,23 +211,22 @@ class SyncEngine {
   /// tel quel.
   Future<int> reclaimExpiredLeases() async {
     final DateTime now = _clock.now();
-    final List<OutboxData> stale = await (_db.select(_db.outbox)
-          ..where((Outbox o) => o.status.equals(OutboxStatus.syncing)))
-        .get();
+    final List<OutboxData> stale = await (_db.select(
+      _db.outbox,
+    )..where((Outbox o) => o.status.equals(OutboxStatus.syncing))).get();
     final List<OutboxData> expired = stale
         .where((OutboxData o) => o.leaseUntil == null || !o.leaseUntil!.isAfter(now))
         .toList(growable: false);
     if (expired.isEmpty) return 0;
 
-    await (_db.update(_db.outbox)..where(
-          (Outbox o) => o.seq.isIn(expired.map((OutboxData e) => e.seq)),
-        ))
-        .write(
-          OutboxCompanion(
-            status: const Value(OutboxStatus.pending),
-            leaseUntil: const Value<DateTime?>(null),
-          ),
-        );
+    await (_db.update(
+      _db.outbox,
+    )..where((Outbox o) => o.seq.isIn(expired.map((OutboxData e) => e.seq)))).write(
+      OutboxCompanion(
+        status: const Value(OutboxStatus.pending),
+        leaseUntil: const Value<DateTime?>(null),
+      ),
+    );
     return expired.length;
   }
 
@@ -275,7 +274,8 @@ class SyncEngine {
     for (final OutboxData row in open) {
       // Une opération sans clé est sa propre partition : elle ne dépend de rien
       // et rien ne dépend d'elle.
-      byKey.putIfAbsent(row.dependencyKey ?? 'op:${row.id}', () => <OutboxData>[])
+      byKey
+          .putIfAbsent(row.dependencyKey ?? 'op:${row.id}', () => <OutboxData>[])
           .add(row);
     }
 
@@ -364,16 +364,15 @@ class SyncEngine {
     // ligne récupérable. L'inverse laisserait une ligne `pending` déjà appliquée
     // côté serveur.
     final DateTime now = _clock.now();
-    await (_db.update(_db.outbox)..where(
-          (Outbox o) => o.seq.isIn(accepted.map((OutboxData e) => e.seq)),
-        ))
-        .write(
-          OutboxCompanion(
-            status: const Value(OutboxStatus.syncing),
-            leaseUntil: Value<DateTime?>(now.add(leaseDuration)),
-            batchId: Value<String?>(batchId),
-          ),
-        );
+    await (_db.update(
+      _db.outbox,
+    )..where((Outbox o) => o.seq.isIn(accepted.map((OutboxData e) => e.seq)))).write(
+      OutboxCompanion(
+        status: const Value(OutboxStatus.syncing),
+        leaseUntil: Value<DateTime?>(now.add(leaseDuration)),
+        batchId: Value<String?>(batchId),
+      ),
+    );
 
     return _PreparedBatch(
       batchId: batchId,
@@ -476,10 +475,9 @@ class SyncEngine {
       return false;
     }
 
-    final Map<String, SyncOperationResultDto> byOpId =
-        <String, SyncOperationResultDto>{
-          for (final SyncOperationResultDto r in result.results) r.opId: r,
-        };
+    final Map<String, SyncOperationResultDto> byOpId = <String, SyncOperationResultDto>{
+      for (final SyncOperationResultDto r in result.results) r.opId: r,
+    };
 
     for (final OutboxData row in prepared.rows) {
       final SyncOperationResultDto? verdict = byOpId[row.id];
@@ -526,19 +524,20 @@ class SyncEngine {
     final String? serverId = verdict.entityId;
     // Remappage d'identifiant : le serveur a réuni deux fiches sur le téléphone.
     // C'est le SEUL remappage du système (ADR 0001 §1).
-    if (serverId != null && serverId != row.entityId && row.entityType == 'representant') {
+    if (serverId != null &&
+        serverId != row.entityId &&
+        row.entityType == 'representant') {
       await remapEntityId(row.entityId, serverId);
     }
     await _db.transaction(() async {
-      await (_db.update(_db.outbox)..where((Outbox o) => o.seq.equals(row.seq)))
-          .write(
-            OutboxCompanion(
-              status: const Value(OutboxStatus.done),
-              leaseUntil: const Value<DateTime?>(null),
-              lastErrorCode: const Value<String?>(null),
-              lastErrorMsg: const Value<String?>(null),
-            ),
-          );
+      await (_db.update(_db.outbox)..where((Outbox o) => o.seq.equals(row.seq))).write(
+        OutboxCompanion(
+          status: const Value(OutboxStatus.done),
+          leaseUntil: const Value<DateTime?>(null),
+          lastErrorCode: const Value<String?>(null),
+          lastErrorMsg: const Value<String?>(null),
+        ),
+      );
       await _stampServerState(
         entityType: row.entityType,
         entityId: serverId ?? row.entityId,
@@ -562,22 +561,23 @@ class SyncEngine {
     // pull suivant, voyant une `rev` déjà à jour, ne corrigerait plus rien.
     if (entityType == callAttemptEntity) return;
     if (entityType == 'representant') {
-      await (_db.update(_db.representants)
-            ..where((Representants t) => t.id.equals(entityId)))
-          .write(
-            RepresentantsCompanion(
-              rev: rev == null ? const Value.absent() : Value<int>(rev),
-              serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
-            ),
-          );
+      await (_db.update(
+        _db.representants,
+      )..where((Representants t) => t.id.equals(entityId))).write(
+        RepresentantsCompanion(
+          rev: rev == null ? const Value.absent() : Value<int>(rev),
+          serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
+        ),
+      );
     } else {
-      await (_db.update(_db.prospects)..where((Prospects t) => t.id.equals(entityId)))
-          .write(
-            ProspectsCompanion(
-              rev: rev == null ? const Value.absent() : Value<int>(rev),
-              serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
-            ),
-          );
+      await (_db.update(
+        _db.prospects,
+      )..where((Prospects t) => t.id.equals(entityId))).write(
+        ProspectsCompanion(
+          rev: rev == null ? const Value.absent() : Value<int>(rev),
+          serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
+        ),
+      );
     }
   }
 
@@ -610,28 +610,26 @@ class SyncEngine {
       final String? resolved = await _autoMergeRepresentant(row);
       if (resolved != null) {
         await remapEntityId(row.entityId, resolved);
-        await (_db.update(_db.outbox)..where((Outbox o) => o.seq.equals(row.seq)))
-            .write(
-              OutboxCompanion(
-                status: const Value(OutboxStatus.done),
-                leaseUntil: const Value<DateTime?>(null),
-                lastErrorCode: const Value<String?>(null),
-                lastErrorMsg: const Value<String?>(null),
-              ),
-            );
+        await (_db.update(_db.outbox)..where((Outbox o) => o.seq.equals(row.seq))).write(
+          OutboxCompanion(
+            status: const Value(OutboxStatus.done),
+            leaseUntil: const Value<DateTime?>(null),
+            lastErrorCode: const Value<String?>(null),
+            lastErrorMsg: const Value<String?>(null),
+          ),
+        );
         return;
       }
     }
 
-    await (_db.update(_db.outbox)..where((Outbox o) => o.seq.equals(row.seq)))
-        .write(
-          OutboxCompanion(
-            status: const Value(OutboxStatus.conflict),
-            leaseUntil: const Value<DateTime?>(null),
-            lastErrorCode: Value<String?>(verdict.errorCode),
-            lastErrorMsg: Value<String?>(verdict.error),
-          ),
-        );
+    await (_db.update(_db.outbox)..where((Outbox o) => o.seq.equals(row.seq))).write(
+      OutboxCompanion(
+        status: const Value(OutboxStatus.conflict),
+        leaseUntil: const Value<DateTime?>(null),
+        lastErrorCode: Value<String?>(verdict.errorCode),
+        lastErrorMsg: Value<String?>(verdict.error),
+      ),
+    );
   }
 
   /// Renvoie l'identifiant serveur si la fusion automatique est légitime.
@@ -691,22 +689,22 @@ class SyncEngine {
   Future<void> remapEntityId(String localId, String serverId) async {
     if (localId == serverId) return;
     await _db.transaction(() async {
-      final Representant? existing =
-          await (_db.select(_db.representants)
-                ..where((Representants t) => t.id.equals(serverId)))
-              .getSingleOrNull();
+      final Representant? existing = await (_db.select(
+        _db.representants,
+      )..where((Representants t) => t.id.equals(serverId))).getSingleOrNull();
 
       if (existing == null) {
-        await _db.customStatement('UPDATE representants SET id = ? WHERE id = ?', <
-          Object?
-        >[serverId, localId]);
+        await _db.customStatement(
+          'UPDATE representants SET id = ? WHERE id = ?',
+          <Object?>[serverId, localId],
+        );
       } else {
         await (_db.update(_db.prospects)
               ..where((Prospects t) => t.representantId.equals(localId)))
             .write(ProspectsCompanion(representantId: Value<String>(serverId)));
-        await (_db.delete(_db.representants)
-              ..where((Representants t) => t.id.equals(localId)))
-            .go();
+        await (_db.delete(
+          _db.representants,
+        )..where((Representants t) => t.id.equals(localId))).go();
       }
 
       await (_db.update(_db.outbox)..where(
@@ -715,38 +713,37 @@ class SyncEngine {
           ))
           .write(OutboxCompanion(entityId: Value<String>(serverId)));
 
-      await (_db.update(_db.outbox)
-            ..where((Outbox o) => o.dependencyKey.equals(localId)))
+      await (_db.update(_db.outbox)..where((Outbox o) => o.dependencyKey.equals(localId)))
           .write(OutboxCompanion(dependencyKey: Value<String?>(serverId)));
 
-      final List<OutboxData> open = await (_db.select(_db.outbox)
-            ..where((Outbox o) => o.status.isIn(OutboxStatus.open)))
-          .get();
+      final List<OutboxData> open = await (_db.select(
+        _db.outbox,
+      )..where((Outbox o) => o.status.isIn(OutboxStatus.open))).get();
       for (final OutboxData row in open) {
         final String? rewritten = _rewriteRepresentantId(row.payload, localId, serverId);
         if (rewritten == null) continue;
-        await (_db.update(_db.outbox)..where((Outbox o) => o.seq.equals(row.seq)))
-            .write(OutboxCompanion(payload: Value<String>(rewritten)));
+        await (_db.update(_db.outbox)..where((Outbox o) => o.seq.equals(row.seq))).write(
+          OutboxCompanion(payload: Value<String>(rewritten)),
+        );
       }
 
       final List<FormDraft> drafts = await _db.select(_db.formDrafts).get();
       for (final FormDraft draft in drafts) {
-        final String? rewritten =
-            _rewriteRepresentantId(draft.payload, localId, serverId);
+        final String? rewritten = _rewriteRepresentantId(
+          draft.payload,
+          localId,
+          serverId,
+        );
         final bool parentMoved = draft.parentId == localId;
         if (rewritten == null && !parentMoved) continue;
-        await (_db.update(_db.formDrafts)
-              ..where((FormDrafts t) => t.draftId.equals(draft.draftId)))
-            .write(
-              FormDraftsCompanion(
-                payload: rewritten == null
-                    ? const Value.absent()
-                    : Value<String>(rewritten),
-                parentId: parentMoved
-                    ? Value<String?>(serverId)
-                    : const Value.absent(),
-              ),
-            );
+        await (_db.update(
+          _db.formDrafts,
+        )..where((FormDrafts t) => t.draftId.equals(draft.draftId))).write(
+          FormDraftsCompanion(
+            payload: rewritten == null ? const Value.absent() : Value<String>(rewritten),
+            parentId: parentMoved ? Value<String?>(serverId) : const Value.absent(),
+          ),
+        );
       }
     });
   }
@@ -761,7 +758,10 @@ class SyncEngine {
     }
     if (decoded is! Map) return null;
     if (decoded['representantId'] != from) return null;
-    return jsonEncode(<String, Object?>{...decoded.cast<String, Object?>(), 'representantId': to});
+    return jsonEncode(<String, Object?>{
+      ...decoded.cast<String, Object?>(),
+      'representantId': to,
+    });
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -905,7 +905,9 @@ class SyncEngine {
     int count = 0;
     await _db.transaction(() async {
       for (final DepartementDto d in page.changes.departements) {
-        await _db.into(_db.departements).insert(
+        await _db
+            .into(_db.departements)
+            .insert(
               DepartementsCompanion.insert(
                 id: d.id,
                 code: d.code,
@@ -933,7 +935,9 @@ class SyncEngine {
         count++;
       }
       for (final BanqueDto b in page.changes.banques) {
-        await _db.into(_db.banques).insert(
+        await _db
+            .into(_db.banques)
+            .insert(
               BanquesCompanion.insert(
                 id: b.id,
                 name: b.name,
@@ -961,7 +965,9 @@ class SyncEngine {
         count++;
       }
       for (final SyndicatDto s in page.changes.syndicats) {
-        await _db.into(_db.syndicats).insert(
+        await _db
+            .into(_db.syndicats)
+            .insert(
               SyndicatsCompanion.insert(
                 id: s.id,
                 name: s.name,
@@ -991,7 +997,9 @@ class SyncEngine {
         count++;
       }
       for (final RepresentantDto r in page.changes.representants) {
-        await _db.into(_db.representants).insert(
+        await _db
+            .into(_db.representants)
+            .insert(
               RepresentantsCompanion.insert(
                 id: r.id,
                 fullName: r.fullName,
@@ -1022,14 +1030,15 @@ class SyncEngine {
                 ),
                 // LWW par révision serveur. Une page rejouée n'écrase rien.
                 where: (Representants old) =>
-                    const CustomExpression<int>('excluded.rev')
-                        .isBiggerThan(old.rev),
+                    const CustomExpression<int>('excluded.rev').isBiggerThan(old.rev),
               ),
             );
         count++;
       }
       for (final ProspectDto p in page.changes.prospects) {
-        await _db.into(_db.prospects).insert(
+        await _db
+            .into(_db.prospects)
+            .insert(
               ProspectsCompanion.insert(
                 id: p.id,
                 nom: p.nom,
@@ -1066,8 +1075,8 @@ class SyncEngine {
                   ),
                   deletedAt: const CustomExpression<DateTime>('excluded.deleted_at'),
                 ),
-                where: (Prospects old) => const CustomExpression<int>('excluded.rev')
-                    .isBiggerThan(old.rev),
+                where: (Prospects old) =>
+                    const CustomExpression<int>('excluded.rev').isBiggerThan(old.rev),
               ),
             );
         count++;
@@ -1092,9 +1101,9 @@ class SyncEngine {
   }
 
   Future<String?> readCursor() async {
-    final SyncStateData? row = await (_db.select(_db.syncState)
-          ..where((SyncState t) => t.collection.equals(cursorKey)))
-        .getSingleOrNull();
+    final SyncStateData? row = await (_db.select(
+      _db.syncState,
+    )..where((SyncState t) => t.collection.equals(cursorKey))).getSingleOrNull();
     return row?.cursor;
   }
 

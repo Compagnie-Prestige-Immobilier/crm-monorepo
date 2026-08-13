@@ -111,7 +111,7 @@ export function demoControl(status: DemoStatus): DemoControl {
       reason:
         status.reason !== null && status.reason.trim() !== ''
           ? status.reason
-          : 'La bascule du mode démonstration est désactivée sur cet environnement.',
+          : 'Bascule désactivée sur cet environnement.',
     };
   }
   return status.enabled ? { kind: 'disable' } : { kind: 'enable' };

@@ -203,8 +203,7 @@ export function BankCaseForm() {
           </span>
         </Label>
         <p id={`${searchId}-aide`} className="text-[0.8125rem] text-muted-foreground">
-          Par nom ou par téléphone. Seuls les clients dont la méthode d’enrôlement est obtenue
-          peuvent recevoir un dossier.
+          Par nom ou par téléphone. Méthode d’enrôlement obtenue requise.
         </p>
         <div className="relative">
           <SearchIcon
@@ -255,13 +254,11 @@ export function BankCaseForm() {
               </div>
             ) : results.isError ? (
               <p className="p-4 text-[0.875rem] text-destructive">
-                La recherche n’a pas abouti. Vérifiez votre connexion puis réessayez : sans client,
-                le dossier ne peut pas être ouvert.
+                La recherche a échoué. Réessayez.
               </p>
             ) : results.data.length === 0 ? (
               <p className="p-4 text-[0.875rem] text-muted-foreground">
-                Aucun client ne correspond. Un dossier ne peut être ouvert que sur un prospect dont
-                la méthode d’enrôlement a été obtenue en phase 2.
+                Aucun client ne correspond.
               </p>
             ) : (
               <ul className="max-h-72 overflow-y-auto p-1 scrollbar-thin">
@@ -304,8 +301,7 @@ export function BankCaseForm() {
                 {formatPhone(selected.phoneE164)}
               </p>
               <p className="mt-1 text-[0.75rem] text-muted-foreground">
-                Le nom et le téléphone sont COPIÉS sur le dossier : corriger la fiche client plus
-                tard ne réécrira pas ce qui aura été transmis à la banque.
+                Nom et téléphone sont copiés sur le dossier.
               </p>
             </div>
           </CardContent>
@@ -313,10 +309,14 @@ export function BankCaseForm() {
       ) : null}
 
       {/* ─── 3. Référence et banque ─────────────────────────────────────── */}
-      <fieldset
-        disabled={selected === null}
-        className={cn('flex flex-col gap-5', selected === null && 'opacity-50')}
-      >
+      {/* Pas d'`opacity-50` sur le bloc entier tant qu'aucun client n'est
+          choisi. Mesuré à l'écran, ce voile faisait tomber le libellé à
+          3,59:1, l'astérisque « obligatoire » à 2,48:1 et l'aide de saisie à
+          2,32:1 : l'utilisateur ne pouvait plus LIRE ce que la section
+          attendait de lui, au moment précis où il cherche quoi faire.
+          `disabled` sur le `fieldset` suffit : chaque champ prend la peau
+          désactivée (`muted`), qui reste lisible et dit déjà « pas encore ». */}
+      <fieldset disabled={selected === null} className="flex flex-col gap-5">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={referenceId}>
             Référence bancaire
@@ -345,8 +345,7 @@ export function BankCaseForm() {
           />
           {duplicate === null ? (
             <p id={`${referenceId}-aide`} className="text-[0.75rem] text-muted-foreground">
-              Deux caractères au minimum. L’unicité est vérifiée en quittant le champ, puis à
-              nouveau par le serveur.
+              Deux caractères au minimum. Référence unique.
               {checkReference.isPending ? ' Vérification en cours…' : ''}
             </p>
           ) : (
@@ -356,7 +355,7 @@ export function BankCaseForm() {
               className="flex flex-wrap items-center gap-1.5 text-[0.75rem] text-destructive"
             >
               <AlertTriangleIcon className="size-3.5 shrink-0" aria-hidden="true" />
-              La référence « {duplicate.reference} » est déjà portée par un autre dossier.
+              La référence « {duplicate.reference} » existe déjà.
               <Link
                 href={`/dossiers/${duplicate.id}`}
                 className="rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -381,14 +380,13 @@ export function BankCaseForm() {
             <SelectContent>
               {(banques.data ?? []).map((banque) => (
                 <SelectItem key={banque.id} value={banque.id}>
-                  {withRetired(banque.shortName, banque.isActive)} — {banque.name}
+                  {withRetired(banque.shortName, banque.isActive)}, {banque.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <p className="text-[0.75rem] text-muted-foreground">
-            Pré-remplie avec la banque du client. Modifiable : un dossier peut être instruit par une
-            autre banque.
+            Pré-remplie avec la banque du client. Modifiable.
           </p>
         </div>
       </fieldset>

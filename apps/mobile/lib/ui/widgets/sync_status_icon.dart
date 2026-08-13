@@ -104,10 +104,32 @@ class _SyncStatusIconState extends State<SyncStatusIcon>
 
   @override
   Widget build(BuildContext context) {
+    final CpiMotion motion = CpiMotion.of(context);
     final Color color = context.cpi.colorForSyncStatus(widget.status.name);
-    final Widget icon = Icon(widget.status.icon, size: widget.size, color: color);
-    if (widget.status != SyncStatus.syncing) return icon;
-    return RotationTransition(turns: _controller, child: icon);
+    final Widget icon = Icon(
+      widget.status.icon,
+      key: ValueKey<SyncStatus>(widget.status),
+      size: widget.size,
+      color: color,
+    );
+
+    // Le passage d'un état à l'autre est le moment où cette icône dit quelque
+    // chose : « en attente » qui devient « envoyé » est exactement ce que
+    // l'utilisateur surveille. Un remplacement sec le rend invisible ; un
+    // fondu-échelle court de 150 ms le rend perceptible sans le rendre lent.
+    // `ScaleTransition` et non une opacité sur un grand sous-arbre : ici le
+    // sous-arbre est une icône, la composition est gratuite.
+    final Widget switched = AnimatedSwitcher(
+      duration: motion.micro,
+      switchInCurve: motion.easeSpring,
+      switchOutCurve: motion.easeOut,
+      transitionBuilder: (Widget child, Animation<double> animation) =>
+          ScaleTransition(scale: animation, child: child),
+      child: icon,
+    );
+
+    if (widget.status != SyncStatus.syncing) return switched;
+    return RotationTransition(turns: _controller, child: switched);
   }
 }
 
@@ -128,10 +150,7 @@ class SyncStatusChip extends StatelessWidget {
         children: <Widget>[
           SyncStatusIcon(status: status, size: 16),
           const SizedBox(width: CpiSpacing.xxs + 2),
-          Text(
-            status.label,
-            style: theme.textTheme.labelMedium?.copyWith(color: color),
-          ),
+          Text(status.label, style: theme.textTheme.labelMedium?.copyWith(color: color)),
         ],
       ),
     );

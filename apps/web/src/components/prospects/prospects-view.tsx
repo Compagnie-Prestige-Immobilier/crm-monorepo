@@ -16,7 +16,8 @@ export function ProspectsView({ canAdminister }: { canAdminister: boolean }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[0.9375rem] text-muted-foreground">Filtrables et exportables.</p>
         <ProspectExportMenu filters={filters} />
       </div>
 

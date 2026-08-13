@@ -52,7 +52,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
       <main id="contenu-principal" className="grid min-h-dvh place-items-center p-6">
         <QueryErrorState
           error={session.error}
-          fallback="Le panel n’a pas pu vérifier votre session. Votre connexion est toujours valide : réessayez dans un instant."
+          fallback="Session non vérifiée. Réessayez dans un instant."
         />
       </main>
     );

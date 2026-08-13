@@ -78,7 +78,12 @@ void callbackDispatcher() {
       // morte, insister ne sert à rien.
       return !outcome.shouldRetry;
     } on Object catch (e, stack) {
-      developer.log('Tâche de fond $task en échec', name: 'cpi.bg', error: e, stackTrace: stack);
+      developer.log(
+        'Tâche de fond $task en échec',
+        name: 'cpi.bg',
+        error: e,
+        stackTrace: stack,
+      );
       return false;
     } finally {
       // La connexion doit être refermée : l'isolat meurt juste après, mais un

@@ -144,12 +144,12 @@ export function CampaignCreateDialog({
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {step === 'saisie' ? 'Nouvelle campagne d’appels' : 'Vérifier avant de lancer'}
+            {step === 'saisie' ? 'Nouvelle campagne d’appels' : 'Aperçu du tirage'}
           </DialogTitle>
           <DialogDescription>
             {step === 'saisie'
-              ? 'Le tirage est définitif : les prospects retenus sont retirés de toute campagne ultérieure.'
-              : 'Ce que la campagne va distribuer, avant confirmation.'}
+              ? 'Le tirage est définitif.'
+              : 'Les prospects tirés sont retirés des campagnes suivantes.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -167,7 +167,6 @@ export function CampaignCreateDialog({
                 value={name}
                 maxLength={120}
                 autoComplete="off"
-                placeholder="Campagne CHUES — avril"
                 onChange={(event) => {
                   setName(event.target.value);
                 }}
@@ -175,13 +174,13 @@ export function CampaignCreateDialog({
                 aria-describedby={`${nameId}-aide`}
               />
               <p id={`${nameId}-aide`} className="text-[0.75rem] text-muted-foreground">
-                Trois caractères au minimum. Ce nom apparaît sur chaque programme imprimé.
+                Trois caractères minimum. Repris sur les programmes imprimés.
               </p>
             </div>
 
             <fieldset className="flex flex-col gap-2">
               <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
-                Périmètre du tirage
+                Périmètre
               </legend>
               <div className="grid gap-2 sm:grid-cols-2">
                 {CAMPAIGN_SCOPES.map((candidate) => (
@@ -213,14 +212,13 @@ export function CampaignCreateDialog({
 
             <fieldset className="flex flex-col gap-2">
               <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
-                Commerciaux destinataires
+                Commerciaux
                 <span className="text-destructive" aria-label="obligatoire">
                   *
                 </span>
               </legend>
               <p className="text-[0.75rem] text-muted-foreground">
-                L’ordre de sélection EST l’ordre du tourniquet : le premier coché reçoit la première
-                fiche tirée.
+                L’ordre de sélection fixe l’ordre du tourniquet.
               </p>
 
               {reference.isPending ? (
@@ -231,8 +229,7 @@ export function CampaignCreateDialog({
                 </div>
               ) : commerciaux.length === 0 ? (
                 <p role="status" className="rounded-md bg-muted px-3 py-4 text-[0.8125rem]">
-                  Aucun compte commercial n’est enregistré. Créez-en un depuis l’écran Commerciaux
-                  avant de lancer une campagne.
+                  Aucun compte commercial. Créez-en un depuis l’écran Commerciaux.
                 </p>
               ) : (
                 <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-md border border-border p-1 scrollbar-thin">
@@ -306,7 +303,7 @@ export function CampaignCreateDialog({
                   setStep('apercu');
                 }}
               >
-                Voir ce qui sera distribué
+                Voir l’aperçu
               </Button>
             </>
           ) : (
@@ -379,8 +376,7 @@ function CampaignPreviewPanel({
         className="flex flex-col items-start gap-3 rounded-md border border-destructive/30 bg-destructive-surface p-4"
       >
         <p className="text-[0.875rem] text-destructive">
-          Le décompte des prospects éligibles n’a pas pu être calculé. Lancer la campagne sans ce
-          chiffre reviendrait à distribuer à l’aveugle.
+          Le décompte des prospects éligibles n’a pas pu être calculé. Réessayez.
         </p>
         <Button type="button" variant="outline" size="sm" onClick={onRetry}>
           Réessayer
@@ -408,7 +404,7 @@ function CampaignPreviewPanel({
         className="rounded-md border border-accent-border/40 bg-accent-surface p-4"
       >
         <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-warning">
-          À distribuer, au maximum
+          Maximum à distribuer
         </p>
         <p className="mt-1 font-display text-[2rem] font-[800] leading-none tracking-[-0.02em] text-foreground tabular-nums">
           {formatNumber(data.maximum)}
@@ -421,15 +417,13 @@ function CampaignPreviewPanel({
 
       <dl className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-md border border-border p-3">
-          <dt className="text-[0.75rem] text-muted-foreground">En attente sur ce périmètre</dt>
+          <dt className="text-[0.75rem] text-muted-foreground">En attente</dt>
           <dd className="mt-0.5 text-[1.125rem] font-[600] tabular-nums">
             {formatNumber(data.pending)}
           </dd>
         </div>
         <div className="rounded-md border border-border p-3">
-          <dt className="text-[0.75rem] text-muted-foreground">
-            Déjà affectés à une campagne en cours
-          </dt>
+          <dt className="text-[0.75rem] text-muted-foreground">Déjà affectés</dt>
           <dd className="mt-0.5 text-[1.125rem] font-[600] tabular-nums">
             {formatNumber(data.alreadyAssigned)}
           </dd>
@@ -443,8 +437,7 @@ function CampaignPreviewPanel({
             campagne concurrente, et il est seul à connaître leur segment. Le
             chiffre affiché est une borne haute — le dire vaut mieux que
             promettre un total qui pourrait être plus bas de quelques unités. */}
-        Borne haute. Le serveur exclut au tirage les prospects qu’une campagne concurrente aurait
-        pris entre-temps ; le total réel peut être légèrement inférieur.
+        Borne haute : le total réel peut être inférieur.
       </p>
 
       <div>

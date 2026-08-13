@@ -58,6 +58,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final CpiColors cpi = context.cpi;
     const Color burgundy = Color(0xFF630210);
 
+    // `colorScheme.error` (#B91C1C) ne fait que 2,10:1 sur le bordeaux : les
+    // messages de validation étaient posés à même le fond plein de cet écran,
+    // donc illisibles. `destructiveOnDark` (#F87171) passe à 4,91:1.
+    final TextStyle errorStyle = (theme.textTheme.bodyMedium ?? const TextStyle())
+        .copyWith(color: cpi.destructiveOnDark, fontWeight: FontWeight.w600);
+    final OutlineInputBorder errorBorder = OutlineInputBorder(
+      borderRadius: CpiRadius.brMd,
+      borderSide: BorderSide(color: cpi.destructiveOnDark, width: 2),
+    );
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -129,10 +139,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 hintText: 'nom.prenom ou e-mail',
                                 prefixIcon: const Icon(PhosphorIconsRegular.user),
                                 fillColor: cpi.inputBackground,
+                                errorStyle: errorStyle,
+                                errorBorder: errorBorder,
+                                focusedErrorBorder: errorBorder,
                               ),
                               validator: (String? value) =>
                                   (value == null || value.trim().isEmpty)
-                                  ? 'Saisissez votre identifiant.'
+                                  ? 'Saisissez l\'identifiant.'
                                   : null,
                               onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
                             ),
@@ -162,10 +175,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         : PhosphorIconsRegular.eyeSlash,
                                   ),
                                 ),
+                                errorStyle: errorStyle,
+                                errorBorder: errorBorder,
+                                focusedErrorBorder: errorBorder,
                               ),
                               validator: (String? value) =>
                                   (value == null || value.isEmpty)
-                                  ? 'Saisissez votre mot de passe.'
+                                  ? 'Saisissez le mot de passe.'
                                   : null,
                               onFieldSubmitted: (_) => _submit(),
                             ),
@@ -207,8 +223,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ],
                         ),
                       ),
-
-
                     ],
                   ),
                 ),
