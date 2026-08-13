@@ -40,16 +40,7 @@ class HistoriqueScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Historique'),
-        actions: <Widget>[
-          IconButton(
-            tooltip: 'Nouveau représentant',
-            onPressed: () => context.push(Routes.newRepresentant),
-            icon: const Icon(PhosphorIconsRegular.plus),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Historique')),
       body: Column(
         children: <Widget>[
           const PendingBanner(),
@@ -102,7 +93,45 @@ class HistoriqueScreen extends ConsumerWidget {
               },
             ),
           ),
+          // Action principale en bas, pas en haut.
+          //
+          // Elle n'existait que dans l'AppBar, hors d'atteinte du pouce sur un
+          // écran de 6,5 pouces tenu à une main. Elle est ici pleine largeur,
+          // comme sur l'accueil et comme sur les formulaires : trois écrans,
+          // une seule place pour l'action qui compte.
+          const _NewRepresentantBar(),
         ],
+      ),
+    );
+  }
+}
+
+/// Barre d'action ancrée en zone de pouce.
+class _NewRepresentantBar extends StatelessWidget {
+  const _NewRepresentantBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        CpiSpacing.md,
+        CpiSpacing.xs,
+        CpiSpacing.md,
+        CpiSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: context.cpi.borderSubtle)),
+      ),
+      child: FilledButton.icon(
+        onPressed: () {
+          HapticFeedback.selectionClick();
+          context.push(Routes.newRepresentant);
+        },
+        icon: const Icon(PhosphorIconsRegular.plus, size: 20),
+        label: const Text('Nouveau représentant'),
       ),
     );
   }

@@ -22,6 +22,7 @@ import { ReferentielsModule } from './modules/referentiels/referentiels.module.j
 import { RepresentantsModule } from './modules/representants/representants.module.js';
 import { SyncModule } from './modules/sync/sync.module.js';
 import { UsersModule } from './modules/users/users.module.js';
+import { AppUpdatesModule } from './modules/app-updates/app-updates.module.js';
 
 const env = readEnv();
 
@@ -82,6 +83,7 @@ const env = readEnv();
     NotificationsModule,
     AnalyticsModule,
     ExportModule,
+    AppUpdatesModule,
   ],
   providers: [
     // L'ordre compte. Le throttler s'applique avant toute lecture de base ;

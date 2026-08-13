@@ -18,6 +18,8 @@ import {
   type ClickableSlice,
 } from '@/components/bank/bank-charts';
 import { BankExportMenu } from '@/components/bank/bank-export-menu';
+import type { ReactNode } from 'react';
+
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
 import { BankFiltersBar } from '@/components/bank/bank-filters-bar';
@@ -29,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchBankAnalytics } from '@/lib/data/bank-cases';
 import { formatDecimal, formatNumber } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import { ExactAmountsToggle, MoneyText } from '@/components/money/exact-amounts';
 import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
 import type { FilterOption } from '@/lib/types';
@@ -83,12 +86,15 @@ export function BankDashboardView() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <LiveIndicator
-          state={live.stateOf(isError)}
-          label={live.labelOf(isError)}
-          updatedAt={hasData ? dataUpdatedAt : null}
-          onTogglePause={live.togglePause}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <ExactAmountsToggle />
+          <LiveIndicator
+            state={live.stateOf(isError)}
+            label={live.labelOf(isError)}
+            updatedAt={hasData ? dataUpdatedAt : null}
+            onTogglePause={live.togglePause}
+          />
+        </div>
         <BankExportMenu filters={filters} />
       </div>
 
@@ -118,7 +124,7 @@ export function BankDashboardView() {
               index={1}
               label="Encaissés"
               value={formatNumber(data.totals.encaisses)}
-              hint={formatXof(data.totals.totalAmountCashed, '0 FCFA')}
+              hint={<MoneyText value={data.totals.totalAmountCashed} placeholder="0 FCFA" />}
               icon={BanknoteIcon}
             />
             <Kpi
@@ -307,7 +313,8 @@ function Kpi({
 }: {
   label: string;
   value: string;
-  hint: string;
+  /** Peut porter un montant rendu par `MoneyText`, pas seulement du texte. */
+  hint: ReactNode;
   icon: LucideIcon;
   index: number;
 }) {

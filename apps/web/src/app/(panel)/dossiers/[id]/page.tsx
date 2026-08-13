@@ -1,6 +1,6 @@
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
+import { redirect, unstable_rethrow } from 'next/navigation';
 
 import { BankCaseDetailView } from '@/components/bank/bank-case-detail-view';
 import { PermissionDenied } from '@/components/permission-denied';
@@ -27,7 +27,10 @@ export default async function DossierPage({ params }: { params: Promise<{ id: st
       queryKey: queryKeys.bankCase(id),
       queryFn: () => fetchBankCase(id, getServerApiClient()),
     });
-  } catch {
+  } catch (error) {
+    // `unstable_rethrow` d'abord : un `catch` nu avale aussi les erreurs de
+    // contrôle de Next (redirection, `notFound()`, bascule en rendu dynamique).
+    unstable_rethrow(error);
     // Un dossier introuvable doit se présenter comme une erreur DANS la vue —
     // qui sait la rendre avec un message et un retour — et non comme une
     // exception de rendu serveur qui ferait tomber l'écran entier.

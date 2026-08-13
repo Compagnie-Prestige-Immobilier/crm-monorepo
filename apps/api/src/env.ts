@@ -87,6 +87,12 @@ export const envSchema = z
     SYNC_MAX_BATCH_SIZE: z.coerce.number().int().positive().max(2000).default(200),
     IDEMPOTENCY_TTL_DAYS: z.coerce.number().int().positive().default(7),
 
+    // APK Android servi depuis le volume persistant du VPS. Le chemin doit
+    // être monté hors de l'image : un redeploy ne doit jamais effacer la
+    // dernière release disponible.
+    APK_RELEASE_DIR: z.string().min(1).default('./storage/releases'),
+    APK_MAX_SIZE_BYTES: z.coerce.number().int().positive().max(1_073_741_824).default(524_288_000),
+
     // Garde-fou du mode démonstration. L'interrupteur lui-même vit en base
     // (table app_settings) et se manœuvre depuis le panel admin ; cette
     // variable est distincte et volontairement hors de portée de l'interface :

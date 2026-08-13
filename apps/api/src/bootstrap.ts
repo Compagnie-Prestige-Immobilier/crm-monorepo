@@ -9,6 +9,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { Logger } from 'nestjs-pino';
+import multipart from '@fastify/multipart';
 
 import { AppModule } from './app.module.js';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter.js';
@@ -65,6 +66,9 @@ export async function createApiApp(): Promise<NestFastifyApplication> {
   // là où la documentation est effectivement servie.
   await app.register(helmet, env.API_DOCS_ENABLED ? { contentSecurityPolicy: false } : {});
   await app.register(rateLimit, { max: 600, timeWindow: '1 minute' });
+  await app.register(multipart, {
+    limits: { fileSize: env.APK_MAX_SIZE_BYTES, files: 1, fields: 8 },
+  });
   // Enregistré dans tous les environnements : c'est la liste blanche qui est le
   // contrôle, pas l'environnement.
   await app.register(cors, {

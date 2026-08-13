@@ -103,16 +103,12 @@ const COMPACT_UNITS: readonly { readonly minDigits: number; readonly suffix: str
   { minDigits: 4, suffix: 'k' },
 ];
 
-export function formatXofCompact(value: string | null | undefined, placeholder = '–'): string {
-  if (value === null || value === undefined || value === '') return placeholder;
-  const trimmed = value.trim();
-  if (!MONEY_PATTERN.test(trimmed)) return formatXof(trimmed, placeholder);
-
-  const digits = trimmed.replace(/^0+(?=\d)/u, '');
+/** `"1250000000"` → `"1,25 Mrd"`. Sans devise : l'appelant la pose, ou pas. */
+function compactMantissa(digits: string): string {
   const unit = COMPACT_UNITS.find((candidate) => digits.length >= candidate.minDigits);
 
   // Moins de quatre chiffres : l'abrégé serait plus long que le montant.
-  if (unit === undefined) return `${digits} FCFA`;
+  if (unit === undefined) return digits;
 
   const scale = unit.minDigits - 1;
   const whole = digits.slice(0, digits.length - scale);
@@ -124,7 +120,32 @@ export function formatXofCompact(value: string | null | undefined, placeholder =
   const fraction = rest.slice(0, decimals).replace(/0+$/u, '');
 
   const mantissa = fraction === '' ? groupDigits(whole) : `${groupDigits(whole)},${fraction}`;
-  return `${mantissa} ${unit.suffix} FCFA`;
+  return `${mantissa} ${unit.suffix}`;
+}
+
+export function formatXofCompact(value: string | null | undefined, placeholder = '–'): string {
+  if (value === null || value === undefined || value === '') return placeholder;
+  const trimmed = value.trim();
+  if (!MONEY_PATTERN.test(trimmed)) return formatXof(trimmed, placeholder);
+
+  return `${compactMantissa(trimmed.replace(/^0+(?=\d)/u, ''))} FCFA`;
+}
+
+/**
+ * Étiquette d'un axe de graphique portant des francs.
+ *
+ * Seul endroit où un montant arrive en `number` : la coordonnée d'un axe est
+ * calculée par Chart.js, elle n'est pas la donnée. La donnée, elle, reste la
+ * chaîne d'origine, et c'est elle que l'info-bulle affiche exactement. Sans
+ * abrégé, un axe en milliards écrirait « 1 250 000 000 » sur chaque graduation
+ * et mangerait la moitié de la surface du graphique.
+ *
+ * Pas de devise : le titre de l'axe porte déjà « FCFA », et le répéter à chaque
+ * graduation encombre pour rien.
+ */
+export function formatXofAxisTick(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0';
+  return compactMantissa(Math.round(value).toString());
 }
 
 /**

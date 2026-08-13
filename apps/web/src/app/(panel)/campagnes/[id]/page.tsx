@@ -1,6 +1,6 @@
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
+import { redirect, unstable_rethrow } from 'next/navigation';
 
 import { PermissionDenied } from '@/components/permission-denied';
 import { CampaignDetailView } from '@/components/phase2/campaign-detail-view';
@@ -31,7 +31,10 @@ export default async function CampagnePage({ params }: { params: Promise<{ id: s
       queryKey: queryKeys.campaign(id),
       queryFn: () => fetchCampaign(id, getServerApiClient()),
     });
-  } catch {
+  } catch (error) {
+    // `unstable_rethrow` d'abord : un `catch` nu avale aussi les erreurs de
+    // contrôle de Next (redirection, `notFound()`, bascule en rendu dynamique).
+    unstable_rethrow(error);
     /* La vue rejouera la requête côté client et affichera l'état d'erreur. */
   }
 

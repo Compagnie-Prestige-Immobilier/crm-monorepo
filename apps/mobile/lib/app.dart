@@ -9,6 +9,10 @@ import 'core/router/app_router.dart';
 import 'core/settings/display_settings.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_state.dart';
+import 'core/updates/app_update_controller.dart';
+import 'core/onboarding/onboarding_controller.dart';
+import 'features/updates/presentation/app_update_screen.dart';
+import 'features/onboarding/presentation/onboarding_screen.dart';
 
 /// Racine de l'application.
 ///
@@ -21,6 +25,43 @@ class CpiGoApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final AppUpdateState update = ref.watch(appUpdateControllerProvider);
+    if (update.status == AppUpdateStatus.checking) {
+      return MaterialApp(
+        title: 'CPI GO',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        themeMode: ThemeMode.light,
+        locale: const Locale('fr', 'SN'),
+        supportedLocales: _supportedLocales,
+        localizationsDelegates: _localizationsDelegates,
+        home: const _BrandSplash(),
+      );
+    }
+    if (update.requiresPrompt) {
+      return MaterialApp(
+        title: 'CPI GO',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        themeMode: ThemeMode.light,
+        locale: const Locale('fr', 'SN'),
+        supportedLocales: _supportedLocales,
+        localizationsDelegates: _localizationsDelegates,
+        home: AppUpdateScreen(state: update),
+      );
+    }
+    if (!ref.watch(onboardingControllerProvider)) {
+      return MaterialApp(
+        title: 'CPI GO',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        themeMode: ThemeMode.light,
+        locale: const Locale('fr', 'SN'),
+        supportedLocales: _supportedLocales,
+        localizationsDelegates: _localizationsDelegates,
+        home: const OnboardingScreen(),
+      );
+    }
     final AuthState auth = ref.watch(authControllerProvider);
 
     if (!auth.isResolved) {
@@ -83,7 +124,10 @@ class CpiGoApp extends ConsumerWidget {
         return MediaQuery(
           data: media.copyWith(
             textScaler: TextScaler.linear(
-              resolveTextScaleFactor(system: media.textScaler, choice: display.textScale),
+              resolveTextScaleFactor(
+                system: media.textScaler,
+                choice: display.textScale,
+              ),
             ),
             // « Réduire les animations » emprunte le chemin de code système :
             // `CpiMotion.of` lit `MediaQuery.maybeDisableAnimationsOf` et ramène
@@ -101,7 +145,10 @@ class CpiGoApp extends ConsumerWidget {
   }
 }
 
-const List<Locale> _supportedLocales = <Locale>[Locale('fr', 'SN'), Locale('fr')];
+const List<Locale> _supportedLocales = <Locale>[
+  Locale('fr', 'SN'),
+  Locale('fr'),
+];
 
 const List<LocalizationsDelegate<dynamic>> _localizationsDelegates =
     <LocalizationsDelegate<dynamic>>[
@@ -115,16 +162,43 @@ class _BrandSplash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
+    return ColoredBox(
       color: Color(0xFF630210),
-      child: Center(
-        child: Image(
-          image: AssetImage('assets/brand/cpi-header.png'),
-          width: 180,
-          height: 74,
-          fit: BoxFit.contain,
-          semanticLabel: 'CPI',
-        ),
+      child: Stack(
+        children: <Widget>[
+          Center(
+            child: Image(
+              image: AssetImage('assets/brand/cpi-header.png'),
+              width: 180,
+              height: 74,
+              fit: BoxFit.contain,
+              semanticLabel: 'CPI',
+            ),
+          ),
+          Positioned(
+            left: 28,
+            right: 28,
+            bottom: 32,
+            child: Column(
+              children: <Widget>[
+                Text(
+                  'Chargement…',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  semanticsLabel: 'Chargement en cours',
+                ),
+                SizedBox(height: 10),
+                Semantics(
+                  label: 'Chargement en cours',
+                  child: LinearProgressIndicator(
+                    minHeight: 3,
+                    backgroundColor: Color(0x66FFFFFF),
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

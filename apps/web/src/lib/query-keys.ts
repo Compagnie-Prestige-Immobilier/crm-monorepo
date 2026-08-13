@@ -81,6 +81,7 @@ export const queryKeys = {
   // ─── Administration ───────────────────────────────────────────────────────
   purgeCatalog: ['purge-catalog'] as const,
   supervision: ['supervision'] as const,
+  androidUpdate: ['android-update'] as const,
 
   // ─── Statistiques ─────────────────────────────────────────────────────────
   statsRoot: ['stats'] as const,

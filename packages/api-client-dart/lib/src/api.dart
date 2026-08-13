@@ -9,6 +9,7 @@ import 'package:crm_api_client/src/auth/bearer_auth.dart';
 import 'package:crm_api_client/src/auth/oauth.dart';
 import 'package:crm_api_client/src/api/admin_api.dart';
 import 'package:crm_api_client/src/api/analytics_api.dart';
+import 'package:crm_api_client/src/api/app_updates_api.dart';
 import 'package:crm_api_client/src/api/auth_api.dart';
 import 'package:crm_api_client/src/api/bank_case_stages_api.dart';
 import 'package:crm_api_client/src/api/bank_cases_api.dart';
@@ -157,6 +158,12 @@ class CrmApiClient {
   /// by doing that all interceptors will not be executed
   AnalyticsApi getAnalyticsApi() {
     return AnalyticsApi(dio);
+  }
+
+  /// Get AppUpdatesApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  AppUpdatesApi getAppUpdatesApi() {
+    return AppUpdatesApi(dio);
   }
 
   /// Get AuthApi instance, base route and serializer can be overridden by a given but be careful,
