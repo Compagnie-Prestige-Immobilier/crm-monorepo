@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
@@ -106,14 +107,29 @@ appUpdateControllerProvider =
 
 class AppUpdateController extends Notifier<AppUpdateState> {
   static const MethodChannel _installer = MethodChannel('sn.cpi.go/updates');
+  StreamSubscription<List<ConnectivityResult>>? _connectivity;
+  Timer? _connectivityDebounce;
+  bool _checking = false;
 
   @override
   AppUpdateState build() {
+    ref.onDispose(() {
+      _connectivityDebounce?.cancel();
+      unawaited(_connectivity?.cancel());
+    });
+    _connectivity = Connectivity().onConnectivityChanged.listen((_) {
+      _connectivityDebounce?.cancel();
+      _connectivityDebounce = Timer(const Duration(seconds: 2), () {
+        unawaited(check());
+      });
+    });
     unawaited(Future<void>.microtask(check));
     return const AppUpdateState.checking();
   }
 
   Future<void> check() async {
+    if (_checking) return;
+    _checking = true;
     final Dio dio = Dio(
       BaseOptions(
         baseUrl: ApiEnvironment.baseUrl,
@@ -156,6 +172,7 @@ class AppUpdateController extends Notifier<AppUpdateState> {
       }
     } finally {
       dio.close(force: true);
+      _checking = false;
     }
   }
 

@@ -97,6 +97,7 @@ test('les filtres de phase 2 vivent dans l’URL et survivent au rechargement', 
   const countLine = page.getByRole('status').filter({ hasText: 'Prospects affichés' });
   await expect(countLine).not.toHaveText('');
 
+  await page.getByRole('button', { name: 'Filtres avancés' }).click();
   await page.getByRole('combobox', { name: 'Statut phase 2' }).click();
   await page.getByRole('option', { name: 'Méthode obtenue' }).click();
   await expect(page).toHaveURL(/phase2Status=METHOD_OBTAINED/);
@@ -174,11 +175,11 @@ test('création d’une campagne : l’aperçu chiffre AVANT la confirmation', a
   await commerciaux.nth(0).check();
   await commerciaux.nth(1).check();
 
-  await page.getByRole('button', { name: 'Voir ce qui sera distribué' }).click();
+  await page.getByRole('button', { name: 'Voir l’aperçu' }).click();
 
   // LE point de cet écran : le nombre est affiché, et il l'est avant que le
   // bouton de confirmation ne soit actionnable.
-  const preview = page.getByRole('status').filter({ hasText: 'À distribuer, au maximum' });
+  const preview = page.getByRole('status').filter({ hasText: /Maximum à distribuer/i });
   await expect(preview).toBeVisible({ timeout: 30_000 });
   const previewText = (await preview.textContent()) ?? '';
   const shown = Number(
@@ -269,7 +270,7 @@ test('un dossier peut être mené jusqu’à l’encaissement', async ({ page })
   const reference = `E2E-ENC-${String(Date.now())}`;
   await createCase(page, reference);
 
-  await expect(page.getByRole('heading', { name: reference })).toBeVisible();
+  await expect(page.getByText(reference, { exact: true })).toBeVisible();
   await expectNoErrorState(page);
 
   // Étape 1 → 2. Le libellé du bouton NOMME l'étape cible : « Suivant » ne dit
