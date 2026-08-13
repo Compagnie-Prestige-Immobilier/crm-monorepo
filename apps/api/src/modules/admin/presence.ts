@@ -104,9 +104,7 @@ export function presenceOf(signals: ActivitySignals, now: Date): PresenceState {
 }
 
 /** Compteurs de tête de l'écran. Un seul parcours, pas trois filtres. */
-export function countByPresence(
-  states: readonly PresenceState[],
-): Record<PresenceState, number> {
+export function countByPresence(states: readonly PresenceState[]): Record<PresenceState, number> {
   const counts: Record<PresenceState, number> = { ONLINE: 0, RECENT: 0, AWAY: 0 };
   for (const state of states) counts[state] += 1;
   return counts;

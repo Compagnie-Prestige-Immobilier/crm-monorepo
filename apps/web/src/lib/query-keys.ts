@@ -29,6 +29,14 @@ export const queryKeys = {
   dashboardRoot: ['dashboard'] as const,
   dashboard: (filters: ProspectFilters) => ['dashboard', filtersQueryKey(filters)] as const,
 
+  /**
+   * L'entonnoir et les montants. Clé DÉRIVÉE du même objet de filtre que le
+   * reste du tableau de bord : le total encaissé décrit forcément la population
+   * des compteurs affichés au-dessus de lui.
+   */
+  funnelRoot: ['funnel'] as const,
+  funnel: (filters: ProspectFilters) => ['funnel', filtersQueryKey(filters)] as const,
+
   representantsRoot: ['representants'] as const,
   representants: (filters: RepresentantFilters) => ['representants', filters] as const,
   representant: (id: string) => ['representants', 'detail', id] as const,

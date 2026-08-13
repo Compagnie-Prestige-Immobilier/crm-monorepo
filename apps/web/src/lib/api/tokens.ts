@@ -17,6 +17,15 @@ export interface RotatedTokens {
 }
 
 /**
+ * Le backend fait tourner un refresh token et invalide l'ancien. Une page
+ * charge plusieurs données en parallèle : sans ce verrou, ces requêtes
+ * présentent toutes le même token, et le deuxième appel est pris pour un
+ * rejeu. La clé est le token lui-même : les sessions distinctes ne se
+ * bloquent pas entre elles.
+ */
+const inFlightRotations = new Map<string, Promise<RotatedTokens | null>>();
+
+/**
  * Lit `exp` d'un JWT SANS vérifier sa signature.
  *
  * C'est volontaire et c'est sans risque ici : la valeur ne sert qu'à décider
@@ -69,6 +78,24 @@ export async function rotateRefreshToken(
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<RotatedTokens | null> {
   if (refreshToken === '') return null;
+
+  const running = inFlightRotations.get(refreshToken);
+  if (running !== undefined) return running;
+
+  const rotation = rotateRefreshTokenOnce(origin, refreshToken, fetchImpl);
+  inFlightRotations.set(refreshToken, rotation);
+  try {
+    return await rotation;
+  } finally {
+    inFlightRotations.delete(refreshToken);
+  }
+}
+
+async function rotateRefreshTokenOnce(
+  origin: string,
+  refreshToken: string,
+  fetchImpl: typeof globalThis.fetch,
+): Promise<RotatedTokens | null> {
 
   let response: Response;
   try {

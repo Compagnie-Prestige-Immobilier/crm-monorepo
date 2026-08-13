@@ -119,8 +119,8 @@ export function RepresentantsView() {
         />
 
         <FilterCombobox
-          label="Commercial"
-          placeholder="Tous les commerciaux"
+          label="Téléconseiller"
+          placeholder="Tous les téléconseillers"
           value={filters.commercialId}
           options={reference?.commerciaux ?? []}
           onChange={(value) => {

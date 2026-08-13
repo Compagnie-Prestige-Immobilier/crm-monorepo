@@ -73,6 +73,7 @@ export const envSchema = z
     JWT_ACCESS_TTL: z.string().min(1).default('15m'),
     JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
     AUTH_LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(10),
+    API_GLOBAL_RATE_LIMIT: z.coerce.number().int().positive().default(300),
 
     // --- Règles métier ---
     BUSINESS_TIME_ZONE: z.string().min(1).default('Africa/Dakar'),

@@ -56,7 +56,7 @@ export function PasswordDialog({
     },
     onSuccess: () => {
       toast.success(
-        `Mot de passe réinitialisé. ${user?.fullName ?? 'Le commercial'} est déconnecté.`,
+        `Mot de passe réinitialisé. ${user?.fullName ?? 'Le téléconseiller'} est déconnecté.`,
       );
       onOpenChange(false);
     },

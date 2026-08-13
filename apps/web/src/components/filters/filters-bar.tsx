@@ -1,9 +1,10 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { RotateCcwIcon, SearchIcon } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { ChevronDownIcon, RotateCcwIcon, SearchIcon, SlidersHorizontalIcon, XIcon } from 'lucide-react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import { buildAdvancedChips } from '@/components/filters/advanced-chips';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
 import { Badge } from '@/components/ui/badge';
@@ -13,9 +14,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchReferenceData } from '@/lib/data/reference';
-import { countActiveFilters } from '@/lib/filters';
+import {
+  clearAdvancedFilters,
+  countActiveFilters,
+  countAdvancedFilters,
+  initialAdvancedOpen,
+  type AdvancedFilterKey,
+} from '@/lib/filters';
 import { withRetired } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
+import { cn } from '@/lib/utils';
 import {
   BDD_SEGMENTS,
   ENROLLMENT_METHODS,
@@ -31,6 +39,30 @@ import {
   type Phase2Status,
   type ProspectStatut,
 } from '@/lib/types';
+
+/**
+ * La barre de filtre du tableau de bord et du tableau des prospects.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Trois critères visibles, dix repliés — et le repli ne cache jamais un
+ * filtre actif.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Les treize champs étaient empilés en permanence : la première chose visible
+ * du tableau de bord était un formulaire, et les indicateurs commençaient sous
+ * la ligne de flottaison. Restent donc à l'air libre la recherche, la période
+ * et le téléconseiller ; les dix autres passent derrière « Filtres avancés ».
+ *
+ * Replier crée un risque que l'empilement n'avait pas : un critère resté actif
+ * restreint la population sans qu'aucun champ visible ne le dise, et le
+ * directeur lit un chiffre partiel en croyant lire le total. Le panneau replié
+ * porte donc un COMPTE sur son bouton et une PUCE par critère, chacune
+ * retirable sans rouvrir le panneau. Voir `advanced-chips.ts`.
+ *
+ * L'état d'ouverture est enregistré, mais l'URL l'emporte : un lien filtré
+ * partagé ouvre le panneau, quelle que soit la préférence du destinataire
+ * (`initialAdvancedOpen`).
+ */
 
 const STATUT_OPTIONS: FilterOption[] = PROSPECT_STATUTS.map((statut) => ({
   value: statut,
@@ -57,11 +89,39 @@ const METHOD_OPTIONS: FilterOption[] = ENROLLMENT_METHODS.map((method) => ({
   label: ENROLLMENT_METHOD_LABELS[method],
 }));
 
+/**
+ * Préférence d'ouverture du panneau.
+ *
+ * `localStorage` et non un cookie : la préférence n'a aucune raison de repartir
+ * vers le serveur à chaque requête. Les accès sont protégés — un navigateur en
+ * navigation privée stricte fait lever `localStorage`, et une barre de filtre
+ * ne doit pas disparaître pour autant.
+ */
+const STORAGE_KEY = 'cpi.filtres-avances';
+
+function readStoredOpen(): boolean | null {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw === null ? null : raw === '1';
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, open ? '1' : '0');
+  } catch {
+    // Préférence perdue, écran intact. Il n'y a rien à signaler à l'utilisateur.
+  }
+}
+
 export function FiltersBar() {
   const { filters, setFilters, resetFilters } = useProspectFilters();
   const searchId = useId();
   const fromId = useId();
   const toId = useId();
+  const panelId = useId();
 
   const {
     data: reference,
@@ -97,7 +157,46 @@ export function FiltersBar() {
     };
   }, [searchDraft, filters.search, setFilters]);
 
+  /**
+   * Ouverture du panneau avancé.
+   *
+   * L'état initial se déduit de l'URL SEULE, identiquement sur le serveur et au
+   * premier rendu client : lire `localStorage` dans le `useState` produirait
+   * deux arbres différents et une erreur d'hydratation. La préférence est
+   * appliquée juste après, une seule fois — la relire à chaque rendu
+   * refermerait le panneau sous les doigts de l'utilisateur au moment où il
+   * retire son dernier critère avancé.
+   */
+  const [advancedOpen, setAdvancedOpen] = useState(() => initialAdvancedOpen(filters, null));
+  const preferenceApplied = useRef(false);
+
+  useEffect(() => {
+    if (preferenceApplied.current) return;
+    preferenceApplied.current = true;
+    setAdvancedOpen(initialAdvancedOpen(filters, readStoredOpen()));
+  }, [filters]);
+
+  const toggleAdvanced = useCallback(() => {
+    setAdvancedOpen((open) => {
+      writeStoredOpen(!open);
+      return !open;
+    });
+  }, []);
+
+  const removeAdvanced = useCallback(
+    (key: AdvancedFilterKey) => {
+      // `Record<AdvancedFilterKey, null>` plutôt qu'une clé calculée nue : le
+      // littéral `{ [key]: null }` s'infère en `{ [x: string]: null }`, que
+      // `Partial<ProspectFilters>` accepterait sans vérifier le nom du champ.
+      const patch: Partial<Record<AdvancedFilterKey, null>> = { [key]: null };
+      setFilters(patch);
+    },
+    [setFilters],
+  );
+
   const activeCount = countActiveFilters(filters);
+  const advancedCount = countAdvancedFilters(filters);
+  const chips = buildAdvancedChips(filters, reference);
 
   // Sans cette branche, un échec du chargement des référentiels laissait la
   // barre en squelette permanent : les filtres devenaient inatteignables sans
@@ -122,8 +221,9 @@ export function FiltersBar() {
       aria-label="Filtres"
       className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 shadow-elev-sm"
     >
+      {/* ─── Filtrage simple ────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex min-w-[16rem] flex-1 flex-col gap-1.5">
+        <div className="flex min-w-[15rem] flex-1 flex-col gap-1.5">
           <Label htmlFor={searchId}>Recherche</Label>
           <div className="relative">
             <SearchIcon
@@ -143,139 +243,19 @@ export function FiltersBar() {
           </div>
         </div>
 
-        {activeCount > 0 ? (
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">
-              {activeCount} filtre{activeCount > 1 ? 's' : ''}
-            </Badge>
-            <Button variant="ghost" onClick={resetFilters}>
-              <RotateCcwIcon aria-hidden="true" />
-              Réinitialiser
-            </Button>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <FilterCombobox
-          label="Commercial"
-          placeholder="Tous les commerciaux"
-          options={reference.commerciaux}
-          value={filters.commercialId}
-          onChange={(value) => {
-            setFilters({ commercialId: value });
-          }}
-        />
-        <FilterCombobox
-          label="Représentant"
-          placeholder="Tous les représentants"
-          options={reference.representants}
-          value={filters.representantId}
-          onChange={(value) => {
-            setFilters({ representantId: value });
-          }}
-        />
-        <FilterCombobox
-          label="Département"
-          placeholder="Tous les départements"
-          options={reference.departements.map((d) => ({
-            value: d.id,
-            label: withRetired(d.name, d.isActive),
-            hint: d.regionName,
-          }))}
-          value={filters.departementId}
-          onChange={(value) => {
-            setFilters({ departementId: value });
-          }}
-        />
-        <FilterCombobox
-          label="Banque"
-          placeholder="Toutes les banques"
-          options={reference.banques.map((b) => ({
-            value: b.id,
-            label: withRetired(b.shortName, b.isActive),
-            hint: b.name,
-          }))}
-          value={filters.banqueId}
-          onChange={(value) => {
-            setFilters({ banqueId: value });
-          }}
-        />
-        <FilterCombobox
-          label="Syndicat"
-          placeholder="Tous les syndicats"
-          options={reference.syndicats.map((s) => ({
-            value: s.id,
-            label: withRetired(s.sigle, s.isActive),
-            hint: s.secteur ?? undefined,
-          }))}
-          value={filters.syndicatId}
-          onChange={(value) => {
-            setFilters({ syndicatId: value });
-          }}
-        />
-        <FilterCombobox
-          label="Statut"
-          placeholder="Tous les statuts"
-          options={STATUT_OPTIONS}
-          value={filters.statut}
-          onChange={(value) => {
-            setFilters({ statut: value as ProspectStatut | null });
-          }}
-        />
-
-        {/* ─── Phase 2 ────────────────────────────────────────────────────
-            Ces cinq critères vivent dans le MÊME objet de filtre que les six
-            précédents. C'est ce qui garantit qu'un lien « BDD2, méthode
-            obtenue, campagne d'avril » rouvre le tableau, les graphiques ET
-            l'export sur exactement la même population. Un second état de
-            filtre, même bien synchronisé, finirait par produire un classeur
-            qui ne correspond pas à l'écran d'où il a été demandé. */}
-        <FilterCombobox
-          label="Segment BDD"
-          placeholder="Tous les segments"
-          options={SEGMENT_OPTIONS}
-          value={filters.segment}
-          onChange={(value) => {
-            setFilters({ segment: value as BddSegment | null });
-          }}
-        />
-        <FilterCombobox
-          label="Statut phase 2"
-          placeholder="Tous les statuts phase 2"
-          options={PHASE2_STATUS_OPTIONS}
-          value={filters.phase2Status}
-          onChange={(value) => {
-            setFilters({ phase2Status: value as Phase2Status | null });
-          }}
-        />
-        <FilterCombobox
-          label="Méthode d’enrôlement"
-          placeholder="Toutes les méthodes"
-          options={METHOD_OPTIONS}
-          value={filters.enrollmentMethod}
-          onChange={(value) => {
-            setFilters({ enrollmentMethod: value as EnrollmentMethod | null });
-          }}
-        />
-        <FilterCombobox
-          label="Campagne d’appels"
-          placeholder="Toutes les campagnes"
-          options={reference.campagnes}
-          value={filters.campaignId}
-          onChange={(value) => {
-            setFilters({ campaignId: value });
-          }}
-        />
-        <FilterCombobox
-          label="Méthode obtenue par"
-          placeholder="Tous les commerciaux"
-          options={reference.commerciaux}
-          value={filters.enrollmentCapturedById}
-          onChange={(value) => {
-            setFilters({ enrollmentCapturedById: value });
-          }}
-        />
+        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
+          {/* Le seul critère de liste resté visible : c'est celui qu'on change
+              à chaque session, quand on regarde le travail d'une personne. */}
+          <FilterCombobox
+            label="Téléconseiller"
+            placeholder="Tous les téléconseillers"
+            options={reference.commerciaux}
+            value={filters.commercialId}
+            onChange={(value) => {
+              setFilters({ commercialId: value });
+            }}
+          />
+        </div>
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={fromId}>Saisi à partir du</Label>
@@ -302,6 +282,201 @@ export function FiltersBar() {
           />
         </div>
       </div>
+
+      {/* ─── Commandes ──────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={toggleAdvanced}
+          aria-expanded={advancedOpen}
+          aria-controls={panelId}
+        >
+          <SlidersHorizontalIcon aria-hidden="true" />
+          Filtres avancés
+          {advancedCount > 0 ? (
+            <Badge variant="default" className="ml-1 tabular-nums">
+              {advancedCount}
+            </Badge>
+          ) : null}
+          <ChevronDownIcon
+            aria-hidden="true"
+            className={cn(
+              'transition-transform duration-(--dur-1) ease-(--ease-out-cpi)',
+              advancedOpen && 'rotate-180',
+            )}
+          />
+        </Button>
+
+        {activeCount > 0 ? (
+          <>
+            <Badge variant="secondary" className="tabular-nums">
+              {activeCount} filtre{activeCount > 1 ? 's' : ''}
+            </Badge>
+            <Button variant="ghost" onClick={resetFilters}>
+              <RotateCcwIcon aria-hidden="true" />
+              Réinitialiser
+            </Button>
+          </>
+        ) : null}
+      </div>
+
+      {/* ─── Rappel des critères repliés ────────────────────────────────────
+          Affiché UNIQUEMENT panneau fermé : ouvert, chaque liste déroulante
+          porte déjà sa valeur, et doubler l'information ferait relire deux
+          fois la même chose. */}
+      {!advancedOpen && chips.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <span className="text-[0.75rem] text-muted-foreground">Filtres avancés actifs</span>
+          {chips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={() => {
+                removeAdvanced(chip.key);
+              }}
+              aria-label={`Retirer le filtre ${chip.field} : ${chip.value}`}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-secondary py-1 pr-1.5 pl-2.5 text-[0.75rem] text-secondary-foreground transition-colors duration-(--dur-1) ease-(--ease-out-cpi) hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <span className="truncate">
+                <span className="text-muted-foreground">{chip.field} : </span>
+                <span className="font-[600]">{chip.value}</span>
+              </span>
+              <XIcon className="size-3.5 shrink-0" aria-hidden="true" />
+            </button>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setFilters(clearAdvancedFilters());
+            }}
+          >
+            Tout retirer
+          </Button>
+        </div>
+      ) : null}
+
+      {/* ─── Filtrage avancé ────────────────────────────────────────────────
+          Le panneau est retiré du DOM quand il est fermé plutôt que masqué en
+          CSS : dix listes déroulantes cachées resteraient atteignables au
+          clavier, et le `Tab` traverserait un formulaire invisible. */}
+      <div id={panelId} hidden={!advancedOpen}>
+        {advancedOpen ? (
+          <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
+            <FilterCombobox
+              label="Représentant"
+              placeholder="Tous les représentants"
+              options={reference.representants}
+              value={filters.representantId}
+              onChange={(value) => {
+                setFilters({ representantId: value });
+              }}
+            />
+            <FilterCombobox
+              label="Département"
+              placeholder="Tous les départements"
+              options={reference.departements.map((d) => ({
+                value: d.id,
+                label: withRetired(d.name, d.isActive),
+                hint: d.regionName,
+              }))}
+              value={filters.departementId}
+              onChange={(value) => {
+                setFilters({ departementId: value });
+              }}
+            />
+            <FilterCombobox
+              label="Banque"
+              placeholder="Toutes les banques"
+              options={reference.banques.map((b) => ({
+                value: b.id,
+                label: withRetired(b.shortName, b.isActive),
+                hint: b.name,
+              }))}
+              value={filters.banqueId}
+              onChange={(value) => {
+                setFilters({ banqueId: value });
+              }}
+            />
+            <FilterCombobox
+              label="Syndicat"
+              placeholder="Tous les syndicats"
+              options={reference.syndicats.map((s) => ({
+                value: s.id,
+                label: withRetired(s.sigle, s.isActive),
+                hint: s.secteur ?? undefined,
+              }))}
+              value={filters.syndicatId}
+              onChange={(value) => {
+                setFilters({ syndicatId: value });
+              }}
+            />
+            <FilterCombobox
+              label="Statut"
+              placeholder="Tous les statuts"
+              options={STATUT_OPTIONS}
+              value={filters.statut}
+              onChange={(value) => {
+                setFilters({ statut: value as ProspectStatut | null });
+              }}
+            />
+
+            {/* ─── Phase 2 ──────────────────────────────────────────────────
+                Ces cinq critères vivent dans le MÊME objet de filtre que les
+                précédents. C'est ce qui garantit qu'un lien « BDD2, méthode
+                obtenue, campagne d'avril » rouvre le tableau, les graphiques ET
+                l'export sur exactement la même population. Un second état de
+                filtre, même bien synchronisé, finirait par produire un classeur
+                qui ne correspond pas à l'écran d'où il a été demandé. */}
+            <FilterCombobox
+              label="Segment BDD"
+              placeholder="Tous les segments"
+              options={SEGMENT_OPTIONS}
+              value={filters.segment}
+              onChange={(value) => {
+                setFilters({ segment: value as BddSegment | null });
+              }}
+            />
+            <FilterCombobox
+              label="Statut phase 2"
+              placeholder="Tous les statuts phase 2"
+              options={PHASE2_STATUS_OPTIONS}
+              value={filters.phase2Status}
+              onChange={(value) => {
+                setFilters({ phase2Status: value as Phase2Status | null });
+              }}
+            />
+            <FilterCombobox
+              label="Méthode d’enrôlement"
+              placeholder="Toutes les méthodes"
+              options={METHOD_OPTIONS}
+              value={filters.enrollmentMethod}
+              onChange={(value) => {
+                setFilters({ enrollmentMethod: value as EnrollmentMethod | null });
+              }}
+            />
+            <FilterCombobox
+              label="Campagne d’appels"
+              placeholder="Toutes les campagnes"
+              options={reference.campagnes}
+              value={filters.campaignId}
+              onChange={(value) => {
+                setFilters({ campaignId: value });
+              }}
+            />
+            <FilterCombobox
+              label="Méthode obtenue par"
+              placeholder="Tous les téléconseillers"
+              options={reference.commerciaux}
+              value={filters.enrollmentCapturedById}
+              onChange={(value) => {
+                setFilters({ enrollmentCapturedById: value });
+              }}
+            />
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -312,15 +487,13 @@ export function FiltersBarSkeleton() {
       aria-hidden="true"
       className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 shadow-elev-sm"
     >
-      <Skeleton className="h-11 w-full max-w-md" />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((index) => (
-          <div key={index} className="flex flex-col gap-1.5">
-            <Skeleton className="h-3 w-24" />
-            <Skeleton className="h-11 w-full" />
-          </div>
-        ))}
+      <div className="flex flex-wrap items-end gap-3">
+        <Skeleton className="h-11 min-w-[15rem] flex-1" />
+        <Skeleton className="h-11 min-w-[13rem] flex-1" />
+        <Skeleton className="h-11 w-40" />
+        <Skeleton className="h-11 w-40" />
       </div>
+      <Skeleton className="h-9 w-44" />
     </section>
   );
 }

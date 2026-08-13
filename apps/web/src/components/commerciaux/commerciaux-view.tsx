@@ -231,7 +231,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Commercial</TableHead>
+                <TableHead>Téléconseiller</TableHead>
                 <TableHead>Identifiants</TableHead>
                 <TableHead>Département</TableHead>
                 <TableHead className="text-right">Prospects</TableHead>

@@ -161,6 +161,6 @@ export const DELIVERY_LABELS: Record<NotificationDeliveryStatus, string> = {
 
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrateur',
-  COMMERCIAL: 'Commercial',
+  COMMERCIAL: 'Téléconseiller',
   BANQUE_FINANCE: 'Banque & Finance',
 };

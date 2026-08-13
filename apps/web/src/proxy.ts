@@ -2,6 +2,7 @@ import { NextResponse, type NextProxy } from 'next/server';
 
 import {
   ACCESS_COOKIE,
+  ApiConfigurationError,
   REFRESH_COOKIE,
   REFRESH_TTL_SECONDS,
   serverApiOrigin,
@@ -37,7 +38,23 @@ const proxy: NextProxy = async (request) => {
   if (refresh === undefined || refresh === '') return NextResponse.next();
   if (!isAccessTokenStale(access)) return NextResponse.next();
 
-  const rotated = await rotateRefreshToken(serverApiOrigin(), refresh);
+  /**
+   * `API_URL` absent : on ne tourne rien et on laisse passer.
+   *
+   * Lever ici ferait répondre 500 à CHAQUE requête du panel, y compris à
+   * l'écran de connexion — le seul endroit où le défaut de configuration peut
+   * encore être nommé. Le message utile serait remplacé par une page d'erreur
+   * muette. Les Route Handlers, eux, répondent avec la variable manquante.
+   */
+  let origin: string;
+  try {
+    origin = serverApiOrigin();
+  } catch (error) {
+    if (error instanceof ApiConfigurationError) return NextResponse.next();
+    throw error;
+  }
+
+  const rotated = await rotateRefreshToken(origin, refresh);
 
   if (rotated === null) {
     // Famille de jetons morte (révoquée, expirée ou rejouée) ou backend

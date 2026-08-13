@@ -1,10 +1,11 @@
 'use client';
 
-import { AlertTriangleIcon, LockIcon, RotateCwIcon, WifiOffIcon } from 'lucide-react';
+import { AlertTriangleIcon, LockIcon, RotateCwIcon, ServerCogIcon, WifiOffIcon } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { isConfigurationError } from '@/lib/api/config';
 import { apiErrorText } from '@/lib/mutation-feedback';
 import { ApiError } from '@crm/api-client/query';
 
@@ -28,6 +29,18 @@ import { ApiError } from '@crm/api-client/query';
  */
 
 function presentation(error: unknown): { icon: LucideIcon; title: string; retryable: boolean } {
+  /**
+   * Configuration incomplète : ni une panne réseau, ni un refus de droits.
+   *
+   * Non rejouable, et c'est le point : « Réessayer » sur une variable
+   * d'environnement absente fait recliquer dans le vide jusqu'à ce que
+   * quelqu'un redéploie. Le titre nomme la nature du défaut, le message nomme
+   * la variable.
+   */
+  if (isConfigurationError(error)) {
+    return { icon: ServerCogIcon, title: 'Configuration incomplète', retryable: false };
+  }
+
   if (error instanceof ApiError) {
     if (error.status === 403) {
       return {

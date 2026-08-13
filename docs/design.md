@@ -124,19 +124,19 @@ La palette sombre ci-dessous est dérivée de la palette claire.
 | Token                | Hex                                                                          | Note                                              |
 | -------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------- |
 | `background`         | `#140206`                                                                    | Prune quasi noir, pas du gris                     |
-| `foreground`         | `#F5E6EA`                                                                    | 16,70:1 sur `background`                          |
+| `foreground`         | `#F2EFF0`                                                                    | 16,21:1 sur `background`                          |
 | `card` / `popover`   | `#1C1A1D`                                                                    |                                                   |
 | `primary`            | **`#A81E33`** _(était `#C4566B`)_                                            | Aplat d'action, porte du **blanc** : 7,25:1       |
 | `primary-foreground` | **`#FFFFFF`** _(était `#1C0810`)_                                            | L'ancien couple plafonnait à **4,48:1**           |
 | `primary-hover`      | **`#BE2439`** _(était `#D3697D`)_                                            | 6,00:1 sur blanc                                  |
-| `primary-text`       | **`#F0919F`** _(rôle nouveau)_                                               | `primary` en TEXTE : 8,53:1 sur `card`            |
+| `primary-text`       | **`#F0919F`** _(rôle nouveau)_                                               | `primary` en TEXTE : 7,62:1 sur `card`            |
 | `secondary`          | `#2A0810`                                                                    |                                                   |
 | `muted`              | `#2A0810`                                                                    |                                                   |
-| `muted-foreground`   | `#C4A0AA`                                                                    | 8,60:1 sur `background`, 8,25:1 sur `card`        |
-| `input-border`       | **`#7A5F66`** _(rôle nouveau)_                                               | Contour de champ : 3,51:1 sur `background`        |
+| `muted-foreground`   | `#C4A0AA`                                                                    | 7,90:1 sur `background`, 7,37:1 sur `card`        |
+| `input-border`       | **`#877078`** _(rôle nouveau)_                                               | Contour de champ : 4,07:1 sur `background`        |
 | `ring`               | **`#F0919F`** _(était `#C4566B`)_                                            | L'anneau de focus doit se voir sur du sombre      |
 | `accent`             | `#C8921A`                                                                    | Surface inchangée                                 |
-| `accent-text`        | `#FFC65A`                                                                    | En sombre c'est l'or clair qui passe : 12,42:1    |
+| `accent-text`        | `#FFC65A`                                                                    | En sombre c'est l'or clair qui passe : 11,89:1    |
 | `border`             | `rgba(255,255,255,0.10)`                                                     | Séparateur décoratif seulement, jamais un contour |
 | `sidebar`            | **`#300710`** _(était `#250408`)_                                            | À `#250408` elle se confondait avec `background`  |
 | `sidebar-foreground` | **`#E8CCD3`** _(était `#DFC0C8`)_                                            | 12,04:1 sur `sidebar`                             |
@@ -158,14 +158,25 @@ apparus à la première capture d'un écran réellement rendu.
    surface sombre. D'où la scission `primary` / `primary-text`.
 
 3. **Les champs de saisie n'avaient aucun contour.** `--border` à
-   `rgba(255,255,255,0.10)` donnait **1,23:1**, et le remplissage `#2A0810` sur
-   `#140206` n'ajoutait que 1,10:1 : rien ne délimitait le champ, alors que
+   `rgba(255,255,255,0.10)` donnait **1,23:1**, et le remplissage du champ sur
+   le fond n'ajoutait que 1,10:1 : rien ne délimitait le champ, alors que
    WCAG 1.4.11 exige 3:1 pour la limite d'une commande. Le même défaut existait
    en clair (**1,27:1**). D'où `input-border`, mesuré dans les deux thèmes.
 
-4. **La sidebar disparaissait dans le fond.** `#250408` sur `#140206` ne se
-   distinguait pas : le volet de marque de l'écran de connexion n'existait
-   simplement plus en mode sombre.
+4. **La sidebar disparaissait dans le fond.** `#250408` était trop proche du
+   fond : le volet de marque de l'écran de connexion n'existait simplement plus
+   en mode sombre. Remontée à `#300710`.
+
+5. **Le logotype était étiré de 6,5×.** Dans une colonne flex,
+   `align-items: stretch` étire un enfant en `width:auto` : le fichier 489×200
+   était rendu en 640×40. Ce n'est pas un défaut de contraste et aucun token ne
+   pouvait le corriger — seule une capture d'écran pouvait le montrer.
+
+6. **Une couleur posée par une utilitaire de forme.** `.eyebrow` déclarait un
+   `color`. Comme `text-*` vit dans la même couche utilitaire, c'est l'ordre du
+   fichier généré qui tranchait : sur la sidebar, `--muted-foreground` écrasait
+   la couleur voulue et retombait à **2,29:1**. Une utilitaire de forme ne porte
+   pas de couleur.
 
 **Corollaire de méthode.** Une paire de tokens ne se valide pas dans un tableau,
 elle se valide sur le pixel rendu, **chaîne d'opacités héritées comprise**. Ce
