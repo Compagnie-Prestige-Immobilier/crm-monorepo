@@ -590,6 +590,9 @@ importers:
       '@prisma/client':
         specifier: 'catalog:'
         version: 7.9.0(prisma@7.9.0(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(typescript@5.9.3)
+      argon2:
+        specifier: 'catalog:'
+        version: 0.45.0
       pg:
         specifier: 'catalog:'
         version: 8.22.0
@@ -609,9 +612,6 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.20.0
-      argon2:
-        specifier: 'catalog:'
-        version: 0.45.0
       eslint:
         specifier: 'catalog:'
         version: 10.7.0(jiti@2.7.0)(supports-color@10.2.2)
