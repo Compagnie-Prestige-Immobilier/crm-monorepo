@@ -7,12 +7,16 @@ import 'package:crm_api_client/src/auth/api_key_auth.dart';
 import 'package:crm_api_client/src/auth/basic_auth.dart';
 import 'package:crm_api_client/src/auth/bearer_auth.dart';
 import 'package:crm_api_client/src/auth/oauth.dart';
+import 'package:crm_api_client/src/api/admin_api.dart';
 import 'package:crm_api_client/src/api/analytics_api.dart';
 import 'package:crm_api_client/src/api/auth_api.dart';
 import 'package:crm_api_client/src/api/bank_case_stages_api.dart';
 import 'package:crm_api_client/src/api/bank_cases_api.dart';
 import 'package:crm_api_client/src/api/demo_api.dart';
+import 'package:crm_api_client/src/api/devices_api.dart';
 import 'package:crm_api_client/src/api/export_api.dart';
+import 'package:crm_api_client/src/api/notification_templates_api.dart';
+import 'package:crm_api_client/src/api/notifications_api.dart';
 import 'package:crm_api_client/src/api/phase2_api.dart';
 import 'package:crm_api_client/src/api/prospects_api.dart';
 import 'package:crm_api_client/src/api/referentiels_api.dart';
@@ -143,6 +147,12 @@ class CrmApiClient {
     }
   }
 
+  /// Get AdminApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  AdminApi getAdminApi() {
+    return AdminApi(dio);
+  }
+
   /// Get AnalyticsApi instance, base route and serializer can be overridden by a given but be careful,
   /// by doing that all interceptors will not be executed
   AnalyticsApi getAnalyticsApi() {
@@ -173,10 +183,28 @@ class CrmApiClient {
     return DemoApi(dio);
   }
 
+  /// Get DevicesApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  DevicesApi getDevicesApi() {
+    return DevicesApi(dio);
+  }
+
   /// Get ExportApi instance, base route and serializer can be overridden by a given but be careful,
   /// by doing that all interceptors will not be executed
   ExportApi getExportApi() {
     return ExportApi(dio);
+  }
+
+  /// Get NotificationTemplatesApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  NotificationTemplatesApi getNotificationTemplatesApi() {
+    return NotificationTemplatesApi(dio);
+  }
+
+  /// Get NotificationsApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  NotificationsApi getNotificationsApi() {
+    return NotificationsApi(dio);
   }
 
   /// Get Phase2Api instance, base route and serializer can be overridden by a given but be careful,
