@@ -53,7 +53,11 @@ if [ "${SEED_ON_START:-true}" = "true" ]; then
     # redémarrer même si le seed bute sur un détail. Les migrations, elles,
     # restent bloquantes — un schéma faux est irrattrapable, un référentiel
     # manquant se corrige depuis le panel.
-    echo "! Amorçage incomplet — l'API démarre quand même." >&2
+    # L'échec est SIGNALÉ, pas avalé : sans cette ligne, une dépendance
+    # manquante rendait l'amorçage silencieux et la seule trace visible était
+    # une connexion refusée, plusieurs déploiements plus tard.
+    echo "! Amorçage en échec — référentiels et compte initial ABSENTS." >&2
+    echo "  L'API démarre, mais aucune connexion ne sera possible." >&2
   fi
 fi
 
