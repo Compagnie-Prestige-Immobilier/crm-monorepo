@@ -448,8 +448,8 @@ test('la désactivation exige une confirmation et affirme que le réel est intac
 
   const dialog = page.getByRole('dialog');
   // La phrase qui décide si le bouton sera pressé un jour.
-  await expect(dialog).toContainText('Vos données réelles ne sont pas touchées');
-  await expect(dialog).toContainText(/enregistré.*identifiant de chaque/s);
+  await expect(dialog).toContainText('Les données réelles ne sont pas supprimées.');
+  await expect(dialog).toContainText('Seules les lignes créées par le mode démonstration le sont.');
 
   const confirm = dialog.getByRole('button', { name: 'Supprimer définitivement' });
   // Le geste ne part PAS sans confirmation explicite : c'est tout l'objet de
