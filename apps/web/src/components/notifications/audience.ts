@@ -72,7 +72,7 @@ export function audienceQuery(selection: AudienceSelection): Record<string, stri
  */
 export function describeAudience(
   row: Pick<NotificationRow, 'audience' | 'audienceRole' | 'audienceUserIds'>,
-  departementName?: string | undefined,
+  departementName?: string,
 ): string {
   switch (row.audience) {
     case 'ALL':

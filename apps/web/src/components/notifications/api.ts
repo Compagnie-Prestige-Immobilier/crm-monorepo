@@ -33,14 +33,13 @@ const BASE = '/api/v1';
 const origin = (): string => (typeof window === 'undefined' ? '' : window.location.origin);
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${origin()}${BASE}${path}`, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      ...(init?.body === undefined ? {} : { 'Content-Type': 'application/json' }),
-      ...init?.headers,
-    },
-  });
+  // `Headers` plutôt qu'un littéral fusionné : `HeadersInit` accepte aussi un
+  // tableau de paires, qu'un étalement d'objet transformerait en indices.
+  const headers = new Headers(init?.headers);
+  headers.set('Accept', 'application/json');
+  if (init?.body !== undefined) headers.set('Content-Type', 'application/json');
+
+  const response = await fetch(`${origin()}${BASE}${path}`, { ...init, headers });
 
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
