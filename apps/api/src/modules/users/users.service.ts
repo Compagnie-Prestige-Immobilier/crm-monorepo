@@ -18,6 +18,8 @@ import type {
   UserListDto,
   UserListQueryDto,
 } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { demoScope } from '../../prisma/demo-visibility.js';
 
 type UserRow = Prisma.UserGetPayload<{
   include: { departement: { select: { name: true } }; _count: { select: { prospects: true } } };
@@ -47,13 +49,19 @@ function toDto(user: UserRow): UserDto {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demo: DemoVisibilityService,
+  ) {}
 
   async list(query: UserListQueryDto): Promise<UserListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
 
-    const where: Prisma.UserWhereInput = { deletedAt: null };
+    const where: Prisma.UserWhereInput = {
+      deletedAt: null,
+      ...demoScope(await this.demo.enabled()),
+    };
     if (query.role) where.role = query.role;
     if (query.isActive !== undefined) where.isActive = query.isActive;
     const search = query.search?.trim();

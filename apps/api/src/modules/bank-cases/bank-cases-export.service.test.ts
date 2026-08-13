@@ -16,6 +16,7 @@ import {
   STAGE_ENCAISSE,
   STAGE_EN_TRAITEMENT,
 } from './fake-prisma.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 /**
  * Le CLASSEUR est vérifié, pas les intentions du code.
@@ -198,7 +199,7 @@ async function build(
   predicate?: (row: { id: string }) => boolean,
 ): Promise<ExcelJS.Workbook> {
   if (predicate) db.filterPredicate = predicate;
-  const service = new BankCasesExportService(db.asService(), stubAnalytics());
+  const service = new BankCasesExportService(db.asService(), stubAnalytics(), fakeDemoVisibility());
 
   const stream = new PassThrough();
   const workbook = new ExcelJS.Workbook();
@@ -360,7 +361,7 @@ describe('feuille Synthèse', () => {
       rejectionRate: 0,
       meanDelayHours: null,
     });
-    const service = new BankCasesExportService(db.asService(), analytics);
+    const service = new BankCasesExportService(db.asService(), analytics, fakeDemoVisibility());
 
     const stream = new PassThrough();
     const workbook = new ExcelJS.Workbook();

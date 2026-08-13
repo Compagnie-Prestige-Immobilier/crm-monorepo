@@ -23,7 +23,11 @@ export interface RotatedTokens {
  * rejeu. La clé est le token lui-même : les sessions distinctes ne se
  * bloquent pas entre elles.
  */
-const inFlightRotations = new Map<string, Promise<RotatedTokens | null>>();
+const inFlightRotations = new Map<string, Promise<RefreshRotationResult>>();
+
+export type RefreshRotationResult =
+  | { ok: true; tokens: RotatedTokens }
+  | { ok: false; reason: 'invalid' | 'unavailable' };
 
 /**
  * Lit `exp` d'un JWT SANS vérifier sa signature.
@@ -77,7 +81,22 @@ export async function rotateRefreshToken(
   refreshToken: string,
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<RotatedTokens | null> {
-  if (refreshToken === '') return null;
+  const result = await rotateRefreshTokenDetailed(origin, refreshToken, fetchImpl);
+  return result.ok ? result.tokens : null;
+}
+
+/**
+ * Même rotation, mais sans perdre la différence entre « session morte » et
+ * « réseau momentanément indisponible ». Les appelants qui gèrent des cookies
+ * doivent conserver cette différence : effacer une session valide pendant une
+ * panne réseau est la déconnexion prématurée observée en production.
+ */
+export async function rotateRefreshTokenDetailed(
+  origin: string,
+  refreshToken: string,
+  fetchImpl: typeof globalThis.fetch = globalThis.fetch,
+): Promise<RefreshRotationResult> {
+  if (refreshToken === '') return { ok: false, reason: 'invalid' };
 
   const running = inFlightRotations.get(refreshToken);
   if (running !== undefined) return running;
@@ -95,7 +114,7 @@ async function rotateRefreshTokenOnce(
   origin: string,
   refreshToken: string,
   fetchImpl: typeof globalThis.fetch,
-): Promise<RotatedTokens | null> {
+): Promise<RefreshRotationResult> {
   let response: Response;
   try {
     response = await fetchImpl(`${origin}${API_PREFIX}/auth/refresh`, {
@@ -108,22 +127,27 @@ async function rotateRefreshTokenOnce(
     // Backend injoignable. On ne détruit PAS la session pour une panne réseau :
     // l'appelant renverra une erreur temporaire, et le jeton restera valable
     // quand le réseau reviendra.
-    return null;
+    return { ok: false, reason: 'unavailable' };
   }
 
-  if (!response.ok) return null;
+  if (!response.ok) return { ok: false, reason: 'invalid' };
 
   try {
     const body: unknown = await response.json();
     if (typeof body !== 'object' || body === null) return null;
     const { accessToken, refreshToken: next, expiresIn } = body as Record<string, unknown>;
-    if (typeof accessToken !== 'string' || typeof next !== 'string') return null;
+    if (typeof accessToken !== 'string' || typeof next !== 'string') {
+      return { ok: false, reason: 'invalid' };
+    }
     return {
-      accessToken,
-      refreshToken: next,
-      expiresIn: typeof expiresIn === 'number' ? expiresIn : 900,
+      ok: true,
+      tokens: {
+        accessToken,
+        refreshToken: next,
+        expiresIn: typeof expiresIn === 'number' ? expiresIn : 900,
+      },
     };
   } catch {
-    return null;
+    return { ok: false, reason: 'invalid' };
   }
 }

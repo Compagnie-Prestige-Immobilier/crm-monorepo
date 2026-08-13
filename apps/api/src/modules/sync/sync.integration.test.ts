@@ -28,6 +28,7 @@ import { SyncBatchStore } from './batch-store.js';
 import { SyncService } from './sync.service.js';
 import { SyncEntity, SyncOp, SyncOpStatus } from './dto.js';
 import type { SyncOperationDto, SyncPushDto } from './dto.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -36,6 +37,7 @@ const sync = new SyncService(
   prisma as unknown as PrismaService,
   new SyncBatchStore(prisma as unknown as PrismaService),
   new Phase2SyncService(),
+  fakeDemoVisibility(),
 );
 
 /** Marqueur porté par toutes les lignes créées ici, pour un nettoyage sûr. */

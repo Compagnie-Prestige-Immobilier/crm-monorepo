@@ -19,6 +19,7 @@ import {
   STAGE_EN_TRAITEMENT,
   STAGE_REJETE,
 } from './fake-prisma.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const user = (fake: { id: string; fullName: string; role: Role }): AuthenticatedUser => ({
   id: fake.id,
@@ -58,7 +59,7 @@ let service: BankCasesService;
 
 beforeEach(() => {
   db = new FakePrisma();
-  service = new BankCasesService(db.asService());
+  service = new BankCasesService(db.asService(), fakeDemoVisibility());
   db.addProspect({ id: 'psp-enrole', nom: 'Diop', prenom: 'Awa', phoneE164: '+221771234567' });
   db.addProspect({
     id: 'psp-en-cours',

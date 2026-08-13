@@ -11,6 +11,7 @@ import { BANK_CASE_INCLUDE, BANK_TRANSITION_INCLUDE } from './mappers.js';
 import type { BankCaseRow, BankTransitionRow } from './mappers.js';
 import { moneyToNumber, moneyToString } from './money.js';
 import type { BankCaseFilterDto } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
 /** Bordeaux CPI. ARGB sans dièse : exceljs n'accepte pas la notation CSS. */
 const CPI_BURGUNDY = 'FF630210';
@@ -45,6 +46,7 @@ export class BankCasesExportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly analytics: BankCaseAnalyticsService,
+    private readonly demo: DemoVisibilityService,
   ) {}
 
   /**
@@ -223,7 +225,7 @@ export class BankCasesExportService {
 
   /** Une page d'identifiants, filtrée par la MÊME requête que la liste et les agrégats. */
   private async pageIds(filter: BankCaseFilterDto, after: string | undefined): Promise<string[]> {
-    const where = bankCaseConditions(filter);
+    const where = bankCaseConditions(filter, await this.demo.enabled());
     const keyset = after === undefined ? Prisma.sql`` : Prisma.sql`AND c."id" > ${after}`;
     const rows = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT c."id" ${BANK_CASE_FROM} WHERE ${where} ${keyset}

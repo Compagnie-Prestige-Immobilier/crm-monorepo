@@ -12,6 +12,7 @@ import { DevicesService } from './devices.service.js';
 import { NotificationError } from './errors.js';
 import { BrokenTransport, FakePrisma, FakeTransport } from './fake-prisma.js';
 import { chunkTokens, classifyFcmError, readFcmErrorCode } from './fcm.transport.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const admin: AuthenticatedUser = {
   id: 'usr-admin',
@@ -55,7 +56,7 @@ const baseBody = {
 beforeEach(() => {
   db = new FakePrisma();
   transport = new FakeTransport();
-  service = new NotificationsService(db.asService(), transport);
+  service = new NotificationsService(db.asService(), transport, fakeDemoVisibility());
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,7 +137,11 @@ describe('résolution du public', () => {
   it('refuse un public vide plutôt que d’enregistrer un envoi sans destinataire', async () => {
     const empty = new FakePrisma();
     empty.users.length = 0;
-    const isolated = new NotificationsService(empty.asService(), new FakeTransport());
+    const isolated = new NotificationsService(
+      empty.asService(),
+      new FakeTransport(),
+      fakeDemoVisibility(),
+    );
 
     const error = await refusal(() => isolated.create(admin, baseBody));
     expect(codeOf(error)).toBe(NotificationError.AUDIENCE_EMPTY);
@@ -189,7 +194,7 @@ describe('éventail', () => {
         ? { token: message.token, ok: false, errorCode: 'INVALID_ARGUMENT', kind: 'invalid' }
         : { token: message.token, ok: true },
     );
-    service = new NotificationsService(db.asService(), transport);
+    service = new NotificationsService(db.asService(), transport, fakeDemoVisibility());
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -214,7 +219,7 @@ describe('éventail', () => {
         ? { token: message.token, ok: false, errorCode: 'UNREGISTERED', kind: 'unregistered' }
         : { token: message.token, ok: true },
     );
-    service = new NotificationsService(db.asService(), transport);
+    service = new NotificationsService(db.asService(), transport, fakeDemoVisibility());
 
     await service.create(admin, { ...baseBody, audience: NotificationAudience.ALL });
 
@@ -237,7 +242,7 @@ describe('éventail', () => {
       errorCode: 'INVALID_ARGUMENT',
       kind: 'invalid',
     }));
-    service = new NotificationsService(db.asService(), transport);
+    service = new NotificationsService(db.asService(), transport, fakeDemoVisibility());
 
     await service.create(admin, baseBody);
 
@@ -266,7 +271,7 @@ describe('éventail', () => {
         ? { token: message.token, ok: false, errorCode: 'UNAVAILABLE', kind: 'transient' }
         : { token: message.token, ok: true },
     );
-    service = new NotificationsService(db.asService(), transport);
+    service = new NotificationsService(db.asService(), transport, fakeDemoVisibility());
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -358,7 +363,11 @@ describe('absence de transport', () => {
   it('un échec d’authentification Google n’élague AUCUN jeton', async () => {
     // Aucun jeton n'est en cause quand c'est l'échange OAuth qui a échoué.
     // Élaguer ici détruirait toute la base d'appareils sur une panne passagère.
-    const broken = new NotificationsService(db.asService(), new BrokenTransport());
+    const broken = new NotificationsService(
+      db.asService(),
+      new BrokenTransport(),
+      fakeDemoVisibility(),
+    );
     const created = await broken.create(admin, {
       ...baseBody,
       audience: NotificationAudience.USERS,

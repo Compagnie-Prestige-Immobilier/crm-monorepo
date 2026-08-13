@@ -34,6 +34,8 @@ import {
   type NotificationListDto,
   type NotificationQueryDto,
 } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { demoScope } from '../../prisma/demo-visibility.js';
 
 /** Ce que l'éventail a réellement produit. Sert aux tests et au journal. */
 export interface DispatchSummary {
@@ -79,6 +81,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(FCM_TRANSPORT) private readonly transport: FcmTransport,
+    private readonly demo: DemoVisibilityService,
   ) {}
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -153,7 +156,10 @@ export class NotificationsService {
    */
   private async resolveRecipients(selector: AudienceSelector): Promise<DeliveryRowSeed[]> {
     const rows = await this.prisma.user.findMany({
-      where: buildAudienceWhere(selector),
+      // Le filtre de demonstration s'ajoute a l'audience choisie, il ne la
+      // remplace pas : une campagne « tous les commerciaux » ne doit pas
+      // notifier des comptes fictifs quand le mode est eteint.
+      where: { ...buildAudienceWhere(selector), ...demoScope(await this.demo.enabled()) },
       select: { id: true },
       orderBy: { id: 'asc' },
     });

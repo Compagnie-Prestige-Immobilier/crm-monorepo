@@ -15,6 +15,7 @@ import { AnalyticsService } from '../analytics/analytics.service.js';
 import { EXPORT_INCLUDE, PROSPECT_COLUMNS, cellValue } from './columns.js';
 import type { ExportRow } from './columns.js';
 import { CONSOLIDATED_SHEET, ExportMode } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
 /** Bordeaux CPI. ARGB, sans le dièse : exceljs n'accepte pas la notation CSS. */
 const CPI_BURGUNDY = 'FF630210';
@@ -54,6 +55,7 @@ export class ExportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly analytics: AnalyticsService,
+    private readonly demo: DemoVisibilityService,
   ) {}
 
   /**
@@ -95,7 +97,7 @@ export class ExportService {
     filter: ProspectFilterDto,
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
   ): Promise<void> {
-    const where = buildProspectWhere(user, filter);
+    const where = buildProspectWhere(user, filter, await this.demo.enabled());
     const { rows: total, representants } = await this.writeProspectSheet(
       workbook,
       'Prospects',
@@ -222,17 +224,23 @@ export class ExportService {
     filter: ProspectFilterDto,
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
   ): Promise<void> {
+    // Lu UNE fois pour tout le classeur. Relire à chaque feuille laisserait une
+    // bascule survenue en cours d'export produire un fichier incohérent : un
+    // onglet consolidé sans les fiches de démonstration et un onglet BDD3 avec.
+    // Personne ne pourrait expliquer l'écart en relisant le fichier.
+    const demoEnabled = await this.demo.enabled();
+
     await this.writeProspectSheet(
       workbook,
       CONSOLIDATED_SHEET,
-      buildProspectWhere(user, filterForSegment(filter, undefined)),
+      buildProspectWhere(user, filterForSegment(filter, undefined), demoEnabled),
     );
 
     for (const segment of ALL_SEGMENTS) {
       await this.writeProspectSheet(
         workbook,
         segment,
-        buildProspectWhere(user, filterForSegment(filter, segment)),
+        buildProspectWhere(user, filterForSegment(filter, segment), demoEnabled),
       );
     }
   }

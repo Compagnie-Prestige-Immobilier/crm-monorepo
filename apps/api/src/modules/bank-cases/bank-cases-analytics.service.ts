@@ -17,6 +17,7 @@ import type {
   BankTimeBucketDto,
 } from './analytics.dto.js';
 import type { BankCaseFilterDto } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
 /**
  * Date d'ENTRÉE en étape terminale.
@@ -48,7 +49,10 @@ const hours = (seconds: number | null): number | null =>
 
 @Injectable()
 export class BankCaseAnalyticsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demo: DemoVisibilityService,
+  ) {}
 
   /**
    * Un seul appel pour tout le tableau de bord.
@@ -81,7 +85,7 @@ export class BankCaseAnalyticsService {
   }
 
   async totals(filter: BankCaseFilterDto): Promise<BankAnalyticsTotalsDto> {
-    const where = bankCaseConditions(filter);
+    const where = bankCaseConditions(filter, await this.demo.enabled());
     const rows = await this.prisma.$queryRaw<
       {
         total: number;
@@ -126,7 +130,7 @@ export class BankCaseAnalyticsService {
   }
 
   async byStage(filter: BankCaseFilterDto): Promise<BankStageCountDto[]> {
-    const where = bankCaseConditions(filter);
+    const where = bankCaseConditions(filter, await this.demo.enabled());
     const rows = await this.prisma.$queryRaw<
       {
         stageId: string;
@@ -150,7 +154,7 @@ export class BankCaseAnalyticsService {
   }
 
   async createdOverTime(query: BankAnalyticsQueryDto): Promise<BankTimeBucketDto[]> {
-    const where = bankCaseConditions(query);
+    const where = bankCaseConditions(query, await this.demo.enabled());
     const rows = await this.prisma.$queryRaw<{ bucket: Date; cases: number }[]>`
       SELECT date_trunc(${unit(query.granularity)}, c."createdAt") AS "bucket",
              COUNT(*)::int AS "cases"
@@ -168,7 +172,7 @@ export class BankCaseAnalyticsService {
 
   /** Encaissements datés par leur transition, en nombre ET en montant. */
   async cashingsOverTime(query: BankAnalyticsQueryDto): Promise<BankTimeBucketDto[]> {
-    const where = bankCaseConditions(query);
+    const where = bankCaseConditions(query, await this.demo.enabled());
     const rows = await this.prisma.$queryRaw<{ bucket: Date; cases: number; amount: string }[]>`
       SELECT date_trunc(${unit(query.granularity)}, cl."closedAt") AS "bucket",
              COUNT(*)::int AS "cases",
@@ -187,7 +191,7 @@ export class BankCaseAnalyticsService {
   }
 
   async byBank(filter: BankCaseFilterDto): Promise<BankBankBreakdownDto[]> {
-    const where = bankCaseConditions(filter);
+    const where = bankCaseConditions(filter, await this.demo.enabled());
     const rows = await this.prisma.$queryRaw<
       {
         bankId: string;
@@ -228,7 +232,7 @@ export class BankCaseAnalyticsService {
   }
 
   async byRejectionReason(filter: BankCaseFilterDto): Promise<BankRejectionBreakdownDto[]> {
-    const where = bankCaseConditions(filter);
+    const where = bankCaseConditions(filter, await this.demo.enabled());
     const rows = await this.prisma.$queryRaw<
       { reasonId: string; code: string; label: string; cases: number }[]
     >`
@@ -253,7 +257,7 @@ export class BankCaseAnalyticsService {
    * travail de celui qui reprend les dossiers d'un collègue absent.
    */
   async byAgent(filter: BankCaseFilterDto): Promise<BankAgentActivityDto[]> {
-    const where = bankCaseConditions(filter);
+    const where = bankCaseConditions(filter, await this.demo.enabled());
     const rows = await this.prisma.$queryRaw<
       {
         agentId: string;

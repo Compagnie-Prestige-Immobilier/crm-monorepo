@@ -6,6 +6,7 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
 import { prospectConditions, PROSPECT_FROM } from './analytics.sql.js';
 import type { AnalyticsFinanceDto, AnalyticsFunnelDto, FunnelStageDto } from './funnel.dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
 /**
  * L'entonnoir et l'argent.
@@ -17,10 +18,13 @@ import type { AnalyticsFinanceDto, AnalyticsFunnelDto, FunnelStageDto } from './
  */
 @Injectable()
 export class FunnelService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demo: DemoVisibilityService,
+  ) {}
 
   async funnel(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<AnalyticsFunnelDto> {
-    const where = prospectConditions(user, filter);
+    const where = prospectConditions(user, filter, await this.demo.enabled());
 
     const [stages, finance] = await Promise.all([this.stages(where), this.finance(where)]);
 

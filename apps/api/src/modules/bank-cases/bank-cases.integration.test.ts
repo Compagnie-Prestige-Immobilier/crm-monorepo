@@ -33,12 +33,16 @@ import { BankCaseStagesService } from './bank-case-stages.service.js';
 import { BankCaseError } from './errors.js';
 import { BankCaseSortField } from './dto.js';
 import { SortOrder } from '../../common/dto/prospect-filter.dto.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
-const service = new BankCasesService(prisma as unknown as PrismaService);
-const analytics = new BankCaseAnalyticsService(prisma as unknown as PrismaService);
+const service = new BankCasesService(prisma as unknown as PrismaService, fakeDemoVisibility());
+const analytics = new BankCaseAnalyticsService(
+  prisma as unknown as PrismaService,
+  fakeDemoVisibility(),
+);
 const stages = new BankCaseStagesService(prisma as unknown as PrismaService);
 
 /** Préfixe unique : la base est partagée, on ne touche QUE nos propres lignes. */

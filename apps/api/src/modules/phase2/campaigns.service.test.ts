@@ -17,6 +17,7 @@ import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { shortCode } from '../../common/short-code.js';
 import { Phase2CampaignsService, scopeLabel } from './campaigns.service.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 type MockFn = ReturnType<typeof vi.fn>;
 
@@ -98,7 +99,10 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
       { campaignId: 'camp-1', status: CallTaskStatus.CANCELLED, _count: { _all: 1 } },
     ]);
 
-    const result = await new Phase2CampaignsService(db as unknown as PrismaService).list({});
+    const result = await new Phase2CampaignsService(
+      db as unknown as PrismaService,
+      fakeDemoVisibility(),
+    ).list({});
 
     expect(result.items[0]?.progress).toEqual({ total: 6, open: 3, done: 2, cancelled: 1 });
     expect(result.items[0]?.scopeLabel).toContain('CHUES');
@@ -136,7 +140,10 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
       },
     ]);
 
-    const result = await new Phase2CampaignsService(db as unknown as PrismaService).get('camp-1');
+    const result = await new Phase2CampaignsService(
+      db as unknown as PrismaService,
+      fakeDemoVisibility(),
+    ).get('camp-1');
 
     expect(result.progress).toEqual({ total: 1, open: 0, done: 1, cancelled: 0 });
     expect(result.commerciaux[0]?.progress.done).toBe(1);
@@ -152,7 +159,9 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
     const db = prismaStub();
     db.callCampaign.findFirst.mockResolvedValue(null);
     await expect(
-      new Phase2CampaignsService(db as unknown as PrismaService).get('missing'),
+      new Phase2CampaignsService(db as unknown as PrismaService, fakeDemoVisibility()).get(
+        'missing',
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -176,7 +185,9 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
     db.callTask.groupBy.mockResolvedValue([]);
     db.callAttempt.findMany.mockResolvedValue([]);
 
-    await new Phase2CampaignsService(db as unknown as PrismaService).close('camp-1');
+    await new Phase2CampaignsService(db as unknown as PrismaService, fakeDemoVisibility()).close(
+      'camp-1',
+    );
 
     const updateArgs = db.callCampaign.update.mock.calls[0] as readonly [unknown] | undefined;
     expect(updateArgs?.[0]).toMatchObject({
@@ -200,10 +211,10 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
       { position: 2, prospect: { id: 'prospect-2', phoneE164: '+221770000002' } },
     ]);
 
-    const result = await new Phase2CampaignsService(db as unknown as PrismaService).programme(
-      'camp-1',
-      'com-1',
-    );
+    const result = await new Phase2CampaignsService(
+      db as unknown as PrismaService,
+      fakeDemoVisibility(),
+    ).programme('camp-1', 'com-1');
 
     expect(result.rows.map((row) => row.position)).toEqual([1, 2]);
     expect(result.rows[0]).toEqual({
@@ -217,7 +228,10 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
   it('refuse la création sans commercial valide ou sans prospect éligible', async () => {
     const db = prismaStub();
     db.user.findMany.mockResolvedValue([]);
-    const service = new Phase2CampaignsService(db as unknown as PrismaService);
+    const service = new Phase2CampaignsService(
+      db as unknown as PrismaService,
+      fakeDemoVisibility(),
+    );
 
     await expect(
       service.create(ADMIN, {

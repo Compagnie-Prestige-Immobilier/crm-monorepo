@@ -61,8 +61,13 @@ export const DEMO_DELETERS: Readonly<
   user: (tx, ids) => tx.user.deleteMany({ where: { id: { in: ids } } }),
 };
 
-/** Clé du réglage portant l'état de l'interrupteur. */
-export const DEMO_MODE_SETTING = 'demo_mode';
+/**
+ * Clé du réglage portant l'état de l'interrupteur.
+ *
+ * Définie dans `prisma/demo-visibility.service.ts`, avec le service qui la lit
+ * pour tous les autres modules, et seulement réexportée ici.
+ */
+export { DEMO_MODE_SETTING } from '../../prisma/demo-visibility.service.js';
 
 /** Clé du réglage portant la date du dernier ensemencement. */
 export const DEMO_SEEDED_AT_SETTING = 'demo_seeded_at';

@@ -20,39 +20,43 @@ describe('filtre par segment', () => {
     // écrite à la main passerait un test de forme, puis divergerait au premier
     // ajustement de la matrice sans que rien ne le signale.
     for (const segment of ['BDD1', 'BDD2', 'BDD3', 'BDD4'] as const) {
-      const where = buildProspectWhere(admin, { segment });
+      const where = buildProspectWhere(admin, { segment }, false);
       expect(where.AND).toEqual([segmentWhere(segment)]);
     }
   });
 
   it('BDD1 vise CHUES et CBAO ; BDD4 vise leurs compléments', () => {
-    expect(buildProspectWhere(admin, { segment: 'BDD1' }).AND).toEqual([
+    expect(buildProspectWhere(admin, { segment: 'BDD1' }, false).AND).toEqual([
       { syndicat: { sigle: 'CHUES' }, banque: { shortName: 'CBAO' } },
     ]);
-    expect(buildProspectWhere(admin, { segment: 'BDD4' }).AND).toEqual([
+    expect(buildProspectWhere(admin, { segment: 'BDD4' }, false).AND).toEqual([
       { syndicat: { sigle: { not: 'CHUES' } }, banque: { shortName: { not: 'CBAO' } } },
     ]);
   });
 
   it('n’écrase pas le filtre par département, qui porte aussi une relation', () => {
-    const where = buildProspectWhere(admin, { segment: 'BDD2', departementId: 'dep-1' });
+    const where = buildProspectWhere(admin, { segment: 'BDD2', departementId: 'dep-1' }, false);
     expect(where.representant).toEqual({ departementId: 'dep-1' });
     expect(where.AND).toEqual([segmentWhere('BDD2')]);
   });
 
   it('reste soumis au cloisonnement : un segment ne l’élargit pas', () => {
-    const where = buildProspectWhere(alice, { segment: 'BDD1' });
+    const where = buildProspectWhere(alice, { segment: 'BDD1' }, false);
     expect(where.createdById).toBe('com-alice');
   });
 });
 
 describe('filtres de phase 2', () => {
   it('traduit statut, méthode et auteur de la méthode', () => {
-    const where = buildProspectWhere(admin, {
-      phase2Status: 'METHOD_OBTAINED',
-      enrollmentMethod: 'PLATFORM',
-      enrollmentCapturedById: 'com-bob',
-    });
+    const where = buildProspectWhere(
+      admin,
+      {
+        phase2Status: 'METHOD_OBTAINED',
+        enrollmentMethod: 'PLATFORM',
+        enrollmentCapturedById: 'com-bob',
+      },
+      false,
+    );
 
     expect(where.phase2Status).toBe('METHOD_OBTAINED');
     expect(where.enrollmentMethod).toBe('PLATFORM');
@@ -62,22 +66,26 @@ describe('filtres de phase 2', () => {
   it('distingue l’auteur de la méthode du commercial de saisie', () => {
     // Deux colonnes différentes : les confondre attribuerait le travail
     // d'appel de la phase 2 à celui qui a rempli la fiche sur le terrain.
-    const where = buildProspectWhere(admin, {
-      commercialId: 'com-saisie',
-      enrollmentCapturedById: 'com-appel',
-    });
+    const where = buildProspectWhere(
+      admin,
+      {
+        commercialId: 'com-saisie',
+        enrollmentCapturedById: 'com-appel',
+      },
+      false,
+    );
 
     expect(where.createdById).toBe('com-saisie');
     expect(where.enrollmentCapturedById).toBe('com-appel');
   });
 
   it('filtre la campagne par la relation callTasks', () => {
-    const where = buildProspectWhere(admin, { campaignId: 'camp-1' });
+    const where = buildProspectWhere(admin, { campaignId: 'camp-1' }, false);
     expect(where.AND).toEqual([{ callTasks: { some: { campaignId: 'camp-1' } } }]);
   });
 
   it('cumule segment et campagne sans que l’un efface l’autre', () => {
-    const where = buildProspectWhere(admin, { segment: 'BDD3', campaignId: 'camp-1' });
+    const where = buildProspectWhere(admin, { segment: 'BDD3', campaignId: 'camp-1' }, false);
     expect(where.AND).toEqual([
       segmentWhere('BDD3'),
       { callTasks: { some: { campaignId: 'camp-1' } } },
@@ -85,13 +93,13 @@ describe('filtres de phase 2', () => {
   });
 
   it('n’ajoute aucune clause AND quand ni segment ni campagne ne sont demandés', () => {
-    expect(buildProspectWhere(admin, { statut: 'NOUVEAU' }).AND).toBeUndefined();
+    expect(buildProspectWhere(admin, { statut: 'NOUVEAU' }, false).AND).toBeUndefined();
   });
 });
 
 describe('recherche — la clause téléphone ne doit jamais tout matcher', () => {
   const clauses = (search: string) =>
-    (buildProspectWhere(admin, { search }).OR ?? []) as Record<string, unknown>[];
+    (buildProspectWhere(admin, { search }, false).OR ?? []) as Record<string, unknown>[];
 
   it('un terme alphabétique ne pose PAS de clause téléphone', () => {
     // Régression : `"ZZZZ".replace(/[^\d+]/g, '')` donne '', et
