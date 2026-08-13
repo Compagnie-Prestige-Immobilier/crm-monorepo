@@ -14,6 +14,7 @@ import 'package:crm_api_client/src/model/create_banque_dto.dart';
 import 'package:crm_api_client/src/model/create_departement_dto.dart';
 import 'package:crm_api_client/src/model/create_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/departement_dto.dart';
+import 'package:crm_api_client/src/model/ief_dto.dart';
 import 'package:crm_api_client/src/model/referentiels_bundle_dto.dart';
 import 'package:crm_api_client/src/model/region_dto.dart';
 import 'package:crm_api_client/src/model/region_with_departements_dto.dart';
@@ -538,6 +539,91 @@ class ReferentielsApi {
     }
 
     return Response<List<DepartementDto>>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Liste des IEF, éventuellement restreinte à un département.
+  /// L’IEF est le découpage SCOLAIRE, distinct du découpage administratif : 59 IEF pour 46 départements. Les feuilles de route sont bâties dessus, et quatre IEF partagent le seul département de Dakar.
+  ///
+  /// Parameters:
+  /// * [activeOnly] - Ne renvoyer que les entrées actives.
+  /// * [departementId]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [List<IefDto>] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<List<IefDto>>> listIefs({
+    bool? activeOnly = true,
+    String? departementId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/referentiels/iefs';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (activeOnly != null) r'activeOnly': activeOnly,
+      if (departementId != null) r'departementId': departementId,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    List<IefDto>? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<IefDto>, IefDto>(
+              rawData,
+              'List<IefDto>',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<List<IefDto>>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

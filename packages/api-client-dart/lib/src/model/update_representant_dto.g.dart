@@ -15,6 +15,8 @@ abstract class _$UpdateRepresentantDtoCWProxy {
 
   UpdateRepresentantDto departementId(String? departementId);
 
+  UpdateRepresentantDto iefId(String? iefId);
+
   UpdateRepresentantDto notes(String? notes);
 
   UpdateRepresentantDto clientCreatedAt(DateTime? clientCreatedAt);
@@ -30,6 +32,7 @@ abstract class _$UpdateRepresentantDtoCWProxy {
     String? fullName,
     String? phone,
     String? departementId,
+    String? iefId,
     String? notes,
     DateTime? clientCreatedAt,
   });
@@ -56,6 +59,9 @@ class _$UpdateRepresentantDtoCWProxyImpl
       this(departementId: departementId);
 
   @override
+  UpdateRepresentantDto iefId(String? iefId) => this(iefId: iefId);
+
+  @override
   UpdateRepresentantDto notes(String? notes) => this(notes: notes);
 
   @override
@@ -74,6 +80,7 @@ class _$UpdateRepresentantDtoCWProxyImpl
     Object? fullName = const $CopyWithPlaceholder(),
     Object? phone = const $CopyWithPlaceholder(),
     Object? departementId = const $CopyWithPlaceholder(),
+    Object? iefId = const $CopyWithPlaceholder(),
     Object? notes = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
   }) {
@@ -94,6 +101,10 @@ class _$UpdateRepresentantDtoCWProxyImpl
           ? _value.departementId
           // ignore: cast_nullable_to_non_nullable
           : departementId as String?,
+      iefId: iefId == const $CopyWithPlaceholder()
+          ? _value.iefId
+          // ignore: cast_nullable_to_non_nullable
+          : iefId as String?,
       notes: notes == const $CopyWithPlaceholder()
           ? _value.notes
           // ignore: cast_nullable_to_non_nullable
@@ -125,6 +136,7 @@ UpdateRepresentantDto _$UpdateRepresentantDtoFromJson(
     fullName: $checkedConvert('fullName', (v) => v as String?),
     phone: $checkedConvert('phone', (v) => v as String?),
     departementId: $checkedConvert('departementId', (v) => v as String?),
+    iefId: $checkedConvert('iefId', (v) => v as String?),
     notes: $checkedConvert('notes', (v) => v as String?),
     clientCreatedAt: $checkedConvert(
       'clientCreatedAt',
@@ -141,6 +153,7 @@ Map<String, dynamic> _$UpdateRepresentantDtoToJson(
   if (instance.fullName case final value?) 'fullName': value,
   if (instance.phone case final value?) 'phone': value,
   if (instance.departementId case final value?) 'departementId': value,
+  if (instance.iefId case final value?) 'iefId': value,
   if (instance.notes case final value?) 'notes': value,
   if (instance.clientCreatedAt?.toIso8601String() case final value?)
     'clientCreatedAt': value,

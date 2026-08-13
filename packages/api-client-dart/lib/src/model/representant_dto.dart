@@ -33,6 +33,10 @@ class RepresentantDto {
 
     required this.departementName,
 
+    required this.iefId,
+
+    required this.iefName,
+
     required this.createdById,
 
     required this.createdByName,
@@ -69,6 +73,12 @@ class RepresentantDto {
   @JsonKey(name: r'departementName', required: true, includeIfNull: false)
   final String departementName;
 
+  @JsonKey(name: r'iefId', required: true, includeIfNull: true)
+  final String? iefId;
+
+  @JsonKey(name: r'iefName', required: true, includeIfNull: true)
+  final String? iefName;
+
   @JsonKey(name: r'createdById', required: true, includeIfNull: false)
   final String createdById;
 
@@ -100,6 +110,8 @@ class RepresentantDto {
                 rev,
                 departementId,
                 departementName,
+                iefId,
+                iefName,
                 createdById,
                 createdByName,
                 clientCreatedAt,
@@ -115,6 +127,8 @@ class RepresentantDto {
                 other.rev,
                 other.departementId,
                 other.departementName,
+                other.iefId,
+                other.iefName,
                 other.createdById,
                 other.createdByName,
                 other.clientCreatedAt,
@@ -136,6 +150,8 @@ class RepresentantDto {
         rev,
         departementId,
         departementName,
+        iefId,
+        iefName,
         createdById,
         createdByName,
         clientCreatedAt,

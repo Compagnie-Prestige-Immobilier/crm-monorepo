@@ -21,6 +21,7 @@ export type ProspectStatut = Schemas['ProspectStatut'];
 
 export type Region = Schemas['RegionDto'];
 export type Departement = Schemas['DepartementDto'];
+export type Ief = Schemas['IefDto'];
 export type Banque = Schemas['BanqueDto'];
 export type Syndicat = Schemas['SyndicatDto'];
 
@@ -320,6 +321,8 @@ export interface FilterOption {
 
 export interface ReferenceData {
   departements: Departement[];
+  /** Les IEF — découpage scolaire. 59 pour 46 départements. */
+  iefs: Ief[];
   banques: Banque[];
   syndicats: Syndicat[];
   regions: Region[];

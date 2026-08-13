@@ -705,6 +705,55 @@
         "tags": ["referentiels"]
       }
     },
+    "/api/v1/referentiels/iefs": {
+      "get": {
+        "description": "L’IEF est le découpage SCOLAIRE, distinct du découpage administratif : 59 IEF pour 46 départements. Les feuilles de route sont bâties dessus, et quatre IEF partagent le seul département de Dakar.",
+        "operationId": "listIefs",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "description": "Ne renvoyer que les entrées actives.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "departementId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IefDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Liste des IEF, éventuellement restreinte à un département.",
+        "tags": ["referentiels"]
+      }
+    },
     "/api/v1/referentiels/regions": {
       "get": {
         "operationId": "listRegions",
@@ -924,6 +973,16 @@
             "name": "departementId",
             "required": false,
             "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "iefId",
+            "required": false,
+            "in": "query",
+            "description": "Filtre par IEF.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -6355,6 +6414,48 @@
         },
         "required": ["banques", "syndicats", "departements", "regions"]
       },
+      "IefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "departementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departementName": {
+            "type": "string"
+          },
+          "regionName": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "departementId",
+          "departementName",
+          "regionName",
+          "isActive",
+          "updatedAt"
+        ]
+      },
       "RegionWithDepartementsDto": {
         "type": "object",
         "properties": {
@@ -6545,6 +6646,15 @@
           "departementName": {
             "type": "string"
           },
+          "iefId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "iefName": {
+            "type": "string",
+            "nullable": true
+          },
           "createdById": {
             "type": "string",
             "format": "uuid"
@@ -6576,6 +6686,8 @@
           "rev",
           "departementId",
           "departementName",
+          "iefId",
+          "iefName",
           "createdById",
           "createdByName",
           "clientCreatedAt",
@@ -6659,6 +6771,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "iefId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire — il se déduit de l’IEF, jamais l’inverse."
+          },
           "notes": {
             "type": "string",
             "maxLength": 2000
@@ -6692,6 +6809,11 @@
           "departementId": {
             "type": "string",
             "format": "uuid"
+          },
+          "iefId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire — il se déduit de l’IEF, jamais l’inverse."
           },
           "notes": {
             "type": "string",
@@ -7173,6 +7295,11 @@
             "format": "uuid",
             "description": "Représentant : département."
           },
+          "iefId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Représentant : IEF de rattachement, facultative. Une version ancienne de l’application ne l’envoie pas ; l’absence du champ laisse la valeur en place et ne l’efface pas."
+          },
           "banqueId": {
             "type": "string",
             "format": "uuid",
@@ -7379,6 +7506,12 @@
               "$ref": "#/components/schemas/DepartementDto"
             }
           },
+          "iefs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IefDto"
+            }
+          },
           "banques": {
             "type": "array",
             "items": {
@@ -7404,7 +7537,7 @@
             }
           }
         },
-        "required": ["departements", "banques", "syndicats", "representants", "prospects"]
+        "required": ["departements", "iefs", "banques", "syndicats", "representants", "prospects"]
       },
       "SyncDeletionDto": {
         "type": "object",

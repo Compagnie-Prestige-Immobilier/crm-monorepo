@@ -286,6 +286,7 @@ class RepresentantsApi {
   /// Parameters:
   /// * [search]
   /// * [departementId]
+  /// * [iefId] - Filtre par IEF.
   /// * [commercialId] - Réservé à l’ADMIN.
   /// * [page]
   /// * [pageSize]
@@ -301,6 +302,7 @@ class RepresentantsApi {
   Future<Response<RepresentantListDto>> listRepresentants({
     String? search,
     String? departementId,
+    String? iefId,
     String? commercialId,
     num? page = 1,
     num? pageSize = 25,
@@ -327,6 +329,7 @@ class RepresentantsApi {
     final _queryParameters = <String, dynamic>{
       if (search != null) r'search': search,
       if (departementId != null) r'departementId': departementId,
+      if (iefId != null) r'iefId': iefId,
       if (commercialId != null) r'commercialId': commercialId,
       if (page != null) r'page': page,
       if (pageSize != null) r'pageSize': pageSize,

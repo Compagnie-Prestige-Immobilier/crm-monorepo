@@ -19,6 +19,7 @@ import {
   DEPARTEMENT_COUNT,
   PrismaClient,
   PrismaPg,
+  IEFS,
   REGIONS_SENEGAL,
   Role,
   SYNDICATS_SENEGAL,
@@ -63,6 +64,42 @@ async function seedGeography(): Promise<void> {
     throw new Error(`Seed géographique incomplet : ${String(count)}/${String(DEPARTEMENT_COUNT)}`);
   }
   console.info(`  régions : ${String(REGIONS_SENEGAL.length)} · départements : ${String(count)}`);
+
+  await seedIefs();
+}
+
+/**
+ * Les IEF, rattachées à leur département par son CODE.
+ *
+ * Le code et non le libellé : la matrice nationale écrit « Birkilane » là où la
+ * feuille de route régionale et l'orthographe officielle écrivent
+ * « Birkelane ». Un rattachement par libellé aurait donc échoué sur ce seul
+ * département, et l'échec se serait lu comme « IEF manquante » plutôt que
+ * comme « les deux sources ne s'accordent pas sur un nom ».
+ */
+async function seedIefs(): Promise<void> {
+  const departements = await prisma.departement.findMany({ select: { id: true, code: true } });
+  const byCode = new Map(departements.map((row) => [row.code, row.id]));
+
+  for (const ief of IEFS) {
+    const departementId = byCode.get(ief.departementCode);
+    if (departementId === undefined) {
+      throw new Error(`IEF ${ief.code} : département ${ief.departementCode} introuvable`);
+    }
+
+    await prisma.ief.upsert({
+      where: { code: ief.code },
+      create: { code: ief.code, name: ief.name, departementId },
+      // Même raison que pour les départements : `isActive` n'est pas réécrit.
+      update: { name: ief.name, departementId },
+    });
+  }
+
+  const count = await prisma.ief.count();
+  if (count < IEFS.length) {
+    throw new Error(`Seed IEF incomplet : ${String(count)}/${String(IEFS.length)}`);
+  }
+  console.info(`  IEF : ${String(count)}`);
 }
 
 async function seedBanques(): Promise<void> {

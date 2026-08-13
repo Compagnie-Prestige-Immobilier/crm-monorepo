@@ -24,6 +24,28 @@ class ReferenceRepository {
         .watch();
   }
 
+  /// Les IEF, éventuellement restreintes à un département.
+  ///
+  /// Le tri est (département, nom) : une liste alphabétique globale placerait
+  /// « Bignona 1 » entre deux IEF de Dakar, et le sélecteur deviendrait
+  /// illisible dès qu'on cherche par zone.
+  Stream<List<Ief>> watchIefs({String? departementId}) {
+    final SimpleSelectStatement<Iefs, Ief> query = _db.select(_db.iefs)
+      ..where((Iefs t) => t.isActive.equals(true) & t.deletedAt.isNull())
+      ..orderBy(<OrderClauseGenerator<Iefs>>[
+        (Iefs t) => OrderingTerm.asc(t.departementName),
+        (Iefs t) => OrderingTerm.asc(t.name),
+      ]);
+    if (departementId != null) {
+      query.where((Iefs t) => t.departementId.equals(departementId));
+    }
+    return query.watch();
+  }
+
+  Future<Ief?> iefById(String id) {
+    return (_db.select(_db.iefs)..where((Iefs t) => t.id.equals(id))).getSingleOrNull();
+  }
+
   Stream<List<Banque>> watchBanques() {
     return (_db.select(_db.banques)
           ..where((Banques t) => t.isActive.equals(true) & t.deletedAt.isNull())

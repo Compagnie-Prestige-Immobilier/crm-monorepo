@@ -369,6 +369,7 @@ class PushCall {
 PullPage emptyPullPage({String? cursor}) => PullPage(
   changes: SyncChangesDto(
     departements: const <DepartementDto>[],
+    iefs: const <IefDto>[],
     banques: const <BanqueDto>[],
     syndicats: const <SyndicatDto>[],
     representants: const <RepresentantDto>[],
@@ -416,6 +417,8 @@ RepresentantDto representantDto({
   required String phoneE164,
   String fullName = 'Représentant serveur',
   String departementId = 'dep-1',
+  String? iefId,
+  String? iefName,
   String createdById = 'me',
 }) => RepresentantDto(
   id: id,
@@ -424,6 +427,8 @@ RepresentantDto representantDto({
   notes: null,
   rev: 3,
   departementId: departementId,
+  iefId: iefId,
+  iefName: iefName,
   departementName: 'Dakar',
   createdById: createdById,
   createdByName: 'Awa Sy',

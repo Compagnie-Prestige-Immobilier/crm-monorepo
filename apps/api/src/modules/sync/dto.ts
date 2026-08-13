@@ -21,7 +21,7 @@ import {
 import { ValidatorConstraint } from 'class-validator';
 import { CallOutcome, EnrollmentMethod, ProspectStatut } from '@crm/database';
 
-import { BanqueDto, DepartementDto, SyndicatDto } from '../referentiels/dto.js';
+import { BanqueDto, DepartementDto, IefDto, SyndicatDto } from '../referentiels/dto.js';
 import { ProspectDto } from '../prospects/dto.js';
 import { RepresentantDto } from '../representants/dto.js';
 
@@ -106,6 +106,17 @@ export class SyncEntityDataDto {
   @IsOptional()
   @IsUUID()
   departementId?: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Représentant : IEF de rattachement, facultative. Une version ancienne de ' +
+      'l’application ne l’envoie pas ; l’absence du champ laisse la valeur en ' +
+      'place et ne l’efface pas.',
+  })
+  @IsOptional()
+  @IsUUID()
+  iefId?: string;
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Prospect : banque.' })
   @IsOptional()
@@ -377,6 +388,7 @@ export class SyncPullQueryDto {
 
 export class SyncChangesDto {
   @ApiProperty({ type: () => [DepartementDto] }) departements!: DepartementDto[];
+  @ApiProperty({ type: () => [IefDto] }) iefs!: IefDto[];
   @ApiProperty({ type: () => [BanqueDto] }) banques!: BanqueDto[];
   @ApiProperty({ type: () => [SyndicatDto] }) syndicats!: SyndicatDto[];
   @ApiProperty({ type: () => [RepresentantDto] }) representants!: RepresentantDto[];

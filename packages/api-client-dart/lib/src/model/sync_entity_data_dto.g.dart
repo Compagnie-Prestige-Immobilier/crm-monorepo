@@ -17,6 +17,8 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto departementId(String? departementId);
 
+  SyncEntityDataDto iefId(String? iefId);
+
   SyncEntityDataDto banqueId(String? banqueId);
 
   SyncEntityDataDto syndicatId(String? syndicatId);
@@ -49,6 +51,7 @@ abstract class _$SyncEntityDataDtoCWProxy {
     String? prenom,
     String? phone,
     String? departementId,
+    String? iefId,
     String? banqueId,
     String? syndicatId,
     String? representantId,
@@ -83,6 +86,9 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
   @override
   SyncEntityDataDto departementId(String? departementId) =>
       this(departementId: departementId);
+
+  @override
+  SyncEntityDataDto iefId(String? iefId) => this(iefId: iefId);
 
   @override
   SyncEntityDataDto banqueId(String? banqueId) => this(banqueId: banqueId);
@@ -131,6 +137,7 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? prenom = const $CopyWithPlaceholder(),
     Object? phone = const $CopyWithPlaceholder(),
     Object? departementId = const $CopyWithPlaceholder(),
+    Object? iefId = const $CopyWithPlaceholder(),
     Object? banqueId = const $CopyWithPlaceholder(),
     Object? syndicatId = const $CopyWithPlaceholder(),
     Object? representantId = const $CopyWithPlaceholder(),
@@ -163,6 +170,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.departementId
           // ignore: cast_nullable_to_non_nullable
           : departementId as String?,
+      iefId: iefId == const $CopyWithPlaceholder()
+          ? _value.iefId
+          // ignore: cast_nullable_to_non_nullable
+          : iefId as String?,
       banqueId: banqueId == const $CopyWithPlaceholder()
           ? _value.banqueId
           // ignore: cast_nullable_to_non_nullable
@@ -226,6 +237,7 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
         prenom: $checkedConvert('prenom', (v) => v as String?),
         phone: $checkedConvert('phone', (v) => v as String?),
         departementId: $checkedConvert('departementId', (v) => v as String?),
+        iefId: $checkedConvert('iefId', (v) => v as String?),
         banqueId: $checkedConvert('banqueId', (v) => v as String?),
         syndicatId: $checkedConvert('syndicatId', (v) => v as String?),
         representantId: $checkedConvert('representantId', (v) => v as String?),
@@ -271,6 +283,7 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(SyncEntityDataDto instance) =>
       if (instance.prenom case final value?) 'prenom': value,
       if (instance.phone case final value?) 'phone': value,
       if (instance.departementId case final value?) 'departementId': value,
+      if (instance.iefId case final value?) 'iefId': value,
       if (instance.banqueId case final value?) 'banqueId': value,
       if (instance.syndicatId case final value?) 'syndicatId': value,
       if (instance.representantId case final value?) 'representantId': value,

@@ -29,9 +29,10 @@ export interface StreamPosition {
   id: string;
 }
 
-/** Les cinq flux servis par le pull. Les référentiels ont leur propre position. */
+/** Les six flux servis par le pull. Les référentiels ont leur propre position. */
 export const SYNC_STREAMS = [
   'departements',
+  'iefs',
   'banques',
   'syndicats',
   'representants',

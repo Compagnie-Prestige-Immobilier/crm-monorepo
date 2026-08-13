@@ -239,6 +239,19 @@ final StreamProvider<List<Departement>> departementsProvider =
       return ref.watch(referenceRepositoryProvider).watchDepartements();
     });
 
+/// Les IEF du département choisi.
+///
+/// Paramétré par département et non global : il y a 59 IEF, et en proposer la
+/// liste entière alors que le département est déjà connu ferait chercher dans
+/// cinquante-huit entrées hors sujet. Sans département, la liste complète —
+/// c'est le cas d'une fiche reprise dont le département n'est pas encore lu.
+final iefsProvider = StreamProvider.family<List<Ief>, String?>((
+  Ref ref,
+  String? departementId,
+) {
+  return ref.watch(referenceRepositoryProvider).watchIefs(departementId: departementId);
+});
+
 final StreamProvider<List<Banque>> banquesProvider = StreamProvider<List<Banque>>((
   Ref ref,
 ) {

@@ -56,6 +56,7 @@ class StubApi implements ApiPort {
     return PullPage(
       changes: SyncChangesDto(
         departements: const <DepartementDto>[],
+    iefs: const <IefDto>[],
         banques: const <BanqueDto>[],
         syndicats: const <SyndicatDto>[],
         representants: const <RepresentantDto>[],

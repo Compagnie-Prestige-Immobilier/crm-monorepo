@@ -21,6 +21,10 @@ abstract class _$RepresentantDtoCWProxy {
 
   RepresentantDto departementName(String departementName);
 
+  RepresentantDto iefId(String? iefId);
+
+  RepresentantDto iefName(String? iefName);
+
   RepresentantDto createdById(String createdById);
 
   RepresentantDto createdByName(String createdByName);
@@ -47,6 +51,8 @@ abstract class _$RepresentantDtoCWProxy {
     num rev,
     String departementId,
     String departementName,
+    String? iefId,
+    String? iefName,
     String createdById,
     String createdByName,
     DateTime clientCreatedAt,
@@ -86,6 +92,12 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
       this(departementName: departementName);
 
   @override
+  RepresentantDto iefId(String? iefId) => this(iefId: iefId);
+
+  @override
+  RepresentantDto iefName(String? iefName) => this(iefName: iefName);
+
+  @override
   RepresentantDto createdById(String createdById) =>
       this(createdById: createdById);
 
@@ -122,6 +134,8 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
     Object? rev = const $CopyWithPlaceholder(),
     Object? departementId = const $CopyWithPlaceholder(),
     Object? departementName = const $CopyWithPlaceholder(),
+    Object? iefId = const $CopyWithPlaceholder(),
+    Object? iefName = const $CopyWithPlaceholder(),
     Object? createdById = const $CopyWithPlaceholder(),
     Object? createdByName = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
@@ -158,6 +172,14 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
           ? _value.departementName
           // ignore: cast_nullable_to_non_nullable
           : departementName as String,
+      iefId: iefId == const $CopyWithPlaceholder()
+          ? _value.iefId
+          // ignore: cast_nullable_to_non_nullable
+          : iefId as String?,
+      iefName: iefName == const $CopyWithPlaceholder()
+          ? _value.iefName
+          // ignore: cast_nullable_to_non_nullable
+          : iefName as String?,
       createdById: createdById == const $CopyWithPlaceholder()
           ? _value.createdById
           // ignore: cast_nullable_to_non_nullable
@@ -209,6 +231,8 @@ RepresentantDto _$RepresentantDtoFromJson(
       'rev',
       'departementId',
       'departementName',
+      'iefId',
+      'iefName',
       'createdById',
       'createdByName',
       'clientCreatedAt',
@@ -225,6 +249,8 @@ RepresentantDto _$RepresentantDtoFromJson(
     rev: $checkedConvert('rev', (v) => v as num),
     departementId: $checkedConvert('departementId', (v) => v as String),
     departementName: $checkedConvert('departementName', (v) => v as String),
+    iefId: $checkedConvert('iefId', (v) => v as String?),
+    iefName: $checkedConvert('iefName', (v) => v as String?),
     createdById: $checkedConvert('createdById', (v) => v as String),
     createdByName: $checkedConvert('createdByName', (v) => v as String),
     clientCreatedAt: $checkedConvert(
@@ -247,6 +273,8 @@ Map<String, dynamic> _$RepresentantDtoToJson(RepresentantDto instance) =>
       'rev': instance.rev,
       'departementId': instance.departementId,
       'departementName': instance.departementName,
+      'iefId': instance.iefId,
+      'iefName': instance.iefName,
       'createdById': instance.createdById,
       'createdByName': instance.createdByName,
       'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),

@@ -13,6 +13,7 @@ import type { Paginated, RepresentantRow, UpdateRepresentantInput } from '@/lib/
 export interface RepresentantFilters {
   search: string;
   departementId: string | null;
+  iefId: string | null;
   commercialId: string | null;
   page: number;
   pageSize: number;
@@ -21,6 +22,7 @@ export interface RepresentantFilters {
 export const DEFAULT_REPRESENTANT_FILTERS: RepresentantFilters = {
   search: '',
   departementId: null,
+  iefId: null,
   commercialId: null,
   page: 1,
   pageSize: 25,
@@ -33,6 +35,7 @@ export async function fetchRepresentants(
   const query: {
     search?: string;
     departementId?: string;
+    iefId?: string;
     commercialId?: string;
     page?: number;
     pageSize?: number;
@@ -41,6 +44,7 @@ export async function fetchRepresentants(
   const search = filters.search.trim();
   if (search !== '') query.search = search;
   if (filters.departementId !== null) query.departementId = filters.departementId;
+  if (filters.iefId !== null) query.iefId = filters.iefId;
   if (filters.commercialId !== null) query.commercialId = filters.commercialId;
 
   return flattenPage(unwrap(await client.GET('/api/v1/representants', { params: { query } })));

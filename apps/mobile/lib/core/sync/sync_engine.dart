@@ -934,6 +934,44 @@ class SyncEngine {
             );
         count++;
       }
+      // Les IEF APRÈS les départements, dans la même transaction : `iefs`
+      // référence `departements`, et `PRAGMA foreign_keys = ON` refuserait une
+      // IEF dont le département n'est pas encore arrivé. L'ordre des boucles
+      // EST la garantie, il n'y en a pas d'autre.
+      for (final IefDto i in page.changes.iefs) {
+        await _db
+            .into(_db.iefs)
+            .insert(
+              IefsCompanion.insert(
+                id: i.id,
+                code: i.code,
+                name: i.name,
+                departementId: i.departementId,
+                departementName: i.departementName,
+                isActive: Value<bool>(i.isActive),
+                localUpdatedAt: _clock.now(),
+                serverUpdatedAt: Value<DateTime?>(i.updatedAt),
+              ),
+              onConflict: DoUpdate<Iefs, Ief>(
+                (Iefs old) => IefsCompanion.custom(
+                  code: const CustomExpression<String>('excluded.code'),
+                  name: const CustomExpression<String>('excluded.name'),
+                  departementId: const CustomExpression<String>('excluded.departement_id'),
+                  departementName: const CustomExpression<String>(
+                    'excluded.departement_name',
+                  ),
+                  isActive: const CustomExpression<bool>('excluded.is_active'),
+                  serverUpdatedAt: const CustomExpression<DateTime>(
+                    'excluded.server_updated_at',
+                  ),
+                  localUpdatedAt: const CustomExpression<DateTime>(
+                    'excluded.local_updated_at',
+                  ),
+                ),
+              ),
+            );
+        count++;
+      }
       for (final BanqueDto b in page.changes.banques) {
         await _db
             .into(_db.banques)
@@ -1006,6 +1044,7 @@ class SyncEngine {
                 phoneE164: r.phoneE164,
                 notes: Value<String?>(r.notes),
                 departementId: r.departementId,
+                iefId: Value<String?>(r.iefId),
                 createdById: r.createdById,
                 clientCreatedAt: r.clientCreatedAt,
                 rev: Value<int>(r.rev.toInt()),
@@ -1020,6 +1059,7 @@ class SyncEngine {
                   departementId: const CustomExpression<String>(
                     'excluded.departement_id',
                   ),
+                  iefId: const CustomExpression<String>('excluded.ief_id'),
                   rev: const CustomExpression<int>('excluded.rev'),
                   serverUpdatedAt: const CustomExpression<DateTime>(
                     'excluded.server_updated_at',

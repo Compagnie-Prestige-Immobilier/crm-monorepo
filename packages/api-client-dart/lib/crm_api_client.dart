@@ -88,6 +88,7 @@ export 'package:crm_api_client/src/model/enrollment_method_count_dto.dart';
 export 'package:crm_api_client/src/model/enrollment_method_list_dto.dart';
 export 'package:crm_api_client/src/model/export_mode.dart';
 export 'package:crm_api_client/src/model/funnel_stage_dto.dart';
+export 'package:crm_api_client/src/model/ief_dto.dart';
 export 'package:crm_api_client/src/model/inbox_dto.dart';
 export 'package:crm_api_client/src/model/inbox_item_dto.dart';
 export 'package:crm_api_client/src/model/login_dto.dart';

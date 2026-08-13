@@ -6,6 +6,7 @@
 import 'package:crm_api_client/src/model/departement_dto.dart';
 import 'package:crm_api_client/src/model/representant_dto.dart';
 import 'package:crm_api_client/src/model/prospect_dto.dart';
+import 'package:crm_api_client/src/model/ief_dto.dart';
 import 'package:crm_api_client/src/model/syndicat_dto.dart';
 import 'package:crm_api_client/src/model/banque_dto.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -26,6 +27,8 @@ class SyncChangesDto {
   SyncChangesDto({
     required this.departements,
 
+    required this.iefs,
+
     required this.banques,
 
     required this.syndicats,
@@ -37,6 +40,9 @@ class SyncChangesDto {
 
   @JsonKey(name: r'departements', required: true, includeIfNull: false)
   final List<DepartementDto> departements;
+
+  @JsonKey(name: r'iefs', required: true, includeIfNull: false)
+  final List<IefDto> iefs;
 
   @JsonKey(name: r'banques', required: true, includeIfNull: false)
   final List<BanqueDto> banques;
@@ -55,9 +61,17 @@ class SyncChangesDto {
         other is SyncChangesDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [departements, banques, syndicats, representants, prospects],
+              [
+                departements,
+                iefs,
+                banques,
+                syndicats,
+                representants,
+                prospects,
+              ],
               [
                 other.departements,
+                other.iefs,
                 other.banques,
                 other.syndicats,
                 other.representants,
@@ -71,6 +85,7 @@ class SyncChangesDto {
       runtimeType.hashCode ^
       mapPropsToHashCode([
         departements,
+        iefs,
         banques,
         syndicats,
         representants,
