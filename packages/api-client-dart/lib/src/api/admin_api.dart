@@ -9,15 +9,18 @@ import 'dart:convert';
 import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
-import 'package:crm_api_client/src/model/demo_status_dto.dart';
+import 'package:crm_api_client/src/model/purge_catalog_dto.dart';
+import 'package:crm_api_client/src/model/purge_request_dto.dart';
+import 'package:crm_api_client/src/model/purge_result_dto.dart';
+import 'package:crm_api_client/src/model/supervision_dto.dart';
 
-class DemoApi {
+class AdminApi {
   final Dio _dio;
 
-  const DemoApi(this._dio);
+  const AdminApi(this._dio);
 
-  /// Masque les données de démonstration.
-  /// NE SUPPRIME RIEN. Les lignes de démonstration restent en base, invisibles pour toute lecture, export Excel compris. Pour les effacer définitivement, utiliser /purge.
+  /// Domaines purgeables, leurs dépendances et le nombre de lignes concernées.
+  /// &#x60;allowed&#x60; vaut false pour tout administrateur autre que le premier : l’écran masque alors la commande, et POST /admin/purge refuse de son côté.
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -27,9 +30,9 @@ class DemoApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [DemoStatusDto] as data
+  /// Returns a [Future] containing a [Response] with a [PurgeCatalogDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DemoStatusDto>> disableDemoMode({
+  Future<Response<PurgeCatalogDto>> getPurgeCatalog({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -37,157 +40,7 @@ class DemoApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/admin/demo/disable';
-    final _options = Options(
-      method: r'POST',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    DemoStatusDto? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<DemoStatusDto, DemoStatusDto>(
-              rawData,
-              'DemoStatusDto',
-              growable: true,
-            );
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<DemoStatusDto>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
-  /// Peuple la plateforme de données de démonstration.
-  /// Idempotent : activer une seconde fois ne double pas le jeu. Refusé en production tant que DEMO_MODE_ALLOWED ne vaut pas true.
-  ///
-  /// Parameters:
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [DemoStatusDto] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<DemoStatusDto>> enableDemoMode({
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/admin/demo/enable';
-    final _options = Options(
-      method: r'POST',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    DemoStatusDto? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<DemoStatusDto, DemoStatusDto>(
-              rawData,
-              'DemoStatusDto',
-              growable: true,
-            );
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<DemoStatusDto>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
-  /// État du mode démonstration, compteurs et autorisation de bascule.
-  ///
-  ///
-  /// Parameters:
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [DemoStatusDto] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<DemoStatusDto>> getDemoStatus({
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/admin/demo';
+    final _path = r'/api/v1/admin/purge';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{...?headers},
@@ -208,15 +61,15 @@ class DemoApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    DemoStatusDto? _responseData;
+    PurgeCatalogDto? _responseData;
 
     try {
       final rawData = _response.data;
       _responseData = rawData == null
           ? null
-          : deserialize<DemoStatusDto, DemoStatusDto>(
+          : deserialize<PurgeCatalogDto, PurgeCatalogDto>(
               rawData,
-              'DemoStatusDto',
+              'PurgeCatalogDto',
               growable: true,
             );
     } catch (error, stackTrace) {
@@ -229,7 +82,7 @@ class DemoApi {
       );
     }
 
-    return Response<DemoStatusDto>(
+    return Response<PurgeCatalogDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -241,8 +94,8 @@ class DemoApi {
     );
   }
 
-  /// Supprime définitivement le jeu de démonstration.
-  /// IRRÉVERSIBLE, et distinct de la désactivation. Supprime exactement les lignes enregistrées à l’ensemencement, dans l’ordre inverse de création. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration. L’interface doit faire confirmer.
+  /// Téléconseillers et pôle Finances générales, avec présence et dernière activité.
+  /// La présence est déduite des traces existantes : familles de jetons, lots de synchronisation, écritures métier. Aucune colonne dédiée.
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -252,9 +105,9 @@ class DemoApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [DemoStatusDto] as data
+  /// Returns a [Future] containing a [Response] with a [SupervisionDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DemoStatusDto>> purgeDemoData({
+  Future<Response<SupervisionDto>> getSupervision({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -262,9 +115,9 @@ class DemoApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/admin/demo/purge';
+    final _path = r'/api/v1/admin/supervision';
     final _options = Options(
-      method: r'POST',
+      method: r'GET',
       headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
@@ -283,15 +136,15 @@ class DemoApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    DemoStatusDto? _responseData;
+    SupervisionDto? _responseData;
 
     try {
       final rawData = _response.data;
       _responseData = rawData == null
           ? null
-          : deserialize<DemoStatusDto, DemoStatusDto>(
+          : deserialize<SupervisionDto, SupervisionDto>(
               rawData,
-              'DemoStatusDto',
+              'SupervisionDto',
               growable: true,
             );
     } catch (error, stackTrace) {
@@ -304,7 +157,99 @@ class DemoApi {
       );
     }
 
-    return Response<DemoStatusDto>(
+    return Response<SupervisionDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Supprime définitivement les domaines sélectionnés.
+  /// Réservé au premier compte administrateur, qui ressaisit son identifiant de connexion. Transactionnel, enfants avant parents. Le compte appelant n’est jamais supprimé. Journalisé.
+  ///
+  /// Parameters:
+  /// * [purgeRequestDto]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [PurgeResultDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<PurgeResultDto>> purgeDatabase({
+    required PurgeRequestDto purgeRequestDto,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/admin/purge';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(purgeRequestDto);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    PurgeResultDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<PurgeResultDto, PurgeResultDto>(
+              rawData,
+              'PurgeResultDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<PurgeResultDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
