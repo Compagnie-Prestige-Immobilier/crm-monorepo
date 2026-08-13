@@ -141,11 +141,7 @@ class AboutScreen extends ConsumerWidget {
   /// est précisément le mensonge que cet écran doit rendre impossible.
   static String get _environmentLabel {
     final String url = ApiEnvironment.baseUrl;
-    if (url.contains('10.0.2.2') ||
-        url.contains('localhost') ||
-        url.contains('127.0.0.1')) {
-      return 'Développement';
-    }
+    if (ApiEnvironment.isDevelopmentServer) return 'Développement';
     if (url.contains('demo') || url.contains('staging') || url.contains('recette')) {
       return 'Démonstration';
     }
