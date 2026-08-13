@@ -5782,6 +5782,110 @@
         "summary": "Export Excel des prospects, avec le même filtre que la liste.",
         "tags": ["export"]
       }
+    },
+    "/api/v1/app-updates/android/current": {
+      "get": {
+        "operationId": "getAndroidUpdate",
+        "parameters": [
+          {
+            "name": "versionCode",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppUpdateDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Vérifie la dernière release Android.",
+        "tags": ["app-updates"]
+      }
+    },
+    "/api/v1/app-updates/android/download": {
+      "get": {
+        "operationId": "downloadAndroidUpdate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.android.package-archive": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Télécharge la dernière release Android.",
+        "tags": ["app-updates"]
+      }
+    },
+    "/api/v1/app-updates/android": {
+      "post": {
+        "operationId": "uploadAndroidUpdate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "versionName", "versionCode", "forceUpdate"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "versionName": {
+                    "type": "string"
+                  },
+                  "versionCode": {
+                    "type": "integer"
+                  },
+                  "forceUpdate": {
+                    "type": "boolean"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppUpdateDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publie une release Android.",
+        "tags": ["app-updates"]
+      }
     }
   },
   "info": {
@@ -9918,6 +10022,52 @@
       "ExportMode": {
         "type": "string",
         "enum": ["filtered", "consolidated"]
+      },
+      "AppUpdateDto": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "forceUpdate": {
+            "type": "boolean"
+          },
+          "versionName": {
+            "type": "string"
+          },
+          "versionCode": {
+            "type": "number"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "type": "number"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "available",
+          "forceUpdate",
+          "versionName",
+          "versionCode",
+          "fileName",
+          "fileSize",
+          "sha256",
+          "downloadUrl",
+          "publishedAt"
+        ]
       }
     }
   }

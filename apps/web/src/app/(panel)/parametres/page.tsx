@@ -1,9 +1,10 @@
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
+import { redirect, unstable_rethrow } from 'next/navigation';
 
 import { PermissionDenied } from '@/components/permission-denied';
 import { DemoModeCard } from '@/components/settings/demo-mode-card';
+import { AndroidReleaseCard } from '@/components/settings/android-release-card';
 import { PurgeCard } from '@/components/settings/purge-card';
 import { getServerApiClient } from '@/lib/api/server';
 import { fetchDemoStatus } from '@/lib/data/demo';
@@ -26,7 +27,10 @@ export default async function ParametresPage() {
       queryKey: queryKeys.demoStatus,
       queryFn: () => fetchDemoStatus(getServerApiClient()),
     });
-  } catch {
+  } catch (error) {
+    // `unstable_rethrow` d'abord : un `catch` nu avale aussi les erreurs de
+    // contrôle de Next (redirection, `notFound()`, bascule en rendu dynamique).
+    unstable_rethrow(error);
     // La carte rejouera la requête et affichera son état d'erreur.
   }
 
@@ -39,6 +43,8 @@ export default async function ParametresPage() {
       <HydrationBoundary state={dehydrate(queryClient)}>
         <DemoModeCard />
       </HydrationBoundary>
+
+      <AndroidReleaseCard />
 
       {/* La carte de purge n'est pas préchargée côté serveur : son catalogue
           compte les lignes de vingt-trois tables, et ce décompte ne doit pas

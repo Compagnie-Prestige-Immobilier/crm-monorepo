@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { ApiError } from '@crm/api-client/query';
+import { unstable_rethrow } from 'next/navigation';
 
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '@/lib/api/config';
 import { SessionExpiredError, getServerApiClient } from '@/lib/api/server';
@@ -66,6 +67,18 @@ export async function readSession(): Promise<SessionResult> {
   try {
     return { status: 'authenticated', user: await fetchSessionUser(getServerApiClient()) };
   } catch (error) {
+    // ── D'ABORD, avant tout examen ────────────────────────────────────────
+    // Next signale la redirection, le `notFound()` et la bascule en rendu
+    // dynamique en LEVANT une erreur de contrôle. Ce `catch` est traversé par
+    // `cookies()` et par un `fetch` non mis en cache : il voit donc ces
+    // signaux, et les avaler les annule.
+    //
+    // C'est ce qui s'est produit en production. Le signal « cette page est
+    // dynamique » était attrapé ici, converti en `unavailable`, et `next build`
+    // en concluait que la page était prérendable. Résultat : un écran
+    // « Serveur injoignable » figé en cache pour un an, servi à tous.
+    unstable_rethrow(error);
+
     // Seul un refus explicite de l'API vaut « pas de session ». `unwrap()`
     // préserve `.status`, et c'est précisément à cela qu'il sert ici.
     if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {

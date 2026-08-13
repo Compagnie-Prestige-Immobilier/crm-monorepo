@@ -18,7 +18,7 @@ Chart.register(BarController, LineController);
 
 import { seriesBorderColor, seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
 import { formatNumber, formatShortDate } from '@/lib/format';
-import { formatXof, xofToChartNumber } from '@/lib/money';
+import { formatXof, formatXofAxisTick, xofToChartNumber } from '@/lib/money';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
 
 /**
@@ -254,7 +254,10 @@ export function CashingsOverTimeChart({
         ticks: {
           color: theme.tick,
           font: { size: 11 },
-          callback: (value) => formatNumber(Number(value)),
+          // Abrégé : « 1,25 Mrd » et non « 1 250 000 000 », qui mangerait la
+          // moitié de la surface du graphique. Le montant exact est dans
+          // l'info-bulle, et il repart de la CHAÎNE d'origine.
+          callback: (value) => formatXofAxisTick(Number(value)),
         },
         title: { display: true, text: 'FCFA', color: theme.tick, font: { size: 11 } },
       },

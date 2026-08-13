@@ -10,6 +10,7 @@ export 'package:crm_api_client/src/auth/oauth.dart';
 
 export 'package:crm_api_client/src/api/admin_api.dart';
 export 'package:crm_api_client/src/api/analytics_api.dart';
+export 'package:crm_api_client/src/api/app_updates_api.dart';
 export 'package:crm_api_client/src/api/auth_api.dart';
 export 'package:crm_api_client/src/api/bank_case_stages_api.dart';
 export 'package:crm_api_client/src/api/bank_cases_api.dart';
@@ -29,6 +30,7 @@ export 'package:crm_api_client/src/model/analytics_finance_dto.dart';
 export 'package:crm_api_client/src/model/analytics_funnel_dto.dart';
 export 'package:crm_api_client/src/model/analytics_series_dto.dart';
 export 'package:crm_api_client/src/model/analytics_totals_dto.dart';
+export 'package:crm_api_client/src/model/app_update_dto.dart';
 export 'package:crm_api_client/src/model/audience_preview_dto.dart';
 export 'package:crm_api_client/src/model/auth_tokens_dto.dart';
 export 'package:crm_api_client/src/model/auth_user_dto.dart';

@@ -1368,6 +1368,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/app-updates/android/current': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Vérifie la dernière release Android. */
+    get: operations['getAndroidUpdate'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/app-updates/android/download': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Télécharge la dernière release Android. */
+    get: operations['downloadAndroidUpdate'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/app-updates/android': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Publie une release Android. */
+    post: operations['uploadAndroidUpdate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2843,6 +2894,18 @@ export interface components {
     };
     /** @enum {string} */
     ExportMode: 'filtered' | 'consolidated';
+    AppUpdateDto: {
+      available: boolean;
+      forceUpdate: boolean;
+      versionName: string;
+      versionCode: number;
+      fileName: string;
+      fileSize: number;
+      sha256: string;
+      downloadUrl: string;
+      publishedAt: string;
+      notes?: Record<string, never>;
+    };
   };
   responses: never;
   parameters: never;
@@ -5552,6 +5615,76 @@ export interface operations {
         };
         content: {
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': string;
+        };
+      };
+    };
+  };
+  getAndroidUpdate: {
+    parameters: {
+      query: {
+        versionCode: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppUpdateDto'];
+        };
+      };
+    };
+  };
+  downloadAndroidUpdate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/vnd.android.package-archive': string;
+        };
+      };
+    };
+  };
+  uploadAndroidUpdate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** Format: binary */
+          file: string;
+          versionName: string;
+          versionCode: number;
+          forceUpdate: boolean;
+          notes?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppUpdateDto'];
         };
       };
     };
