@@ -44,6 +44,7 @@ import type {
   ProspectSearchQueryDto,
   UpdateBankCaseDto,
 } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
 const DEFAULT_PAGE_SIZE = 25;
 const DEFAULT_SEARCH_PAGE_SIZE = 20;
@@ -53,7 +54,10 @@ const REV_MISMATCH = Symbol('rev-mismatch');
 
 @Injectable()
 export class BankCasesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demo: DemoVisibilityService,
+  ) {}
 
   /**
    * Liste paginée.
@@ -67,7 +71,7 @@ export class BankCasesService {
   async list(query: BankCaseQueryDto): Promise<BankCaseListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
-    const where = bankCaseConditions(query);
+    const where = bankCaseConditions(query, await this.demo.enabled());
     const orderBy = bankCaseOrderBy(query.sortBy, query.sortOrder);
 
     const [ids, totals] = await Promise.all([

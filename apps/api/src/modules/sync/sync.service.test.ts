@@ -10,6 +10,7 @@ import { SyncService } from './sync.service.js';
 import { FakePrisma } from './fake-prisma.js';
 import { SyncEntity, SyncOp, SyncOpStatus, dependencyKeyOf } from './dto.js';
 import type { SyncOperationDto, SyncPushDto } from './dto.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const alice: AuthenticatedUser = {
   id: 'com-alice',
@@ -34,7 +35,12 @@ beforeEach(() => {
 
   db = new FakePrisma();
   const prisma = db as unknown as PrismaService;
-  sync = new SyncService(prisma, new SyncBatchStore(prisma), new Phase2SyncService());
+  sync = new SyncService(
+    prisma,
+    new SyncBatchStore(prisma),
+    new Phase2SyncService(),
+    fakeDemoVisibility(),
+  );
 });
 
 let counter = 0;

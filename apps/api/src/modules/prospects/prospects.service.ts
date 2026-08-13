@@ -26,6 +26,7 @@ import type {
   ReassignResultDto,
   UpdateProspectDto,
 } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
 export const PROSPECT_INCLUDE = {
   // `shortName` en plus de `name` : c'est lui, et non le nom complet, qui porte
@@ -88,14 +89,17 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
 
 @Injectable()
 export class ProspectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demo: DemoVisibilityService,
+  ) {}
 
   async list(user: AuthenticatedUser, query: ProspectQueryDto): Promise<ProspectListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
     // Cloisonnement inclus dans buildProspectWhere : la liste, les agrégats et
     // l'export partagent la même clause, donc la même portée.
-    const where = buildProspectWhere(user, query);
+    const where = buildProspectWhere(user, query, await this.demo.enabled());
 
     const sortBy = query.sortBy ?? ProspectSortField.CLIENT_CREATED_AT;
     const sortOrder = query.sortOrder ?? SortOrder.DESC;

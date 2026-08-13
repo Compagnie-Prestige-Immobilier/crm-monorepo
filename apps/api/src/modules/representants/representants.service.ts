@@ -21,6 +21,8 @@ import type {
   RepresentantQueryDto,
   UpdateRepresentantDto,
 } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { demoScope } from '../../prisma/demo-visibility.js';
 
 export const REPRESENTANT_INCLUDE = {
   departement: { select: { name: true } },
@@ -52,7 +54,10 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
 
 @Injectable()
 export class RepresentantsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demo: DemoVisibilityService,
+  ) {}
 
   async list(user: AuthenticatedUser, query: RepresentantQueryDto): Promise<RepresentantListDto> {
     const page = query.page ?? 1;
@@ -60,7 +65,11 @@ export class RepresentantsService {
 
     // Le cloisonnement est composé ICI, dans le service : posé dans le
     // contrôleur, il dépendrait de la discipline de chaque route.
-    const where: Prisma.RepresentantWhereInput = { deletedAt: null, ...ownerScope(user) };
+    const where: Prisma.RepresentantWhereInput = {
+      deletedAt: null,
+      ...ownerScope(user),
+      ...demoScope(await this.demo.enabled()),
+    };
     if (query.commercialId) {
       where.createdById = isAdmin(user)
         ? query.commercialId

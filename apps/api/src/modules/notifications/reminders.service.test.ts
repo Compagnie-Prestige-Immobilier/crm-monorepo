@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { NotificationsService } from './notifications.service.js';
 import { RemindersService, ReminderKey, periodFor, remindersCron } from './reminders.service.js';
 import { FakePrisma, FakeTransport } from './fake-prisma.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 /**
  * Rappels programmés.
@@ -21,8 +22,8 @@ let reminders: RemindersService;
 
 /** Reconstruit le service sur la MÊME base : c'est la simulation d'un redémarrage. */
 const restart = (): RemindersService => {
-  const notifications = new NotificationsService(db.asService(), transport);
-  return new RemindersService(db.asService(), notifications);
+  const notifications = new NotificationsService(db.asService(), transport, fakeDemoVisibility());
+  return new RemindersService(db.asService(), notifications, fakeDemoVisibility());
 };
 
 beforeEach(() => {

@@ -11,6 +11,7 @@ import { PrismaClient, PrismaPg } from '@crm/database';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { DemoCountsDto } from './dto.js';
 import { DemoService } from './demo.service.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({
@@ -19,7 +20,7 @@ const prisma = new PrismaClient({
   }),
 });
 
-const demo = new DemoService(prisma as unknown as PrismaService);
+const demo = new DemoService(prisma as unknown as PrismaService, fakeDemoVisibility());
 
 let adminId: string;
 /** Identifiants des lignes créées par le test lui-même, à nettoyer à la fin. */

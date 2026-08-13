@@ -5,6 +5,7 @@ import type { AuthenticatedUser } from './decorators/current-user.decorator.js';
 import { isAdmin, ownerScope } from './scope.js';
 import { tryNormalizePhone } from './phone.js';
 import type { ProspectFilterDto } from './dto/prospect-filter.dto.js';
+import { demoScope } from '../prisma/demo-visibility.js';
 
 /**
  * Traduit le filtre commun en clause `where` Prisma, cloisonnement compris.
@@ -14,14 +15,21 @@ import type { ProspectFilterDto } from './dto/prospect-filter.dto.js';
  * exactement au nombre de lignes du fichier exporté. Le cloisonnement est
  * appliqué ICI et non chez l'appelant, pour qu'aucun futur endpoint construit
  * sur ce filtre ne puisse l'omettre.
+ *
+ * `demoEnabled` est un paramètre OBLIGATOIRE, sans valeur par défaut. Un défaut
+ * — quel qu'il soit — laisserait un appelant l'oublier et hériter en silence
+ * d'une visibilité qu'il n'a pas choisie ; ici l'oubli ne compile pas.
  */
 export function buildProspectWhere(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   filter: ProspectFilterDto,
+  demoEnabled: boolean,
 ): Prisma.ProspectWhereInput {
   const where: Prisma.ProspectWhereInput = {
     // Le cloisonnement d'abord : il n'est jamais surchargeable par un filtre.
     ...ownerScope(user),
+    // Puis la visibilité de démonstration, pour la même raison.
+    ...demoScope(demoEnabled),
   };
 
   // `commercialId` ne peut qu'AFFINER la portée. Un COMMERCIAL qui le

@@ -6,6 +6,7 @@ import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { AnalyticsService } from './analytics.service.js';
 import { SEGMENT_EXPR, prospectConditions, segmentCondition } from './analytics.sql.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const alice: AuthenticatedUser = {
   id: 'com-alice',
@@ -98,22 +99,28 @@ describe('traduction SQL du segment', () => {
 
 describe('conditions communes', () => {
   it('borne un COMMERCIAL à ses lignes, avant tout filtre', () => {
-    expect(rendered(prospectConditions(alice, {}))).toContain('p."createdById" = "com-alice"');
+    expect(rendered(prospectConditions(alice, {}, false))).toContain(
+      'p."createdById" = "com-alice"',
+    );
   });
 
   it('un COMMERCIAL qui vise un collègue obtient l’ensemble vide', () => {
-    const sql = rendered(prospectConditions(alice, { commercialId: 'com-bob' }));
+    const sql = rendered(prospectConditions(alice, { commercialId: 'com-bob' }, false));
     expect(sql).not.toContain('"com-bob"');
     expect(sql).toContain('"__aucun__"');
   });
 
   it('traduit les filtres de phase 2 sur les bonnes colonnes', () => {
     const sql = rendered(
-      prospectConditions(admin, {
-        phase2Status: 'METHOD_OBTAINED',
-        enrollmentMethod: 'PLATFORM',
-        enrollmentCapturedById: 'com-bob',
-      }),
+      prospectConditions(
+        admin,
+        {
+          phase2Status: 'METHOD_OBTAINED',
+          enrollmentMethod: 'PLATFORM',
+          enrollmentCapturedById: 'com-bob',
+        },
+        false,
+      ),
     );
 
     expect(sql).toContain('p."phase2Status" = "METHOD_OBTAINED"');
@@ -124,13 +131,13 @@ describe('conditions communes', () => {
   });
 
   it('filtre la campagne par une sous-requête sur les tâches', () => {
-    const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }));
+    const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }, false));
     expect(sql).toContain('"call_tasks"');
     expect(sql).toContain('ct."campaignId" = "camp-1"');
   });
 
   it('exclut les fiches supprimées et celles d’un représentant supprimé', () => {
-    const sql = rendered(prospectConditions(admin, {}));
+    const sql = rendered(prospectConditions(admin, {}, false));
     expect(sql).toContain('p."deletedAt" IS NULL');
     // Sans elle, un total « par département » dépasserait le total global.
     expect(sql).toContain('r."deletedAt" IS NULL');
@@ -144,7 +151,10 @@ describe('séries de phase 2', () => {
       { key: 'METHOD_OBTAINED', prospects: 3 },
     ]);
 
-    const result = await new AnalyticsService(service).byPhase2Status(admin, {});
+    const result = await new AnalyticsService(service, fakeDemoVisibility()).byPhase2Status(
+      admin,
+      {},
+    );
 
     // Un histogramme qui perd une barre dès que le compteur tombe à zéro change
     // de forme sans raison : l'absence de « Refus » se lirait comme une panne.
@@ -163,7 +173,10 @@ describe('séries de phase 2', () => {
   it('ne compte comme méthodes que les fiches qui en portent une', async () => {
     const { service, sql } = makePrisma([{ key: 'PLATFORM', prospects: 4 }]);
 
-    const result = await new AnalyticsService(service).byEnrollmentMethod(admin, {});
+    const result = await new AnalyticsService(service, fakeDemoVisibility()).byEnrollmentMethod(
+      admin,
+      {},
+    );
 
     expect(sql()).toContain('p."enrollmentMethod" IS NOT NULL');
     expect(result.items.map((item) => item.method)).toEqual([
@@ -182,7 +195,7 @@ describe('séries de phase 2', () => {
       { segment: 'BDD4', prospects: 5, obtained: 0 },
     ]);
 
-    const result = await new AnalyticsService(service).bySegment(admin, {});
+    const result = await new AnalyticsService(service, fakeDemoVisibility()).bySegment(admin, {});
 
     expect(result.items.map((item) => item.segment)).toEqual(['BDD1', 'BDD2', 'BDD3', 'BDD4']);
     expect(result.items.map((item) => item.prospects)).toEqual([5, 0, 0, 5]);
@@ -194,7 +207,7 @@ describe('séries de phase 2', () => {
 
   it('agrège en SQL : une requête par série, aucune ligne remontée', async () => {
     const { service, calls } = makePrisma([]);
-    const analytics = new AnalyticsService(service);
+    const analytics = new AnalyticsService(service, fakeDemoVisibility());
 
     await analytics.bySegment(admin, {});
     await analytics.byPhase2Status(admin, {});
@@ -205,7 +218,7 @@ describe('séries de phase 2', () => {
 
   it('applique le filtre reçu à chaque série', async () => {
     const { service, queries } = makePrisma([]);
-    const analytics = new AnalyticsService(service);
+    const analytics = new AnalyticsService(service, fakeDemoVisibility());
     const filter = { segment: 'BDD2', campaignId: 'camp-1' } as const;
 
     await analytics.bySegment(admin, filter);
@@ -225,7 +238,10 @@ describe('séries de phase 2', () => {
 
   it('rend zéro plutôt qu’une division par zéro sur une base vide', async () => {
     const { service } = makePrisma([]);
-    const result = await new AnalyticsService(service).byPhase2Status(admin, {});
+    const result = await new AnalyticsService(service, fakeDemoVisibility()).byPhase2Status(
+      admin,
+      {},
+    );
     expect(result.total).toBe(0);
     expect(result.items.every((item) => item.share === 0)).toBe(true);
   });
@@ -234,7 +250,7 @@ describe('séries de phase 2', () => {
 describe('cloisonnement des agrégats', () => {
   it('un COMMERCIAL ne lit jamais les chiffres de ses collègues', async () => {
     const { service, sql } = makePrisma([]);
-    const analytics = new AnalyticsService(service);
+    const analytics = new AnalyticsService(service, fakeDemoVisibility());
 
     await analytics.bySegment(alice, {});
     await analytics.byPhase2Status(alice, {});
@@ -246,7 +262,7 @@ describe('cloisonnement des agrégats', () => {
 
   it('un ADMIN n’est borné par rien', async () => {
     const { service, sql } = makePrisma([]);
-    await new AnalyticsService(service).totals(admin, {});
+    await new AnalyticsService(service, fakeDemoVisibility()).totals(admin, {});
     expect(sql()).not.toContain('p."createdById" =');
   });
 });
@@ -256,7 +272,7 @@ describe('granularité temporelle', () => {
     const { service, sql } = makePrisma([]);
     // La valeur vient d'une énumération fermée : une chaîne arbitraire retombe
     // sur 'day' plutôt que d'atteindre la requête.
-    await new AnalyticsService(service).overTime(admin, {
+    await new AnalyticsService(service, fakeDemoVisibility()).overTime(admin, {
       granularity: "day'); DROP TABLE prospects; --" as never,
     });
 

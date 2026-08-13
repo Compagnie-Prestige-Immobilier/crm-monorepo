@@ -100,9 +100,7 @@ export function SidebarNav({
               <h2
                 id={`nav-section-${String(index)}`}
                 className={cn(
-                  collapsed
-                    ? 'sr-only'
-                    : 'eyebrow px-3 pb-1.5 text-sidebar-muted-foreground',
+                  collapsed ? 'sr-only' : 'eyebrow px-3 pb-1.5 text-sidebar-muted-foreground',
                 )}
               >
                 {section.title}

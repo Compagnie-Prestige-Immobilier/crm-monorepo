@@ -17,6 +17,8 @@ import { NotificationsService } from './notifications.service.js';
 import { readNotificationsEnv } from './notifications.env.js';
 import { renderNotification } from './template.js';
 import type { ReminderRunDto } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { demoScope } from '../../prisma/demo-visibility.js';
 
 /**
  * Rappels programmés.
@@ -97,6 +99,7 @@ export class RemindersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly demo: DemoVisibilityService,
   ) {}
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -244,12 +247,18 @@ export class RemindersService {
   async remindOpenCallTasks(now: Date = new Date()): Promise<ReminderRunDto> {
     if (!this.config.NOTIFICATIONS_OPEN_TASKS_ENABLED) return { created: 0, skipped: 0 };
 
+    // Lu une fois pour tout le passage de rappels : regrouper les taches avec
+    // une visibilite et resoudre les destinataires avec une autre produirait
+    // une relance adressee a personne.
+    const demoEnabled = await this.demo.enabled();
+
     const grouped = await this.prisma.callTask.groupBy({
       by: ['assignedToId'],
       where: {
         status: CallTaskStatus.OPEN,
         isActive: true,
         campaign: { status: CampaignStatus.ACTIVE },
+        ...demoScope(demoEnabled),
       },
       _count: { _all: true },
     });
@@ -264,6 +273,7 @@ export class RemindersService {
         id: { in: eligible.map((group) => group.assignedToId) },
         isActive: true,
         deletedAt: null,
+        ...demoScope(demoEnabled),
       },
       select: { id: true, fullName: true },
     });

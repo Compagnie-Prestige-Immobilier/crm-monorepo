@@ -3,7 +3,8 @@ import { redirect, unstable_rethrow } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { DemoBanner } from '@/components/layout/demo-banner';
-import { SIDEBAR_COOKIE, SidebarShell } from '@/components/layout/sidebar-shell';
+import { SIDEBAR_COOKIE } from '@/components/layout/sidebar-cookie';
+import { SidebarShell } from '@/components/layout/sidebar-shell';
 import { Topbar } from '@/components/layout/topbar';
 import { QueryErrorState } from '@/components/query-error-state';
 import { getServerApiClient } from '@/lib/api/server';

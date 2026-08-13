@@ -43,6 +43,9 @@ export interface UserRow {
   isActive: boolean;
   deletedAt: Date | null;
   departementId: string | null;
+  /** Présent parce que le schéma le porte : sans lui, `where: { isDemo: false }`
+   *  ne correspondrait à aucune ligne et la doublure validerait un faux. */
+  isDemo: boolean;
 }
 
 export interface DeviceTokenRow {
@@ -102,6 +105,8 @@ export interface CallTaskRow {
   status: string;
   isActive: boolean;
   campaignStatus: string;
+  /** Même raison que sur `UserRow` : le schéma le porte, la doublure aussi. */
+  isDemo: boolean;
 }
 
 export const ADMIN: UserRow = {
@@ -110,6 +115,7 @@ export const ADMIN: UserRow = {
   role: Role.ADMIN,
   isActive: true,
   deletedAt: null,
+  isDemo: false,
   departementId: null,
 };
 
@@ -207,6 +213,7 @@ export class FakePrisma {
       isActive: row.isActive ?? true,
       deletedAt: row.deletedAt ?? null,
       departementId: row.departementId ?? null,
+      isDemo: row.isDemo ?? false,
       id: row.id,
     };
     this.users.push(user);
@@ -236,6 +243,7 @@ export class FakePrisma {
       status: row.status ?? 'OPEN',
       isActive: row.isActive ?? true,
       campaignStatus: row.campaignStatus ?? 'ACTIVE',
+      isDemo: row.isDemo ?? false,
     };
     this.callTasks.push(task);
     return task;
