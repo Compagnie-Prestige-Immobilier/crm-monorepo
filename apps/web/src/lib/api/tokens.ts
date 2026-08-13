@@ -26,8 +26,7 @@ export interface RotatedTokens {
 const inFlightRotations = new Map<string, Promise<RefreshRotationResult>>();
 
 export type RefreshRotationResult =
-  | { ok: true; tokens: RotatedTokens }
-  | { ok: false; reason: 'invalid' | 'unavailable' };
+  { ok: true; tokens: RotatedTokens } | { ok: false; reason: 'invalid' | 'unavailable' };
 
 /**
  * Lit `exp` d'un JWT SANS vérifier sa signature.
