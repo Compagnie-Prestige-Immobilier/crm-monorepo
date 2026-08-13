@@ -579,7 +579,7 @@ export function NotificationComposer({
                   send.isPending ||
                   preview.isPending ||
                   preview.isError ||
-                  (preview.data?.recipientCount ?? 0) === 0
+                  preview.data.recipientCount === 0
                 }
                 onClick={() => {
                   send.mutate();
