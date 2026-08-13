@@ -39,8 +39,9 @@ class AppDatabase extends _$AppDatabase {
 
   /// v2 — phase 2 : `phase2_directory` et `call_attempts`.
   /// v3 — notifications push : `notifications`.
+  /// v4 — référentiel `iefs` et colonne facultative `representants.ief_id`.
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -61,6 +62,21 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(notifications);
         await m.createIndex(notificationsCreatedIdx);
         await m.createIndex(notificationsUnreadIdx);
+      }
+      // `to` est testé, et pas seulement `from`. Les paliers précédents ne
+      // créaient que des tables neuves, et une table en trop passe inaperçue.
+      // Celui-ci AJOUTE UNE COLONNE à une table existante : exécuté lors d'une
+      // migration qui ne vise que la v2, il produirait un schéma qui n'est
+      // aucune version déclarée. Le test doré l'a attrapé, un appareil ne
+      // l'aurait pas signalé.
+      if (from < 4 && to >= 4) {
+        await m.createTable(iefs);
+        await m.createIndex(iefsActiveIdx);
+        await m.createIndex(iefsDepartementIdx);
+        // Colonne AJOUTÉE, table non recréée : `representants` porte les fiches
+        // pas encore synchronisées. Les recréer effacerait une journée de
+        // saisie que rien ne pourrait restituer.
+        await m.addColumn(representants, representants.iefId);
       }
     },
     beforeOpen: (OpeningDetails details) async {

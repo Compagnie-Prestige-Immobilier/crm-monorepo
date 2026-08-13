@@ -20,6 +20,7 @@ import { RETIRED_SUFFIX, type ProspectFilters, type ReferenceData } from '@/lib/
 
 const REFERENCE: ReferenceData = {
   regions: [],
+  iefs: [],
   departements: [
     { id: 'd-1', name: 'Dakar', regionId: 'reg-1', regionName: 'Dakar', isActive: true },
     { id: 'd-2', name: 'Thiès', regionId: 'reg-2', regionName: 'Thiès', isActive: false },

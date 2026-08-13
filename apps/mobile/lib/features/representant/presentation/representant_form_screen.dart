@@ -52,14 +52,17 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   final TextEditingController _nom = TextEditingController();
   final TextEditingController _phone = TextEditingController();
   final TextEditingController _departement = TextEditingController();
+  final TextEditingController _ief = TextEditingController();
   final FocusNode _nomFocus = FocusNode();
   final FocusNode _phoneFocus = FocusNode();
   final FocusNode _departementFocus = FocusNode();
+  final FocusNode _iefFocus = FocusNode();
 
   late final String _draftId = widget.draftId ?? Ids.newId();
   late final String _entityId = widget.representantId ?? Ids.newId();
 
   String? _departementId;
+  String? _iefId;
   bool _saving = false;
   String? _error;
 
@@ -99,6 +102,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     'phone': _phone.text,
     'departementId': _departementId,
     'departementLabel': _departement.text,
+    'iefId': _iefId,
+    'iefLabel': _ief.text,
   };
 
   @override
@@ -106,7 +111,12 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     super.initState();
     // Vider sur perte de focus, en plus de la traîne : quitter un champ est le
     // moment où l'utilisateur considère sa valeur acquise.
-    for (final FocusNode node in <FocusNode>[_nomFocus, _phoneFocus, _departementFocus]) {
+    for (final FocusNode node in <FocusNode>[
+      _nomFocus,
+      _phoneFocus,
+      _departementFocus,
+      _iefFocus,
+    ]) {
       node.addListener(() {
         if (!node.hasFocus) unawaited(flushDraft());
       });
@@ -120,9 +130,11 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     _nom.dispose();
     _phone.dispose();
     _departement.dispose();
+    _ief.dispose();
     _nomFocus.dispose();
     _phoneFocus.dispose();
     _departementFocus.dispose();
+    _iefFocus.dispose();
     super.dispose();
   }
 
@@ -136,8 +148,10 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
           _nom.text = existing.fullName;
           _phone.text = Phone.groupNational(Phone.digitsOf(existing.phoneE164));
           _departementId = existing.departementId;
+        _iefId = existing.iefId;
         });
         await _labelDepartement(existing.departementId);
+        if (existing.iefId != null) await _labelIef(existing.iefId!);
       }
       return;
     }
@@ -165,6 +179,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       _phone.text = (snapshot.values['phone'] as String?) ?? '';
       _departementId = snapshot.values['departementId'] as String?;
       _departement.text = (snapshot.values['departementLabel'] as String?) ?? '';
+      _iefId = snapshot.values['iefId'] as String?;
+      _ief.text = (snapshot.values['iefLabel'] as String?) ?? '';
       _pendingRestore = null;
     });
     _scheduleLookup();
@@ -175,6 +191,11 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
         .read(referenceRepositoryProvider)
         .departementById(id);
     if (dep != null && mounted) setState(() => _departement.text = dep.name);
+  }
+
+  Future<void> _labelIef(String id) async {
+    final Ief? ief = await ref.read(referenceRepositoryProvider).iefById(id);
+    if (ief != null && mounted) setState(() => _ief.text = ief.name);
   }
 
   // ── Détection de doublon ───────────────────────────────────────────────────
@@ -252,6 +273,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
               fullName: _nom.text.trim(),
               phoneE164: phoneE164,
               departementId: _departementId!,
+              iefId: _iefId,
               draftId: _draftId,
             );
       } else {
@@ -262,6 +284,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
               fullName: _nom.text.trim(),
               phoneE164: phoneE164,
               departementId: _departementId!,
+              iefId: _iefId,
               createdById: userId,
               draftId: _draftId,
             );
@@ -303,6 +326,10 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     final ThemeData theme = Theme.of(context);
     final List<Departement> departements =
         ref.watch(departementsProvider).value ?? const <Departement>[];
+    // Restreintes au département choisi : proposer les 59 IEF du pays alors que
+    // le département est connu ferait chercher dans cinquante-huit entrées hors
+    // sujet.
+    final List<Ief> iefs = ref.watch(iefsProvider(_departementId)).value ?? const <Ief>[];
 
     return CpiPopScope(
       child: Scaffold(
@@ -398,7 +425,49 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                         markDraftDirty();
                       },
                       onSelected: (TypeaheadOption option) {
-                        setState(() => _departementId = option.id);
+                        setState(() {
+                          _departementId = option.id;
+                          // Changer de département invalide l'IEF : les IEF
+                          // n'appartiennent qu'à un seul département, et garder
+                          // « Almadies » après être passé à Thiès produirait une
+                          // fiche que le serveur refuserait sans qu'on sache
+                          // pourquoi.
+                          _iefId = null;
+                          _ief.text = '';
+                        });
+                        markDraftDirty();
+                        unawaited(flushDraft());
+                      },
+                    ),
+                    const SizedBox(height: CpiSpacing.md),
+                    LocalTypeahead(
+                      controller: _ief,
+                      focusNode: _iefFocus,
+                      label: 'IEF (facultatif)',
+                      hint: _departementId == null
+                          ? 'Choisissez d’abord le département'
+                          : 'Almadies, Grand Dakar, Thiaroye…',
+                      selectedId: _iefId,
+                      textInputAction: TextInputAction.done,
+                      emptyHint: iefs.isEmpty
+                          ? 'Aucune IEF pour ce département.'
+                          : 'Aucun résultat',
+                      options: iefs
+                          .map(
+                            (Ief i) => TypeaheadOption(
+                              id: i.id,
+                              label: i.name,
+                              secondary: i.departementName,
+                              keywords: <String>[i.code, i.departementName],
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: (String _) {
+                        if (_iefId != null) setState(() => _iefId = null);
+                        markDraftDirty();
+                      },
+                      onSelected: (TypeaheadOption option) {
+                        setState(() => _iefId = option.id);
                         markDraftDirty();
                         unawaited(flushDraft());
                       },

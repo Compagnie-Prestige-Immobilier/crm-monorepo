@@ -32,6 +32,8 @@ class SyncEntityDataDto {
 
     this.departementId,
 
+    this.iefId,
+
     this.banqueId,
 
     this.syndicatId,
@@ -72,6 +74,10 @@ class SyncEntityDataDto {
   /// Représentant : département.
   @JsonKey(name: r'departementId', required: false, includeIfNull: false)
   final String? departementId;
+
+  /// Représentant : IEF de rattachement, facultative. Une version ancienne de l’application ne l’envoie pas ; l’absence du champ laisse la valeur en place et ne l’efface pas.
+  @JsonKey(name: r'iefId', required: false, includeIfNull: false)
+  final String? iefId;
 
   /// Prospect : banque.
   @JsonKey(name: r'banqueId', required: false, includeIfNull: false)
@@ -137,6 +143,7 @@ class SyncEntityDataDto {
                 prenom,
                 phone,
                 departementId,
+                iefId,
                 banqueId,
                 syndicatId,
                 representantId,
@@ -154,6 +161,7 @@ class SyncEntityDataDto {
                 other.prenom,
                 other.phone,
                 other.departementId,
+                other.iefId,
                 other.banqueId,
                 other.syndicatId,
                 other.representantId,
@@ -177,6 +185,7 @@ class SyncEntityDataDto {
         prenom,
         phone,
         departementId,
+        iefId,
         banqueId,
         syndicatId,
         representantId,

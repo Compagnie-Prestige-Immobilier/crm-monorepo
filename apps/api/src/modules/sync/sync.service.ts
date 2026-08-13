@@ -396,6 +396,7 @@ export class SyncService {
           phoneE164,
           ...(data.notes ? { notes: data.notes } : {}),
           departementId: data.departementId,
+          ...(data.iefId ? { iefId: data.iefId } : {}),
           createdById: user.id,
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
         },
@@ -404,6 +405,7 @@ export class SyncService {
           phoneE164,
           notes: data.notes ?? null,
           departementId: data.departementId,
+          ...(data.iefId ? { iefId: data.iefId } : {}),
           deletedAt: null,
           rev: { increment: 1 },
         },
@@ -423,6 +425,9 @@ export class SyncService {
         phoneE164,
         ...(data.notes !== undefined ? { notes: data.notes || null } : {}),
         ...(data.departementId ? { departementId: data.departementId } : {}),
+        // `undefined` et non `null` : une application ancienne n'envoie pas le
+        // champ, et son silence ne doit pas effacer une IEF deja renseignee.
+        ...(data.iefId === undefined ? {} : { iefId: data.iefId }),
         rev: { increment: 1 },
       },
     });
@@ -618,6 +623,17 @@ export class SyncService {
     cursor = advance(cursor, 'departements', lastPosition(departements));
     hasMore ||= departements.length === limit;
 
+    // Les IEF voyagent avec les autres référentiels : le sélecteur de saisie
+    // doit fonctionner hors ligne, sinon la fiche s'arrête à la première coupure.
+    const iefs = await this.prisma.ief.findMany({
+      where: keyset(cursor.streams.iefs, safeNow),
+      include: { departement: { select: { name: true, region: { select: { name: true } } } } },
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'iefs', lastPosition(iefs));
+    hasMore ||= iefs.length === limit;
+
     const banques = await this.prisma.banque.findMany({
       where: keyset(cursor.streams.banques, safeNow),
       orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
@@ -692,6 +708,16 @@ export class SyncService {
           name: row.name,
           regionId: row.regionId,
           regionName: row.region.name,
+          isActive: row.isActive,
+          updatedAt: row.updatedAt.toISOString(),
+        })),
+        iefs: iefs.map((row) => ({
+          id: row.id,
+          code: row.code,
+          name: row.name,
+          departementId: row.departementId,
+          departementName: row.departement.name,
+          regionName: row.departement.region.name,
           isActive: row.isActive,
           updatedAt: row.updatedAt.toISOString(),
         })),

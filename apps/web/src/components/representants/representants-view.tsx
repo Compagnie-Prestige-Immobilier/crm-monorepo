@@ -114,7 +114,38 @@ export function RepresentantsView() {
             label: departement.name,
           }))}
           onChange={(value) => {
-            setFilters((current) => ({ ...current, departementId: value, page: 1 }));
+            setFilters((current) => ({
+              ...current,
+              departementId: value,
+              // L'IEF choisie n'appartient qu'à un département : la garder après
+              // un changement de département donnerait une liste vide sans que
+              // rien à l'écran n'explique pourquoi.
+              iefId: null,
+              page: 1,
+            }));
+          }}
+        />
+
+        <FilterCombobox
+          label="IEF"
+          placeholder="Toutes les IEF"
+          value={filters.iefId}
+          options={(reference?.iefs ?? [])
+            // Restreintes au département choisi. Proposer les 59 IEF du pays
+            // alors que le département est déjà filtré ferait chercher dans
+            // cinquante-huit entrées hors sujet.
+            .filter((ief) =>
+              filters.departementId === null ? true : ief.departementId === filters.departementId,
+            )
+            .map((ief) => ({
+              value: ief.id,
+              label: ief.name,
+              // Le département en indice : « Bignona 1 » et « Bignona 2 » ne se
+              // distinguent que par lui, et quatre IEF partagent Dakar.
+              hint: ief.departementName,
+            }))}
+          onChange={(value) => {
+            setFilters((current) => ({ ...current, iefId: value, page: 1 }));
           }}
         />
 
@@ -152,6 +183,7 @@ export function RepresentantsView() {
                 <TableHead>Représentant</TableHead>
                 <TableHead>Téléphone</TableHead>
                 <TableHead>Département</TableHead>
+                <TableHead>IEF</TableHead>
                 <TableHead>Saisi par</TableHead>
                 <TableHead className="text-right">Prospects</TableHead>
                 <TableHead>Première saisie</TableHead>
@@ -160,7 +192,7 @@ export function RepresentantsView() {
             <TableBody>
               {data.items.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={6} className="py-16">
+                  <TableCell colSpan={7} className="py-16">
                     <div className="flex flex-col items-center gap-2 text-center">
                       <UsersRoundIcon className="size-8 text-muted-foreground" aria-hidden="true" />
                       <p className="font-[600]">Aucun représentant ne correspond à ces critères.</p>
@@ -178,6 +210,12 @@ export function RepresentantsView() {
                       {formatPhone(representant.phoneE164)}
                     </TableCell>
                     <TableCell>{representant.departementName}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {/* Un tiret cadratin, et non « — aucune » : les fiches
+                          saisies avant l'arrivée du référentiel n'en portent
+                          pas, et ce n'est pas une anomalie à commenter. */}
+                      {representant.iefName ?? '—'}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {representant.createdByName}
                     </TableCell>

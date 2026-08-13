@@ -50,6 +50,7 @@ import 'package:crm_api_client/src/model/directory_page_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method_count_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method_list_dto.dart';
 import 'package:crm_api_client/src/model/funnel_stage_dto.dart';
+import 'package:crm_api_client/src/model/ief_dto.dart';
 import 'package:crm_api_client/src/model/inbox_dto.dart';
 import 'package:crm_api_client/src/model/inbox_item_dto.dart';
 import 'package:crm_api_client/src/model/login_dto.dart';
@@ -314,6 +315,8 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'FunnelStageDto':
       return FunnelStageDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'IefDto':
+      return IefDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'InboxDto':
       return InboxDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'InboxItemDto':

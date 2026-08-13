@@ -960,6 +960,7 @@ void main() {
         PullPage(
           changes: SyncChangesDto(
             departements: const <DepartementDto>[],
+    iefs: const <IefDto>[],
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
             representants: <RepresentantDto>[
@@ -999,6 +1000,7 @@ void main() {
         PullPage(
           changes: SyncChangesDto(
             departements: const <DepartementDto>[],
+    iefs: const <IefDto>[],
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
             representants: const <RepresentantDto>[],
@@ -1024,6 +1026,7 @@ void main() {
         PullPage(
           changes: SyncChangesDto(
             departements: const <DepartementDto>[],
+    iefs: const <IefDto>[],
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
             representants: const <RepresentantDto>[],

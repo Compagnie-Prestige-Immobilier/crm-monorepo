@@ -9,6 +9,8 @@ part of 'sync_changes_dto.dart';
 abstract class _$SyncChangesDtoCWProxy {
   SyncChangesDto departements(List<DepartementDto> departements);
 
+  SyncChangesDto iefs(List<IefDto> iefs);
+
   SyncChangesDto banques(List<BanqueDto> banques);
 
   SyncChangesDto syndicats(List<SyndicatDto> syndicats);
@@ -25,6 +27,7 @@ abstract class _$SyncChangesDtoCWProxy {
   /// ````
   SyncChangesDto call({
     List<DepartementDto> departements,
+    List<IefDto> iefs,
     List<BanqueDto> banques,
     List<SyndicatDto> syndicats,
     List<RepresentantDto> representants,
@@ -41,6 +44,9 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
   @override
   SyncChangesDto departements(List<DepartementDto> departements) =>
       this(departements: departements);
+
+  @override
+  SyncChangesDto iefs(List<IefDto> iefs) => this(iefs: iefs);
 
   @override
   SyncChangesDto banques(List<BanqueDto> banques) => this(banques: banques);
@@ -66,6 +72,7 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
   /// ````
   SyncChangesDto call({
     Object? departements = const $CopyWithPlaceholder(),
+    Object? iefs = const $CopyWithPlaceholder(),
     Object? banques = const $CopyWithPlaceholder(),
     Object? syndicats = const $CopyWithPlaceholder(),
     Object? representants = const $CopyWithPlaceholder(),
@@ -76,6 +83,10 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
           ? _value.departements
           // ignore: cast_nullable_to_non_nullable
           : departements as List<DepartementDto>,
+      iefs: iefs == const $CopyWithPlaceholder()
+          ? _value.iefs
+          // ignore: cast_nullable_to_non_nullable
+          : iefs as List<IefDto>,
       banques: banques == const $CopyWithPlaceholder()
           ? _value.banques
           // ignore: cast_nullable_to_non_nullable
@@ -112,6 +123,7 @@ SyncChangesDto _$SyncChangesDtoFromJson(Map<String, dynamic> json) =>
         json,
         requiredKeys: const [
           'departements',
+          'iefs',
           'banques',
           'syndicats',
           'representants',
@@ -123,6 +135,12 @@ SyncChangesDto _$SyncChangesDtoFromJson(Map<String, dynamic> json) =>
           'departements',
           (v) => (v as List<dynamic>)
               .map((e) => DepartementDto.fromJson(e as Map<String, dynamic>))
+              .toList(),
+        ),
+        iefs: $checkedConvert(
+          'iefs',
+          (v) => (v as List<dynamic>)
+              .map((e) => IefDto.fromJson(e as Map<String, dynamic>))
               .toList(),
         ),
         banques: $checkedConvert(
@@ -156,6 +174,7 @@ SyncChangesDto _$SyncChangesDtoFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$SyncChangesDtoToJson(SyncChangesDto instance) =>
     <String, dynamic>{
       'departements': instance.departements.map((e) => e.toJson()).toList(),
+      'iefs': instance.iefs.map((e) => e.toJson()).toList(),
       'banques': instance.banques.map((e) => e.toJson()).toList(),
       'syndicats': instance.syndicats.map((e) => e.toJson()).toList(),
       'representants': instance.representants.map((e) => e.toJson()).toList(),
