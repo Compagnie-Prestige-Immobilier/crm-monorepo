@@ -1,23 +1,17 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import {
-  ChevronDownIcon,
-  RotateCcwIcon,
-  SearchIcon,
-  SlidersHorizontalIcon,
-  XIcon,
-} from 'lucide-react';
+import { ChevronDownIcon, RotateCcwIcon, SlidersHorizontalIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { buildAdvancedChips } from '@/components/filters/advanced-chips';
+import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { SearchField } from '@/components/filters/search-field';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
 import { Badge } from '@/components/ui/badge';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchReferenceData } from '@/lib/data/reference';
 import {
@@ -124,9 +118,6 @@ function writeStoredOpen(open: boolean): void {
 
 export function FiltersBar() {
   const { filters, setFilters, resetFilters } = useProspectFilters();
-  const searchId = useId();
-  const fromId = useId();
-  const toId = useId();
   const panelId = useId();
 
   const {
@@ -229,25 +220,11 @@ export function FiltersBar() {
     >
       {/* ─── Filtrage simple ────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex min-w-[15rem] flex-1 flex-col gap-1.5">
-          <Label htmlFor={searchId}>Recherche</Label>
-          <div className="relative">
-            <SearchIcon
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <Input
-              id={searchId}
-              type="search"
-              value={searchDraft}
-              onChange={(event) => {
-                setSearchDraft(event.target.value);
-              }}
-              placeholder="Nom, téléphone, représentant…"
-              className="pl-9"
-            />
-          </div>
-        </div>
+        <SearchField
+          value={searchDraft}
+          onChange={setSearchDraft}
+          placeholder="Nom, téléphone, représentant…"
+        />
 
         <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
           {/* Le seul critère de liste resté visible : c'est celui qu'on change
@@ -263,30 +240,24 @@ export function FiltersBar() {
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor={fromId}>Saisi à partir du</Label>
-          <Input
-            id={fromId}
-            type="date"
-            value={filters.dateFrom ?? ''}
-            max={filters.dateTo ?? undefined}
-            onChange={(event) => {
-              setFilters({ dateFrom: event.target.value === '' ? null : event.target.value });
-            }}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor={toId}>Jusqu’au</Label>
-          <Input
-            id={toId}
-            type="date"
-            value={filters.dateTo ?? ''}
-            min={filters.dateFrom ?? undefined}
-            onChange={(event) => {
-              setFilters({ dateTo: event.target.value === '' ? null : event.target.value });
-            }}
-          />
-        </div>
+        <DatePicker
+          id="prospects-date-from"
+          label="Saisi à partir du"
+          value={filters.dateFrom}
+          max={filters.dateTo}
+          onChange={(dateFrom) => {
+            setFilters({ dateFrom });
+          }}
+        />
+        <DatePicker
+          id="prospects-date-to"
+          label="Jusqu’au"
+          value={filters.dateTo}
+          min={filters.dateFrom}
+          onChange={(dateTo) => {
+            setFilters({ dateTo });
+          }}
+        />
       </div>
 
       {/* ─── Commandes ──────────────────────────────────────────────────── */}
@@ -300,9 +271,16 @@ export function FiltersBar() {
         >
           <SlidersHorizontalIcon aria-hidden="true" />
           Filtres avancés
+          {/* Le compte porte sur les critères REPLIÉS, et sur eux seuls : ce
+              sont les seuls qu'on ne voit pas. Compter aussi la recherche et la
+              période mettrait un « 5 » sur un bouton qui n'en cache que trois. */}
           {advancedCount > 0 ? (
             <Badge variant="default" className="ml-1 tabular-nums">
               {advancedCount}
+              <span className="sr-only">
+                {' '}
+                critère{advancedCount > 1 ? 's' : ''} replié{advancedCount > 1 ? 's' : ''}
+              </span>
             </Badge>
           ) : null}
           <ChevronDownIcon
@@ -314,16 +292,16 @@ export function FiltersBar() {
           />
         </Button>
 
+        {/* Pas de seconde pastille « 3 filtres » à côté de celle du bouton :
+            posées côte à côte, les deux comptes se lisaient comme une
+            répétition, et rien n'indiquait qu'ils portent sur des ensembles
+            différents. Les critères visibles se comptent à l'œil ; seuls les
+            critères repliés méritaient un chiffre. */}
         {activeCount > 0 ? (
-          <>
-            <Badge variant="secondary" className="tabular-nums">
-              {activeCount} filtre{activeCount > 1 ? 's' : ''}
-            </Badge>
-            <Button variant="ghost" onClick={resetFilters}>
-              <RotateCcwIcon aria-hidden="true" />
-              Réinitialiser
-            </Button>
-          </>
+          <Button variant="ghost" onClick={resetFilters}>
+            <RotateCcwIcon aria-hidden="true" />
+            Tout effacer
+          </Button>
         ) : null}
       </div>
 
