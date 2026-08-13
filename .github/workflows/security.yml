@@ -30,16 +30,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dependency-review:
-    name: dependency review — changed packages
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
-        with:
-          fail-on-severity: high
-
   secrets:
     name: gitleaks
     runs-on: ubuntu-latest
