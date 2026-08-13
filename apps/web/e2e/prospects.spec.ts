@@ -60,7 +60,8 @@ test('filtrage du tableau puis export xlsx', async ({ page }) => {
   // Le rôle `combobox` est indispensable : l'en-tête de tri de la colonne
   // porte AUSSI le nom accessible « Statut », mais comme `button`. Viser le
   // bouton triait la colonne au lieu d'ouvrir le filtre.
-  await page.getByRole('combobox', { name: 'Statut' }).click();
+  await page.getByRole('button', { name: 'Filtres avancés' }).click();
+  await page.getByRole('combobox', { name: 'Statut Tous les statuts' }).click();
   await page.getByRole('option', { name: 'Nouveau', exact: true }).click();
 
   // L'URL EST l'état : sans cela le lien n'est pas partageable, et l'export ne
@@ -109,7 +110,7 @@ test('chaque écran du panel se charge sans état d’erreur', async ({ page }) 
     ['/dossiers/export', 'Export'],
     ['/dossiers/etapes', 'Étapes bancaires'],
     ['/representants', 'Représentants'],
-    ['/commerciaux', 'Commerciaux'],
+    ['/commerciaux', 'Téléconseillers'],
     ['/referentiels', 'Référentiels'],
     ['/parametres', 'Paramètres'],
   ] as const) {
