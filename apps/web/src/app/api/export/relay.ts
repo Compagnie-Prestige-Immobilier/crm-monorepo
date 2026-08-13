@@ -13,7 +13,7 @@ import {
   setSessionCookies,
   toAuthTokens,
 } from '@/lib/api/server';
-import { rotateRefreshToken } from '@/lib/api/tokens';
+import { rotateRefreshTokenDetailed } from '@/lib/api/tokens';
 import { getSession } from '@/lib/session';
 import type { Role } from '@/lib/types';
 
@@ -94,12 +94,16 @@ export async function relayXlsx(options: XlsxRelayOptions): Promise<Response> {
 
     if (upstream.status === 401) {
       const refreshToken = await getRefreshToken();
-      const rotated =
+      const rotation =
         refreshToken === null || refreshToken === ''
-          ? null
-          : await rotateRefreshToken(serverApiOrigin(), refreshToken);
+          ? { ok: false as const, reason: 'invalid' as const }
+          : await rotateRefreshTokenDetailed(serverApiOrigin(), refreshToken);
 
-      if (rotated === null) {
+      if (!rotation.ok && rotation.reason === 'unavailable') {
+        return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });
+      }
+
+      if (!rotation.ok) {
         await clearSessionCookies();
         return NextResponse.json(
           { error: 'Session expirée. Reconnectez-vous.', code: 'SESSION_EXPIRED' },
@@ -107,8 +111,8 @@ export async function relayXlsx(options: XlsxRelayOptions): Promise<Response> {
         );
       }
 
-      await setSessionCookies(toAuthTokens(rotated));
-      upstream = await requestUpstream(options, rotated.accessToken);
+      await setSessionCookies(toAuthTokens(rotation.tokens));
+      upstream = await requestUpstream(options, rotation.tokens.accessToken);
     }
   } catch {
     return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });

@@ -42,6 +42,8 @@ import {
   type SyncPushDto,
   type SyncPushResponseDto,
 } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { demoScope } from '../../prisma/demo-visibility.js';
 
 /**
  * Retard de sécurité du pull.
@@ -124,6 +126,7 @@ export class SyncService {
     private readonly prisma: PrismaService,
     private readonly batches: SyncBatchStore,
     private readonly phase2Sync: Phase2SyncService,
+    private readonly demo: DemoVisibilityService,
   ) {}
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -632,7 +635,13 @@ export class SyncService {
     hasMore ||= syndicats.length === limit;
 
     // ─ Métier : cloisonné par commercial ─
-    const scope = ownerScope(user);
+    //
+    // Le cloisonnement suffirait presque : les fiches de démonstration
+    // appartiennent à des comptes de démonstration, et un vrai commercial ne
+    // tire que les siennes. On pose quand même le filtre, pour la seule
+    // situation où l'un ne couvre pas l'autre — le compte de démonstration
+    // lui-même, qui ne doit plus rien recevoir une fois le mode éteint.
+    const scope = { ...ownerScope(user), ...demoScope(await this.demo.enabled()) };
 
     const representants = await this.prisma.representant.findMany({
       where: { ...keyset(cursor.streams.representants, safeNow), ...scope },

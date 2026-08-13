@@ -7,7 +7,7 @@ import {
   REFRESH_TTL_SECONDS,
   serverApiOrigin,
 } from '@/lib/api/config';
-import { isAccessTokenStale, rotateRefreshToken } from '@/lib/api/tokens';
+import { isAccessTokenStale, rotateRefreshTokenDetailed } from '@/lib/api/tokens';
 
 /**
  * Rotation ANTICIPÉE des jetons (`proxy.ts`, ex-`middleware.ts`).
@@ -54,13 +54,18 @@ const proxy: NextProxy = async (request) => {
     throw error;
   }
 
-  const rotated = await rotateRefreshToken(origin, refresh);
+  const rotation = await rotateRefreshTokenDetailed(origin, refresh);
 
-  if (rotated === null) {
-    // Famille de jetons morte (révoquée, expirée ou rejouée) ou backend
-    // injoignable. On efface : la page appelante lira une session absente et
-    // renverra vers /connexion. Effacer plutôt que rediriger d'ici évite de
-    // casser une requête de données en cours avec une redirection HTML.
+  if (!rotation.ok && rotation.reason === 'unavailable') {
+    // Une panne réseau n'est pas une session morte. Garder les cookies permet
+    // au prochain chargement de retenter la rotation quand l'API revient.
+    return NextResponse.next();
+  }
+
+  if (!rotation.ok) {
+    // Famille de jetons morte (révoquée, expirée ou rejouée). Effacer plutôt
+    // que rediriger d'ici évite de casser une requête de données en cours avec
+    // une redirection HTML.
     const response = NextResponse.next();
     response.cookies.delete(ACCESS_COOKIE);
     response.cookies.delete(REFRESH_COOKIE);
@@ -69,8 +74,8 @@ const proxy: NextProxy = async (request) => {
 
   // Réécriture côté REQUÊTE : sans elle, le rendu qui suit lirait encore
   // l'ancien jeton dans `cookies()` et repartirait pour un 401.
-  request.cookies.set(ACCESS_COOKIE, rotated.accessToken);
-  request.cookies.set(REFRESH_COOKIE, rotated.refreshToken);
+  request.cookies.set(ACCESS_COOKIE, rotation.tokens.accessToken);
+  request.cookies.set(REFRESH_COOKIE, rotation.tokens.refreshToken);
 
   const response = NextResponse.next({ request });
   const options = {
@@ -80,11 +85,11 @@ const proxy: NextProxy = async (request) => {
     path: '/',
   } as const;
 
-  response.cookies.set(ACCESS_COOKIE, rotated.accessToken, {
+  response.cookies.set(ACCESS_COOKIE, rotation.tokens.accessToken, {
     ...options,
-    maxAge: rotated.expiresIn,
+    maxAge: rotation.tokens.expiresIn,
   });
-  response.cookies.set(REFRESH_COOKIE, rotated.refreshToken, {
+  response.cookies.set(REFRESH_COOKIE, rotation.tokens.refreshToken, {
     ...options,
     maxAge: REFRESH_TTL_SECONDS,
   });

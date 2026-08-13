@@ -30,6 +30,8 @@ import type {
   CampaignSummaryDto,
   CreateCampaignDto,
 } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { demoScope } from '../../prisma/demo-visibility.js';
 
 /**
  * Le tirage d'une campagne écrit autant de lignes qu'il y a de prospects
@@ -79,7 +81,10 @@ function tallyInto(index: ProgressIndex, key: string, status: CallTaskStatus, co
 export class Phase2CampaignsService {
   private readonly logger = new Logger(Phase2CampaignsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demo: DemoVisibilityService,
+  ) {}
 
   // ───────────────────────────────────────────────────────────────────────────
   // Création
@@ -234,7 +239,10 @@ export class Phase2CampaignsService {
   async list(query: CampaignQueryDto): Promise<CampaignListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
-    const where: Prisma.CallCampaignWhereInput = query.status ? { status: query.status } : {};
+    const where: Prisma.CallCampaignWhereInput = {
+      ...demoScope(await this.demo.enabled()),
+      ...(query.status ? { status: query.status } : {}),
+    };
 
     const [total, campaigns] = await Promise.all([
       this.prisma.callCampaign.count({ where }),

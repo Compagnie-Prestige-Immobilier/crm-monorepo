@@ -13,6 +13,7 @@ import {
 } from './demo-registry.js';
 import { seedDemoData } from './demo-seeder.js';
 import type { DemoCountsDto, DemoStatusDto } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
 /**
  * L'ensemencement touche plusieurs milliers de lignes : le délai par défaut de
@@ -26,7 +27,10 @@ const DEMO_TRANSACTION_TIMEOUT_MS = 120_000;
 export class DemoService {
   private readonly logger = new Logger(DemoService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly visibility: DemoVisibilityService,
+  ) {}
 
   // ───────────────────────────────────────────────────────────────────────────
   // Garde-fou d'environnement
@@ -235,5 +239,12 @@ export class DemoService {
       create: { key, value, updatedById },
       update: { value, updatedById },
     });
+
+    // Le cache de visibilité est vidé ICI, dans l'unique fonction qui écrit un
+    // réglage, et non à la sortie de `enable` / `disable` / `purge` : ces trois
+    // méthodes ont sept points de retour à elles trois, et il suffirait d'en
+    // oublier un pour qu'un administrateur bascule l'interrupteur sans que
+    // l'écran change — le pire symptôme possible pour un interrupteur.
+    this.visibility.invalidate();
   }
 }

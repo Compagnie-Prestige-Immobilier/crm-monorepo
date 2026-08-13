@@ -73,15 +73,15 @@ const CHAMPS: Readonly<Record<keyof ProspectFilterDto, ProspectFilterDto>> = {
 };
 
 describe('un filtre, la même population sur les trois surfaces', () => {
-  const referenceWhere = JSON.stringify(buildProspectWhere(admin, {}));
-  const referenceSql = rendered(prospectConditions(admin, {}));
+  const referenceWhere = JSON.stringify(buildProspectWhere(admin, {}, false));
+  const referenceSql = rendered(prospectConditions(admin, {}, false));
 
   for (const [champ, filtre] of Object.entries(CHAMPS)) {
     it(`« ${champ} » restreint la liste ET les agrégats`, () => {
       // Côté liste et exports.
-      expect(JSON.stringify(buildProspectWhere(admin, filtre))).not.toBe(referenceWhere);
+      expect(JSON.stringify(buildProspectWhere(admin, filtre, false))).not.toBe(referenceWhere);
       // Côté tableau de bord.
-      expect(rendered(prospectConditions(admin, filtre))).not.toBe(referenceSql);
+      expect(rendered(prospectConditions(admin, filtre, false))).not.toBe(referenceSql);
     });
   }
 
@@ -112,13 +112,13 @@ describe('un filtre, la même population sur les trois surfaces', () => {
   it('le cloisonnement s’applique aux trois surfaces, et n’est jamais surchargeable', () => {
     const filtre: ProspectFilterDto = { commercialId: 'com-bob', includeDeleted: true };
 
-    expect(buildProspectWhere(alice, filtre)).toMatchObject({
+    expect(buildProspectWhere(alice, filtre, false)).toMatchObject({
       createdById: '__aucun__',
       // `includeDeleted` reste sans effet pour un non-ADMIN.
       deletedAt: null,
     });
 
-    const sql = rendered(prospectConditions(alice, filtre));
+    const sql = rendered(prospectConditions(alice, filtre, false));
     expect(sql).toContain('p."createdById" = "com-alice"');
     expect(sql).toContain('"__aucun__"');
     expect(sql).toContain('p."deletedAt" IS NULL');
@@ -131,11 +131,11 @@ describe('un filtre, la même population sur les trois surfaces', () => {
     // donné contiendrait tout le département.
     const filtre: ProspectFilterDto = { segment: 'BDD1', departementId: 'd-1' };
 
-    const where = buildProspectWhere(admin, filtre);
+    const where = buildProspectWhere(admin, filtre, false);
     expect(where.representant).toEqual({ departementId: 'd-1' });
     expect(where.AND).toHaveLength(1);
 
-    const sql = rendered(prospectConditions(admin, filtre));
+    const sql = rendered(prospectConditions(admin, filtre, false));
     expect(sql).toContain('r."departementId" = "d-1"');
     expect(sql).toContain('sy."sigle" = "CHUES"');
     expect(sql).toContain('bq."shortName" = "CBAO"');

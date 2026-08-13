@@ -10,6 +10,8 @@ import {
   type ActivitySignals,
 } from './presence.js';
 import type { SupervisedUserDto, SupervisionDto } from './supervision.dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { demoScope } from '../../prisma/demo-visibility.js';
 
 /**
  * Supervision des comptes.
@@ -50,14 +52,21 @@ function latest(a: Date | undefined, b: Date | undefined): Date | null {
 
 @Injectable()
 export class SupervisionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demo: DemoVisibilityService,
+  ) {}
 
   async overview(): Promise<SupervisionDto> {
     const now = new Date();
 
     const [users, sessions, syncs, calls, transitions] = await Promise.all([
       this.prisma.user.findMany({
-        where: { role: { in: [...SUPERVISED_ROLES] }, deletedAt: null },
+        where: {
+          role: { in: [...SUPERVISED_ROLES] },
+          deletedAt: null,
+          ...demoScope(await this.demo.enabled()),
+        },
         select: {
           id: true,
           fullName: true,

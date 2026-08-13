@@ -13,7 +13,7 @@ import {
   setSessionCookies,
   toAuthTokens,
 } from '@/lib/api/server';
-import { rotateRefreshToken } from '@/lib/api/tokens';
+import { rotateRefreshTokenDetailed } from '@/lib/api/tokens';
 
 /**
  * Relais `/api/v1/*` — la seule voie par laquelle le navigateur atteint NestJS.
@@ -135,12 +135,16 @@ async function handle(
   // rejoue. Sans ce rejeu, l'utilisateur serait déconnecté toutes les quinze
   // minutes alors que son refresh token vaut trente jours.
   const refreshToken = await getRefreshToken();
-  const rotated =
+  const rotation =
     refreshToken === null || refreshToken === ''
-      ? null
-      : await rotateRefreshToken(serverApiOrigin(), refreshToken);
+      ? { ok: false as const, reason: 'invalid' as const }
+      : await rotateRefreshTokenDetailed(serverApiOrigin(), refreshToken);
 
-  if (rotated === null) {
+  if (!rotation.ok && rotation.reason === 'unavailable') {
+    return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });
+  }
+
+  if (!rotation.ok) {
     await clearSessionCookies();
     return NextResponse.json(
       { error: 'Session expirée. Reconnectez-vous.', code: 'SESSION_EXPIRED' },
@@ -148,10 +152,10 @@ async function handle(
     );
   }
 
-  await setSessionCookies(toAuthTokens(rotated));
+  await setSessionCookies(toAuthTokens(rotation.tokens));
 
   try {
-    return toClientResponse(await forward(request, method, path, rotated.accessToken, body));
+    return toClientResponse(await forward(request, method, path, rotation.tokens.accessToken, body));
   } catch {
     return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });
   }

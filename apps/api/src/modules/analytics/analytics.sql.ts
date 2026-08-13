@@ -20,12 +20,20 @@ import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js'
 export function prospectConditions(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   filter: ProspectFilterDto,
+  demoEnabled: boolean,
 ): Prisma.Sql {
   const conditions: Prisma.Sql[] = [];
 
   // Cloisonnement d'abord, et non surchargeable par un paramètre de requête.
   if (!isAdmin(user)) {
     conditions.push(Prisma.sql`p."createdById" = ${user.id}`);
+  }
+
+  // Visibilité de démonstration. Elle porte sur le PROSPECT, comme du côté
+  // Prisma : c'est lui que l'agrégat compte, et c'est donc lui qui décide si la
+  // ligne entre ou non dans le total.
+  if (!demoEnabled) {
+    conditions.push(Prisma.sql`p."isDemo" = FALSE`);
   }
 
   if (filter.commercialId) {

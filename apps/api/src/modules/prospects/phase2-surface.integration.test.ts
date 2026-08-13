@@ -14,6 +14,7 @@ import { ExportService } from '../export/export.service.js';
 import { ExportMode } from '../export/dto.js';
 import { PROSPECT_COLUMNS } from '../export/columns.js';
 import { ProspectsService } from './prospects.service.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 /**
  * Un seul filtre, quatre surfaces, sur un VRAI PostgreSQL.
@@ -45,9 +46,9 @@ function readRootEnv(): string {
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: DATABASE_URL }) });
 const service = prisma as unknown as PrismaService;
 
-const prospects = new ProspectsService(service);
-const analytics = new AnalyticsService(service);
-const exports = new ExportService(service, analytics);
+const prospects = new ProspectsService(service, fakeDemoVisibility());
+const analytics = new AnalyticsService(service, fakeDemoVisibility());
+const exports = new ExportService(service, analytics, fakeDemoVisibility());
 
 /** Le commercial propriétaire des fixtures : sa portée EST l'univers du test. */
 let commercial: AuthenticatedUser;

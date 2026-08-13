@@ -10,6 +10,8 @@ import {
   type DirectoryCursor,
 } from './directory-cursor.js';
 import type { DirectoryEntryDto, DirectoryPageDto, DirectoryQueryDto } from './dto.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { demoScope } from '../../prisma/demo-visibility.js';
 
 /**
  * Annuaire hors ligne de la phase 2.
@@ -88,7 +90,10 @@ function keyset(cursor: DirectoryCursor | undefined, safeNow: Date): Prisma.Pros
 
 @Injectable()
 export class Phase2DirectoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demo: DemoVisibilityService,
+  ) {}
 
   async pull(query: DirectoryQueryDto): Promise<DirectoryPageDto> {
     const limit = query.limit ?? DIRECTORY_DEFAULT_PAGE_SIZE;
@@ -102,7 +107,11 @@ export class Phase2DirectoryService {
       // assumée : une fiche supprimée cesse simplement d'être renvoyée, sans
       // marqueur de suppression — en porter un exigerait un septième champ, et
       // la frontière à six champs prime.
-      where: { deletedAt: null, ...keyset(incoming, safeNow) },
+      where: {
+        deletedAt: null,
+        ...demoScope(await this.demo.enabled()),
+        ...keyset(incoming, safeNow),
+      },
       select: DIRECTORY_SELECT,
       orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
       take: limit,

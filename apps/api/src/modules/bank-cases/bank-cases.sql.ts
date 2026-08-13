@@ -29,8 +29,12 @@ export const BANK_CASE_FROM = Prisma.sql`
   INNER JOIN "bank_case_stages" s ON s."id" = c."currentStageId"
 `;
 
-export function bankCaseConditions(filter: BankCaseFilterDto): Prisma.Sql {
+export function bankCaseConditions(filter: BankCaseFilterDto, demoEnabled: boolean): Prisma.Sql {
   const conditions: Prisma.Sql[] = [Prisma.sql`c."deletedAt" IS NULL`];
+
+  // Visibilite de demonstration. Sans elle, un dossier fictif entre dans le
+  // total encaisse affiche a la direction, et le montant devient faux.
+  if (!demoEnabled) conditions.push(Prisma.sql`c."isDemo" = FALSE`);
 
   if (filter.stageId) conditions.push(Prisma.sql`c."currentStageId" = ${filter.stageId}`);
   if (filter.stageType) {

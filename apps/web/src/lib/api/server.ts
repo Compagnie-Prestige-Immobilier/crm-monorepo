@@ -10,7 +10,10 @@ import {
   REFRESH_TTL_SECONDS,
   serverApiOrigin,
 } from '@/lib/api/config';
-import { rotateRefreshToken, type RotatedTokens } from '@/lib/api/tokens';
+import {
+  rotateRefreshTokenDetailed,
+  type RotatedTokens,
+} from '@/lib/api/tokens';
 
 /**
  * Client d'API CÔTÉ SERVEUR — rendu des pages, Route Handlers, Server Actions.
@@ -34,6 +37,13 @@ export class SessionExpiredError extends Error {
   constructor() {
     super('Session expirée. Reconnectez-vous.');
     this.name = 'SessionExpiredError';
+  }
+}
+
+export class SessionUnavailableError extends Error {
+  constructor() {
+    super('Le serveur CPI est momentanément injoignable.');
+    this.name = 'SessionUnavailableError';
   }
 }
 
@@ -128,13 +138,16 @@ const refreshOnce = cache(async (): Promise<AuthTokens | null> => {
   const refreshToken = await getRefreshToken();
   if (refreshToken === null || refreshToken === '') return null;
 
-  const rotated = await rotateRefreshToken(serverApiOrigin(), refreshToken);
-  if (rotated === null) {
+  const rotation = await rotateRefreshTokenDetailed(serverApiOrigin(), refreshToken);
+  if (!rotation.ok && rotation.reason === 'unavailable') {
+    throw new SessionUnavailableError();
+  }
+  if (!rotation.ok) {
     await clearSessionCookies();
     return null;
   }
 
-  const tokens = toAuthTokens(rotated);
+  const tokens = toAuthTokens(rotation.tokens);
   const persisted = await setSessionCookies(tokens);
   if (!persisted) requestTokenOverride().value = tokens.accessToken;
   return tokens;

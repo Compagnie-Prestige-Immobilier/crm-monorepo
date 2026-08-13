@@ -3,6 +3,7 @@
 import { PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
+import { SIDEBAR_COOKIE, SIDEBAR_COOKIE_MAX_AGE } from '@/components/layout/sidebar-cookie';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
 import type { Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -28,14 +29,9 @@ import { cn } from '@/lib/utils';
  * on ne perd aucune fonction.
  */
 
-export const SIDEBAR_COOKIE = 'cpi_sidebar';
-
-/** Un an : c'est une préférence d'atelier, pas une session. */
-const COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
-
 function persist(collapsed: boolean): void {
   try {
-    document.cookie = `${SIDEBAR_COOKIE}=${collapsed ? '1' : '0'};path=/;max-age=${String(COOKIE_MAX_AGE)};samesite=lax`;
+    document.cookie = `${SIDEBAR_COOKIE}=${collapsed ? '1' : '0'};path=/;max-age=${String(SIDEBAR_COOKIE_MAX_AGE)};samesite=lax`;
   } catch {
     // Préférence perdue, écran intact : rien à signaler à l'utilisateur.
   }

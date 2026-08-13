@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { ProspectsService } from './prospects.service.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const alice: AuthenticatedUser = {
   id: 'com-alice',
@@ -67,7 +68,7 @@ function firstArg(fn: ReturnType<typeof vi.fn>): PrismaCallArgs {
 }
 
 const service = (prisma: PrismaMock): ProspectsService =>
-  new ProspectsService(prisma as unknown as PrismaService);
+  new ProspectsService(prisma as unknown as PrismaService, fakeDemoVisibility());
 
 describe('cloisonnement par commercial', () => {
   let prisma: PrismaMock;

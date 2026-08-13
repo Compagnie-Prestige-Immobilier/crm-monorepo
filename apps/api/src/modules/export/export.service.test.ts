@@ -12,6 +12,7 @@ import type { AnalyticsService } from '../analytics/analytics.service.js';
 import { ExportService } from './export.service.js';
 import { ExportMode } from './dto.js';
 import { PROSPECT_COLUMNS } from './columns.js';
+import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const admin: AuthenticatedUser = {
   id: 'admin-1',
@@ -242,7 +243,7 @@ async function build(
   fixtures = FIXTURES,
 ): Promise<ExcelJS.Workbook> {
   const { service } = makePrisma(fixtures);
-  return read(new ExportService(service, stubAnalytics()), filter, mode);
+  return read(new ExportService(service, stubAnalytics(), fakeDemoVisibility()), filter, mode);
 }
 
 async function read(
@@ -439,7 +440,10 @@ describe('vue filtrée', () => {
     // Appelé SANS quatrième argument : c'est la valeur par défaut du service
     // qui est vérifiée, et non celle que le test aurait passée lui-même.
     const { service } = makePrisma();
-    const workbook = await read(new ExportService(service, stubAnalytics()), {});
+    const workbook = await read(
+      new ExportService(service, stubAnalytics(), fakeDemoVisibility()),
+      {},
+    );
     expect(sheetNames(workbook)).toEqual(['Prospects', 'Représentants', 'Synthèse']);
   });
 
@@ -453,7 +457,7 @@ describe('vue filtrée', () => {
 describe('coût des requêtes', () => {
   it('lit les dernières tentatives par PAGE, jamais par ligne', async () => {
     const { service, queries } = makePrisma();
-    const exports = new ExportService(service, stubAnalytics());
+    const exports = new ExportService(service, stubAnalytics(), fakeDemoVisibility());
     const stream = new PassThrough();
     stream.resume();
 
