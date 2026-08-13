@@ -105,7 +105,12 @@ if (/^emulator-\d+\s+device$/m.test(devices.stdout ?? '')) {
 process.stdin.setRawMode?.(true);
 process.stdin.resume();
 process.stdin.on('data', (data) => {
-  if (data.toString().toLowerCase() === 'r' && flutterProcess?.stdin.writable) {
+  const key = data.toString();
+  if (key === '\u0003') {
+    shutdown();
+    return;
+  }
+  if (key.toLowerCase() === 'r' && flutterProcess?.stdin.writable) {
     console.log('[dx] hot restart Flutter…');
     flutterProcess.stdin.write('R');
   }

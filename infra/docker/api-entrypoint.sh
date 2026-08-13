@@ -33,6 +33,30 @@ if ! node_modules/.bin/prisma migrate deploy; then
 fi
 echo "✓ Base à jour."
 
+# ── Amorçage ────────────────────────────────────────────────────────────────
+# Les référentiels — 46 départements, banques, syndicats, workflow bancaire —
+# sont des clés étrangères OBLIGATOIRES : sans eux, aucune saisie n'est
+# possible et même la connexion échoue faute de compte.
+#
+# Le seed est idempotent : chaque entité est écrite en `upsert` sur sa clé
+# naturelle, et le mot de passe d'un compte existant n'est JAMAIS réécrit — un
+# redémarrage ne remet donc pas le mot de passe de l'administrateur à la valeur
+# du fichier d'environnement.
+#
+# `SEED_ON_START=false` permet de le couper une fois la plateforme en service.
+if [ "${SEED_ON_START:-true}" = "true" ]; then
+  echo "▸ Référentiels et compte initial…"
+  if node dist/seed.js; then
+    echo "✓ Référentiels en place."
+  else
+    # Volontairement non bloquant : une base déjà peuplée doit pouvoir
+    # redémarrer même si le seed bute sur un détail. Les migrations, elles,
+    # restent bloquantes — un schéma faux est irrattrapable, un référentiel
+    # manquant se corrige depuis le panel.
+    echo "! Amorçage incomplet — l'API démarre quand même." >&2
+  fi
+fi
+
 cd /repo
 # `exec` remplace le shell : Node devient PID 1 et reçoit SIGTERM directement,
 # donc Nest ferme proprement le pool pg au lieu d'être tué au bout du délai de
