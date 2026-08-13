@@ -103,8 +103,7 @@ export function confirmationSentence(recipientCount: number, reachableCount: num
     return 'Ce public ne correspond à aucun compte actif. Rien ne sera envoyé.';
   }
 
-  const people =
-    recipientCount === 1 ? '1 personne' : `${String(recipientCount)} personnes`;
+  const people = recipientCount === 1 ? '1 personne' : `${String(recipientCount)} personnes`;
   const head = `Cet envoi s’adresse à ${people}.`;
 
   if (reachableCount === recipientCount) return head;

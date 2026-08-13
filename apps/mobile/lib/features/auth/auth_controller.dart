@@ -166,7 +166,7 @@ class AuthController extends Notifier<AuthState> {
   }
 
   /// Messages en français, sans code technique : l'utilisateur est un
-  /// commercial debout dans la rue, pas un développeur.
+  /// téléconseiller au téléphone, pas un développeur.
   static String _messageFor(ApiException e) => switch (e.code) {
     'invalid_credentials' => 'Identifiant ou mot de passe incorrect.',
     'account_disabled' => 'Ce compte est désactivé. Contactez votre responsable.',

@@ -9,7 +9,7 @@ import 'dart:math';
 /// antenne revient et que trente appareils se reconnectent dans la même seconde,
 /// ils réessaient tous après *au moins* `delai/2`, c'est-à-dire tous ensemble,
 /// sur un backhaul qui vient à peine de se rétablir. La gigue complète étale les
-/// trente tentatives sur tout l'intervalle. Sur le terrain — un marché, une
+/// trente tentatives sur tout l'intervalle. Sur un lien dégradé, une
 /// tournée syndicale, une salle de formation — c'est exactement la situation où
 /// tous les téléphones ont accumulé une file et retrouvent le réseau au même
 /// instant.

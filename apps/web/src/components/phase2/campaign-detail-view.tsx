@@ -187,9 +187,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
         {data.recentAttempts.length === 0 ? (
           <Card>
             <CardContent>
-              <p className="text-[0.875rem] text-muted-foreground">
-                Aucune tentative enregistrée.
-              </p>
+              <p className="text-[0.875rem] text-muted-foreground">Aucune tentative enregistrée.</p>
             </CardContent>
           </Card>
         ) : (

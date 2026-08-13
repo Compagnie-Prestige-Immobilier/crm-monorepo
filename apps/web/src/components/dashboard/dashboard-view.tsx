@@ -13,6 +13,7 @@ import {
 } from '@/components/dashboard/charts';
 import { FunnelPanel, FunnelPanelSkeleton } from '@/components/dashboard/funnel-panel';
 import { KpiCards, KpiCardsSkeleton } from '@/components/dashboard/kpi-cards';
+import { ExactAmountsToggle } from '@/components/money/exact-amounts';
 import { FiltersBar } from '@/components/filters/filters-bar';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
 import { QueryErrorInline, QueryErrorState } from '@/components/query-error-state';
@@ -82,6 +83,11 @@ export function DashboardView() {
       <FiltersBar />
 
       <div className="flex flex-wrap items-center justify-end gap-3">
+        {/* Le nombre exact reste à un clic : un directeur financier qui lit
+            « 1,25 Mrd » doit pouvoir obtenir « 1 250 000 000 » sans quitter la
+            page ni ouvrir un export. */}
+        <ExactAmountsToggle />
+
         {/* L'indicateur porte l'état des DEUX requêtes : annoncer « En direct »
             pendant que les montants ne se rafraîchissent plus serait le pire
             mensonge de cet écran. */}

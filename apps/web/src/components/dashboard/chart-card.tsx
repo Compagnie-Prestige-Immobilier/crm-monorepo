@@ -20,9 +20,7 @@ export function ChartCard({
     // Chart.js marks canvas as role=img but has no knowledge of the chart
     // title. The surrounding labelled region is the accessible name; the
     // canvas itself is presentation so axe does not report a missing alt.
-    chartRegion.current
-      ?.querySelector('canvas')
-      ?.setAttribute('role', 'presentation');
+    chartRegion.current?.querySelector('canvas')?.setAttribute('role', 'presentation');
   }, []);
 
   return (
@@ -33,7 +31,12 @@ export function ChartCard({
       </CardHeader>
       {/* Hauteur fixe : Chart.js mesure son conteneur, et un parent
           auto-dimensionné produit une boucle de redimensionnement. */}
-      <div ref={chartRegion} className="h-64 px-5 pb-1" role="group" aria-label={`${title} graphique`}>
+      <div
+        ref={chartRegion}
+        className="h-64 px-5 pb-1"
+        role="group"
+        aria-label={`${title} graphique`}
+      >
         {children}
       </div>
     </Card>

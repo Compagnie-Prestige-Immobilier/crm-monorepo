@@ -2,13 +2,13 @@
 
 import { BanknoteIcon, CalendarRangeIcon, PercentIcon, ReceiptTextIcon } from 'lucide-react';
 
+import { MoneyText } from '@/components/money/exact-amounts';
 import { StatInfo } from '@/components/stats/stat-info';
 import { StatTile } from '@/components/stats/stat-tile';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { breakingStageIndex, type Funnel, type FunnelStage } from '@/lib/data/funnel';
 import { formatNumber, formatRate } from '@/lib/format';
-import { formatXof } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
 /**
@@ -53,9 +53,11 @@ function MoneyHeadline({ finance }: { finance: Funnel['finance'] }) {
 
           {/* Le chiffre de la page. `tabular-nums` pour que la carte ne se
               décale pas quand le montant change de largeur en cours de cycle. */}
-          <p className="mt-2 font-display text-display font-[800] leading-none tracking-[-0.02em] tabular-nums text-primary-text">
-            {formatXof(finance.montantEncaisse, '0 FCFA')}
-          </p>
+          <MoneyText
+            value={finance.montantEncaisse}
+            placeholder="0 FCFA"
+            className="mt-2 block font-display text-display font-[800] leading-none tracking-[-0.02em] text-primary-text"
+          />
 
           <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5 text-[0.75rem]">
             <div className="flex items-baseline gap-1.5">
@@ -66,8 +68,12 @@ function MoneyHeadline({ finance }: { finance: Funnel['finance'] }) {
             </div>
             <div className="flex items-baseline gap-1.5">
               <dt className="text-muted-foreground">En cours</dt>
-              <dd className="font-[600] tabular-nums">
-                {formatXof(finance.montantEnCours, '0 FCFA')}
+              <dd>
+                <MoneyText
+                  value={finance.montantEnCours}
+                  placeholder="0 FCFA"
+                  className="font-[600]"
+                />
               </dd>
             </div>
           </dl>
@@ -94,14 +100,14 @@ export function MoneyBand({ finance }: { finance: Funnel['finance'] }) {
           index={1}
           stat="moneyCashed30Days"
           label="Sur 30 jours"
-          value={formatXof(finance.montantEncaisse30Jours, '0 FCFA')}
+          value={<MoneyText value={finance.montantEncaisse30Jours} placeholder="0 FCFA" />}
           icon={CalendarRangeIcon}
         />
         <StatTile
           index={2}
           stat="moneyAverageCashing"
           label="Encaissement moyen"
-          value={formatXof(finance.encaissementMoyen, '0 FCFA')}
+          value={<MoneyText value={finance.encaissementMoyen} placeholder="0 FCFA" />}
           hint="Par dossier encaissé"
           icon={ReceiptTextIcon}
         />

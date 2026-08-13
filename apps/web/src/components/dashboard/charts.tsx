@@ -5,12 +5,7 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 
 import '@/components/dashboard/chart-setup';
 
-import {
-  seriesBorderColor,
-  seriesColor,
-  useChartTheme,
-  type ChartTheme,
-} from '@/lib/chart-theme';
+import { seriesBorderColor, seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
 import { formatNumber, formatShortDate } from '@/lib/format';
 import type { NamedCount, TimeSeriePoint } from '@/lib/types';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';

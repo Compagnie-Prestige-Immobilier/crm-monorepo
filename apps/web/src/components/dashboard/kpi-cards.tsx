@@ -93,12 +93,7 @@ export function KpiCards({ kpis }: { kpis: DashboardKpis }) {
           hint={`${formatNumber(kpis.prospects7Jours)} sur 7 jours`}
           icon={UsersIcon}
         />
-        <KpiCard
-          index={1}
-          label="Représentants"
-          value={kpis.representants}
-          icon={UsersRoundIcon}
-        />
+        <KpiCard index={1} label="Représentants" value={kpis.representants} icon={UsersRoundIcon} />
         <KpiCard
           index={2}
           label="Téléconseillers actifs"

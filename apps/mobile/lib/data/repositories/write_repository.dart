@@ -367,7 +367,7 @@ class WriteRepository {
   ///
   /// Séparées, elles laisseraient l'écran affirmer « enregistré » sur une saisie
   /// qui ne partira jamais, ou rendre un numéro déjà traité à nouveau saisissable
-  /// — deux mensonges qu'un commercial ne peut pas détecter depuis le terrain.
+  /// : deux mensonges que l'utilisateur ne peut pas détecter depuis l'app.
   ///
   /// ## La validation est locale, et c'est le point
   ///

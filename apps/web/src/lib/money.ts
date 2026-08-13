@@ -60,6 +60,74 @@ export function formatXof(value: string | null | undefined, placeholder = '–')
 }
 
 /**
+ * Montant ABRÉGÉ : `"1250000000"` → `"1,25 Mrd FCFA"`, `"85000"` → `"85 k FCFA"`.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Pourquoi l'abrégé existe, et où il n'a rien à faire.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * C'est de l'immobilier : un encaissement cumulé atteindra le milliard de
+ * francs. `1 250 000 000 FCFA` posé sur une carte d'indicateur déborde, se
+ * tronque, ou pousse la grille entière. L'abrégé rend la tuile lisible.
+ *
+ * Il n'a en revanche RIEN à faire dans un tableau, un export ou une fiche de
+ * dossier : là, le montant exact EST la donnée, et un dossier de 12 500 000
+ * francs ne s'affiche pas « 12,5 M » sur sa propre fiche. La règle est donc :
+ * abrégé sur une tuile ou un axe, exact partout ailleurs, et le nombre exact
+ * reste toujours atteignable à l'écran (voir `components/money`).
+ *
+ * ── L'abréviation est FRANÇAISE ──────────────────────────────────────────────
+ * Le milliard s'abrège « Mrd ». Ni « B », qui est l'anglais *billion*, ni « G ».
+ * Un « 1,25 B FCFA » sur un écran de direction sénégalaise se lit au mieux
+ * comme une coquille, au pire comme un autre ordre de grandeur.
+ *
+ * ── Le découpage se fait sur la CHAÎNE ───────────────────────────────────────
+ * Pas de division, pas de `parseFloat`, pas de `Number`. On choisit l'unité
+ * d'après le NOMBRE DE CHIFFRES, puis on tranche la chaîne : la partie entière
+ * d'un côté, les décimales de l'autre. Une division flottante sur un
+ * `Decimal(18,0)` perdrait des unités au-delà de 2^53, et les unités perdues
+ * sont des francs.
+ *
+ * ── Les décimales sont TRONQUÉES, jamais arrondies ───────────────────────────
+ * Arrondir 999 999 999 donnerait « 1 Mrd », soit un franc annoncé de plus que
+ * la caisse n'en contient, et un changement d'unité par-dessus le marché. La
+ * troncature n'annonce jamais plus que ce qui existe. L'écart est visible d'un
+ * clic : le montant exact est toujours à portée.
+ *
+ * Trois chiffres significatifs : `1,25 Mrd`, `85 k`, `340 M`. Au-delà, l'abrégé
+ * redevient aussi long que le nombre entier et ne sert plus à rien.
+ */
+const COMPACT_UNITS: readonly { readonly minDigits: number; readonly suffix: string }[] = [
+  { minDigits: 10, suffix: 'Mrd' },
+  { minDigits: 7, suffix: 'M' },
+  { minDigits: 4, suffix: 'k' },
+];
+
+export function formatXofCompact(value: string | null | undefined, placeholder = '–'): string {
+  if (value === null || value === undefined || value === '') return placeholder;
+  const trimmed = value.trim();
+  if (!MONEY_PATTERN.test(trimmed)) return formatXof(trimmed, placeholder);
+
+  const digits = trimmed.replace(/^0+(?=\d)/u, '');
+  const unit = COMPACT_UNITS.find((candidate) => digits.length >= candidate.minDigits);
+
+  // Moins de quatre chiffres : l'abrégé serait plus long que le montant.
+  if (unit === undefined) return `${digits} FCFA`;
+
+  const scale = unit.minDigits - 1;
+  const whole = digits.slice(0, digits.length - scale);
+  const rest = digits.slice(digits.length - scale);
+
+  // Trois chiffres significatifs en tout : une partie entière à un chiffre en
+  // garde deux après la virgule, à deux chiffres une seule, à trois aucune.
+  const decimals = Math.max(0, 3 - whole.length);
+  const fraction = rest.slice(0, decimals).replace(/0+$/u, '');
+
+  const mantissa = fraction === '' ? groupDigits(whole) : `${groupDigits(whole)},${fraction}`;
+  return `${mantissa} ${unit.suffix} FCFA`;
+}
+
+/**
  * Aperçu d'une saisie en cours : ce que l'agent tape (« 1 200 000 », « 1.200.000 »,
  * « 1200000 FCFA ») ramené aux seuls chiffres, puis reformaté.
  *

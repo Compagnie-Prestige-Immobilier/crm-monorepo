@@ -1,6 +1,12 @@
 'use client';
 
-import { AlertTriangleIcon, LockIcon, RotateCwIcon, ServerCogIcon, WifiOffIcon } from 'lucide-react';
+import {
+  AlertTriangleIcon,
+  LockIcon,
+  RotateCwIcon,
+  ServerCogIcon,
+  WifiOffIcon,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';

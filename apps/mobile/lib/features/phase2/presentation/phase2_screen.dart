@@ -20,7 +20,7 @@ import '../phase2_controller.dart';
 ///
 /// ## Ce que fait cet écran, et ce qu'il ne fait pas
 ///
-/// Le commercial travaille depuis un **programme PDF imprimé** qui ne liste que
+/// Le téléconseiller travaille depuis un **programme imprimé** qui ne liste que
 /// des numéros de téléphone — pas de noms, délibérément. Il appelle, puis vient
 /// consigner ici soit la méthode d'enrôlement obtenue, soit la raison pour
 /// laquelle il n'en a pas obtenu. **Le papier est le programme ; l'app est
@@ -100,7 +100,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     // Numéro inconnu de l'annuaire : c'est une erreur d'orientation, pas une
     // faute de frappe — le commercial vient peut-être de tourner une page du
     // mauvais programme. Le signaler par un retour tactile évite de lui faire
-    // relire l'écran au soleil.
+    // relire l'écran entre deux appels.
     if (ref.read(phase2ControllerProvider).stage == Phase2Stage.notFound) {
       await HapticFeedback.heavyImpact();
     }
@@ -765,7 +765,7 @@ class _Capture extends StatelessWidget {
         const SizedBox(height: CpiSpacing.sm),
         // Trois cartes empilées et non un groupe de radios : la cible d'un
         // radio Material fait 40 dp de large pour un texte qui en fait 200, et
-        // se rate au soleil, debout, à une main. Ici toute la carte est la
+        // se rate à une main, entre deux appels. Ici toute la carte est la
         // cible, sur toute la largeur.
         _MethodCard(
           method: EnrollmentMethods.platform,
