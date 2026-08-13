@@ -122,7 +122,16 @@ function shutdown() {
   console.log('\n[dx] arrêt des services…');
   stopApps();
   process.stdin.setRawMode?.(false);
-  process.exit(0);
+  // Laisser les groupes de processus recevoir SIGTERM avant de quitter : avec
+  // `pnpm dev`, le serveur réel est un petit-enfant du shell pnpm.
+  setTimeout(() => {
+    spawnSync('docker', ['compose', '-f', 'infra/docker/docker-compose.yml', 'stop'], {
+      cwd: root,
+      env: process.env,
+      stdio: 'inherit',
+    });
+    process.exit(0);
+  }, 250);
 }
 
 process.on('SIGINT', shutdown);

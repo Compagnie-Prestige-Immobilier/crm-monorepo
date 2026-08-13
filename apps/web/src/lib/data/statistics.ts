@@ -3,7 +3,13 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { toFilterQuery } from '@/lib/api/query-params';
-import type { BddSegment, EnrollmentMethod, NamedCount, Phase2Status, ProspectFilters } from '@/lib/types';
+import type {
+  BddSegment,
+  EnrollmentMethod,
+  NamedCount,
+  Phase2Status,
+  ProspectFilters,
+} from '@/lib/types';
 
 /**
  * Écran « Statistiques » — volet téléconseil.

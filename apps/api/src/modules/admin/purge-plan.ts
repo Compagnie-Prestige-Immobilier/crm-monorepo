@@ -139,12 +139,7 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     key: 'notifications',
     label: 'Notifications',
     hint: 'Envois, accusés, gabarits et appareils enregistrés.',
-    steps: [
-      'notificationDeliveries',
-      'notifications',
-      'notificationTemplates',
-      'deviceTokens',
-    ],
+    steps: ['notificationDeliveries', 'notifications', 'notificationTemplates', 'deviceTokens'],
     requires: [],
   },
   {
@@ -166,14 +161,7 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     label: 'Comptes téléconseillers',
     hint: 'Comptes et tout ce qu’ils ont saisi.',
     steps: ['commercialAccounts'],
-    requires: [
-      'dossiers',
-      'tentatives',
-      'fileAppels',
-      'campagnes',
-      'prospects',
-      'representants',
-    ],
+    requires: ['dossiers', 'tentatives', 'fileAppels', 'campagnes', 'prospects', 'representants'],
   },
   {
     key: 'finances',

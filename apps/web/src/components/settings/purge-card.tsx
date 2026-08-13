@@ -272,12 +272,17 @@ export function PurgeCard() {
             </p>
 
             <div className="flex flex-col gap-2">
+              {/* Le libellé NOMME le champ ; c'est le repère grisé qui montre
+                  ce qu'il attend. Une phrase impérative en guise de libellé
+                  (« Saisissez untel pour confirmer ») transforme un formulaire
+                  en mode d'emploi, et se lit deux fois moins vite. */}
               <label htmlFor={confirmId} className="text-[0.875rem] font-[600]">
-                Saisissez {data.confirmationHint} pour confirmer
+                Identifiant de connexion
               </label>
               <Input
                 id={confirmId}
                 value={confirmation}
+                placeholder={data.confirmationHint}
                 autoComplete="off"
                 spellCheck={false}
                 disabled={purge.isPending}

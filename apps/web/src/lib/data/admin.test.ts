@@ -123,9 +123,9 @@ describe('conditions d’envoi', () => {
   });
 
   it('ne part pas pour un administrateur non habilité', () => {
-    expect(
-      canSubmitPurge({ ...base, catalog: catalog({ allowed: false }), pending: false }),
-    ).toBe(false);
+    expect(canSubmitPurge({ ...base, catalog: catalog({ allowed: false }), pending: false })).toBe(
+      false,
+    );
   });
 
   it('ne part pas sans domaine coché', () => {

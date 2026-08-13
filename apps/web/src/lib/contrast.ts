@@ -96,17 +96,20 @@ export function ratio(a: string, b: string): number {
  * deux fichiers changent dans le même commit ou pas du tout.
  */
 export const TOKENS = {
-  // §2.1 base, mode clair
-  background: '#FAF7F7',
+  // ── Mode clair ────────────────────────────────────────────────────────────
+  background: '#FFFFFF',
   foreground: '#1C0810',
-  card: '#FFFFFF',
+  card: '#FBFBFC',
+  popover: '#FFFFFF',
+  inputBorder: '#AF7D84',
 
-  // §2.2 bordeaux
   primary: '#630210',
   primaryForeground: '#FFFFFF',
-  secondary: '#F5ECEE',
+  secondary: '#F4F4F6',
   secondaryForeground: '#630210',
+  muted: '#EEEEF1',
   mutedForeground: '#6B4A52',
+  ring: '#630210',
 
   // §2.3 or
   accent: '#C8921A',
@@ -126,28 +129,41 @@ export const TOKENS = {
   info: '#A34462',
   infoSurface: '#F7EEF1',
 
-  // §2.5 navigation, surfaces SOMBRES
+  // §2.5 navigation, surfaces SOMBRES en mode clair comme en mode sombre
   sidebar: '#3A010A',
   sidebarForeground: '#DFC0C8',
+  sidebarMutedForeground: '#C09AA4',
   sidebarAccent: '#4A0110',
   sidebarAccentForeground: '#FFFFFF',
   sidebarRing: '#B05070',
 
-  // §3 déclinaisons sombres, réutilisées sur toute surface sombre
-  darkForeground: '#F5E6EA',
-  darkBackground: '#140206',
-  darkCard: '#1F050C',
-  darkPrimary: '#A81E33',
-  darkPrimaryText: '#F0919F',
+  // Statuts posés sur une surface sombre (voir globals.css, `:root`)
   destructiveOnDark: '#F87171',
   successOnDark: '#4FBF8B',
   warningOnDark: '#FFC65A',
   infoOnDark: '#E08BA6',
 
-  // §2.6 séries de graphiques, mode clair
+  // ── Mode sombre ───────────────────────────────────────────────────────────
+  darkBackground: '#141315',
+  darkForeground: '#F2EFF0',
+  darkCard: '#1C1A1D',
+  darkInputBorder: '#877078',
+  darkPrimary: '#A81E33',
+  darkPrimaryText: '#F0919F',
+  darkMutedForeground: '#C4A0AA',
+  darkSidebar: '#300710',
+  darkSidebarForeground: '#E8CCD3',
+  darkSidebarAccent: '#4A0E1C',
+
+  // §2.6 séries de graphiques
   chart1: '#630210',
   chart2: '#C8921A',
   chart3: '#1A6B44',
   chart4: '#B05070',
   chart5: '#8B5CF6',
+  darkChart1: '#D9647A',
+  darkChart2: '#FFC65A',
+  darkChart3: '#4FBF8B',
+  darkChart4: '#E08BA6',
+  darkChart5: '#B79BFF',
 } as const;

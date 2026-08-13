@@ -17,6 +17,20 @@ export function formatDecimal(value: number): string {
   return decimalFormatter.format(value);
 }
 
+/**
+ * Un TAUX, sans signe : `43.2` → « 43,2 % », `100` → « 100 % ».
+ *
+ * Distinct de `formatPercent`, qui préfixe un `+` : une variation se signe, une
+ * part ne se signe pas. « +43,2 % de l'étape précédente » se lirait comme une
+ * hausse là où le chiffre décrit une proportion.
+ *
+ * La décimale tombe sur un entier : « 100,0 % » ajoute un chiffre qui ne porte
+ * aucune information et rallonge une colonne déjà serrée.
+ */
+export function formatRate(value: number): string {
+  return `${Number.isInteger(value) ? formatNumber(value) : formatDecimal(value)} %`;
+}
+
 export function formatPercent(value: number): string {
   const sign = value > 0 ? '+' : '';
   return `${sign}${decimalFormatter.format(value)} %`;

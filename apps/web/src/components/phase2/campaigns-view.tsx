@@ -13,11 +13,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DEFAULT_CAMPAIGN_FILTERS, fetchCampaigns, type CampaignFilters } from '@/lib/data/phase2';
 import { formatDate, formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
-import { CAMPAIGN_STATUS_LABELS, campaignScopeLabel, type CampaignStatus } from '@/lib/types';
+import { CAMPAIGN_STATUS_LABELS, campaignScopeLabel } from '@/lib/types';
 
 /**
  * Liste des campagnes d'appels.
@@ -55,24 +54,39 @@ export function CampaignsView() {
         </Button>
       </div>
 
-      <Tabs
-        value={filters.status ?? 'TOUTES'}
-        onValueChange={(value) => {
-          setFilters((current) => ({
-            ...current,
-            status: value === 'TOUTES' ? null : (value as CampaignStatus),
-            // Changer de filtre remet la pagination à 1 : rester en page 3 d'un
-            // résultat qui n'en compte plus qu'une affiche une liste vide.
-            page: 1,
-          }));
-        }}
+      <div
+        role="tablist"
+        aria-label="Filtrer par statut"
+        className="inline-flex h-11 w-fit items-center justify-center rounded-md bg-secondary p-1 text-muted-foreground"
       >
-        <TabsList aria-label="Filtrer par statut">
-          <TabsTrigger value="TOUTES">Toutes</TabsTrigger>
-          <TabsTrigger value="ACTIVE">En cours</TabsTrigger>
-          <TabsTrigger value="CLOSED">Clôturées</TabsTrigger>
-        </TabsList>
-      </Tabs>
+        {([
+          ['TOUTES', 'Toutes'],
+          ['ACTIVE', 'En cours'],
+          ['CLOSED', 'Clôturées'],
+        ] as const).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={(filters.status ?? 'TOUTES') === value}
+            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-sm px-3 text-[0.875rem] font-[600] whitespace-nowrap transition-colors aria-selected:bg-card aria-selected:text-foreground aria-selected:shadow-elev-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            onClick={() => {
+              // `value` sort déjà typé du tuple `as const` : le réassertir
+              // masquerait un renommage de statut au lieu de le signaler.
+              const next = value;
+              setFilters((current) => ({
+                ...current,
+                status: next === 'TOUTES' ? null : next,
+                // Changer de filtre remet la pagination à 1 : rester en page 3 d'un
+                // résultat qui n'en compte plus qu'une affiche une liste vide.
+                page: 1,
+              }));
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {isPending ? (
         <CampaignsSkeleton />

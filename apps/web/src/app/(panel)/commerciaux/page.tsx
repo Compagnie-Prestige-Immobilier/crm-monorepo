@@ -11,7 +11,7 @@ import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { getAdminSession } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Commerciaux' };
+export const metadata: Metadata = { title: 'Téléconseillers' };
 
 export default async function CommerciauxPage() {
   // `GET /users` répond 403 à un COMMERCIAL. On coupe ici plutôt que de laisser

@@ -65,9 +65,9 @@ describe('état de présence', () => {
 
   it('n’annonce pas connecté sans session vivante, même sur une trace fraîche', () => {
     // Compte déconnecté à l'instant : la trace est fraîche, la session est morte.
-    expect(
-      presenceOf(signals({ hasLiveSession: false, lastWriteAt: minutesAgo(2) }), NOW),
-    ).toBe('RECENT');
+    expect(presenceOf(signals({ hasLiveSession: false, lastWriteAt: minutesAgo(2) }), NOW)).toBe(
+      'RECENT',
+    );
   });
 
   it('n’annonce pas connecté un compte désactivé', () => {

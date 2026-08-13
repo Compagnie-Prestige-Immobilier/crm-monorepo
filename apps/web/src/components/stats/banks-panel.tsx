@@ -132,11 +132,7 @@ export function BanksPanel() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <StatChartCard
-          stat="bankOverTime"
-          title="Dossiers dans le temps"
-          className="xl:col-span-2"
-        >
+        <StatChartCard stat="bankOverTime" title="Dossiers dans le temps" className="xl:col-span-2">
           <CashingsOverTimeChart buckets={data.createdOverTime} />
         </StatChartCard>
 
@@ -146,18 +142,20 @@ export function BanksPanel() {
 
         <StatChartCard stat="bankByEstablishment" title="Répartition par établissement">
           <BankShareChart
-            items={data.byBank.map(
-              (bank): ClickableSlice => ({ label: bank.label, value: bank.cases }),
-            )}
+            items={data.byBank.map((bank): ClickableSlice => ({
+              label: bank.label,
+              value: bank.cases,
+            }))}
           />
         </StatChartCard>
 
         <StatChartCard stat="bankByStage" title="Dossiers par étape">
           <BankRankChart
             label="Dossiers"
-            items={data.byStage.map(
-              (stage): ClickableSlice => ({ label: stage.label, value: stage.cases }),
-            )}
+            items={data.byStage.map((stage): ClickableSlice => ({
+              label: stage.label,
+              value: stage.cases,
+            }))}
           />
         </StatChartCard>
 
@@ -167,9 +165,10 @@ export function BanksPanel() {
           ) : (
             <BankRankChart
               label="Rejets"
-              items={data.byRejectionReason.map(
-                (reason): ClickableSlice => ({ label: reason.label, value: reason.cases }),
-              )}
+              items={data.byRejectionReason.map((reason): ClickableSlice => ({
+                label: reason.label,
+                value: reason.cases,
+              }))}
             />
           )}
         </StatChartCard>

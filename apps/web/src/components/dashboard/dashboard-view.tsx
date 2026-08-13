@@ -11,12 +11,14 @@ import {
   RankBarChart,
   ShareDoughnutChart,
 } from '@/components/dashboard/charts';
+import { FunnelPanel, FunnelPanelSkeleton } from '@/components/dashboard/funnel-panel';
 import { KpiCards, KpiCardsSkeleton } from '@/components/dashboard/kpi-cards';
 import { FiltersBar } from '@/components/filters/filters-bar';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
-import { QueryErrorState } from '@/components/query-error-state';
+import { QueryErrorInline, QueryErrorState } from '@/components/query-error-state';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { fetchFunnel } from '@/lib/data/funnel';
 import { fetchDashboardStats } from '@/lib/data/stats';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
@@ -55,20 +57,60 @@ export function DashboardView() {
     placeholderData: keepPreviousData,
   });
 
+  /**
+   * L'entonnoir et les montants — requête SÉPARÉE, volontairement.
+   *
+   * Elle vise `GET /analytics/funnel`, absente du client engendré, et elle
+   * porte le seul chiffre que la direction vient chercher. La tenir à part
+   * garantit qu'un échec des six agrégats de prospection n'efface pas le
+   * montant encaissé, et réciproquement : deux pannes distinctes, deux zones
+   * d'écran distinctes. Le filtre, lui, reste le même — les montants décrivent
+   * la population des compteurs affichés dessous.
+   */
+  const funnelQuery = useQuery({
+    queryKey: queryKeys.funnel(filters),
+    queryFn: () => fetchFunnel(filters),
+    refetchInterval: live.refetchInterval,
+    placeholderData: keepPreviousData,
+  });
+
   const hasData = data !== undefined;
+  const funnel = funnelQuery.data;
 
   return (
     <div className="flex flex-col gap-6">
       <FiltersBar />
 
       <div className="flex flex-wrap items-center justify-end gap-3">
+        {/* L'indicateur porte l'état des DEUX requêtes : annoncer « En direct »
+            pendant que les montants ne se rafraîchissent plus serait le pire
+            mensonge de cet écran. */}
         <LiveIndicator
-          state={live.stateOf(isError)}
-          label={live.labelOf(isError)}
+          state={live.stateOf(isError || funnelQuery.isError)}
+          label={live.labelOf(isError || funnelQuery.isError)}
           updatedAt={hasData ? dataUpdatedAt : null}
           onTogglePause={live.togglePause}
         />
       </div>
+
+      {/* L'ARGENT D'ABORD. Les compteurs de prospection décrivent l'effort ;
+          seuls les encaissements décrivent le résultat, et une direction qui
+          doit dérouler la page pour l'atteindre ne le regardera pas. */}
+      {shouldShowError({ isError: funnelQuery.isError, hasData: funnel !== undefined }) ? (
+        <Card role="alert" className="px-6 py-10">
+          <QueryErrorInline
+            error={funnelQuery.error}
+            onRetry={() => {
+              void funnelQuery.refetch();
+            }}
+            fallback="Les encaissements n’ont pas pu être calculés."
+          />
+        </Card>
+      ) : funnel === undefined ? (
+        <FunnelPanelSkeleton />
+      ) : (
+        <FunnelPanel funnel={funnel} />
+      )}
 
       {shouldShowError({ isError, hasData }) ? (
         <QueryErrorState

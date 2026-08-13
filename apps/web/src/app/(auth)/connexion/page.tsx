@@ -115,7 +115,7 @@ export default async function ConnexionPage({
           </div>
 
           <p className="mt-10 border-t border-border pt-5 text-caption text-muted-foreground">
-            Les commerciaux se connectent depuis l’application mobile.
+            Les téléconseillers se connectent depuis l’application mobile.
           </p>
         </div>
       </section>

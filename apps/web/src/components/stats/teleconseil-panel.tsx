@@ -1,13 +1,7 @@
 'use client';
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import {
-  ActivityIcon,
-  HeadsetIcon,
-  PercentIcon,
-  TargetIcon,
-  UsersIcon,
-} from 'lucide-react';
+import { ActivityIcon, HeadsetIcon, PercentIcon, TargetIcon, UsersIcon } from 'lucide-react';
 
 import {
   CategoryBarChart,

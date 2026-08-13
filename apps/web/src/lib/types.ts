@@ -51,7 +51,7 @@ export const PROSPECT_STATUT_LABELS: Record<ProspectStatut, string> = {
 
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrateur',
-  COMMERCIAL: 'Commercial',
+  COMMERCIAL: 'Téléconseiller',
   BANQUE_FINANCE: 'Banque & Finance',
 };
 

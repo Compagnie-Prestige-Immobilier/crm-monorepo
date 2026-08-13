@@ -1,6 +1,8 @@
 import { ApiError } from '@crm/api-client/query';
 import { toast } from 'sonner';
 
+import { ApiConfigurationError, configErrorMessage } from '@/lib/api/config';
+
 /**
  * Message d'erreur ACTIONNABLE pour une mutation.
  *
@@ -14,9 +16,19 @@ import { toast } from 'sonner';
  * ce passage.
  */
 export function apiErrorText(error: unknown, fallback: string): string {
+  // Une CONFIGURATION incomplète n'est pas une coupure réseau. Elle nomme donc
+  // la variable manquante : « Vérifiez la connexion » enverrait chercher un
+  // câble là où il manque une variable d'environnement.
+  if (error instanceof ApiConfigurationError) return error.message;
+
   if (!(error instanceof ApiError)) {
     return 'Serveur injoignable. Vérifiez la connexion, puis réessayez.';
   }
+
+  // Le 500 du relais porte le message de configuration dans son corps : il
+  // traverse le réseau, et c'est le seul lien entre la cause serveur et l'écran.
+  const configuration = configErrorMessage(error.body);
+  if (configuration !== null) return configuration;
 
   switch (error.status) {
     case 400:

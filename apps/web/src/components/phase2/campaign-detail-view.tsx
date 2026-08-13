@@ -144,7 +144,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Commerciaux</dt>
+              <dt className="text-muted-foreground">Téléconseillers</dt>
               <dd className="font-[600] tabular-nums">{formatNumber(data.commercialCount)}</dd>
             </div>
             <div>
@@ -235,7 +235,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                       attempt.assignedToId !== attempt.performedById ? (
                         // Cas réel et déroutant s'il n'est pas signalé : un
                         // commercial peut appeler un numéro affecté à un autre.
-                        <p className="mt-0.5">Tâche d’un autre commercial</p>
+                        <p className="mt-0.5">Tâche d’un autre téléconseiller</p>
                       ) : null}
                     </div>
                   </li>

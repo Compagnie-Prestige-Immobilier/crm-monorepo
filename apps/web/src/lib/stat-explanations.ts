@@ -46,19 +46,24 @@ export const STAT_KEYS = [
   'bankCashingsOverTime',
   'bankByStage',
   'bankByRejectionReason',
+
+  // ── Entonnoir et argent, en tête du tableau de bord ──────────────────────
+  'moneyCashed',
+  'moneyCashed30Days',
+  'moneyAverageCashing',
+  'moneyRejectionRate',
+  'funnelStages',
 ] as const;
 
 export type StatKey = (typeof STAT_KEYS)[number];
 
 export const STAT_EXPLANATIONS: Record<StatKey, string> = {
   prospects: 'Nombre de fiches prospects correspondant aux filtres en haut de page.',
-  representants:
-    'Nombre de représentants ayant au moins une fiche dans la sélection courante.',
+  representants: 'Nombre de représentants ayant au moins une fiche dans la sélection courante.',
   teleconseillersActifs:
     'Comptes téléconseillers actifs ayant saisi au moins une fiche sur la période.',
   departementsCouverts: 'Départements où au moins un prospect a été enregistré.',
-  conversionRate:
-    'Part des prospects passés au statut Converti, rapportée au total filtré.',
+  conversionRate: 'Part des prospects passés au statut Converti, rapportée au total filtré.',
   methodRate:
     'Part des prospects ayant livré une méthode d’enrôlement. Les autres restent en attente, en refus ou en mauvais numéro.',
   dailyAverage:
@@ -76,8 +81,7 @@ export const STAT_EXPLANATIONS: Record<StatKey, string> = {
   parSegment:
     'Croisement syndicat et banque, de BDD1 à BDD4. La part de méthodes obtenues distingue les segments les plus réceptifs.',
 
-  bankVolume:
-    'Dossiers bancaires ouverts sur la sélection, toutes étapes confondues.',
+  bankVolume: 'Dossiers bancaires ouverts sur la sélection, toutes étapes confondues.',
   bankCashed: 'Dossiers arrivés à l’encaissement, et somme correspondante en francs CFA.',
   bankRejectionRate:
     'Rejets rapportés aux dossiers ayant abouti, encaissés ou rejetés. Les dossiers encore en cours sont exclus du calcul.',
@@ -91,10 +95,18 @@ export const STAT_EXPLANATIONS: Record<StatKey, string> = {
     'Dossiers ouverts par jour sur la période filtrée. Les creux correspondent aux jours sans dépôt.',
   bankCashingsOverTime:
     'Encaissements par jour, en nombre et en montant. Les deux échelles sont indépendantes.',
-  bankByStage:
-    'Dossiers actuellement positionnés sur chaque étape du flux de traitement.',
+  bankByStage: 'Dossiers actuellement positionnés sur chaque étape du flux de traitement.',
   bankByRejectionReason:
     'Répartition des motifs de rejet. Elle nomme la cause la plus fréquente de perte d’un dossier.',
+
+  moneyCashed:
+    'Somme des montants des dossiers encaissés, sur la sélection courante. C’est la seule étape de la chaîne qui rapporte.',
+  moneyCashed30Days: 'Montants encaissés au cours des trente derniers jours.',
+  moneyAverageCashing: 'Montant moyen d’un dossier encaissé, sur la sélection courante.',
+  moneyRejectionRate:
+    'Part des dossiers clos qui ont été rejetés. Les dossiers encore ouverts n’entrent pas dans le calcul.',
+  funnelStages:
+    'Effectif restant à chaque étape, du prospect saisi au dossier encaissé. Le taux indiqué est celui de l’étape précédente.',
 };
 
 /** Texte de la bulle. Une clé inconnue est impossible : le type l'interdit. */
