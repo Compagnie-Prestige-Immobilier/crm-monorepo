@@ -29,6 +29,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
+    "argon2": "catalog:",
     "pg": "catalog:",
     "prisma": "catalog:"
   },
@@ -37,7 +38,6 @@
     "@crm/typescript-config": "workspace:*",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
-    "argon2": "catalog:",
     "eslint": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
