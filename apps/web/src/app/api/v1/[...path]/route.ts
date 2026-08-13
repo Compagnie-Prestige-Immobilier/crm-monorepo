@@ -155,7 +155,9 @@ async function handle(
   await setSessionCookies(toAuthTokens(rotation.tokens));
 
   try {
-    return toClientResponse(await forward(request, method, path, rotation.tokens.accessToken, body));
+    return toClientResponse(
+      await forward(request, method, path, rotation.tokens.accessToken, body),
+    );
   } catch {
     return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });
   }
