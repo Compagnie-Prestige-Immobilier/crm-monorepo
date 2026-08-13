@@ -20,6 +20,13 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 type DatePickerProps = {
@@ -32,6 +39,10 @@ type DatePickerProps = {
 };
 
 const WEEKDAYS = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+const MONTHS = Array.from({ length: 12 }, (_, index) => ({
+  value: String(index),
+  label: format(new Date(2024, index, 1), 'LLLL', { locale: fr }),
+}));
 
 export function DatePicker({ id, label, value, min, max, onChange }: DatePickerProps) {
   const selected = value ? parseISO(value) : null;
@@ -43,6 +54,10 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
   });
   const minDate = min ? parseISO(min) : null;
   const maxDate = max ? parseISO(max) : null;
+  const selectedYear = selected?.getFullYear() ?? new Date().getFullYear();
+  const firstYear = Math.min(new Date().getFullYear() - 10, selectedYear - 2);
+  const lastYear = Math.max(new Date().getFullYear() + 5, selectedYear + 2);
+  const years = Array.from({ length: lastYear - firstYear + 1 }, (_, index) => firstYear + index);
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -72,8 +87,51 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[19rem] p-3" align="start">
-          <div className="flex items-center justify-between">
-            <p className="font-semibold capitalize">{format(month, 'LLLL yyyy', { locale: fr })}</p>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1">
+              <Select
+                value={String(month.getMonth())}
+                onValueChange={(value) => {
+                  setMonth((current) => new Date(current.getFullYear(), Number(value), 1));
+                }}
+              >
+                <SelectTrigger
+                  aria-label="Mois affiché"
+                  size="sm"
+                  className="w-[7.5rem] border-0 px-2 capitalize"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((item) => (
+                    <SelectItem key={item.value} value={item.value} className="capitalize">
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={String(month.getFullYear())}
+                onValueChange={(value) => {
+                  setMonth((current) => new Date(Number(value), current.getMonth(), 1));
+                }}
+              >
+                <SelectTrigger
+                  aria-label="Année affichée"
+                  size="sm"
+                  className="w-[5.5rem] border-0 px-2"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center gap-1">
               <Button
                 type="button"
