@@ -404,7 +404,7 @@ test('le tableau de bord bancaire mène à la liste filtrée depuis un graphique
   page,
 }) => {
   await page.goto('/banque');
-  await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'CPI GO', level: 1 })).toBeVisible();
   await expectNoErrorState(page);
 
   await expect(page.getByText('Taux de rejet')).toBeVisible();
