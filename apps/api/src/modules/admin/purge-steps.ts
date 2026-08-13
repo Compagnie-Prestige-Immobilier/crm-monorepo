@@ -56,8 +56,7 @@ function accountsOfRole(role: Role): PurgeStep {
   return {
     table: 'users',
     count: (db, context) => db.user.count({ where: where(context) }),
-    remove: async (db, context) =>
-      (await db.user.deleteMany({ where: where(context) })).count,
+    remove: async (db, context) => (await db.user.deleteMany({ where: where(context) })).count,
   };
 }
 

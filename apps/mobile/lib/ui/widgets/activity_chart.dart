@@ -70,8 +70,14 @@ class ActivityChart extends StatelessWidget {
             Row(
               children: <Widget>[
                 Expanded(
-                  child: Text('7 derniers jours', style: theme.textTheme.titleSmall),
+                  child: Text(
+                    '7 derniers jours',
+                    style: theme.textTheme.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+                const SizedBox(width: CpiSpacing.xs),
                 Text(
                   '$total',
                   style: theme.textTheme.titleSmall?.copyWith(
@@ -115,10 +121,14 @@ class ActivityChart extends StatelessWidget {
               ],
             ),
             const SizedBox(height: CpiSpacing.xs),
-            Row(
+            // `Wrap` et non `Row` : à la plus grande taille de texte, les deux
+            // entrées de légende dépassaient de 21 px sur 360 dp de large.
+            // Elles passent alors l'une sous l'autre au lieu de déborder.
+            Wrap(
+              spacing: CpiSpacing.md,
+              runSpacing: CpiSpacing.xxs,
               children: <Widget>[
                 _LegendDot(color: theme.colorScheme.primary, label: 'Envoyé'),
-                const SizedBox(width: CpiSpacing.md),
                 _LegendDot(
                   color: cpi.accent,
                   border: cpi.accentBorder,

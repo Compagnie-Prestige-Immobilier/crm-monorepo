@@ -84,6 +84,17 @@
   --info-foreground: #ffffff;
   --info-surface: #f7eef1;
 
+  /* Statuts posés SUR UNE SURFACE SOMBRE — sidebar #3A010A, bordeaux #630210.
+     design.md mesure ses paires sur fond clair ; les quatre tokens ci-dessus
+     sont des teintes foncées et n'y survivent pas : `--destructive` #B91C1C
+     tombe à 2,10:1 sur bordeaux. On reprend les déclinaisons de §3, pour la
+     raison exacte qui les a fait exister, plutôt que d'inventer une teinte.
+     Ratios mesurés sur bordeaux et vérifiés par `lib/contrast.test.ts`. */
+  --destructive-on-dark: #f87171;
+  --success-on-dark: #4fbf8b;
+  --warning-on-dark: #ffc65a;
+  --info-on-dark: #e08ba6;
+
   /* §2.5 Navigation */
   --sidebar: #3a010a;
   --sidebar-foreground: #dfc0c8;
@@ -168,9 +179,12 @@
   --border: rgba(255, 255, 255, 0.12);
   --input: transparent;
   --input-background: #232125;
-  /* 3,51:1 sur le fond, 3,37:1 sur `card`. L'ancienne bordure blanche à 10 %
-     donnait 1,23:1 : en sombre les champs étaient des trous noirs sans bord. */
-  --input-border: #7a5f66;
+  /* RE-MESURÉ après le passage aux surfaces neutres : 4,07:1 sur `background`,
+     3,80:1 sur `card`. La valeur précédente (#7A5F66) avait été calibrée sur le
+     prune #140206 et retombait à 3,01:1 sur le nouveau `card` : un chiffre
+     mesuré sur une surface qui n'existe plus ne vaut rien. L'ancienne bordure
+     blanche à 10 % donnait 1,23:1, les champs n'avaient aucun bord. */
+  --input-border: #877078;
   --switch-background: #4a2029;
   --scrim: rgba(0, 0, 0, 0.65);
 
@@ -182,8 +196,9 @@
   --primary: #a81e33;
   --primary-hover: #be2439;
   --primary-foreground: #ffffff;
-  /* Le même bordeaux en TEXTE sur #1F050C ne ferait que 1,7:1. Le rôle texte
-     bascule donc sur un rose clair : 8,53:1 sur `card`, 8,89:1 sur le fond. */
+  /* Le même bordeaux en TEXTE sur une surface sombre ne ferait que ~1,7:1. Le
+     rôle texte bascule donc sur un rose clair : 7,62:1 sur `card`, 8,16:1 sur
+     `background` (mesuré sur les surfaces neutres actuelles). */
   --primary-text: #f0919f;
   --secondary: #232125;
   --secondary-foreground: #f5e6ea;
@@ -213,9 +228,8 @@
   --info-surface: #331923;
 
   /* La sidebar garde son bordeaux profond : c'est l'identité, pas un thème.
-     Elle est REMONTÉE de #250408 à #300710 : à #250408 elle se confondait avec
-     le fond #140206 et le panneau de marque de l'écran de connexion
-     disparaissait purement et simplement. */
+     Elle est REMONTÉE de #250408 à #300710 : trop proche du fond, le panneau de
+     marque de l'écran de connexion disparaissait purement et simplement. */
   --sidebar: #300710;
   --sidebar-foreground: #e8ccd3;
   --sidebar-primary: #ffffff;
@@ -281,6 +295,13 @@
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-info-surface: var(--info-surface);
+
+  /* `text-destructive-on-dark`, `text-success-on-dark`… : à employer dès qu'un
+     statut est posé sur la sidebar ou sur un aplat bordeaux. */
+  --color-destructive-on-dark: var(--destructive-on-dark);
+  --color-success-on-dark: var(--success-on-dark);
+  --color-warning-on-dark: var(--warning-on-dark);
+  --color-info-on-dark: var(--info-on-dark);
 
   --color-border: var(--border);
   --color-input: var(--input);
@@ -446,14 +467,24 @@
     background: var(--accent);
   }
 
-  /* Surtitre de section. Il NOMME la zone, il ne la commente pas. */
+  /* Surtitre de section. Il NOMME la zone, il ne la commente pas.
+     AUCUNE couleur ici : `.eyebrow` et `text-*` vivent dans la même couche
+     utilitaire, donc c'est l'ordre du fichier qui tranchait, pas l'intention.
+     Posée sur la sidebar, la règle écrasait `text-sidebar-muted-foreground` et
+     replaçait `--muted-foreground` (#6B4A52) sur le bordeaux : 2,29:1, mesuré
+     à l'écran. La couleur se déclare donc au point d'usage. */
   .eyebrow {
     font-size: var(--text-label);
     line-height: 1.35;
     font-weight: var(--font-weight-medium);
     text-transform: uppercase;
     letter-spacing: 0.09em;
-    color: var(--muted-foreground);
+  }
+
+  /* Tailwind's generated text utility can win over the semantic sidebar
+     token. Keep section labels readable on the burgundy navigation. */
+  .eyebrow.text-sidebar-muted-foreground {
+    color: var(--sidebar-muted-foreground);
   }
 
   /* Chiffres alignés en colonne. Sans cela, un total qui passe de 9 à 10

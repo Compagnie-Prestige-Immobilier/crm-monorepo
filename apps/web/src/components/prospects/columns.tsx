@@ -217,7 +217,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
     {
       id: 'ownedByCommercialName',
       accessorKey: 'ownedByCommercialName',
-      header: 'Commercial',
+      header: 'Téléconseiller',
       cell: ({ row }) => <span className="truncate">{row.original.ownedByCommercialName}</span>,
     },
     {

@@ -329,7 +329,7 @@ function ProspectCard({
         <dd className="truncate">{prospect.banqueName}</dd>
         <dt className="text-muted-foreground">Syndicat</dt>
         <dd className="truncate">{prospect.syndicatSigle}</dd>
-        <dt className="text-muted-foreground">Commercial</dt>
+        <dt className="text-muted-foreground">Téléconseiller</dt>
         <dd className="truncate">{prospect.ownedByCommercialName}</dd>
         <dt className="text-muted-foreground">Saisi le</dt>
         <dd className="tabular-nums">{formatDate(prospect.clientCreatedAt)}</dd>

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { seconds, Throttle } from '@nestjs/throttler';
 
 import { Public } from '../../common/decorators/public.decorator.js';
 import {
@@ -9,7 +9,6 @@ import {
 } from '../../common/decorators/current-user.decorator.js';
 import { AuthService } from './auth.service.js';
 import { AuthTokensDto, AuthUserDto, LoginDto, LogoutResponseDto, RefreshDto } from './dto.js';
-import { LOGIN_THROTTLER } from './login-throttle.js';
 
 @ApiTags('auth')
 @Controller({ path: 'auth', version: '1' })
@@ -17,7 +16,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public()
-  @Throttle({ [LOGIN_THROTTLER]: {} })
+  @Throttle({ default: { ttl: seconds(60), limit: 10 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

@@ -161,8 +161,10 @@ describe('description du public dans l’historique', () => {
   });
 
   it('nomme le rôle plutôt que « par rôle »', () => {
+    // Le rôle porte le nom du MÉTIER. L'application sert des téléconseillers
+    // sur place ; « Commercial » décrivait un métier de terrain inexistant ici.
     expect(describeAudience(row({ audience: 'ROLE', audienceRole: 'COMMERCIAL' }))).toBe(
-      'Commercial',
+      'Téléconseiller',
     );
   });
 

@@ -72,7 +72,8 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
       className={cn(
         // `eyebrow` : les en-têtes de colonne parlent la même langue que les
         // surtitres de section. Un seul style de nommage dans tout le panel.
-        'eyebrow h-11 px-3 text-left align-middle whitespace-nowrap',
+        // `.eyebrow` ne porte que la forme ; la couleur se déclare ici.
+        'eyebrow h-11 px-3 text-left align-middle whitespace-nowrap text-muted-foreground',
         className,
       )}
       {...props}

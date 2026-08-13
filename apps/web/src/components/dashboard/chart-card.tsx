@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,17 @@ export function ChartCard({
   children: ReactNode;
   className?: string | undefined;
 }) {
+  const chartRegion = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Chart.js marks canvas as role=img but has no knowledge of the chart
+    // title. The surrounding labelled region is the accessible name; the
+    // canvas itself is presentation so axe does not report a missing alt.
+    chartRegion.current
+      ?.querySelector('canvas')
+      ?.setAttribute('role', 'presentation');
+  }, []);
+
   return (
     <Card className={cn('animate-rise', className)}>
       <CardHeader>
@@ -22,7 +33,9 @@ export function ChartCard({
       </CardHeader>
       {/* Hauteur fixe : Chart.js mesure son conteneur, et un parent
           auto-dimensionné produit une boucle de redimensionnement. */}
-      <div className="h-64 px-5 pb-1">{children}</div>
+      <div ref={chartRegion} className="h-64 px-5 pb-1" role="group" aria-label={`${title} graphique`}>
+        {children}
+      </div>
     </Card>
   );
 }

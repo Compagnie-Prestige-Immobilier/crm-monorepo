@@ -166,9 +166,7 @@ describe('PurgeService — exécution', () => {
       confirmation: 'direction',
     });
 
-    expect(indexOfModel(trace, 'bankCaseTransition')).toBeLessThan(
-      indexOfModel(trace, 'bankCase'),
-    );
+    expect(indexOfModel(trace, 'bankCaseTransition')).toBeLessThan(indexOfModel(trace, 'bankCase'));
     expect(indexOfModel(trace, 'bankCase')).toBeLessThan(indexOfModel(trace, 'prospect'));
     expect(indexOfModel(trace, 'prospect')).toBeLessThan(indexOfModel(trace, 'representant'));
   });

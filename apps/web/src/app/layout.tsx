@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     template: '%s · CPI GO',
   },
   description:
-    'Panneau d’administration CPI GO : suivi des prospects, des représentants et des commerciaux.',
+    'Panneau d’administration CPI GO : prospects, représentants, téléconseillers et dossiers bancaires.',
   icons: {
     icon: [
       { url: '/brand/favicon.svg', type: 'image/svg+xml' },

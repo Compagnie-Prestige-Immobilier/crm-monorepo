@@ -1,6 +1,7 @@
 'use client';
 
 import type { LucideIcon } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 import { AnimatedNumber } from '@/components/live/animated-number';
 import { StatInfo } from '@/components/stats/stat-info';
@@ -99,20 +100,30 @@ export function StatChartCard({
   className?: string | undefined;
   children: React.ReactNode;
 }) {
+  const chartRegion = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chartRegion.current
+      ?.querySelector('canvas')
+      ?.setAttribute('role', 'presentation');
+  }, []);
+
   return (
     <Card className={`animate-rise ${className ?? ''}`}>
       <div className="flex flex-col gap-1 px-5 pt-5">
-        <h3 className="flex items-center gap-2 font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
+        <h2 className="flex items-center gap-2 font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
           {title}
           <StatInfo stat={stat} label={title} />
-        </h3>
+        </h2>
         {description !== undefined ? (
           <p className="text-[0.8125rem] text-muted-foreground">{description}</p>
         ) : null}
       </div>
       {/* Hauteur fixe : Chart.js mesure son conteneur, et un parent
           auto-dimensionné produit une boucle de redimensionnement. */}
-      <div className="h-64 px-5 pb-1">{children}</div>
+      <div ref={chartRegion} className="h-64 px-5 pb-1" role="group" aria-label={`${title} graphique`}>
+        {children}
+      </div>
     </Card>
   );
 }

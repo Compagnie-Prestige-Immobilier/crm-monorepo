@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 
-import { API_PREFIX, serverApiOrigin } from '@/lib/api/config';
+import {
+  API_PREFIX,
+  ApiConfigurationError,
+  configErrorBody,
+  serverApiOrigin,
+} from '@/lib/api/config';
 import {
   clearSessionCookies,
   getAccessToken,
@@ -51,6 +56,18 @@ async function requestUpstream(options: XlsxRelayOptions, accessToken: string): 
 }
 
 export async function relayXlsx(options: XlsxRelayOptions): Promise<Response> {
+  // Même garde que le relais `/api/v1/*` : une variable manquante n'est pas un
+  // serveur injoignable, et l'export doit le dire plutôt que de laisser croire
+  // à une coupure.
+  try {
+    serverApiOrigin();
+  } catch (error) {
+    if (error instanceof ApiConfigurationError) {
+      return NextResponse.json(configErrorBody(error), { status: 500 });
+    }
+    throw error;
+  }
+
   const session = await getSession();
   if (session === null) {
     return NextResponse.json({ error: 'Session expirée.' }, { status: 401 });

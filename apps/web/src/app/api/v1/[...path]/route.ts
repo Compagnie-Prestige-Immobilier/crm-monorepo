@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 
-import { API_PREFIX, serverApiOrigin } from '@/lib/api/config';
+import {
+  API_PREFIX,
+  ApiConfigurationError,
+  configErrorBody,
+  serverApiOrigin,
+} from '@/lib/api/config';
 import {
   clearSessionCookies,
   getAccessToken,
@@ -89,6 +94,23 @@ async function handle(
   context: { params: Promise<{ path: string[] }> },
 ): Promise<Response> {
   const { path } = await context.params;
+
+  /**
+   * La configuration est vérifiée AVANT tout le reste.
+   *
+   * Sans cette garde, l'absence d'`API_URL` faisait lever `serverApiOrigin()`
+   * au fond de `forward()`, où le `catch` la confondait avec un backend
+   * injoignable : le panel répondait « Le serveur CPI est injoignable » et
+   * envoyait chercher une panne de réseau qui n'existait pas.
+   */
+  try {
+    serverApiOrigin();
+  } catch (error) {
+    if (error instanceof ApiConfigurationError) {
+      return NextResponse.json(configErrorBody(error), { status: 500 });
+    }
+    throw error;
+  }
 
   const accessToken = await getAccessToken();
   if (accessToken === null || accessToken === '') {

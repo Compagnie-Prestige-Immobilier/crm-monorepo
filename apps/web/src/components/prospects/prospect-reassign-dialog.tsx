@@ -117,8 +117,8 @@ export function ProspectReassignDialog({
             onChange={setRepresentantId}
           />
           <FilterCombobox
-            label="Commercial propriétaire"
-            placeholder="Choisir un commercial"
+            label="Téléconseiller"
+            placeholder="Choisir un téléconseiller"
             options={reference?.commerciaux ?? []}
             value={commercialId}
             onChange={setCommercialId}

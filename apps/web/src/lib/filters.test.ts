@@ -3,10 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { toFilterQuery, toProspectQuery } from '@/lib/api/query-params';
 import { buildExportUrl, exportFileName } from '@/lib/data/export';
 import {
+  ADVANCED_FILTER_KEYS,
   DEFAULT_PAGE_SIZE,
   EMPTY_FILTERS,
+  activeAdvancedKeys,
+  clearAdvancedFilters,
   countActiveFilters,
+  countAdvancedFilters,
   filtersQueryKey,
+  hasAdvancedFilters,
+  initialAdvancedOpen,
   parseProspectFilters,
   serializeProspectFilters,
 } from '@/lib/filters';
@@ -302,5 +308,70 @@ describe('classeur consolidé', () => {
     const day = new Date('2026-08-12T10:00:00.000Z');
     expect(exportFileName(day, 'filtered')).toBe('cpi-prospects-2026-08-12.xlsx');
     expect(exportFileName(day, 'consolidated')).toBe('cpi-prospects-consolide-2026-08-12.xlsx');
+  });
+});
+
+/**
+ * Le partage entre filtrage simple et filtrage avancé.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Ce que ces tests protègent : un filtre actif ne doit JAMAIS devenir
+ * invisible.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Replier dix champs raccourcit la page, mais si un critère resté actif
+ * disparaît de l'écran, le tableau affiche une population restreinte que
+ * personne ne sait expliquer. Le chiffre lu est faux, et il a l'air normal.
+ *
+ * D'où deux invariants : le compte des critères repliés est exact, et une URL
+ * qui en porte un ouvre le panneau quelle que soit la préférence enregistrée.
+ */
+describe('filtrage avancé', () => {
+  it('compte les critères repliés, sans compter ceux restés visibles', () => {
+    // Les dix critères avancés de FULL. La recherche, la période et le
+    // téléconseiller restent à l'air libre : ils ne comptent pas ici.
+    expect(countAdvancedFilters(FULL)).toBe(10);
+    expect(activeAdvancedKeys(FULL)).toEqual([...ADVANCED_FILTER_KEYS]);
+    expect(hasAdvancedFilters(FULL)).toBe(true);
+  });
+
+  it('ne compte aucun critère avancé quand seuls les champs visibles sont remplis', () => {
+    const visibleOnly: ProspectFilters = {
+      ...EMPTY_FILTERS,
+      search: 'Ndiaye',
+      commercialId: 'c-1',
+      dateFrom: '2026-01-01',
+      dateTo: '2026-03-31',
+    };
+    expect(countAdvancedFilters(visibleOnly)).toBe(0);
+    expect(hasAdvancedFilters(visibleOnly)).toBe(false);
+    // Trois critères actifs tout de même : le compte global les voit.
+    expect(countActiveFilters(visibleOnly)).toBe(3);
+  });
+
+  it('n’efface QUE les critères repliés', () => {
+    const cleared: ProspectFilters = { ...FULL, ...clearAdvancedFilters() };
+    expect(hasAdvancedFilters(cleared)).toBe(false);
+    // Ce que l'utilisateur voit à l'écran n'a pas bougé : effacer un champ
+    // visible depuis un bouton rangé ailleurs se lirait comme un défaut.
+    expect(cleared.search).toBe('Ndiaye');
+    expect(cleared.commercialId).toBe('c-1');
+    expect(cleared.dateFrom).toBe('2026-01-01');
+    expect(cleared.dateTo).toBe('2026-03-31');
+  });
+
+  it('ouvre le panneau sur une URL qui porte un critère replié, préférence contraire comprise', () => {
+    const shared: ProspectFilters = { ...EMPTY_FILTERS, banqueId: 'b-1' };
+    expect(initialAdvancedOpen(shared, false)).toBe(true);
+    expect(initialAdvancedOpen(shared, null)).toBe(true);
+  });
+
+  it('suit la préférence enregistrée quand l’URL ne porte aucun critère replié', () => {
+    expect(initialAdvancedOpen(EMPTY_FILTERS, true)).toBe(true);
+    expect(initialAdvancedOpen(EMPTY_FILTERS, false)).toBe(false);
+  });
+
+  it('reste replié par défaut : c’est tout l’objet du changement', () => {
+    expect(initialAdvancedOpen(EMPTY_FILTERS, null)).toBe(false);
   });
 });

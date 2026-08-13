@@ -127,7 +127,7 @@ export function CampaignCreateDialog({
   const selectedNames = useMemo(
     () =>
       selected.map(
-        (id) => commerciaux.find((option) => option.value === id)?.label ?? 'Commercial',
+        (id) => commerciaux.find((option) => option.value === id)?.label ?? 'Téléconseiller',
       ),
     [selected, commerciaux],
   );

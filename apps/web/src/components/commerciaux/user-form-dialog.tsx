@@ -153,7 +153,7 @@ export function UserFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Modifier le commercial' : 'Nouveau commercial'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Modifier le téléconseiller' : 'Nouveau téléconseiller'}</DialogTitle>
           <DialogDescription>
             {isEdit
               ? 'Le mot de passe n’est pas modifiable ici.'

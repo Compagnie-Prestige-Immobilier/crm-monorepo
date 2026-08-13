@@ -8,7 +8,6 @@ import { envSchema, readEnv } from './env.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
-import { LOGIN_THROTTLER } from './modules/auth/login-throttle.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { BankCasesModule } from './modules/bank-cases/bank-cases.module.js';
@@ -67,10 +66,7 @@ const env = readEnv();
     }),
     ThrottlerModule.forRoot({
       throttlers: [
-        { name: 'default', ttl: seconds(60), limit: 300 },
-        // Limite dédiée à la connexion : la globale protège le service, celle-ci
-        // protège les comptes contre l'essai systématique de mots de passe.
-        { name: LOGIN_THROTTLER, ttl: seconds(60), limit: env.AUTH_LOGIN_RATE_LIMIT },
+        { name: 'default', ttl: seconds(60), limit: env.API_GLOBAL_RATE_LIMIT },
       ],
     }),
     PrismaModule,

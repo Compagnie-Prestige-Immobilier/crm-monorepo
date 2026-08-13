@@ -1,6 +1,7 @@
 import { ApiError } from '@crm/api-client/query';
 import { NextResponse } from 'next/server';
 
+import { ApiConfigurationError, configErrorBody } from '@/lib/api/config';
 import { getAnonymousApiClient, setSessionCookies } from '@/lib/api/server';
 import { authenticate } from '@/lib/data/auth';
 import { loginSchema } from '@/lib/schemas';
@@ -40,6 +41,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       getAnonymousApiClient(),
     );
   } catch (error) {
+    // `API_URL` absent : le panel n'a aucun backend à joindre. C'est la
+    // PREMIÈRE branche, avant le repli « injoignable » — sans elle, un panel
+    // mal déployé envoyait l'administrateur vérifier sa connexion.
+    if (error instanceof ApiConfigurationError) {
+      return NextResponse.json(configErrorBody(error), { status: 500 });
+    }
     // 429 : le limiteur de débit de l'API. Le dire, sinon l'utilisateur
     // réessaie en boucle en croyant s'être trompé de mot de passe.
     if (error instanceof ApiError && error.status === 429) {
