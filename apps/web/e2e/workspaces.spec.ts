@@ -353,7 +353,7 @@ test('le motif « Autre » exige une précision', async ({ page }) => {
   await expect(confirm).toBeEnabled();
   await confirm.click();
   await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 30_000 });
-  await expect(page.getByText(/Vérification à mener avec la direction/)).toBeVisible();
+  await expect(page.getByText(/Vérification à mener avec la direction/).last()).toBeVisible();
 });
 
 test('la référence dupliquée est signalée au flou, avec un lien vers le dossier existant', async ({

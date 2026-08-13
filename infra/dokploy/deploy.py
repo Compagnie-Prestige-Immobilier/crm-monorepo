@@ -58,6 +58,8 @@ PG_NAME = "cpi-go-postgres"
 API_NAME = "cpi-go-api"
 WEB_NAME = "cpi-go-web"
 SSH_KEY_NAME = "cpi-go-deploy"
+APK_RELEASE_MOUNT = "/repo/storage/releases"
+APK_RELEASE_VOLUME = "cpi-go-apk-releases"
 
 HERE = Path(__file__).resolve().parent
 SECRETS_FILE = HERE / ".secrets.generated"
@@ -398,6 +400,7 @@ def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
             "API_TRUST_PROXY_HEADERS=true",
             # Swagger fermé : le contrat est publié par la CI, pas par le serveur.
             "API_DOCS_ENABLED=false",
+            f"APK_RELEASE_DIR={APK_RELEASE_MOUNT}",
             "BUSINESS_TIME_ZONE=Africa/Dakar",
             "PHONE_DEFAULT_REGION=SN",
             "SYNC_MAX_BATCH_SIZE=200",
@@ -411,6 +414,36 @@ def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
             "SEED_ADMIN_FULL_NAME=Administrateur CPI",
         ]
     )
+
+
+def ensure_apk_mount(application_id: str) -> None:
+    """Ensure releases are stored outside the replaceable application image."""
+    mounts = call(
+        "mounts.listByServiceId",
+        {"serviceType": "application", "serviceId": application_id},
+        method="GET",
+    ) or []
+    for mount in mounts:
+        if mount.get("mountPath") != APK_RELEASE_MOUNT:
+            continue
+        if mount.get("type") != "volume" or mount.get("volumeName") != APK_RELEASE_VOLUME:
+            raise DokployError(
+                f"un montage existe déjà sur {APK_RELEASE_MOUNT} avec une autre configuration"
+            )
+        ok(f"volume APK « {APK_RELEASE_VOLUME} » déjà monté")
+        return
+
+    call(
+        "mounts.create",
+        {
+            "type": "volume",
+            "volumeName": APK_RELEASE_VOLUME,
+            "mountPath": APK_RELEASE_MOUNT,
+            "serviceType": "application",
+            "serviceId": application_id,
+        },
+    )
+    ok(f"volume APK « {APK_RELEASE_VOLUME} » monté sur {APK_RELEASE_MOUNT}")
 
 
 def _web_env(names: dict[str, str]) -> str:
@@ -501,6 +534,9 @@ def cmd_configure() -> None:
         },
     )
     ok("API — infra/docker/Dockerfile.api (étape runner)")
+
+    step("Stockage persistant des releases Android")
+    ensure_apk_mount(ids["API_ID"])
 
     call(
         "application.saveBuildType",

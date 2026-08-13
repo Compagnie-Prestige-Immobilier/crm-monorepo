@@ -134,7 +134,9 @@ async function rotateRefreshTokenOnce(
 
   try {
     const body: unknown = await response.json();
-    if (typeof body !== 'object' || body === null) return null;
+    if (typeof body !== 'object' || body === null) {
+      return { ok: false, reason: 'invalid' };
+    }
     const { accessToken, refreshToken: next, expiresIn } = body as Record<string, unknown>;
     if (typeof accessToken !== 'string' || typeof next !== 'string') {
       return { ok: false, reason: 'invalid' };

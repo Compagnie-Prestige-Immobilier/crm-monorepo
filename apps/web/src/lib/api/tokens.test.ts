@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { isAccessTokenStale, readJwtExpiry, rotateRefreshToken } from '@/lib/api/tokens';
+import {
+  isAccessTokenStale,
+  readJwtExpiry,
+  rotateRefreshToken,
+  rotateRefreshTokenDetailed,
+} from '@/lib/api/tokens';
 
 /** Fabrique un JWT non signé dont seul `exp` compte ici. */
 function jwtExpiringAt(epochSeconds: number): string {
@@ -114,6 +119,14 @@ describe('rotateRefreshToken', () => {
   it('renvoie null sur panne réseau, sans lever', async () => {
     const fetchImpl = vi.fn(() => Promise.reject(new Error('ECONNREFUSED')));
     await expect(rotateRefreshToken('http://api.test', 'old', fetchImpl)).resolves.toBeNull();
+  });
+
+  it('signale une panne réseau comme temporaire, pas comme session invalide', async () => {
+    const fetchImpl = vi.fn(() => Promise.reject(new Error('ECONNREFUSED')));
+    await expect(rotateRefreshTokenDetailed('http://api.test', 'old', fetchImpl)).resolves.toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
   });
 
   it('single-flight le même refresh token pendant les requêtes concurrentes', async () => {
