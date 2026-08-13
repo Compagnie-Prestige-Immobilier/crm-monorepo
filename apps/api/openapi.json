@@ -2988,9 +2988,35 @@
         "tags": ["demo"]
       }
     },
+    "/api/v1/admin/demo/purge": {
+      "post": {
+        "description": "IRRÉVERSIBLE, et distinct de la désactivation. Supprime exactement les lignes enregistrées à l’ensemencement, dans l’ordre inverse de création. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration. L’interface doit faire confirmer.",
+        "operationId": "purgeDemoData",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supprime définitivement le jeu de démonstration.",
+        "tags": ["demo"]
+      }
+    },
     "/api/v1/admin/demo/disable": {
       "post": {
-        "description": "Supprime EXACTEMENT les lignes enregistrées au moment de l’ensemencement. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration.",
+        "description": "NE SUPPRIME RIEN. Les lignes de démonstration restent en base, invisibles pour toute lecture, export Excel compris. Pour les effacer définitivement, utiliser /purge.",
         "operationId": "disableDemoMode",
         "parameters": [],
         "responses": {
@@ -3010,8 +3036,870 @@
             "bearer": []
           }
         ],
-        "summary": "Retire les données de démonstration.",
+        "summary": "Masque les données de démonstration.",
         "tags": ["demo"]
+      }
+    },
+    "/api/v1/admin/purge": {
+      "get": {
+        "description": "`allowed` vaut false pour tout administrateur autre que le premier : l’écran masque alors la commande, et POST /admin/purge refuse de son côté.",
+        "operationId": "getPurgeCatalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgeCatalogDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Domaines purgeables, leurs dépendances et le nombre de lignes concernées.",
+        "tags": ["admin"]
+      },
+      "post": {
+        "description": "Réservé au premier compte administrateur, qui ressaisit son identifiant de connexion. Transactionnel, enfants avant parents. Le compte appelant n’est jamais supprimé. Journalisé.",
+        "operationId": "purgeDatabase",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgeResultDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Identifiant de confirmation incorrect."
+          },
+          "403": {
+            "description": "Compte administrateur autre que le premier."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supprime définitivement les domaines sélectionnés.",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/supervision": {
+      "get": {
+        "description": "La présence est déduite des traces existantes : familles de jetons, lots de synchronisation, écritures métier. Aucune colonne dédiée.",
+        "operationId": "getSupervision",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Téléconseillers et pôle Finances générales, avec présence et dernière activité.",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/notifications": {
+      "post": {
+        "description": "Le public est résolu et les lignes de livraison écrites AVANT toute remise. Sans compte de service FCM, la notification est stockée et mise en file : `transportStatus` vaut alors NOT_CONFIGURED et l’interface doit le dire.",
+        "operationId": "createNotification",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNotificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "NOTIFICATION_AUDIENCE_EMPTY, NOTIFICATION_AUDIENCE_ROLE_REQUIRED, NOTIFICATION_AUDIENCE_DEPARTEMENT_REQUIRED, NOTIFICATION_AUDIENCE_USERS_REQUIRED, NOTIFICATION_SCHEDULE_IN_PAST, NOTIFICATION_ROUTE_INVALID."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Compose et envoie, ou programme, une notification.",
+        "tags": ["notifications"]
+      },
+      "get": {
+        "operationId": "listNotifications",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/NotificationStatus"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/NotificationCategory"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Historique des envois, avec les compteurs de livraison.",
+        "tags": ["notifications"]
+      }
+    },
+    "/api/v1/notifications/mine": {
+      "get": {
+        "description": "Fonctionne même sans transport push : une notification en file y figure dès sa composition, ce qui rend le centre de notifications utile avant tout provisionnement Firebase.",
+        "operationId": "listMyNotifications",
+        "parameters": [
+          {
+            "name": "unreadOnly",
+            "required": false,
+            "in": "query",
+            "description": "Ne rendre que les non lues.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Boîte de réception de l’utilisateur courant.",
+        "tags": ["notifications"]
+      }
+    },
+    "/api/v1/notifications/audience-preview": {
+      "get": {
+        "description": "Utilise exactement le filtre de l’envoi : le nombre annoncé est celui qui sera servi. Envoyer à 400 personnes ne s’annule pas.",
+        "operationId": "previewNotificationAudience",
+        "parameters": [
+          {
+            "name": "audience",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/NotificationAudience"
+            }
+          },
+          {
+            "name": "audienceRole",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Role"
+            }
+          },
+          {
+            "name": "audienceDepartementId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "audienceUserIds",
+            "required": false,
+            "in": "query",
+            "description": "Identifiants séparés par des virgules (contrainte de la chaîne de requête).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudiencePreviewDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Nombre de destinataires, AVANT confirmation.",
+        "tags": ["notifications"]
+      }
+    },
+    "/api/v1/notifications/{id}": {
+      "get": {
+        "operationId": "getNotification",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOTIFICATION_NOT_FOUND."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Détail d’un envoi, destinataire par destinataire.",
+        "tags": ["notifications"]
+      }
+    },
+    "/api/v1/notifications/{id}/cancel": {
+      "post": {
+        "description": "Refusé sur un envoi déjà parti : un téléphone qui a sonné ne se rappelle pas, et marquer « annulée » une chose déjà lue serait un mensonge dans l’historique.",
+        "operationId": "cancelNotification",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "NOTIFICATION_NOT_SCHEDULED."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Annule une notification encore programmée.",
+        "tags": ["notifications"]
+      }
+    },
+    "/api/v1/notifications/{id}/read": {
+      "post": {
+        "description": "Idempotent : un second appel ne réécrit pas la première lecture, qui est la seule intéressante.",
+        "operationId": "markNotificationRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marque lue la notification de l’utilisateur courant.",
+        "tags": ["notifications"]
+      }
+    },
+    "/api/v1/devices/register": {
+      "post": {
+        "description": "Un jeton déjà connu d’un AUTRE compte lui est DÉTACHÉ, jamais dupliqué : les téléphones se prêtent, et l’ancien propriétaire ne doit plus rien recevoir sur un appareil qui n’est plus le sien.",
+        "operationId": "registerDevice",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDeviceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enregistre ou rafraîchit le jeton FCM de l’appareil courant.",
+        "tags": ["devices"]
+      }
+    },
+    "/api/v1/devices/unregister": {
+      "post": {
+        "description": "Toujours `ok`, y compris sur un jeton inconnu : une déconnexion ne doit jamais échouer côté client.",
+        "operationId": "unregisterDevice",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnregisterDeviceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Révoque le jeton à la déconnexion.",
+        "tags": ["devices"]
+      }
+    },
+    "/api/v1/notification-templates": {
+      "get": {
+        "operationId": "listNotificationTemplates",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationTemplateListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Gabarits disponibles, avec leurs variables.",
+        "tags": ["notification-templates"]
+      },
+      "post": {
+        "description": "`variables` n’est pas saisi : il est déduit du texte à chaque écriture. Une liste tenue à la main diverge du gabarit dès la première correction.",
+        "operationId": "createNotificationTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNotificationTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationTemplateDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "NOTIFICATION_TEMPLATE_NAME_CONFLICT."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crée un gabarit.",
+        "tags": ["notification-templates"]
+      }
+    },
+    "/api/v1/notification-templates/{id}": {
+      "get": {
+        "operationId": "getNotificationTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationTemplateDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOTIFICATION_TEMPLATE_NOT_FOUND."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Un gabarit.",
+        "tags": ["notification-templates"]
+      },
+      "patch": {
+        "operationId": "updateNotificationTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationTemplateDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifie un gabarit.",
+        "tags": ["notification-templates"]
+      }
+    },
+    "/api/v1/notification-templates/{id}/render": {
+      "post": {
+        "description": "Une variable manquante n’est PAS une erreur : le marqueur `{{nom}}` reste visible et son nom remonte dans `missing`, ce qui laisse l’interface avertir sans interrompre la frappe.",
+        "operationId": "renderNotificationTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderedTemplateDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Substitue les variables, pour l’aperçu du compositeur.",
+        "tags": ["notification-templates"]
+      }
+    },
+    "/api/v1/analytics/funnel": {
+      "get": {
+        "description": "Du prospect saisi au dossier encaissé, plus les montants. Le tableau de bord montrait l’effort — prospects, représentants, téléconseillers — mais jamais le résultat. Une direction qui ne voit que le haut de l’entonnoir peut féliciter une équipe qui saisit beaucoup et ne convertit rien.",
+        "operationId": "getAnalyticsFunnel",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Recherche libre sur le nom, le prénom ou le téléphone.",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "representantId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "banqueId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "syndicatId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "departementId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "commercialId",
+            "required": false,
+            "in": "query",
+            "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "statut",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectStatut"
+            }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "description": "Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.",
+            "schema": {
+              "$ref": "#/components/schemas/BddSegment"
+            }
+          },
+          {
+            "name": "phase2Status",
+            "required": false,
+            "in": "query",
+            "description": "Avancement de la phase 2. Dimension indépendante de `statut`.",
+            "schema": {
+              "$ref": "#/components/schemas/Phase2Status"
+            }
+          },
+          {
+            "name": "enrollmentMethod",
+            "required": false,
+            "in": "query",
+            "description": "Méthode d’enrôlement obtenue en phase 2.",
+            "schema": {
+              "$ref": "#/components/schemas/EnrollmentMethod"
+            }
+          },
+          {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "enrollmentCapturedById",
+            "required": false,
+            "in": "query",
+            "description": "Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "required": false,
+            "in": "query",
+            "description": "Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsFunnelDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Entonnoir complet et montants encaissés.",
+        "tags": ["analytics"]
       }
     },
     "/api/v1/analytics/totals": {
@@ -7731,6 +8619,982 @@
           }
         },
         "required": ["enabled", "seededAt", "canToggle", "reason", "counts"]
+      },
+      "PurgeDomainKey": {
+        "type": "string",
+        "enum": [
+          "teleconseillers",
+          "finances",
+          "representants",
+          "prospects",
+          "campagnes",
+          "fileAppels",
+          "tentatives",
+          "dossiers",
+          "notifications",
+          "synchronisation",
+          "journal",
+          "referentiels"
+        ]
+      },
+      "PurgeDomainDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PurgeDomainKey"
+              }
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "hint": {
+            "type": "string"
+          },
+          "requires": {
+            "description": "Domaines entraînés par celui-ci, clés étrangères obligent. L’écran les coche avec lui.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "number",
+            "description": "Lignes actuellement concernées."
+          }
+        },
+        "required": ["key", "label", "hint", "requires", "rows"]
+      },
+      "PurgeCatalogDto": {
+        "type": "object",
+        "properties": {
+          "allowed": {
+            "type": "boolean",
+            "description": "Vrai si le compte appelant est le premier administrateur, seul habilité à purger."
+          },
+          "confirmationHint": {
+            "type": "string",
+            "description": "Identifiant de connexion à ressaisir pour confirmer."
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurgeDomainDto"
+            }
+          }
+        },
+        "required": ["allowed", "confirmationHint", "domains"]
+      },
+      "PurgeRequestDto": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "description": "Domaines cochés. Le serveur y ajoute leurs dépendances.",
+            "items": {
+              "$ref": "#/components/schemas/PurgeDomainKey"
+            }
+          },
+          "confirmation": {
+            "type": "string",
+            "maxLength": 254,
+            "description": "Identifiant de connexion de l’administrateur, ressaisi. Comparé à son e-mail ou à son nom d’utilisateur."
+          }
+        },
+        "required": ["domains", "confirmation"]
+      },
+      "PurgeDeletionDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PurgeDomainKey"
+              }
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "number"
+          }
+        },
+        "required": ["key", "label", "rows"]
+      },
+      "PurgeResultDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurgeDeletionDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "purgedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Horodatage serveur de la purge."
+          }
+        },
+        "required": ["deleted", "total", "purgedAt"]
+      },
+      "PresenceState": {
+        "type": "string",
+        "enum": ["ONLINE", "RECENT", "AWAY"]
+      },
+      "SupervisedUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              }
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "departementName": {
+            "type": "string",
+            "nullable": true
+          },
+          "presence": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PresenceState"
+              }
+            ]
+          },
+          "hasLiveSession": {
+            "type": "boolean",
+            "description": "Une famille de jetons est encore vivante : ni révoquée, ni expirée."
+          },
+          "sessionCount": {
+            "type": "number",
+            "description": "Sessions ouvertes, tous appareils confondus."
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Trace d’activité la plus récente, toutes sources confondues."
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastSyncAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Dernier lot de synchronisation reçu d’un appareil."
+          },
+          "lastWriteAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Dernière écriture métier : tentative d’appel ou transition de dossier."
+          }
+        },
+        "required": [
+          "id",
+          "fullName",
+          "username",
+          "email",
+          "role",
+          "isActive",
+          "departementName",
+          "presence",
+          "hasLiveSession",
+          "sessionCount",
+          "lastSeenAt",
+          "lastLoginAt",
+          "lastSyncAt",
+          "lastWriteAt"
+        ]
+      },
+      "PresenceCountsDto": {
+        "type": "object",
+        "properties": {
+          "online": {
+            "type": "number"
+          },
+          "recent": {
+            "type": "number"
+          },
+          "away": {
+            "type": "number"
+          }
+        },
+        "required": ["online", "recent", "away"]
+      },
+      "SupervisionDto": {
+        "type": "object",
+        "properties": {
+          "observedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Horloge du serveur au moment de la lecture."
+          },
+          "onlineWindowMinutes": {
+            "type": "number",
+            "default": 20,
+            "description": "Fenêtre, en minutes, en deçà de laquelle un compte est dit connecté."
+          },
+          "teleconseillers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisedUserDto"
+            }
+          },
+          "finances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisedUserDto"
+            }
+          },
+          "counts": {
+            "$ref": "#/components/schemas/PresenceCountsDto"
+          }
+        },
+        "required": ["observedAt", "onlineWindowMinutes", "teleconseillers", "finances", "counts"]
+      },
+      "NotificationCategory": {
+        "type": "string",
+        "enum": ["ANNONCE", "RAPPEL", "CAMPAGNE", "DOSSIER", "SYSTEME"]
+      },
+      "NotificationAudience": {
+        "type": "string",
+        "enum": ["ALL", "ROLE", "DEPARTEMENT", "USERS"]
+      },
+      "CreateNotificationDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Android tronque au-delà de quatre lignes environ ; 500 est un plafond de stockage, pas une cible de rédaction."
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationCategory"
+              }
+            ]
+          },
+          "route": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Route interne, ex. `/phase2`. Une URL absolue est refusée."
+          },
+          "payload": {
+            "type": "object",
+            "description": "Données libres transmises au client."
+          },
+          "audience": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationAudience"
+              }
+            ]
+          },
+          "audienceRole": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              }
+            ]
+          },
+          "audienceDepartementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "audienceUserIds": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scheduledFor": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Absent ou passé : envoi immédiat refusé si passé, envoi immédiat si absent."
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Gabarit d’origine, pour la traçabilité."
+          }
+        },
+        "required": ["title", "body", "audience"]
+      },
+      "NotificationStatus": {
+        "type": "string",
+        "enum": ["SCHEDULED", "SENDING", "SENT", "CANCELLED"]
+      },
+      "NotificationDeliveryCountsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "pending": {
+            "type": "number",
+            "description": "En file : aucun push tenté (ou aucun appareil)."
+          },
+          "sent": {
+            "type": "number",
+            "description": "Accepté par FCM. N’implique pas « affiché »."
+          },
+          "delivered": {
+            "type": "number"
+          },
+          "failed": {
+            "type": "number"
+          },
+          "read": {
+            "type": "number"
+          }
+        },
+        "required": ["total", "pending", "sent", "delivered", "failed", "read"]
+      },
+      "NotificationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationCategory"
+              }
+            ]
+          },
+          "route": {
+            "type": "string",
+            "nullable": true,
+            "description": "Route interne ouverte au tap, ex. `/phase2`. Jamais une URL absolue."
+          },
+          "audience": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationAudience"
+              }
+            ]
+          },
+          "audienceRole": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              }
+            ]
+          },
+          "audienceDepartementId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "audienceUserIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationStatus"
+              }
+            ]
+          },
+          "scheduledFor": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancelledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "transportStatus": {
+            "type": "string",
+            "nullable": true,
+            "description": "NOT_CONFIGURED quand aucun compte de service FCM n’est fourni : les lignes de livraison existent, la remise n’a pas eu lieu. TRANSPORT_ERROR quand Google a refusé l’authentification."
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/NotificationDeliveryCountsDto"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "category",
+          "route",
+          "audience",
+          "audienceRole",
+          "audienceDepartementId",
+          "audienceUserIds",
+          "status",
+          "scheduledFor",
+          "sentAt",
+          "cancelledAt",
+          "transportStatus",
+          "createdByName",
+          "createdAt",
+          "counts"
+        ]
+      },
+      "NotificationListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": ["items", "meta"]
+      },
+      "InboxItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identifiant de la LIVRAISON, pas de l’envoi."
+          },
+          "notificationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationCategory"
+              }
+            ]
+          },
+          "route": {
+            "type": "string",
+            "nullable": true
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "notificationId",
+          "title",
+          "body",
+          "category",
+          "route",
+          "isRead",
+          "readAt",
+          "createdAt"
+        ]
+      },
+      "InboxDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxItemDto"
+            }
+          },
+          "unreadCount": {
+            "type": "number"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": ["items", "unreadCount", "meta"]
+      },
+      "AudiencePreviewDto": {
+        "type": "object",
+        "properties": {
+          "recipientCount": {
+            "type": "number",
+            "description": "Comptes actifs visés."
+          },
+          "reachableCount": {
+            "type": "number",
+            "description": "Destinataires possédant au moins un appareil enregistré. L’écart avec `recipientCount` est le nombre de personnes qui ne verront le message qu’en ouvrant l’application."
+          },
+          "transportConfigured": {
+            "type": "boolean",
+            "description": "Faux quand aucun compte de service FCM n’est configuré."
+          },
+          "transportReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["recipientCount", "reachableCount", "transportConfigured", "transportReason"]
+      },
+      "NotificationDeliveryStatus": {
+        "type": "string",
+        "enum": ["PENDING", "SENT", "DELIVERED", "FAILED", "READ"]
+      },
+      "NotificationRecipientDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              }
+            ]
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationDeliveryStatus"
+              }
+            ]
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["userId", "fullName", "role", "status", "error", "sentAt", "readAt"]
+      },
+      "NotificationDetailDto": {
+        "type": "object",
+        "properties": {
+          "notification": {
+            "$ref": "#/components/schemas/NotificationDto"
+          },
+          "recipients": {
+            "description": "Une ligne par destinataire — c’est ce qui rend « qui a reçu ? » répondable.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationRecipientDto"
+            }
+          }
+        },
+        "required": ["notification", "recipients"]
+      },
+      "DevicePlatform": {
+        "type": "string",
+        "enum": ["ANDROID", "IOS", "WEB"]
+      },
+      "RegisterDeviceDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 4096,
+            "description": "Jeton d’enregistrement FCM. Réattribué si un autre compte le détenait."
+          },
+          "platform": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DevicePlatform"
+              }
+            ]
+          },
+          "appVersion": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "pendingOps": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Écritures encore dans la file locale. Alimente le rappel « saisies non synchronisées » ; le serveur ne peut pas le deviner."
+          }
+        },
+        "required": ["token"]
+      },
+      "DeviceTokenDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DevicePlatform"
+              }
+            ]
+          },
+          "appVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "pushEnabled": {
+            "type": "boolean",
+            "description": "Faux quand aucun transport n’est configuré : le jeton est stocké, rien n’est remis."
+          }
+        },
+        "required": ["id", "platform", "appVersion", "lastSeenAt", "pushEnabled"]
+      },
+      "UnregisterDeviceDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 4096
+          }
+        },
+        "required": ["token"]
+      },
+      "NotificationTemplateDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationCategory"
+              }
+            ]
+          },
+          "titleTemplate": {
+            "type": "string"
+          },
+          "bodyTemplate": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string",
+            "nullable": true
+          },
+          "variables": {
+            "description": "Variables citées par le gabarit, recalculées à chaque écriture.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "category",
+          "titleTemplate",
+          "bodyTemplate",
+          "route",
+          "variables",
+          "isActive",
+          "updatedAt"
+        ]
+      },
+      "NotificationTemplateListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationTemplateDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "CreateNotificationTemplateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationCategory"
+              }
+            ]
+          },
+          "titleTemplate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "Peut contenir des `{{variables}}`."
+          },
+          "bodyTemplate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "route": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": ["name", "titleTemplate", "bodyTemplate"]
+      },
+      "UpdateNotificationTemplateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationCategory"
+              }
+            ]
+          },
+          "titleTemplate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "bodyTemplate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "route": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RenderTemplateDto": {
+        "type": "object",
+        "properties": {
+          "variables": {
+            "type": "object",
+            "description": "Couples `{ variable: valeur }`."
+          }
+        },
+        "required": ["variables"]
+      },
+      "RenderedTemplateDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "missing": {
+            "description": "Variables citées et non fournies. Le marqueur `{{nom}}` reste visible dans le texte rendu.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["title", "body", "missing"]
+      },
+      "FunnelStageDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Nom de l’étape, prêt à afficher."
+          },
+          "count": {
+            "type": "number"
+          },
+          "tauxEtapePrecedente": {
+            "type": "number",
+            "description": "Part de l’étape précédente, en pourcentage. Vaut 100 pour la première. C’est le taux qui montre OÙ la chaîne se casse, et non le taux global qui noie la marche défaillante dans la moyenne."
+          },
+          "tauxGlobal": {
+            "type": "number",
+            "description": "Part du sommet de l’entonnoir, en pourcentage."
+          }
+        },
+        "required": ["label", "count", "tauxEtapePrecedente", "tauxGlobal"]
+      },
+      "AnalyticsFinanceDto": {
+        "type": "object",
+        "properties": {
+          "montantEncaisse": {
+            "type": "string",
+            "description": "Total encaissé, en francs CFA. Chaîne : XOF est un Decimal(18,0).",
+            "example": "22000000"
+          },
+          "montantEnCours": {
+            "type": "string",
+            "description": "Montant des dossiers encore ouverts, à l’instant. Chaîne.",
+            "example": "0"
+          },
+          "encaissementMoyen": {
+            "type": "string",
+            "description": "Encaissement moyen par dossier encaissé. Chaîne.",
+            "example": "3142857"
+          },
+          "montantEncaisse30Jours": {
+            "type": "string",
+            "description": "Total encaissé sur les 30 derniers jours. Chaîne.",
+            "example": "8500000"
+          },
+          "dossiers": {
+            "type": "number"
+          },
+          "dossiersOuverts": {
+            "type": "number",
+            "description": "Dossiers encore ouverts."
+          },
+          "dossiersEncaisses": {
+            "type": "number"
+          },
+          "dossiersRejetes": {
+            "type": "number"
+          },
+          "tauxRejet": {
+            "type": "number",
+            "description": "Part des dossiers clos qui ont été rejetés, en pourcentage. Calculée sur les dossiers CLOS et non sur tous : inclure les dossiers en cours ferait baisser le taux simplement parce qu’on ouvre des dossiers."
+          },
+          "delaiMoyenJours": {
+            "type": "number",
+            "nullable": true,
+            "description": "Délai moyen en jours entre l’ouverture d’un dossier et son issue. Nul tant qu’aucun dossier n’est clos."
+          }
+        },
+        "required": [
+          "montantEncaisse",
+          "montantEnCours",
+          "encaissementMoyen",
+          "montantEncaisse30Jours",
+          "dossiers",
+          "dossiersOuverts",
+          "dossiersEncaisses",
+          "dossiersRejetes",
+          "tauxRejet",
+          "delaiMoyenJours"
+        ]
+      },
+      "AnalyticsFunnelDto": {
+        "type": "object",
+        "properties": {
+          "etapes": {
+            "description": "Les quatre étapes, du prospect saisi au dossier encaissé.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunnelStageDto"
+            }
+          },
+          "finance": {
+            "$ref": "#/components/schemas/AnalyticsFinanceDto"
+          }
+        },
+        "required": ["etapes", "finance"]
       },
       "AnalyticsTotalsDto": {
         "type": "object",

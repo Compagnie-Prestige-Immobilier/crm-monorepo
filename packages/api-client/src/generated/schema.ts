@@ -848,6 +848,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/demo/purge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Supprime définitivement le jeu de démonstration.
+     * @description IRRÉVERSIBLE, et distinct de la désactivation. Supprime exactement les lignes enregistrées à l’ensemencement, dans l’ordre inverse de création. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration. L’interface doit faire confirmer.
+     */
+    post: operations['purgeDemoData'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/demo/disable': {
     parameters: {
       query?: never;
@@ -858,10 +878,291 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Retire les données de démonstration.
-     * @description Supprime EXACTEMENT les lignes enregistrées au moment de l’ensemencement. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration.
+     * Masque les données de démonstration.
+     * @description NE SUPPRIME RIEN. Les lignes de démonstration restent en base, invisibles pour toute lecture, export Excel compris. Pour les effacer définitivement, utiliser /purge.
      */
     post: operations['disableDemoMode'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/purge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Domaines purgeables, leurs dépendances et le nombre de lignes concernées.
+     * @description `allowed` vaut false pour tout administrateur autre que le premier : l’écran masque alors la commande, et POST /admin/purge refuse de son côté.
+     */
+    get: operations['getPurgeCatalog'];
+    put?: never;
+    /**
+     * Supprime définitivement les domaines sélectionnés.
+     * @description Réservé au premier compte administrateur, qui ressaisit son identifiant de connexion. Transactionnel, enfants avant parents. Le compte appelant n’est jamais supprimé. Journalisé.
+     */
+    post: operations['purgeDatabase'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/supervision': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Téléconseillers et pôle Finances générales, avec présence et dernière activité.
+     * @description La présence est déduite des traces existantes : familles de jetons, lots de synchronisation, écritures métier. Aucune colonne dédiée.
+     */
+    get: operations['getSupervision'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Historique des envois, avec les compteurs de livraison. */
+    get: operations['listNotifications'];
+    put?: never;
+    /**
+     * Compose et envoie, ou programme, une notification.
+     * @description Le public est résolu et les lignes de livraison écrites AVANT toute remise. Sans compte de service FCM, la notification est stockée et mise en file : `transportStatus` vaut alors NOT_CONFIGURED et l’interface doit le dire.
+     */
+    post: operations['createNotification'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/mine': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Boîte de réception de l’utilisateur courant.
+     * @description Fonctionne même sans transport push : une notification en file y figure dès sa composition, ce qui rend le centre de notifications utile avant tout provisionnement Firebase.
+     */
+    get: operations['listMyNotifications'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/audience-preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Nombre de destinataires, AVANT confirmation.
+     * @description Utilise exactement le filtre de l’envoi : le nombre annoncé est celui qui sera servi. Envoyer à 400 personnes ne s’annule pas.
+     */
+    get: operations['previewNotificationAudience'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Détail d’un envoi, destinataire par destinataire. */
+    get: operations['getNotification'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Annule une notification encore programmée.
+     * @description Refusé sur un envoi déjà parti : un téléphone qui a sonné ne se rappelle pas, et marquer « annulée » une chose déjà lue serait un mensonge dans l’historique.
+     */
+    post: operations['cancelNotification'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/{id}/read': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Marque lue la notification de l’utilisateur courant.
+     * @description Idempotent : un second appel ne réécrit pas la première lecture, qui est la seule intéressante.
+     */
+    post: operations['markNotificationRead'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/devices/register': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Enregistre ou rafraîchit le jeton FCM de l’appareil courant.
+     * @description Un jeton déjà connu d’un AUTRE compte lui est DÉTACHÉ, jamais dupliqué : les téléphones se prêtent, et l’ancien propriétaire ne doit plus rien recevoir sur un appareil qui n’est plus le sien.
+     */
+    post: operations['registerDevice'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/devices/unregister': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Révoque le jeton à la déconnexion.
+     * @description Toujours `ok`, y compris sur un jeton inconnu : une déconnexion ne doit jamais échouer côté client.
+     */
+    post: operations['unregisterDevice'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notification-templates': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Gabarits disponibles, avec leurs variables. */
+    get: operations['listNotificationTemplates'];
+    put?: never;
+    /**
+     * Crée un gabarit.
+     * @description `variables` n’est pas saisi : il est déduit du texte à chaque écriture. Une liste tenue à la main diverge du gabarit dès la première correction.
+     */
+    post: operations['createNotificationTemplate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notification-templates/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Un gabarit. */
+    get: operations['getNotificationTemplate'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Modifie un gabarit. */
+    patch: operations['updateNotificationTemplate'];
+    trace?: never;
+  };
+  '/api/v1/notification-templates/{id}/render': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Substitue les variables, pour l’aperçu du compositeur.
+     * @description Une variable manquante n’est PAS une erreur : le marqueur `{{nom}}` reste visible et son nom remonte dans `missing`, ce qui laisse l’interface avertir sans interrompre la frappe.
+     */
+    post: operations['renderNotificationTemplate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/analytics/funnel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Entonnoir complet et montants encaissés.
+     * @description Du prospect saisi au dossier encaissé, plus les montants. Le tableau de bord montrait l’effort — prospects, représentants, téléconseillers — mais jamais le résultat. Une direction qui ne voit que le haut de l’entonnoir peut féliciter une équipe qui saisit beaucoup et ne convertit rien.
+     */
+    get: operations['getAnalyticsFunnel'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2098,6 +2399,344 @@ export interface components {
       /** @description Explication lisible quand canToggle est faux. */
       reason: string | null;
       counts: components['schemas']['DemoCountsDto'];
+    };
+    /** @enum {string} */
+    PurgeDomainKey:
+      | 'teleconseillers'
+      | 'finances'
+      | 'representants'
+      | 'prospects'
+      | 'campagnes'
+      | 'fileAppels'
+      | 'tentatives'
+      | 'dossiers'
+      | 'notifications'
+      | 'synchronisation'
+      | 'journal'
+      | 'referentiels';
+    PurgeDomainDto: {
+      key: components['schemas']['PurgeDomainKey'];
+      label: string;
+      hint: string;
+      /** @description Domaines entraînés par celui-ci, clés étrangères obligent. L’écran les coche avec lui. */
+      requires: string[];
+      /** @description Lignes actuellement concernées. */
+      rows: number;
+    };
+    PurgeCatalogDto: {
+      /** @description Vrai si le compte appelant est le premier administrateur, seul habilité à purger. */
+      allowed: boolean;
+      /** @description Identifiant de connexion à ressaisir pour confirmer. */
+      confirmationHint: string;
+      domains: components['schemas']['PurgeDomainDto'][];
+    };
+    PurgeRequestDto: {
+      /** @description Domaines cochés. Le serveur y ajoute leurs dépendances. */
+      domains: components['schemas']['PurgeDomainKey'][];
+      /** @description Identifiant de connexion de l’administrateur, ressaisi. Comparé à son e-mail ou à son nom d’utilisateur. */
+      confirmation: string;
+    };
+    PurgeDeletionDto: {
+      key: components['schemas']['PurgeDomainKey'];
+      label: string;
+      rows: number;
+    };
+    PurgeResultDto: {
+      deleted: components['schemas']['PurgeDeletionDto'][];
+      total: number;
+      /**
+       * Format: date-time
+       * @description Horodatage serveur de la purge.
+       */
+      purgedAt: string;
+    };
+    /** @enum {string} */
+    PresenceState: 'ONLINE' | 'RECENT' | 'AWAY';
+    SupervisedUserDto: {
+      /** Format: uuid */
+      id: string;
+      fullName: string;
+      username: string;
+      email: string;
+      role: components['schemas']['Role'];
+      isActive: boolean;
+      departementName: string | null;
+      presence: components['schemas']['PresenceState'];
+      /** @description Une famille de jetons est encore vivante : ni révoquée, ni expirée. */
+      hasLiveSession: boolean;
+      /** @description Sessions ouvertes, tous appareils confondus. */
+      sessionCount: number;
+      /**
+       * Format: date-time
+       * @description Trace d’activité la plus récente, toutes sources confondues.
+       */
+      lastSeenAt: string | null;
+      /** Format: date-time */
+      lastLoginAt: string | null;
+      /**
+       * Format: date-time
+       * @description Dernier lot de synchronisation reçu d’un appareil.
+       */
+      lastSyncAt: string | null;
+      /**
+       * Format: date-time
+       * @description Dernière écriture métier : tentative d’appel ou transition de dossier.
+       */
+      lastWriteAt: string | null;
+    };
+    PresenceCountsDto: {
+      online: number;
+      recent: number;
+      away: number;
+    };
+    SupervisionDto: {
+      /**
+       * Format: date-time
+       * @description Horloge du serveur au moment de la lecture.
+       */
+      observedAt: string;
+      /**
+       * @description Fenêtre, en minutes, en deçà de laquelle un compte est dit connecté.
+       * @default 20
+       */
+      onlineWindowMinutes: number;
+      teleconseillers: components['schemas']['SupervisedUserDto'][];
+      finances: components['schemas']['SupervisedUserDto'][];
+      counts: components['schemas']['PresenceCountsDto'];
+    };
+    /** @enum {string} */
+    NotificationCategory: 'ANNONCE' | 'RAPPEL' | 'CAMPAGNE' | 'DOSSIER' | 'SYSTEME';
+    /** @enum {string} */
+    NotificationAudience: 'ALL' | 'ROLE' | 'DEPARTEMENT' | 'USERS';
+    CreateNotificationDto: {
+      title: string;
+      /** @description Android tronque au-delà de quatre lignes environ ; 500 est un plafond de stockage, pas une cible de rédaction. */
+      body: string;
+      category?: components['schemas']['NotificationCategory'];
+      /** @description Route interne, ex. `/phase2`. Une URL absolue est refusée. */
+      route?: string;
+      /** @description Données libres transmises au client. */
+      payload?: Record<string, never>;
+      audience: components['schemas']['NotificationAudience'];
+      audienceRole?: components['schemas']['Role'];
+      /** Format: uuid */
+      audienceDepartementId?: string;
+      audienceUserIds?: string[];
+      /**
+       * Format: date-time
+       * @description Absent ou passé : envoi immédiat refusé si passé, envoi immédiat si absent.
+       */
+      scheduledFor?: string;
+      /**
+       * Format: uuid
+       * @description Gabarit d’origine, pour la traçabilité.
+       */
+      templateId?: string;
+    };
+    /** @enum {string} */
+    NotificationStatus: 'SCHEDULED' | 'SENDING' | 'SENT' | 'CANCELLED';
+    NotificationDeliveryCountsDto: {
+      total: number;
+      /** @description En file : aucun push tenté (ou aucun appareil). */
+      pending: number;
+      /** @description Accepté par FCM. N’implique pas « affiché ». */
+      sent: number;
+      delivered: number;
+      failed: number;
+      read: number;
+    };
+    NotificationDto: {
+      /** Format: uuid */
+      id: string;
+      title: string;
+      body: string;
+      category: components['schemas']['NotificationCategory'];
+      /** @description Route interne ouverte au tap, ex. `/phase2`. Jamais une URL absolue. */
+      route: string | null;
+      audience: components['schemas']['NotificationAudience'];
+      audienceRole: components['schemas']['Role'] | null;
+      /** Format: uuid */
+      audienceDepartementId: string | null;
+      audienceUserIds: string[];
+      status: components['schemas']['NotificationStatus'];
+      /** Format: date-time */
+      scheduledFor: string | null;
+      /** Format: date-time */
+      sentAt: string | null;
+      /** Format: date-time */
+      cancelledAt: string | null;
+      /** @description NOT_CONFIGURED quand aucun compte de service FCM n’est fourni : les lignes de livraison existent, la remise n’a pas eu lieu. TRANSPORT_ERROR quand Google a refusé l’authentification. */
+      transportStatus: string | null;
+      createdByName: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      counts: components['schemas']['NotificationDeliveryCountsDto'];
+    };
+    NotificationListDto: {
+      items: components['schemas']['NotificationDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    InboxItemDto: {
+      /**
+       * Format: uuid
+       * @description Identifiant de la LIVRAISON, pas de l’envoi.
+       */
+      id: string;
+      /** Format: uuid */
+      notificationId: string;
+      title: string;
+      body: string;
+      category: components['schemas']['NotificationCategory'];
+      route: string | null;
+      isRead: boolean;
+      /** Format: date-time */
+      readAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    InboxDto: {
+      items: components['schemas']['InboxItemDto'][];
+      unreadCount: number;
+      meta: components['schemas']['PageMetaDto'];
+    };
+    AudiencePreviewDto: {
+      /** @description Comptes actifs visés. */
+      recipientCount: number;
+      /** @description Destinataires possédant au moins un appareil enregistré. L’écart avec `recipientCount` est le nombre de personnes qui ne verront le message qu’en ouvrant l’application. */
+      reachableCount: number;
+      /** @description Faux quand aucun compte de service FCM n’est configuré. */
+      transportConfigured: boolean;
+      transportReason: string | null;
+    };
+    /** @enum {string} */
+    NotificationDeliveryStatus: 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED' | 'READ';
+    NotificationRecipientDto: {
+      /** Format: uuid */
+      userId: string;
+      fullName: string;
+      role: components['schemas']['Role'];
+      status: components['schemas']['NotificationDeliveryStatus'];
+      error: string | null;
+      /** Format: date-time */
+      sentAt: string | null;
+      /** Format: date-time */
+      readAt: string | null;
+    };
+    NotificationDetailDto: {
+      notification: components['schemas']['NotificationDto'];
+      /** @description Une ligne par destinataire — c’est ce qui rend « qui a reçu ? » répondable. */
+      recipients: components['schemas']['NotificationRecipientDto'][];
+    };
+    /** @enum {string} */
+    DevicePlatform: 'ANDROID' | 'IOS' | 'WEB';
+    RegisterDeviceDto: {
+      /** @description Jeton d’enregistrement FCM. Réattribué si un autre compte le détenait. */
+      token: string;
+      platform?: components['schemas']['DevicePlatform'];
+      appVersion?: string;
+      /** @description Écritures encore dans la file locale. Alimente le rappel « saisies non synchronisées » ; le serveur ne peut pas le deviner. */
+      pendingOps?: number;
+    };
+    DeviceTokenDto: {
+      /** Format: uuid */
+      id: string;
+      platform: components['schemas']['DevicePlatform'];
+      appVersion: string | null;
+      /** Format: date-time */
+      lastSeenAt: string;
+      /** @description Faux quand aucun transport n’est configuré : le jeton est stocké, rien n’est remis. */
+      pushEnabled: boolean;
+    };
+    UnregisterDeviceDto: {
+      token: string;
+    };
+    NotificationTemplateDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      category: components['schemas']['NotificationCategory'];
+      titleTemplate: string;
+      bodyTemplate: string;
+      route: string | null;
+      /** @description Variables citées par le gabarit, recalculées à chaque écriture. */
+      variables: string[];
+      isActive: boolean;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    NotificationTemplateListDto: {
+      items: components['schemas']['NotificationTemplateDto'][];
+    };
+    CreateNotificationTemplateDto: {
+      name: string;
+      category?: components['schemas']['NotificationCategory'];
+      /** @description Peut contenir des `{{variables}}`. */
+      titleTemplate: string;
+      bodyTemplate: string;
+      route?: string;
+    };
+    UpdateNotificationTemplateDto: {
+      name?: string;
+      category?: components['schemas']['NotificationCategory'];
+      titleTemplate?: string;
+      bodyTemplate?: string;
+      route?: string;
+      isActive?: boolean;
+    };
+    RenderTemplateDto: {
+      /** @description Couples `{ variable: valeur }`. */
+      variables: Record<string, never>;
+    };
+    RenderedTemplateDto: {
+      title: string;
+      body: string;
+      /** @description Variables citées et non fournies. Le marqueur `{{nom}}` reste visible dans le texte rendu. */
+      missing: string[];
+    };
+    FunnelStageDto: {
+      /** @description Nom de l’étape, prêt à afficher. */
+      label: string;
+      count: number;
+      /** @description Part de l’étape précédente, en pourcentage. Vaut 100 pour la première. C’est le taux qui montre OÙ la chaîne se casse, et non le taux global qui noie la marche défaillante dans la moyenne. */
+      tauxEtapePrecedente: number;
+      /** @description Part du sommet de l’entonnoir, en pourcentage. */
+      tauxGlobal: number;
+    };
+    AnalyticsFinanceDto: {
+      /**
+       * @description Total encaissé, en francs CFA. Chaîne : XOF est un Decimal(18,0).
+       * @example 22000000
+       */
+      montantEncaisse: string;
+      /**
+       * @description Montant des dossiers encore ouverts, à l’instant. Chaîne.
+       * @example 0
+       */
+      montantEnCours: string;
+      /**
+       * @description Encaissement moyen par dossier encaissé. Chaîne.
+       * @example 3142857
+       */
+      encaissementMoyen: string;
+      /**
+       * @description Total encaissé sur les 30 derniers jours. Chaîne.
+       * @example 8500000
+       */
+      montantEncaisse30Jours: string;
+      dossiers: number;
+      /** @description Dossiers encore ouverts. */
+      dossiersOuverts: number;
+      dossiersEncaisses: number;
+      dossiersRejetes: number;
+      /** @description Part des dossiers clos qui ont été rejetés, en pourcentage. Calculée sur les dossiers CLOS et non sur tous : inclure les dossiers en cours ferait baisser le taux simplement parce qu’on ouvre des dossiers. */
+      tauxRejet: number;
+      /** @description Délai moyen en jours entre l’ouverture d’un dossier et son issue. Nul tant qu’aucun dossier n’est clos. */
+      delaiMoyenJours: number | null;
+    };
+    AnalyticsFunnelDto: {
+      /** @description Les quatre étapes, du prospect saisi au dossier encaissé. */
+      etapes: components['schemas']['FunnelStageDto'][];
+      finance: components['schemas']['AnalyticsFinanceDto'];
     };
     AnalyticsTotalsDto: {
       prospects: number;
@@ -3903,6 +4542,25 @@ export interface operations {
       };
     };
   };
+  purgeDemoData: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DemoStatusDto'];
+        };
+      };
+    };
+  };
   disableDemoMode: {
     parameters: {
       query?: never;
@@ -3918,6 +4576,481 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['DemoStatusDto'];
+        };
+      };
+    };
+  };
+  getPurgeCatalog: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurgeCatalogDto'];
+        };
+      };
+    };
+  };
+  purgeDatabase: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PurgeRequestDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurgeResultDto'];
+        };
+      };
+      /** @description Identifiant de confirmation incorrect. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Compte administrateur autre que le premier. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  getSupervision: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SupervisionDto'];
+        };
+      };
+    };
+  };
+  listNotifications: {
+    parameters: {
+      query?: {
+        status?: components['schemas']['NotificationStatus'];
+        category?: components['schemas']['NotificationCategory'];
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationListDto'];
+        };
+      };
+    };
+  };
+  createNotification: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateNotificationDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationDto'];
+        };
+      };
+      /** @description NOTIFICATION_AUDIENCE_EMPTY, NOTIFICATION_AUDIENCE_ROLE_REQUIRED, NOTIFICATION_AUDIENCE_DEPARTEMENT_REQUIRED, NOTIFICATION_AUDIENCE_USERS_REQUIRED, NOTIFICATION_SCHEDULE_IN_PAST, NOTIFICATION_ROUTE_INVALID. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  listMyNotifications: {
+    parameters: {
+      query?: {
+        /** @description Ne rendre que les non lues. */
+        unreadOnly?: boolean;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InboxDto'];
+        };
+      };
+    };
+  };
+  previewNotificationAudience: {
+    parameters: {
+      query: {
+        audience: components['schemas']['NotificationAudience'];
+        audienceRole?: components['schemas']['Role'];
+        audienceDepartementId?: string;
+        /** @description Identifiants séparés par des virgules (contrainte de la chaîne de requête). */
+        audienceUserIds?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AudiencePreviewDto'];
+        };
+      };
+    };
+  };
+  getNotification: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationDetailDto'];
+        };
+      };
+      /** @description NOTIFICATION_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  cancelNotification: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationDto'];
+        };
+      };
+      /** @description NOTIFICATION_NOT_SCHEDULED. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  markNotificationRead: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OkDto'];
+        };
+      };
+    };
+  };
+  registerDevice: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RegisterDeviceDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DeviceTokenDto'];
+        };
+      };
+    };
+  };
+  unregisterDevice: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UnregisterDeviceDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OkDto'];
+        };
+      };
+    };
+  };
+  listNotificationTemplates: {
+    parameters: {
+      query?: {
+        includeInactive?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationTemplateListDto'];
+        };
+      };
+    };
+  };
+  createNotificationTemplate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateNotificationTemplateDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationTemplateDto'];
+        };
+      };
+      /** @description NOTIFICATION_TEMPLATE_NAME_CONFLICT. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  getNotificationTemplate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationTemplateDto'];
+        };
+      };
+      /** @description NOTIFICATION_TEMPLATE_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  updateNotificationTemplate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateNotificationTemplateDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationTemplateDto'];
+        };
+      };
+    };
+  };
+  renderNotificationTemplate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RenderTemplateDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RenderedTemplateDto'];
+        };
+      };
+    };
+  };
+  getAnalyticsFunnel: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AnalyticsFunnelDto'];
         };
       };
     };
