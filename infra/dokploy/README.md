@@ -28,6 +28,10 @@ export DOKPLOY_KEY='…'
 python3 infra/dokploy/deploy.py deploy
 ```
 
+Le script configure aussi le volume Dokploy `cpi-go-apk-releases`, monté sur
+`/repo/storage/releases`. Les APK publiés depuis **Paramètres → Release Android**
+survivent ainsi aux reconstructions et redéploiements de l'API.
+
 Un workflow SSH lançant `docker-compose.prod.yml` sur ce VPS serait pire que
 rien : il démarrerait Caddy sur les ports 80 et 443, déjà tenus par le Traefik
 de Dokploy, et l'un des deux ne monterait pas.

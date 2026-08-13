@@ -96,6 +96,8 @@ services:
       # Swagger fermé en production : le contrat est publié par la CI, pas par
       # le serveur de production.
       API_DOCS_ENABLED: 'false'
+      # Les APK publiés depuis le panel doivent survivre à une nouvelle image.
+      APK_RELEASE_DIR: /repo/storage/releases
       # Caddy est en amont et réécrit X-Forwarded-For, donc l'en-tête est
       # digne de confiance ici — et il le faut, sinon toutes les requêtes
       # paraissent venir de l'IP de Caddy et le throttler devient global.
@@ -122,6 +124,8 @@ services:
       retries: 3
       start_period: 40s
     networks: [cpi-go]
+    volumes:
+      - apk-releases:/repo/storage/releases
     logging: *logging
 
   web:
@@ -210,6 +214,7 @@ services:
 
 volumes:
   pgdata:
+  apk-releases:
   caddy-data:
   caddy-config:
 

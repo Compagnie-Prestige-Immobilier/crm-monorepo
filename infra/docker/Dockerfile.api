@@ -112,6 +112,10 @@ COPY --from=builder   --chown=node:node /repo/packages/database/prisma ./package
 COPY --from=builder   --chown=node:node /repo/packages/database/prisma.config.ts ./packages/database/prisma.config.ts
 COPY --chown=node:node infra/docker/api-entrypoint.sh /usr/local/bin/api-entrypoint.sh
 RUN chmod +x /usr/local/bin/api-entrypoint.sh
+# The APK volume is mounted over this directory in production. Creating it with
+# the runtime user's ownership lets Docker initialize a new named volume with
+# permissions that the non-root API can write to.
+RUN mkdir -p /repo/storage/releases && chown -R node:node /repo/storage
 
 USER node
 EXPOSE 3001

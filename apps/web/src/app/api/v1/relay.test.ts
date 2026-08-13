@@ -279,4 +279,17 @@ describe('échec du rafraîchissement', () => {
     expect(store.raw(ACCESS_COOKIE)?.value).toBe(OLD_ACCESS);
     expect(store.raw(REFRESH_COOKIE)?.value).toBe(OLD_REFRESH);
   });
+
+  it('conserve la session si le refresh lui-même est momentanément injoignable', async () => {
+    fetchMock
+      .mockResolvedValueOnce(json({ statusCode: 401 }, 401))
+      .mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+    const { GET } = await import('@/app/api/v1/[...path]/route');
+    const response = await GET(relayRequest(), params(['prospects']));
+
+    expect(response.status).toBe(502);
+    expect(store.raw(ACCESS_COOKIE)?.value).toBe(OLD_ACCESS);
+    expect(store.raw(REFRESH_COOKIE)?.value).toBe(OLD_REFRESH);
+  });
 });
