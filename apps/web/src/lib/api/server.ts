@@ -10,10 +10,7 @@ import {
   REFRESH_TTL_SECONDS,
   serverApiOrigin,
 } from '@/lib/api/config';
-import {
-  rotateRefreshTokenDetailed,
-  type RotatedTokens,
-} from '@/lib/api/tokens';
+import { rotateRefreshTokenDetailed, type RotatedTokens } from '@/lib/api/tokens';
 
 /**
  * Client d'API CÔTÉ SERVEUR — rendu des pages, Route Handlers, Server Actions.
