@@ -431,7 +431,7 @@ test('la configuration des étapes se réordonne au clavier, sans glisser-dépos
   await expect(initialRow.getByRole('button', { name: /^Monter/ })).toBeDisabled();
 
   // Les étapes système ne se désactivent pas.
-  await expect(page.getByRole('heading', { name: 'Étapes terminales' })).toBeVisible();
+  await expect(page.getByText('Étapes terminales', { exact: true })).toBeVisible();
   await expect(page.getByText('Non modifiable').first()).toBeVisible();
 });
 
