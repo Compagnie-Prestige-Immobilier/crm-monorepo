@@ -278,7 +278,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                           {user.isActive ? null : <Badge variant="destructive">Désactivé</Badge>}
                         </div>
                         <span className="truncate text-[0.75rem] text-muted-foreground">
-                          {user.phoneE164 === null ? '—' : formatPhone(user.phoneE164)}
+                          {user.phoneE164 === null ? '–' : formatPhone(user.phoneE164)}
                         </span>
                       </div>
                     </TableCell>
@@ -290,7 +290,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell>{user.departementName ?? '—'}</TableCell>
+                    <TableCell>{user.departementName ?? '–'}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatNumber(user.prospectCount)}
                     </TableCell>

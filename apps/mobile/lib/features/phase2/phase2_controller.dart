@@ -280,7 +280,7 @@ class Phase2Controller extends Notifier<Phase2State> {
   static String labelForOutcome(String outcome, [String? method]) =>
       switch (outcome) {
         CallOutcomes.methodObtained =>
-          'Méthode obtenue — ${labelForMethod(method ?? '')}',
+          'Méthode obtenue : ${labelForMethod(method ?? '')}',
         CallOutcomes.unreachable => 'Injoignable',
         CallOutcomes.callback => 'À rappeler',
         CallOutcomes.refused => 'Refus',

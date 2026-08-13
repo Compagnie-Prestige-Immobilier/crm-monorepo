@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/drafts/draft_form_mixin.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
@@ -282,7 +282,10 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         });
         _nomFocus.requestFocus();
       } else {
-        context.go(Routes.historique);
+        // Retour à l'écran d'où l'on vient plutôt qu'un saut d'onglet : la
+        // saisie de prospects s'ouvre depuis l'historique comme depuis un
+        // formulaire de représentant.
+        popOrHome(context, fallback: Routes.historique);
       }
     } on Object catch (e) {
       if (!mounted) return;
@@ -306,9 +309,12 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         ? 0
         : (ref.watch(prospectCountForProvider(_representantId!)).value ?? 0);
 
-    return Scaffold(
+    return CpiPopScope(
+      fallback: Routes.historique,
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Saisie de prospects'),
+        leading: const CpiBackButton(fallback: Routes.historique),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(28),
           child: Padding(
@@ -419,7 +425,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
                       label: 'Banque',
                       selectedId: _banqueId,
                       emptyHint: banques.isEmpty
-                          ? 'Aucune banque locale. Synchronisez une première fois.'
+                          ? 'Aucune banque. Synchronisez.'
                           : 'Aucun résultat',
                       options: banques
                           .map(
@@ -449,7 +455,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
                       selectedId: _syndicatId,
                       textInputAction: TextInputAction.done,
                       emptyHint: syndicats.isEmpty
-                          ? 'Aucun syndicat local. Synchronisez une première fois.'
+                          ? 'Aucun syndicat. Synchronisez.'
                           : 'Aucun résultat',
                       options: syndicats
                           .map(
@@ -514,6 +520,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
           ],
         ),
       ),
+      ),
     );
   }
 }
@@ -537,19 +544,13 @@ class _MissingRepresentant extends StatelessWidget {
             ),
             const SizedBox(height: CpiSpacing.md),
             Text(
-              'Un prospect se rattache toujours à un représentant.',
+              'Aucun représentant sélectionné',
               textAlign: TextAlign.center,
               style: theme.textTheme.titleSmall,
             ),
-            const SizedBox(height: CpiSpacing.xs),
-            Text(
-              'Choisissez-en un dans l\'historique, ou créez-le.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
-            ),
             const SizedBox(height: CpiSpacing.lg),
             FilledButton(
-              onPressed: () => context.go(Routes.historique),
+              onPressed: () => popOrHome(context, fallback: Routes.historique),
               child: const Text('Voir mes représentants'),
             ),
           ],
@@ -576,7 +577,7 @@ class _ResumeStrip extends StatelessWidget {
         children: <Widget>[
           Expanded(
             child: Text(
-              'Reprendre la saisie en cours ?',
+              'Saisie non terminée',
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: cpi.info),

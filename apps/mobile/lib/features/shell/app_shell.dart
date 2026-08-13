@@ -119,8 +119,7 @@ class PendingBanner extends ConsumerWidget {
           const SizedBox(width: CpiSpacing.xs),
           Expanded(
             child: Text(
-              '$pending élément${pending > 1 ? 's' : ''} en attente. '
-              'Sera envoyé dès que possible.',
+              '$pending élément${pending > 1 ? 's' : ''} en attente d\'envoi',
               style: theme.textTheme.bodySmall?.copyWith(color: cpi.accentText),
             ),
           ),

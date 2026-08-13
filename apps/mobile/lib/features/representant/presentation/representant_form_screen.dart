@@ -8,6 +8,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/drafts/draft_form_mixin.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/sync/api_port.dart';
 import '../../../core/theme/cpi_colors.dart';
@@ -285,7 +286,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       // On enchaîne directement sur la saisie de prospects : c'est le geste
       // suivant dans 100 % des cas réels. Renvoyer à l'accueil obligerait à
       // retrouver le représentant qu'on vient de créer.
-      context.go(Routes.newProspectFor(_entityId));
+      context.pushReplacement(Routes.newProspectFor(_entityId));
     } on Object catch (e) {
       if (!mounted) return;
       setState(() {
@@ -311,13 +312,15 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     final List<Departement> departements =
         ref.watch(departementsProvider).value ?? const <Departement>[];
 
-    return Scaffold(
+    return CpiPopScope(
+      child: Scaffold(
       appBar: AppBar(
         title: Text(
           widget.representantId == null
               ? 'Nouveau représentant'
               : 'Modifier le représentant',
         ),
+        leading: const CpiBackButton(),
       ),
       body: SafeArea(
         child: Column(
@@ -366,7 +369,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                       owner: _duplicate!.owner,
                       onAddProspects: _duplicate!.representantId == null
                           ? null
-                          : () => context.go(
+                          : () => context.pushReplacement(
                               Routes.newProspectFor(_duplicate!.representantId!),
                             ),
                     ),
@@ -380,7 +383,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                     selectedId: _departementId,
                     textInputAction: TextInputAction.done,
                     emptyHint: departements.isEmpty
-                        ? 'Aucun département local. Synchronisez une première fois.'
+                        ? 'Aucun département. Synchronisez.'
                         : 'Aucun résultat',
                     options: departements
                         .map(
@@ -429,6 +432,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -501,7 +505,7 @@ class _DuplicateBanner extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      owner == null ? name : '$name — enregistré par $owner',
+                      owner == null ? name : '$name · enregistré par $owner',
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
@@ -516,7 +520,7 @@ class _DuplicateBanner extends StatelessWidget {
               child: TextButton.icon(
                 onPressed: onAddProspects,
                 icon: const Icon(PhosphorIconsRegular.userPlus, size: 18),
-                label: const Text('Ajouter des prospects à sa liste'),
+                label: const Text('Ajouter des prospects'),
               ),
             ),
           ],
@@ -560,7 +564,7 @@ class _ResumeBanner extends StatelessWidget {
           const SizedBox(width: CpiSpacing.xs),
           Expanded(
             child: Text(
-              'Reprendre la saisie de $who ?',
+              'Saisie non terminée : $who',
               style: theme.textTheme.bodySmall?.copyWith(color: cpi.info),
             ),
           ),

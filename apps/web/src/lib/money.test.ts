@@ -50,9 +50,9 @@ describe('formatXof', () => {
     // Un dossier en instruction n'a AUCUN montant ; un dossier rejeté en a un,
     // qui vaut zéro. Les confondre effacerait la différence entre « pas encore
     // décidé » et « décidé, à zéro ».
-    expect(formatXof(null)).toBe('—');
-    expect(formatXof(undefined)).toBe('—');
-    expect(formatXof('')).toBe('—');
+    expect(formatXof(null)).toBe('–');
+    expect(formatXof(undefined)).toBe('–');
+    expect(formatXof('')).toBe('–');
     expect(formatXof('0')).toBe('0 FCFA');
     expect(formatXof(null, '0 FCFA')).toBe('0 FCFA');
   });

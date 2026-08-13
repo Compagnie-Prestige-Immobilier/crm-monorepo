@@ -38,8 +38,9 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// v2 — phase 2 : `phase2_directory` et `call_attempts`.
+  /// v3 — notifications push : `notifications`.
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -55,6 +56,11 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(callAttempts);
         await m.createIndex(callAttemptsProspectIdx);
         await m.createIndex(callAttemptsCreatedIdx);
+      }
+      if (from < 3) {
+        await m.createTable(notifications);
+        await m.createIndex(notificationsCreatedIdx);
+        await m.createIndex(notificationsUnreadIdx);
       }
     },
     beforeOpen: (OpeningDetails details) async {

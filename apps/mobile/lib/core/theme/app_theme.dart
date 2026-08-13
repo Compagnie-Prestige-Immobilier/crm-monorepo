@@ -237,8 +237,45 @@ abstract final class AppTheme {
         minVerticalPadding: CpiSpacing.sm,
         iconColor: scheme.onSurfaceVariant,
         titleTextStyle: text.bodyLarge,
-        subtitleTextStyle: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+        // `bodyMedium` (16) et non `bodySmall` : un sous-titre de ListTile porte
+        // souvent l'information utile — l'état de synchronisation, le numéro —
+        // et se lisait à 13 sp.
+        subtitleTextStyle: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
         shape: const RoundedRectangleBorder(borderRadius: CpiRadius.brMd),
+      ),
+
+      // Libellés de navigation TOUJOURS visibles et à 14 sp.
+      //
+      // Le défaut Material colle `labelMedium` sur une barre de 80 dp ; à 12 sp
+      // les quatre destinations se lisaient mal. `alwaysShow` parce qu'une
+      // destination sans libellé oblige à reconnaître une icône, ce qui est un
+      // apprentissage qu'aucune app de saisie ne mérite.
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: scheme.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: scheme.secondaryContainer,
+        elevation: 0,
+        height: 76,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        labelTextStyle: WidgetStateProperty.resolveWith<TextStyle?>((
+          Set<WidgetState> states,
+        ) {
+          final TextStyle base =
+              text.labelMedium ?? const TextStyle(fontSize: 14);
+          return states.contains(WidgetState.selected)
+              ? base.copyWith(color: scheme.primary, fontWeight: FontWeight.w700)
+              : base.copyWith(color: scheme.onSurfaceVariant);
+        }),
+        iconTheme: WidgetStateProperty.resolveWith<IconThemeData>((
+          Set<WidgetState> states,
+        ) {
+          return IconThemeData(
+            size: 26,
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : scheme.onSurfaceVariant,
+          );
+        }),
       ),
 
       chipTheme: ChipThemeData(

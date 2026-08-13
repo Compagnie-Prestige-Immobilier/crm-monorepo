@@ -85,9 +85,7 @@ export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
     onSuccess: (_result, target) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardRoot });
-      toast.success(
-        `${target.prenom} ${target.nom} supprimé. Le numéro redevient saisissable sur le terrain.`,
-      );
+      toast.success(`${target.prenom} ${target.nom} supprimé.`);
       setDeleting(null);
     },
     onError: (error) => {
@@ -354,7 +352,7 @@ export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
             <DialogDescription>
               {deleting === null
                 ? null
-                : `${deleting.prenom} ${deleting.nom} — ${formatPhone(deleting.phoneE164)}. La fiche est retirée des listes et des exports ; son numéro pourra être ressaisi sur le terrain.`}
+                : `${deleting.prenom} ${deleting.nom}, ${formatPhone(deleting.phoneE164)}. La fiche est retirée des listes et des exports.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

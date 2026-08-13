@@ -1,6 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <!-- Requise depuis Android 13 (API 33) pour afficher la moindre
+         notification. Elle est DEMANDÉE À L'EXÉCUTION, et uniquement à la
+         première ouverture du centre de notifications : la demander au
+         lancement, avant que l'utilisateur ait la moindre idée de ce que
+         l'application enverra, la fait refuser par réflexe — et Android ne
+         repose plus jamais la question. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!--
       CONFIDENTIALITÉ AU REPOS — voir android:allowBackup ci-dessous.
 

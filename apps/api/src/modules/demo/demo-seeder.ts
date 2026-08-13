@@ -83,6 +83,9 @@ export async function seedDemoData(
     const passwordHash = (await hash(spec.password, ARGON2_OPTIONS)) as string;
     const created = await tx.user.create({
       data: {
+        // Taguée : c'est ce drapeau, et lui seul, qui décide de la
+        // visibilité de la ligne selon l'état du mode démonstration.
+        isDemo: true,
         email: spec.email,
         username: spec.username,
         fullName: spec.fullName,
@@ -110,6 +113,7 @@ export async function seedDemoData(
     const at = daysAgoToDate(spec.daysAgo);
     const created = await tx.representant.create({
       data: {
+        isDemo: true,
         id: crypto.randomUUID(),
         fullName: spec.fullName,
         phoneE164: spec.phoneE164,
@@ -130,6 +134,7 @@ export async function seedDemoData(
     const at = daysAgoToDate(spec.daysAgo);
     const created = await tx.prospect.create({
       data: {
+        isDemo: true,
         id: crypto.randomUUID(),
         nom: spec.nom,
         prenom: spec.prenom,
@@ -165,6 +170,7 @@ export async function seedDemoData(
   for (const campaign of DEMO_DATASET.campaigns) {
     const created = await tx.callCampaign.create({
       data: {
+        isDemo: true,
         name: campaign.name,
         scope: campaign.scope,
         seed: campaign.seed,
@@ -192,6 +198,7 @@ export async function seedDemoData(
     for (const task of campaign.tasks) {
       const createdTask = await tx.callTask.create({
         data: {
+          isDemo: true,
           campaignId: created.id,
           prospectId: prospectId(task.prospectKey),
           assignedToId: userId(task.assignedToKey),
@@ -212,6 +219,7 @@ export async function seedDemoData(
         const at = daysAgoToDate(attempt.daysAgo);
         const createdAttempt = await tx.callAttempt.create({
           data: {
+            isDemo: true,
             id: crypto.randomUUID(),
             prospectId: prospectId(attempt.prospectKey),
             taskId: createdTask.id,
@@ -242,6 +250,7 @@ export async function seedDemoData(
 
     const created = await tx.bankCase.create({
       data: {
+        isDemo: true,
         reference: spec.reference,
         referenceKey: referenceKeyOf(spec.reference),
         prospectId: linked,
@@ -268,6 +277,7 @@ export async function seedDemoData(
     for (const transition of spec.transitions) {
       const createdTransition = await tx.bankCaseTransition.create({
         data: {
+          isDemo: true,
           caseId: created.id,
           ...(transition.fromStageCode === null
             ? {}

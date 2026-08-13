@@ -37,8 +37,16 @@ beforeAll(async () => {
   process.env.JWT_ACCESS_SECRET ??= 'a'.repeat(32);
   process.env.JWT_REFRESH_SECRET ??= 'b'.repeat(32);
   process.env.DATABASE_URL ??= 'postgresql://crm:crm@localhost:5434/crm?schema=public';
-  const admin = await prisma.user.findFirstOrThrow({ where: { role: 'ADMIN' } });
+  // L'admin RÉEL, pas celui du jeu de démonstration : ce dernier est supprimé
+  // par la purge, et s'en servir ferait échouer les écritures qui suivent.
+  const admin = await prisma.user.findFirstOrThrow({
+    where: { role: 'ADMIN', isDemo: false },
+  });
   adminId = admin.id;
+
+  // La suite décrit un cycle complet à partir de zéro : elle purge d'abord, pour
+  // ne pas dépendre de l'état laissé par une exécution précédente.
+  await demo.purge(adminId);
 
   // Un jeu de LEURRES : des lignes réelles qui ressemblent trait pour trait à
   // des données de démonstration — même préfixe de nom, créées dans la même
@@ -153,10 +161,44 @@ describe('mode démonstration', () => {
     expect(étapes).toBe(4);
   });
 
-  it('LA DONNÉE RÉELLE SURVIT À LA DÉSACTIVATION', async () => {
-    const prospectsAvant = await prisma.prospect.count();
+  it('la DÉSACTIVATION ne supprime rien : elle masque', async () => {
+    const avant = await prisma.prospect.count();
 
     await demo.disable(adminId);
+
+    // Le jeu de démonstration est toujours en base — c'est le principe de la
+    // bascule : rien n'est détruit, ni côté réel, ni côté démonstration.
+    expect(await prisma.prospect.count()).toBe(avant);
+    expect(await prisma.demoEntity.count()).toBeGreaterThan(0);
+    expect(await prisma.user.findUnique({ where: { username: 'demo.banque' } })).not.toBeNull();
+
+    const état = await demo.status();
+    expect(état.enabled).toBe(false);
+  }, 60_000);
+
+  it('les lignes de démonstration portent le drapeau isDemo', async () => {
+    // C'est ce drapeau, et lui seul, qui décide de la visibilité. Une ligne de
+    // démonstration non taguée resterait visible mode éteint, et sortirait donc
+    // dans un export Excel transmis au siège.
+    const nonTaguées = await prisma.prospect.count({
+      where: { id: { in: (await prisma.demoEntity.findMany({
+        where: { entityType: 'prospect' }, select: { entityId: true },
+      })).map((e) => e.entityId) }, isDemo: false },
+    });
+    expect(nonTaguées).toBe(0);
+  });
+
+  it('la réactivation ne resème pas : elle rallume', async () => {
+    const avant = await prisma.demoEntity.count();
+    await demo.enable(adminId);
+    expect(await prisma.demoEntity.count()).toBe(avant);
+    expect((await demo.status()).enabled).toBe(true);
+  }, 60_000);
+
+  it('LA PURGE SUPPRIME LA DÉMO ET ÉPARGNE LA DONNÉE RÉELLE', async () => {
+    const prospectsAvant = await prisma.prospect.count();
+
+    await demo.purge(adminId);
 
     // Les leurres — indiscernables de données de démonstration pour toute
     // heuristique de nom, de date ou de propriétaire — sont toujours là.
@@ -176,8 +218,8 @@ describe('mode démonstration', () => {
     expect(état.counts.prospects).toBe(0);
   }, 180_000);
 
-  it('la désactivation est idempotente', async () => {
-    await demo.disable(adminId);
+  it('la purge est idempotente', async () => {
+    await demo.purge(adminId);
     expect(await prisma.demoEntity.count()).toBe(0);
   }, 60_000);
 });

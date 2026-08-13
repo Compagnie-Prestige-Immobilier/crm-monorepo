@@ -101,7 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: CpiSpacing.xs),
                       Text(
-                        'Prospection terrain',
+                        'Espace téléconseil',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: cpi.navForeground,
@@ -208,15 +208,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: CpiSpacing.xl),
-                      Text(
-                        'Vos saisies sont enregistrées sur l\'appareil et '
-                        'envoyées dès qu\'un réseau est disponible.',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: cpi.navForeground,
-                        ),
-                      ),
+
                     ],
                   ),
                 ),
