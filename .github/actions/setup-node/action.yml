@@ -23,16 +23,14 @@ runs:
         node-version: 24.18.0
         cache: pnpm
 
-    # Cache turbo local : les paquets inchangés ne sont pas reconstruits d'une
-    # PR à l'autre. La clé inclut le SHA pour écrire une nouvelle entrée à
-    # chaque commit, les restore-keys rattrapent la plus récente.
+    # Cache Turbo local : une entrée doit correspondre exactement au commit.
+    # Les sorties incluent le build Prisma généré, qui peut changer sans que
+    # TypeScript voie un fichier source différent ; restaurer une ancienne
+    # entrée via `restore-keys` injecterait alors des types périmés.
     - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: .turbo
         key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
-        restore-keys: |
-          turbo-${{ runner.os }}-${{ github.job }}-
-          turbo-${{ runner.os }}-
 
     - if: inputs.install == 'true'
       shell: bash
