@@ -165,8 +165,6 @@ beforeEach(async () => {
   await cleanupData();
 
   let representant = await prisma.representant.findFirst({ where: { deletedAt: null } });
-  let modele: Awaited<ReturnType<typeof prisma.prospect.create>>;
-
   // La CI part d'une base vide hors référentiels : ne pas rendre le test
   // dépendant d'un prospect métier absent du seed.
   if (!representant) {
@@ -183,7 +181,7 @@ beforeEach(async () => {
     });
   }
   const syndicat = await prisma.syndicat.findFirstOrThrow();
-  modele = await prisma.prospect.create({
+  const modele = await prisma.prospect.create({
     data: {
       id: uuidv7(),
       nom: `${TAG} Modèle`,
@@ -203,7 +201,7 @@ beforeEach(async () => {
   const base = {
     banqueId: banqueA,
     syndicatId: modele.syndicatId,
-    representantId: representant?.id ?? modele.representantId,
+    representantId: representant.id,
     createdById: admin.id,
     phase2Status: Phase2Status.METHOD_OBTAINED,
     enrollmentMethod: EnrollmentMethod.PLATFORM,
