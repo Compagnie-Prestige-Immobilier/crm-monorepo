@@ -1,11 +1,13 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { RotateCcwIcon, SearchIcon } from 'lucide-react';
+import { RotateCcwIcon } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
 import { useBankFilters } from '@/components/bank/use-bank-filters';
+import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { SearchField } from '@/components/filters/search-field';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,9 +43,6 @@ export function BankFiltersBar({
   agentOptions?: readonly FilterOption[] | undefined;
 }) {
   const { filters, setFilters, resetFilters } = useBankFilters();
-  const searchId = useId();
-  const fromId = useId();
-  const toId = useId();
   const minId = useId();
   const maxId = useId();
 
@@ -129,25 +128,11 @@ export function BankFiltersBar({
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex min-w-[16rem] flex-1 flex-col gap-1.5">
-          <Label htmlFor={searchId}>Recherche</Label>
-          <div className="relative">
-            <SearchIcon
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <Input
-              id={searchId}
-              type="search"
-              value={searchDraft}
-              onChange={(event) => {
-                setSearchDraft(event.target.value);
-              }}
-              placeholder="Référence, nom du client, téléphone…"
-              className="pl-9"
-            />
-          </div>
-        </div>
+        <SearchField
+          value={searchDraft}
+          onChange={setSearchDraft}
+          placeholder="Référence, nom du client, téléphone…"
+        />
 
         {activeCount > 0 ? (
           <div className="flex items-center gap-2">
@@ -156,7 +141,7 @@ export function BankFiltersBar({
             </Badge>
             <Button variant="ghost" onClick={resetFilters}>
               <RotateCcwIcon aria-hidden="true" />
-              Réinitialiser
+              Tout effacer
             </Button>
           </div>
         ) : null}
@@ -214,30 +199,24 @@ export function BankFiltersBar({
           }}
         />
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor={fromId}>Créé à partir du</Label>
-          <Input
-            id={fromId}
-            type="date"
-            value={filters.dateFrom ?? ''}
-            max={filters.dateTo ?? undefined}
-            onChange={(event) => {
-              setFilters({ dateFrom: event.target.value === '' ? null : event.target.value });
-            }}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor={toId}>Jusqu’au</Label>
-          <Input
-            id={toId}
-            type="date"
-            value={filters.dateTo ?? ''}
-            min={filters.dateFrom ?? undefined}
-            onChange={(event) => {
-              setFilters({ dateTo: event.target.value === '' ? null : event.target.value });
-            }}
-          />
-        </div>
+        <DatePicker
+          id="bank-cases-date-from"
+          label="Créé à partir du"
+          value={filters.dateFrom}
+          max={filters.dateTo}
+          onChange={(dateFrom) => {
+            setFilters({ dateFrom });
+          }}
+        />
+        <DatePicker
+          id="bank-cases-date-to"
+          label="Jusqu’au"
+          value={filters.dateTo}
+          min={filters.dateFrom}
+          onChange={(dateTo) => {
+            setFilters({ dateTo });
+          }}
+        />
 
         {/* Bornes de montant : `inputMode="numeric"` et non `type="number"`.
             Un champ numérique HTML transforme la valeur en `number` côté DOM,
