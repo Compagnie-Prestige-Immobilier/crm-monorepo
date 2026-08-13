@@ -79,6 +79,9 @@ catalog:
   '@nestjs/core': '11.1.28'
   '@nestjs/jwt': '^11.0.0'
   '@nestjs/platform-fastify': '11.1.28'
+  # Ordonnanceur des rappels de notification. Seule dépendance transitive :
+  # `cron`, qui n'exécute aucun script d'installation.
+  '@nestjs/schedule': '6.1.3'
   '@nestjs/swagger': '11.4.6'
   '@nestjs/testing': '11.1.28'
   '@nestjs/throttler': '^6.4.0'
