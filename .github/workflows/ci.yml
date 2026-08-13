@@ -68,6 +68,8 @@ jobs:
 
       - name: Migrations
         run: pnpm db:deploy
+      - name: Données de test
+        run: pnpm db:seed
       - run: pnpm test:integration
 
       # `pnpm build` passe par turbo : la tâche `build` dépend de `generate`,
