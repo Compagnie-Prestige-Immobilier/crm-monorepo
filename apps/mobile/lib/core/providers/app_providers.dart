@@ -1,7 +1,11 @@
 import 'package:crm_api_client/crm_api_client.dart';
 import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' show QueryRow, ResultSetImplementation;
+import 'package:flutter/material.dart' show DateUtils;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../ui/widgets/activity_chart.dart' show ActivityDay;
 
 import '../../data/local/database.dart';
 import '../../data/local/refresh_mutex_db.dart';
@@ -149,6 +153,75 @@ final StreamProvider<int> prospectCountProvider = StreamProvider<int>((Ref ref) 
 final StreamProvider<int> pendingSyncCountProvider = StreamProvider<int>((Ref ref) {
   return ref.watch(appDatabaseProvider).countPendingOutbox().watchSingle();
 });
+
+/// Saisies des sept derniers jours, réparties entre envoyées et en attente.
+///
+/// `customSelect` et non une requête déclarée dans `schema.drift` : la requête
+/// est purement d'affichage, elle ne mérite pas un passage de générateur ni une
+/// entrée dans le schéma versionné. Elle lit les **vues** de synchronisation,
+/// qui portent déjà `sync_status` en joignant l'outbox : aucune colonne
+/// dénormalisée à tenir à jour, donc rien à oublier.
+///
+/// Aucun appel réseau : c'est un flux drift, il se réémet dès qu'une écriture
+/// locale touche l'une des trois tables.
+final StreamProvider<List<ActivityDay>> activityLast7DaysProvider =
+    StreamProvider<List<ActivityDay>>((Ref ref) {
+      final AppDatabase db = ref.watch(appDatabaseProvider);
+      // `date(..., 'localtime')` : les DATETIME sont stockés en texte ISO-8601
+      // UTC (voir build.yaml). Grouper sans conversion placerait une saisie de
+      // 23 h au lendemain pour l'utilisateur.
+      const String sql = '''
+SELECT day,
+       SUM(is_synced) AS synced,
+       SUM(is_pending) AS pending
+FROM (
+  SELECT date(client_created_at, 'localtime') AS day,
+         CASE WHEN sync_status = 'synced' THEN 1 ELSE 0 END AS is_synced,
+         CASE WHEN sync_status = 'synced' THEN 0 ELSE 1 END AS is_pending
+  FROM representant_sync_view
+  WHERE deleted_at IS NULL
+  UNION ALL
+  SELECT date(client_created_at, 'localtime'),
+         CASE WHEN sync_status = 'synced' THEN 1 ELSE 0 END,
+         CASE WHEN sync_status = 'synced' THEN 0 ELSE 1 END
+  FROM prospect_sync_view
+  WHERE deleted_at IS NULL
+)
+WHERE day >= date('now', 'localtime', '-6 days')
+GROUP BY day
+''';
+      return db
+          .customSelect(
+            sql,
+            readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+              db.representants,
+              db.prospects,
+              db.outbox,
+            },
+          )
+          .watch()
+          .map((List<QueryRow> rows) {
+            final Map<String, QueryRow> byDay = <String, QueryRow>{
+              for (final QueryRow r in rows) r.read<String>('day'): r,
+            };
+            final DateTime today = DateUtils.dateOnly(DateTime.now());
+            return List<ActivityDay>.generate(7, (int i) {
+              final DateTime day = today.subtract(Duration(days: 6 - i));
+              final String key = _isoDay(day);
+              final QueryRow? row = byDay[key];
+              return ActivityDay(
+                day: day,
+                synced: row?.read<int?>('synced') ?? 0,
+                pending: row?.read<int?>('pending') ?? 0,
+              );
+            });
+          });
+    });
+
+String _isoDay(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-'
+    '${d.month.toString().padLeft(2, '0')}-'
+    '${d.day.toString().padLeft(2, '0')}';
 
 /// Nombre d'opérations qui demandent une action humaine. Alimente la pastille
 /// « À corriger ».

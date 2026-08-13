@@ -67,8 +67,8 @@ export function ProspectExportMenu({ filters }: { filters: ProspectFilters }) {
             <span className="font-[600]">Exporter la vue filtrée</span>
             <span className="text-[0.75rem] text-muted-foreground">
               {activeCount === 0
-                ? 'Aucun filtre actif : le classeur contient tous les prospects.'
-                : `${String(activeCount)} filtre${activeCount > 1 ? 's' : ''} appliqué${activeCount > 1 ? 's' : ''} — le classeur reprend exactement cette sélection.`}
+                ? 'Aucun filtre actif'
+                : `${String(activeCount)} filtre${activeCount > 1 ? 's' : ''} appliqué${activeCount > 1 ? 's' : ''}`}
             </span>
           </span>
         </DropdownMenuItem>
@@ -87,8 +87,7 @@ export function ProspectExportMenu({ filters }: { filters: ProspectFilters }) {
           <span className="flex min-w-0 flex-col">
             <span className="font-[600]">Classeur consolidé BDD1–BDD4</span>
             <span className="text-[0.75rem] text-muted-foreground">
-              Cinq feuilles fixes : Consolidé, BDD1, BDD2, BDD3, BDD4. Le filtre de segment est
-              ignoré — c’est le classeur qui porte la segmentation.
+              Cinq feuilles fixes. Le filtre de segment est ignoré.
             </span>
           </span>
         </DropdownMenuItem>

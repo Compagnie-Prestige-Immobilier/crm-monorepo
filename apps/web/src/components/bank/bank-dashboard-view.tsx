@@ -121,7 +121,7 @@ export function BankDashboardView() {
               label="Délai moyen"
               value={
                 data.totals.meanDelayHours === null
-                  ? '—'
+                  ? '–'
                   : `${formatDecimal(data.totals.meanDelayHours / 24)} j`
               }
               hint={

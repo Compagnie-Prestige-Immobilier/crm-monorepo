@@ -42,7 +42,7 @@ class HistoriqueScreen extends ConsumerWidget {
         actions: <Widget>[
           IconButton(
             tooltip: 'Nouveau représentant',
-            onPressed: () => context.go(Routes.newRepresentant),
+            onPressed: () => context.push(Routes.newRepresentant),
             icon: const Icon(PhosphorIconsRegular.plus),
           ),
         ],
@@ -56,7 +56,7 @@ class HistoriqueScreen extends ConsumerWidget {
               onChanged: (String value) =>
                   ref.read(historiqueSearchProvider.notifier).set(value),
               decoration: const InputDecoration(
-                hintText: 'Rechercher un nom ou un numéro',
+                hintText: 'Nom ou numéro',
                 prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, size: 20),
               ),
             ),
@@ -130,14 +130,14 @@ class _RepresentantTile extends ConsumerWidget {
           children: <Widget>[
             IconButton(
               tooltip: 'Modifier',
-              onPressed: () => context.go(
+              onPressed: () => context.push(
                 '${Routes.newRepresentant}?id=${Uri.encodeComponent(data.id)}',
               ),
               icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 20),
             ),
             IconButton(
               tooltip: 'Ajouter des prospects',
-              onPressed: () => context.go(Routes.newProspectFor(data.id)),
+              onPressed: () => context.push(Routes.newProspectFor(data.id)),
               icon: const Icon(PhosphorIconsRegular.userPlus, size: 20),
             ),
           ],
@@ -153,8 +153,7 @@ class _RepresentantTile extends ConsumerWidget {
       builder: (BuildContext context) => AlertDialog(
         title: const Text('Supprimer ce représentant ?'),
         content: Text(
-          '$name et tous ses prospects seront supprimés. '
-          'La suppression sera envoyée au serveur.',
+          '$name et tous ses prospects seront supprimés.',
         ),
         actions: <Widget>[
           TextButton(
@@ -253,7 +252,7 @@ class _ProspectList extends ConsumerWidget {
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('Supprimer ce prospect ?'),
-        content: Text('$name sera supprimé, ici et sur le serveur.'),
+        content: Text('$name sera supprimé.'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -305,8 +304,7 @@ class _StatusButton extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Le représentant de cette fiche est bloqué. '
-              'Résolvez-le dans « À corriger ».',
+              'Représentant bloqué. Résolvez-le dans « À corriger ».',
             ),
           ),
         );
@@ -315,7 +313,7 @@ class _StatusButton extends ConsumerWidget {
       case SyncStatus.draft:
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$entityLabel — sera envoyé dès que possible.'),
+            content: Text('$entityLabel : en attente d\'envoi.'),
             action: SnackBarAction(
               label: 'Envoyer',
               onPressed: () => ref.read(syncCoordinatorProvider.notifier).run(),
@@ -345,16 +343,10 @@ class _EmptyHistorique extends StatelessWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: CpiSpacing.md),
-          Text('Aucun représentant pour le moment.', style: theme.textTheme.titleSmall),
-          const SizedBox(height: CpiSpacing.xs),
-          Text(
-            'Créez-en un, puis ajoutez ses prospects. Tout fonctionne sans réseau.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall,
-          ),
+          Text('Aucun représentant', style: theme.textTheme.titleSmall),
           const SizedBox(height: CpiSpacing.lg),
           FilledButton.icon(
-            onPressed: () => context.go(Routes.newRepresentant),
+            onPressed: () => context.push(Routes.newRepresentant),
             icon: const Icon(PhosphorIconsRegular.plus, size: 20),
             label: const Text('Nouveau représentant'),
           ),

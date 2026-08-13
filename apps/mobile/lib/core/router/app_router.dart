@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/about/presentation/about_screen.dart';
 import '../../features/auth/auth_state.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/corrections/presentation/corrections_screen.dart';
 import '../../features/historique/presentation/historique_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/permissions/presentation/battery_help_screen.dart';
 import '../../features/phase2/presentation/phase2_screen.dart';
 import '../../features/prospect/presentation/prospect_entry_screen.dart';
@@ -117,11 +119,24 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: (BuildContext context, GoRouterState state) => const Phase2Screen(),
       ),
       GoRoute(
+        path: Routes.notifications,
+        name: 'notifications',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const NotificationsScreen(),
+      ),
+      GoRoute(
         path: Routes.batteryHelp,
         name: 'batteryHelp',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             const BatteryHelpScreen(),
+      ),
+      GoRoute(
+        path: Routes.about,
+        name: 'about',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            const AboutScreen(),
       ),
 
       StatefulShellRoute.indexedStack(

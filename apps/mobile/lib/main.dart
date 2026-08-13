@@ -5,12 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
 import 'core/background/background_sync.dart';
 import 'core/providers/app_providers.dart';
+import 'core/push/firebase_push_transport.dart';
+import 'core/push/push_background.dart';
+import 'core/push/push_transport.dart';
+import 'features/notifications/notifications_controller.dart';
 import 'data/local/connection.dart';
 import 'data/local/database.dart';
 import 'data/repositories/draft_repository.dart';
@@ -60,16 +65,50 @@ Future<void> main() async {
   // appareil lent pour un bénéfice nul.
   unawaited(_initBackground());
 
+  // Le transport push est résolu AVANT le premier cadre, mais son
+  // initialisation ne peut pas échouer bruyamment : sans projet Firebase,
+  // `initialize()` renvoie `false` et l'application démarre normalement avec un
+  // transport inerte. Cf. `core/push/firebase_push_transport.dart`.
+  final PushTransport push = await _initPush();
+
   runApp(
     ProviderScope(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
         sharedPreferencesProvider.overrideWithValue(preferences),
         buildNumberProvider.overrideWithValue(packageInfo.buildNumber),
+        pushTransportProvider.overrideWithValue(push),
       ],
       child: const CpiGoApp(),
     ),
   );
+}
+
+/// Prépare Firebase Messaging et enregistre le gestionnaire d'arrière-plan.
+///
+/// `onBackgroundMessage` exige une fonction de PREMIER NIVEAU annotée
+/// `@pragma('vm:entry-point')` : elle est appelée depuis le moteur, dans un
+/// isolat neuf, sans jamais passer par du code Dart appelant. Une fermeture ou
+/// une méthode d'instance y serait introuvable.
+///
+/// L'enregistrement est fait même quand le transport est indisponible : il ne
+/// coûte rien, et il évite un chemin conditionnel de plus le jour où Firebase
+/// sera provisionné.
+Future<PushTransport> _initPush() async {
+  final FirebasePushTransport transport = FirebasePushTransport();
+  try {
+    final bool ready = await transport.initialize();
+    if (ready) {
+      FirebaseMessaging.onBackgroundMessage(cpiPushBackgroundHandler);
+    }
+    return ready ? transport : const NullPushTransport();
+  } on Object catch (e) {
+    // Une plateforme qui refuse Firebase ne doit pas empêcher l'application de
+    // démarrer : la prospection hors ligne est le métier, les notifications
+    // sont un confort.
+    debugPrint('Notifications push indisponibles : $e');
+    return const NullPushTransport();
+  }
 }
 
 Future<void> _initBackground() async {

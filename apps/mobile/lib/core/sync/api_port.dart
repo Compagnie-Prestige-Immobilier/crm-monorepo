@@ -20,6 +20,8 @@ class AuthTokens {
     required this.expiresAt,
     required this.userId,
     required this.fullName,
+    this.role,
+    this.email,
   });
 
   final String accessToken;
@@ -27,6 +29,13 @@ class AuthTokens {
   final DateTime expiresAt;
   final String userId;
   final String fullName;
+
+  /// Rôle serveur, brut (`COMMERCIAL`, `ADMIN`…). Il sert à afficher à
+  /// l'utilisateur **qui il est** ; c'est l'identifiant technique qui, lui, n'a
+  /// rien à faire sur un écran de réglages.
+  final String? role;
+
+  final String? email;
 }
 
 /// Réponse d'un envoi de lot.

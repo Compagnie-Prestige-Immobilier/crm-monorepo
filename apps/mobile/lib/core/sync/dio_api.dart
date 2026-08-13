@@ -87,6 +87,8 @@ class DioApi implements ApiPort {
       ),
       userId: dto.user.id,
       fullName: dto.user.fullName,
+      role: dto.user.role.name,
+      email: dto.user.email,
     );
   }
 

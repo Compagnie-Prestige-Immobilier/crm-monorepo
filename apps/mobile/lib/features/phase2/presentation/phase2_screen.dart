@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/router/back_navigation.dart';
 import '../../../core/sync/phase2_directory_sync.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
@@ -136,14 +137,14 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     final Phase2State phase2 = ref.watch(phase2ControllerProvider);
     final CpiMotion motion = CpiMotion.of(context);
 
-    return Scaffold(
+    // `CpiPopScope` + `CpiBackButton` : la flèche ET le geste système
+    // aboutissent, y compris quand cet écran est le premier de la pile (route
+    // restaurée au démarrage à froid). C'est le bug signalé sur Phase 2.
+    return CpiPopScope(
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Phase 2'),
-        leading: IconButton(
-          icon: const Icon(PhosphorIconsRegular.arrowLeft),
-          tooltip: 'Retour',
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
+        leading: const CpiBackButton(),
       ),
       body: SafeArea(
         child: Column(
@@ -208,8 +209,13 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                 ],
               ),
             ),
+            // Action ancrée en zone de pouce quand l'annuaire est vide : sans
+            // elle, le seul « Télécharger » était en haut de l'écran, hors
+            // d'atteinte à une main.
+            const _DownloadBar(),
           ],
         ),
+      ),
       ),
     );
   }
@@ -313,6 +319,52 @@ class _StatusStrip extends ConsumerWidget {
   }
 }
 
+/// Premier téléchargement de l'annuaire, ancré en bas d'écran.
+///
+/// Elle disparaît dès que l'annuaire existe : une barre d'action permanente
+/// mangerait la hauteur utile de l'écran le plus répétitif de l'app.
+class _DownloadBar extends ConsumerWidget {
+  const _DownloadBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final int directory = ref.watch(phase2DirectoryCountProvider).value ?? 0;
+    final bool downloading = ref.watch(phase2ControllerProvider).downloading;
+    if (directory > 0) return const SizedBox.shrink();
+
+    final ThemeData theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        CpiSpacing.md,
+        CpiSpacing.xs,
+        CpiSpacing.md,
+        CpiSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: context.cpi.borderSubtle)),
+      ),
+      child: FilledButton.icon(
+        onPressed: downloading
+            ? null
+            : () {
+                HapticFeedback.selectionClick();
+                ref.read(phase2ControllerProvider.notifier).download();
+              },
+        icon: downloading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(PhosphorIconsRegular.cloudArrowDown, size: 20),
+        label: const Text('Télécharger l\'annuaire'),
+      ),
+    );
+  }
+}
+
 class _Metric extends StatelessWidget {
   const _Metric({
     required this.icon,
@@ -354,12 +406,15 @@ class _Metric extends StatelessWidget {
               ),
             ],
           ),
+          // 14 sp et non `labelSmall` 11 : ces trois libellés portent tout le
+          // sens des trois chiffres au-dessus d'eux, et se lisaient mal.
           Text(
             label,
             maxLines: 2,
-            style: theme.textTheme.labelSmall?.copyWith(
+            style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-              height: 1.15,
+              fontWeight: FontWeight.w500,
+              height: 1.2,
             ),
           ),
         ],
@@ -389,7 +444,7 @@ class _DirectoryLine extends ConsumerWidget {
     if (phase2.downloading) {
       return Semantics(
         liveRegion: true,
-        label: 'Téléchargement de l\'annuaire : ${phase2.downloaded} numéros.',
+        label: 'Téléchargement : ${phase2.downloaded} numéros.',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
@@ -400,7 +455,7 @@ class _DirectoryLine extends ConsumerWidget {
             const LinearProgressIndicator(minHeight: 3),
             const SizedBox(height: CpiSpacing.xxs),
             Text(
-              '${_number.format(phase2.downloaded)} numéros téléchargés…',
+              '${_number.format(phase2.downloaded)} numéros',
               style: theme.textTheme.bodySmall,
             ),
           ],
@@ -425,7 +480,7 @@ class _DirectoryLine extends ConsumerWidget {
         Expanded(
           child: Text(
             directory == 0
-                ? 'Annuaire vide — téléchargez-le avant de commencer.'
+                ? 'Annuaire non téléchargé'
                 : 'Annuaire : ${_number.format(directory)} numéros · $freshness',
             style: theme.textTheme.bodySmall?.copyWith(
               color: directory == 0
@@ -434,15 +489,17 @@ class _DirectoryLine extends ConsumerWidget {
             ),
           ),
         ),
-        // 48 dp de cible minimale, imposée par la contrainte et pas seulement
-        // par la taille de l'icône.
-        ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          child: TextButton(
-            onPressed: () => ref.read(phase2ControllerProvider.notifier).download(),
-            child: Text(directory == 0 ? 'Télécharger' : 'Mettre à jour'),
+        // Le bouton du haut ne subsiste que pour la mise à jour d'un annuaire
+        // déjà présent : le premier téléchargement, lui, est ancré en bas
+        // d'écran (voir `_DownloadBar`).
+        if (directory > 0)
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: TextButton(
+              onPressed: () => ref.read(phase2ControllerProvider.notifier).download(),
+              child: const Text('Mettre à jour'),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -536,6 +593,9 @@ class _SearchHint extends StatelessWidget {
         message: message!,
       );
     }
+    // Aucun mode d'emploi : le champ au-dessus dit déjà « Numéro appelé », et
+    // une phrase qui explique un champ est une phrase que personne ne lit deux
+    // fois. L'icône marque l'attente, rien de plus.
     return Column(
       children: <Widget>[
         const SizedBox(height: CpiSpacing.xxl),
@@ -543,15 +603,6 @@ class _SearchHint extends StatelessWidget {
           PhosphorIconsDuotone.phoneList,
           size: 56,
           color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-        ),
-        const SizedBox(height: CpiSpacing.md),
-        Text(
-          'Composez le numéro depuis votre programme papier, puis saisissez-le '
-          'ici pour consigner l\'appel.',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
         ),
       ],
     );
@@ -576,8 +627,8 @@ class _NotFound extends StatelessWidget {
           color: cpi.syncFailed,
           surface: cpi.warningSurface,
           message:
-              'Ce numéro n\'est pas dans votre annuaire. Vérifiez la saisie, ou '
-              'mettez l\'annuaire à jour s\'il date.',
+              'Numéro absent de l\'annuaire. Vérifiez la saisie ou mettez '
+              'l\'annuaire à jour.',
         ),
         const SizedBox(height: CpiSpacing.xs),
         if (phone != null)
@@ -682,9 +733,7 @@ class _AlreadyClosed extends StatelessWidget {
               icon: PhosphorIconsRegular.lockSimple,
               color: cpi.accentText,
               surface: cpi.accentSurface,
-              message:
-                  'Ce dossier ne peut plus être modifié depuis le terrain. '
-                  'Seul un administrateur peut le corriger depuis le web.',
+              message: 'Modifiable par un administrateur uniquement.',
             ),
             const SizedBox(height: CpiSpacing.md),
             FilledButton.icon(
@@ -738,7 +787,7 @@ class _Capture extends StatelessWidget {
         _MethodCard(
           method: EnrollmentMethods.platform,
           title: 'Plateforme',
-          subtitle: 'Enrôlement effectué en ligne.',
+          subtitle: 'En ligne',
           icon: PhosphorIconsRegular.deviceMobile,
           enabled: !state.saving,
           onTap: onMethod,
@@ -747,7 +796,7 @@ class _Capture extends StatelessWidget {
         _MethodCard(
           method: EnrollmentMethods.physical,
           title: 'Physique',
-          subtitle: 'Dossier signé en présence.',
+          subtitle: 'Dossier signé en présence',
           icon: PhosphorIconsRegular.handshake,
           enabled: !state.saving,
           onTap: onMethod,
@@ -756,7 +805,7 @@ class _Capture extends StatelessWidget {
         _MethodCard(
           method: EnrollmentMethods.voiceOrElectronicMessaging,
           title: 'Voix / messagerie électronique',
-          subtitle: 'Accord donné par appel, SMS ou message.',
+          subtitle: 'Accord par appel, SMS ou message',
           icon: PhosphorIconsRegular.chatCircleText,
           enabled: !state.saving,
           onTap: onMethod,
@@ -896,7 +945,7 @@ class _Confirmed extends StatelessWidget {
     final CpiColors cpi = context.cpi;
     return Semantics(
       liveRegion: true,
-      label: 'Enregistré sur l\'appareil : ${label ?? ''}.',
+      label: 'Enregistré : ${label ?? ''}.',
       child: ExcludeSemantics(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -921,7 +970,7 @@ class _Confirmed extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
                         Text(
-                          'Enregistré sur l\'appareil',
+                          'Enregistré',
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: cpi.success,
                           ),
@@ -989,31 +1038,31 @@ class _NegativeSheetState extends State<_NegativeSheet> {
     (
       outcome: CallOutcomes.unreachable,
       title: 'Injoignable',
-      subtitle: 'Pas de réponse, boîte vocale, hors service.',
+      subtitle: 'Pas de réponse, boîte vocale, hors service',
       icon: PhosphorIconsRegular.phoneSlash,
     ),
     (
       outcome: CallOutcomes.callback,
       title: 'À rappeler',
-      subtitle: 'La personne a demandé un autre moment.',
+      subtitle: 'Rappel demandé',
       icon: PhosphorIconsRegular.clockCountdown,
     ),
     (
       outcome: CallOutcomes.refused,
       title: 'Refus',
-      subtitle: 'La personne ne souhaite pas s\'enrôler. Définitif.',
+      subtitle: 'Refus définitif',
       icon: PhosphorIconsRegular.prohibit,
     ),
     (
       outcome: CallOutcomes.wrongNumber,
       title: 'Mauvais numéro',
-      subtitle: 'Le numéro ne correspond pas. Définitif.',
+      subtitle: 'Numéro erroné. Définitif',
       icon: PhosphorIconsRegular.warningCircle,
     ),
     (
       outcome: CallOutcomes.other,
       title: 'Autre',
-      subtitle: 'Commentaire obligatoire.',
+      subtitle: 'Commentaire obligatoire',
       icon: PhosphorIconsRegular.dotsThreeCircle,
     ),
   ];
@@ -1142,7 +1191,7 @@ class _NegativeSheetState extends State<_NegativeSheet> {
                         labelText: _needsComment
                             ? 'Commentaire (obligatoire)'
                             : 'Commentaire (facultatif)',
-                        hintText: 'Ce que la personne a dit, en une phrase.',
+                        hintText: 'En une phrase',
                         alignLabelWithHint: true,
                       ),
                     ),

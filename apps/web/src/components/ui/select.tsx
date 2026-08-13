@@ -31,12 +31,12 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        'flex w-full items-center justify-between gap-2 rounded-md border border-border bg-input-background px-3 py-2',
+        'flex w-full items-center justify-between gap-2 rounded-md border border-input-border bg-input-background px-3 py-2',
         'text-[0.875rem] text-foreground whitespace-nowrap transition-colors',
         'data-[size=default]:h-11 data-[size=sm]:h-9',
         'data-[placeholder]:text-muted-foreground',
         'focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-        'disabled:cursor-not-allowed disabled:opacity-40',
+        'disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground',
         '[&_svg]:pointer-events-none [&_svg]:shrink-0',
         className,
       )}
@@ -115,7 +115,7 @@ function SelectItem({
         // en dessous des 3:1 exigés d'un indicateur de focus (WCAG 1.4.11).
         'focus:outline-2 focus:-outline-offset-2 focus:outline-ring',
         'focus:bg-secondary focus:text-secondary-foreground',
-        'data-[disabled]:pointer-events-none data-[disabled]:opacity-40',
+        'data-[disabled]:pointer-events-none data-[disabled]:text-muted-foreground',
         className,
       )}
       {...props}

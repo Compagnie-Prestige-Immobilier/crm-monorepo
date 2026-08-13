@@ -36,50 +36,51 @@ export default async function ConnexionPage({
     typeof candidate === 'string' && /^\/(?!\/)[^\\]*$/.test(candidate) ? candidate : null;
 
   return (
-    <main id="contenu-principal" className="grid min-h-dvh lg:grid-cols-2">
-      {/* Volet de marque : bordeaux CPI, logo inversé, or réservé aux
-          accents décoratifs (jamais au texte — design.md §2.3). */}
-      <section className="relative hidden flex-col justify-between bg-sidebar p-10 text-sidebar-foreground lg:flex">
+    <main id="contenu-principal" className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
+      {/* Volet de marque : bordeaux CPI, logo inversé, or réservé au MARQUAGE
+          (le filet), jamais au texte — design.md §2.3.
+
+          Le contenu est GROUPÉ en bas de colonne plutôt qu'étalé en
+          `justify-between` : réparti sur toute la hauteur, il laissait deux
+          vides de 300 px et l'écran paraissait inachevé. */}
+      <section className="relative hidden flex-col justify-end gap-14 overflow-hidden bg-sidebar px-12 py-12 text-sidebar-foreground lg:flex">
+        {/* `self-start` est OBLIGATOIRE. Dans une colonne flex, un enfant en
+            `width:auto` est étiré par `align-items: stretch` : le logotype
+            était rendu en 640×40 pour un fichier 489×200, soit une
+            déformation horizontale de 6,5×. C'est ce qui le rendait
+            illisible, pas son contraste. */}
         <Image
           src="/brand/cpi-header.png"
           alt="CPI"
           width={489}
           height={200}
           priority
-          className="h-10 w-auto"
+          className="absolute left-12 top-12 h-12 w-auto self-start"
         />
-        <div className="max-w-md">
-          <p className="font-display text-[clamp(1.625rem,3vw,2rem)] font-[800] leading-[1.15] tracking-[-0.02em] text-sidebar-accent-foreground">
-            La prospection terrain, consolidée au siège.
-          </p>
-          <p className="mt-3 text-[0.9375rem] opacity-80">
-            Représentants, prospects et activité des commerciaux — remontés depuis le terrain,
-            filtrables et exportables.
-          </p>
-          <span aria-hidden="true" className="mt-6 block h-1 w-24 rounded-full bg-accent" />
-        </div>
-        {/* 4,39:1 à `opacity-60` : sous le seuil pour du 12 px. */}
-        <p className="text-[0.75rem] opacity-70">
-          CPI — Coopérative de Promotion Immobilière, Sénégal
+
+        {/* Le volet porte l'identité, rien d'autre. Pas d'argumentaire, pas
+            d'index des fonctions : ceux qui arrivent ici connaissent l'outil. */}
+        <p className="font-display text-[clamp(2.5rem,5vw,4rem)] font-[800] leading-[0.95] tracking-[-0.035em] text-sidebar-accent-foreground">
+          CPI GO
+        </p>
+
+        <p className="text-caption text-sidebar-foreground">
+          Compagnie Prestige Immobilier, Sénégal
         </p>
       </section>
 
-      <section className="flex items-center justify-center bg-background px-4 py-12">
-        <div className="w-full max-w-sm animate-rise">
+      <section className="flex items-center justify-center bg-background px-6 py-12">
+        <div className="animate-rise w-full max-w-[26rem]">
           <Image
             src="/brand/cpi-logo.png"
             alt="CPI GO"
             width={417}
             height={170}
             priority
-            className="mb-8 h-10 w-auto lg:hidden"
+            className="mb-10 h-11 w-auto lg:hidden"
           />
-          <h1 className="font-display text-[clamp(1.625rem,3vw,2rem)] font-[800] tracking-[-0.02em]">
-            Connexion
-          </h1>
-          <p className="mt-2 mb-8 text-[0.9375rem] text-muted-foreground">
-            Panneau d’administration réservé au siège.
-          </p>
+
+          <h1 className="rail font-display text-h1 font-[800] tracking-[-0.025em]">Connexion</h1>
 
           {expired ? (
             /* `status` et non `alert` : l'information est contextuelle, pas
@@ -87,19 +88,16 @@ export default async function ConnexionPage({
                au moment où il annonce le formulaire. */
             <p
               role="status"
-              className="mb-6 flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.8125rem] text-warning"
+              className="mt-8 flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3.5 py-3 text-small text-warning"
             >
               <InfoIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              Votre session a expiré pour cause d’inactivité. Reconnectez-vous pour reprendre où
-              vous en étiez.
+              Session expirée. Reconnectez-vous.
             </p>
           ) : null}
 
-          <LoginForm next={next} />
-
-          <p className="mt-8 text-[0.75rem] text-muted-foreground">
-            Les commerciaux se connectent depuis l’application mobile CPI GO.
-          </p>
+          <div className="mt-8">
+            <LoginForm next={next} />
+          </div>
         </div>
       </section>
     </main>

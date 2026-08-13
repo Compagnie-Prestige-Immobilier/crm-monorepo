@@ -151,7 +151,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
               <dt className="text-muted-foreground">Clôturée le</dt>
               <dd className="font-[600]">
                 {data.closedAt === null ? (
-                  '—'
+                  '–'
                 ) : (
                   <time dateTime={data.closedAt}>{formatDateTime(data.closedAt)}</time>
                 )}

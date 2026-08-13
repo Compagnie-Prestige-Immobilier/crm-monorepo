@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -8,12 +9,13 @@ import '../../../core/background/background_sync.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/sync_coordinator.dart';
 import '../../../core/router/route_paths.dart';
-import '../../../core/sync/sync_engine.dart';
+import '../../../core/settings/display_settings.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
+import '../../../core/theme/cpi_typography.dart';
 import '../../auth/auth_state.dart';
 
-/// Réglages : profil, synchronisation manuelle, déconnexion.
+/// Réglages : profil, synchronisation, affichage, session.
 class ReglagesScreen extends ConsumerStatefulWidget {
   const ReglagesScreen({super.key});
 
@@ -45,11 +47,20 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
     final AuthState auth = ref.watch(authControllerProvider);
     final SyncUiState sync = ref.watch(syncCoordinatorProvider);
     final int pending = ref.watch(pendingSyncCountProvider).value ?? 0;
+    final DisplaySettings display = ref.watch(displaySettingsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Réglages')),
       body: ListView(
-        padding: const EdgeInsets.all(CpiSpacing.md),
+        // Marge haute réduite : le premier contenu utile commence à 12 dp du
+        // bandeau, pas à 16. Sur un écran de 360 dp, chaque bande vide en haut
+        // pousse le reste hors de portée du pouce.
+        padding: const EdgeInsets.fromLTRB(
+          CpiSpacing.md,
+          CpiSpacing.sm,
+          CpiSpacing.md,
+          CpiSpacing.md,
+        ),
         children: <Widget>[
           _Section(
             title: 'Profil',
@@ -57,14 +68,23 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
+                  radius: 24,
                   backgroundColor: theme.colorScheme.primary,
                   child: Text(
                     _initials(auth.fullName),
-                    style: TextStyle(color: theme.colorScheme.onPrimary),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                    ),
                   ),
                 ),
-                title: Text(auth.fullName ?? 'Commercial'),
-                subtitle: Text(auth.userId ?? '—', style: theme.textTheme.bodySmall),
+                title: Text(
+                  auth.fullName ?? 'Compte',
+                  style: theme.textTheme.titleSmall,
+                ),
+                // L'identifiant technique a disparu d'ici. Un UUID sous un nom
+                // n'apprend rien à personne ; il vit désormais dans
+                // « À propos », où il sert au support.
+                subtitle: Text(_profileLine(auth)),
               ),
             ],
           ),
@@ -77,6 +97,7 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                   pending == 0
                       ? PhosphorIconsRegular.checkCircle
                       : PhosphorIconsRegular.cloudArrowUp,
+                  size: 26,
                   color: pending == 0 ? cpi.success : cpi.accentText,
                 ),
                 title: Text(
@@ -84,15 +105,12 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                       ? 'Tout est envoyé'
                       : '$pending élément${pending > 1 ? 's' : ''} en attente',
                 ),
-                // Aucune promesse de délai : WorkManager ne la tiendrait pas, et
-                // une promesse non tenue sur des données saisies détruit la
-                // confiance dans l'app entière.
                 subtitle: Text(
                   pending == 0
                       ? sync.lastRunAt == null
-                            ? 'Aucune synchronisation depuis le lancement.'
-                            : 'Dernier envoi ${_relative(sync.lastRunAt!)}.'
-                      : 'Sera envoyé dès que possible.',
+                            ? 'Aucun envoi'
+                            : 'Dernier envoi ${_relative(sync.lastRunAt!)}'
+                      : 'En attente d\'envoi',
                 ),
               ),
               if (sync.lastError != null)
@@ -100,13 +118,18 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                   padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
                   child: Text(
                     'Dernière erreur : ${sync.lastError}',
-                    style: theme.textTheme.bodySmall?.copyWith(color: cpi.syncFailed),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cpi.syncFailed,
+                    ),
                   ),
                 ),
               FilledButton.tonalIcon(
                 onPressed: sync.running
                     ? null
-                    : () => ref.read(syncCoordinatorProvider.notifier).run(),
+                    : () {
+                        HapticFeedback.selectionClick();
+                        ref.read(syncCoordinatorProvider.notifier).run();
+                      },
                 icon: sync.running
                     ? const SizedBox(
                         width: 18,
@@ -118,10 +141,51 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
               ),
             ],
           ),
-          if (_shouldSuggestBatteryHelp)
-            _Section(
-              title: 'Arrière-plan',
-              children: <Widget>[
+
+          // ── Affichage ────────────────────────────────────────────────────
+          //
+          // Le réglage vit ici et pas dans les réglages d'Android : la moitié
+          // des ROM du parc enterrent la taille de police sous trois niveaux de
+          // menu, et un utilisateur qui ne lit pas l'écran ne va pas partir la
+          // chercher. Le choix de l'app se multiplie au choix système, il ne le
+          // remplace pas.
+          _Section(
+            title: 'Affichage',
+            children: <Widget>[
+              Text(
+                'Taille du texte',
+                style: theme.textTheme.bodyLarge,
+              ),
+              const SizedBox(height: CpiSpacing.xs),
+              _TextScaleChoice(
+                value: display.textScale,
+                onChanged: (CpiTextScale value) {
+                  HapticFeedback.selectionClick();
+                  ref
+                      .read(displaySettingsProvider.notifier)
+                      .setTextScale(value);
+                },
+              ),
+              const SizedBox(height: CpiSpacing.xs),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                value: display.reduceMotion,
+                onChanged: (bool value) {
+                  HapticFeedback.selectionClick();
+                  ref
+                      .read(displaySettingsProvider.notifier)
+                      .setReduceMotion(value: value);
+                },
+                title: const Text('Réduire les animations'),
+                subtitle: const Text('Transitions instantanées'),
+              ),
+            ],
+          ),
+
+          _Section(
+            title: 'Arrière-plan',
+            children: <Widget>[
+              if (_shouldSuggestBatteryHelp) ...<Widget>[
                 Container(
                   padding: const EdgeInsets.all(CpiSpacing.sm),
                   decoration: BoxDecoration(
@@ -129,42 +193,45 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                     borderRadius: CpiRadius.brMd,
                     border: Border.all(color: cpi.accentBorder.withValues(alpha: 0.4)),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        _backgroundDiagnosis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: cpi.accentText,
-                        ),
-                      ),
-                      const SizedBox(height: CpiSpacing.xs),
-                      TextButton.icon(
-                        onPressed: () => context.go(Routes.batteryHelp),
-                        icon: const Icon(PhosphorIconsRegular.batteryWarning, size: 18),
-                        label: const Text('Autorisations & batterie'),
-                      ),
-                    ],
+                  child: Text(
+                    _backgroundDiagnosis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cpi.accentText,
+                    ),
                   ),
                 ),
+                const SizedBox(height: CpiSpacing.xs),
               ],
-            )
-          else
-            _Section(
-              title: 'Arrière-plan',
-              children: <Widget>[
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(PhosphorIconsRegular.batteryCharging),
-                  title: const Text('Autorisations & batterie'),
-                  subtitle: const Text(
-                    'Vérifier que le téléphone laisse l\'app envoyer en fond.',
-                  ),
-                  trailing: const Icon(PhosphorIconsRegular.caretRight, size: 18),
-                  onTap: () => context.go(Routes.batteryHelp),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(
+                  PhosphorIconsRegular.batteryCharging,
+                  size: 26,
                 ),
-              ],
-            ),
+                title: const Text('Autorisations d\'arrière-plan'),
+                trailing: const Icon(PhosphorIconsRegular.caretRight, size: 20),
+                // `push` et non `go` : `go` remplace la pile de navigation, et
+                // la flèche de retour de l'écran d'arrivée n'a alors plus rien
+                // à dépiler.
+                onTap: () => context.push(Routes.batteryHelp),
+              ),
+            ],
+          ),
+
+          _Section(
+            title: 'Application',
+            children: <Widget>[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(PhosphorIconsRegular.info, size: 26),
+                title: const Text('À propos'),
+                subtitle: Text('Version, serveur, support'),
+                trailing: const Icon(PhosphorIconsRegular.caretRight, size: 20),
+                onTap: () => context.push(Routes.about),
+              ),
+            ],
+          ),
+
           _Section(
             title: 'Session',
             children: <Widget>[
@@ -175,28 +242,26 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
               ),
             ],
           ),
-          const SizedBox(height: CpiSpacing.md),
-          Center(
-            child: Text(
-              'Version ${ref.watch(buildNumberProvider)} · '
-              'payload v${SyncEngine.payloadVersion}',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
         ],
       ),
     );
+  }
+
+  /// Ligne d'identité : rôle et adresse, dans cet ordre de priorité.
+  static String _profileLine(AuthState auth) {
+    final List<String> parts = <String>[
+      if (auth.roleLabel != null) auth.roleLabel!,
+      if (auth.email != null && auth.email!.isNotEmpty) auth.email!,
+    ];
+    return parts.isEmpty ? 'Session active' : parts.join(' · ');
   }
 
   /// Heuristique « la dernière tâche de fond date de N jours ».
   ///
   /// C'est le seul signal observable qu'une ROM constructeur tue nos workers :
   /// Android ne dit jamais « j'ai supprimé votre tâche ». On ne l'affiche pas
-  /// tout de suite après l'installation — un utilisateur qui vient d'installer
-  /// n'a évidemment pas encore de tâche de fond exécutée, et l'alerter serait
-  /// l'inquiéter pour rien.
+  /// tout de suite après l'installation : quelqu'un qui vient d'installer n'a
+  /// évidemment pas encore de tâche de fond exécutée.
   bool get _shouldSuggestBatteryHelp {
     if (!_loadedBackground) return false;
     final DateTime? last = _lastBackgroundRun;
@@ -206,11 +271,10 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
 
   String get _backgroundDiagnosis {
     final DateTime? last = _lastBackgroundRun;
-    if (last == null) return 'Aucun envoi en arrière-plan n\'a encore eu lieu.';
+    if (last == null) return 'Aucun envoi en arrière-plan.';
     final int days = DateTime.now().toUtc().difference(last).inDays;
-    return 'Le dernier envoi en arrière-plan date de $days jour'
-        '${days > 1 ? 's' : ''}. Votre téléphone bloque probablement l\'app '
-        'quand elle est fermée.';
+    return 'Dernier envoi en arrière-plan il y a $days jour'
+        '${days > 1 ? 's' : ''}. Le téléphone bloque l\'app en arrière-plan.';
   }
 
   Future<void> _signOut(BuildContext context, int pending) async {
@@ -219,23 +283,17 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
     // `signOut` efface les jetons ; l'outbox, elle, survit dans la base. Mais
     // sans session, plus rien ne peut partir, et si l'utilisateur se reconnecte
     // avec un autre compte, ses opérations partiraient sous une identité qui
-    // n'est pas celle qui les a saisies — le serveur les refuserait en
-    // `ENTITY_ID_OWNED_BY_ANOTHER_USER`. Mieux vaut un avertissement explicite
-    // qu'une perte silencieuse.
+    // n'est pas celle qui les a saisies : le serveur les refuserait en
+    // `ENTITY_ID_OWNED_BY_ANOTHER_USER`.
     if (pending > 0) {
       final bool? force = await showDialog<bool>(
         context: context,
         builder: (BuildContext context) => AlertDialog(
-          title: const Text('Des saisies ne sont pas encore envoyées'),
+          title: const Text(_pendingTitle),
           content: Text(
-            '$pending élément${pending > 1 ? 's' : ''} attend'
-            '${pending > 1 ? 'ent' : ''} d\'être envoyé'
-            '${pending > 1 ? 's' : ''} au serveur.\n\n'
-            'Si vous vous déconnectez maintenant, ces saisies resteront sur '
-            'l\'appareil et ne partiront qu\'à votre prochaine connexion avec '
-            'CE compte. Connectez-vous à une autre session et elles seront '
-            'refusées.\n\n'
-            'Synchronisez d\'abord si vous avez du réseau.',
+            '$pending élément${pending > 1 ? 's' : ''} en attente d\'envoi. '
+            'Ces saisies ne partiront qu\'à la prochaine connexion avec ce '
+            'compte. Synchronisez d\'abord.',
           ),
           actions: <Widget>[
             TextButton(
@@ -251,7 +309,7 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Se déconnecter quand même'),
+              child: const Text('Se déconnecter'),
             ),
           ],
         ),
@@ -261,6 +319,8 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
     await ref.read(authControllerProvider.notifier).signOut();
     await ref.read(routeMemoryProvider).clear();
   }
+
+  static const String _pendingTitle = 'Saisies en attente';
 
   static String _initials(String? name) {
     if (name == null || name.trim().isEmpty) return 'C';
@@ -278,6 +338,34 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
   }
 }
 
+/// Trois paliers de taille, en segments.
+///
+/// Segments et non menu déroulant : les trois choix sont visibles d'un coup, et
+/// le résultat se voit immédiatement sur l'écran qui les porte.
+class _TextScaleChoice extends StatelessWidget {
+  const _TextScaleChoice({required this.value, required this.onChanged});
+
+  final CpiTextScale value;
+  final ValueChanged<CpiTextScale> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<CpiTextScale>(
+      segments: <ButtonSegment<CpiTextScale>>[
+        for (final CpiTextScale scale in CpiTextScale.values)
+          ButtonSegment<CpiTextScale>(
+            value: scale,
+            label: Text(scale.label),
+          ),
+      ],
+      selected: <CpiTextScale>{value},
+      showSelectedIcon: false,
+      onSelectionChanged: (Set<CpiTextScale> selection) =>
+          onChanged(selection.first),
+    );
+  }
+}
+
 class _Section extends StatelessWidget {
   const _Section({required this.title, required this.children});
 
@@ -288,15 +376,16 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: CpiSpacing.lg),
+      padding: const EdgeInsets.only(bottom: CpiSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          // 14 sp gras et non `labelSmall` 11 : capitalisé et espacé, un
+          // libellé perd en lisibilité à taille égale (voir CpiTypography).
           Text(
             title.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
+            style: CpiTypography.sectionLabel.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-              letterSpacing: 0.6,
             ),
           ),
           const SizedBox(height: CpiSpacing.xs),

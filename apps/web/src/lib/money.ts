@@ -48,7 +48,7 @@ export function groupDigits(digits: string): string {
  * montant » ne sont pas la même information — un dossier en cours d'instruction
  * n'a AUCUN montant, il n'a pas un montant nul.
  */
-export function formatXof(value: string | null | undefined, placeholder = '—'): string {
+export function formatXof(value: string | null | undefined, placeholder = '–'): string {
   if (value === null || value === undefined || value === '') return placeholder;
   const trimmed = value.trim();
   // Repli : on affiche la valeur brute plutôt que de masquer une donnée que

@@ -5,6 +5,8 @@ import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../../core/router/back_navigation.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 
@@ -37,8 +39,13 @@ class BatteryHelpScreen extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Autorisations & batterie')),
+    return CpiPopScope(
+      fallback: Routes.reglages,
+      child: Scaffold(
+      appBar: AppBar(
+        title: const Text('Autorisations et batterie'),
+        leading: const CpiBackButton(fallback: Routes.reglages),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(CpiSpacing.md),
         children: <Widget>[
@@ -55,10 +62,8 @@ class BatteryHelpScreen extends StatelessWidget {
                 const SizedBox(width: CpiSpacing.xs),
                 Expanded(
                   child: Text(
-                    'Vos saisies ne sont jamais perdues : elles restent sur '
-                    'l\'appareil jusqu\'à leur envoi. Ces réglages servent '
-                    'seulement à ce que l\'envoi puisse se faire pendant que '
-                    'l\'app est fermée.',
+                    'Ces réglages permettent l\'envoi pendant que l\'app est '
+                    'fermée.',
                     style: theme.textTheme.bodySmall?.copyWith(color: cpi.info),
                   ),
                 ),
@@ -66,7 +71,7 @@ class BatteryHelpScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: CpiSpacing.lg),
-          Text('Trois réglages à vérifier', style: theme.textTheme.titleSmall),
+          Text('Trois réglages', style: theme.textTheme.titleSmall),
           const SizedBox(height: CpiSpacing.xs),
           const _Step(
             index: 1,
@@ -78,15 +83,14 @@ class BatteryHelpScreen extends StatelessWidget {
             index: 2,
             title: 'Démarrage automatique (Xiaomi, Tecno, Infinix, itel)',
             body: 'Sécurité → Autorisations → Démarrage automatique → activer '
-                'CPI GO. Sans cette autorisation, l\'app ne peut pas être '
-                'réveillée par le système.',
+                'CPI GO.',
           ),
           const _Step(
             index: 3,
             title: 'Verrouiller l\'app dans les tâches récentes',
             body: 'Ouvrez les applications récentes, puis touchez le cadenas '
-                'sur CPI GO. Sur beaucoup de ROM, c\'est ce cadenas — et rien '
-                'd\'autre — qui empêche la fermeture automatique.',
+                'sur CPI GO. Sur beaucoup de ROM, seul ce cadenas empêche la '
+                'fermeture automatique.',
           ),
           const SizedBox(height: CpiSpacing.lg),
           FilledButton.icon(
@@ -101,6 +105,7 @@ class BatteryHelpScreen extends StatelessWidget {
             label: const Text('Ouvrir la fiche de l\'application'),
           ),
         ],
+      ),
       ),
     );
   }

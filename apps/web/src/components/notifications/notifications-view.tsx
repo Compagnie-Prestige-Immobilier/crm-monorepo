@@ -70,7 +70,7 @@ const DELIVERY_VARIANT: Record<
 };
 
 const dateTime = (value: string | null): string =>
-  value === null ? '—' : new Date(value).toLocaleString('fr-SN');
+  value === null ? '–' : new Date(value).toLocaleString('fr-SN');
 
 export function NotificationsView() {
   const queryClient = useQueryClient();

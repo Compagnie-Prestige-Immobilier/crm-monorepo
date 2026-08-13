@@ -45,15 +45,31 @@ export class DemoController {
     return this.demo.enable(user.id);
   }
 
+  @Post('purge')
+  @HttpCode(200)
+  @ApiOperation({
+    operationId: 'purgeDemoData',
+    summary: 'Supprime définitivement le jeu de démonstration.',
+    description:
+      'IRRÉVERSIBLE, et distinct de la désactivation. Supprime exactement les ' +
+      'lignes enregistrées à l’ensemencement, dans l’ordre inverse de création. ' +
+      'Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec ' +
+      'une donnée de démonstration. L’interface doit faire confirmer.',
+  })
+  @ApiResponse({ status: 200, type: DemoStatusDto })
+  purge(@CurrentUser() user: AuthenticatedUser): Promise<DemoStatusDto> {
+    return this.demo.purge(user.id);
+  }
+
   @Post('disable')
   @HttpCode(200)
   @ApiOperation({
     operationId: 'disableDemoMode',
-    summary: 'Retire les données de démonstration.',
+    summary: 'Masque les données de démonstration.',
     description:
-      'Supprime EXACTEMENT les lignes enregistrées au moment de ' +
-      'l’ensemencement. Aucune donnée réelle n’est touchée, quelle que soit sa ' +
-      'ressemblance avec une donnée de démonstration.',
+      'NE SUPPRIME RIEN. Les lignes de démonstration restent en base, ' +
+      'invisibles pour toute lecture, export Excel compris. Pour les effacer ' +
+      'définitivement, utiliser /purge.',
   })
   @ApiResponse({ status: 200, type: DemoStatusDto })
   disable(@CurrentUser() user: AuthenticatedUser): Promise<DemoStatusDto> {

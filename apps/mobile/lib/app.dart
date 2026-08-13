@@ -3,7 +3,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/providers/app_providers.dart';
+import 'features/notifications/notifications_controller.dart';
+import 'features/notifications/push_deep_link_listener.dart';
 import 'core/router/app_router.dart';
+import 'core/settings/display_settings.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_state.dart';
 
@@ -51,14 +54,20 @@ class CpiGoApp extends ConsumerWidget {
     // de synchronisation.
     if (auth.isAuthenticated) {
       ref.watch(syncCoordinatorProvider.notifier);
+      // Même raisonnement que le coordinateur de synchronisation : le
+      // coordinateur push doit vivre aussi longtemps que la session, et
+      // démarrer ICI. C'est lui qui consomme le message de lancement d'un
+      // démarrage à froid.
+      ref.watch(pushCoordinatorProvider.notifier);
     }
 
     return MaterialApp.router(
       title: 'CPI GO',
       debugShowCheckedModeBanner: false,
       // **Un seul thème, verrouillé en clair.** Pas de `darkTheme`, pas de
-      // `ThemeMode.system` : l'app sert dehors, en plein soleil, où le mode
-      // sombre réduit la lisibilité (docs/design.md §3).
+      // `ThemeMode.system` : docs/design.md §3 réserve le mode sombre au panel
+      // web, et deux thèmes à maintenir pour un poste de saisie n'apportent
+      // rien.
       theme: AppTheme.light,
       themeMode: ThemeMode.light,
       locale: const Locale('fr', 'SN'),
@@ -66,18 +75,29 @@ class CpiGoApp extends ConsumerWidget {
       localizationsDelegates: _localizationsDelegates,
       routerConfig: ref.watch(routerProvider),
       builder: (BuildContext context, Widget? child) {
-        // Bornage de la mise à l'échelle du texte : au-delà de 1,3 les cartes
-        // de l'accueil débordent. En dessous de 1,0 le texte devient illisible
-        // au soleil.
+        // Taille de texte et animations : le réglage de l'app est multiplié au
+        // réglage système, puis borné (voir `display_settings.dart`). C'est le
+        // seul endroit où les deux se combinent — aucun écran n'a à le savoir.
+        final DisplaySettings display = ref.watch(displaySettingsProvider);
         final MediaQueryData media = MediaQuery.of(context);
         return MediaQuery(
           data: media.copyWith(
-            textScaler: media.textScaler.clamp(
-              minScaleFactor: 1.0,
-              maxScaleFactor: 1.3,
+            textScaler: TextScaler.linear(
+              resolveTextScaleFactor(
+                system: media.textScaler,
+                choice: display.textScale,
+              ),
             ),
+            // « Réduire les animations » emprunte le chemin de code système :
+            // `CpiMotion.of` lit `MediaQuery.maybeDisableAnimationsOf` et ramène
+            // toutes les durées à zéro, sans qu'aucun widget ne connaisse le
+            // réglage.
+            disableAnimations: media.disableAnimations || display.reduceMotion,
           ),
-          child: child ?? const SizedBox.shrink(),
+          // Monté SOUS le `Router` : c'est la seule position d'où `context.go`
+          // atteint le routeur réel, et donc d'où un lien profond peut être
+          // rejoué après la résolution du garde.
+          child: PushDeepLinkListener(child: child ?? const SizedBox.shrink()),
         );
       },
     );

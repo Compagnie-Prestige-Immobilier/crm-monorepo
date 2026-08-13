@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'generated_migrations/schema.dart';
 import 'generated_migrations/schema_v1.dart' as v1;
+import 'generated_migrations/schema_v2.dart' as v2;
 
 /// Test doré de migration.
 ///
@@ -161,6 +162,65 @@ void main() {
     expect(names, contains('phase2_directory_status_idx'));
     expect(names, contains('call_attempts_prospect_idx'));
     expect(names, contains('call_attempts_created_idx'));
+
+    await db.close();
+  });
+
+  // ── v2 → v3 : notifications push ───────────────────────────────────────────
+  //
+  // Même piège qu'au palier précédent, et il vaut la peine d'être répété : un
+  // `createTable` sans son `createIndex` passe tous les tests fonctionnels et
+  // ne se remarque qu'en production, sous forme de lenteur inexpliquée.
+
+  test('v2 -> v3 ajoute la boîte de réception sans toucher au reste', () async {
+    final schema = await verifier.schemaAt(2);
+
+    // Une base de v2 avec une saisie encore en file : c'est elle qui ne doit
+    // rien perdre.
+    final v2.DatabaseAtV2 old = v2.DatabaseAtV2(schema.newConnection());
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-9', 'representant', 'rep-9', 'create', '{}', _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 3);
+
+    final List<QueryRow> pending = await db
+        .customSelect('SELECT id FROM outbox WHERE status = \'pending\'')
+        .get();
+    expect(pending, hasLength(1), reason: 'la file ne doit pas être vidée par une migration');
+
+    // La table existe et démarre vide : un historique de notifications ne se
+    // fabrique pas par migration, il se retélécharge.
+    final List<QueryRow> inbox =
+        await db.customSelect('SELECT COUNT(*) AS c FROM notifications').get();
+    expect(inbox.single.read<int>('c'), 0);
+
+    await db.close();
+  });
+
+  test('v2 -> v3 crée les index de la boîte de réception', () async {
+    final schema = await verifier.schemaAt(2);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 3);
+
+    final List<QueryRow> indexes = await db
+        .customSelect(
+          'SELECT name FROM sqlite_master '
+          'WHERE type = \'index\' AND tbl_name = \'notifications\'',
+        )
+        .get();
+    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+
+    // `notifications_unread_idx` sert la pastille de l'AppBar, relue à chaque
+    // changement de la table.
+    expect(names, contains('notifications_created_idx'));
+    expect(names, contains('notifications_unread_idx'));
 
     await db.close();
   });

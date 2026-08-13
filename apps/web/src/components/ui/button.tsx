@@ -19,7 +19,20 @@ const buttonVariants = cva(
     'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md',
     'font-[600] transition-colors duration-150 ease-[cubic-bezier(0.22,1,0.36,1)]',
     'outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-    'disabled:pointer-events-none disabled:opacity-40',
+    /**
+     * Désactivé : on CHANGE de peau, on ne baisse pas l'opacité.
+     *
+     * `disabled:opacity-40` mesurait 1,53:1 en clair et 3,39:1 en sombre sur
+     * « Ouvrir le dossier » : le bouton devenait un fantôme illisible. WCAG
+     * exempte les commandes inactives, ce qui rend l'échec invisible en audit
+     * automatique — mais un utilisateur qui ne peut plus lire le libellé ne
+     * sait plus ce que le bouton refuse de faire.
+     *
+     * Le signal « désactivé » passe donc par la PERTE de couleur, d'ombre et
+     * de survol, pas par l'effacement : 6,18:1 en clair, 7,85:1 en sombre.
+     */
+    'disabled:pointer-events-none disabled:border-transparent disabled:bg-muted',
+    'disabled:text-muted-foreground disabled:shadow-none',
     "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   ].join(' '),
   {

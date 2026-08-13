@@ -69,4 +69,8 @@ export const queryKeys = {
 
   // ─── Mode démonstration ───────────────────────────────────────────────────
   demoStatus: ['demo-status'] as const,
+
+  // ─── Administration ───────────────────────────────────────────────────────
+  purgeCatalog: ['purge-catalog'] as const,
+  supervision: ['supervision'] as const,
 };

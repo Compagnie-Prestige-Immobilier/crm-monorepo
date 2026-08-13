@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
+import 'cpi_pressable.dart';
 
 /// Carte de synthèse de l'accueil.
 ///
@@ -35,61 +37,66 @@ class SummaryCard extends StatelessWidget {
     final Color accent = accentColor ?? theme.colorScheme.primary;
     final Color surface = surfaceColor ?? theme.colorScheme.surfaceContainerLowest;
 
-    return Material(
-      color: surface,
-      borderRadius: CpiRadius.brLg,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: CpiRadius.brLg,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: CpiRadius.brLg,
-            border: Border.all(color: cpi.borderSubtle),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(CpiSpacing.md),
-            child: Row(
-              children: <Widget>[
-                Container(
-                  width: kCpiMinTouchTarget,
-                  height: kCpiMinTouchTarget,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.10),
-                    borderRadius: CpiRadius.brMd,
+    return CpiPressable(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: CpiRadius.brLg,
+          border: Border.all(color: cpi.borderSubtle),
+        ),
+        padding: const EdgeInsets.all(CpiSpacing.md),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: kCpiMinTouchTarget,
+              height: kCpiMinTouchTarget,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.10),
+                borderRadius: CpiRadius.brMd,
+              ),
+              child: Icon(icon, color: accent, size: 22),
+            ),
+            const SizedBox(width: CpiSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  // `bodyMedium` (16) et non `bodySmall` (13 avant refonte) :
+                  // c'est le libellé qui dit ce que compte le chiffre.
+                  Text(
+                    label,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                  child: Icon(icon, color: accent, size: 22),
-                ),
-                const SizedBox(width: CpiSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(
-                        label,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: CpiSpacing.xxs / 2),
+                  if (isLoading)
+                    const _CountPlaceholder()
+                  else
+                    // Le chiffre se remplace en fondu court : une valeur qui
+                    // change sous les doigts sans mouvement passe inaperçue.
+                    AnimatedSwitcher(
+                      duration: CpiMotion.of(context).micro,
+                      switchInCurve: CpiMotion.of(context).easeOut,
+                      child: Text(
+                        value,
+                        key: ValueKey<String>(value),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: accent,
                         ),
                       ),
-                      const SizedBox(height: CpiSpacing.xxs / 2),
-                      if (isLoading)
-                        const _CountPlaceholder()
-                      else
-                        Text(
-                          value,
-                          style: theme.textTheme.headlineSmall?.copyWith(color: accent),
-                        ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  size: 20,
-                ),
-              ],
+                    ),
+                ],
+              ),
             ),
-          ),
+            Icon(
+              PhosphorIconsRegular.caretRight,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ],
         ),
       ),
     );

@@ -53,6 +53,7 @@ class RouteMemory {
     // transporté dans l'URL — ni numéro, ni identifiant de prospect — donc la
     // restauration ne fait fuiter aucune donnée dans l'historique.
     Routes.phase2,
+    Routes.notifications,
   ];
 
   final SharedPreferences _prefs;

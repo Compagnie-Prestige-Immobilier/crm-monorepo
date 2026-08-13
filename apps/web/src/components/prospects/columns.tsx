@@ -61,7 +61,7 @@ export interface ProspectRowActions {
 
 /** Cellule vide explicite. Une case blanche se lit comme une donnée perdue. */
 function Empty() {
-  return <span className="text-muted-foreground">—</span>;
+  return <span className="text-muted-foreground">–</span>;
 }
 
 /**

@@ -119,7 +119,6 @@ export function LoginForm({ next }: { next?: string | null }) {
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder="admin@cpi.sn"
           aria-invalid={errors.identifier !== undefined}
           aria-describedby={errors.identifier !== undefined ? 'identifier-error' : undefined}
           {...register('identifier')}

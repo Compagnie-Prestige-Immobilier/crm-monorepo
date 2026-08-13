@@ -91,7 +91,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
         onRetry={() => {
           void stages.refetch();
         }}
-        fallback="Le flux de traitement n’a pas pu être lu : aucune action ne peut être proposée sans lui."
+        fallback="Le flux de traitement n’a pas pu être chargé."
       />
     );
   }
@@ -159,7 +159,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
 
           {bankCase.rejectionReason !== null ? (
             <p className="rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.875rem] text-destructive">
-              <span className="font-[600]">Rejeté — {bankCase.rejectionReason.label}.</span>
+              <span className="font-[600]">Rejeté : {bankCase.rejectionReason.label}.</span>
               {bankCase.rejectionDetail !== null && bankCase.rejectionDetail !== ''
                 ? ` ${bankCase.rejectionDetail}`
                 : ''}
@@ -220,8 +220,8 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
             >
               <ShieldAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               {role === 'ADMIN'
-                ? 'Ce dossier est en étape terminale. Un administrateur peut encore le corriger depuis l’API, avec justification obligatoire ; la correction est tracée dans l’historique ci-dessous.'
-                : 'Ce dossier est en étape terminale : il est verrouillé. Seul un administrateur peut le corriger, avec justification.'}
+                ? 'Étape terminale. Correction possible par un administrateur, avec justification.'
+                : 'Étape terminale. Dossier verrouillé.'}
             </p>
           )}
         </CardContent>
@@ -296,7 +296,7 @@ function Timeline({ history }: { history: readonly BankCaseTransition[] }) {
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <p className="font-[600]">
                   {transition.fromStage === null
-                    ? `Ouverture — ${transition.toStage.label}`
+                    ? `Ouverture : ${transition.toStage.label}`
                     : `${transition.fromStage.label} → ${transition.toStage.label}`}
                 </p>
                 {transition.correctionReason !== null ? (
@@ -325,7 +325,7 @@ function Timeline({ history }: { history: readonly BankCaseTransition[] }) {
                 <p className="mt-1 text-[0.875rem]">
                   Motif : <span className="font-[600]">{transition.rejectionReason.label}</span>
                   {transition.rejectionDetail !== null && transition.rejectionDetail !== ''
-                    ? ` — ${transition.rejectionDetail}`
+                    ? `. ${transition.rejectionDetail}`
                     : ''}
                 </p>
               ) : null}
@@ -419,11 +419,11 @@ function AdvanceDialog({
           <DialogTitle>
             {isCashing ? 'Déclarer l’encaissement' : `Passer à « ${target?.label ?? ''} »`}
           </DialogTitle>
-          <DialogDescription>
-            {isCashing
-              ? 'L’encaissement clôt le parcours du dossier : après validation, seul un administrateur pourra le corriger.'
-              : 'Le dossier avance d’une étape. L’historique conserve qui l’a fait et quand.'}
-          </DialogDescription>
+          {isCashing ? (
+            <DialogDescription>
+              L’encaissement clôt le dossier. Correction possible ensuite par un administrateur.
+            </DialogDescription>
+          ) : null}
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
@@ -461,7 +461,7 @@ function AdvanceDialog({
               >
                 {amount === null ? (
                   <span className="font-[400] text-muted-foreground">
-                    Saisissez un montant strictement positif.
+                    Montant strictement positif.
                   </span>
                 ) : (
                   formatXof(amount)
@@ -476,7 +476,7 @@ function AdvanceDialog({
               id={commentId}
               value={comment}
               maxLength={2000}
-              placeholder="Précision utile pour la suite du dossier…"
+              placeholder="Précision"
               onChange={(event) => {
                 setComment(event.target.value);
               }}
@@ -574,7 +574,7 @@ function RejectDialog({
     },
     onSuccess: () => {
       onDone();
-      toast.success('Dossier rejeté. Le montant enregistré est 0 FCFA.');
+      toast.success('Dossier rejeté. Montant : 0 FCFA.');
       reset();
       onOpenChange(false);
     },
@@ -612,16 +612,14 @@ function RejectDialog({
                 rejet, quoi qu'on lui envoie — mais un agent qui vient de voir
                 un montant à l'écran croirait sinon que le rejet le conserve, et
                 s'étonnerait de le voir disparaître de la synthèse. */}
-            Le rejet clôt le dossier. <strong className="font-[600]">Montant : 0 FCFA</strong> — un
-            dossier rejeté n’entre dans aucune somme encaissée. Seul un administrateur pourra
-            corriger ensuite, avec justification.
+            Le rejet clôt le dossier. <strong className="font-[600]">Montant : 0 FCFA</strong>.
+            Correction possible ensuite par un administrateur.
           </DialogDescription>
         </DialogHeader>
 
         {targetStageId === null ? (
           <p role="alert" className="text-[0.875rem] text-destructive">
-            Aucune étape de rejet active n’est configurée. Un administrateur doit en activer une
-            avant que ce geste soit possible.
+            Aucune étape de rejet active. Un administrateur doit en activer une.
           </p>
         ) : (
           <div className="flex flex-col gap-4">
@@ -649,10 +647,6 @@ function RejectDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[0.75rem] text-muted-foreground">
-                Le motif alimente la statistique des rejets : c’est lui qui dira, dans trois mois,
-                ce qu’il faut corriger en amont.
-              </p>
             </div>
 
             {detailRequired ? (
@@ -674,8 +668,7 @@ function RejectDialog({
                   }}
                 />
                 <p id={`${detailId}-aide`} className="text-[0.75rem] text-muted-foreground">
-                  Obligatoire pour « Autre motif » : sans elle, la statistique des rejets est
-                  aveugle sur sa plus grosse catégorie.
+                  Obligatoire pour ce motif.
                 </p>
               </div>
             ) : null}
