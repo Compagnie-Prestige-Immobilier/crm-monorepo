@@ -24,12 +24,26 @@ import 'route_paths.dart';
 ///    à dépiler, et il ne doit pas pour autant être impossible de revenir.
 ///    [popOrHome] retombe sur l'accueil.
 void popOrHome(BuildContext context, {String fallback = Routes.home}) {
-  final GoRouter router = GoRouter.of(context);
+  final GoRouter? router = GoRouter.maybeOf(context);
+  if (router == null) {
+    // Aucun routeur : écran monté seul (test de widget, aperçu). On retombe sur
+    // le `Navigator` local plutôt que de lever — un écran ne doit jamais
+    // dépendre du routeur pour se construire.
+    Navigator.of(context).maybePop();
+    return;
+  }
   if (router.canPop()) {
     router.pop();
     return;
   }
   router.go(fallback);
+}
+
+/// La pile peut-elle être dépilée ? Faux quand aucun routeur n'est monté.
+bool _canPopHere(BuildContext context) {
+  final GoRouter? router = GoRouter.maybeOf(context);
+  if (router != null) return router.canPop();
+  return Navigator.of(context).canPop();
 }
 
 /// Flèche de retour de l'AppBar.
@@ -59,18 +73,14 @@ class CpiBackButton extends StatelessWidget {
 /// contient quelque chose, on laisse le comportement natif faire son travail :
 /// l'animation de retour prédictif d'Android 14+ en dépend.
 class CpiPopScope extends StatelessWidget {
-  const CpiPopScope({
-    super.key,
-    required this.child,
-    this.fallback = Routes.home,
-  });
+  const CpiPopScope({super.key, required this.child, this.fallback = Routes.home});
 
   final Widget child;
   final String fallback;
 
   @override
   Widget build(BuildContext context) {
-    final bool canPop = GoRouter.of(context).canPop();
+    final bool canPop = _canPopHere(context);
     return PopScope<Object?>(
       canPop: canPop,
       onPopInvokedWithResult: (bool didPop, Object? _) {

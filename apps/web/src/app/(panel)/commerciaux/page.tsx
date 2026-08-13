@@ -22,7 +22,7 @@ export default async function CommerciauxPage() {
       <EmptyState
         icon={ShieldAlertIcon}
         title="Accès réservé aux administrateurs"
-        description="La gestion des comptes commerciaux n’est accessible qu’avec un compte administrateur. Demandez à la DSI de CPI de relever vos droits si vous en avez besoin."
+        description="Gestion des comptes de connexion à l’application mobile."
       />
     );
   }

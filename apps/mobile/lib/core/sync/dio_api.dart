@@ -31,10 +31,7 @@ class DioApi implements ApiPort {
   // ── Authentification ───────────────────────────────────────────────────────
 
   @override
-  Future<AuthTokens> login({
-    required String identifier,
-    required String password,
-  }) async {
+  Future<AuthTokens> login({required String identifier, required String password}) async {
     return _guard('login', () async {
       final Response<AuthTokensDto> response = await _auth.login(
         userAgent: ApiEnvironment.userAgent,
@@ -82,9 +79,7 @@ class DioApi implements ApiPort {
       // `expiresIn` est une durée en secondes ; on la matérialise en instant une
       // fois pour toutes, ici, plutôt que de recalculer « maintenant + n » à
       // chaque lecture — deux appelants ne partiraient pas du même « maintenant ».
-      expiresAt: DateTime.now().toUtc().add(
-        Duration(seconds: dto.expiresIn.toInt()),
-      ),
+      expiresAt: DateTime.now().toUtc().add(Duration(seconds: dto.expiresIn.toInt())),
       userId: dto.user.id,
       fullName: dto.user.fullName,
       role: dto.user.role.name,

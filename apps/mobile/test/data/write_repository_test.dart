@@ -34,8 +34,7 @@ void main() {
   );
 
   group('l\'invariant d\'enregistrement', () {
-    test('ligne métier + opération d\'outbox + suppression du brouillon',
-        () async {
+    test('ligne métier + opération d\'outbox + suppression du brouillon', () async {
       await seedDraft('d1');
       final String id = await repo.createRepresentant(
         fullName: 'Awa Sy',
@@ -67,32 +66,33 @@ void main() {
       expect(await db.select(db.formDrafts).get(), isEmpty);
     });
 
-    test('si l\'insertion échoue, le brouillon SURVIT et rien n\'est mis en file',
-        () async {
-      // Le numéro est déjà pris : l'index unique partiel refuse la ligne.
-      await insertRepresentant(db, id: 'deja', phone: '+221770000001');
-      await seedDraft('d1');
+    test(
+      'si l\'insertion échoue, le brouillon SURVIT et rien n\'est mis en file',
+      () async {
+        // Le numéro est déjà pris : l'index unique partiel refuse la ligne.
+        await insertRepresentant(db, id: 'deja', phone: '+221770000001');
+        await seedDraft('d1');
 
-      await expectLater(
-        repo.createRepresentant(
-          fullName: 'Awa Sy',
-          phoneE164: '+221770000001',
-          departementId: 'dep-1',
-          createdById: 'me',
-          draftId: 'd1',
-        ),
-        throwsA(isA<SqliteException>()),
-      );
+        await expectLater(
+          repo.createRepresentant(
+            fullName: 'Awa Sy',
+            phoneE164: '+221770000001',
+            departementId: 'dep-1',
+            createdById: 'me',
+            draftId: 'd1',
+          ),
+          throwsA(isA<SqliteException>()),
+        );
 
-      // C'est TOUT le point : il n'existe aucun état atteignable où la frappe de
-      // l'utilisateur est perdue après qu'il a appuyé sur Enregistrer.
-      expect(await drafts.read('d1'), isNotNull);
-      expect(await allOutbox(db), isEmpty);
-      expect((await db.select(db.representants).get()).single.id, 'deja');
-    });
+        // C'est TOUT le point : il n'existe aucun état atteignable où la frappe de
+        // l'utilisateur est perdue après qu'il a appuyé sur Enregistrer.
+        expect(await drafts.read('d1'), isNotNull);
+        expect(await allOutbox(db), isEmpty);
+        expect((await db.select(db.representants).get()).single.id, 'deja');
+      },
+    );
 
-    test('l\'ordre inverse est impossible : le brouillon ne part jamais seul',
-        () async {
+    test('l\'ordre inverse est impossible : le brouillon ne part jamais seul', () async {
       await seedDraft('d1');
       // Une clé étrangère invalide fait échouer l'insertion métier.
       await expectLater(
@@ -191,15 +191,9 @@ void main() {
       expect((await allOutbox(db)).single.baseRev, isNull);
     });
 
-    test('supprimer un représentant emporte logiquement ses prospects',
-        () async {
+    test('supprimer un représentant emporte logiquement ses prospects', () async {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
-      await insertProspect(
-        db,
-        id: 'p1',
-        representantId: 'repA',
-        phone: '+221780000001',
-      );
+      await insertProspect(db, id: 'p1', representantId: 'repA', phone: '+221780000001');
       await repo.deleteRepresentant('repA');
 
       final Representant rep = (await db.select(db.representants).get()).single;
@@ -214,25 +208,10 @@ void main() {
     /// chaîne parfaitement saine.
     Future<Map<String, int>> seedChains() async {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
-      await insertProspect(
-        db,
-        id: 'pA1',
-        representantId: 'repA',
-        phone: '+221780000001',
-      );
-      await insertProspect(
-        db,
-        id: 'pA2',
-        representantId: 'repA',
-        phone: '+221780000002',
-      );
+      await insertProspect(db, id: 'pA1', representantId: 'repA', phone: '+221780000001');
+      await insertProspect(db, id: 'pA2', representantId: 'repA', phone: '+221780000002');
       await insertRepresentant(db, id: 'repB', phone: '+221770000002');
-      await insertProspect(
-        db,
-        id: 'pB1',
-        representantId: 'repB',
-        phone: '+221780000003',
-      );
+      await insertProspect(db, id: 'pB1', representantId: 'repB', phone: '+221780000003');
 
       await queueOp(
         db,
@@ -264,9 +243,7 @@ void main() {
         dependencyKey: 'repB',
       );
 
-      return <String, int>{
-        for (final OutboxData o in await allOutbox(db)) o.id: o.seq,
-      };
+      return <String, int>{for (final OutboxData o in await allOutbox(db)) o.id: o.seq};
     }
 
     test('abandonner un `create` emporte toute la suite de sa clé', () async {
@@ -287,10 +264,9 @@ void main() {
         (await db.select(db.representants).get()).map((Representant r) => r.id),
         <String>['repB'],
       );
-      expect(
-        (await db.select(db.prospects).get()).map((Prospect p) => p.id),
-        <String>['pB1'],
-      );
+      expect((await db.select(db.prospects).get()).map((Prospect p) => p.id), <String>[
+        'pB1',
+      ]);
     });
 
     test('la chaîne voisine est intacte', () async {
@@ -300,17 +276,16 @@ void main() {
       expect((await outboxById(db, 'B2')).dependencyKey, 'repB');
     });
 
-    test('abandonner un prospect ne touche ni son parent ni ses frères',
-        () async {
+    test('abandonner un prospect ne touche ni son parent ni ses frères', () async {
       final Map<String, int> seqs = await seedChains();
       final int removed = await repo.discardOperation(seqs['A2']!);
       expect(removed, 1);
       final List<OutboxData> left = await allOutbox(db);
       expect(left.map((OutboxData o) => o.id), <String>['A1', 'A3', 'B1', 'B2']);
-      expect(
-        (await db.select(db.prospects).get()).map((Prospect p) => p.id),
-        <String>['pA2', 'pB1'],
-      );
+      expect((await db.select(db.prospects).get()).map((Prospect p) => p.id), <String>[
+        'pA2',
+        'pB1',
+      ]);
     });
 
     test('abandonner un `update` ne supprime que lui-même', () async {
@@ -355,8 +330,7 @@ void main() {
   });
 
   group('reprise manuelle', () {
-    test('retryOperation remet le compteur à zéro et rend la ligne due',
-        () async {
+    test('retryOperation remet le compteur à zéro et rend la ligne due', () async {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
       await queueOp(
         db,
@@ -383,8 +357,7 @@ void main() {
   });
 
   group('payload', () {
-    test('le payload est du JSON brut, relisible après mise à jour de l\'app',
-        () async {
+    test('le payload est du JSON brut, relisible après mise à jour de l\'app', () async {
       await repo.createRepresentant(
         fullName: 'Awa Sy',
         phoneE164: '+221770000001',
@@ -393,8 +366,7 @@ void main() {
         notes: 'Marché de Thiaroye',
       );
       final Map<String, Object?> payload =
-          jsonDecode((await allOutbox(db)).single.payload)
-              as Map<String, Object?>;
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
       expect(payload['fullName'], 'Awa Sy');
       expect(payload['phone'], '+221770000001');
       expect(payload['departementId'], 'dep-1');
@@ -411,8 +383,7 @@ void main() {
         notes: '',
       );
       final Map<String, Object?> payload =
-          jsonDecode((await allOutbox(db)).single.payload)
-              as Map<String, Object?>;
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
       expect(payload.containsKey('notes'), isFalse);
     });
   });

@@ -98,7 +98,7 @@ export function DemoModeCard() {
       );
     },
     onError: (error) => {
-      toastApiError(error, 'L’activation a échoué.');
+      toastApiError(error, 'Activation impossible. Réessayez.');
     },
   });
 
@@ -108,10 +108,10 @@ export function DemoModeCard() {
       afterToggle();
       setConfirming(false);
       setConfirmed(false);
-      toast.success('Mode démonstration retiré. Les données réelles sont intactes.');
+      toast.success('Mode démonstration retiré. Les données réelles sont conservées.');
     },
     onError: (error) => {
-      toastApiError(error, 'La désactivation a échoué.');
+      toastApiError(error, 'Suppression impossible. Réessayez.');
     },
   });
 
@@ -124,7 +124,7 @@ export function DemoModeCard() {
         onRetry={() => {
           void status.refetch();
         }}
-        fallback="L’état du mode démonstration n’a pas pu être lu."
+        fallback="État du mode démonstration non chargé."
       />
     );
   }
@@ -146,8 +146,7 @@ export function DemoModeCard() {
                 Mode démonstration
               </CardTitle>
               <CardDescription>
-                Peuple la plateforme d’un jeu complet et crédible — comptes, prospects, campagnes,
-                dossiers bancaires — pour une présentation ou une recette.
+                Jeu de données complet&nbsp;: comptes, prospects, campagnes, dossiers bancaires.
               </CardDescription>
             </div>
             <Badge variant={data.enabled ? 'warning' : 'secondary'}>
@@ -176,12 +175,11 @@ export function DemoModeCard() {
               </p>
             ) : (
               <p className="text-[0.875rem] text-muted-foreground">
-                Aucune donnée de démonstration n’est en place.
+                Aucune donnée de démonstration.
                 {seededAt !== null ? (
                   <>
                     {' '}
-                    Dernier ensemencement :{' '}
-                    <time dateTime={seededAt}>{formatDateTime(seededAt)}</time>.
+                    Dernier jeu créé le <time dateTime={seededAt}>{formatDateTime(seededAt)}</time>.
                   </>
                 ) : null}
               </p>
@@ -237,7 +235,7 @@ export function DemoModeCard() {
                 )}
               </Button>
               <p className="text-[0.75rem] text-muted-foreground">
-                Opération idempotente : activer deux fois ne double pas le jeu.
+                Activer deux fois ne double pas le jeu.
               </p>
             </div>
           ) : (
@@ -254,9 +252,7 @@ export function DemoModeCard() {
                 <TriangleAlertIcon aria-hidden="true" />
                 Retirer les données de démonstration
               </Button>
-              <p className="text-[0.75rem] text-muted-foreground">
-                Une confirmation détaillée vous sera demandée.
-              </p>
+              <p className="text-[0.75rem] text-muted-foreground">Confirmation requise.</p>
             </div>
           )}
         </CardContent>
@@ -276,8 +272,7 @@ export function DemoModeCard() {
           <DialogHeader>
             <DialogTitle>Retirer les données de démonstration ?</DialogTitle>
             <DialogDescription>
-              {formatNumber(total)} ligne{total > 1 ? 's' : ''} créée
-              {total > 1 ? 's' : ''} par le mode démonstration ser
+              {formatNumber(total)} ligne{total > 1 ? 's' : ''} de démonstration ser
               {total > 1 ? 'ont' : 'a'} supprimée{total > 1 ? 's' : ''}.
             </DialogDescription>
           </DialogHeader>
@@ -309,10 +304,8 @@ export function DemoModeCard() {
             <p className="flex items-start gap-2 rounded-md border border-success/30 bg-success-surface px-3 py-2.5 text-[0.875rem] text-success">
               <ShieldCheckIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>
-                <span className="font-[600]">Vos données réelles ne sont pas touchées.</span> Le
-                serveur a enregistré, à l’ensemencement, l’identifiant de chaque ligne qu’il a
-                créée. La suppression porte exactement sur cette liste — et sur rien d’autre, quelle
-                que soit la ressemblance d’une fiche réelle avec une fiche de démonstration.
+                <span className="font-[600]">Les données réelles ne sont pas supprimées.</span>{' '}
+                Seules les lignes créées par le mode démonstration le sont.
               </span>
             </p>
 
@@ -331,8 +324,7 @@ export function DemoModeCard() {
                 }}
               />
               <span>
-                Je confirme vouloir supprimer les {formatNumber(total)} lignes de démonstration
-                listées ci-dessus.
+                Je confirme la suppression des {formatNumber(total)} lignes de démonstration.
               </span>
             </label>
           </div>

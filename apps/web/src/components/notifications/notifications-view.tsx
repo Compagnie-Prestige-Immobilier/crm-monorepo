@@ -87,7 +87,7 @@ export function NotificationsView() {
     mutationFn: (id: string) => cancelNotification(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.root });
-      toast.success('Notification annulée. Elle ne partira pas.');
+      toast.success('Notification annulée.');
     },
     onError: (error) => {
       toastApiError(error, 'L’annulation a échoué.');
@@ -128,7 +128,7 @@ export function NotificationsView() {
             <EmptyState
               icon={BellOffIcon}
               title="Aucune notification envoyée"
-              description="Les notifications composées ici arrivent sur les téléphones des commerciaux et s’ajoutent à leur centre de notifications."
+              description="Les envois apparaissent ici."
               action={
                 <Button
                   type="button"
@@ -263,7 +263,7 @@ function DeliverySummary({ row }: { row: NotificationRow }) {
         <Badge variant="destructive">{String(counts.failed)} échecs</Badge>
       ) : null}
       {counts.pending > 0 ? (
-        <Badge variant="warning">{String(counts.pending)} en file</Badge>
+        <Badge variant="warning">{String(counts.pending)} en attente</Badge>
       ) : null}
     </div>
   );
@@ -287,7 +287,7 @@ function NotificationDetailDialog({ id, onClose }: { id: string | null; onClose:
         <DialogHeader>
           <DialogTitle>{detail.data?.notification.title ?? 'Détail de l’envoi'}</DialogTitle>
           <DialogDescription>
-            Une ligne par destinataire — c’est ce qui rend « qui a reçu ? » répondable.
+            Une ligne par destinataire.
           </DialogDescription>
         </DialogHeader>
 

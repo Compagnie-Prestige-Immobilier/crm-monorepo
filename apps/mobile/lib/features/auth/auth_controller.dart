@@ -41,8 +41,8 @@ class AuthController extends Notifier<AuthState> {
     String? role;
     String? email;
     if (store is SecureTokenStore) {
-      final ({String fullName, String id, String? role, String? email})?
-      identity = await store.readIdentity();
+      final ({String fullName, String id, String? role, String? email})? identity =
+          await store.readIdentity();
       id = identity?.id;
       name = identity?.fullName;
       role = identity?.role;

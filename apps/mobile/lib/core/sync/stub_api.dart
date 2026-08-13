@@ -15,10 +15,7 @@ class StubApi implements ApiPort {
   static const String _marker = 'stub';
 
   @override
-  Future<AuthTokens> login({
-    required String identifier,
-    required String password,
-  }) async {
+  Future<AuthTokens> login({required String identifier, required String password}) async {
     if (identifier.trim().isEmpty || password.isEmpty) {
       throw const ApiException(
         'invalid_credentials',

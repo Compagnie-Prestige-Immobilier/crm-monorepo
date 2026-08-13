@@ -43,6 +43,8 @@ export interface ChartTheme {
   tooltipBackground: string;
   tooltipForeground: string;
   border: string;
+  /** `--accent-border` (#A87A15). Contour obligatoire de la série or, §2.6. */
+  accentBorder: string;
 }
 
 const LIGHT_FALLBACK: ChartTheme = {
@@ -52,6 +54,7 @@ const LIGHT_FALLBACK: ChartTheme = {
   tooltipBackground: '#FFFFFF',
   tooltipForeground: '#1C0810',
   border: 'rgba(99,2,16,0.12)',
+  accentBorder: '#A87A15',
 };
 
 function readVar(styles: CSSStyleDeclaration, name: string, fallback: string): string {
@@ -75,6 +78,7 @@ function readChartTheme(): ChartTheme {
     tooltipBackground: readVar(styles, '--popover', LIGHT_FALLBACK.tooltipBackground),
     tooltipForeground: readVar(styles, '--popover-foreground', LIGHT_FALLBACK.tooltipForeground),
     border: readVar(styles, '--border', LIGHT_FALLBACK.border),
+    accentBorder: readVar(styles, '--accent-border', LIGHT_FALLBACK.accentBorder),
   };
 }
 
@@ -85,6 +89,7 @@ function sameTheme(a: ChartTheme, b: ChartTheme): boolean {
     a.tooltipBackground === b.tooltipBackground &&
     a.tooltipForeground === b.tooltipForeground &&
     a.border === b.border &&
+    a.accentBorder === b.accentBorder &&
     a.series.length === b.series.length &&
     a.series.every((color, index) => color === b.series[index])
   );
@@ -133,4 +138,23 @@ export function useChartTheme(): ChartTheme {
 /** Couleur de la n-ième série, en bouclant si jamais on dépassait 5. */
 export function seriesColor(theme: ChartTheme, index: number): string {
   return theme.series[index % theme.series.length] ?? LIGHT_FALLBACK.series[0] ?? '#630210';
+}
+
+/** Rang de la série or dans `chart-1..5`. */
+const GOLD_SERIES_INDEX = 1;
+
+/**
+ * Contour d'une surface de graphique.
+ *
+ * `chart-2` est l'or `#C8921A`, à 2,77:1 sur blanc. Son emploi comme SURFACE
+ * est une exception explicitement encadrée par design.md §2.6, et la première
+ * des trois conditions qui la rendent acceptable est un contour
+ * `accent-border` `#A87A15` (3,85:1) : c'est ce trait, et non le remplissage,
+ * qui délimite la forme. Sans lui, l'or redevient interdit.
+ *
+ * Les autres séries reprennent le repli fourni par l'appelant — la couleur de
+ * la carte pour un anneau, la couleur de la série pour une barre.
+ */
+export function seriesBorderColor(theme: ChartTheme, index: number, fallback: string): string {
+  return index % theme.series.length === GOLD_SERIES_INDEX ? theme.accentBorder : fallback;
 }

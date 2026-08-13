@@ -5,9 +5,14 @@ import { cn } from '@/lib/utils';
 function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
     <div data-slot="table-container" className="relative w-full overflow-x-auto scrollbar-thin">
+      {/* `figure` (tabular-nums) sur la TABLE entière, pas cellule par cellule.
+          Un CRM aligne des montants, des compteurs et des dates : en chiffres
+          proportionnels, une colonne se décale à chaque rafraîchissement et
+          l'œil perd la comparaison verticale, qui est tout l'intérêt d'un
+          tableau. */}
       <table
         data-slot="table"
-        className={cn('w-full caption-bottom border-collapse text-[0.875rem]', className)}
+        className={cn('figure w-full caption-bottom border-collapse text-[0.875rem]', className)}
         {...props}
       />
     </div>
@@ -18,7 +23,9 @@ function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
   return (
     <thead
       data-slot="table-header"
-      className={cn('[&_tr]:border-b [&_tr]:border-border', className)}
+      // Un filet franc sous l'en-tête, pas la même hairline que les lignes :
+      // c'est ce qui sépare l'étiquette de la donnée.
+      className={cn('[&_tr]:border-b-2 [&_tr]:border-border', className)}
       {...props}
     />
   );
@@ -63,8 +70,9 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     <th
       data-slot="table-head"
       className={cn(
-        'h-11 px-3 text-left align-middle text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground',
-        'whitespace-nowrap',
+        // `eyebrow` : les en-têtes de colonne parlent la même langue que les
+        // surtitres de section. Un seul style de nommage dans tout le panel.
+        'eyebrow h-11 px-3 text-left align-middle whitespace-nowrap',
         className,
       )}
       {...props}

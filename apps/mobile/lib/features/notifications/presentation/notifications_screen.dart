@@ -56,7 +56,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
-    final AsyncValue<List<StoredNotification>> notifications = ref.watch(notificationsProvider);
+    final AsyncValue<List<StoredNotification>> notifications = ref.watch(
+      notificationsProvider,
+    );
     final PushPermission permission = ref.watch(pushPermissionProvider);
 
     return Scaffold(
@@ -82,7 +84,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               error: (Object error, StackTrace stack) => _Empty(
                 icon: PhosphorIconsDuotone.warningCircle,
                 title: 'Liste indisponible',
-                message: 'Les notifications enregistrées sur cet appareil n’ont pas pu être lues.',
+                message:
+                    'Les notifications enregistrées sur cet appareil n’ont pas pu être lues.',
                 color: cpi.syncFailed,
               ),
               data: (List<StoredNotification> rows) {
@@ -99,8 +102,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: CpiSpacing.xs),
                   itemCount: rows.length,
-                  separatorBuilder: (BuildContext context, int index) =>
-                      const Divider(height: 1, indent: CpiSpacing.md, endIndent: CpiSpacing.md),
+                  separatorBuilder: (BuildContext context, int index) => const Divider(
+                    height: 1,
+                    indent: CpiSpacing.md,
+                    endIndent: CpiSpacing.md,
+                  ),
                   itemBuilder: (BuildContext context, int index) =>
                       _NotificationTile(data: rows[index]),
                 );
@@ -203,7 +209,9 @@ class _PermissionBanner extends ConsumerWidget {
                     // issue est la page de l'application dans les réglages.
                     await const AndroidIntent(
                       action: 'android.settings.APP_NOTIFICATION_SETTINGS',
-                      arguments: <String, dynamic>{'android.provider.extra.APP_PACKAGE': 'sn.cpi.go'},
+                      arguments: <String, dynamic>{
+                        'android.provider.extra.APP_PACKAGE': 'sn.cpi.go',
+                      },
                     ).launch();
                   },
                   child: Text(action),
@@ -287,11 +295,17 @@ class _NotificationTile extends ConsumerWidget {
                         ),
                         if (hasRoute) ...<Widget>[
                           const SizedBox(width: CpiSpacing.xs),
-                          Icon(PhosphorIconsRegular.arrowRight, size: 12, color: cpi.accentText),
+                          Icon(
+                            PhosphorIconsRegular.arrowRight,
+                            size: 12,
+                            color: cpi.accentText,
+                          ),
                           const SizedBox(width: 2),
                           Text(
                             'Ouvrir',
-                            style: theme.textTheme.labelSmall?.copyWith(color: cpi.accentText),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cpi.accentText,
+                            ),
                           ),
                         ],
                       ],

@@ -29,13 +29,11 @@ class FakeApi implements ApiPort {
   final Map<String, SyncOperationDto> rows = <String, SyncOperationDto>{};
 
   /// Registre d'idempotence : `opId` → verdict déjà rendu.
-  final Map<String, SyncOperationResultDto> ledger =
-      <String, SyncOperationResultDto>{};
+  final Map<String, SyncOperationResultDto> ledger = <String, SyncOperationResultDto>{};
 
   /// Verdicts forcés, par `opId`. Consommés à la première utilisation quand
   /// [verdictsAreOneShot], sinon persistants.
-  final Map<String, SyncOperationResultDto> verdicts =
-      <String, SyncOperationResultDto>{};
+  final Map<String, SyncOperationResultDto> verdicts = <String, SyncOperationResultDto>{};
 
   bool verdictsAreOneShot = false;
 
@@ -213,8 +211,7 @@ class FakeApi implements ApiPort {
   }
 
   /// Les opérations brutes « écrites » côté serveur, par identifiant d'entité.
-  final Map<String, Map<String, Object?>> rawRows =
-      <String, Map<String, Object?>>{};
+  final Map<String, Map<String, Object?>> rawRows = <String, Map<String, Object?>>{};
 
   @override
   Future<PushResult> push({
@@ -244,18 +241,10 @@ class FakeApi implements ApiPort {
     if (loseNextResponse) {
       loseNextResponse = false;
       // Le lot EST appliqué côté serveur ; c'est la réponse qui n'arrive pas.
-      throw boom ??
-          const ApiException(
-            'network_timeout',
-            statusCode: 504,
-          );
+      throw boom ?? const ApiException('network_timeout', statusCode: 504);
     }
 
-    return PushResult(
-      batchId: batchId,
-      results: results,
-      serverTime: serverTime,
-    );
+    return PushResult(batchId: batchId, results: results, serverTime: serverTime);
   }
 
   SyncOperationResultDto _apply(SyncOperationDto op) {
@@ -452,10 +441,8 @@ class ExplodingApi implements ApiPort {
   Never _boom() => throw StateError('le réseau ne devait pas être sollicité');
 
   @override
-  Future<AuthTokens> login({
-    required String identifier,
-    required String password,
-  }) => _boom();
+  Future<AuthTokens> login({required String identifier, required String password}) =>
+      _boom();
 
   @override
   Future<AuthTokens> refresh({required String refreshToken}) => _boom();
@@ -481,10 +468,8 @@ class ExplodingApi implements ApiPort {
   }) => _boom();
 
   @override
-  Future<Phase2DirectoryPage> pullPhase2Directory({
-    String? cursor,
-    int limit = 2000,
-  }) => _boom();
+  Future<Phase2DirectoryPage> pullPhase2Directory({String? cursor, int limit = 2000}) =>
+      _boom();
 
   @override
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone) => _boom();

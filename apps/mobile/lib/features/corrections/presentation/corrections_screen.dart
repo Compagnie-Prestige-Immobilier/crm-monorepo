@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -12,6 +13,7 @@ import '../../../core/sync/outbox_status.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../data/local/database.dart';
+import '../../../ui/widgets/cpi_pressable.dart';
 import 'ownership_sheet.dart';
 
 /// « À corriger » : la file des opérations en `conflict` ou `failed`.
@@ -39,13 +41,27 @@ class CorrectionsScreen extends ConsumerWidget {
         error: (Object e, StackTrace _) => Center(child: Text('Lecture impossible : $e')),
         data: (List<OutboxData> list) {
           if (list.isEmpty) return const _Empty();
-          return ListView.separated(
-            padding: const EdgeInsets.all(CpiSpacing.md),
-            itemCount: list.length,
-            separatorBuilder: (BuildContext context, int index) =>
-                const SizedBox(height: CpiSpacing.sm),
-            itemBuilder: (BuildContext context, int index) =>
-                _CorrectionCard(row: list[index]),
+          return RefreshIndicator(
+            onRefresh: () async {
+              await HapticFeedback.selectionClick();
+              await ref.read(syncCoordinatorProvider.notifier).run(pull: false);
+            },
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(
+                CpiSpacing.md,
+                CpiSpacing.sm,
+                CpiSpacing.md,
+                CpiSpacing.md,
+              ),
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: list.length,
+              separatorBuilder: (BuildContext context, int index) =>
+                  const SizedBox(height: CpiSpacing.xs),
+              itemBuilder: (BuildContext context, int index) => CpiListEntrance(
+                index: index,
+                child: _CorrectionCard(row: list[index]),
+              ),
+            ),
           );
         },
       ),
@@ -164,9 +180,10 @@ class _CorrectionCard extends ConsumerWidget {
     final Object? decoded = _payload;
     final String name = decoded is Map
         ? (decoded['fullName'] as String? ??
-              <String?>[decoded['prenom'] as String?, decoded['nom'] as String?]
-                  .whereType<String>()
-                  .join(' '))
+              <String?>[
+                decoded['prenom'] as String?,
+                decoded['nom'] as String?,
+              ].whereType<String>().join(' '))
         : '';
     return name.isEmpty ? '$what · $verb' : '$what · $name';
   }
@@ -179,9 +196,8 @@ class _CorrectionCard extends ConsumerWidget {
     }
   }
 
-  String get _fallbackMessage => row.lastErrorCode == null
-      ? 'Envoi impossible.'
-      : 'Refusé (${row.lastErrorCode}).';
+  String get _fallbackMessage =>
+      row.lastErrorCode == null ? 'Envoi impossible.' : 'Refusé (${row.lastErrorCode}).';
 
   Future<void> _openOwnership(BuildContext context, WidgetRef ref) async {
     final Object? decoded = _payload;
@@ -244,13 +260,14 @@ class _CorrectionCard extends ConsumerWidget {
 
   Future<int> _countCascade(WidgetRef ref) async {
     if (row.op != 'create' || row.dependencyKey == null) return 1;
-    final List<OutboxData> all =
-        await ref.read(needsAttentionProvider.future).catchError(
-              (Object _) => const <OutboxData>[],
-            );
+    final List<OutboxData> all = await ref
+        .read(needsAttentionProvider.future)
+        .catchError((Object _) => const <OutboxData>[]);
     // Approximation volontaire à l'affichage : le compte exact est fait dans la
     // transaction de suppression, seule source de vérité.
-    return all.where((OutboxData o) => o.dependencyKey == row.dependencyKey).length
+    return all
+        .where((OutboxData o) => o.dependencyKey == row.dependencyKey)
+        .length
         .clamp(1, 999);
   }
 }
@@ -266,11 +283,7 @@ class _Empty extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
-          Icon(
-            PhosphorIconsDuotone.checkCircle,
-            size: 56,
-            color: context.cpi.success,
-          ),
+          Icon(PhosphorIconsDuotone.checkCircle, size: 56, color: context.cpi.success),
           const SizedBox(height: CpiSpacing.md),
           Text('Rien à corriger', style: theme.textTheme.titleSmall),
         ],

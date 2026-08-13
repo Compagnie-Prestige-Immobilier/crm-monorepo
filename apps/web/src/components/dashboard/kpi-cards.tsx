@@ -1,11 +1,12 @@
 import {
-  BuildingIcon,
+  HeadsetIcon,
   MapPinnedIcon,
   UsersIcon,
   UsersRoundIcon,
   type LucideIcon,
 } from 'lucide-react';
 
+import { AnimatedNumber } from '@/components/live/animated-number';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,7 +29,7 @@ function KpiCard({
   index,
 }: {
   label: string;
-  value: string;
+  value: number;
   hint?: string | undefined;
   icon: LucideIcon;
   index: number;
@@ -46,9 +47,12 @@ function KpiCard({
           <p className="truncate text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
-          <p className="mt-1 font-display text-[1.75rem] font-[800] leading-none tracking-[-0.02em]">
-            {value}
-          </p>
+          {/* `tabular-nums` : les chiffres gardent la même largeur pendant
+              l'interpolation, si bien que la carte ne se décale jamais. */}
+          <AnimatedNumber
+            value={value}
+            className="mt-1 block font-display text-[1.75rem] font-[800] leading-none tracking-[-0.02em] tabular-nums"
+          />
           {hint !== undefined ? (
             <p className="mt-2 text-[0.75rem] text-muted-foreground">{hint}</p>
           ) : null}
@@ -85,26 +89,26 @@ export function KpiCards({ kpis }: { kpis: DashboardKpis }) {
         <KpiCard
           index={0}
           label="Prospects"
-          value={formatNumber(kpis.prospects)}
-          hint={`${formatNumber(kpis.prospects7Jours)} sur les 7 derniers jours`}
+          value={kpis.prospects}
+          hint={`${formatNumber(kpis.prospects7Jours)} sur 7 jours`}
           icon={UsersIcon}
         />
         <KpiCard
           index={1}
           label="Représentants"
-          value={formatNumber(kpis.representants)}
+          value={kpis.representants}
           icon={UsersRoundIcon}
         />
         <KpiCard
           index={2}
-          label="Commerciaux actifs"
-          value={formatNumber(kpis.commerciauxActifs)}
-          icon={BuildingIcon}
+          label="Téléconseillers actifs"
+          value={kpis.commerciauxActifs}
+          icon={HeadsetIcon}
         />
         <KpiCard
           index={3}
           label="Départements couverts"
-          value={formatNumber(kpis.departementsCouverts)}
+          value={kpis.departementsCouverts}
           icon={MapPinnedIcon}
         />
       </div>

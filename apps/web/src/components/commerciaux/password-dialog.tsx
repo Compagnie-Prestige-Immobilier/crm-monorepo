@@ -56,12 +56,12 @@ export function PasswordDialog({
     },
     onSuccess: () => {
       toast.success(
-        `Mot de passe réinitialisé. ${user?.fullName ?? 'Le commercial'} devra se reconnecter sur son téléphone.`,
+        `Mot de passe réinitialisé. ${user?.fullName ?? 'Le commercial'} est déconnecté.`,
       );
       onOpenChange(false);
     },
     onError: (error) => {
-      toastApiError(error, 'La réinitialisation a échoué.');
+      toastApiError(error, 'Réinitialisation impossible. Réessayez.');
     },
   });
 
@@ -73,7 +73,7 @@ export function PasswordDialog({
           <DialogDescription>
             {user === null
               ? null
-              : `Compte de ${user.fullName} (${user.email}). Les sessions ouvertes sur son téléphone seront fermées.`}
+              : `Compte de ${user.fullName} (${user.email}). Les sessions ouvertes seront fermées.`}
           </DialogDescription>
         </DialogHeader>
 

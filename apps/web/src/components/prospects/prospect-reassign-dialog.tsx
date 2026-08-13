@@ -76,7 +76,7 @@ export function ProspectReassignDialog({
       void queryClient.invalidateQueries({ queryKey: queryKeys.representantsRoot });
       toast.success(
         result.updated === 0
-          ? 'Aucun changement : le prospect était déjà rattaché ainsi.'
+          ? 'Rattachement inchangé.'
           : 'Prospect réaffecté.',
       );
       onOpenChange(false);
@@ -104,7 +104,7 @@ export function ProspectReassignDialog({
           <DialogDescription>
             {prospect === null
               ? null
-              : `${prospect.prenom} ${prospect.nom} — ${formatPhone(prospect.phoneE164)}`}
+              : `${prospect.prenom} ${prospect.nom}, ${formatPhone(prospect.phoneE164)}`}
           </DialogDescription>
         </DialogHeader>
 
@@ -124,9 +124,8 @@ export function ProspectReassignDialog({
             onChange={setCommercialId}
           />
           <p className="text-[0.75rem] text-muted-foreground">
-            Changer de représentant met aussi à jour le département du prospect. Changer de
-            commercial le fait apparaître dans l’application mobile du nouveau propriétaire, et
-            disparaître de celle de l’ancien.
+            Le représentant détermine le département. Le commercial propriétaire voit le prospect
+            dans l’application mobile.
           </p>
         </div>
 

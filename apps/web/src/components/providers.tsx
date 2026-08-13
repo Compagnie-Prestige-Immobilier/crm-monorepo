@@ -19,7 +19,10 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider
         attribute="class"
-        defaultTheme="system"
+        // Clair par défaut, et non « system » : le panel est un outil de
+        // bureau lu à la journée, sur des tableaux et des chiffres. Le sombre
+        // reste accessible d'un clic pour qui le préfère.
+        defaultTheme="light"
         enableSystem
         // Sans cela, next-themes anime la bascule et l'écran entier flashe.
         disableTransitionOnChange

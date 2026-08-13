@@ -33,9 +33,9 @@ export function DemoBanner({ seededAt, role }: { seededAt: string | null; role: 
       <FlaskConicalIcon className="size-4 shrink-0" aria-hidden="true" />
       <span className="font-[600]">Mode démonstration actif.</span>
       <span>
-        Les données affichées sont fictives
-        {seededAt !== null ? ` — jeu créé le ${formatDate(seededAt)}` : ''}. Ne les exportez pas
-        comme des chiffres réels.
+        Données fictives
+        {seededAt !== null ? `, jeu créé le ${formatDate(seededAt)}` : ''}. Ne pas exporter comme
+        chiffres réels.
       </span>
       {role === 'ADMIN' ? (
         <Link

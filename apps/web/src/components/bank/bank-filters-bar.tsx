@@ -87,7 +87,7 @@ export function BankFiltersBar({
         onRetry={() => {
           void stages.refetch();
         }}
-        fallback="Les étapes du flux n’ont pas pu être chargées : les filtres restent inutilisables tant qu’elles manquent."
+        fallback="Les étapes du flux n’ont pas pu être chargées."
         className="animate-rise items-center gap-3 border-destructive/30 px-6 py-8 text-center"
       />
     );

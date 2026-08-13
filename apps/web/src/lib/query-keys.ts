@@ -73,4 +73,9 @@ export const queryKeys = {
   // ─── Administration ───────────────────────────────────────────────────────
   purgeCatalog: ['purge-catalog'] as const,
   supervision: ['supervision'] as const,
+
+  // ─── Statistiques ─────────────────────────────────────────────────────────
+  statsRoot: ['stats'] as const,
+  statsTeleconseil: (filters: ProspectFilters) =>
+    ['stats', 'teleconseil', filtersQueryKey(filters)] as const,
 };

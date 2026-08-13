@@ -53,10 +53,7 @@ class InMemoryTokenStore implements TokenStore {
   String? get accessToken => _accessToken;
 
   @override
-  Future<void> save({
-    required String accessToken,
-    required String refreshToken,
-  }) async {
+  Future<void> save({required String accessToken, required String refreshToken}) async {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
   }

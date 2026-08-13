@@ -98,8 +98,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   /// référence au brouillon, sans quoi un redémarrage rouvre bien le bon parent
   /// mais avec un formulaire vide.
   @override
-  String? draftRouteWithId() =>
-      widget.draftId == null && widget.representantId != null
+  String? draftRouteWithId() => widget.draftId == null && widget.representantId != null
       ? Routes.newProspectFor(widget.representantId!, draftId: _draftId)
       : null;
 
@@ -183,8 +182,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
       _banque.text = (snapshot.values['banqueLabel'] as String?) ?? '';
       _syndicatId = snapshot.values['syndicatId'] as String?;
       _syndicat.text = (snapshot.values['syndicatLabel'] as String?) ?? '';
-      _representantId =
-          _representantId ?? snapshot.values['representantId'] as String?;
+      _representantId = _representantId ?? snapshot.values['representantId'] as String?;
       _pendingRestore = null;
     });
     unawaited(_loadRepresentant());
@@ -312,214 +310,217 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     return CpiPopScope(
       fallback: Routes.historique,
       child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Saisie de prospects'),
-        leading: const CpiBackButton(fallback: Routes.historique),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(28),
-          child: Padding(
-            padding: const EdgeInsets.only(
-              left: CpiSpacing.md,
-              right: CpiSpacing.md,
-              bottom: CpiSpacing.xs,
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _representant == null
-                    ? 'Aucun représentant sélectionné'
-                    : '${_representant!.fullName} · '
-                          '$count prospect${count > 1 ? 's' : ''} ajouté'
-                          '${count > 1 ? 's' : ''}',
-                style: theme.textTheme.bodySmall?.copyWith(color: cpi.accentOnDark),
+        appBar: AppBar(
+          title: const Text('Saisie de prospects'),
+          leading: const CpiBackButton(fallback: Routes.historique),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(28),
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: CpiSpacing.md,
+                right: CpiSpacing.md,
+                bottom: CpiSpacing.xs,
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _representant == null
+                      ? 'Aucun représentant sélectionné'
+                      : '${_representant!.fullName} · '
+                            '$count prospect${count > 1 ? 's' : ''} ajouté'
+                            '${count > 1 ? 's' : ''}',
+                  style: theme.textTheme.bodySmall?.copyWith(color: cpi.accentOnDark),
+                ),
               ),
             ),
           ),
         ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            if (_pendingRestore != null)
-              _ResumeStrip(
-                onResume: () => _apply(_pendingRestore!),
-                onDiscard: () async {
-                  await ref.read(draftRepositoryProvider).delete(_draftId);
-                  if (mounted) setState(() => _pendingRestore = null);
-                },
-              ),
-            if (_representantId == null)
-              const _MissingRepresentant()
-            else
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(CpiSpacing.md),
-                  children: <Widget>[
-                    Row(
-                      children: <Widget>[
-                        Expanded(
-                          child: TextField(
-                            controller: _prenom,
-                            focusNode: _prenomFocus,
-                            textCapitalization: TextCapitalization.words,
-                            textInputAction: TextInputAction.next,
-                            onChanged: (String _) {
-                              markDraftDirty();
-                              setState(() {});
-                            },
-                            decoration: const InputDecoration(labelText: 'Prénom'),
-                          ),
-                        ),
-                        const SizedBox(width: CpiSpacing.sm),
-                        Expanded(
-                          child: TextField(
-                            controller: _nom,
-                            focusNode: _nomFocus,
-                            autofocus: true,
-                            textCapitalization: TextCapitalization.words,
-                            textInputAction: TextInputAction.next,
-                            onChanged: (String _) {
-                              markDraftDirty();
-                              setState(() {});
-                            },
-                            decoration: const InputDecoration(labelText: 'Nom'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: CpiSpacing.md),
-                    PhoneField(
-                      controller: _phone,
-                      focusNode: _phoneFocus,
-                      onChanged: (String _) {
-                        markDraftDirty();
-                        _scheduleLookup();
-                        setState(() {});
-                      },
-                    ),
-                    if (_duplicateName != null) ...<Widget>[
-                      const SizedBox(height: CpiSpacing.xs),
+        body: SafeArea(
+          child: Column(
+            children: <Widget>[
+              if (_pendingRestore != null)
+                _ResumeStrip(
+                  onResume: () => _apply(_pendingRestore!),
+                  onDiscard: () async {
+                    await ref.read(draftRepositoryProvider).delete(_draftId);
+                    if (mounted) setState(() => _pendingRestore = null);
+                  },
+                ),
+              if (_representantId == null)
+                const _MissingRepresentant()
+              else
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(CpiSpacing.md),
+                    children: <Widget>[
                       Row(
                         children: <Widget>[
-                          Icon(
-                            PhosphorIconsRegular.warningCircle,
-                            size: 16,
-                            color: cpi.accentText,
-                          ),
-                          const SizedBox(width: CpiSpacing.xxs),
                           Expanded(
-                            child: Text(
-                              'Déjà saisi : $_duplicateName',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: cpi.accentText,
-                              ),
+                            child: TextField(
+                              controller: _prenom,
+                              focusNode: _prenomFocus,
+                              textCapitalization: TextCapitalization.words,
+                              textInputAction: TextInputAction.next,
+                              onChanged: (String _) {
+                                markDraftDirty();
+                                setState(() {});
+                              },
+                              decoration: const InputDecoration(labelText: 'Prénom'),
+                            ),
+                          ),
+                          const SizedBox(width: CpiSpacing.sm),
+                          Expanded(
+                            child: TextField(
+                              controller: _nom,
+                              focusNode: _nomFocus,
+                              autofocus: true,
+                              textCapitalization: TextCapitalization.words,
+                              textInputAction: TextInputAction.next,
+                              onChanged: (String _) {
+                                markDraftDirty();
+                                setState(() {});
+                              },
+                              decoration: const InputDecoration(labelText: 'Nom'),
                             ),
                           ),
                         ],
                       ),
-                    ],
-                    const SizedBox(height: CpiSpacing.md),
-                    LocalTypeahead(
-                      controller: _banque,
-                      focusNode: _banqueFocus,
-                      label: 'Banque',
-                      selectedId: _banqueId,
-                      emptyHint: banques.isEmpty
-                          ? 'Aucune banque. Synchronisez.'
-                          : 'Aucun résultat',
-                      options: banques
-                          .map(
-                            (Banque b) => TypeaheadOption(
-                              id: b.id,
-                              label: b.name,
-                              secondary: b.shortName,
-                              keywords: <String>[b.shortName],
-                            ),
-                          )
-                          .toList(growable: false),
-                      onChanged: (String _) {
-                        if (_banqueId != null) setState(() => _banqueId = null);
-                        markDraftDirty();
-                      },
-                      onSelected: (TypeaheadOption o) {
-                        setState(() => _banqueId = o.id);
-                        markDraftDirty();
-                        unawaited(flushDraft());
-                      },
-                    ),
-                    const SizedBox(height: CpiSpacing.md),
-                    LocalTypeahead(
-                      controller: _syndicat,
-                      focusNode: _syndicatFocus,
-                      label: 'Syndicat',
-                      selectedId: _syndicatId,
-                      textInputAction: TextInputAction.done,
-                      emptyHint: syndicats.isEmpty
-                          ? 'Aucun syndicat. Synchronisez.'
-                          : 'Aucun résultat',
-                      options: syndicats
-                          .map(
-                            (Syndicat s) => TypeaheadOption(
-                              id: s.id,
-                              label: s.name,
-                              secondary: s.sigle,
-                              keywords: <String>[s.sigle, if (s.secteur != null) s.secteur!],
-                            ),
-                          )
-                          .toList(growable: false),
-                      onChanged: (String _) {
-                        if (_syndicatId != null) setState(() => _syndicatId = null);
-                        markDraftDirty();
-                      },
-                      onSelected: (TypeaheadOption o) {
-                        setState(() => _syndicatId = o.id);
-                        markDraftDirty();
-                        unawaited(flushDraft());
-                      },
-                    ),
-                    if (_error != null) ...<Widget>[
                       const SizedBox(height: CpiSpacing.md),
-                      Text(
-                        _error!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.error,
+                      PhoneField(
+                        controller: _phone,
+                        focusNode: _phoneFocus,
+                        onChanged: (String _) {
+                          markDraftDirty();
+                          _scheduleLookup();
+                          setState(() {});
+                        },
+                      ),
+                      if (_duplicateName != null) ...<Widget>[
+                        const SizedBox(height: CpiSpacing.xs),
+                        Row(
+                          children: <Widget>[
+                            Icon(
+                              PhosphorIconsRegular.warningCircle,
+                              size: 16,
+                              color: cpi.accentText,
+                            ),
+                            const SizedBox(width: CpiSpacing.xxs),
+                            Expanded(
+                              child: Text(
+                                'Déjà saisi : $_duplicateName',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: cpi.accentText,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
+                      ],
+                      const SizedBox(height: CpiSpacing.md),
+                      LocalTypeahead(
+                        controller: _banque,
+                        focusNode: _banqueFocus,
+                        label: 'Banque',
+                        selectedId: _banqueId,
+                        emptyHint: banques.isEmpty
+                            ? 'Aucune banque. Synchronisez.'
+                            : 'Aucun résultat',
+                        options: banques
+                            .map(
+                              (Banque b) => TypeaheadOption(
+                                id: b.id,
+                                label: b.name,
+                                secondary: b.shortName,
+                                keywords: <String>[b.shortName],
+                              ),
+                            )
+                            .toList(growable: false),
+                        onChanged: (String _) {
+                          if (_banqueId != null) setState(() => _banqueId = null);
+                          markDraftDirty();
+                        },
+                        onSelected: (TypeaheadOption o) {
+                          setState(() => _banqueId = o.id);
+                          markDraftDirty();
+                          unawaited(flushDraft());
+                        },
+                      ),
+                      const SizedBox(height: CpiSpacing.md),
+                      LocalTypeahead(
+                        controller: _syndicat,
+                        focusNode: _syndicatFocus,
+                        label: 'Syndicat',
+                        selectedId: _syndicatId,
+                        textInputAction: TextInputAction.done,
+                        emptyHint: syndicats.isEmpty
+                            ? 'Aucun syndicat. Synchronisez.'
+                            : 'Aucun résultat',
+                        options: syndicats
+                            .map(
+                              (Syndicat s) => TypeaheadOption(
+                                id: s.id,
+                                label: s.name,
+                                secondary: s.sigle,
+                                keywords: <String>[
+                                  s.sigle,
+                                  if (s.secteur != null) s.secteur!,
+                                ],
+                              ),
+                            )
+                            .toList(growable: false),
+                        onChanged: (String _) {
+                          if (_syndicatId != null) setState(() => _syndicatId = null);
+                          markDraftDirty();
+                        },
+                        onSelected: (TypeaheadOption o) {
+                          setState(() => _syndicatId = o.id);
+                          markDraftDirty();
+                          unawaited(flushDraft());
+                        },
+                      ),
+                      if (_error != null) ...<Widget>[
+                        const SizedBox(height: CpiSpacing.md),
+                        Text(
+                          _error!,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              if (_representantId != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(
+                    CpiSpacing.md,
+                    CpiSpacing.sm,
+                    CpiSpacing.md,
+                    CpiSpacing.md,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    border: Border(top: BorderSide(color: cpi.borderSubtle)),
+                  ),
+                  child: Column(
+                    children: <Widget>[
+                      FilledButton.icon(
+                        onPressed: _canSave ? () => _save(andNext: true) : null,
+                        icon: const Icon(PhosphorIconsRegular.arrowRight, size: 20),
+                        label: const Text('Enregistrer et suivant'),
+                      ),
+                      const SizedBox(height: CpiSpacing.xs),
+                      OutlinedButton(
+                        onPressed: _canSave ? () => _save(andNext: false) : null,
+                        child: const Text('Enregistrer et terminer'),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            if (_representantId != null)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(
-                  CpiSpacing.md,
-                  CpiSpacing.sm,
-                  CpiSpacing.md,
-                  CpiSpacing.md,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  border: Border(top: BorderSide(color: cpi.borderSubtle)),
-                ),
-                child: Column(
-                  children: <Widget>[
-                    FilledButton.icon(
-                      onPressed: _canSave ? () => _save(andNext: true) : null,
-                      icon: const Icon(PhosphorIconsRegular.arrowRight, size: 20),
-                      label: const Text('Enregistrer et suivant'),
-                    ),
-                    const SizedBox(height: CpiSpacing.xs),
-                    OutlinedButton(
-                      onPressed: _canSave ? () => _save(andNext: false) : null,
-                      child: const Text('Enregistrer et terminer'),
-                    ),
-                  ],
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -578,9 +579,7 @@ class _ResumeStrip extends StatelessWidget {
           Expanded(
             child: Text(
               'Saisie non terminée',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: cpi.info),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cpi.info),
             ),
           ),
           TextButton(onPressed: onResume, child: const Text('Reprendre')),

@@ -10,12 +10,11 @@ import '../support/db_fixture.dart';
 
 void main() {
   group('DraftDebouncer', () {
-    testWidgets('400 ms de traîne : quinze frappes, une seule écriture',
-        (WidgetTester tester) async {
+    testWidgets('400 ms de traîne : quinze frappes, une seule écriture', (
+      WidgetTester tester,
+    ) async {
       int writes = 0;
-      final DraftDebouncer d = DraftDebouncer(
-        onFlush: () async => writes++,
-      );
+      final DraftDebouncer d = DraftDebouncer(onFlush: () async => writes++);
       for (int i = 0; i < 15; i++) {
         d.touch();
         await tester.pump(const Duration(milliseconds: 100));
@@ -28,8 +27,9 @@ void main() {
       await d.dispose();
     });
 
-    testWidgets('3 s d\'attente maximale : une frappe lente est sauvegardée',
-        (WidgetTester tester) async {
+    testWidgets('3 s d\'attente maximale : une frappe lente est sauvegardée', (
+      WidgetTester tester,
+    ) async {
       int writes = 0;
       final DraftDebouncer d = DraftDebouncer(onFlush: () async => writes++);
       // Une frappe toutes les 300 ms : la traîne de 400 ms ne se déclenche
@@ -57,8 +57,7 @@ void main() {
       await d.dispose();
     });
 
-    testWidgets('flush() sans modification n\'écrit rien',
-        (WidgetTester tester) async {
+    testWidgets('flush() sans modification n\'écrit rien', (WidgetTester tester) async {
       int writes = 0;
       final DraftDebouncer d = DraftDebouncer(onFlush: () async => writes++);
       await d.flush();
@@ -88,16 +87,15 @@ void main() {
     tearDown(() => db.close());
 
     Future<void> pumpForm(WidgetTester tester) async {
-      await tester.pumpWidget(
-        MaterialApp(home: _DraftForm(repository: drafts)),
-      );
+      await tester.pumpWidget(MaterialApp(home: _DraftForm(repository: drafts)));
       // L'écran démarre au premier plan.
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
     }
 
-    testWidgets('`inactive` écrit le brouillon — `paused` serait trop tard',
-        (WidgetTester tester) async {
+    testWidgets('`inactive` écrit le brouillon — `paused` serait trop tard', (
+      WidgetTester tester,
+    ) async {
       await pumpForm(tester);
       await tester.enterText(find.byType(TextField), 'Mamadou');
       await tester.pump();
@@ -125,8 +123,9 @@ void main() {
       expect(snapshot.age, DraftAge.crash);
     });
 
-    testWidgets('l\'app n\'atteint JAMAIS `paused` et la saisie est déjà sauve',
-        (WidgetTester tester) async {
+    testWidgets('l\'app n\'atteint JAMAIS `paused` et la saisie est déjà sauve', (
+      WidgetTester tester,
+    ) async {
       await pumpForm(tester);
       await tester.enterText(find.byType(TextField), 'Fatou');
       await tester.pump();
@@ -137,8 +136,7 @@ void main() {
       expect((await drafts.read('d-test'))!.values['fullName'], 'Fatou');
     });
 
-    testWidgets('quitter l\'écran vide aussi le brouillon',
-        (WidgetTester tester) async {
+    testWidgets('quitter l\'écran vide aussi le brouillon', (WidgetTester tester) async {
       await pumpForm(tester);
       await tester.enterText(find.byType(TextField), 'Ousmane');
       await tester.pump();
@@ -147,8 +145,9 @@ void main() {
       expect((await drafts.read('d-test'))!.values['fullName'], 'Ousmane');
     });
 
-    testWidgets('un formulaire vide ne crée pas de brouillon',
-        (WidgetTester tester) async {
+    testWidgets('un formulaire vide ne crée pas de brouillon', (
+      WidgetTester tester,
+    ) async {
       await pumpForm(tester);
       final _DraftFormState state = tester.state<_DraftFormState>(
         find.byType(_DraftForm),
@@ -160,8 +159,9 @@ void main() {
       expect(await drafts.read('d-test'), isNull);
     });
 
-    testWidgets('après enregistrement, le brouillon ne ressuscite pas',
-        (WidgetTester tester) async {
+    testWidgets('après enregistrement, le brouillon ne ressuscite pas', (
+      WidgetTester tester,
+    ) async {
       await pumpForm(tester);
       await tester.enterText(find.byType(TextField), 'Aminata');
       await tester.pump();
@@ -297,10 +297,7 @@ class _DraftFormState extends State<_DraftForm> with DraftFormMixin<_DraftForm> 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: TextField(
-        controller: _controller,
-        onChanged: (String _) => markDraftDirty(),
-      ),
+      body: TextField(controller: _controller, onChanged: (String _) => markDraftDirty()),
     );
   }
 }

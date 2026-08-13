@@ -157,10 +157,10 @@ export const BDD_SEGMENTS: readonly BddSegment[] = ['BDD1', 'BDD2', 'BDD3', 'BDD
  * l'export se lit comme deux populations différentes.
  */
 export const SEGMENT_LABELS: Record<BddSegment, string> = {
-  BDD1: 'BDD1 — CHUES / CBAO',
-  BDD2: 'BDD2 — CHUES / autre banque',
-  BDD3: 'BDD3 — autre syndicat / CBAO',
-  BDD4: 'BDD4 — autre syndicat / autre banque',
+  BDD1: 'BDD1 : CHUES / CBAO',
+  BDD2: 'BDD2 : CHUES / autre banque',
+  BDD3: 'BDD3 : autre syndicat / CBAO',
+  BDD4: 'BDD4 : autre syndicat / autre banque',
 };
 
 /** Version courte, pour une cellule de tableau où le libellé complet déborde. */
@@ -174,7 +174,7 @@ export const SEGMENT_SHORT_LABELS: Record<BddSegment, string> = {
 export const CAMPAIGN_SCOPES: readonly CampaignScope[] = ['ALL', 'BDD1', 'BDD2', 'BDD3', 'BDD4'];
 
 export function campaignScopeLabel(scope: CampaignScope): string {
-  return scope === 'ALL' ? 'Toutes bases — BDD1 à BDD4' : SEGMENT_LABELS[scope];
+  return scope === 'ALL' ? 'Toutes bases : BDD1 à BDD4' : SEGMENT_LABELS[scope];
 }
 
 export const PHASE2_STATUSES: readonly Phase2Status[] = [

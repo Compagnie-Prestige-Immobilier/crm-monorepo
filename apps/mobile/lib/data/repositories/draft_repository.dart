@@ -93,15 +93,15 @@ class DraftRepository {
   }
 
   Future<void> delete(String draftId) async {
-    await (_db.delete(_db.formDrafts)
-          ..where((FormDrafts t) => t.draftId.equals(draftId)))
-        .go();
+    await (_db.delete(
+      _db.formDrafts,
+    )..where((FormDrafts t) => t.draftId.equals(draftId))).go();
   }
 
   Future<DraftSnapshot?> read(String draftId) async {
-    final FormDraft? row = await (_db.select(_db.formDrafts)
-          ..where((FormDrafts t) => t.draftId.equals(draftId)))
-        .getSingleOrNull();
+    final FormDraft? row = await (_db.select(
+      _db.formDrafts,
+    )..where((FormDrafts t) => t.draftId.equals(draftId))).getSingleOrNull();
     if (row == null) return null;
     return _decode(row);
   }
@@ -109,13 +109,14 @@ class DraftRepository {
   /// Le brouillon le plus récent d'un formulaire, tous identifiants confondus.
   /// Sert à proposer « Reprendre la saisie de X ? » à l'ouverture d'un écran.
   Future<DraftSnapshot?> latestFor(String formKey) async {
-    final List<FormDraft> rows = await (_db.select(_db.formDrafts)
-          ..where((FormDrafts t) => t.formKey.equals(formKey))
-          ..orderBy(<OrderClauseGenerator<FormDrafts>>[
-            (FormDrafts t) => OrderingTerm.desc(t.updatedAt),
-          ])
-          ..limit(5))
-        .get();
+    final List<FormDraft> rows =
+        await (_db.select(_db.formDrafts)
+              ..where((FormDrafts t) => t.formKey.equals(formKey))
+              ..orderBy(<OrderClauseGenerator<FormDrafts>>[
+                (FormDrafts t) => OrderingTerm.desc(t.updatedAt),
+              ])
+              ..limit(5))
+            .get();
     for (final FormDraft row in rows) {
       final DraftSnapshot? snapshot = await _decode(row);
       if (snapshot != null) return snapshot;
@@ -135,9 +136,9 @@ class DraftRepository {
         .map((FormDraft d) => d.draftId)
         .toList(growable: false);
     if (doomed.isEmpty) return 0;
-    await (_db.delete(_db.formDrafts)
-          ..where((FormDrafts t) => t.draftId.isIn(doomed)))
-        .go();
+    await (_db.delete(
+      _db.formDrafts,
+    )..where((FormDrafts t) => t.draftId.isIn(doomed))).go();
     return doomed.length;
   }
 

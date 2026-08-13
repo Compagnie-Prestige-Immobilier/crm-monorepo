@@ -132,8 +132,7 @@ export function ProspectEditDialog({
         <DialogHeader>
           <DialogTitle>Modifier le prospect</DialogTitle>
           <DialogDescription>
-            Saisi le terrain par {prospect?.ownedByCommercialName ?? '–'}. La modification redescend
-            sur les téléphones à la prochaine synchronisation.
+            Saisi par {prospect?.ownedByCommercialName ?? '–'}.
           </DialogDescription>
         </DialogHeader>
 
@@ -157,7 +156,7 @@ export function ProspectEditDialog({
           <Field
             label="Téléphone"
             required
-            description="Clé de déduplication : deux prospects ne peuvent pas partager un numéro."
+            description="Un seul prospect par numéro."
             error={formState.errors.phone?.message}
           >
             {(props) => <Input {...props} type="tel" {...register('phone')} />}

@@ -42,7 +42,7 @@ function presentation(error: unknown): { icon: LucideIcon; title: string; retrya
     if (error.status >= 500) {
       return {
         icon: AlertTriangleIcon,
-        title: 'Le serveur CPI a rencontré une erreur',
+        title: 'Erreur serveur',
         retryable: true,
       };
     }
@@ -55,7 +55,7 @@ function presentation(error: unknown): { icon: LucideIcon; title: string; retrya
 export function QueryErrorState({
   error,
   onRetry,
-  fallback = 'Ces données n’ont pas pu être chargées.',
+  fallback = 'Chargement impossible. Réessayez dans un instant.',
   className,
 }: {
   error: unknown;

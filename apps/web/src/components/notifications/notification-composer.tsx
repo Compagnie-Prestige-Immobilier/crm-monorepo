@@ -174,17 +174,17 @@ export function NotificationComposer({
       void queryClient.invalidateQueries({ queryKey: notificationKeys.root });
 
       if (created.status === 'SCHEDULED') {
-        toast.success('Notification programmée. Vous pourrez encore l’annuler avant l’heure.');
+        toast.success('Notification programmée. Annulable jusqu’au départ.');
       } else if (created.transportStatus === 'NOT_CONFIGURED') {
         // Le pire message possible serait « Envoyée » alors que rien n'est
         // parti. On le dit, et on dit pourquoi.
         toast.warning(
-          `Enregistrée pour ${String(created.counts.total)} destinataire(s), mais AUCUN push n’a été remis : le compte de service Firebase n’est pas configuré. Les destinataires la verront en ouvrant l’application.`,
+          `Enregistrée pour ${String(created.counts.total)} destinataire(s). Aucun push remis : Firebase n’est pas configuré.`,
           { duration: 12_000 },
         );
       } else if (created.counts.failed > 0) {
         toast.warning(
-          `Envoyée à ${String(created.counts.sent)} destinataire(s). ${String(created.counts.failed)} échec(s) — ouvrez le détail pour voir lesquels.`,
+          `Envoyée à ${String(created.counts.sent)} destinataire(s), ${String(created.counts.failed)} échec(s).`,
         );
       } else {
         toast.success(`Envoyée à ${String(created.counts.sent)} destinataire(s).`);
@@ -226,8 +226,8 @@ export function NotificationComposer({
           </DialogTitle>
           <DialogDescription>
             {step === 'redaction'
-              ? 'Le texte part sur les téléphones des destinataires. Relisez l’aperçu : Android coupe au-delà de quelques lignes.'
-              : 'Une notification envoyée ne se rappelle pas. Vérifiez le nombre de destinataires avant de confirmer.'}
+              ? 'Envoi push aux destinataires choisis.'
+              : 'L’envoi est irréversible.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -235,7 +235,7 @@ export function NotificationComposer({
           <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="flex min-w-0 flex-col gap-4">
               {templates.data && templates.data.items.length > 0 ? (
-                <Field label="Partir d’un gabarit" description="Facultatif.">
+                <Field label="Gabarit" description="Facultatif.">
                   {(props) => (
                     <Select
                       value={templateId}
@@ -260,9 +260,7 @@ export function NotificationComposer({
 
               {template && template.variables.length > 0 ? (
                 <fieldset className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-border bg-secondary/40 p-3">
-                  <legend className="px-1 text-[0.75rem] font-[600]">
-                    Variables du gabarit
-                  </legend>
+                  <legend className="px-1 text-[0.75rem] font-[600]">Variables</legend>
                   {template.variables.map((name) => (
                     <Field key={name} label={name}>
                       {(props) => (
@@ -281,8 +279,7 @@ export function NotificationComposer({
                   ))}
                   {rendered.missing.length > 0 ? (
                     <p role="status" className="text-[0.75rem] text-warning">
-                      Non renseignée(s) : {rendered.missing.join(', ')}. Le marqueur restera visible
-                      tel quel dans la notification.
+                      Non renseignée(s) : {rendered.missing.join(', ')}.
                     </p>
                   ) : null}
                 </fieldset>
@@ -298,7 +295,6 @@ export function NotificationComposer({
                     {...props}
                     maxLength={TITLE_MAX}
                     value={title}
-                    placeholder="Réunion commerciale demain"
                     onChange={(event) => {
                       setTitle(event.target.value);
                     }}
@@ -316,7 +312,6 @@ export function NotificationComposer({
                     {...props}
                     maxLength={BODY_MAX}
                     value={body}
-                    placeholder="Point commercial à 9 h au siège. Apportez vos relevés de la semaine."
                     onChange={(event) => {
                       setBody(event.target.value);
                     }}
@@ -457,13 +452,12 @@ export function NotificationComposer({
                 <Field
                   label="Identifiants des comptes"
                   required
-                  description="Un identifiant par ligne. Le sélecteur nominatif viendra avec la régénération du client."
+                  description="Un identifiant par ligne."
                 >
                   {(props) => (
                     <Textarea
                       {...props}
                       value={selection.audienceUserIds.join('\n')}
-                      placeholder="019ff658-dddd-7489-ab22-1f2ada5ef38a"
                       onChange={(event) => {
                         setSelection((current) => ({
                           ...current,
@@ -649,8 +643,7 @@ function ConfirmationStep({
             </p>
           ) : isError ? (
             <p className="text-[0.9375rem] text-destructive">
-              Le nombre de destinataires n’a pas pu être calculé. L’envoi est bloqué tant que ce
-              nombre est inconnu.
+              Le nombre de destinataires n’a pas pu être calculé. Envoi bloqué.
             </p>
           ) : preview ? (
             <>
@@ -672,10 +665,8 @@ function ConfirmationStep({
             <div className="text-[0.8125rem]">
               <p className="font-[600] text-warning">Aucun push ne sera remis</p>
               <p className="mt-0.5 text-muted-foreground">
-                {preview.transportReason ??
-                  'Le compte de service Firebase n’est pas configuré sur le serveur.'}{' '}
-                La notification sera enregistrée et les destinataires la verront en ouvrant
-                l’application.
+                {preview.transportReason ?? 'Firebase n’est pas configuré.'} Notification
+                enregistrée, visible dans l’application.
               </p>
             </div>
           </div>
@@ -709,7 +700,7 @@ function ConfirmationStep({
                   Immédiat et irréversible
                 </Badge>
               ) : (
-                <Badge variant="info">Programmé — annulable jusqu’au départ</Badge>
+                <Badge variant="info">Programmé, annulable jusqu’au départ</Badge>
               )}
               {when === 'later' && scheduledFor !== '' ? (
                 <span className="ml-2 text-muted-foreground">

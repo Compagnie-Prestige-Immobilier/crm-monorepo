@@ -125,13 +125,13 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
       if (context?.previous !== undefined) {
         queryClient.setQueryData(queryKeys.commerciaux(filters), context.previous);
       }
-      toastApiError(error, "Le changement d'état a échoué.");
+      toastApiError(error, "Changement d'état impossible. Réessayez.");
     },
     onSuccess: (saved) => {
       toast.success(
         saved.isActive
-          ? `${saved.fullName} peut de nouveau se connecter.`
-          : `${saved.fullName} est désactivé. Ses prospects et représentants sont conservés.`,
+          ? `${saved.fullName} réactivé.`
+          : `${saved.fullName} désactivé. Ses prospects et représentants sont conservés.`,
       );
     },
     onSettled: () => {
@@ -147,9 +147,8 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Comptes utilisés par les commerciaux sur l’application mobile. Désactiver un compte ferme
-          son accès sans rien supprimer&nbsp;: ses représentants et ses prospects restent dans la
-          base et dans les exports.
+          Comptes de connexion à l’application mobile. Désactiver ferme l’accès, sans rien
+          supprimer.
         </p>
         <Button
           onClick={() => {
@@ -220,7 +219,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
           onRetry={() => {
             void refetch();
           }}
-          fallback="La liste des comptes n’a pas pu être chargée."
+          fallback="Liste des comptes non chargée."
         />
       ) : (
         <div

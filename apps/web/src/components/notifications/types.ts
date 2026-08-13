@@ -152,8 +152,8 @@ export const STATUS_LABELS: Record<NotificationStatus, string> = {
 };
 
 export const DELIVERY_LABELS: Record<NotificationDeliveryStatus, string> = {
-  PENDING: 'En file',
-  SENT: 'Remise à FCM',
+  PENDING: 'En attente',
+  SENT: 'Remise',
   DELIVERED: 'Reçue',
   FAILED: 'Échec',
   READ: 'Lue',

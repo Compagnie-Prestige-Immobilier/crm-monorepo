@@ -19,7 +19,7 @@ export default function NotFound() {
         Page introuvable
       </h1>
       <p className="max-w-md text-[0.9375rem] text-muted-foreground">
-        Cette adresse ne correspond à aucun écran du panneau d’administration.
+        Cette adresse ne correspond à aucun écran du panel.
       </p>
       <Button asChild>
         <Link href="/tableau-de-bord">Retour au tableau de bord</Link>

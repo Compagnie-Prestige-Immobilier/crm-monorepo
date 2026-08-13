@@ -57,6 +57,10 @@ import { cn } from '@/lib/utils';
 export function ReferentielsView() {
   return (
     <div className="flex flex-col gap-6">
+      <p className="max-w-3xl text-[0.9375rem] text-muted-foreground">
+        Listes de valeurs proposées à la saisie des prospects.
+      </p>
+
       <Tabs defaultValue="banques">
         <TabsList>
           <TabsTrigger value="banques">Banques</TabsTrigger>
@@ -90,11 +94,13 @@ function useUsage(): { banques: UsageCounts; syndicats: UsageCounts; departement
 
 function TabShell({
   title,
+  description,
   onCreate,
   createLabel,
   children,
 }: {
   title: string;
+  description: string;
   onCreate: () => void;
   createLabel: string;
   children: ReactNode;
@@ -104,6 +110,7 @@ function TabShell({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{title}</h2>
+          <p className="text-[0.8125rem] text-muted-foreground">{description}</p>
         </div>
         <Button onClick={onCreate}>
           <PlusIcon aria-hidden="true" />
@@ -176,13 +183,11 @@ function BanquesTab() {
       invalidate();
       setDeactivating(null);
       toast.success(
-        saved.isActive
-          ? `${saved.shortName} est de nouveau proposée à la saisie.`
-          : `${saved.shortName} retirée de la saisie. Les prospects existants la conservent.`,
+        saved.isActive ? `${saved.shortName} réactivée.` : `${saved.shortName} désactivée.`,
       );
     },
     onError: (error) => {
-      toastApiError(error, "Le changement d'état a échoué.");
+      toastApiError(error, "Changement d'état impossible. Réessayez.");
     },
   });
 
@@ -205,7 +210,7 @@ function BanquesTab() {
     },
     onSuccess: invalidate,
     onError: (error) => {
-      toastApiError(error, 'Le réordonnancement a échoué.');
+      toastApiError(error, 'Réordonnancement impossible. Réessayez.');
     },
   });
 
@@ -216,6 +221,7 @@ function BanquesTab() {
   return (
     <TabShell
       title="Banques"
+      description="Domiciliation bancaire du prospect."
       createLabel="Nouvelle banque"
       onCreate={() => {
         setEditing(undefined);
@@ -230,7 +236,7 @@ function BanquesTab() {
           onRetry={() => {
             void refetch();
           }}
-          fallback="Ce référentiel n’a pas pu être chargé."
+          fallback="Référentiel non chargé."
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
@@ -388,14 +394,10 @@ function SyndicatsTab() {
     onSuccess: (saved) => {
       invalidate();
       setDeactivating(null);
-      toast.success(
-        saved.isActive
-          ? `${saved.sigle} est de nouveau proposé à la saisie.`
-          : `${saved.sigle} retiré de la saisie. Les prospects existants le conservent.`,
-      );
+      toast.success(saved.isActive ? `${saved.sigle} réactivé.` : `${saved.sigle} désactivé.`);
     },
     onError: (error) => {
-      toastApiError(error, "Le changement d'état a échoué.");
+      toastApiError(error, "Changement d'état impossible. Réessayez.");
     },
   });
 
@@ -406,7 +408,7 @@ function SyndicatsTab() {
     },
     onSuccess: invalidate,
     onError: (error) => {
-      toastApiError(error, 'Le réordonnancement a échoué.');
+      toastApiError(error, 'Réordonnancement impossible. Réessayez.');
     },
   });
 
@@ -417,6 +419,7 @@ function SyndicatsTab() {
   return (
     <TabShell
       title="Syndicats"
+      description="Appartenance syndicale du prospect."
       createLabel="Nouveau syndicat"
       onCreate={() => {
         setEditing(undefined);
@@ -431,7 +434,7 @@ function SyndicatsTab() {
           onRetry={() => {
             void refetch();
           }}
-          fallback="Ce référentiel n’a pas pu être chargé."
+          fallback="Référentiel non chargé."
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
@@ -584,14 +587,10 @@ function DepartementsTab() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.referentielsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.reference });
       setDeactivating(null);
-      toast.success(
-        saved.isActive
-          ? `${saved.name} est de nouveau proposé à la saisie.`
-          : `${saved.name} retiré de la saisie. Les représentants et prospects existants le conservent.`,
-      );
+      toast.success(saved.isActive ? `${saved.name} réactivé.` : `${saved.name} désactivé.`);
     },
     onError: (error) => {
-      toastApiError(error, "Le changement d'état a échoué.");
+      toastApiError(error, "Changement d'état impossible. Réessayez.");
     },
   });
 
@@ -604,6 +603,7 @@ function DepartementsTab() {
   return (
     <TabShell
       title="Départements"
+      description="Triés par région, puis par nom."
       createLabel="Nouveau département"
       onCreate={() => {
         setEditing(undefined);
@@ -618,7 +618,7 @@ function DepartementsTab() {
           onRetry={() => {
             void refetch();
           }}
-          fallback="Ce référentiel n’a pas pu être chargé."
+          fallback="Référentiel non chargé."
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
@@ -743,9 +743,6 @@ function EmptyRow({ colSpan, children }: { colSpan: number; children: ReactNode 
         <div className="flex flex-col items-center gap-2 text-center">
           <InboxIcon className="size-8 text-muted-foreground" aria-hidden="true" />
           <p className="font-[600]">{children}</p>
-          <p className="text-[0.8125rem] text-muted-foreground">
-            Utilisez «&nbsp;Ajouter&nbsp;» pour créer la première entrée.
-          </p>
         </div>
       </TableCell>
     </TableRow>

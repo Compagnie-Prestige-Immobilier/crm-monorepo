@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
 
+import { Facade } from '@/app/(auth)/connexion/facade';
 import { LoginForm } from '@/app/(auth)/connexion/login-form';
 import { homePathForRole } from '@/components/layout/nav-items';
 import { SESSION_EXPIRED_PARAM, SESSION_EXPIRED_VALUE } from '@/lib/api/session-expiry';
@@ -43,7 +44,9 @@ export default async function ConnexionPage({
           Le contenu est GROUPÉ en bas de colonne plutôt qu'étalé en
           `justify-between` : réparti sur toute la hauteur, il laissait deux
           vides de 300 px et l'écran paraissait inachevé. */}
-      <section className="relative hidden flex-col justify-end gap-14 overflow-hidden bg-sidebar px-12 py-12 text-sidebar-foreground lg:flex">
+      <section className="relative hidden flex-col justify-center overflow-hidden bg-sidebar px-12 py-12 text-sidebar-foreground lg:flex">
+        <Facade />
+
         {/* `self-start` est OBLIGATOIRE. Dans une colonne flex, un enfant en
             `width:auto` est étiré par `align-items: stretch` : le logotype
             était rendu en 640×40 pour un fichier 489×200, soit une
@@ -58,13 +61,22 @@ export default async function ConnexionPage({
           className="absolute left-12 top-12 h-12 w-auto self-start"
         />
 
-        {/* Le volet porte l'identité, rien d'autre. Pas d'argumentaire, pas
-            d'index des fonctions : ceux qui arrivent ici connaissent l'outil. */}
-        <p className="font-display text-[clamp(2.5rem,5vw,4rem)] font-[800] leading-[0.95] tracking-[-0.035em] text-sidebar-accent-foreground">
-          CPI GO
-        </p>
+        {/* Le volet nomme l'outil et ce qu'il tient. Une ligne, des noms : ni
+            argumentaire, ni mode d'emploi. */}
+        <div className="max-w-lg">
+          <p className="font-display text-[clamp(2.5rem,5vw,3.75rem)] font-[800] leading-[0.95] tracking-[-0.035em] text-sidebar-accent-foreground">
+            CPI GO
+          </p>
+          <p className="mt-5 text-body-xl text-sidebar-foreground">
+            Prospects, campagnes d’appels et dossiers bancaires.
+          </p>
+        </div>
 
-        <p className="text-caption text-sidebar-foreground">
+        {/* Logo et mention légale sont SORTIS du flux : le bloc d'identité se
+            centre alors sur la même ligne d'horizon que le formulaire d'en
+            face. En flux, `justify-between` les écartait aux deux extrémités
+            et laissait 550 px de bordeaux vide au milieu. */}
+        <p className="absolute inset-x-12 bottom-12 text-caption text-sidebar-foreground">
           Compagnie Prestige Immobilier, Sénégal
         </p>
       </section>
@@ -80,7 +92,10 @@ export default async function ConnexionPage({
             className="mb-10 h-11 w-auto lg:hidden"
           />
 
-          <h1 className="rail font-display text-h1 font-[800] tracking-[-0.025em]">Connexion</h1>
+          <div className="rail">
+            <h1 className="font-display text-h1 font-[800] tracking-[-0.025em]">Connexion</h1>
+            <p className="mt-1.5 text-body text-muted-foreground">Panneau d’administration</p>
+          </div>
 
           {expired ? (
             /* `status` et non `alert` : l'information est contextuelle, pas
@@ -98,6 +113,10 @@ export default async function ConnexionPage({
           <div className="mt-8">
             <LoginForm next={next} />
           </div>
+
+          <p className="mt-10 border-t border-border pt-5 text-caption text-muted-foreground">
+            Les commerciaux se connectent depuis l’application mobile.
+          </p>
         </div>
       </section>
     </main>

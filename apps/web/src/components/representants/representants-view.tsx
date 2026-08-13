@@ -77,9 +77,8 @@ export function RepresentantsView() {
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-        Personnes rencontrées sur le terrain qui remettent les listes de prospects. Les fiches sont
-        créées depuis l’application mobile&nbsp;: le numéro de téléphone y sert de clé de
-        déduplication.
+        Personnes qui remettent les listes de prospects. Fiches créées depuis l’application mobile,
+        en consultation seule ici.
       </p>
 
       <section
@@ -138,7 +137,7 @@ export function RepresentantsView() {
           onRetry={() => {
             void refetch();
           }}
-          fallback="La liste des représentants n’a pas pu être chargée."
+          fallback="Liste des représentants non chargée."
         />
       ) : (
         <div

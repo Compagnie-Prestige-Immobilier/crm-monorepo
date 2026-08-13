@@ -24,18 +24,15 @@ import { bankExportFileName, buildBankExportUrl } from '@/lib/data/export';
 const SHEETS: readonly { name: string; description: string }[] = [
   {
     name: 'Dossiers',
-    description:
-      'Une ligne par dossier retenu par les filtres : référence, client, banque, étape, montant, agent, dates.',
+    description: 'Référence, client, banque, étape, montant, agent, dates.',
   },
   {
     name: 'Historique',
-    description:
-      'Toutes les transitions de ces dossiers, du plus ancien au plus récent — y compris les corrections d’administrateur et leur justification.',
+    description: 'Transitions des dossiers, corrections d’administrateur comprises.',
   },
   {
     name: 'Synthèse',
-    description:
-      'Les mêmes agrégats que le tableau de bord : par étape, par banque, motifs de rejet, activité par agent.',
+    description: 'Agrégats par étape, par banque, motifs de rejet, activité par agent.',
   },
 ];
 
@@ -47,9 +44,7 @@ export function BankExportView() {
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-        Le classeur reprend EXACTEMENT les critères réglés ci-dessous. Ce sont les mêmes que ceux de
-        la liste et du tableau de bord : un lien partagé, un écran et un fichier décrivent toujours
-        la même population.
+        Le classeur reprend les critères réglés ci-dessous.
       </p>
 
       <BankFiltersBar />
@@ -59,7 +54,7 @@ export function BankExportView() {
           <CardTitle>Classeur des dossiers bancaires</CardTitle>
           <CardDescription>
             {activeCount === 0
-              ? 'Aucun filtre actif : le classeur contiendra tous les dossiers.'
+              ? 'Aucun filtre : tous les dossiers.'
               : `${String(activeCount)} filtre${activeCount > 1 ? 's' : ''} appliqué${activeCount > 1 ? 's' : ''}.`}
           </CardDescription>
         </CardHeader>
@@ -101,7 +96,7 @@ export function BankExportView() {
               )}
             </Button>
             <Button asChild variant="ghost">
-              <Link href="/dossiers">Voir la liste correspondante</Link>
+              <Link href="/dossiers">Voir la liste</Link>
             </Button>
           </div>
         </CardContent>

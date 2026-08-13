@@ -34,20 +34,19 @@ class AboutScreen extends ConsumerWidget {
     final SyncUiState sync = ref.watch(syncCoordinatorProvider);
     final String build = ref.watch(buildNumberProvider);
 
-    final List<({String label, String value})> rows =
-        <({String label, String value})>[
-          (label: 'Version', value: '1.0.0'),
-          (label: 'Build', value: build),
-          (label: 'Environnement', value: _environmentLabel),
-          (label: 'Serveur', value: ApiEnvironment.baseUrl),
-          (label: 'Format des données', value: 'v${SyncEngine.payloadVersion}'),
-          (
-            label: 'Dernière synchronisation',
-            value: sync.lastRunAt == null ? 'Aucune' : _stamp.format(sync.lastRunAt!),
-          ),
-          (label: 'Compte', value: auth.email ?? auth.fullName ?? 'Inconnu'),
-          (label: 'Identifiant de compte', value: auth.userId ?? 'Inconnu'),
-        ];
+    final List<({String label, String value})> rows = <({String label, String value})>[
+      (label: 'Version', value: '1.0.0'),
+      (label: 'Build', value: build),
+      (label: 'Environnement', value: _environmentLabel),
+      (label: 'Serveur', value: ApiEnvironment.baseUrl),
+      (label: 'Format des données', value: 'v${SyncEngine.payloadVersion}'),
+      (
+        label: 'Dernière synchronisation',
+        value: sync.lastRunAt == null ? 'Aucune' : _stamp.format(sync.lastRunAt!),
+      ),
+      (label: 'Compte', value: auth.email ?? auth.fullName ?? 'Inconnu'),
+      (label: 'Identifiant de compte', value: auth.userId ?? 'Inconnu'),
+    ];
 
     return CpiPopScope(
       fallback: Routes.reglages,
@@ -163,9 +162,9 @@ class AboutScreen extends ConsumerWidget {
     await Clipboard.setData(ClipboardData(text: text));
     await HapticFeedback.selectionClick();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Informations copiées')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Informations copiées')));
   }
 }
 
@@ -187,9 +186,9 @@ class _InfoRow extends StatelessWidget {
             await Clipboard.setData(ClipboardData(text: value));
             await HapticFeedback.selectionClick();
             if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('$label copié')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('$label copié')));
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(

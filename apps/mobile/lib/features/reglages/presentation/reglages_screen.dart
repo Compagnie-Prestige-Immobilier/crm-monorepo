@@ -77,10 +77,7 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                     ),
                   ),
                 ),
-                title: Text(
-                  auth.fullName ?? 'Compte',
-                  style: theme.textTheme.titleSmall,
-                ),
+                title: Text(auth.fullName ?? 'Compte', style: theme.textTheme.titleSmall),
                 // L'identifiant technique a disparu d'ici. Un UUID sous un nom
                 // n'apprend rien à personne ; il vit désormais dans
                 // « À propos », où il sert au support.
@@ -118,12 +115,18 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                   padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
                   child: Text(
                     'Dernière erreur : ${sync.lastError}',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: cpi.syncFailed,
-                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(color: cpi.syncFailed),
                   ),
                 ),
               FilledButton.tonalIcon(
+                // Style explicite : `filledButtonTheme` force `backgroundColor`
+                // sur `primary`, ce qui écrasait la variante tonale et faisait
+                // passer « Synchroniser » pour l'action principale de l'écran.
+                // Ce n'en est pas une : c'est un rappel manuel.
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.colorScheme.secondaryContainer,
+                  foregroundColor: theme.colorScheme.primary,
+                ),
                 onPressed: sync.running
                     ? null
                     : () {
@@ -152,18 +155,13 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
           _Section(
             title: 'Affichage',
             children: <Widget>[
-              Text(
-                'Taille du texte',
-                style: theme.textTheme.bodyLarge,
-              ),
+              Text('Taille du texte', style: theme.textTheme.bodyLarge),
               const SizedBox(height: CpiSpacing.xs),
               _TextScaleChoice(
                 value: display.textScale,
                 onChanged: (CpiTextScale value) {
                   HapticFeedback.selectionClick();
-                  ref
-                      .read(displaySettingsProvider.notifier)
-                      .setTextScale(value);
+                  ref.read(displaySettingsProvider.notifier).setTextScale(value);
                 },
               ),
               const SizedBox(height: CpiSpacing.xs),
@@ -195,19 +193,14 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                   ),
                   child: Text(
                     _backgroundDiagnosis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: cpi.accentText,
-                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(color: cpi.accentText),
                   ),
                 ),
                 const SizedBox(height: CpiSpacing.xs),
               ],
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(
-                  PhosphorIconsRegular.batteryCharging,
-                  size: 26,
-                ),
+                leading: const Icon(PhosphorIconsRegular.batteryCharging, size: 26),
                 title: const Text('Autorisations d\'arrière-plan'),
                 trailing: const Icon(PhosphorIconsRegular.caretRight, size: 20),
                 // `push` et non `go` : `go` remplace la pile de navigation, et
@@ -353,15 +346,11 @@ class _TextScaleChoice extends StatelessWidget {
     return SegmentedButton<CpiTextScale>(
       segments: <ButtonSegment<CpiTextScale>>[
         for (final CpiTextScale scale in CpiTextScale.values)
-          ButtonSegment<CpiTextScale>(
-            value: scale,
-            label: Text(scale.label),
-          ),
+          ButtonSegment<CpiTextScale>(value: scale, label: Text(scale.label)),
       ],
       selected: <CpiTextScale>{value},
       showSelectedIcon: false,
-      onSelectionChanged: (Set<CpiTextScale> selection) =>
-          onChanged(selection.first),
+      onSelectionChanged: (Set<CpiTextScale> selection) => onChanged(selection.first),
     );
   }
 }

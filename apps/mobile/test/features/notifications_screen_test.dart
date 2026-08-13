@@ -48,8 +48,11 @@ void notificationTestWidgets(String description, WidgetTesterCallback body) {
 /// Session ouverte, sans toucher au stockage chiffré.
 class _SignedInController extends AuthController {
   @override
-  AuthState build() =>
-      const AuthState(status: AuthStatus.authenticated, userId: 'me', fullName: 'Awa Diop');
+  AuthState build() => const AuthState(
+    status: AuthStatus.authenticated,
+    userId: 'me',
+    fullName: 'Awa Diop',
+  );
 }
 
 /// Session dont le verdict n'est pas encore rendu — l'état d'un démarrage à
@@ -59,7 +62,11 @@ class _ResolvingController extends AuthController {
   AuthState build() => const AuthState.unknown();
 
   void resolveAuthenticated() {
-    state = const AuthState(status: AuthStatus.authenticated, userId: 'me', fullName: 'Awa');
+    state = const AuthState(
+      status: AuthStatus.authenticated,
+      userId: 'me',
+      fullName: 'Awa',
+    );
   }
 }
 
@@ -100,8 +107,12 @@ void main() {
       );
     }
 
-    notificationTestWidgets('affiche un état vide explicite', (WidgetTester tester) async {
-      final FakePushTransport transport = FakePushTransport(permission: PushPermission.granted);
+    notificationTestWidgets('affiche un état vide explicite', (
+      WidgetTester tester,
+    ) async {
+      final FakePushTransport transport = FakePushTransport(
+        permission: PushPermission.granted,
+      );
       addTearDown(transport.dispose);
 
       await tester.pumpWidget(host(transport));
@@ -110,8 +121,12 @@ void main() {
       expect(find.text('Aucune notification'), findsOneWidget);
     });
 
-    notificationTestWidgets('liste ce qui est en base, sans réseau', (WidgetTester tester) async {
-      final FakePushTransport transport = FakePushTransport(permission: PushPermission.granted);
+    notificationTestWidgets('liste ce qui est en base, sans réseau', (
+      WidgetTester tester,
+    ) async {
+      final FakePushTransport transport = FakePushTransport(
+        permission: PushPermission.granted,
+      );
       addTearDown(transport.dispose);
       await PushInboxHelper(db).seed(message('ntf-1'));
 
@@ -151,7 +166,9 @@ void main() {
     ) async {
       // Les notifications sont un confort ; la prospection hors ligne est le
       // métier. Un refus ne doit rien bloquer, ni masquer la liste.
-      final FakePushTransport transport = FakePushTransport(permission: PushPermission.denied);
+      final FakePushTransport transport = FakePushTransport(
+        permission: PushPermission.denied,
+      );
       addTearDown(transport.dispose);
       await PushInboxHelper(db).seed(message('ntf-1'));
 
@@ -179,7 +196,9 @@ void main() {
     notificationTestWidgets('un tap marque lu et fait retomber la pastille', (
       WidgetTester tester,
     ) async {
-      final FakePushTransport transport = FakePushTransport(permission: PushPermission.granted);
+      final FakePushTransport transport = FakePushTransport(
+        permission: PushPermission.granted,
+      );
       addTearDown(transport.dispose);
       await PushInboxHelper(db).seed(message('ntf-1'));
 
@@ -211,7 +230,10 @@ void main() {
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
           supportedLocales: const <Locale>[Locale('fr')],
           home: Scaffold(
-            appBar: AppBar(title: const Text('CPI GO'), actions: const <Widget>[NotificationBell()]),
+            appBar: AppBar(
+              title: const Text('CPI GO'),
+              actions: const <Widget>[NotificationBell()],
+            ),
           ),
         ),
       );
@@ -375,7 +397,9 @@ void main() {
       final BuildContext context = tester.element(find.byType(MaterialApp).first);
       final ProviderContainer scope = ProviderScope.containerOf(context);
 
-      scope.read(pendingPushRouteProvider.notifier).offerRoute('https://exemple.test/piege');
+      scope
+          .read(pendingPushRouteProvider.notifier)
+          .offerRoute('https://exemple.test/piege');
       await tester.pumpAndSettle();
 
       expect(scope.read(pendingPushRouteProvider), isNull);

@@ -48,7 +48,9 @@ class NotificationBell extends ConsumerWidget {
                 Icon(
                   hasUnread ? PhosphorIconsFill.bell : PhosphorIconsRegular.bell,
                   size: 20,
-                  color: hasUnread ? context.cpi.accentOnDark : theme.colorScheme.onPrimary,
+                  color: hasUnread
+                      ? context.cpi.accentOnDark
+                      : theme.colorScheme.onPrimary,
                 ),
                 if (hasUnread) ...<Widget>[
                   const SizedBox(width: CpiSpacing.xxs + 2),

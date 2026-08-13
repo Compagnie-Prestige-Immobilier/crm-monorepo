@@ -52,7 +52,8 @@ void main() {
       expect(
         raw.primary,
         isNot(const Color(0xFF630210)),
-        reason: 'si un jour l\'algorithme Material tombait juste, la surcharge '
+        reason:
+            'si un jour l\'algorithme Material tombait juste, la surcharge '
             'deviendrait redondante — ce test le signalerait',
       );
     });
@@ -98,6 +99,52 @@ void main() {
       );
       // `outline` sert de bordure de champ : seuil non textuel, 3:1.
       expect(contrast(scheme.outline, scheme.surface), greaterThanOrEqualTo(3.0));
+    });
+
+    group('texte posé sur le bordeaux plein', () {
+      // L'écran de connexion est bordeaux plein bord à bord. TOUT ce qui s'y
+      // écrit se mesure contre `primary`, et pas contre une surface claire.
+      const CpiColors cpi = CpiColors.light;
+
+      test('le rouge d\'erreur standard NE PASSE PAS sur bordeaux', () {
+        // Le bug constaté : `colorScheme.error` posé à même le fond de l'écran
+        // de connexion. 2,10:1, illisible. Ce test fige la raison d'être de
+        // `destructiveOnDark` : si quelqu'un rebascule sur `error`, il casse.
+        expect(contrast(scheme.error, scheme.primary), lessThan(3.0));
+      });
+
+      test('destructiveOnDark passe AA sur bordeaux', () {
+        expect(
+          contrast(cpi.destructiveOnDark, scheme.primary),
+          greaterThanOrEqualTo(4.5),
+        );
+      });
+
+      test('les autres couleurs de l\'écran de connexion passent AA', () {
+        for (final (String name, Color color) in <(String, Color)>[
+          ('blanc', const Color(0xFFFFFFFF)),
+          ('navForeground', cpi.navForeground),
+          ('accentOnDark', cpi.accentOnDark),
+        ]) {
+          expect(
+            contrast(color, scheme.primary),
+            greaterThanOrEqualTo(4.5),
+            reason: '$name doit rester lisible sur bordeaux',
+          );
+        }
+      });
+
+      test('sur bordeaux, l\'or de texte reste accentOnDark', () {
+        // L'or de surface #C8921A atteint par accident 4,90:1 sur bordeaux,
+        // mais il n'est pas la déclinaison de texte : docs/design.md §2.3 en
+        // désigne UNE seule par fond, et sur bordeaux c'est `accent-on-dark`.
+        // S'en remettre au chiffre plutôt qu'au token conduirait à réintroduire
+        // #C8921A comme texte ailleurs, où il fait 2,77:1.
+        expect(
+          contrast(cpi.accentOnDark, scheme.primary),
+          greaterThan(contrast(cpi.accent, scheme.primary)),
+        );
+      });
     });
   });
 
@@ -208,8 +255,9 @@ void main() {
       final ButtonStyle? filled = theme.filledButtonTheme.style;
       final Size? min = filled?.minimumSize?.resolve(<WidgetState>{});
       expect(min!.height, greaterThanOrEqualTo(kCpiMinTouchTarget));
-      final Size? outlined = theme.outlinedButtonTheme.style?.minimumSize
-          ?.resolve(<WidgetState>{});
+      final Size? outlined = theme.outlinedButtonTheme.style?.minimumSize?.resolve(
+        <WidgetState>{},
+      );
       expect(outlined!.height, greaterThanOrEqualTo(kCpiMinTouchTarget));
     });
   });

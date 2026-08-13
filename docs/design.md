@@ -27,11 +27,12 @@ ont été mesurés paire par paire. Base structurelle : **Material Design 3**.
 
 | Token               | Hex                  | Rôle                         |
 | ------------------- | -------------------- | ---------------------------- |
-| `background`        | `#FAF7F7`            | Fond d'application           |
+| `background`        | `#FFFFFF`            | Fond d'application           |
 | `foreground`        | `#1C0810`            | Texte courant                |
-| `card` / `popover`  | `#FFFFFF`            | Surfaces élevées             |
-| `border`            | `rgba(99,2,16,0.12)` | Bordures (prune translucide) |
+| `card` / `popover`  | `#FBFBFC`            | Surfaces élevées             |
+| `border`            | `rgba(99,2,16,0.12)` | Séparateurs décoratifs       |
 | `input-background`  | `#F5ECEE`            | Fond de champ                |
+| `input-border`      | `#AF7D84`            | Contour de champ — 3,24:1    |
 | `switch-background` | `#C4A0AA`            | Piste d'interrupteur         |
 
 ### 2.2 Bordeaux CPI — primaire
@@ -41,6 +42,7 @@ ont été mesurés paire par paire. Base structurelle : **Material Design 3**.
 | `primary`              | `#630210` | Actions principales, en-têtes  |
 | `primary-hover`        | `#7E0417` | Survol / pression              |
 | `primary-foreground`   | `#FFFFFF` | Texte sur bordeaux             |
+| `primary-text`         | `#630210` | `primary` en texte et icônes   |
 | `secondary`            | `#F5ECEE` | Surface prune claire           |
 | `secondary-foreground` | `#630210` | Texte sur surface prune claire |
 | `muted`                | `#EDE4E6` | Surface neutre                 |
@@ -111,22 +113,88 @@ Sans ces trois conditions, l'or redevient interdit. En mode sombre, `chart-2` ba
 ⚠️ Le bloc `.dark` du fichier PLATEFORME d'origine est un **reliquat shadcn en gris neutre**,
 sans aucune identité CPI (`--primary: oklch(0.985 0 0)`, soit du blanc). Il n'est pas repris.
 
-La palette sombre ci-dessous est dérivée de la palette claire :
+La palette sombre ci-dessous est dérivée de la palette claire.
 
-| Token                | Hex                                                                          | Note                                          |
-| -------------------- | ---------------------------------------------------------------------------- | --------------------------------------------- |
-| `background`         | `#140206`                                                                    | Prune quasi noir, pas du gris                 |
-| `foreground`         | `#F5E6EA`                                                                    |                                               |
-| `card` / `popover`   | `#1F050C`                                                                    |                                               |
-| `primary`            | `#C4566B`                                                                    | Le bordeaux pur est illisible sur fond sombre |
-| `primary-foreground` | `#1C0810`                                                                    |                                               |
-| `secondary`          | `#2A0810`                                                                    |                                               |
-| `muted`              | `#2A0810`                                                                    |                                               |
-| `muted-foreground`   | `#C4A0AA`                                                                    |                                               |
-| `accent`             | `#C8921A`                                                                    | Surface inchangée                             |
-| `accent-text`        | `#FFC65A`                                                                    | En sombre, c'est l'or clair qui passe         |
-| `border`             | `rgba(255,255,255,0.10)`                                                     |                                               |
-| `success`            | `#4FBF8B` · `destructive` `#F87171` · `warning` `#FFC65A` · `info` `#E08BA6` |
+> **Révisée après mesure sur un écran RENDU (2026-08).** Les valeurs de ce bloc
+> avaient été dérivées sur le papier et validées par des tests unitaires, sans
+> qu'aucune capture d'écran ne soit jamais regardée. Trois d'entre elles ne
+> résistaient pas au premier rendu. Elles sont corrigées ici, ancienne valeur en
+> regard, et les causes sont en §3.1.
+
+| Token                | Hex                                                                          | Note                                              |
+| -------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------- |
+| `background`         | `#140206`                                                                    | Prune quasi noir, pas du gris                     |
+| `foreground`         | `#F5E6EA`                                                                    | 16,70:1 sur `background`                          |
+| `card` / `popover`   | `#1C1A1D`                                                                    |                                                   |
+| `primary`            | **`#A81E33`** _(était `#C4566B`)_                                            | Aplat d'action, porte du **blanc** : 7,25:1       |
+| `primary-foreground` | **`#FFFFFF`** _(était `#1C0810`)_                                            | L'ancien couple plafonnait à **4,48:1**           |
+| `primary-hover`      | **`#BE2439`** _(était `#D3697D`)_                                            | 6,00:1 sur blanc                                  |
+| `primary-text`       | **`#F0919F`** _(rôle nouveau)_                                               | `primary` en TEXTE : 8,53:1 sur `card`            |
+| `secondary`          | `#2A0810`                                                                    |                                                   |
+| `muted`              | `#2A0810`                                                                    |                                                   |
+| `muted-foreground`   | `#C4A0AA`                                                                    | 8,60:1 sur `background`, 8,25:1 sur `card`        |
+| `input-border`       | **`#7A5F66`** _(rôle nouveau)_                                               | Contour de champ : 3,51:1 sur `background`        |
+| `ring`               | **`#F0919F`** _(était `#C4566B`)_                                            | L'anneau de focus doit se voir sur du sombre      |
+| `accent`             | `#C8921A`                                                                    | Surface inchangée                                 |
+| `accent-text`        | `#FFC65A`                                                                    | En sombre c'est l'or clair qui passe : 12,42:1    |
+| `border`             | `rgba(255,255,255,0.10)`                                                     | Séparateur décoratif seulement, jamais un contour |
+| `sidebar`            | **`#300710`** _(était `#250408`)_                                            | À `#250408` elle se confondait avec `background`  |
+| `sidebar-foreground` | **`#E8CCD3`** _(était `#DFC0C8`)_                                            | 12,04:1 sur `sidebar`                             |
+| `success`            | `#4FBF8B` · `destructive` `#F87171` · `warning` `#FFC65A` · `info` `#E08BA6` |                                                   |
+
+### 3.1 Ce que la mesure sur écran a corrigé
+
+Quatre défauts étaient invisibles dans un tableau de paires théoriques. Ils sont
+apparus à la première capture d'un écran réellement rendu.
+
+1. **`primary` + `primary-foreground` = 4,48:1.** Le couple « rose pâle, texte
+   sombre » échouait AA sur le bouton principal de l'écran de connexion, celui
+   par lequel tout le monde entre. Un bordeaux franc portant du blanc rétablit
+   7,25:1, et ressemble à CPI, ce que le rose pâle ne faisait pas.
+
+2. **`primary` servait deux rôles incompatibles.** Le même token remplissait les
+   aplats ET colorait texte et icônes. Un aplat sombre conçu pour porter du
+   blanc ne peut pas, par construction, servir de couleur de texte sur une
+   surface sombre. D'où la scission `primary` / `primary-text`.
+
+3. **Les champs de saisie n'avaient aucun contour.** `--border` à
+   `rgba(255,255,255,0.10)` donnait **1,23:1**, et le remplissage `#2A0810` sur
+   `#140206` n'ajoutait que 1,10:1 : rien ne délimitait le champ, alors que
+   WCAG 1.4.11 exige 3:1 pour la limite d'une commande. Le même défaut existait
+   en clair (**1,27:1**). D'où `input-border`, mesuré dans les deux thèmes.
+
+4. **La sidebar disparaissait dans le fond.** `#250408` sur `#140206` ne se
+   distinguait pas : le volet de marque de l'écran de connexion n'existait
+   simplement plus en mode sombre.
+
+**Corollaire de méthode.** Une paire de tokens ne se valide pas dans un tableau,
+elle se valide sur le pixel rendu, **chaîne d'opacités héritées comprise**. Ce
+n'était pas la valeur des tokens qui délavait le volet de marque, c'était
+`opacity-70` et `opacity-80` posés par-dessus. Un audit qui ne compose pas les
+opacités des ancêtres ne mesure pas ce que l'utilisateur voit. Toute couleur de
+texte se pose donc avec un token, jamais avec une opacité.
+
+**États désactivés.** `opacity-40` sur un bouton plein tombait à **1,53:1** en
+clair. WCAG exempte les commandes inactives, donc aucun audit automatique ne le
+signale, mais le libellé devient illisible et l'utilisateur ne sait plus ce que
+le bouton refuse de faire. Un composant désactivé change donc de **peau**
+(`muted` + `muted-foreground`, 6,18:1 en clair, 7,85:1 en sombre) au lieu de
+s'effacer : il perd sa couleur, son ombre et son survol, pas sa lisibilité.
+
+### La couleur de marque n'est pas une couleur de fond
+
+Les surfaces sont **neutres**, dans les deux thèmes. Le fond clair a d'abord été
+un `#FAF7F7` teinté de rose et le fond sombre un `#140206` prune : sur un grand
+écran de travail, la teinte se voit, et le plan de lecture entier vire au rouge.
+
+Le bordeaux CPI vit dans la **barre latérale**, les **actions** et les
+**accents**. Il ne passe jamais sous les chiffres qu'un administrateur lit
+pendant huit heures. Une identité forte tient à quelques surfaces bien placées,
+pas à la teinte du papier.
+
+Le panel web démarre en **thème clair**, et non sur la préférence système : c'est
+un outil de bureau, fait de tableaux et de chiffres. Le sombre reste accessible
+d'un clic.
 
 **Le mobile ne suit pas le thème système.** L'app est verrouillée en clair : elle sert en
 extérieur, en plein soleil, où le mode sombre réduit la lisibilité. Le mode sombre est réservé

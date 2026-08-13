@@ -112,8 +112,8 @@ export function confirmationSentence(recipientCount: number, reachableCount: num
   const silent = recipientCount - reachableCount;
   const tail =
     silent === 1
-      ? '1 d’entre elles n’a aucun appareil enregistré et ne verra le message qu’en ouvrant l’application.'
-      : `${String(silent)} d’entre elles n’ont aucun appareil enregistré et ne verront le message qu’en ouvrant l’application.`;
+      ? '1 d’entre elles n’a aucun appareil enregistré.'
+      : `${String(silent)} d’entre elles n’ont aucun appareil enregistré.`;
   return `${head} ${tail}`;
 }
 
@@ -130,7 +130,7 @@ export function routeProblem(route: string): string | null {
   const trimmed = route.trim();
   if (trimmed === '') return null;
   if (!ROUTE_PATTERN.test(trimmed)) {
-    return 'Le lien doit être une route interne commençant par « / », jamais une adresse web.';
+    return 'Le lien doit être une route interne commençant par « / ».';
   }
   return null;
 }
@@ -139,7 +139,7 @@ export function routeProblem(route: string): string | null {
 export const KNOWN_ROUTES: readonly { path: string; label: string }[] = [
   { path: '/', label: 'Accueil' },
   { path: '/historique', label: 'Historique' },
-  { path: '/phase2', label: 'Phase 2 — saisie des méthodes' },
+  { path: '/phase2', label: 'Phase 2 : saisie des méthodes' },
   { path: '/a-corriger', label: 'File de synchronisation' },
   { path: '/notifications', label: 'Centre de notifications' },
   { path: '/reglages', label: 'Réglages' },

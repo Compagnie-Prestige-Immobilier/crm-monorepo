@@ -92,8 +92,7 @@ export function BankCasesView() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Dossiers bancaires ouverts sur des clients dont la méthode d’enrôlement est obtenue. Les
-          filtres sont dans l’URL : un lien partagé rouvre exactement cette liste.
+          Dossiers bancaires ouverts sur des clients dont la méthode d’enrôlement est obtenue.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <BankExportMenu filters={filters} />
@@ -128,8 +127,8 @@ export function BankCasesView() {
           }
           description={
             countActiveBankFilters(filters) === 0
-              ? 'Ouvrez un dossier depuis « Nouveau dossier » : cherchez le client par son nom ou son téléphone, saisissez la référence bancaire, et le suivi commence.'
-              : 'Élargissez la période, changez de vue rapide ou retirez un critère.'
+              ? 'Ouvrez un dossier depuis « Nouveau dossier ».'
+              : 'Élargissez la période ou retirez un critère.'
           }
           action={
             countActiveBankFilters(filters) === 0 ? (
@@ -389,7 +388,7 @@ function BankCaseCard({ bankCase }: { bankCase: BankCase }) {
           <div className="col-span-2 min-w-0">
             <dt className="text-muted-foreground">Dernière intervention</dt>
             <dd className="truncate">
-              {bankCase.updatedByName ?? bankCase.createdByName} —{' '}
+              {bankCase.updatedByName ?? bankCase.createdByName},{' '}
               <time dateTime={bankCase.updatedAt} className="tabular-nums">
                 {formatDateTime(bankCase.updatedAt)}
               </time>

@@ -63,14 +63,18 @@ void main() {
   setUp(() async {
     db = await openTestDatabase();
     api = FakeApi();
-    await db.into(db.phase2Directory).insert(
+    await db
+        .into(db.phase2Directory)
+        .insert(
           Phase2DirectoryCompanion.insert(
             prospectId: 'pros-1',
             phoneE164: '+221771234567',
             updatedAt: t0,
           ),
         );
-    await db.into(db.phase2Directory).insert(
+    await db
+        .into(db.phase2Directory)
+        .insert(
           Phase2DirectoryCompanion.insert(
             prospectId: 'pros-2',
             phoneE164: '+221781234567',
@@ -108,16 +112,15 @@ void main() {
     );
   }
 
-
-
   /// Tape un numéro dans le champ et laisse la recherche s'exécuter.
   Future<void> type(WidgetTester tester, String digits) async {
     await tester.enterText(find.byType(TextField).first, digits);
     await tester.pumpAndSettle();
   }
 
-  phase2TestWidgets('le champ prend le focus tout seul : aucun appui préalable',
-      (WidgetTester tester) async {
+  phase2TestWidgets('le champ prend le focus tout seul : aucun appui préalable', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(host());
     await tester.pump();
 
@@ -130,8 +133,9 @@ void main() {
     expect(field.focusNode.hasFocus, isTrue);
   });
 
-  phase2TestWidgets('un numéro connu et ouvert ouvre les trois cartes de méthode',
-      (WidgetTester tester) async {
+  phase2TestWidgets('un numéro connu et ouvert ouvre les trois cartes de méthode', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(host());
     await type(tester, '771234567');
 
@@ -141,8 +145,9 @@ void main() {
     expect(find.text('Méthode non obtenue'), findsOneWidget);
   });
 
-  phase2TestWidgets('les cibles tactiles font au moins 48 dp',
-      (WidgetTester tester) async {
+  phase2TestWidgets('les cibles tactiles font au moins 48 dp', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(host());
     await type(tester, '771234567');
 
@@ -170,37 +175,34 @@ void main() {
     }
   });
 
-  phase2TestWidgets('un dossier déjà clos est en lecture seule, sans issue de saisie',
-      (WidgetTester tester) async {
+  phase2TestWidgets('un dossier déjà clos est en lecture seule, sans issue de saisie', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(host());
     await type(tester, '781234567');
 
     expect(find.text('Dossier déjà traité'), findsOneWidget);
     expect(find.text('Méthode obtenue'), findsOneWidget);
-    expect(
-      find.textContaining('Seul un administrateur peut le corriger'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Modifiable par un administrateur'), findsOneWidget);
     // Aucune carte de saisie : le serveur refuserait l'écriture, et proposer un
     // formulaire qui ne peut pas aboutir ferait perdre du temps au commercial.
     expect(find.text('Plateforme'), findsNothing);
     expect(find.text('Méthode non obtenue'), findsNothing);
   });
 
-  phase2TestWidgets('un numéro inconnu de l\'annuaire est signalé sans blocage',
-      (WidgetTester tester) async {
+  phase2TestWidgets('un numéro inconnu de l\'annuaire est signalé sans blocage', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(host());
     await type(tester, '765555555');
 
-    expect(
-      find.textContaining('n\'est pas dans votre annuaire'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Numéro absent de l\'annuaire'), findsOneWidget);
     expect(find.text('Effacer et recommencer'), findsOneWidget);
   });
 
-  phase2TestWidgets('OTHER sans commentaire est refusé DANS la feuille, avant écriture',
-      (WidgetTester tester) async {
+  phase2TestWidgets('OTHER sans commentaire est refusé DANS la feuille, avant écriture', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(host());
     await type(tester, '771234567');
 
@@ -228,8 +230,9 @@ void main() {
     expect(await db.countMyAttempts().getSingle(), 0);
   });
 
-  phase2TestWidgets('OTHER commenté s\'enregistre et confirme',
-      (WidgetTester tester) async {
+  phase2TestWidgets('OTHER commenté s\'enregistre et confirme', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(host());
     await type(tester, '771234567');
 
@@ -258,14 +261,15 @@ void main() {
     await tester.tap(find.text('Enregistrer'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Enregistré sur l\'appareil'), findsOneWidget);
+    expect(find.text('Enregistré'), findsOneWidget);
     expect(await db.countMyAttempts().getSingle(), 1);
     // La saisie est en file, pas envoyée : c'est le moteur qui décidera quand.
     expect(await db.countPhase2Pending().getSingle(), 1);
   });
 
-  phase2TestWidgets('« Numéro suivant » vide le champ et lui rend le focus',
-      (WidgetTester tester) async {
+  phase2TestWidgets('« Numéro suivant » vide le champ et lui rend le focus', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(host());
     await type(tester, '781234567');
 
@@ -285,22 +289,25 @@ void main() {
     expect(find.text('Dossier déjà traité'), findsNothing);
   });
 
-  phase2TestWidgets('mouvement réduit : les durées tombent à zéro, la logique ne change pas',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(host(disableAnimations: true));
-    await tester.pump();
+  phase2TestWidgets(
+    'mouvement réduit : les durées tombent à zéro, la logique ne change pas',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(host(disableAnimations: true));
+      await tester.pump();
 
-    final BuildContext context = tester.element(find.byType(Phase2Screen));
-    expect(CpiMotion.of(context).component, Duration.zero);
+      final BuildContext context = tester.element(find.byType(Phase2Screen));
+      expect(CpiMotion.of(context).component, Duration.zero);
 
-    final AnimatedSwitcher switcher =
-        tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher));
-    expect(switcher.duration, Duration.zero);
+      final AnimatedSwitcher switcher = tester.widget<AnimatedSwitcher>(
+        find.byType(AnimatedSwitcher),
+      );
+      expect(switcher.duration, Duration.zero);
 
-    // La logique, elle, est identique : le même numéro donne le même écran.
-    await type(tester, '771234567');
-    expect(find.text('Plateforme'), findsOneWidget);
-  });
+      // La logique, elle, est identique : le même numéro donne le même écran.
+      await type(tester, '771234567');
+      expect(find.text('Plateforme'), findsOneWidget);
+    },
+  );
 
   phase2TestWidgets('rien ne vibre à la frappe', (WidgetTester tester) async {
     // Une vibration par caractère transformerait la saisie d'un numéro en
@@ -339,39 +346,35 @@ void main() {
     expect(await db.countMyAttempts().getSingle(), 1);
   });
 
-  phase2TestWidgets('l\'écran est lisible par un lecteur d\'écran',
-      (WidgetTester tester) async {
+  phase2TestWidgets('l\'écran est lisible par un lecteur d\'écran', (
+    WidgetTester tester,
+  ) async {
     final SemanticsHandle handle = tester.ensureSemantics();
     await tester.pumpWidget(host());
     await type(tester, '771234567');
 
-    expect(
-      find.bySemanticsLabel(RegExp('Méthode obtenue : Plateforme')),
-      findsOneWidget,
-    );
-    expect(
-      find.bySemanticsLabel(RegExp('Numéro appelé, neuf chiffres')),
-      findsOneWidget,
-    );
-    expect(
-      find.bySemanticsLabel(RegExp('appels consignés')),
-      findsOneWidget,
-    );
+    expect(find.bySemanticsLabel(RegExp('Méthode obtenue : Plateforme')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Numéro appelé, neuf chiffres')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('appels consignés')), findsOneWidget);
     handle.dispose();
   });
 
-  phase2TestWidgets('l\'annuaire vide invite à le télécharger avant de commencer',
-      (WidgetTester tester) async {
+  phase2TestWidgets('l\'annuaire vide invite à le télécharger avant de commencer', (
+    WidgetTester tester,
+  ) async {
     await db.delete(db.phase2Directory).go();
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Annuaire vide'), findsOneWidget);
-    expect(find.text('Télécharger'), findsOneWidget);
+    expect(find.textContaining('Annuaire non téléchargé'), findsOneWidget);
+    // L'action de premier téléchargement est ancrée en bas d'écran, en zone de
+    // pouce, et non plus en tête de bandeau.
+    expect(find.text('Télécharger l\'annuaire'), findsOneWidget);
   });
 
-  phase2TestWidgets('le téléchargement rend une progression, page par page',
-      (WidgetTester tester) async {
+  phase2TestWidgets('le téléchargement rend une progression, page par page', (
+    WidgetTester tester,
+  ) async {
     await db.delete(db.phase2Directory).go();
     api.directoryPages.addAll(<Phase2DirectoryPage>[
       directoryPage(
@@ -392,7 +395,7 @@ void main() {
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Télécharger'));
+    await tester.tap(find.text('Télécharger l\'annuaire'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('3 numéros'), findsOneWidget);

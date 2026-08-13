@@ -26,10 +26,10 @@ class SenegalPhoneFormatter extends TextInputFormatter {
         .replaceAll(RegExp(r'[^0-9]'), '')
         .substring(
           0,
-          newValue.text.replaceAll(RegExp(r'[^0-9]'), '').length.clamp(
-            0,
-            kSenegalNationalLength,
-          ),
+          newValue.text
+              .replaceAll(RegExp(r'[^0-9]'), '')
+              .length
+              .clamp(0, kSenegalNationalLength),
         );
 
     final int digitsBeforeCursor = newValue.text
@@ -97,7 +97,9 @@ class PhoneField extends StatelessWidget {
             parsed is PhoneInvalid &&
             (parsed.reason == PhoneProblem.tooShort ||
                 parsed.reason == PhoneProblem.empty);
-        final String? error = partial ? null : (parsed is PhoneInvalid ? parsed.message : null);
+        final String? error = partial
+            ? null
+            : (parsed is PhoneInvalid ? parsed.message : null);
 
         return TextField(
           controller: controller,
