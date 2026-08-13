@@ -60,6 +60,12 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: ./.github/actions/setup-node
+      # Le build global régénère aussi le client Dart via build_runner.
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.41.7
+          channel: stable
+          cache: true
 
       - name: Client Prisma
         run: pnpm db:generate
