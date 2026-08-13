@@ -6,6 +6,8 @@ import {
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
 import { AnalyticsService } from './analytics.service.js';
+import { FunnelService } from './funnel.service.js';
+import { AnalyticsFunnelDto } from './funnel.dto.js';
 import {
   AnalyticsQueryDto,
   AnalyticsSeriesDto,
@@ -29,7 +31,28 @@ import {
 @ApiBearerAuth()
 @Controller({ path: 'analytics', version: '1' })
 export class AnalyticsController {
-  constructor(private readonly analytics: AnalyticsService) {}
+  constructor(
+    private readonly analytics: AnalyticsService,
+    private readonly funnelService: FunnelService,
+  ) {}
+
+  @Get('funnel')
+  @ApiOperation({
+    operationId: 'getAnalyticsFunnel',
+    summary: 'Entonnoir complet et montants encaissés.',
+    description:
+      'Du prospect saisi au dossier encaissé, plus les montants. Le tableau de ' +
+      'bord montrait l’effort — prospects, représentants, téléconseillers — mais ' +
+      'jamais le résultat. Une direction qui ne voit que le haut de l’entonnoir ' +
+      'peut féliciter une équipe qui saisit beaucoup et ne convertit rien.',
+  })
+  @ApiResponse({ status: 200, type: AnalyticsFunnelDto })
+  funnel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: AnalyticsQueryDto,
+  ): Promise<AnalyticsFunnelDto> {
+    return this.funnelService.funnel(user, query);
+  }
 
   @Get('totals')
   @ApiOperation({ operationId: 'getAnalyticsTotals', summary: 'Compteurs de tête.' })
