@@ -3,10 +3,13 @@ import { Module } from '@nestjs/common';
 import { AnalyticsController } from './analytics.controller.js';
 import { AnalyticsService } from './analytics.service.js';
 import { FunnelService } from './funnel.service.js';
+import { PilotageService } from './pilotage.service.js';
+import { PortfolioService } from './portfolio.service.js';
+import { QualityService } from './quality.service.js';
 
 @Module({
   controllers: [AnalyticsController],
-  providers: [AnalyticsService, FunnelService],
-  exports: [AnalyticsService, FunnelService],
+  providers: [AnalyticsService, FunnelService, PilotageService, PortfolioService, QualityService],
+  exports: [AnalyticsService, FunnelService, PilotageService, PortfolioService, QualityService],
 })
 export class AnalyticsModule {}

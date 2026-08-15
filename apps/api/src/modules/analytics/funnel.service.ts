@@ -5,6 +5,8 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
 import { prospectConditions, PROSPECT_FROM } from './analytics.sql.js';
+import { BANK_CASE, demoScopeOn } from './pilotage.sql.js';
+import { closedAtLateral } from '../bank-cases/bank-cases.sql.js';
 import type { AnalyticsFinanceDto, AnalyticsFunnelDto, FunnelStageDto } from './funnel.dto.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
@@ -13,9 +15,41 @@ import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
  *
  * Deux requêtes, pas une : l'entonnoir se compte sur les PROSPECTS filtrés,
  * l'argent se compte sur les DOSSIERS. Les joindre en une seule requête
- * multiplierait les lignes — un prospect peut porter plusieurs dossiers — et
+ * multiplierait les lignes, un prospect peut porter plusieurs dossiers, et
  * gonflerait les montants d'un facteur invisible à la relecture.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LA VISIBILITÉ DE DÉMONSTRATION PORTE SUR CHAQUE TABLE JOINTE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `prospectConditions` ne cloisonne que le PROSPECT. Les deux requêtes
+ * ci-dessous joignent `bank_cases`, qui porte sa propre colonne `isDemo` : un
+ * dossier fictif accroché à un prospect réel comptait donc dans « dossiers
+ * ouverts », dans « encaissés », et dans le montant d'un entonnoir transmis au
+ * siège. `pilotage.sql.ts` et `portfolio.service.ts` posent déjà la condition
+ * sur chaque jointure ; ce fichier était le dernier à ne pas le faire.
+ *
+ * Elle est posée dans le `ON` et non dans le `WHERE`. La jointure de `stages`
+ * est EXTERNE : une condition sur `bc` placée dans le `WHERE` la ramènerait à
+ * une jointure interne et ferait disparaître les prospects sans dossier,
+ * c'est-à-dire le sommet même de l'entonnoir.
  */
+
+/**
+ * Date d'encaissement ou de rejet, lue dans l'HISTORIQUE et non sur
+ * `bank_cases."updatedAt"`.
+ *
+ * `updatedAt` bouge à chaque écriture : un dossier encaissé en janvier dont on
+ * corrige le montant en août ressortait dans « encaissé sur 30 jours », et son
+ * délai de traitement passait de trois jours à sept mois. Les deux indicateurs
+ * étaient donc faux ensemble, et faux dans le sens flatteur.
+ *
+ * La définition est empruntée au module bancaire à dessein : le tableau de bord
+ * Banque & Finance affiche déjà un montant encaissé par mois, et deux
+ * définitions de la date d'encaissement feraient dire deux chiffres différents
+ * à deux écrans pour la même période.
+ */
+const CLOSED_AT = closedAtLateral(BANK_CASE);
 @Injectable()
 export class FunnelService {
   constructor(
@@ -24,16 +58,20 @@ export class FunnelService {
   ) {}
 
   async funnel(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<AnalyticsFunnelDto> {
-    const where = prospectConditions(user, filter, await this.demo.enabled());
+    const demoEnabled = await this.demo.enabled();
+    const where = prospectConditions(user, filter, demoEnabled);
 
-    const [stages, finance] = await Promise.all([this.stages(where), this.finance(where)]);
+    const [stages, finance] = await Promise.all([
+      this.stages(where, demoEnabled),
+      this.finance(where, demoEnabled),
+    ]);
 
     return { etapes: stages, finance };
   }
 
   // ── L'entonnoir ────────────────────────────────────────────────────────────
 
-  private async stages(where: Prisma.Sql): Promise<FunnelStageDto[]> {
+  private async stages(where: Prisma.Sql, demoEnabled: boolean): Promise<FunnelStageDto[]> {
     const rows = await this.prisma.$queryRaw<
       {
         prospects: number;
@@ -51,7 +89,9 @@ export class FunnelService {
         )::int                                                              AS encaisses
       ${PROSPECT_FROM}
       LEFT JOIN "bank_cases" bc
-        ON bc."prospectId" = p."id" AND bc."deletedAt" IS NULL
+        ON bc."prospectId" = p."id"
+       AND bc."deletedAt" IS NULL
+       AND ${demoScopeOn(BANK_CASE, demoEnabled)}
       LEFT JOIN "bank_case_stages" st
         ON st."id" = bc."currentStageId"
       WHERE ${where}
@@ -64,11 +104,16 @@ export class FunnelService {
     // chaîne se casse. Le taux global, seul, noie la marche défaillante dans la
     // moyenne : 2 % de conversion finale ne dit pas si le problème est la
     // collecte de méthodes ou le traitement bancaire.
+    // Les deux taux sont NULS, et non nuls-virgule-zéro, quand leur
+    // dénominateur est vide. Publier « 0 % » sur une étape qui n'a rien reçu à
+    // convertir la rend indistinguable d'une étape qui a tout perdu : le
+    // lecteur croit à une contre-performance là où il n'y a simplement pas eu
+    // de population. Même convention que `days()` et `rate()` du pilotage.
     const build = (label: string, count: number, precedent: number): FunnelStageDto => ({
       label,
       count,
-      tauxEtapePrecedente: precedent === 0 ? 0 : Math.round((count / precedent) * 1000) / 10,
-      tauxGlobal: sommet === 0 ? 0 : Math.round((count / sommet) * 1000) / 10,
+      tauxEtapePrecedente: precedent === 0 ? null : Math.round((count / precedent) * 1000) / 10,
+      tauxGlobal: sommet === 0 ? null : Math.round((count / sommet) * 1000) / 10,
     });
 
     return [
@@ -81,7 +126,7 @@ export class FunnelService {
 
   // ── L'argent ───────────────────────────────────────────────────────────────
 
-  private async finance(where: Prisma.Sql): Promise<AnalyticsFinanceDto> {
+  private async finance(where: Prisma.Sql, demoEnabled: boolean): Promise<AnalyticsFinanceDto> {
     const rows = await this.prisma.$queryRaw<
       {
         dossiers: number;
@@ -94,12 +139,15 @@ export class FunnelService {
       }[]
     >`
       WITH portee AS (
-        SELECT bc."id", bc."amountXof", bc."createdAt", bc."updatedAt", st."type"
+        SELECT bc."id", bc."amountXof", bc."createdAt", cl."closedAt", st."type"
         ${PROSPECT_FROM}
         JOIN "bank_cases" bc
-          ON bc."prospectId" = p."id" AND bc."deletedAt" IS NULL
+          ON bc."prospectId" = p."id"
+         AND bc."deletedAt" IS NULL
+         AND ${demoScopeOn(BANK_CASE, demoEnabled)}
         JOIN "bank_case_stages" st
           ON st."id" = bc."currentStageId"
+        ${CLOSED_AT}
         WHERE ${where}
       )
       SELECT
@@ -109,9 +157,9 @@ export class FunnelService {
         COUNT(*) FILTER (WHERE "type" = 'REJECTED')::int           AS rejetes,
         COALESCE(SUM("amountXof") FILTER (WHERE "type" = 'CASHED'), 0)::text AS montant,
         COALESCE(SUM("amountXof") FILTER (
-          WHERE "type" = 'CASHED' AND "updatedAt" >= now() - interval '30 days'
+          WHERE "type" = 'CASHED' AND "closedAt" >= now() - interval '30 days'
         ), 0)::text                                                AS montant30,
-        AVG(EXTRACT(EPOCH FROM ("updatedAt" - "createdAt")) / 86400) FILTER (
+        AVG(EXTRACT(EPOCH FROM ("closedAt" - "createdAt")) / 86400) FILTER (
           WHERE "type" IN ('CASHED', 'REJECTED')
         )::float                                                   AS delai
       FROM portee
@@ -127,7 +175,7 @@ export class FunnelService {
     return {
       montantEncaisse: montant,
       // Un dossier ouvert n'a pas de montant : il n'est connu qu'à
-      // l'encaissement. On ne l'invente pas — annoncer un « en cours » chiffré
+      // l'encaissement. On ne l'invente pas, annoncer un « en cours » chiffré
       // sur des dossiers sans montant serait une prévision déguisée en fait.
       montantEnCours: '0',
       encaissementMoyen: encaisses === 0 ? '0' : (BigInt(montant) / BigInt(encaisses)).toString(),

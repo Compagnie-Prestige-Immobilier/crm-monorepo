@@ -230,7 +230,7 @@ export class AnalyticsService {
    *
    * Les prospects sans méthode sont hors de cette série : `null` n'est pas une
    * méthode. Leur nombre se lit dans `by-phase2-status`, où ils forment les
-   * statuts autres que « Méthode obtenue » — et le `total` renvoyé ici est donc
+   * statuts autres que « Méthode obtenue », et le `total` renvoyé ici est donc
    * délibérément celui des seuls porteurs d'une méthode.
    */
   async byEnrollmentMethod(

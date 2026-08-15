@@ -136,6 +136,33 @@ describe('conditions communes', () => {
     expect(sql).toContain('ct."campaignId" = "camp-1"');
   });
 
+  /**
+   * LA SOUS-REQUÊTE CLOISONNE SA PROPRE TABLE.
+   *
+   * L'assertion précédente ne vérifiait que la présence de la table et du
+   * paramètre : elle restait verte alors que `call_tasks` était lue sans
+   * aucune condition de visibilité. Une tâche de démonstration accrochée à un
+   * prospect réel faisait donc entrer ce prospect dans le total d'une
+   * campagne, mode éteint.
+   *
+   * Le balayage SQL ne pouvait pas le dénoncer : il travaille au niveau du
+   * FICHIER, et ce fichier cloisonne déjà `p` quelques lignes plus haut.
+   * C'est la conséquence vivante de la limite épinglée dans
+   * `demo-visibility.sweep.test.ts`.
+   */
+  it('CLOISONNE la sous-requête de campagne, mode éteint', () => {
+    const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }, false));
+    expect(sql).toContain('ct."isDemo" = FALSE');
+  });
+
+  it('et l’ouvre quand le mode est allumé', () => {
+    const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }, true));
+    expect(sql).not.toContain('ct."isDemo" = FALSE');
+    // `TRUE` plutôt qu'un fragment vide : la condition se compose sans risque
+    // de produire un `AND` orphelin. Même convention que `demoScopeOn`.
+    expect(sql).toContain('AND TRUE');
+  });
+
   it('exclut les fiches supprimées et celles d’un représentant supprimé', () => {
     const sql = rendered(prospectConditions(admin, {}, false));
     expect(sql).toContain('p."deletedAt" IS NULL');
