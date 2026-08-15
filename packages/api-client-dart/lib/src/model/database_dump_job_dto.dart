@@ -81,7 +81,7 @@ class DatabaseDumpJobDto {
   @JsonKey(name: r'failureReason', required: true, includeIfNull: true)
   final String? failureReason;
 
-  /// Issue de l’avis de fin. `SENT` : l’e-mail est parti. `NOT_CONFIGURED` : aucun compte Brevo n’est branché, l’export est prêt et seule la boîte de réception le signale. `TRANSPORT_ERROR` : Brevo a refusé. Un export prêt dont personne n’a été prévenu doit se voir, pas se deviner.
+  /// Issue de l’avis de fin. `INBOX_ONLY` : l’avis est dans la boîte de réception du panel, et c’est le SEUL canal. Aucun e-mail n’est envoyé pour cet avis : la sélection des destinataires d’e-mail ne retient que les comptes COMMERCIAL, et le demandeur d’un export est toujours un ADMIN. `FAILED` : l’avis n’a pas pu être écrit, et l’export est prêt quand même. Un export prêt dont personne n’a été prévenu doit se voir, pas se deviner.
   @JsonKey(name: r'noticeStatus', required: true, includeIfNull: true)
   final String? noticeStatus;
 
