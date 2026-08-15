@@ -9,7 +9,7 @@ import {
   DemoWritable,
 } from '../../common/decorators/demo-writable.decorator.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { Roles } from '../../common/decorators/roles.decorator.js';
+import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
 import { DemoService } from './demo.service.js';
 import { DemoStatusDto } from './dto.js';
 
@@ -59,7 +59,14 @@ import { DemoStatusDto } from './dto.js';
 export class DemoController {
   constructor(private readonly demo: DemoService) {}
 
+  // OUVERT AUX TROIS RÔLES, ET ÉCRIT COMME TEL : chaque client interroge cet
+  // interrupteur pour afficher son bandeau « démonstration en cours ». Le
+  // fermer ferait disparaître le bandeau chez les rôles qui ont justement
+  // besoin de savoir que ce qu'ils voient est fictif. Les trois routes qui
+  // BASCULENT l'interrupteur portent chacune `@Roles(ADMIN)`, et la décision
+  // est là.
   @Get()
+  @Roles(...ANY_AUTHENTICATED)
   @ApiOperation({
     operationId: 'getDemoStatus',
     summary: 'État du mode démonstration, compteurs et autorisation de bascule.',

@@ -1,8 +1,10 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProduces, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
+import { Role } from '@crm/database';
 import type { FastifyReply } from 'fastify';
 
+import { Roles } from '../../common/decorators/roles.decorator.js';
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -17,6 +19,33 @@ import { RepresentantExportQueryDto } from '../representants/dto.js';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
+/**
+ * Exports Excel, et POURQUOI LES RÔLES SONT POSÉS ROUTE PAR ROUTE.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CE QUE CE CONTRÔLEUR N'AVAIT PAS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Ses trois routes ne portaient AUCUN `@Roles`, et `RolesGuard` laisse passer
+ * toute identité authentifiée en l'absence de décorateur : les trois classeurs
+ * étaient donc téléchargeables par les trois rôles. Rien n'a fuité, parce que
+ * chaque service cloisonne sa lecture par `ownerScope`, mais c'était une
+ * propriété de CHAQUE requête et non une règle du contrôleur, exactement la
+ * situation qu'`analytics.controller.ts` a quittée en posant son `@Roles` de
+ * classe. La première colonne ajoutée sans passer par `buildProspectWhere`
+ * ouvrait les trois routes d'un coup.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PAS DE `@Roles` DE CLASSE ICI, ET C'EST DÉLIBÉRÉ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Les trois routes ne servent pas la même population. Un `@Roles` de classe
+ * devrait alors prendre l'UNION des trois, c'est-à-dire la plus large, et
+ * chaque route devrait la resserrer : la règle apparente serait la plus
+ * permissive, et une quatrième route écrite demain hériterait de cette union
+ * sans que personne l'ait décidé pour elle. Chaque route porte donc son propre
+ * décorateur, avec le motif écrit au-dessus.
+ */
 @ApiTags('export')
 @ApiBearerAuth()
 // Toute route de ce contrôleur peut refuser pour ces trois raisons :
@@ -33,7 +62,28 @@ export class ExportController {
     private readonly demo: DemoVisibilityService,
   ) {}
 
+  /**
+   * ADMIN et COMMERCIAL, LES MÊMES QUE LE TABLEAU DE BORD.
+   *
+   * Le classeur ne contient pas que des lignes de prospects. Sa feuille
+   * Synthèse est composée à partir d'`AnalyticsService` : `totals`, `byBanque`,
+   * `bySyndicat`, `byDepartement`, `bySegment`, `byPhase2Status` et
+   * `byEnrollmentMethod`. Ce sont EXACTEMENT les agrégats qu'`AnalyticsController`
+   * ferme à BANQUE_FINANCE par un `@Roles` de classe, et il les ferme
+   * précisément parce que le cloisonnement de chaque requête ne suffisait pas à
+   * en faire une règle. Sans décorateur ici, cette route était une seconde
+   * porte sur les mêmes chiffres, et elle n'avait pas de serrure.
+   *
+   * BANQUE_FINANCE a son propre export, `bank-cases.xlsx`, qui porte les
+   * dossiers dont il répond. La prospection terrain ne le regarde pas.
+   *
+   * Le cloisonnement par commercial reste où il doit être, dans
+   * `buildProspectWhere` : un COMMERCIAL n'exporte que ses fiches, un ADMIN
+   * tout. Le décorateur ne remplace pas ce filtre, il dit qui a le droit de
+   * demander le fichier.
+   */
   @Get('prospects.xlsx')
+  @Roles(Role.ADMIN, Role.COMMERCIAL)
   @ApiProduces(XLSX_MIME)
   @ApiOperation({
     operationId: 'exportProspectsXlsx',
@@ -98,7 +148,23 @@ export class ExportController {
   // Représentants
   // ───────────────────────────────────────────────────────────────────────────
 
+  /**
+   * ADMIN SEUL, comme l'import qu'il sert.
+   *
+   * Ce classeur est vide de données métier : des en-têtes, une ligne d'exemple
+   * et des listes déroulantes alimentées par les référentiels, eux-mêmes
+   * ouverts à tout utilisateur authentifié. Il ne fuit donc rien, et ce n'est
+   * pas pour cela qu'il est fermé.
+   *
+   * Il est fermé parce qu'il n'a qu'un seul usage : remplir
+   * `POST /v1/representants/import`, qui porte `@Roles(Role.ADMIN)`. Un
+   * formulaire que son destinataire ne pourra pas déposer n'a pas à lui être
+   * proposé : le laisser ouvert promet une manœuvre qui finira en 403, ce que
+   * l'écran d'import du panneau, réservé à l'ADMIN lui aussi, prend déjà soin
+   * de ne pas faire.
+   */
   @Get('representants-modele.xlsx')
+  @Roles(Role.ADMIN)
   @ApiProduces(XLSX_MIME)
   @ApiOperation({
     operationId: 'downloadRepresentantsTemplateXlsx',
@@ -129,7 +195,22 @@ export class ExportController {
     }
   }
 
+  /**
+   * LES RÔLES DE LA LISTE QU'IL RECOPIE, ni plus ni moins.
+   *
+   * Sa description annonce « mêmes critères que `GET /representants` : ce qui
+   * est exporté est exactement ce qui est affiché ». Or ce contrôleur-là porte
+   * `@Roles(Role.COMMERCIAL, Role.ADMIN)`, et celui-ci ne portait rien : le
+   * classeur était donc atteignable par un rôle à qui la liste elle-même est
+   * refusée. Un export plus large que son écran est un contournement, pas une
+   * fonctionnalité.
+   *
+   * C'est la convention que suit déjà `bank-cases-export.controller.ts`, qui
+   * répète mot pour mot le `@Roles` de `bank-cases.controller.ts` plutôt que de
+   * s'en remettre au cloisonnement de son service.
+   */
   @Get('representants.xlsx')
+  @Roles(Role.COMMERCIAL, Role.ADMIN)
   @ApiProduces(XLSX_MIME)
   @ApiOperation({
     operationId: 'exportRepresentantsXlsx',
