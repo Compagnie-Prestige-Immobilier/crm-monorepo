@@ -8,6 +8,7 @@ import { envSchema, readEnv } from './env.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { DemoModeInterceptor } from './common/interceptors/demo-mode.interceptor.js';
 import { DemoReadOnlyGuard } from './common/guards/demo-read-only.guard.js';
+import { FreshSessionGuard } from './common/guards/fresh-session.guard.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { AdminModule } from './modules/admin/admin.module.js';
@@ -96,10 +97,18 @@ const env = readEnv();
   providers: [
     // L'ordre compte. Le throttler s'applique avant toute lecture de base ;
     // JwtAuthGuard renseigne `request.user`, que RolesGuard lit ensuite. Les
-    // quatre sont globaux : une route qui oublie un décorateur est refusée,
+    // cinq sont globaux : une route qui oublie un décorateur est refusée,
     // pas exposée.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // ENTRE les deux, et l'ordre est la correction elle-même. Le jeton PORTE le
+    // rôle : il dit ce qui était vrai à l'émission, et le répète pendant quinze
+    // minutes. `FreshSessionGuard` relit l'autorité en base sur les routes qui
+    // en exigent une, et écrase `request.user` AVANT que `RolesGuard` ne
+    // tranche. Sans lui, rétrograder un ADMIN ne lui retirait rien jusqu'à
+    // l'expiration de son jeton, et un jeton de démonstration survivait à
+    // l'extinction du mode.
+    { provide: APP_GUARD, useClass: FreshSessionGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     // EN DERNIER, délibérément. Une requête sans jeton doit repartir en 401,
     // pas en 409 : le mode démonstration n'est pas une raison de renseigner un

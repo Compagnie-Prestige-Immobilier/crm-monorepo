@@ -36,6 +36,21 @@ export interface DumpJob {
   readonly fileSize: number | null;
   readonly sha256: string | null;
   readonly expiresAt: string | null;
+  /**
+   * Horodatage de la RÉSERVATION pour livraison. `null` tant que personne ne
+   * télécharge.
+   *
+   * Une ligne `ready` dit « le fichier existe » ; elle ne dit pas « personne
+   * n'est en train de l'emporter ». Deux administrateurs, ou deux onglets,
+   * passaient tous deux le contrôle et recevaient tous deux l'archive
+   * complète : la destruction après envoi ne garantit UNE livraison que si la
+   * prise est exclusive AVANT le premier octet. Ce champ est cette prise, et
+   * il est posé par une écriture CONDITIONNELLE (voir `DbDumpService.reserve`).
+   *
+   * Il est RELÂCHÉ si l'envoi n'aboutit pas, pour que le téléchargement coupé
+   * sur une liaison mobile reste reprenable, ce qui est la promesse d'origine.
+   */
+  readonly reservedAt: string | null;
   readonly downloadedAt: string | null;
   readonly failureReason: string | null;
   /**
@@ -87,14 +102,30 @@ export interface DumpJob {
 export const DUMP_TTL_MS = 6 * 60 * 60 * 1_000;
 
 /**
- * Au-delà, un `running` est réputé MORT.
+ * Au-delà, un travail EN COURS est réputé MORT. `queued` COMPRIS.
  *
  * L'état vit en base, le processus vit dans le conteneur : un redéploiement au
- * milieu d'un `pg_dump` laisse une ligne `running` que plus rien ne fera
- * avancer. Sans cette borne, elle bloquerait DÉFINITIVEMENT toute nouvelle
- * demande, puisqu'une seule est autorisée à la fois. Trente minutes sont très
- * au-delà de ce que demande une base de cette taille, et très en deçà d'une
- * journée de travail perdue à se demander pourquoi le bouton ne répond plus.
+ * milieu d'un `pg_dump` laisse une ligne que plus rien ne fera avancer. Sans
+ * cette borne, elle bloquerait DÉFINITIVEMENT toute nouvelle demande, puisqu'une
+ * seule est autorisée à la fois. Trente minutes sont très au-delà de ce que
+ * demande une base de cette taille, et très en deçà d'une journée de travail
+ * perdue à se demander pourquoi le bouton ne répond plus.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * POURQUOI `queued` COMPTE AUTANT QUE `running`
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * La borne ne portait que sur `running`, et `queued` passait à travers. La
+ * fenêtre entre l'écriture de `queued` et celle de `running` est étroite, mais
+ * elle existe, et un conteneur qui meurt dedans laissait une ligne `queued`
+ * ÉTERNELLE. Comme `isInFlight('queued')` est vrai et que `request()` rend le
+ * travail en cours au lieu d'en démarrer un second, la fonctionnalité était
+ * alors morte pour toujours : plus aucun export possible, aucune route pour
+ * réarmer, et un écran qui tourne indéfiniment puisque le panel considère
+ * `queued` comme « en cours ».
+ *
+ * Une borne qui ne couvre pas l'état le plus court est la plus dangereuse : le
+ * cas est rare, donc jamais observé en recette, et définitif quand il survient.
  */
 export const DUMP_MAX_RUNTIME_MS = 30 * 60 * 1_000;
 
@@ -119,8 +150,13 @@ export function effectiveStatus(job: DumpJob, now: Date): DumpStatus {
     if (job.expiresAt !== null && Date.parse(job.expiresAt) <= now.getTime()) return 'expired';
     return 'ready';
   }
-  if (job.status === 'running' && job.startedAt !== null) {
-    if (now.getTime() - Date.parse(job.startedAt) > DUMP_MAX_RUNTIME_MS) return 'failed';
+  if (isInFlight(job.status)) {
+    // `startedAt` quand il existe, `requestedAt` sinon : un `queued` n'a pas
+    // encore de date de démarrage, et c'est justement lui qu'il ne faut pas
+    // laisser passer à travers la borne. Un horodatage illisible ne doit pas
+    // enterrer un travail vivant, d'où le contrôle de finitude.
+    const since = Date.parse(job.startedAt ?? job.requestedAt);
+    if (Number.isFinite(since) && now.getTime() - since > DUMP_MAX_RUNTIME_MS) return 'failed';
   }
   return job.status;
 }

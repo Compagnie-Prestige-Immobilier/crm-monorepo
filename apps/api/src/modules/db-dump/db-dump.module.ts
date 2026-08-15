@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { readEnv } from '../../env.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { DbDumpController } from './db-dump.controller.js';
+import { DbDumpEnabledGuard } from './db-dump-enabled.guard.js';
 import { DbDumpService } from './db-dump.service.js';
 import { DUMP_RUNNER, PgDumpRunner } from './db-dump.runner.js';
 
@@ -26,6 +27,11 @@ import { DUMP_RUNNER, PgDumpRunner } from './db-dump.runner.js';
   controllers: [DbDumpController],
   providers: [
     DbDumpService,
+    // Déclarée en fournisseur bien qu'elle soit posée par `@UseGuards` : Nest
+    // sait instancier une garde sans dépendance, mais la déclarer la rend
+    // substituable dans les montages d'essai, où l'interrupteur doit pouvoir
+    // être basculé dans les deux sens.
+    DbDumpEnabledGuard,
     { provide: DUMP_RUNNER, useFactory: () => new PgDumpRunner(readEnv().DATABASE_URL) },
   ],
 })
