@@ -6,7 +6,9 @@ import {
   FlaskConicalIcon,
   InfoIcon,
   LoaderIcon,
+  LockIcon,
   ShieldCheckIcon,
+  SmartphoneIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -248,9 +250,6 @@ export function DemoModeCard() {
                   </>
                 )}
               </Button>
-              <p className="text-[0.75rem] text-muted-foreground">
-                Activer deux fois ne double pas le jeu.
-              </p>
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-3">
@@ -282,6 +281,14 @@ export function DemoModeCard() {
         exports. Pas de case à cocher ici : l'action est entièrement réversible
         (l'API tient le registre des lignes qu'elle a créées), et exiger le même
         rituel que la suppression banaliserait celui de la suppression.
+
+        Elle annonce AUSSI la conséquence que l'opérateur ne peut pas deviner :
+        activer la démonstration passe TOUTE LA PLATEFORME en lecture seule,
+        pour tout le monde et pas seulement pour lui. Le contrat le dit sur
+        `DemoStatusDto.enabled` et sur la description d'`enableDemoMode` ; s'il
+        ne l'apprend qu'au premier 409 d'un collègue, la fonctionnalité se lit
+        comme une panne, et quelqu'un ouvre un ticket au lieu d'éteindre
+        l'interrupteur.
       */}
       <Dialog
         open={confirmingEnable}
@@ -294,8 +301,8 @@ export function DemoModeCard() {
           <DialogHeader>
             <DialogTitle>Créer le jeu de démonstration ?</DialogTitle>
             <DialogDescription>
-              Des lignes fictives vont être ajoutées à cette base et apparaître dans les écrans de
-              tous les rôles.
+              Des lignes fictives vont être ajoutées à cette base, et toute la plateforme passera en
+              lecture seule pour tous les utilisateurs.
             </DialogDescription>
           </DialogHeader>
 
@@ -320,11 +327,60 @@ export function DemoModeCard() {
               </span>
             </p>
 
+            {/*
+              LA conséquence que l'opérateur ne peut pas deviner.
+
+              Ce n'est pas un détail technique à ranger dans une infobulle : la
+              bascule qu'il s'apprête à faire suspend la saisie de TOUS ses
+              collègues, dans tout le pays, jusqu'à ce que quelqu'un la
+              rattrape. Elle est donc affirmée en toutes lettres, avant le
+              bouton, au même rang que la pollution des chiffres.
+
+              Les exceptions sont NOMMÉES juste après, et brièvement : sans
+              elles, « lecture seule » se lit comme « plus rien ne marche », et
+              un administrateur prudent n'ose plus lancer la démonstration.
+            */}
+            <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.875rem] text-warning">
+              <LockIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <span>
+                <span className="font-[600]">
+                  Toute la plateforme passe en lecture seule, pour tous les utilisateurs.
+                </span>{' '}
+                Tant que le mode est actif, chaque création, modification et suppression est
+                refusée, pour tout le monde et pas seulement pour vous. Restent possibles&nbsp;: se
+                connecter, rebasculer ce réglage, la synchronisation mobile, et marquer une
+                notification comme lue.
+              </span>
+            </p>
+
+            {/*
+              LA phrase qui décide si la bascule sera lancée.
+
+              La crainte qu'elle lève est celle qui a dicté toute la conception
+              côté serveur : « et les saisies que mes équipes font sur le
+              terrain pendant ce temps, je les perds ? ». Non. La remontée hors
+              ligne du mobile n'est JAMAIS refusée, et ce qui arrive par ce
+              chemin est écrit `isDemo: false`, donc comme du travail réel qui
+              survit à l'extinction du mode. Sans cette phrase, personne
+              n'active la démonstration en journée, et la fonctionnalité ne sert
+              qu'après 20 h.
+            */}
+            <p className="flex items-start gap-2 rounded-md border border-success/30 bg-success-surface px-3 py-2.5 text-[0.875rem] text-success">
+              <SmartphoneIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <span>
+                <span className="font-[600]">Le travail du terrain n’est pas affecté.</span> Les
+                saisies remontées par la synchronisation mobile pendant la démonstration sont
+                enregistrées comme des données réelles, jamais comme des données de démonstration,
+                et elles restent en place une fois le mode désactivé.
+              </span>
+            </p>
+
             <p className="flex items-start gap-2 rounded-md border border-success/30 bg-success-surface px-3 py-2.5 text-[0.875rem] text-success">
               <ShieldCheckIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>
                 <span className="font-[600]">Réversible.</span> L’API enregistre chaque ligne
-                qu’elle crée et le retrait ne supprimera que celles-là.
+                qu’elle crée et le retrait ne supprimera que celles-là. Le retrait rend aussi
+                l’écriture à toute la plateforme.
               </span>
             </p>
           </div>

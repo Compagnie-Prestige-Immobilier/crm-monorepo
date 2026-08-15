@@ -113,10 +113,6 @@ export default async function ConnexionPage({
           <div className="mt-8">
             <LoginForm next={next} />
           </div>
-
-          <p className="mt-10 border-t border-border pt-5 text-caption text-muted-foreground">
-            Les téléconseillers se connectent depuis l’application mobile.
-          </p>
         </div>
       </section>
     </main>

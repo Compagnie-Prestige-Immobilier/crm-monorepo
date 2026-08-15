@@ -29,6 +29,73 @@ function serverReason(error: ApiError): string {
   return /^Request failed with status \d+$/u.test(message) ? '' : message;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LE MODE DÉMONSTRATION : un refus TRANSVERSE, traité une fois pour toutes.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Tant que le mode démonstration est actif, l'API refuse TOUTE requête POST,
+ * PATCH, PUT ou DELETE avec un 409 portant `code: 'DEMO_MODE_READ_ONLY'`. Ce
+ * refus ne vient d'aucune opération en particulier : il décrit l'état de la
+ * plateforme, et il peut donc revenir de n'importe lequel des trente écrans qui
+ * mutent quelque chose. Le brancher écran par écran serait une trentaine
+ * d'occasions d'oublier, et l'oubli ne se verrait qu'en démonstration.
+ *
+ * On branche donc sur le CODE, ici, au seul endroit que traversent toutes les
+ * mutations. Sur le code et non sur le statut : `ApiErrorDto.code` est la clé
+ * stable du contrat, alors que 409 sert aussi aux conflits d'unicité ordinaires.
+ *
+ * Le `message` du serveur est rendu TEL QUEL : il est rédigé pour l'écran, il
+ * nomme la cause et le remède (« demandez à un administrateur de désactiver le
+ * mode démonstration »), et le réécrire ici ferait diverger deux formulations
+ * de la même règle.
+ */
+export const DEMO_MODE_READ_ONLY = 'DEMO_MODE_READ_ONLY';
+
+/**
+ * Phrase de secours quand le corps porte le CODE mais pas de prose.
+ *
+ * Elle n'est pas décorative. Sans elle, un tel corps retomberait sur la branche
+ * 409 générique, c'est-à-dire sur « Un enregistrement existe déjà avec ces
+ * valeurs » : un mensonge, qui envoie l'utilisateur chercher un doublon
+ * inexistant pendant que la vraie cause est un interrupteur au bureau.
+ */
+const DEMO_MODE_READ_ONLY_FALLBACK =
+  'La plateforme est en mode démonstration : les écritures sont suspendues. ' +
+  'Demandez à un administrateur de désactiver le mode démonstration.';
+
+/** Code machinable porté par le corps d'erreur, ou `null`. */
+function errorCode(error: ApiError): string | null {
+  const body: unknown = error.body;
+  if (typeof body !== 'object' || body === null) return null;
+  const { code } = body as { code?: unknown };
+  return typeof code === 'string' && code !== '' ? code : null;
+}
+
+/**
+ * Le message du refus de démonstration, ou `null` si l'erreur est autre chose.
+ *
+ * Exportée pour qu'un écran qui aurait besoin de RÉAGIR au refus (et pas
+ * seulement de l'annoncer) puisse le reconnaître sans réimplémenter la lecture
+ * du corps.
+ */
+export function demoReadOnlyMessage(error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null;
+  if (errorCode(error) !== DEMO_MODE_READ_ONLY) return null;
+  const reason = serverReason(error);
+  return reason === '' ? DEMO_MODE_READ_ONLY_FALLBACK : reason;
+}
+
+/**
+ * Durée d'affichage du refus de démonstration.
+ *
+ * Sonner retire un toast au bout de quatre secondes. Le message du serveur fait
+ * trois phrases : il expliquerait quoi faire, mais il disparaît avant d'avoir
+ * été lu, et l'utilisateur ne retient que « ça a échoué ». Les autres messages
+ * gardent le défaut : ils tiennent en une ligne.
+ */
+const DEMO_MODE_TOAST_MS = 12_000;
+
 export function apiErrorText(error: unknown, fallback: string): string {
   // Une CONFIGURATION incomplète n'est pas une coupure réseau. Elle nomme donc
   // la variable manquante : « Vérifiez la connexion » enverrait chercher un
@@ -43,6 +110,11 @@ export function apiErrorText(error: unknown, fallback: string): string {
   // traverse le réseau, et c'est le seul lien entre la cause serveur et l'écran.
   const configuration = configErrorMessage(error.body);
   if (configuration !== null) return configuration;
+
+  // AVANT le `switch` : le refus de démonstration se reconnaît à son code, et
+  // la branche 409 générique le confondrait avec un conflit d'unicité.
+  const demoReadOnly = demoReadOnlyMessage(error);
+  if (demoReadOnly !== null) return demoReadOnly;
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════
@@ -95,5 +167,21 @@ export function apiErrorText(error: unknown, fallback: string): string {
 
 /** Raccourci : `onError: (error) => { toastApiError(error, '…'); }`. */
 export function toastApiError(error: unknown, fallback: string): void {
+  /**
+   * Le refus de démonstration reçoit un IDENTIFIANT STABLE, et c'est le point.
+   *
+   * Il ne frappe pas une mutation, il frappe la plateforme : une vue qui en
+   * lance plusieurs (une réaffectation en lot, un écran à mise à jour
+   * optimiste) prend donc autant de refus identiques que d'appels partis, et
+   * empile trois fois le même pavé de trois phrases dans le coin de l'écran.
+   * Sonner remplace un toast qui porte un identifiant déjà affiché : il n'en
+   * reste qu'un, celui qui décrit l'état réel.
+   */
+  const demoReadOnly = demoReadOnlyMessage(error);
+  if (demoReadOnly !== null) {
+    toast.error(demoReadOnly, { id: DEMO_MODE_READ_ONLY, duration: DEMO_MODE_TOAST_MS });
+    return;
+  }
+
   toast.error(apiErrorText(error, fallback));
 }

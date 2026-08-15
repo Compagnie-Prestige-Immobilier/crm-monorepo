@@ -96,6 +96,80 @@ describe('DemoModeCard, activation', () => {
     expect(screen.getByText(/Réversible/)).toBeTruthy();
   });
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * La LECTURE SEULE doit être annoncée AVANT le clic, pas découverte après.
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Activer la démonstration ne fait pas que salir des chiffres : l'API passe
+   * TOUTE la plateforme en lecture seule et refuse chaque écriture par un 409
+   * `DEMO_MODE_READ_ONLY`, pour tous les utilisateurs à la fois. L'opérateur qui
+   * bascule ne le subit pas lui-même le premier : ce sont ses collègues qui
+   * découvrent une saisie refusée, la lisent comme une panne, et ouvrent un
+   * ticket au lieu d'éteindre l'interrupteur.
+   *
+   * La confirmation d'activation est le SEUL moment où l'information sert
+   * encore à quelque chose.
+   */
+  it('annonce que TOUTE la plateforme passe en lecture seule, pour tous', async () => {
+    renderWithQuery(<DemoModeCard />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Activer le mode démonstration/ }),
+    );
+
+    const dialog = await screen.findByRole('dialog');
+    // « lecture seule » seul ne suffit pas : la portée est ce qui change la
+    // décision, donc « tous les utilisateurs » doit y être aussi.
+    expect(dialog.textContent).toMatch(/lecture seule/u);
+    expect(dialog.textContent).toMatch(/tous les utilisateurs/u);
+  });
+
+  /**
+   * « Lecture seule » sans exceptions se lit « plus rien ne marche ».
+   *
+   * Un administrateur qui le croit n'ose plus lancer une démonstration en
+   * journée. Les quatre chemins qui restent ouverts sont donc nommés, et c'est
+   * une liste courte parce qu'elle doit être lue d'un coup d'œil.
+   */
+  it('nomme ce qui continue de fonctionner malgré la lecture seule', async () => {
+    renderWithQuery(<DemoModeCard />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Activer le mode démonstration/ }),
+    );
+
+    const text = (await screen.findByRole('dialog')).textContent;
+    expect(text).toMatch(/se connecter/u);
+    expect(text).toMatch(/rebasculer ce réglage/u);
+    expect(text).toMatch(/synchronisation mobile/u);
+    expect(text).toMatch(/notification comme lue/u);
+  });
+
+  /**
+   * LA phrase qui décide si la bascule part.
+   *
+   * La crainte qu'elle lève est celle qui a dicté toute la conception côté
+   * serveur : « et les saisies du terrain pendant ce temps, je les perds ? ».
+   * La remontée hors ligne n'est JAMAIS refusée, et ce qui arrive par ce chemin
+   * est écrit comme du travail réel, qui survit à l'extinction du mode. Sans
+   * cette phrase, la démonstration ne se lance qu'après 20 h.
+   */
+  it('affirme que les saisies du terrain sont réelles et survivent', async () => {
+    renderWithQuery(<DemoModeCard />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Activer le mode démonstration/ }),
+    );
+
+    const text = (await screen.findByRole('dialog')).textContent;
+    // Deux affirmations, et il faut les deux : ce qui remonte est écrit comme
+    // réel, et cela reste après extinction. Une troisième assertion portait sur
+    // « ne perdent rien », une redite de ces deux-là que la copie a perdue.
+    expect(text).toMatch(/données réelles/u);
+    expect(text).toMatch(/restent en place une fois le mode désactivé/u);
+  });
+
   it('annuler la confirmation n’ensemence pas', async () => {
     renderWithQuery(<DemoModeCard />);
 

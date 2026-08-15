@@ -69,8 +69,7 @@ export function AndroidReleaseCard() {
           Mise à jour mobile Android
         </CardTitle>
         <CardDescription>
-          La prochaine version est téléchargée dès que le téléphone retrouve Internet. Une mise à
-          jour obligatoire reste affichée jusqu’à son installation.
+          La prochaine version est téléchargée dès que le téléphone retrouve Internet.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">

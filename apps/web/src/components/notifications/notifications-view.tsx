@@ -294,7 +294,7 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
                 }
                 description={
                   activeFilterCount === 0
-                    ? 'Les envois apparaissent ici.'
+                    ? 'Un envoi part en push vers les destinataires choisis, et reste dans leur boîte de réception.'
                     : 'Changez d’état ou de catégorie.'
                 }
                 action={
