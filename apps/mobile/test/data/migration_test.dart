@@ -8,6 +8,9 @@ import 'generated_migrations/schema.dart';
 import 'generated_migrations/schema_v1.dart' as v1;
 import 'generated_migrations/schema_v2.dart' as v2;
 import 'generated_migrations/schema_v3.dart' as v3;
+import 'generated_migrations/schema_v4.dart' as v4;
+import 'generated_migrations/schema_v5.dart' as v5;
+import 'generated_migrations/schema_v6.dart' as v6;
 
 /// Test doré de migration.
 ///
@@ -63,11 +66,24 @@ void main() {
   //
   // Le palier n'ajoute que deux tables. C'est précisément pour cela qu'il doit
   // être testé avec des données : une migration additive est celle qu'on écrit
-  // le plus vite et celle où l'on oublie le plus facilement un index — un
+  // le plus vite et celle où l'on oublie le plus facilement un index : un
   // `createTable` sans son `createIndex` produit une base qui fonctionne en test
   // et qui met plusieurs secondes par recherche sur 500 000 lignes en
   // production, sans jamais lever d'erreur.
 
+  // ═══ POURQUOI CES DEUX PALIERS VALIDENT À LA VERSION COURANTE ═══
+  //
+  // `Migrator.createTable` engendre TOUJOURS la définition courante d'une table,
+  // jamais celle de la version visée : drift n'a pas de mémoire des formes
+  // passées. Tant qu'une table créée en v2 n'a plus jamais bougé, valider à la
+  // v2 fonctionne ; depuis que la v6 retire les `CHECK` d'énumération de
+  // `phase2_directory`, une migration 1 → 2 produit la forme de la v6, ce qui est
+  // le comportement CORRECT sur un appareil réel (il finit toujours à la version
+  // courante) mais ne correspond plus au doré de la v2.
+  //
+  // On valide donc à la version courante et on garde intactes les assertions qui
+  // portent réellement le risque : la saisie non synchronisée a-t-elle traversé,
+  // et les index sont-ils là.
   test('v1 -> v2 conserve les saisies non synchronisées', () async {
     final schema = await verifier.schemaAt(1);
 
@@ -118,7 +134,7 @@ void main() {
     await old.close();
 
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 2);
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
     // La saisie a traversé.
     final List<QueryRow> representants = await db
@@ -130,7 +146,7 @@ void main() {
         .get();
     expect(pending, hasLength(1));
 
-    // Les deux tables de phase 2 existent et sont vides — un annuaire ne se
+    // Les deux tables de phase 2 existent et sont vides : un annuaire ne se
     // fabrique pas par migration, il se télécharge.
     final List<QueryRow> directory = await db
         .customSelect('SELECT COUNT(*) AS c FROM phase2_directory')
@@ -147,7 +163,7 @@ void main() {
   test('v1 -> v2 crée les index de l\'annuaire, pas seulement les tables', () async {
     final schema = await verifier.schemaAt(1);
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 2);
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
     final List<QueryRow> indexes = await db
         .customSelect(
@@ -159,7 +175,7 @@ void main() {
 
     // `phase2_directory_phone_unique` est le seul index qui rende la recherche
     // par téléphone tenable : sans lui, chaque numéro tapé déclenche un balayage
-    // complet de l'annuaire — des secondes par appel sur un téléphone d'entrée
+    // complet de l'annuaire : des secondes par appel sur un téléphone d'entrée
     // de gamme, multipliées par la pile de numéros de la journée.
     expect(names, contains('phase2_directory_phone_unique'));
     expect(names, contains('phase2_directory_status_idx'));
@@ -282,6 +298,7 @@ void main() {
       reason: 'une fiche ancienne n’a pas d’IEF, et ce n’est pas une erreur',
     );
 
+
     final List<QueryRow> pending = await db
         .customSelect('SELECT id FROM outbox WHERE status = \'pending\'')
         .get();
@@ -293,6 +310,31 @@ void main() {
         .customSelect('SELECT COUNT(*) AS c FROM iefs')
         .get();
     expect(iefs.single.read<int>('c'), 0);
+
+    // ═══ LA COLONNE EST-ELLE UTILISABLE, ET PAS SEULEMENT PRÉSENTE ? ═══
+    //
+    // Le test s'arrêtait à « la colonne existe et vaut NULL ». Une colonne
+    // ajoutée sans sa clé étrangère, ou avec un type incompatible, aurait passé
+    // cette assertion et cassé la première fiche saisie après la mise à jour.
+    // On écrit donc réellement dedans, à travers la clé étrangère.
+    await db.customStatement(
+      'INSERT INTO iefs '
+      '(id, code, name, departement_id, departement_name, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['ief-1', 'IEF-DK1', 'IEF Dakar 1', 'dep-1', 'Dakar', _iso],
+    );
+    await db.customStatement(
+      'UPDATE representants SET ief_id = ? WHERE id = ?',
+      <Object?>['ief-1', 'rep-4'],
+    );
+    final List<QueryRow> rattachee = await db
+        .customSelect('SELECT ief_id FROM representants WHERE id = \'rep-4\'')
+        .get();
+    expect(
+      rattachee.single.read<String?>('ief_id'),
+      'ief-1',
+      reason: 'la colonne doit être ÉCRITE, pas seulement présente',
+    );
 
     await db.close();
   });
@@ -314,6 +356,334 @@ void main() {
     // `iefs_departement_idx` sert la restriction au département choisi.
     expect(names, contains('iefs_active_idx'));
     expect(names, contains('iefs_departement_idx'));
+
+    await db.close();
+  });
+
+  // ── v4 → v5 : compteur de rejeux bloqués ───────────────────────────────────
+  //
+  // Le palier ajoute une colonne à `outbox` : LA table qui porte les saisies
+  // pas encore parties. La recréer viderait la file, c'est-à-dire une journée
+  // de prospection, et l'appareil ne dirait rien.
+
+  test('v4 -> v5 ajoute blocked_attempts SANS vider la file', () async {
+    final schema = await verifier.schemaAt(4);
+
+    final v4.DatabaseAtV4 old = v4.DatabaseAtV4(schema.newConnection());
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, attempts, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-5', 'representant', 'rep-5', 'create', '{}', 3, _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 5);
+
+    final List<QueryRow> rows = await db
+        .customSelect('SELECT id, attempts, blocked_attempts FROM outbox')
+        .get();
+    expect(rows, hasLength(1), reason: 'la file ne doit pas être vidée');
+    expect(rows.single.read<int>('attempts'), 3, reason: 'le compteur serveur survit');
+    expect(
+      rows.single.read<int>('blocked_attempts'),
+      0,
+      reason: 'une ligne ancienne n’a jamais été bloquée : elle repart à zéro',
+    );
+
+    await db.close();
+  });
+
+  // ── v5 → v6 : retrait des CHECK d'énumération ──────────────────────────────
+  //
+  // Le premier palier qui RECRÉE des tables portant des données. Il doit donc
+  // prouver deux choses opposées : que rien n'est perdu, et que la contrainte
+  // qu'on voulait retirer l'est réellement.
+
+  test('v5 -> v6 accepte une valeur d\'énumération que ce client ignore', () async {
+    final schema = await verifier.schemaAt(5);
+
+    final v5.DatabaseAtV5 old = v5.DatabaseAtV5(schema.newConnection());
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO phase2_directory '
+      '(prospect_id, phone_e164, phase2_status, rev, updated_at) '
+      'VALUES (?, ?, ?, ?, ?)',
+      <Object?>['p-1', '+221771112233', 'PENDING', 1, _iso],
+    );
+    // Sous v5, cette écriture est REFUSÉE par le CHECK : c'est le défaut.
+    await expectLater(
+      old.customStatement(
+        'INSERT INTO phase2_directory '
+        '(prospect_id, phone_e164, phase2_status, rev, updated_at) '
+        'VALUES (?, ?, ?, ?, ?)',
+        <Object?>['p-2', '+221771112244', 'ESCALATED', 1, _iso],
+      ),
+      throwsA(anything),
+      reason: 'c\'est bien le CHECK de v5 qui bloquait la page de pull entière',
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 6);
+
+    // Rien n'a été perdu par la recréation de table.
+    final List<QueryRow> kept = await db
+        .customSelect('SELECT prospect_id, phase2_status FROM phase2_directory')
+        .get();
+    expect(kept, hasLength(1));
+    expect(kept.single.read<String>('phase2_status'), 'PENDING');
+
+    // Et la valeur inconnue passe désormais : c'est tout l'objet du palier.
+    await db.customStatement(
+      'INSERT INTO phase2_directory '
+      '(prospect_id, phone_e164, phase2_status, enrollment_method, rev, updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['p-2', '+221771112244', 'ESCALATED', 'USSD', 1, _iso],
+    );
+    final List<QueryRow> after = await db
+        .customSelect('SELECT COUNT(*) AS c FROM phase2_directory')
+        .get();
+    expect(after.single.read<int>('c'), 2);
+
+    await db.close();
+  });
+
+  test('v5 -> v6 repose les index des tables recréées', () async {
+    final schema = await verifier.schemaAt(5);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 6);
+
+    final List<QueryRow> indexes = await db
+        .customSelect(
+          'SELECT name FROM sqlite_master WHERE type = \'index\' '
+          'AND tbl_name IN (\'prospects\', \'phase2_directory\', \'call_attempts\')',
+        )
+        .get();
+    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+
+    // Recréer une table emporte ses index avec elle. Les oublier ne casse
+    // aucun test fonctionnel : ça rend seulement chaque recherche de numéro
+    // linéaire sur 500 000 lignes, en production, sans jamais lever d'erreur.
+    expect(names, contains('prospects_phone_unique'));
+    expect(names, contains('prospects_representant_idx'));
+    expect(names, contains('prospects_created_idx'));
+    expect(names, contains('phase2_directory_phone_unique'));
+    expect(names, contains('phase2_directory_status_idx'));
+    expect(names, contains('call_attempts_prospect_idx'));
+    expect(names, contains('call_attempts_created_idx'));
+
+    await db.close();
+  });
+
+  test('v5 -> v6 garde les CHECK de FORME de call_attempts', () async {
+    final schema = await verifier.schemaAt(5);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 6);
+
+    // Ce qui a été retiré, c'est la LISTE de vocabulaire. Les trois règles
+    // structurelles du serveur : méthode ssi METHOD_OBTAINED, OTHER exige un
+    // commentaire, commentaire borné : restent vraies quelle que soit l'issue
+    // que le serveur ajoutera, et doivent survivre à la recréation de table.
+    await expectLater(
+      db.customStatement(
+        'INSERT INTO call_attempts '
+        '(id, prospect_id, outcome, method, client_created_at, created_by_id) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>['a-1', 'p-1', 'CALLBACK', 'PLATFORM', _iso, 'me'],
+      ),
+      throwsA(anything),
+      reason: 'une méthode sur une issue non terminale reste refusée',
+    );
+    await expectLater(
+      db.customStatement(
+        'INSERT INTO call_attempts '
+        '(id, prospect_id, outcome, client_created_at, created_by_id) '
+        'VALUES (?, ?, ?, ?, ?)',
+        <Object?>['a-2', 'p-1', 'OTHER', _iso, 'me'],
+      ),
+      throwsA(anything),
+      reason: 'OTHER sans commentaire reste refusé',
+    );
+    // Mais une issue INCONNUE de ce client passe maintenant.
+    await db.customStatement(
+      'INSERT INTO call_attempts '
+      '(id, prospect_id, outcome, client_created_at, created_by_id) '
+      'VALUES (?, ?, ?, ?, ?)',
+      <Object?>['a-3', 'p-1', 'ESCALATED', _iso, 'me'],
+    );
+
+    await db.close();
+  });
+
+  // ── v6 → v7 : le jeton de possession ───────────────────────────────────────
+  //
+  // Ce palier ajoute une colonne à `outbox`, la table qui porte les saisies non
+  // encore parties. C'est le palier le plus dangereux du fichier : `alterTable`
+  // au lieu d'`addColumn`, et c'est une journée de prospection qui disparaît.
+
+  test('v6 -> v7 ajoute claim_token sans toucher à la file', () async {
+    final schema = await verifier.schemaAt(6);
+
+    // Une file de fin de journée : une opération qui attend, et une qui était
+    // EN VOL au moment de la mise à jour de l'application.
+    final v6.DatabaseAtV6 old = v6.DatabaseAtV6(schema.newConnection());
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, attempts, blocked_attempts, '
+      ' status, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-1', 'prospect', 'pro-1', 'create', '{"nom":"Diop"}', 3, 1, 'pending', _iso, _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, attempts, blocked_attempts, '
+      ' status, next_attempt_at, lease_until, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-2', 'representant', 'rep-1', 'update', '{}', 0, 0, 'syncing', _iso, _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 7);
+
+    final List<QueryRow> queue = await db
+        .customSelect(
+          'SELECT id, payload, attempts, blocked_attempts, status, claim_token '
+          'FROM outbox ORDER BY seq',
+        )
+        .get();
+    expect(queue, hasLength(2), reason: 'la file traverse le palier intacte');
+    expect(queue.first.read<String>('payload'), '{"nom":"Diop"}');
+    expect(queue.first.read<int>('attempts'), 3);
+    expect(queue.first.read<int>('blocked_attempts'), 1);
+
+    // La colonne existe et vaut NULL partout, y compris sur la ligne qui était
+    // en vol. C'est voulu : « possédée par personne ». Son bail finira par
+    // expirer, la récupération la repassera en `pending` et elle repartira sous
+    // un jeton neuf. Au pire un envoi rejoué, que la clé d'idempotence sait
+    // rapprocher ; jamais une saisie perdue.
+    for (final QueryRow row in queue) {
+      expect(row.read<String?>('claim_token'), isNull);
+    }
+    expect(queue.last.read<String>('status'), 'syncing');
+
+    await db.close();
+  });
+
+  // ── Le saut de plusieurs versions ──────────────────────────────────────────
+  //
+  // Chaque test ci-dessus ne franchit qu'UN palier. Or un commercial qui n'a pas
+  // mis à jour depuis deux mois saute trois ou quatre versions d'un coup, et
+  // c'est le seul chemin que personne ne parcourt en développement : la machine
+  // de l'équipe est toujours à la version précédente. Les paliers v4 et v5 sont
+  // gardés par `to >= n` précisément parce qu'une composition mal ordonnée
+  // produit un schéma qui n'est AUCUNE version déclarée.
+
+  test('v1 -> v7 d\'un seul coup : deux mois sans mise à jour', () async {
+    final schema = await verifier.schemaAt(1);
+
+    final v1.DatabaseAtV1 old = v1.DatabaseAtV1(schema.newConnection());
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO departements (id, code, name, region_id, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?)',
+      <Object?>['dep-1', 'DK', 'Dakar', 'reg-1', _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO banques (id, name, short_name, local_updated_at) '
+      'VALUES (?, ?, ?, ?)',
+      <Object?>['bq-1', 'Banque Test', 'BT', _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO syndicats (id, name, sigle, local_updated_at) '
+      'VALUES (?, ?, ?, ?)',
+      <Object?>['sy-1', 'Syndicat Test', 'ST', _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, departement_id, created_by_id, '
+      ' client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['rep-1', 'Awa Ndiaye', '+221771234567', 'dep-1', 'me', _iso, _iso],
+    );
+    // Un prospect : c'est SA table que le palier v6 recrée, et il porte une
+    // clé étrangère vers le représentant.
+    await old.customStatement(
+      'INSERT INTO prospects '
+      '(id, nom, prenom, phone_e164, banque_id, syndicat_id, representant_id, '
+      ' created_by_id, statut, client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'pro-1',
+        'Diop',
+        'Moussa',
+        '+221771112299',
+        'bq-1',
+        'sy-1',
+        'rep-1',
+        'me',
+        'CONTACTE',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, attempts, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-1', 'prospect', 'pro-1', 'create', '{}', 2, _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    // UN SEUL appel, de 1 à 7 : c'est le vrai chemin de l'appareil qui a sauté
+    // les versions intermédiaires.
+    await verifier.migrateAndValidate(db, 7);
+
+    // Les données de v1 ont traversé cinq paliers, dont une recréation de table.
+    final List<QueryRow> prospects = await db
+        .customSelect('SELECT id, statut, representant_id FROM prospects')
+        .get();
+    expect(prospects, hasLength(1), reason: 'la recréation de table ne perd rien');
+    expect(prospects.single.read<String>('statut'), 'CONTACTE');
+    expect(prospects.single.read<String>('representant_id'), 'rep-1');
+
+    final List<QueryRow> queue = await db
+        .customSelect('SELECT id, attempts, blocked_attempts, claim_token FROM outbox')
+        .get();
+    expect(queue, hasLength(1), reason: 'la file survit au saut de versions');
+    expect(queue.single.read<int>('attempts'), 2);
+    expect(queue.single.read<int>('blocked_attempts'), 0);
+    expect(queue.single.read<String?>('claim_token'), isNull);
+
+    // La clé étrangère du prospect recréé pointe toujours vers une vraie fiche.
+    final List<QueryRow> violations = await db
+        .customSelect('PRAGMA foreign_key_check')
+        .get();
+    expect(violations, isEmpty, reason: 'la recréation a préservé les clés étrangères');
+
+    await db.close();
+  });
+
+  test('v2 -> v7 : le saut passe aussi par les colonnes ajoutées', () async {
+    final schema = await verifier.schemaAt(2);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 7);
+
+    // Les trois colonnes ajoutées en chemin (v4, v5 puis v7) doivent être là
+    // toutes les trois : un palier gardé par `from < n` seul, sans `to >= n`,
+    // produit un schéma intermédiaire qui n'est aucune version déclarée.
+    final List<QueryRow> columns = await db
+        .customSelect('SELECT ief_id FROM representants')
+        .get();
+    expect(columns, isEmpty);
+    final List<QueryRow> outbox = await db
+        .customSelect('SELECT blocked_attempts, claim_token FROM outbox')
+        .get();
+    expect(outbox, isEmpty);
 
     await db.close();
   });

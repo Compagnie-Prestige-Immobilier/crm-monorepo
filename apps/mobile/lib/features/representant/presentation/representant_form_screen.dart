@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,7 +19,9 @@ import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
 import '../../../data/repositories/draft_repository.dart';
 import '../../../ui/widgets/local_typeahead.dart';
+import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/phone_field.dart';
+import '../../../ui/widgets/referentials_banner.dart';
 
 /// Nouveau représentant.
 ///
@@ -28,18 +31,30 @@ import '../../../ui/widgets/phone_field.dart';
 /// chaîne, une commission fausse. Le prévenir à la saisie coûte une requête ; le
 /// réparer après coup coûte une conversation avec deux commerciaux.
 ///
-/// La détection interroge **d'abord la base locale** — instantanée, disponible
-/// hors ligne — puis le serveur si le réseau répond. L'ordre n'est pas
+/// La détection interroge **d'abord la base locale** : instantanée, disponible
+/// hors ligne : puis le serveur si le réseau répond. L'ordre n'est pas
 /// négociable : le résultat local doit s'afficher sans attendre le réseau, sinon
 /// la fonctionnalité disparaît précisément là où elle sert.
 class RepresentantFormScreen extends ConsumerStatefulWidget {
-  const RepresentantFormScreen({super.key, this.draftId, this.representantId});
+  const RepresentantFormScreen({
+    super.key,
+    this.draftId,
+    this.representantId,
+    this.prefillName,
+    this.prefillPhone,
+  });
 
   /// Référence au brouillon, transportée par l'URL (`?draft=<id>`).
   final String? draftId;
 
   /// Renseigné en modification.
   final String? representantId;
+
+  /// Recherche restée sans résultat dans le sélecteur, reprise telle quelle :
+  /// la retaper est un geste de plus au moment où l'utilisateur en a déjà fait
+  /// un pour rien.
+  final String? prefillName;
+  final String? prefillPhone;
 
   @override
   ConsumerState<RepresentantFormScreen> createState() => _RepresentantFormScreenState();
@@ -58,7 +73,12 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   final FocusNode _departementFocus = FocusNode();
   final FocusNode _iefFocus = FocusNode();
 
-  late final String _draftId = widget.draftId ?? Ids.newId();
+  /// Non `final` : quand un brouillon est retrouvé sous un AUTRE identifiant
+  /// (ouverture depuis un bouton, retour depuis le sélecteur), l'écran l'adopte
+  /// au lieu d'en créer un second. Sans adoption, la reprise écrirait désormais
+  /// sous l'identifiant neuf et laisserait l'ancienne ligne orpheline sept
+  /// jours durant.
+  late String _draftId = widget.draftId ?? Ids.newId();
   late final String _entityId = widget.representantId ?? Ids.newId();
 
   String? _departementId;
@@ -85,12 +105,21 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   @override
   DraftRepository get draftRepository => ref.read(draftRepositoryProvider);
 
+  /// Vide veut dire « rien à sauver », et le référentiel choisi COMPTE.
+  ///
+  /// Sélectionner un département dans une liste est le geste le plus lent d'un
+  /// formulaire tactile : ne le considérer comme rien parce que le nom n'est pas
+  /// encore tapé revenait à jeter précisément ce qu'on voulait protéger.
   @override
   bool get draftIsEmpty =>
-      _nom.text.trim().isEmpty && _phone.text.trim().isEmpty && _departementId == null;
+      _nom.text.trim().isEmpty &&
+      _phone.text.trim().isEmpty &&
+      _departementId == null &&
+      _iefId == null;
 
   /// En création seulement : en modification, la fiche existe déjà et c'est son
-  /// identifiant, pas un brouillon, qui porte la restauration.
+  /// identifiant : porté par `?id=`, et retrouvé par
+  /// [DraftRepository.forEntity] : qui porte la restauration.
   @override
   String? draftRouteWithId() => widget.draftId == null && widget.representantId == null
       ? Routes.newRepresentantWithDraft(_draftId)
@@ -109,6 +138,15 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   @override
   void initState() {
     super.initState();
+    if (widget.representantId == null) {
+      final String? name = widget.prefillName?.trim();
+      final String? phone = widget.prefillPhone?.trim();
+      if (name != null && name.isNotEmpty) _nom.text = name;
+      if (phone != null && phone.isNotEmpty) {
+        _phone.text = Phone.groupNational(Phone.digitsOf(phone));
+        _scheduleLookup();
+      }
+    }
     // Vider sur perte de focus, en plus de la traîne : quitter un champ est le
     // moment où l'utilisateur considère sa valeur acquise.
     for (final FocusNode node in <FocusNode>[
@@ -138,7 +176,22 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     super.dispose();
   }
 
+  /// Retrouve la saisie inachevée, quel que soit le chemin d'arrivée.
+  ///
+  /// ═══ CE QUE CE MÉCANISME NE FAISAIT PAS ═══
+  ///
+  /// `_draftId` vaut `widget.draftId ?? Ids.newId()` : ouvert depuis un bouton,
+  /// l'écran tire un identifiant NEUF à chaque montage et relit sous cet
+  /// identifiant, qui par construction n'a jamais rien porté. La restauration
+  /// était donc en écriture seule : le brouillon existait bien en base, et
+  /// personne ne savait plus sous quel nom le chercher.
+  ///
+  /// On interroge donc, dans l'ordre : l'identifiant de l'URL s'il y en a un,
+  /// puis : à défaut : le dernier brouillon connu de ce formulaire. Et en
+  /// modification, le brouillon de CETTE fiche, retrouvé par son `entityId`.
   Future<void> _restore() async {
+    final DraftRepository drafts = ref.read(draftRepositoryProvider);
+
     if (widget.representantId != null) {
       final Representant? existing = await ref
           .read(referenceRepositoryProvider)
@@ -148,19 +201,34 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
           _nom.text = existing.fullName;
           _phone.text = Phone.groupNational(Phone.digitsOf(existing.phoneE164));
           _departementId = existing.departementId;
-        _iefId = existing.iefId;
+          _iefId = existing.iefId;
         });
         await _labelDepartement(existing.departementId);
         if (existing.iefId != null) await _labelIef(existing.iefId!);
       }
+      // La fiche est chargée ; s'il existe une correction inachevée sur CETTE
+      // fiche, elle est plus récente que la base et prime : c'est ce que
+      // l'utilisateur était en train d'écrire quand le système l'a interrompu.
+      final DraftSnapshot? pending = await drafts.forEntity(
+        formKey,
+        widget.representantId!,
+      );
+      if (pending != null && mounted) _offer(pending);
       return;
     }
 
-    final DraftSnapshot? snapshot = await ref
-        .read(draftRepositoryProvider)
-        .read(_draftId);
+    DraftSnapshot? snapshot = await drafts.read(_draftId);
+    // Aucun brouillon sous l'identifiant courant, et l'URL n'en imposait pas :
+    // l'écran vient d'être ouvert depuis un bouton. Le dernier brouillon de ce
+    // formulaire est alors la seule piste, et c'est la bonne.
+    if (snapshot == null && widget.draftId == null) {
+      snapshot = await drafts.latestFor(formKey);
+    }
     if (snapshot == null || !mounted) return;
+    _offer(snapshot);
+  }
 
+  void _offer(DraftSnapshot snapshot) {
     switch (snapshot.age) {
       case DraftAge.crash:
         // Moins de 60 s : ce n'est pas un abandon, c'est un plantage ou une
@@ -174,7 +242,12 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   }
 
   void _apply(DraftSnapshot snapshot) {
+    // ADOPTION de l'identifiant retrouvé : les écritures suivantes reprennent
+    // la même ligne. Sans elle, la reprise créerait un second brouillon et
+    // laisserait le premier traîner sept jours.
+    final bool adopted = snapshot.draftId != _draftId;
     setState(() {
+      if (adopted) _draftId = snapshot.draftId;
       _nom.text = (snapshot.values['fullName'] as String?) ?? '';
       _phone.text = (snapshot.values['phone'] as String?) ?? '';
       _departementId = snapshot.values['departementId'] as String?;
@@ -183,6 +256,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       _ief.text = (snapshot.values['iefLabel'] as String?) ?? '';
       _pendingRestore = null;
     });
+    if (adopted) republishDraftRoute();
     _scheduleLookup();
   }
 
@@ -304,16 +378,62 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       context.pushReplacement(Routes.newProspectFor(_entityId));
     } on Object catch (e) {
       if (!mounted) return;
+      final String message = _humanize(e);
       setState(() {
         _saving = false;
-        _error = _humanize(e);
+        _error = message;
       });
+      _announceFailure(message);
     }
   }
 
+  /// Un échec d'enregistrement doit être **perçu**, pas seulement affiché.
+  ///
+  /// Deux canaux, parce qu'aucun ne suffit seul : une infobulle qui passe par
+  /// dessus le clavier, et une annonce au lecteur d'écran. Le message rendu en
+  /// bas de la liste défilante ne franchissait ni l'un ni l'autre : l'appui
+  /// paraissait sans effet.
+  void _announceFailure(String message) {
+    // `sendAnnouncement` et non `announce` : cette dernière est dépréciée depuis
+    // Flutter 3.35 et ne sait pas de quelle fenêtre elle parle.
+    // `Assertiveness.assertive` : un échec d'enregistrement interrompt la
+    // lecture en cours, il ne se met pas dans la file d'attente.
+    unawaited(
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        message,
+        Directionality.of(context),
+        assertiveness: Assertiveness.assertive,
+      ),
+    );
+    final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(context);
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+  }
+
+  /// ═══ ON RECONNAÎT LA COLONNE, PAS LE NOM DE L'INDEX ═══
+  ///
+  /// Le test portait sur `representants_phone_unique`, le nom de l'index.
+  /// SQLite ne le cite jamais : il rend « UNIQUE constraint failed:
+  /// representants.phone_e164 ». La branche lisible n'était donc JAMAIS prise,
+  /// et pour le cas d'échec le plus fréquent de l'application : ressaisir un
+  /// représentant déjà enregistré : le commercial recevait un
+  /// `SqliteException(2067)` complet en pleine barre d'enregistrement.
+  ///
+  /// Les deux formes sont acceptées : le nom de l'index couvre les moteurs qui
+  /// le citent, la colonne couvre celui qu'on embarque.
   static String _humanize(Object error) {
     final String raw = error.toString();
-    if (raw.contains('representants_phone_unique')) {
+    if (raw.contains('representants.phone_e164') ||
+        raw.contains('representants_phone_unique')) {
       return 'Ce numéro est déjà enregistré sur cet appareil.';
     }
     return 'Enregistrement impossible. $raw';
@@ -323,7 +443,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     final List<Departement> departements =
         ref.watch(departementsProvider).value ?? const <Departement>[];
     // Restreintes au département choisi : proposer les 59 IEF du pays alors que
@@ -340,10 +459,21 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                 : 'Modifier le représentant',
           ),
           leading: const CpiBackButton(),
+          // Hors coque de navigation, cet écran n'avait AUCUN signal réseau :
+          // ni cette icône, ni le bandeau d'attente du shell. Or c'est ici que
+          // le commercial passe l'essentiel de son temps.
+          actions: const <Widget>[
+            OfflineIndicator(),
+            SizedBox(width: CpiSpacing.xs),
+          ],
         ),
         body: SafeArea(
           child: Column(
             children: <Widget>[
+              // Sans département, « Enregistrer » ne peut PAS s'activer : c'est
+              // la seule chose à dire, et il faut la dire avant que
+              // l'utilisateur ne conclue que l'application est cassée.
+              ReferentialsBanner(missing: departements.isEmpty),
               if (_pendingRestore != null)
                 _ResumeBanner(
                   label: (_pendingRestore!.values['fullName'] as String?)?.trim(),
@@ -472,15 +602,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                         unawaited(flushDraft());
                       },
                     ),
-                    if (_error != null) ...<Widget>[
-                      const SizedBox(height: CpiSpacing.md),
-                      Text(
-                        _error!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.error,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -491,6 +612,11 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                 enabled: _canSave,
                 busy: _saving,
                 onPressed: _save,
+                // L'erreur voyage AVEC le bouton. En bas d'une `ListView`, elle
+                // n'était visible que si l'utilisateur se trouvait déjà au bas
+                // du formulaire : dans tous les autres cas, l'appui semblait
+                // n'avoir aucun effet.
+                error: _error,
               ),
             ],
           ),
@@ -516,8 +642,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
 /// Bandeau « ce représentant existe déjà ».
 ///
 /// Il ne bloque pas la saisie : le commercial peut avoir une raison de créer
-/// quand même (homonyme, numéro recyclé). Il propose l'action utile — aller
-/// ajouter des prospects à la fiche existante — au lieu de se contenter d'un
+/// quand même (homonyme, numéro recyclé). Il propose l'action utile : aller
+/// ajouter des prospects à la fiche existante : au lieu de se contenter d'un
 /// avertissement dont on ne peut rien faire.
 class _DuplicateBanner extends StatelessWidget {
   const _DuplicateBanner({required this.name, this.owner, this.onAddProspects});
@@ -610,18 +736,36 @@ class _ResumeBanner extends StatelessWidget {
         horizontal: CpiSpacing.md,
         vertical: CpiSpacing.xs,
       ),
-      child: Row(
+      // Même mise en page que le bandeau des référentiels, et pour la même
+      // raison : deux `TextButton` posés dans le `Row` du message réclamaient
+      // ensemble plus que la largeur d'un 320 dp. Ils prenaient leur dû AVANT
+      // l'`Expanded`, qui se repliait alors sur des dizaines de lignes. Les
+      // actions descendent donc sous le message, dans un `Wrap` qui les met
+      // l'une sous l'autre plutôt que de sortir de l'écran.
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Icon(PhosphorIconsRegular.arrowCounterClockwise, size: 18, color: cpi.info),
-          const SizedBox(width: CpiSpacing.xs),
-          Expanded(
-            child: Text(
-              'Saisie non terminée : $who',
-              style: theme.textTheme.bodySmall?.copyWith(color: cpi.info),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Icon(PhosphorIconsRegular.arrowCounterClockwise, size: 18, color: cpi.info),
+              const SizedBox(width: CpiSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Saisie non terminée : $who',
+                  style: theme.textTheme.bodySmall?.copyWith(color: cpi.info),
+                ),
+              ),
+            ],
           ),
-          TextButton(onPressed: onResume, child: const Text('Reprendre')),
-          TextButton(onPressed: onDiscard, child: const Text('Supprimer')),
+          Wrap(
+            alignment: WrapAlignment.end,
+            children: <Widget>[
+              TextButton(onPressed: onResume, child: const Text('Reprendre')),
+              TextButton(onPressed: onDiscard, child: const Text('Supprimer')),
+            ],
+          ),
         ],
       ),
     );
@@ -638,12 +782,16 @@ class _SaveBar extends StatelessWidget {
     required this.enabled,
     required this.busy,
     required this.onPressed,
+    this.error,
   });
 
   final String label;
   final bool enabled;
   final bool busy;
   final VoidCallback onPressed;
+
+  /// Message d'échec, affiché **au contact du bouton** qui vient d'être appuyé.
+  final String? error;
 
   @override
   Widget build(BuildContext context) {
@@ -660,16 +808,47 @@ class _SaveBar extends StatelessWidget {
         color: theme.colorScheme.surface,
         border: Border(top: BorderSide(color: context.cpi.borderSubtle)),
       ),
-      child: FilledButton.icon(
-        onPressed: enabled ? onPressed : null,
-        icon: busy
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(PhosphorIconsRegular.check, size: 20),
-        label: Text(label),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          if (error != null) ...<Widget>[
+            Semantics(
+              liveRegion: true,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Icon(
+                    PhosphorIconsRegular.warningCircle,
+                    size: 18,
+                    color: theme.colorScheme.error,
+                  ),
+                  const SizedBox(width: CpiSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      error!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: CpiSpacing.xs),
+          ],
+          FilledButton.icon(
+            onPressed: enabled ? onPressed : null,
+            icon: busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(PhosphorIconsRegular.check, size: 20),
+            label: Text(label),
+          ),
+        ],
       ),
     );
   }

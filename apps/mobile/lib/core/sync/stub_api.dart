@@ -56,7 +56,7 @@ class StubApi implements ApiPort {
     return PullPage(
       changes: SyncChangesDto(
         departements: const <DepartementDto>[],
-    iefs: const <IefDto>[],
+        iefs: const <IefDto>[],
         banques: const <BanqueDto>[],
         syndicats: const <SyndicatDto>[],
         representants: const <RepresentantDto>[],
@@ -74,19 +74,6 @@ class StubApi implements ApiPort {
     required String batchId,
     required int payloadVersion,
     required List<SyncOperationDto> operations,
-  }) async {
-    throw const ApiException(
-      'api_not_configured',
-      message: 'Aucun serveur configuré : ce transport ne pousse rien.',
-      kind: FailureKind.retryable,
-    );
-  }
-
-  @override
-  Future<PushResult> pushRaw({
-    required String batchId,
-    required int payloadVersion,
-    required List<Map<String, Object?>> operations,
   }) async {
     throw const ApiException(
       'api_not_configured',

@@ -16,7 +16,7 @@ const int kDraftSchemaVersion = 1;
 /// Politique de reprise, dérivée de l'âge du brouillon.
 enum DraftAge {
   /// Moins de 60 s : ce n'est pas un abandon, c'est un plantage ou une
-  /// éjection mémoire. On restaure **en silence** — demander « voulez-vous
+  /// éjection mémoire. On restaure **en silence** : demander « voulez-vous
   /// reprendre ? » à quelqu'un qui tapait il y a quinze secondes est une
   /// question absurde qui coûte un aller-retour d'attention.
   crash,
@@ -53,11 +53,11 @@ class DraftSnapshot {
   final String? parentId;
 }
 
-/// Persistance des saisies inachevées — **Dart pur**.
+/// Persistance des saisies inachevées : **Dart pur**.
 ///
 /// Un brouillon n'est PAS une intention d'écriture : il ne part jamais au
 /// serveur, il n'a pas de place dans l'outbox. C'est une saisie en cours qu'on
-/// refuse de perdre si le système tue l'app au milieu d'un formulaire — ce que
+/// refuse de perdre si le système tue l'app au milieu d'un formulaire : ce que
 /// les ROM Transsion et Xiaomi font volontiers, sans prévenir.
 class DraftRepository {
   DraftRepository(this._db, {Clock clock = const SystemClock()}) : _clock = clock;
@@ -122,6 +122,45 @@ class DraftRepository {
       if (snapshot != null) return snapshot;
     }
     return null;
+  }
+
+  /// Le brouillon d'une entité **en cours de modification**.
+  ///
+  /// La création se repère par son `draftId` (transporté dans l'URL) ; la
+  /// modification, elle, n'a pas de `draftId` dans l'adresse : elle porte
+  /// `?id=<entityId>`. Sans cette lecture, un écran de modification écrivait
+  /// bien un brouillon à chaque frappe et n'en relisait jamais aucun : une mort
+  /// de processus au milieu d'une correction perdait les modifications ET
+  /// laissait la ligne en base pour sept jours.
+  Future<DraftSnapshot?> forEntity(String formKey, String entityId) async {
+    final List<FormDraft> rows =
+        await (_db.select(_db.formDrafts)
+              ..where(
+                (FormDrafts t) =>
+                    t.formKey.equals(formKey) & t.entityId.equals(entityId),
+              )
+              ..orderBy(<OrderClauseGenerator<FormDrafts>>[
+                (FormDrafts t) => OrderingTerm.desc(t.updatedAt),
+              ])
+              ..limit(5))
+            .get();
+    for (final FormDraft row in rows) {
+      final DraftSnapshot? snapshot = await _decode(row);
+      if (snapshot != null) return snapshot;
+    }
+    return null;
+  }
+
+  /// Vrai s'il reste une saisie inachevée sous cet identifiant.
+  ///
+  /// Lu par la mémoire de route : elle refuse d'écraser l'adresse d'un
+  /// formulaire par celle de l'écran qui le précède tant que le brouillon
+  /// existe.
+  Future<bool> exists(String draftId) async {
+    final FormDraft? row = await (_db.select(
+      _db.formDrafts,
+    )..where((FormDrafts t) => t.draftId.equals(draftId))).getSingleOrNull();
+    return row != null;
   }
 
   /// Purge les brouillons trop vieux. Appelée au démarrage.

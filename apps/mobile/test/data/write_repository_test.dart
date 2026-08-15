@@ -60,7 +60,7 @@ void main() {
       // Éligible tout de suite : le premier essai ne doit pas attendre.
       expect(op.nextAttemptAt, t0);
 
-      // 3. le brouillon a disparu — sinon l'écran proposerait « reprendre la
+      // 3. le brouillon a disparu : sinon l'écran proposerait « reprendre la
       //    saisie » d'une fiche déjà enregistrée, que l'utilisateur ressaisirait.
       expect(await drafts.read('d1'), isNull);
       expect(await db.select(db.formDrafts).get(), isEmpty);
@@ -114,7 +114,7 @@ void main() {
       await seedDraft('d1');
       // Une erreur levée dans la transaction de l'appelant doit tout annuler :
       // si les trois instructions committaient séparément, la ligne métier
-      // resterait sans opération d'outbox — visible, jamais envoyée.
+      // resterait sans opération d'outbox : visible, jamais envoyée.
       await expectLater(
         db.transaction(() async {
           await repo.createRepresentant(
@@ -249,12 +249,13 @@ void main() {
     test('abandonner un `create` emporte toute la suite de sa clé', () async {
       final Map<String, int> seqs = await seedChains();
 
-      final int removed = await repo.discardOperation(seqs['A1']!);
+      final DiscardResult result = await repo.discardOperation(seqs['A1']!);
 
       // Sans cette cascade, les prospects partiraient vers un parent qui
       // n'existera jamais côté serveur : REPRESENTANT_NOT_FOUND à chaque
       // tentative, indéfiniment, et une file qui ne se vide pas.
-      expect(removed, 3);
+      expect(result.outcome, DiscardOutcome.discarded);
+      expect(result.removed, 3);
       final List<OutboxData> left = await allOutbox(db);
       expect(left.map((OutboxData o) => o.id), <String>['B1', 'B2']);
 
@@ -278,8 +279,8 @@ void main() {
 
     test('abandonner un prospect ne touche ni son parent ni ses frères', () async {
       final Map<String, int> seqs = await seedChains();
-      final int removed = await repo.discardOperation(seqs['A2']!);
-      expect(removed, 1);
+      final DiscardResult result = await repo.discardOperation(seqs['A2']!);
+      expect(result.removed, 1);
       final List<OutboxData> left = await allOutbox(db);
       expect(left.map((OutboxData o) => o.id), <String>['A1', 'A3', 'B1', 'B2']);
       expect((await db.select(db.prospects).get()).map((Prospect p) => p.id), <String>[
@@ -304,7 +305,7 @@ void main() {
         status: OutboxStatus.failed,
       );
       final OutboxData u1 = await outboxById(db, 'U1');
-      expect(await repo.discardOperation(u1.seq), 1);
+      expect((await repo.discardOperation(u1.seq)).removed, 1);
       expect(await allOutbox(db), isEmpty);
       // La fiche existe côté serveur : la supprimer localement la ferait
       // revenir au prochain pull, en donnant l'illusion d'un bug.
@@ -324,7 +325,10 @@ void main() {
 
     test('abandonner une opération inexistante ne fait rien', () async {
       await seedChains();
-      expect(await repo.discardOperation(99999), 0);
+      expect(
+        (await repo.discardOperation(99999)).outcome,
+        DiscardOutcome.notFound,
+      );
       expect(await allOutbox(db), hasLength(5));
     });
   });

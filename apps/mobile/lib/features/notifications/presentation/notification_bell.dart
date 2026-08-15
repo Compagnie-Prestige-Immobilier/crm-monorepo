@@ -32,7 +32,11 @@ class NotificationBell extends ConsumerWidget {
           ? '$unread notification${unread > 1 ? 's' : ''} non lue${unread > 1 ? 's' : ''}'
           : 'Notifications',
       child: InkWell(
-        onTap: () => context.go(Routes.notifications),
+        // `push` et non `go` : `go` REMPLACE la pile, et c'est exactement ce
+        // qui rendait le centre d'annonces sans issue : plus rien à dépiler,
+        // donc flèche inerte et geste système qui sort de l'application. Voir
+        // `core/router/back_navigation.dart`.
+        onTap: () => context.push(Routes.notifications),
         borderRadius: CpiRadius.brFull,
         child: ConstrainedBox(
           // 48 dp : l'application sert debout, au soleil, parfois à une main.

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/background/background_sync.dart';
@@ -10,9 +9,12 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/sync_coordinator.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/settings/display_settings.dart';
+import '../../../core/utils/relative_time.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/theme/cpi_typography.dart';
+import '../../../ui/widgets/offline_indicator.dart';
+import '../../../ui/widgets/sync_badge.dart';
 import '../../auth/auth_state.dart';
 
 /// Réglages : profil, synchronisation, affichage, session.
@@ -50,7 +52,14 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
     final DisplaySettings display = ref.watch(displaySettingsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Réglages')),
+      appBar: AppBar(
+        title: const Text('Réglages'),
+        actions: const <Widget>[
+          OfflineIndicator(),
+          SyncBadge(),
+          SizedBox(width: CpiSpacing.xs),
+        ],
+      ),
       body: ListView(
         // Marge haute réduite : le premier contenu utile commence à 12 dp du
         // bandeau, pas à 16. Sur un écran de 360 dp, chaque bande vide en haut
@@ -106,7 +115,7 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                   pending == 0
                       ? sync.lastRunAt == null
                             ? 'Aucun envoi'
-                            : 'Dernier envoi ${_relative(sync.lastRunAt!)}'
+                            : 'Dernier envoi ${relativeTime(sync.lastRunAt!)}'
                       : 'En attente d\'envoi',
                 ),
               ),
@@ -322,13 +331,6 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
     return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
   }
 
-  static String _relative(DateTime when) {
-    final Duration delta = DateTime.now().difference(when);
-    if (delta.inMinutes < 1) return 'à l\'instant';
-    if (delta.inHours < 1) return 'il y a ${delta.inMinutes} min';
-    if (delta.inDays < 1) return 'il y a ${delta.inHours} h';
-    return 'le ${DateFormat('d MMMM à HH:mm', 'fr').format(when)}';
-  }
 }
 
 /// Trois paliers de taille, en segments.

@@ -12,8 +12,8 @@ final DateTime t0 = DateTime.utc(2026, 8, 12, 9);
 /// Base en mémoire, référentiels minimaux déjà posés, clés étrangères actives.
 ///
 /// `PRAGMA foreign_keys = ON` n'est pas cosmétique ici : sans lui, le
-/// `ON UPDATE CASCADE` de `prospects.representant_id` — qui porte toute la
-/// résolution de doublon — ne se déclenche pas, et les tests de remappage
+/// `ON UPDATE CASCADE` de `prospects.representant_id` : qui porte toute la
+/// résolution de doublon : ne se déclenche pas, et les tests de remappage
 /// passeraient pour de mauvaises raisons.
 Future<AppDatabase> openTestDatabase() async {
   final AppDatabase db = AppDatabase(NativeDatabase.memory());
@@ -120,8 +120,10 @@ Future<int> queueOp(
   String status = OutboxStatus.pending,
   Map<String, Object?> payload = const <String, Object?>{},
   int attempts = 0,
+  int? baseRev,
   DateTime? nextAttemptAt,
   DateTime? leaseUntil,
+  String? claimToken,
 }) {
   return db
       .into(db.outbox)
@@ -135,8 +137,10 @@ Future<int> queueOp(
           payload: jsonEncode(payload),
           status: Value<String>(status),
           attempts: Value<int>(attempts),
+          baseRev: Value<int?>(baseRev),
           nextAttemptAt: nextAttemptAt ?? t0,
           leaseUntil: Value<DateTime?>(leaseUntil),
+          claimToken: Value<String?>(claimToken),
           createdAt: t0,
         ),
       );

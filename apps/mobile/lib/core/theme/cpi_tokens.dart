@@ -117,19 +117,19 @@ class CpiMotion extends ThemeExtension<CpiMotion> {
     easeSpring: Cubic(0.34, 1.56, 0.64, 1),
   );
 
-  /// 150 ms — micro-retours (coche de sync, pression de bouton).
+  /// 150 ms : micro-retours (coche de sync, pression de bouton).
   final Duration micro;
 
-  /// 220 ms — transitions de composant (ouverture de champ, snackbar).
+  /// 220 ms : transitions de composant (ouverture de champ, snackbar).
   final Duration component;
 
-  /// 300 ms — transitions d'écran.
+  /// 300 ms : transitions d'écran.
   final Duration screen;
 
-  /// `cubic-bezier(0.22, 1, 0.36, 1)` — entrées et sorties.
+  /// `cubic-bezier(0.22, 1, 0.36, 1)` : entrées et sorties.
   final Curve easeOut;
 
-  /// `cubic-bezier(0.34, 1.56, 0.64, 1)` — confirmations (rebond léger).
+  /// `cubic-bezier(0.34, 1.56, 0.64, 1)` : confirmations (rebond léger).
   final Curve easeSpring;
 
   /// Les durées tombent à zéro si l'utilisateur a désactivé les animations ;

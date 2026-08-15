@@ -10,11 +10,11 @@ import 'package:crm_api_client/crm_api_client.dart';
 /// lignes quand un serveur répond quelque chose de précis. Le faux serveur tient
 /// donc un vrai registre :
 ///
-/// * [rows] — les entités « écrites » côté serveur. C'est ce qu'on compte pour
+/// * [rows] : les entités « écrites » côté serveur. C'est ce qu'on compte pour
 ///   savoir si un rejeu a produit un doublon ;
-/// * le registre d'idempotence par `opId` — un `opId` déjà appliqué revient en
+/// * le registre d'idempotence par `opId` : un `opId` déjà appliqué revient en
 ///   `duplicate` sans créer de seconde ligne, exactement comme le serveur réel ;
-/// * [calls] — chaque lot reçu, dans l'ordre, avec son `batchId` et sa version
+/// * [calls] : chaque lot reçu, dans l'ordre, avec son `batchId` et sa version
 ///   de payload.
 class FakeApi implements ApiPort {
   FakeApi({this.userId = 'me'});
@@ -109,9 +109,6 @@ class FakeApi implements ApiPort {
   /// Erreur de transport à lever au prochain [pullPhase2Directory].
   ApiException? failNextDirectoryPull;
 
-  /// Chaque appel à [pushRaw], dans l'ordre.
-  final List<RawPushCall> rawCalls = <RawPushCall>[];
-
   @override
   Future<Phase2DirectoryPage> pullPhase2Directory({
     String? cursor,
@@ -133,85 +130,6 @@ class FakeApi implements ApiPort {
     }
     return directoryPages.removeAt(0);
   }
-
-  /// Le chemin brut de la phase 2. Il partage délibérément le registre
-  /// d'idempotence et le journal de [push] : du point de vue du serveur, les
-  /// deux transports frappent la même route, et un test qui les séparerait
-  /// laisserait passer un doublon inter-transport.
-  @override
-  Future<PushResult> pushRaw({
-    required String batchId,
-    required int payloadVersion,
-    required List<Map<String, Object?>> operations,
-  }) async {
-    rawCalls.add(
-      RawPushCall(
-        batchId: batchId,
-        payloadVersion: payloadVersion,
-        operations: List<Map<String, Object?>>.unmodifiable(operations),
-      ),
-    );
-
-    final ApiException? boom = failNextPush;
-    if (boom != null && !loseNextResponse) {
-      failNextPush = null;
-      throw boom;
-    }
-
-    final List<SyncOperationResultDto> results = <SyncOperationResultDto>[];
-    for (final Map<String, Object?> op in operations) {
-      final String opId = op['opId']! as String;
-      final String entityId = op['entityId']! as String;
-      final SyncOperationResultDto? seen = ledger[opId];
-      if (seen != null) {
-        results.add(
-          SyncOperationResultDto(
-            opId: opId,
-            status: SyncOpStatus.duplicate,
-            entityId: seen.entityId,
-            rev: seen.rev,
-            serverUpdatedAt: seen.serverUpdatedAt,
-            errorCode: null,
-            error: null,
-          ),
-        );
-        continue;
-      }
-      final SyncOperationResultDto? forced = verdicts[opId];
-      if (forced != null) {
-        if (verdictsAreOneShot) verdicts.remove(opId);
-        if (forced.status == SyncOpStatus.applied ||
-            forced.status == SyncOpStatus.duplicate) {
-          rawRows[entityId] = op;
-          ledger[opId] = forced;
-        }
-        results.add(forced);
-        continue;
-      }
-      final SyncOperationResultDto ok = SyncOperationResultDto(
-        opId: opId,
-        status: SyncOpStatus.applied,
-        entityId: entityId,
-        rev: 2,
-        serverUpdatedAt: serverTime,
-        errorCode: null,
-        error: null,
-      );
-      rawRows[entityId] = op;
-      ledger[opId] = ok;
-      results.add(ok);
-    }
-
-    if (loseNextResponse) {
-      loseNextResponse = false;
-      throw boom ?? const ApiException('network_timeout', statusCode: 504);
-    }
-
-    return PushResult(batchId: batchId, results: results, serverTime: serverTime);
-  }
-
-  /// Les opérations brutes « écrites » côté serveur, par identifiant d'entité.
-  final Map<String, Map<String, Object?>> rawRows = <String, Map<String, Object?>>{};
 
   @override
   Future<PushResult> push({
@@ -292,31 +210,6 @@ class FakeApi implements ApiPort {
     ledger[op.opId] = ok;
     return ok;
   }
-}
-
-/// Un lot reçu par le chemin brut de la phase 2.
-class RawPushCall {
-  const RawPushCall({
-    required this.batchId,
-    required this.payloadVersion,
-    required this.operations,
-  });
-
-  final String batchId;
-  final int payloadVersion;
-  final List<Map<String, Object?>> operations;
-
-  List<String> get opIds => <String>[
-    for (final Map<String, Object?> o in operations) o['opId']! as String,
-  ];
-
-  List<String> get entityIds => <String>[
-    for (final Map<String, Object?> o in operations) o['entityId']! as String,
-  ];
-
-  /// Le `data` de la n-ième opération, tel qu'il partirait sur le réseau.
-  Map<String, Object?> dataAt(int index) =>
-      (operations[index]['data']! as Map<String, Object?>);
 }
 
 /// Une page d'annuaire prête à l'emploi.
@@ -420,12 +313,13 @@ RepresentantDto representantDto({
   String? iefId,
   String? iefName,
   String createdById = 'me',
+  int rev = 3,
 }) => RepresentantDto(
   id: id,
   fullName: fullName,
   phoneE164: phoneE164,
   notes: null,
-  rev: 3,
+  rev: rev,
   departementId: departementId,
   iefId: iefId,
   iefName: iefName,
@@ -463,13 +357,6 @@ class ExplodingApi implements ApiPort {
     required String batchId,
     required int payloadVersion,
     required List<SyncOperationDto> operations,
-  }) => _boom();
-
-  @override
-  Future<PushResult> pushRaw({
-    required String batchId,
-    required int payloadVersion,
-    required List<Map<String, Object?>> operations,
   }) => _boom();
 
   @override

@@ -6,10 +6,12 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../ui/widgets/activity_chart.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
+import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/summary_card.dart';
 import '../../../ui/widgets/sync_badge.dart';
 import '../../auth/auth_state.dart';
@@ -37,6 +39,7 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('CPI GO'),
         actions: const <Widget>[
+          OfflineIndicator(),
           NotificationBell(),
           SyncBadge(),
           SizedBox(width: CpiSpacing.xs),
@@ -195,7 +198,7 @@ class _Phase2Entry extends ConsumerWidget {
 
     // `push` et non `go` : `go` remplace la pile, ce qui rendait inerte la
     // flèche de retour de l'écran Phase 2.
-    void open() => context.push(Routes.phase2);
+    void open() => context.pushOnce(Routes.phase2);
 
     return Semantics(
       button: true,
@@ -276,6 +279,12 @@ class _Phase2Entry extends ConsumerWidget {
 }
 
 /// Action principale, ancrée en zone de pouce.
+///
+/// Elle menait droit au formulaire de création, seule route de représentant que
+/// le routeur connaissait. Un commercial qui revenait voir la même concession
+/// n'avait donc, depuis l'accueil, aucune issue autre que ressaisir une fiche
+/// existante. Elle ouvre désormais la sélection, d'où la création reste à un
+/// geste (voir `representant_picker_screen.dart`).
 class _PrimaryAction extends StatelessWidget {
   const _PrimaryAction();
 
@@ -294,13 +303,34 @@ class _PrimaryAction extends StatelessWidget {
         color: theme.colorScheme.surface,
         border: Border(top: BorderSide(color: context.cpi.borderSubtle)),
       ),
-      child: FilledButton.icon(
-        onPressed: () {
-          HapticFeedback.selectionClick();
-          context.push(Routes.newRepresentant);
-        },
-        icon: const Icon(PhosphorIconsRegular.plus, size: 20),
-        label: const Text('Nouveau représentant'),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          FilledButton.icon(
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              context.pushOnce(Routes.representants);
+            },
+            icon: const Icon(PhosphorIconsRegular.users, size: 20),
+            // Le libellé DIT OÙ IL MÈNE. « Saisir des prospects » ouvrait
+            // « Choisir un représentant » : la promesse et l'écran ne se
+            // ressemblaient pas, et l'utilisateur croyait s'être trompé de
+            // bouton.
+            label: const Text('Choisir un représentant'),
+          ),
+          const SizedBox(height: CpiSpacing.xs),
+          // La création reste à UN geste depuis l'accueil. Cachée derrière le
+          // sélecteur, elle demandait deux écrans pour la fiche qui naît en
+          // tournée, c'est-à-dire le cas pressé.
+          OutlinedButton.icon(
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              context.pushOnce(Routes.newRepresentant);
+            },
+            icon: const Icon(PhosphorIconsRegular.userPlus, size: 20),
+            label: const Text('Nouveau représentant'),
+          ),
+        ],
       ),
     );
   }

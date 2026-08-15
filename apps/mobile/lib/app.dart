@@ -79,27 +79,28 @@ class CpiGoApp extends ConsumerWidget {
 
     // **Le coordinateur doit vivre aussi longtemps que la session, et démarrer
     // ICI.** C'est un `NotifierProvider` paresseux : il ne se construit qu'au
-    // premier `read`/`watch`, et donc ne branche ses cinq déclencheurs — dont le
-    // tout premier `run()`, celui qui tire les référentiels — qu'à ce
+    // premier `read`/`watch`, et donc ne branche ses cinq déclencheurs : dont le
+    // tout premier `run()`, celui qui tire les référentiels : qu'à ce
     // moment-là. Tant que c'était Réglages, Historique ou « À corriger » qui le
     // construisaient en premier, un utilisateur qui se connectait et allait
     // droit à « Nouveau représentant » n'avait AUCUN département, AUCUNE banque
     // et AUCUN syndicat en base locale : le bouton « Enregistrer » ne pouvait
     // jamais s'activer, et l'app était inutilisable sans détour par un onglet
     // sans rapport. Le placer à la racine authentifiée le rend indépendant de
-    // la route d'arrivée — y compris une route restaurée qui pointe droit sur
+    // la route d'arrivée : y compris une route restaurée qui pointe droit sur
     // un formulaire, hors de la coque de navigation.
     //
     // On observe le *notifier* et non l'état : l'instance est stable, donc la
-    // racine — et tout l'arbre sous elle — ne se reconstruit pas à chaque cycle
+    // racine : et tout l'arbre sous elle : ne se reconstruit pas à chaque cycle
     // de synchronisation.
     if (auth.isAuthenticated) {
       ref.watch(syncCoordinatorProvider.notifier);
       // Même raisonnement que le coordinateur de synchronisation : le
-      // coordinateur push doit vivre aussi longtemps que la session, et
-      // démarrer ICI. C'est lui qui consomme le message de lancement d'un
-      // démarrage à froid.
-      ref.watch(pushCoordinatorProvider.notifier);
+      // coordinateur de notifications doit vivre aussi longtemps que la
+      // session, et démarrer ICI. C'est lui qui consomme le message de
+      // lancement d'un démarrage à froid, et surtout c'est lui qui rapatrie la
+      // boîte de réception : sans Firebase, personne d'autre ne le fait.
+      ref.watch(notificationsCoordinatorProvider.notifier);
     }
 
     return MaterialApp.router(
@@ -118,7 +119,7 @@ class CpiGoApp extends ConsumerWidget {
       builder: (BuildContext context, Widget? child) {
         // Taille de texte et animations : le réglage de l'app est multiplié au
         // réglage système, puis borné (voir `display_settings.dart`). C'est le
-        // seul endroit où les deux se combinent — aucun écran n'a à le savoir.
+        // seul endroit où les deux se combinent : aucun écran n'a à le savoir.
         final DisplaySettings display = ref.watch(displaySettingsProvider);
         final MediaQueryData media = MediaQuery.of(context);
         return MediaQuery(

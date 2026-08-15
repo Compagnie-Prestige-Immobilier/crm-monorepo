@@ -1,4 +1,4 @@
-/// Frontière réseau du moteur de synchronisation — **Dart pur**.
+/// Frontière réseau du moteur de synchronisation : **Dart pur**.
 ///
 /// Le port est typé avec les modèles du client généré depuis
 /// `apps/api/openapi.json`, et non avec des `Map<String, dynamic>` maison. C'est
@@ -64,21 +64,21 @@ class PullPage {
   final SyncChangesDto changes;
   final List<SyncDeletionDto> deletions;
 
-  /// Curseur opaque `{t, id}` — jamais un horodatage nu (ADR 0001 §6). Il se
+  /// Curseur opaque `{t, id}` : jamais un horodatage nu (ADR 0001 §6). Il se
   /// renvoie tel quel, on ne l'interprète pas côté client.
   final String nextCursor;
   final bool hasMore;
   final DateTime serverTime;
 }
 
-/// Une entrée de l'annuaire de phase 2 — **six champs, jamais un de plus**.
+/// Une entrée de l'annuaire de phase 2 : **six champs, jamais un de plus**.
 ///
 /// L'annuaire est répliqué hors ligne sur le téléphone personnel de chaque
 /// commercial et couvre tout le portefeuille. Le nom, la banque et le syndicat
 /// en sont absents **délibérément** : le programme de travail est un PDF
 /// imprimé qui ne porte que des numéros, et une perte d'appareil ne doit pas
 /// pouvoir faire fuiter une base nominative. Ce n'est pas une préférence, c'est
-/// la frontière de confidentialité du dispositif — on ne demande pas plus au
+/// la frontière de confidentialité du dispositif : on ne demande pas plus au
 /// serveur, et on ne stocke pas plus localement.
 class Phase2DirectoryEntry {
   const Phase2DirectoryEntry({
@@ -120,7 +120,7 @@ class Phase2DirectoryPage {
 
   /// `hasMore` vaut `entries.length == limit` côté serveur : une dernière page
   /// pleine annonce donc encore du travail, et coûte un aller-retour à vide.
-  /// C'est le serveur qui a raison, pas notre intuition — on boucle jusqu'à
+  /// C'est le serveur qui a raison, pas notre intuition : on boucle jusqu'à
   /// `false`.
   final bool hasMore;
 
@@ -155,9 +155,21 @@ class RepresentantLookup {
 /// une opération parfaitement saine en `dead` au bout de huit collisions
 /// d'idempotence.
 enum FailureKind {
-  /// Coupure, DNS, délai dépassé, 5xx, 408, 425. Back-off normal, tentative
-  /// comptée.
+  /// 5xx, 408, 425, corps illisible d'un serveur joignable. Le serveur a
+  /// répondu, mal : la tentative se compte.
   retryable,
+
+  /// **Le lien est mort** : pas de route, plus de crédit data, portail captif,
+  /// DNS muet, délai dépassé. Le serveur n'a rien refusé, il n'a rien reçu.
+  ///
+  /// Distinct de [retryable], et ce n'est pas une nuance : les huit tentatives
+  /// de l'outbox mesurent des REFUS SERVEUR, pas du temps qui passe. Confondus,
+  /// quatre à huit minutes de lien mort suffisaient à épuiser les huit essais
+  /// d'une saisie parfaitement valide, qui partait ensuite en
+  /// `ATTEMPTS_EXHAUSTED` dans « À corriger » : le commercial voyait sa journée
+  /// marquée en échec pour une antenne absente. On remet donc en file **sans
+  /// compter la tentative**, exactement comme pour une session expirée.
+  unreachable,
 
   /// 429. Le serveur dit *quand* revenir : on l'écoute, plutôt que d'appliquer
   /// notre back-off qui serait soit trop court (on se refait limiter) soit trop
@@ -199,8 +211,14 @@ class ApiException implements Exception {
 
   bool get retryable =>
       kind == FailureKind.retryable ||
+      kind == FailureKind.unreachable ||
       kind == FailureKind.throttled ||
       kind == FailureKind.idempotencyInProgress;
+
+  /// Vrai quand l'échec vient du LIEN et non du serveur. Lu par l'interface
+  /// pour afficher « réseau injoignable » là où `connectivity_plus` annonce
+  /// encore une interface active (voir `core/providers/connectivity.dart`).
+  bool get isUnreachable => kind == FailureKind.unreachable;
 
   @override
   String toString() => 'ApiException($code, status: $statusCode, $message)';
@@ -220,7 +238,7 @@ abstract interface class ApiPort {
   Future<PullPage> pull({String? cursor, int limit});
 
   /// Pousse un lot. [batchId] part **à l'identique** dans l'en-tête
-  /// `Idempotency-Key` et dans `clientBatchId` — le serveur refuse en 422 si les
+  /// `Idempotency-Key` et dans `clientBatchId` : le serveur refuse en 422 si les
   /// deux diffèrent.
   Future<PushResult> push({
     required String batchId,
@@ -228,29 +246,11 @@ abstract interface class ApiPort {
     required List<SyncOperationDto> operations,
   });
 
-  /// Pousse un lot dont les opérations sont du **JSON brut**.
-  ///
-  /// TODO(generated-client): supprimer cette méthode et repasser par [push] dès
-  /// que `apps/api/openapi.json` aura été régénéré en client Dart. Aujourd'hui
-  /// le client généré est en retard sur le serveur : `SyncEntity` ne connaît que
-  /// `representant` et `prospect`, et `SyncEntityDataDto` n'a ni `prospectId`,
-  /// ni `outcome`, ni `method`, ni `comment`. Il est généré avec
-  /// `disallowUnrecognizedKeys: false`, donc `SyncEntityDataDto.fromJson`
-  /// **laisse tomber ces champs en silence** au lieu de lever : passer une
-  /// tentative d'appel par [push] produirait un lot que le serveur refuse en
-  /// `CALL_ATTEMPT_INCOMPLETE`, sans le moindre indice côté client. Un chemin
-  /// brut, explicitement nommé et isolé, est le moindre mal — et la bascule sera
-  /// mécanique.
-  Future<PushResult> pushRaw({
-    required String batchId,
-    required int payloadVersion,
-    required List<Map<String, Object?>> operations,
-  });
-
   /// Une page de l'annuaire de phase 2.
   ///
-  /// TODO(generated-client): remplacer par `Phase2Api.getDirectory` quand le
-  /// client généré connaîtra `/api/v1/phase2/directory`.
+  /// [cursor] nul **ou vide** veut dire « depuis le début » : l'implémentation
+  /// n'envoie alors pas du tout le paramètre `since`, que le serveur refuse
+  /// vide. C'est le tout premier téléchargement d'annuaire qui en dépend.
   Future<Phase2DirectoryPage> pullPhase2Directory({String? cursor, int limit});
 
   /// Recherche d'un représentant par téléphone, avant saisie et après un 409.

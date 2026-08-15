@@ -1,4 +1,4 @@
-/// Contrat de stockage des jetons — Dart pur, aucune dépendance Flutter.
+/// Contrat de stockage des jetons : Dart pur, aucune dépendance Flutter.
 ///
 /// L'implémentation réelle s'appuie sur `flutter_secure_storage`, qui est un
 /// plugin. L'isolat WorkManager n'a pas de plugins enregistrés : c'est
@@ -25,7 +25,7 @@ abstract interface class TokenStore {
   /// besoin **dans l'isolat WorkManager**, pour trancher le cas le plus délicat
   /// du système : un 409 sur un téléphone déjà pris se fusionne tout seul si la
   /// fiche est la mienne, et ne se fusionne SURTOUT PAS si elle est à un
-  /// collègue — l'attribution détermine la commission. Sans cette information,
+  /// collègue : l'attribution détermine la commission. Sans cette information,
   /// le moteur ne peut pas décider et devrait tout remonter à l'utilisateur.
   Future<String?> readUserId();
 
@@ -33,7 +33,7 @@ abstract interface class TokenStore {
   Future<void> clear();
 }
 
-/// Implémentation mémoire — utilisée par les tests et par tout contexte qui n'a
+/// Implémentation mémoire : utilisée par les tests et par tout contexte qui n'a
 /// pas de plugin disponible.
 class InMemoryTokenStore implements TokenStore {
   InMemoryTokenStore({String? refreshToken, String? userId})

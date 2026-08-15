@@ -33,8 +33,8 @@ void main() {
       int writes = 0;
       final DraftDebouncer d = DraftDebouncer(onFlush: () async => writes++);
       // Une frappe toutes les 300 ms : la traîne de 400 ms ne se déclenche
-      // JAMAIS. Sans l'attente maximale, cet utilisateur — celui dont on veut le
-      // plus protéger la saisie — ne serait jamais sauvegardé.
+      // JAMAIS. Sans l'attente maximale, cet utilisateur : celui dont on veut le
+      // plus protéger la saisie : ne serait jamais sauvegardé.
       for (int i = 0; i < 12; i++) {
         d.touch();
         await tester.pump(const Duration(milliseconds: 300));
@@ -76,7 +76,7 @@ void main() {
     });
   });
 
-  group('DraftFormMixin — vidange sur AppLifecycleState.inactive', () {
+  group('DraftFormMixin : vidange sur AppLifecycleState.inactive', () {
     late AppDatabase db;
     late DraftRepository drafts;
 
@@ -93,7 +93,7 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('`inactive` écrit le brouillon — `paused` serait trop tard', (
+    testWidgets('`inactive` écrit le brouillon : `paused` serait trop tard', (
       WidgetTester tester,
     ) async {
       await pumpForm(tester);

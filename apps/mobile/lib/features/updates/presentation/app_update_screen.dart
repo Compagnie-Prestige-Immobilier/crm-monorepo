@@ -64,6 +64,29 @@ class AppUpdateScreen extends ConsumerWidget {
                       icon: const Icon(Icons.install_mobile_rounded),
                       label: const Text('Installer la mise à jour'),
                     ),
+                  ] else if (state.blocker == AppUpdateBlocker.meteredLink) ...<Widget>[
+                    // Le téléchargement partait tout seul, sur n'importe quelle
+                    // interface, et se réarmait à chaque bascule Wi-Fi ↔ mobile :
+                    // plusieurs mégaoctets prélevés en silence sur le forfait
+                    // personnel du commercial. Il attend désormais le Wi-Fi ou
+                    // ce tap.
+                    Text(
+                      'Vous êtes sur des données mobiles. '
+                      '${_megabytes(release.fileSize)} seront téléchargés.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: controller.downloadNow,
+                      icon: const Icon(Icons.download_rounded),
+                      label: const Text('Télécharger maintenant'),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Sinon, le téléchargement démarrera seul au prochain Wi-Fi.',
+                      style: theme.textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
                   ] else ...<Widget>[
                     Text(
                       state.error ?? 'Le téléchargement n’a pas pu démarrer.',
@@ -99,4 +122,12 @@ class AppUpdateScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Taille lisible : le commercial paie sa data au mégaoctet, il a le droit de
+/// savoir combien avant de dire oui.
+String _megabytes(int bytes) {
+  if (bytes <= 0) return 'Plusieurs mégaoctets';
+  final double mb = bytes / (1024 * 1024);
+  return '${mb.toStringAsFixed(mb >= 10 ? 0 : 1)} Mo';
 }

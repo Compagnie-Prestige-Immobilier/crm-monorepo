@@ -13,6 +13,10 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Le verdict de portail captif d'Android, lu tel quel. Voir
+        // NetworkValidationChannel : c'est la même capacité que `androidx.work`
+        // consulte, et connectivity_plus ne l'expose pas.
+        NetworkValidationChannel(this).register(flutterEngine.dartExecutor.binaryMessenger)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName).setMethodCallHandler { call, result ->
             if (call.method != "installApk") {
                 result.notImplemented()

@@ -10,7 +10,7 @@ import 'cpi_typography.dart';
 /// **Un seul thème.** L'app est verrouillée en clair (docs/design.md §3) : elle
 /// s'utilise dehors, en plein soleil, où le mode sombre réduit la lisibilité.
 /// `MaterialApp.darkTheme` n'est pas fourni et `themeMode` reste
-/// [ThemeMode.light] — suivre le thème système serait une régression.
+/// [ThemeMode.light] : suivre le thème système serait une régression.
 abstract final class AppTheme {
   /// Graine de la palette. Elle ne sert que de **point de départ** : l'algorithme
   /// Material dérive des rôles qui ne correspondent pas aux valeurs auditées, et
@@ -38,8 +38,8 @@ abstract final class AppTheme {
   static const Color _borderFlattened = Color(0xFFECE1E2);
 
   static ColorScheme get colorScheme {
-    // `fromSeed` d'abord — il remplit correctement les rôles secondaires et les
-    // niveaux `surfaceDim`/`surfaceBright` qu'on ne veut pas écrire à la main —
+    // `fromSeed` d'abord : il remplit correctement les rôles secondaires et les
+    // niveaux `surfaceDim`/`surfaceBright` qu'on ne veut pas écrire à la main :
     // puis on écrase tout ce que docs/design.md fixe explicitement.
     return ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light).copyWith(
       primary: _primary,
@@ -233,7 +233,7 @@ abstract final class AppTheme {
         iconColor: scheme.onSurfaceVariant,
         titleTextStyle: text.bodyLarge,
         // `bodyMedium` (16) et non `bodySmall` : un sous-titre de ListTile porte
-        // souvent l'information utile — l'état de synchronisation, le numéro —
+        // souvent l'information utile : l'état de synchronisation, le numéro :
         // et se lisait à 13 sp.
         subtitleTextStyle: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
         shape: const RoundedRectangleBorder(borderRadius: CpiRadius.brMd),

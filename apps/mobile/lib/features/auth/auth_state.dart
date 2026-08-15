@@ -1,3 +1,4 @@
+import 'package:crm_api_client/crm_api_client.dart';
 import 'package:flutter/foundation.dart';
 
 /// Trois états, pas deux.
@@ -5,7 +6,7 @@ import 'package:flutter/foundation.dart';
 /// [unknown] existe parce que la lecture du jeton de renouvellement est
 /// asynchrone. Sans lui, le garde de route voit « pas authentifié » pendant les
 /// quelques millisecondes de la lecture et renvoie l'utilisateur sur l'écran de
-/// connexion à chaque démarrage à froid — alors qu'il a une session valide.
+/// connexion à chaque démarrage à froid : alors qu'il a une session valide.
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
 @immutable
@@ -44,17 +45,40 @@ class AuthState {
   bool get isAuthenticated => status == AuthStatus.authenticated;
   bool get isResolved => status != AuthStatus.unknown;
 
-  /// Rôle en français, pour l'affichage. Un rôle inconnu se rend tel quel
-  /// plutôt que de disparaître : une chaîne vide se remarque moins qu'un mot
-  /// inattendu, et c'est le mot inattendu qui fait remonter le bug.
-  String? get roleLabel => switch (role?.toUpperCase()) {
-    null => null,
-    'COMMERCIAL' => 'Téléconseiller',
-    'ADMIN' => 'Administrateur',
-    'SUPERVISEUR' || 'SUPERVISOR' => 'Superviseur',
-    'FINANCE' => 'Finances générales',
-    final String other => other,
-  };
+  /// Rôle en français, pour l'affichage.
+  ///
+  /// ═══ LE MIROIR DIVERGEAIT DU SERVEUR ═══
+  ///
+  /// Cette table était écrite à la main. Elle manquait `BANQUE_FINANCE`, qui
+  /// existe : un utilisateur de banque voyait donc la chaîne brute
+  /// `BANQUE_FINANCE` dans ses réglages, à la place de son rôle. Et elle
+  /// inventait `SUPERVISEUR`, `SUPERVISOR` et `FINANCE`, qui n'existent nulle
+  /// part côté serveur : trois branches mortes qui donnaient l'illusion d'une
+  /// couverture complète.
+  ///
+  /// On part maintenant de l'énumération GÉNÉRÉE depuis `apps/api/openapi.json`.
+  /// Un rôle ajouté côté serveur fait apparaître un cas non traité au prochain
+  /// `build_runner`, ce qu'aucune relecture de `switch` sur chaînes n'aurait
+  /// signalé.
+  ///
+  /// Un rôle que le client généré ne connaît pas encore
+  /// (`unknown_default_open_api`, grâce à `enumUnknownDefaultCase: true`) se rend
+  /// TEL QU'IL EST ARRIVÉ, jamais vide : un mot inattendu se remarque et remonte,
+  /// un champ vide passe inaperçu pendant des mois.
+  String? get roleLabel {
+    final String? raw = role;
+    if (raw == null) return null;
+    final Role parsed = Role.values.firstWhere(
+      (Role r) => r.value == raw.toUpperCase(),
+      orElse: () => Role.unknownDefaultOpenApi,
+    );
+    return switch (parsed) {
+      Role.COMMERCIAL => 'Téléconseiller',
+      Role.ADMIN => 'Administrateur',
+      Role.BANQUE_FINANCE => 'Banque et financement',
+      Role.unknownDefaultOpenApi => raw,
+    };
+  }
 
   AuthState copyWith({
     AuthStatus? status,
