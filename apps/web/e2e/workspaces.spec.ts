@@ -246,7 +246,267 @@ test('la clôture annonce les tâches annulées avant de les annuler', async ({ 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. Banque & Finance : cycle complet d'un dossier
+// 4. Campagnes REPRÉSENTANTS : tirage, puis programme imprimable
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * La famille de campagnes qu'on appelle EN PREMIER dans l'ordre du métier : on
+ * appelle les représentants pour qu'ils remettent leurs listes, et seulement
+ * ensuite les prospects qui en sortent. Elle vit sur sa propre route, avec ses
+ * propres tables côté serveur, et son programme PDF passe par un point d'entrée
+ * distinct de celui des campagnes prospects
+ * (`/rep-campaigns/{id}/commerciaux/{userId}/programme.pdf`).
+ *
+ * C'est précisément pour cela qu'il faut l'éprouver à part : le jumeau
+ * prospects était couvert, celui-ci ne l'était pas, et « les deux écrans se
+ * ressemblent » n'a jamais prouvé que les deux routes répondent.
+ */
+const REP_CAMPAIGN_NAME = `E2E REP ${String(Date.now())}`;
+
+test('une campagne représentants se tire depuis l’onglet dédié', async ({ page }) => {
+  await page.goto('/campagnes/representants');
+  await expect(page.getByRole('heading', { name: 'Campagnes', level: 1 })).toBeVisible();
+  // Le titre de la barre supérieure est celui de `/campagnes` : c'est l'onglet
+  // qui dit sur laquelle des deux listes on se trouve.
+  await expect(page.getByRole('link', { name: 'Appels représentants' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  await page.getByRole('button', { name: 'Nouvelle campagne' }).first().click();
+  await page.getByLabel('Nom de la campagne').fill(REP_CAMPAIGN_NAME);
+
+  /**
+   * Les téléconseillers sont pris DANS leur groupe de champs, pas dans la
+   * page.
+   *
+   * Le dialogue porte une autre case à cocher, « seulement les représentants
+   * dormants », et elle vient AVANT dans le DOM : un `getByRole('checkbox')`
+   * global cocherait ce filtre en croyant choisir le premier téléconseiller, et
+   * réduirait le tirage à une population qui peut parfaitement être vide.
+   */
+  const equipe = page.getByRole('group', { name: /Téléconseillers/ });
+  await equipe.getByRole('checkbox').nth(0).check();
+  await equipe.getByRole('checkbox').nth(1).check();
+
+  await page.getByRole('button', { name: 'Voir l’aperçu' }).click();
+
+  /**
+   * L'aperçu vient du SERVEUR, contrairement aux campagnes prospects.
+   *
+   * L'éligibilité croise le rattachement, la présence de prospects vivants et
+   * les campagnes en cours : le chiffre affiché ici est donc celui du tirage
+   * réel, et le confirmer sans l'avoir vu n'aurait aucun sens.
+   */
+  const preview = page.getByRole('status').filter({ hasText: /Représentants éligibles/i });
+  await expect(preview).toBeVisible({ timeout: 30_000 });
+  const eligible = Number(((await preview.textContent()) ?? '').replace(/[^\d]/gu, ''));
+  expect(
+    eligible,
+    'Aucun représentant éligible : le jeu de démonstration devrait en avoir semé.',
+  ).toBeGreaterThan(0);
+
+  await expect(page.getByRole('heading', { name: 'Répartition en tourniquet' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Lancer la campagne' }).click();
+
+  await page.waitForURL(/\/campagnes\/representants\/[0-9a-f-]{36}/, { timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: 'Répartition par téléconseiller' })).toBeVisible();
+  await expectNoErrorState(page);
+});
+
+test('chaque téléconseiller a son programme PDF de campagne représentants', async ({ page }) => {
+  await page.goto('/campagnes/representants');
+  await page.getByRole('link', { name: REP_CAMPAIGN_NAME }).first().click();
+  await page.waitForURL(/\/campagnes\/representants\/[0-9a-f-]{36}/);
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page
+      .getByRole('button', { name: /Programme PDF/ })
+      .first()
+      .click(),
+  ]);
+
+  /**
+   * Le préfixe `programme-representants-` est le point du parcours.
+   *
+   * Un téléconseiller reçoit les deux liasses le même matin. Si les deux
+   * fichiers s'appelaient `programme-…`, ils se confondraient dans le dossier
+   * de téléchargements, et se confondraient encore une fois imprimés : celui
+   * qu'on appelle n'est pas le même, et l'un des deux n'a pas de nom au
+   * téléphone.
+   */
+  expect(download.suggestedFilename()).toMatch(/^programme-representants-e2e-rep-.*\.pdf$/);
+  const path = await download.path();
+  expect((await stat(path)).size).toBeGreaterThan(500);
+  // « %PDF » : un vrai document, pas un JSON d'erreur relayé en .pdf.
+  expect(await readMagic(path, 4)).toEqual([0x25, 0x50, 0x44, 0x46]);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. Demandes de création de client : la banque dépose, l'administration crée
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BANK_IDENTIFIER = process.env.E2E_BANK_IDENTIFIER ?? 'demo.banque@cpi.sn';
+const BANK_PASSWORD = process.env.E2E_BANK_PASSWORD ?? 'Demo1-CPI-Sunugal';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+
+test('une demande déposée par une banque devient un prospect qui porte sa provenance', async ({
+  page,
+  browser,
+}) => {
+  /**
+   * DEUX sessions dans un même parcours, et c'est irréductible.
+   *
+   * Le geste éprouvé traverse deux rôles : un agent BANQUE_FINANCE dépose, un
+   * ADMIN arbitre. Le découper en deux fichiers ferait dépendre le second d'une
+   * demande créée ailleurs, et la suite tomberait sur une précondition absente
+   * plutôt que sur un défaut.
+   *
+   * `page` porte déjà la session administrateur rangée par `auth.setup.ts` ;
+   * seule la session bancaire est ouverte ici, ce qui coûte UNE connexion sur
+   * les dix par minute que l'API accorde.
+   */
+  const stamp = String(Date.now());
+  const prenom = 'Coumba';
+  const nom = `Ndoye${stamp}`;
+  // Préfixe `77` : une plage mobile que `libphonenumber` reconnaît pour le
+  // Sénégal. Saisi avec ses espaces : c'est le SERVEUR qui normalise en E.164,
+  // et c'est cette normalisation qui décide du doublon.
+  const suffix = stamp.slice(-7);
+  const phone = `77 ${suffix.slice(0, 3)} ${suffix.slice(3, 5)} ${suffix.slice(5, 7)}`;
+
+  const bankContext = await browser.newContext({ baseURL: WEB_URL });
+  const bankPage = await bankContext.newPage();
+
+  try {
+    // ─── La banque dépose ───────────────────────────────────────────────────
+    await bankPage.goto('/connexion');
+    await bankPage.getByLabel('E-mail ou identifiant').fill(BANK_IDENTIFIER);
+    await bankPage.getByLabel('Mot de passe').fill(BANK_PASSWORD);
+    await bankPage.getByRole('button', { name: 'Se connecter' }).click();
+    await bankPage.waitForURL(/\/dossiers/, { timeout: 30_000 });
+
+    await bankPage.goto('/dossiers/nouveau');
+    await bankPage.getByLabel('Rechercher un client').fill(`${prenom} ${nom}`);
+
+    // L'IMPASSE que ce dialogue existe pour ouvrir : l'écran s'arrêtait là,
+    // et le rôle BANQUE_FINANCE n'a aucune route de création de prospect.
+    await expect(bankPage.getByText('Aucun client ne correspond.')).toBeVisible({
+      timeout: 30_000,
+    });
+    await bankPage.getByRole('button', { name: 'Demander la création du client' }).click();
+
+    const depot = bankPage.getByRole('dialog');
+    // PRÉ-REMPLI depuis la recherche : redemander ce qui vient d'être tapé
+    // serait une double saisie, et une occasion de divergence entre ce qui a
+    // été cherché et ce qui est demandé.
+    await expect(depot.getByLabel(/^Prénom/)).toHaveValue(prenom);
+    await expect(depot.getByLabel(/^Nom/)).toHaveValue(nom);
+
+    await depot.getByLabel(/^Téléphone/).fill(phone);
+    // Le déclencheur d'un `Select` porte son nom accessible dans son CONTENU :
+    // un `<label for>` n'entre pas dans le calcul du nom d'un bouton.
+    await depot.getByRole('combobox', { name: /Choisir une banque/ }).click();
+    await bankPage.getByRole('option', { name: /^CBAO/ }).click();
+    await depot.getByLabel(/^Contexte pour/).fill('Ouverture de dossier, suite E2E.');
+
+    await depot.getByRole('button', { name: 'Envoyer la demande' }).click();
+
+    // AUCUNE fermeture automatique : l'agent doit lire que sa demande attend
+    // un arbitrage, sinon il redéposerait la même dans la minute.
+    await expect(depot).toContainText('Demande envoyée', { timeout: 30_000 });
+    await expect(depot).toContainText(`${prenom} ${nom} est en attente d’approbation.`);
+    await depot.getByRole('button', { name: 'Fermer' }).click();
+
+    // Il retrouve sa demande sur SON écran de suivi, et l'écran ne lui propose
+    // aucun geste d'arbitrage : l'API ne lui renvoie que ses propres demandes,
+    // et la décision n'est pas la sienne.
+    await bankPage.goto('/demandes-clients');
+    await expect(bankPage.getByRole('heading', { name: 'Mes demandes', level: 1 })).toBeVisible();
+    const suivi = bankPage.getByRole('listitem').filter({ hasText: nom });
+    await expect(suivi).toContainText('En attente d’arbitrage par l’administration.');
+    await expect(
+      suivi.getByRole('button', { name: 'Approuver et créer le prospect' }),
+    ).toHaveCount(0);
+
+    // ─── L'administration arbitre ───────────────────────────────────────────
+    await page.goto('/demandes-clients');
+    await expect(page.getByRole('heading', { name: 'Demandes clients', level: 1 })).toBeVisible();
+
+    const carte = page.getByRole('listitem').filter({ hasText: nom });
+    await expect(carte).toBeVisible({ timeout: 30_000 });
+    // La PROVENANCE est lisible avant la décision : c'est elle qui explique
+    // qu'une fiche née ici n'ait pas de représentant de terrain.
+    await expect(carte).toContainText('Demande de CBAO');
+    await expect(carte).toContainText('Ouverture de dossier, suite E2E.');
+
+    await carte.getByRole('button', { name: 'Approuver et créer le prospect' }).click();
+
+    const arbitrage = page.getByRole('dialog');
+    await expect(arbitrage).toContainText(`${prenom} ${nom}`);
+
+    const creer = arbitrage.getByRole('button', { name: 'Créer le prospect' });
+    /**
+     * Trois champs verrouillent l'envoi, et ce n'est pas de la bureaucratie.
+     *
+     * Le prospect naît en « méthode obtenue », condition exacte du filtre de
+     * recherche bancaire, pour que le dossier puisse s'y rattacher tout de
+     * suite. Une contrainte CHECK lie ce statut à la méthode d'enrôlement : les
+     * demander ici évite de créer une fiche qui échouerait à l'insertion, ou
+     * pire, qui serait invisible du formulaire d'ouverture après approbation.
+     */
+    await expect(creer).toBeDisabled();
+
+    await arbitrage.getByRole('button', { name: /Représentant de rattachement/ }).click();
+    // La liste est rendue dans un portail, hors du dialogue.
+    await page.getByRole('option').first().click();
+
+    await arbitrage.getByRole('combobox', { name: /Choisir un syndicat/ }).click();
+    await page.getByRole('option').first().click();
+
+    await arbitrage.getByRole('combobox', { name: /Choisir une méthode/ }).click();
+    await page.getByRole('option').first().click();
+
+    await expect(creer).toBeEnabled();
+    await creer.click();
+    await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 60_000 });
+
+    // ─── Le prospect existe, et la provenance a suivi ───────────────────────
+    await page.getByRole('button', { name: 'Approuvées' }).click();
+    const arbitree = page.getByRole('listitem').filter({ hasText: nom });
+    await expect(arbitree).toContainText('Approuvée', { timeout: 30_000 });
+    await expect(arbitree).toContainText('Demande de CBAO');
+
+    await arbitree.getByRole('link', { name: 'Voir le prospect créé' }).click();
+    // Le lien porte le TÉLÉPHONE et non l'identifiant : c'est la clé de
+    // déduplication du système, et la seule qui retrouve la fiche à coup sûr.
+    await expect(page).toHaveURL(/\/prospects\?search=/);
+
+    const ligne = page.getByRole('row').filter({ hasText: nom });
+    await expect(ligne).toHaveCount(1, { timeout: 30_000 });
+    // « Méthode obtenue » : la conséquence visible de l'approbation, celle qui
+    // rend la fiche atteignable depuis le formulaire d'ouverture de dossier.
+    await expect(ligne).toContainText('Méthode obtenue');
+
+    // Et la boucle se referme côté banque : la demande approuvée propose enfin
+    // le geste qui l'avait motivée.
+    await bankPage.goto('/demandes-clients');
+    await bankPage.getByRole('button', { name: 'Approuvées' }).click();
+    await expect(
+      bankPage
+        .getByRole('listitem')
+        .filter({ hasText: nom })
+        .getByRole('link', { name: 'Ouvrir un dossier pour ce client' }),
+    ).toBeVisible({ timeout: 30_000 });
+  } finally {
+    await bankContext.close();
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Banque & Finance : cycle complet d'un dossier
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Ouvre un dossier sur le premier client trouvé et rend sa référence. */
@@ -438,7 +698,7 @@ test('la configuration des étapes se réordonne au clavier, sans glisser-dépos
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. Mode démonstration : désactivation
+// 7. Mode démonstration : désactivation
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('la désactivation exige une confirmation et affirme que le réel est intact', async ({
