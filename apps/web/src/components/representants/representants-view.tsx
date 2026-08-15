@@ -64,6 +64,16 @@ import { cn } from '@/lib/utils';
  * prospect » est un lien, pas un état perdu au rechargement. L'export part
  * exactement de ces critères.
  */
+/**
+ * Absence de valeur, dans un tableau comme dans une carte.
+ *
+ * Un tiret DEMI-cadratin (U+2013), comme le rapport d'import : le cadratin est
+ * proscrit dans ce dépôt. Et un tiret plutôt que « aucune » : les fiches saisies
+ * avant l'arrivée du référentiel des IEF n'en portent pas, ce qui est un fait
+ * d'historique et non une anomalie à commenter sur chaque ligne.
+ */
+const NO_VALUE = '–';
+
 export function RepresentantsView() {
   const { filters, setFilters } = useRepresentantFilters();
   const exporter = useFileDownload();
@@ -145,63 +155,74 @@ export function RepresentantsView() {
           }}
           fallback="Liste des représentants non chargée."
         />
-      ) : (
-        <div
-          className={cn(
-            'overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity',
-            isFetching && 'opacity-80',
-          )}
-        >
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Représentant</TableHead>
-                <TableHead>Téléphone</TableHead>
-                <TableHead>Département</TableHead>
-                <TableHead>IEF</TableHead>
-                <TableHead>Saisi par</TableHead>
-                <TableHead className="text-right">Prospects</TableHead>
-                <TableHead>Première saisie</TableHead>
-                <TableHead className="w-24">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.items.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={8} className="py-16">
-                    {/*
-                      Deux vides, deux messages : et la distinction n'est pas
-                      cosmétique.
+      ) : data.items.length === 0 ? (
+        /*
+          Deux vides, deux messages : et la distinction n'est pas cosmétique.
 
-                      Ce bloc disait toujours « Aucun représentant ne correspond
-                      à ces critères. Élargissez la recherche ou retirez un
-                      filtre. », y compris sans le moindre critère posé. Une
-                      installation neuve, ou un compte qui ouvre l'écran pour la
-                      première fois, se voyait donc renvoyé retirer des filtres
-                      qu'il n'avait jamais mis : il cherchait, ne trouvait rien à
-                      retirer, et concluait à une panne. Les campagnes, les
-                      dossiers et les demandes clients branchent déjà sur leur
-                      compteur de filtres actifs.
-                    */}
-                    <div className="flex flex-col items-center gap-2 text-center">
-                      <UsersRoundIcon className="size-8 text-muted-foreground" aria-hidden="true" />
-                      <p className="font-[600]">
-                        {activeFilterCount === 0
-                          ? 'Aucun représentant enregistré.'
-                          : 'Aucun représentant ne correspond à ces critères.'}
-                      </p>
-                      <p className="text-[0.8125rem] text-muted-foreground">
-                        {activeFilterCount === 0
-                          ? 'Les fiches sont saisies en tournée depuis le mobile, ou créées ici, une par une ou par import d’un classeur.'
-                          : 'Élargissez la recherche ou retirez un filtre.'}
-                      </p>
-                    </div>
-                  </TableCell>
+          Ce bloc disait toujours « Aucun représentant ne correspond à ces
+          critères. Élargissez la recherche ou retirez un filtre. », y compris
+          sans le moindre critère posé. Une installation neuve, ou un compte qui
+          ouvre l'écran pour la première fois, se voyait donc renvoyé retirer des
+          filtres qu'il n'avait jamais mis : il cherchait, ne trouvait rien à
+          retirer, et concluait à une panne. Les campagnes, les dossiers et les
+          demandes clients branchent déjà sur leur compteur de filtres actifs.
+
+          Sorti du `<tbody>` : le tableau n'existe plus sous 1024 px, et un état
+          vide enfermé dans une cellule y aurait disparu avec lui.
+        */
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card py-16 text-center shadow-elev-sm">
+          <UsersRoundIcon className="size-8 text-muted-foreground" aria-hidden="true" />
+          <p className="font-[600]">
+            {activeFilterCount === 0
+              ? 'Aucun représentant enregistré.'
+              : 'Aucun représentant ne correspond à ces critères.'}
+          </p>
+          <p className="max-w-md text-[0.8125rem] text-muted-foreground">
+            {activeFilterCount === 0
+              ? 'Les fiches sont saisies en tournée depuis le mobile, ou créées ici, une par une ou par import d’un classeur.'
+              : 'Élargissez la recherche ou retirez un filtre.'}
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* ─── Cartes : sous 1024 px ────────────────────────────────── */}
+          <ul className={cn('flex flex-col gap-3 lg:hidden', isFetching && 'opacity-80')}>
+            {data.items.map((representant) => (
+              <li key={representant.id}>
+                <RepresentantCard
+                  representant={representant}
+                  onEdit={() => {
+                    setEditing({ representant });
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+
+          {/* ─── Tableau : à partir de 1024 px ────────────────────────── */}
+          <div
+            className={cn(
+              'hidden overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity lg:block',
+              isFetching && 'opacity-80',
+            )}
+          >
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Représentant</TableHead>
+                  <TableHead>Téléphone</TableHead>
+                  <TableHead>Département</TableHead>
+                  <TableHead>IEF</TableHead>
+                  <TableHead>Saisi par</TableHead>
+                  <TableHead className="text-right">Prospects</TableHead>
+                  <TableHead>Première saisie</TableHead>
+                  <TableHead className="w-24">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
-              ) : (
-                data.items.map((representant) => (
+              </TableHeader>
+              <TableBody>
+                {data.items.map((representant) => (
                   <TableRow key={representant.id}>
                     <TableCell className="font-[600]">{representant.fullName}</TableCell>
                     <TableCell className="tabular-nums">
@@ -209,10 +230,10 @@ export function RepresentantsView() {
                     </TableCell>
                     <TableCell>{representant.departementName}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {/* Un tiret cadratin, et non « : aucune » : les fiches
+                      {/* Un tiret demi-cadratin, et non « aucune » : les fiches
                           saisies avant l'arrivée du référentiel n'en portent
                           pas, et ce n'est pas une anomalie à commenter. */}
-                      {representant.iefName ?? '\u2014'}
+                      {representant.iefName ?? NO_VALUE}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {representant.createdByName}
@@ -241,11 +262,11 @@ export function RepresentantsView() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
 
       {/*
@@ -313,6 +334,92 @@ export function RepresentantsView() {
         representant={editing?.representant ?? null}
       />
     </div>
+  );
+}
+
+/**
+ * Le même représentant, en CARTE lisible.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Huit colonnes ne rentrent pas sur un téléphone, et les comprimer ne les y
+ * fait pas rentrer.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * L'écran n'avait qu'un tableau, avec le seul défilement horizontal du composant
+ * `Table` pour tout recours. Huit colonnes sur 360 px, ce sont des colonnes de
+ * quarante pixels : « +221 77 123 45 67 » se coupe en trois lignes, « Première
+ * saisie » devient illisible, et il faut balayer latéralement pour lire UNE
+ * fiche. `/dossiers` traite exactement le même nombre de colonnes en rendant
+ * deux fois : ce composant reprend cet arrangement, pour que les deux listes se
+ * lisent pareil sur le même téléphone.
+ *
+ * Le défilement horizontal reste possible sur le tableau : c'est une sortie de
+ * secours, pas la réponse au petit écran.
+ */
+function RepresentantCard({
+  representant,
+  onEdit,
+}: {
+  representant: RepresentantRow;
+  onEdit: () => void;
+}) {
+  return (
+    <article className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-[600]">{representant.fullName}</p>
+          <p className="truncate text-[0.8125rem] text-muted-foreground tabular-nums">
+            {formatPhone(representant.phoneE164)}
+          </p>
+        </div>
+        {/*
+          Le compte de prospects reste l'information CENTRALE : c'est lui qui dit
+          si une fiche compte. Il garde donc le poids typographique qu'il a dans
+          le tableau, plutôt que de se fondre dans la liste des attributs.
+        */}
+        <p className="shrink-0 text-right">
+          <span className="block font-display text-[1.25rem] font-[800] leading-none tabular-nums">
+            {formatNumber(representant.prospectCount)}
+          </span>
+          <span className="block text-[0.6875rem] text-muted-foreground">
+            prospect{representant.prospectCount === 1 ? '' : 's'}
+          </span>
+        </p>
+      </div>
+
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[0.8125rem]">
+        <div className="min-w-0">
+          <dt className="text-[0.6875rem] text-muted-foreground">Département</dt>
+          <dd className="truncate">{representant.departementName}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-[0.6875rem] text-muted-foreground">IEF</dt>
+          <dd className="truncate text-muted-foreground">{representant.iefName ?? NO_VALUE}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-[0.6875rem] text-muted-foreground">Saisi par</dt>
+          <dd className="truncate text-muted-foreground">{representant.createdByName}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-[0.6875rem] text-muted-foreground">Première saisie</dt>
+          <dd className="truncate text-muted-foreground">
+            {formatDate(representant.clientCreatedAt)}
+          </dd>
+        </div>
+      </dl>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-fit"
+        aria-label={`Modifier la fiche de ${representant.fullName}`}
+        onClick={onEdit}
+      >
+        <PencilIcon className="size-4" aria-hidden="true" />
+        <span aria-hidden="true">Modifier</span>
+      </Button>
+    </article>
   );
 }
 

@@ -11,7 +11,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { parseRepCampaignFilters, type RawSearchParams } from '@/lib/rep-campaign-filters';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Campagnes représentants' };
+export const metadata: Metadata = { title: 'Campagnes d’appels représentants' };
 
 /**
  * Second onglet de `/campagnes`, servi par une ROUTE et non par un paramètre.
@@ -30,7 +30,12 @@ export default async function CampagnesRepresentantsPage({
   const guard = await guardRoles(['ADMIN']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
-    return <PermissionDenied role={guard.user.role} what="Le suivi des campagnes représentants" />;
+    return (
+      <PermissionDenied
+        role={guard.user.role}
+        what="Le suivi des campagnes d’appels représentants"
+      />
+    );
   }
 
   const filters = parseRepCampaignFilters(await searchParams);
