@@ -98,7 +98,12 @@ describe('DeactivateUserDialog', () => {
 
   it('ne rend rien tant qu’aucun compte n’est visé', () => {
     render(
-      <DeactivateUserDialog user={null} onOpenChange={vi.fn()} pending={false} onConfirm={vi.fn()} />,
+      <DeactivateUserDialog
+        user={null}
+        onOpenChange={vi.fn()}
+        pending={false}
+        onConfirm={vi.fn()}
+      />,
     );
 
     expect(screen.queryByRole('dialog')).toBeNull();

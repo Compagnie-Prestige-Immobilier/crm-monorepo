@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as InboxModule from '@/lib/data/inbox';
 import { renderWithQuery } from '@/test/render-query';
 
 /**
@@ -23,11 +24,11 @@ import { renderWithQuery } from '@/test/render-query';
  * composeur, réservé à l'ADMIN, ce qui rejouerait exactement le défaut corrigé.
  */
 
-const markNotificationRead = vi.fn(() => Promise.resolve());
+const markNotificationRead = vi.fn((id: string) => Promise.resolve(id));
 const fetchInbox = vi.fn();
 
 vi.mock('@/lib/data/inbox', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/data/inbox')>('@/lib/data/inbox');
+  const actual = await vi.importActual<typeof InboxModule>('@/lib/data/inbox');
   return {
     ...actual,
     fetchInbox: () => fetchInbox() as unknown,
