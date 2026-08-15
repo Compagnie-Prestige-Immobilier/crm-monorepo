@@ -28,7 +28,8 @@ import { UsersService } from './users.service.js';
 type MockFn = ReturnType<typeof vi.fn>;
 
 interface MockDb {
-  user: Record<'findFirst' | 'create', MockFn>;
+  user: Record<'findFirst' | 'create' | 'update', MockFn>;
+  refreshToken: Record<'updateMany', MockFn>;
 }
 
 const createdRow = (isDemo: boolean): Record<string, unknown> => ({
@@ -61,7 +62,9 @@ beforeEach(() => {
     user: {
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue(createdRow(false)),
+      update: vi.fn().mockResolvedValue(createdRow(false)),
     },
+    refreshToken: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
   };
 });
 
@@ -95,5 +98,62 @@ describe('nature du compte créé', () => {
       .where;
     expect(where.isDemo).toBeUndefined();
     expect(where.OR).toEqual([{ email: 'awa@cpi.sn' }, { username: 'awa' }]);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CHANGER LE RÔLE MET FIN À LA SESSION
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Seule la DÉSACTIVATION révoquait les jetons. Rétrograder un ADMIN le laissait
+ * donc avec un refresh token valable des SEMAINES, avec lequel il obtenait à
+ * volonté de nouveaux jetons d'accès. Le défaut se referme à deux endroits, et
+ * aucun ne remplace l'autre :
+ *
+ *  · `FreshSessionGuard` relit le rôle en base sur les routes qui en exigent
+ *    un, ce qui ferme la fenêtre du jeton DÉJÀ émis, quinze minutes ;
+ *  · la révocation ci-dessous ferme la porte de derrière, celle du
+ *    RENOUVELLEMENT, qui n'a pas de borne de temps utile.
+ */
+describe('sessions et changement de rôle', () => {
+  const existing = {
+    id: 'usr-1',
+    email: 'awa@cpi.sn',
+    username: 'awa',
+    role: Role.ADMIN,
+    isActive: true,
+  };
+
+  beforeEach(() => {
+    db.user.findFirst.mockResolvedValue(existing);
+  });
+
+  it('révoque les jetons quand le rôle change', async () => {
+    await service(false).update('usr-1', { role: Role.COMMERCIAL });
+
+    expect(db.refreshToken.updateMany).toHaveBeenCalledTimes(1);
+    const call = db.refreshToken.updateMany.mock.calls[0]?.[0] as {
+      where: Record<string, unknown>;
+    };
+    expect(call.where.userId).toBe('usr-1');
+    expect(call.where.revokedAt).toBeNull();
+  });
+
+  /**
+   * Contre-épreuve : révoquer sur CHAQUE modification déconnecterait un
+   * administrateur qui corrige une faute de frappe dans son propre nom, et
+   * ferait passer le test ci-dessus sans rien prouver.
+   */
+  it('ne révoque rien quand le rôle est réécrit à l’identique', async () => {
+    await service(false).update('usr-1', { role: Role.ADMIN, fullName: 'Awa Diop' });
+
+    expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('ne révoque rien quand le rôle n’est pas touché', async () => {
+    await service(false).update('usr-1', { fullName: 'Awa Diop' });
+
+    expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
   });
 });

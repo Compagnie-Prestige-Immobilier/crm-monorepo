@@ -158,7 +158,17 @@ export class UsersService {
     // Désactiver un compte doit couper ses sessions ouvertes : sans cela le
     // porteur d'un access token continue de travailler jusqu'à son expiration
     // et son refresh token reste valable des semaines.
-    if (input.isActive === false) await this.revokeSessions(id);
+    //
+    // CHANGER LE RÔLE aussi, et pour la même raison poussée d'un cran. Le jeton
+    // d'accès PORTE le rôle : sans révocation, l'ancien administrateur garde un
+    // refresh token valable des semaines, avec lequel il obtient à volonté de
+    // nouveaux jetons. `FreshSessionGuard` relit désormais le rôle en base à
+    // chaque requête qui en exige un, ce qui ferme la fenêtre de quinze minutes
+    // du jeton déjà émis ; la révocation ci-dessous ferme la porte de derrière,
+    // celle du renouvellement. Les deux sont nécessaires, et aucune ne remplace
+    // l'autre : la première corrige l'AUTORITÉ, la seconde met fin à la SESSION.
+    const roleChanged = input.role !== undefined && input.role !== existing.role;
+    if (input.isActive === false || roleChanged) await this.revokeSessions(id);
 
     return toDto(user);
   }
