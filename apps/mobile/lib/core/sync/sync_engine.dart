@@ -1675,11 +1675,30 @@ class SyncEngine {
 
   Future<int> _applyPage(PullPage page) async {
     int count = 0;
-    final Set<String> guardedRepresentants = await _entitiesWithOpenWrites(
-      'representant',
-    );
-    final Set<String> guardedProspects = await _entitiesWithOpenWrites('prospect');
     await _db.transaction(() async {
+      // ═══ LA GARDE SE LIT DANS LA TRANSACTION QU'ELLE PROTÈGE ═══
+      //
+      // Les deux ensembles étaient calculés AVANT d'ouvrir la transaction. Rien
+      // ne suspend l'interface entre les deux lectures et la première écriture
+      // de la page : la page arrive par un lien 2G, le commercial a son
+      // formulaire sous les yeux, et « Enregistrer » écrit la fiche et met
+      // l'opération en file exactement là. Cette opération-là n'était dans aucun
+      // des deux ensembles, et l'`ON CONFLICT DO UPDATE` écrasait la correction
+      // qui venait d'être enregistrée.
+      //
+      // Elle n'était pas perdue pour la file : elle serait partie au cycle
+      // suivant. Mais l'écran affichait de nouveau la valeur d'avant, et c'est
+      // précisément ce que cette garde existe pour empêcher : le commercial
+      // ressaisit une correction qu'il vient de faire, et la ressaisie produit
+      // une seconde écriture sur la même fiche.
+      //
+      // Lues ici, les deux lectures et toutes les écritures de la page tiennent
+      // dans la même transaction : plus aucune mise en file ne peut s'intercaler
+      // entre le constat et la décision qu'on en tire.
+      final Set<String> guardedRepresentants = await _entitiesWithOpenWrites(
+        'representant',
+      );
+      final Set<String> guardedProspects = await _entitiesWithOpenWrites('prospect');
       for (final DepartementDto d in page.changes.departements) {
         await _db
             .into(_db.departements)
