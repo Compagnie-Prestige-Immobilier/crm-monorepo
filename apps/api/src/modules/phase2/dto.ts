@@ -25,6 +25,8 @@ import {
 } from '@crm/database';
 
 import { COMMENT_MAX_LENGTH } from './attempt-rules.js';
+import { MAX_SPREAD_DAYS, MIN_SPREAD_DAYS } from './distribution.js';
+import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 
 /**
  * Contrat HTTP de la phase 2.
@@ -46,25 +48,27 @@ import { COMMENT_MAX_LENGTH } from './attempt-rules.js';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Métadonnées de page propres à la phase 2.
+ * La pagination de la phase 2 est `PageMetaDto`, celle du reste du contrat.
  *
- * Volontairement distinctes de `PageMetaDto` : deux schémas OpenAPI ne peuvent
- * pas porter le même nom, et emprunter celui d'un autre module lierait ce
- * contrat aux évolutions d'une pagination qui n'a rien à voir.
+ * Il a existé ici un `Phase2PageMetaDto` identique champ pour champ, justifié
+ * par le fait que deux schémas OpenAPI ne peuvent pas porter le même nom. C'est
+ * vrai et sans rapport : deux modules IMPORTENT très bien la même classe, ce
+ * que fait l'import en tête de fichier. Le doublon ne protégeait donc rien et
+ * coûtait, dans chaque client engendré, une seconde classe de pagination que le
+ * web et le mobile devaient traiter à part.
+ *
+ * La forme d'une page (total, page, taille, nombre de pages) n'est pas un choix
+ * de module : c'est la même question posée à toutes les listes du produit. Le
+ * jour où la phase 2 aurait besoin d'un champ supplémentaire, elle déclarera
+ * son propre type à ce moment-là, avec une raison à écrire ici.
  */
-export class Phase2PageMetaDto {
-  @ApiProperty({ type: Number }) total!: number;
-  @ApiProperty({ type: Number }) page!: number;
-  @ApiProperty({ type: Number }) pageSize!: number;
-  @ApiProperty({ type: Number }) pageCount!: number;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Campagnes — création
+// Campagnes, création
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class CreateCampaignDto {
-  @ApiProperty({ maxLength: 120, example: 'Campagne CHUES — avril' })
+  @ApiProperty({ maxLength: 120, example: 'Campagne CHUES, avril' })
   @IsString()
   @MinLength(3)
   @MaxLength(120)
@@ -92,10 +96,25 @@ export class CreateCampaignDto {
   @ArrayMaxSize(200)
   @ArrayUnique()
   commercialIds!: string[];
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: MIN_SPREAD_DAYS,
+    maximum: MAX_SPREAD_DAYS,
+    default: MIN_SPREAD_DAYS,
+    description:
+      'Étale la file de chaque commercial sur N journées. À 1 (défaut), comportement inchangé : un seul programme. Au-delà, chaque commercial reçoit un programme par jour, ce qui rend une base de 120 000 fiches distribuable.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(MIN_SPREAD_DAYS)
+  @Max(MAX_SPREAD_DAYS)
+  spreadDays?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Campagnes — lecture
+// Campagnes, lecture
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class CampaignProgressDto {
@@ -121,6 +140,17 @@ export class CampaignCommercialDto {
   position!: number;
 
   @ApiProperty({ type: () => CampaignProgressDto }) progress!: CampaignProgressDto;
+
+  /**
+   * Nombre de lignes par journée d'étalement, jour 1 en tête.
+   *
+   * Toujours présent, avec une seule entrée quand la campagne n'est pas
+   * étalée : c'est cette liste qui dit à l'interface combien de boutons PDF
+   * afficher, et un tableau vide l'obligerait à recalculer une répartition que
+   * le serveur seul connaît.
+   */
+  @ApiProperty({ type: () => [Number], description: 'Lignes par journée, jour 1 en tête.' })
+  perDay!: number[];
 }
 
 /**
@@ -182,6 +212,10 @@ export class CampaignSummaryDto {
   @ApiProperty({ format: 'uuid' }) createdById!: string;
   @ApiProperty() createdByName!: string;
   @ApiProperty({ type: Number }) commercialCount!: number;
+
+  @ApiProperty({ type: Number, description: 'Journées d’étalement. 1 : programme unique.' })
+  spreadDays!: number;
+
   @ApiProperty({ type: () => CampaignProgressDto }) progress!: CampaignProgressDto;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) closedAt!: string | null;
@@ -197,9 +231,19 @@ export class CampaignDetailDto {
   @ApiProperty({ format: 'uuid' }) createdById!: string;
   @ApiProperty() createdByName!: string;
   @ApiProperty({ type: Number }) commercialCount!: number;
+
+  @ApiProperty({ type: Number, description: 'Journées d’étalement. 1 : programme unique.' })
+  spreadDays!: number;
+
   @ApiProperty({ type: () => CampaignProgressDto }) progress!: CampaignProgressDto;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) closedAt!: string | null;
+
+  @ApiProperty({
+    type: () => [Number],
+    description: 'Lignes par journée, toutes affectations confondues. Jour 1 en tête.',
+  })
+  perDay!: number[];
 
   @ApiProperty({ type: () => [CampaignCommercialDto], description: 'Ordonnés par position.' })
   commerciaux!: CampaignCommercialDto[];
@@ -213,14 +257,61 @@ export class CampaignDetailDto {
 
 export class CampaignListDto {
   @ApiProperty({ type: () => [CampaignSummaryDto] }) items!: CampaignSummaryDto[];
-  @ApiProperty({ type: () => Phase2PageMetaDto }) meta!: Phase2PageMetaDto;
+  @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
 }
 
+/**
+ * Filtres de la liste des campagnes.
+ *
+ * Les quatre critères ajoutés (recherche, périmètre, créateur, dates) portent
+ * exactement les mêmes noms que ceux du panneau « Filtres avancés » du web :
+ * l'état de ce panneau est porté par l'URL, et un écart de nommage rendrait une
+ * URL partagée impossible à reconstituer.
+ */
 export class CampaignQueryDto {
   @ApiPropertyOptional({ enum: CampaignStatus, enumName: 'CampaignStatus' })
   @IsOptional()
   @IsEnum(CampaignStatus)
   status?: CampaignStatus;
+
+  @ApiPropertyOptional({
+    description: 'Recherche libre sur le nom de la campagne.',
+    maxLength: 120,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  search?: string;
+
+  @ApiPropertyOptional({
+    enum: CampaignScope,
+    enumName: 'CampaignScope',
+    description: 'Périmètre du tirage.',
+  })
+  @IsOptional()
+  @IsEnum(CampaignScope)
+  scope?: CampaignScope;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Administrateur qui a créé la campagne.' })
+  @IsOptional()
+  @IsUUID()
+  createdById?: string;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description: 'Borne basse sur la date de création, incluse.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  dateFrom?: string;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description: 'Borne haute sur la date de création, incluse.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  dateTo?: string;
 
   @ApiPropertyOptional({ type: Number, minimum: 1, default: 1 })
   @IsOptional()
@@ -236,6 +327,28 @@ export class CampaignQueryDto {
   @Min(1)
   @Max(100)
   pageSize?: number;
+}
+
+/**
+ * Paramètres du programme PDF.
+ *
+ * `jour` est FACULTATIF et sans valeur par défaut : son absence rend le
+ * programme entier, exactement comme avant l'étalement. Un défaut à 1
+ * amputerait silencieusement toutes les liasses déjà en circulation.
+ */
+export class ProgrammeQueryDto {
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: MAX_SPREAD_DAYS,
+    description: 'Journée d’étalement, à partir de 1. Absent : tout le programme du commercial.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_SPREAD_DAYS)
+  jour?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -310,7 +423,7 @@ export class DirectoryQueryDto {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tentatives d'appel — contrat consommé par le module de synchronisation
+// Tentatives d'appel, contrat consommé par le module de synchronisation
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**

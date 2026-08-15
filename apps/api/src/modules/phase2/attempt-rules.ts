@@ -3,7 +3,7 @@ import type { EnrollmentMethod } from '@crm/database';
 import { CallOutcome, Phase2Status } from '@crm/database';
 
 /**
- * Règles de cohérence d'une tentative d'appel — miroir applicatif des
+ * Règles de cohérence d'une tentative d'appel, miroir applicatif des
  * contraintes CHECK posées par la migration `20260812141010_phase2_and_bank_finance`.
  *
  * Elles sont écrites DEUX FOIS, ici et en base, et c'est délibéré :
@@ -18,7 +18,7 @@ import { CallOutcome, Phase2Status } from '@crm/database';
  * entrée acceptée ici est acceptée par la base.
  */
 
-/** Longueur maximale d'un commentaire — identique à la contrainte CHECK. */
+/** Longueur maximale d'un commentaire, identique à la contrainte CHECK. */
 export const COMMENT_MAX_LENGTH = 2_000;
 
 /**
