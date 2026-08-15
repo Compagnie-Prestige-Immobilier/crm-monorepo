@@ -59,7 +59,7 @@ export interface RepresentantFilters {
   /** `true` : au moins un prospect. `false` : aucun. `null` : indifférent. */
   hasProspects: boolean | null;
   sortBy: RepresentantSortField;
-  sortOrder: SortDirection;
+  sortDir: SortDirection;
   page: number;
   pageSize: number;
 }
@@ -73,7 +73,7 @@ export const EMPTY_REPRESENTANT_FILTERS: RepresentantFilters = {
   dateTo: null,
   hasProspects: null,
   sortBy: 'clientCreatedAt',
-  sortOrder: 'desc',
+  sortDir: 'desc',
   page: 1,
   pageSize: REPRESENTANT_PAGE_SIZE,
 };
@@ -94,7 +94,7 @@ export function parseRepresentantFilters(
     sortBy:
       readEnum<RepresentantSortField>(params, 'sortBy', REPRESENTANT_SORT_FIELDS) ??
       EMPTY_REPRESENTANT_FILTERS.sortBy,
-    sortOrder: readString(params, 'sortOrder') === 'asc' ? 'asc' : 'desc',
+    sortDir: readString(params, 'sortDir') === 'asc' ? 'asc' : 'desc',
     page: readPositiveInt(params, 'page', 1),
     pageSize: REPRESENTANT_PAGE_SIZE,
   };
@@ -115,8 +115,8 @@ export function serializeRepresentantFilters(filters: RepresentantFilters): URLS
   put('dateTo', filters.dateTo);
   if (filters.hasProspects !== null) put('hasProspects', filters.hasProspects ? 'oui' : 'non');
   if (filters.sortBy !== EMPTY_REPRESENTANT_FILTERS.sortBy) put('sortBy', filters.sortBy);
-  if (filters.sortOrder !== EMPTY_REPRESENTANT_FILTERS.sortOrder) {
-    put('sortOrder', filters.sortOrder);
+  if (filters.sortDir !== EMPTY_REPRESENTANT_FILTERS.sortDir) {
+    put('sortDir', filters.sortDir);
   }
   if (filters.page !== 1) put('page', String(filters.page));
 

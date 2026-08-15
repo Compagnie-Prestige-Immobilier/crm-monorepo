@@ -3,6 +3,8 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 
+import { isTransientPatch } from '@/components/filters/use-url-filters';
+
 import {
   EMPTY_BANK_FILTERS,
   parseBankFilters,
@@ -22,6 +24,11 @@ import {
  * mars pour motif document manquant » est une URL. Elle se colle dans un
  * message, se met en favori, et le bouton « Précédent » défait le dernier
  * filtre.
+ *
+ * Cette dernière promesse tient depuis que `setFilters` EMPILE une entrée sur un
+ * critère choisi, au lieu de tout remplacer. Le raisonnement complet, et la
+ * raison pour laquelle la recherche libre fait exception, sont dans
+ * `components/filters/use-url-filters.ts`.
  */
 export function useBankFilters(): {
   filters: BankCaseFilters;
@@ -60,7 +67,12 @@ export function useBankFilters(): {
 
   const setFilters = useCallback(
     (patch: Partial<BankCaseFilters>) => {
-      router.replace(buildHref(patch), { scroll: false });
+      const url = buildHref(patch);
+      if (isTransientPatch(patch)) {
+        router.replace(url, { scroll: false });
+      } else {
+        router.push(url, { scroll: false });
+      }
     },
     [buildHref, router],
   );
@@ -72,7 +84,8 @@ export function useBankFilters(): {
       ...EMPTY_BANK_FILTERS,
       pageSize: filters.pageSize,
     }).toString();
-    router.replace(query === '' ? pathname : `${pathname}?${query}`, { scroll: false });
+    // Geste délibéré, et l'un des plus regrettés : il doit pouvoir se défaire.
+    router.push(query === '' ? pathname : `${pathname}?${query}`, { scroll: false });
   }, [filters.pageSize, pathname, router]);
 
   return { filters, setFilters, resetFilters, hrefWith: buildHref };
