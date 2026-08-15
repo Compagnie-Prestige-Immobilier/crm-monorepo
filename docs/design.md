@@ -1,4 +1,4 @@
-# Design system — CPI GO
+# Design system : CPI GO
 
 Source unique de vérité pour **les deux** clients : `apps/web` (Tailwind v4) et
 `apps/mobile` (Flutter Material 3). Un token change ici, il change des deux côtés.
@@ -14,14 +14,14 @@ ont été mesurés paire par paire. Base structurelle : **Material Design 3**.
 
 1. **Structure Material 3, couleur CPI.** On ne redessine pas les composants, on les habille.
 2. **Un token, un rôle.** Aucune couleur en dur dans un widget ou un composant. Si un rôle
-   manque, on l'ajoute ici — on ne bricole pas localement.
+   manque, on l'ajoute ici : on ne bricole pas localement.
 3. **Le contraste n'est pas négociable.** AA (4.5:1) pour le texte, 3:1 pour les éléments non
    textuels. Toute paire non listée ici doit être mesurée avant usage.
 4. **Cible tactile minimale 44 px.** L'app est utilisée debout, au soleil, parfois à une main.
 
 ---
 
-## 2. Couleurs — mode clair
+## 2. Couleurs : mode clair
 
 ### 2.1 Base
 
@@ -32,10 +32,10 @@ ont été mesurés paire par paire. Base structurelle : **Material Design 3**.
 | `card` / `popover`  | `#FBFBFC`            | Surfaces élevées          |
 | `border`            | `rgba(99,2,16,0.12)` | Séparateurs décoratifs    |
 | `input-background`  | `#F5ECEE`            | Fond de champ             |
-| `input-border`      | `#AF7D84`            | Contour de champ — 3,24:1 |
+| `input-border`      | `#AF7D84`            | Contour de champ : 3,24:1 |
 | `switch-background` | `#C4A0AA`            | Piste d'interrupteur      |
 
-### 2.2 Bordeaux CPI — primaire
+### 2.2 Bordeaux CPI : primaire
 
 | Token                  | Hex       | Rôle                           |
 | ---------------------- | --------- | ------------------------------ |
@@ -49,7 +49,7 @@ ont été mesurés paire par paire. Base structurelle : **Material Design 3**.
 | `muted-foreground`     | `#6B4A52` | Texte secondaire               |
 | `ring`                 | `#630210` | Anneau de focus                |
 
-### 2.3 Or CPI — la règle à ne jamais oublier
+### 2.3 Or CPI : la règle à ne jamais oublier
 
 `#C8921A` fait **2,77:1 sur blanc**. Il échoue AA texte (4,5:1) _et_ le seuil grand texte (3:1).
 
@@ -58,10 +58,10 @@ ont été mesurés paire par paire. Base structurelle : **Material Design 3**.
 | Token               | Hex       | Usage autorisé                                               |
 | ------------------- | --------- | ------------------------------------------------------------ |
 | `accent`            | `#C8921A` | **Surface décorative uniquement**                            |
-| `accent-foreground` | `#1C0810` | Texte posé _sur_ une surface or — 6,95:1                     |
-| `accent-text`       | `#856011` | **Seule** déclinaison pour texte et icônes — 5,71:1 sur card |
-| `accent-border`     | `#A87A15` | Bordures et traits or — 3,85:1 sur blanc                     |
-| `accent-on-dark`    | `#FFC65A` | Texte or sur bordeaux — 8,71:1 sur `primary`                 |
+| `accent-foreground` | `#1C0810` | Texte posé _sur_ une surface or : 6,95:1                     |
+| `accent-text`       | `#856011` | **Seule** déclinaison pour texte et icônes : 5,71:1 sur card |
+| `accent-border`     | `#A87A15` | Bordures et traits or : 3,85:1 sur blanc                     |
+| `accent-on-dark`    | `#FFC65A` | Texte or sur bordeaux : 8,71:1 sur `primary`                 |
 | `accent-surface`    | `#FAF4E8` | Fond de statut « attention » (or 10 % aplati)                |
 
 ### 2.4 Statuts
@@ -92,13 +92,13 @@ Au-delà de 5 séries, on ne rallonge pas la liste : on regroupe en « Autres »
 12 teintes rend un graphe illisible bien avant d'être épuisée.
 
 **L'or `#C8921A` en `chart-2` est une exception assumée, pas un oubli.** Il ne fait que 2,77:1
-sur blanc, ce qui échouerait pour du texte — mais §2.3 interdit l'or comme couleur de _texte_,
+sur blanc, ce qui échouerait pour du texte : mais §2.3 interdit l'or comme couleur de _texte_,
 pas comme _surface_, et une série de graphique est une surface. Trois conditions rendent
 l'exception acceptable :
 
 1. La série porte une **bordure `accent-border` `#A87A15`** (3,85:1) qui en dessine le contour :
    c'est ce trait, pas le remplissage, qui délimite la forme.
-2. Aucune information n'est portée **par la couleur seule** — WCAG 1.4.1. Chaque série est aussi
+2. Aucune information n'est portée **par la couleur seule** : WCAG 1.4.1. Chaque série est aussi
    identifiée par sa légende, et l'info-bulle nomme la valeur au survol comme au clavier.
 3. Les canevas ne sont pas lisibles par un lecteur d'écran de toute façon : tout graphique doit
    être doublé d'une alternative textuelle ou d'un tableau équivalent.
@@ -108,7 +108,7 @@ Sans ces trois conditions, l'or redevient interdit. En mode sombre, `chart-2` ba
 
 ---
 
-## 3. Couleurs — mode sombre
+## 3. Couleurs : mode sombre
 
 ⚠️ Le bloc `.dark` du fichier PLATEFORME d'origine est un **reliquat shadcn en gris neutre**,
 sans aucune identité CPI (`--primary: oklch(0.985 0 0)`, soit du blanc). Il n'est pas repris.
@@ -170,7 +170,7 @@ apparus à la première capture d'un écran réellement rendu.
 5. **Le logotype était étiré de 6,5×.** Dans une colonne flex,
    `align-items: stretch` étire un enfant en `width:auto` : le fichier 489×200
    était rendu en 640×40. Ce n'est pas un défaut de contraste et aucun token ne
-   pouvait le corriger — seule une capture d'écran pouvait le montrer.
+   pouvait le corriger : seule une capture d'écran pouvait le montrer.
 
 6. **Une couleur posée par une utilitaire de forme.** `.eyebrow` déclarait un
    `color`. Comme `text-*` vit dans la même couche utilitaire, c'est l'ordre du
@@ -241,12 +241,12 @@ Graisses : normal 400, medium 600, display 700–800. Titres à `letter-spacing:
 
 ## 5. Espacement, rayons, élévation
 
-**Grille 4 pt** — `4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64 · 80`
+**Grille 4 pt** : `4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64 · 80`
 
-**Rayons** — `xs 6 · sm 8 · md 12 · lg 16 · xl 20 · 2xl 24 · full 9999`
+**Rayons** : `xs 6 · sm 8 · md 12 · lg 16 · xl 20 · 2xl 24 · full 9999`
 (`--radius` de base : `0.25rem`)
 
-**Élévation** — ombres teintées prune `rgba(28,8,16,·)`, jamais du noir pur :
+**Élévation** : ombres teintées prune `rgba(28,8,16,·)`, jamais du noir pur :
 
 ```
 elev-xs  0 1px 2px  /0.04
@@ -273,8 +273,8 @@ Opacités de la couleur de premier plan appliquées par-dessus la surface :
 | Pression              | 0.12    |
 | Sélection             | 0.12    |
 | Glissé                | 0.16    |
-| Désactivé — contenu   | 0.38    |
-| Désactivé — conteneur | 0.12    |
+| Désactivé : contenu   | 0.38    |
+| Désactivé : conteneur | 0.12    |
 
 Cible tactile minimale : **44 px**.
 
@@ -330,7 +330,7 @@ Aucun SVG du wordmark n'existe dans le patrimoine CPI. Masters raster :
 | Fichier                    | Usage                                   |
 | -------------------------- | --------------------------------------- |
 | `cpi-logo.png` (417×170)   | Sur fond clair                          |
-| `cpi-header.png` (489×200) | Sur fond bordeaux — version inversée    |
+| `cpi-header.png` (489×200) | Sur fond bordeaux : version inversée    |
 | `favicon.svg` (512×512)    | Symbole seul, seul vectoriel disponible |
 
 Origine : `CPI/Projects/cpi-platform-source-20260717/apps/web/public/logos/`.
@@ -350,7 +350,7 @@ Copiés dans `apps/mobile/assets/brand/` et `apps/web/public/brand/`.
 | `success` / `warning` / `info` | idem                                         | `CpiColors` (Material 3 n'a pas ces rôles)  |
 
 Material 3 ne définit ni `success`, ni `warning`, ni `info`. Côté Flutter ils vivent dans une
-`ThemeExtension<CpiColors>` — **pas** dans des constantes globales, pour rester accessibles via
+`ThemeExtension<CpiColors>` : **pas** dans des constantes globales, pour rester accessibles via
 `Theme.of(context)` et testables.
 
 `ColorScheme.fromSeed(#630210)` seul ne suffit pas : l'algorithme de Material dérive des rôles

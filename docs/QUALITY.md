@@ -1,4 +1,4 @@
-# CPI GO — quality gates
+# CPI GO : quality gates
 
 The repository has two levels of verification:
 

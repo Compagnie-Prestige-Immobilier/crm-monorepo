@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# Image de l'API NestJS — et, via la cible `migrator`, du service de migration.
+# Image de l'API NestJS, et, via la cible `migrator`, du service de migration.
 # Contexte de build : la RACINE du dépôt (voir docker-compose.prod.yml).
 #
 # Le monorepo est découpé avec `turbo prune --docker`, qui produit :
@@ -40,7 +40,7 @@ RUN turbo prune @crm/api --docker
 # -----------------------------------------------------------------------------
 FROM base AS builder
 # argon2 est natif. Il publie des binaires précompilés, mais si le triplet de
-# la plateforme n'en a pas, node-gyp doit pouvoir compiler — sinon l'échec
+# la plateforme n'en a pas, node-gyp doit pouvoir compiler, sinon l'échec
 # arrive à l'installation avec un message très indirect.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
@@ -53,7 +53,7 @@ RUN pnpm --filter @crm/database db:generate
 # pnpm et non turbo : la tâche turbo `build` dépend de `generate`, qui dépend
 # de `@crm/api#openapi:generate`. Régénérer le contrat exigerait ici le
 # workspace entier. Le code généré étant committé (ADR 0002), l'image se
-# contente de compiler ce qui est dans l'arbre — et la CI garantit par
+# contente de compiler ce qui est dans l'arbre, et la CI garantit par
 # ailleurs que cet arbre est à jour.
 RUN pnpm --filter @crm/database build \
     && pnpm --filter @crm/api build
@@ -81,7 +81,7 @@ RUN npm install -g prisma@${PRISMA_VERSION} \
 # -----------------------------------------------------------------------------
 # Migrations. Repose sur `builder`, pas sur `prod-deps` : `prisma migrate
 # deploy` a besoin du CLI Prisma ET de packages/database/prisma.config.ts, qui
-# importe `prisma/config` — deux devDependencies absentes d'une image de
+# importe `prisma/config`, deux devDependencies absentes d'une image de
 # production. Ce conteneur vit trente secondes ; sa taille est sans intérêt,
 # sa correction non.
 # -----------------------------------------------------------------------------
@@ -102,6 +102,12 @@ WORKDIR /repo
 COPY --from=prod-deps --chown=node:node /repo ./
 COPY --from=builder   --chown=node:node /repo/packages/database/dist ./packages/database/dist
 COPY --from=builder   --chown=node:node /repo/apps/api/dist ./apps/api/dist
+# Assets statiques embarqués dans le code : aujourd'hui le logo CPI du PDF
+# « programme d'appels ». Ils vivent HORS de dist/ parce que tsc ne copie que du
+# JavaScript. Le générateur dégrade proprement si le fichier manque (en-tête
+# texte au lieu du logo), mais c'est le seul document que CPI remet à
+# l'extérieur : il doit sortir avec sa marque.
+COPY --from=builder   --chown=node:node /repo/apps/api/assets ./apps/api/assets
 # Le schéma et les migrations : le point d'entrée applique `migrate deploy`
 # avant de démarrer, pour que l'image soit autonome là où il n'existe pas de
 # service de migration séparé (Dokploy, Railway…).

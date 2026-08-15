@@ -6,7 +6,7 @@
 # `docker compose logs backup` suffit à savoir si la dernière sauvegarde a
 # réussi. Un cron dans un conteneur écrit dans un fichier que personne ne lit.
 #
-# Écrit dans /backups, qui est un bind mount de l'hôte — délibérément hors du
+# Écrit dans /backups, qui est un bind mount de l'hôte, délibérément hors du
 # volume de données : une sauvegarde qui disparaît avec le volume qu'elle
 # protège n'est pas une sauvegarde.
 
@@ -34,7 +34,7 @@ dump() {
 		log "terminé → $(du -h "${file}" | cut -f1)"
 	else
 		rm -f "${file}.partial"
-		log "ÉCHEC — aucune sauvegarde produite ce cycle"
+		log "ÉCHEC, aucune sauvegarde produite ce cycle"
 		return 1
 	fi
 }
@@ -57,7 +57,7 @@ seconds_until_next_run() {
 }
 
 mkdir -p "${BACKUP_DIR}"
-log "démarré — rétention ${RETENTION_DAYS} j, exécution quotidienne à ${BACKUP_HOUR}h00 (${TZ:-UTC})"
+log "démarré, rétention ${RETENTION_DAYS} j, exécution quotidienne à ${BACKUP_HOUR}h00 (${TZ:-UTC})"
 
 # Une sauvegarde immédiate au démarrage : après un redéploiement, on veut un
 # point de restauration récent sans attendre la prochaine fenêtre nocturne.

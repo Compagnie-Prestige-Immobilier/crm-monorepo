@@ -1,4 +1,4 @@
-# Caddy — unique point d'entrée HTTPS.
+# Caddy, unique point d'entrée HTTPS.
 #
 # TLS automatique : Caddy demande et renouvelle seul un certificat Let's
 # Encrypt pour {$DOMAIN}. Prérequis : l'enregistrement A du domaine pointe sur
@@ -40,7 +40,7 @@
 	# En-têtes que seul le terminaison TLS peut poser honnêtement.
 	header {
 		# HSTS : un an, sous-domaines compris. À n'activer qu'une fois le
-		# certificat obtenu et le domaine définitif — un navigateur qui a vu
+		# certificat obtenu et le domaine définitif, un navigateur qui a vu
 		# cet en-tête refusera le HTTP en clair pendant un an.
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"

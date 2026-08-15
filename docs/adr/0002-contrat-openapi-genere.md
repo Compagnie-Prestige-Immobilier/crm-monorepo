@@ -1,11 +1,11 @@
-# ADR 0002 — Le contrat OpenAPI est généré, les clients aussi
+# ADR 0002 : Le contrat OpenAPI est généré, les clients aussi
 
 **Statut** : accepté · **Date** : 2026-08-12
 
 ## Contexte
 
 Trois applications, deux langages clients. Toute divergence entre ce que l'API renvoie et ce que
-les clients attendent se paie au runtime — et sur mobile, dans un village sans réseau, chez un
+les clients attendent se paie au runtime : et sur mobile, dans un village sans réseau, chez un
 utilisateur qu'on ne peut pas forcer à mettre à jour.
 
 ## Décision
@@ -39,12 +39,12 @@ aucun SHA git, normalisation prettier systématique.
 ### Générateur Dart : `dart-dio` + `json_serializable`
 
 `built_value` impose `BuiltList`/`BuiltMap` et un registre `Serializers` global **à travers
-toute l'application** — chaque état Riverpod, chaque conversion Drift, chaque `copyWith` traverse
+toute l'application** : chaque état Riverpod, chaque conversion Drift, chaque `copyWith` traverse
 cette frontière. C'est une dépendance virale vers une bibliothèque en maintenance dont
 l'ergonomie précède la sûreté du null.
 
 `json_serializable` produit des classes Dart ordinaires, directement interopérables avec Drift
-**et avec les charges utiles JSON brutes de l'outbox** — `outbox.payload` est littéralement la
+**et avec les charges utiles JSON brutes de l'outbox** : `outbox.payload` est littéralement la
 sortie de `model.toJson()`.
 
 **Risque assumé** : ce mode est marqué BETA en 7.24.0 (le défaut reste `built_value`). Il est
@@ -61,7 +61,7 @@ doit pas faire planter une version ancienne installée sur un téléphone qu'on 
 Y compris la sortie `*.g.dart` de build_runner. Inhabituel pour du code applicatif, correct ici :
 `flutter build`, `dart analyze` et l'auto-complétion ont besoin des sources ; un développeur
 Android ne devrait pas avoir besoin de Node **et** de Java pour ouvrir le projet ; et surtout
-cela rend le contrôle de dérive **total** — un fichier généré à la compilation ne peut pas être
+cela rend le contrôle de dérive **total** : un fichier généré à la compilation ne peut pas être
 détecté comme périmé.
 
 ## Deux bugs du dépôt de référence, corrigés ici
@@ -93,11 +93,11 @@ champ supprimé ou renommé est un incident de production, pas une remarque de r
 - `type: () => [MonDto]` sur **chaque** tableau. La réflexion TypeScript ne voit pas le type des
   éléments d'un tableau : l'oublier est la première cause de `List<dynamic>` dans le Dart généré,
   et cela détruit silencieusement le typage de toute la charge de synchronisation.
-- `@ApiOperation({ operationId: '...' })` sur **chaque** route — openapi-generator en dérive le
+- `@ApiOperation({ operationId: '...' })` sur **chaque** route : openapi-generator en dérive le
   nom des méthodes Dart ; sans lui on obtient `representantsControllerFindAll_1`.
 - `nullable: true` et « champ optionnel » sont distingués : en Dart, `T?` et un champ absent ne
   sont pas la même chose.
 - `Idempotency-Key` est déclaré via `@ApiHeader` pour devenir un paramètre nommé typé dans le
-  client généré. L'alternative — le passer dans `Options(headers:)` — fonctionne mais n'est pas
+  client généré. L'alternative : le passer dans `Options(headers:)` : fonctionne mais n'est pas
   contrainte, et un en-tête oublié signifie des doubles insertions silencieuses. Le compilateur
   tient l'invariant.
