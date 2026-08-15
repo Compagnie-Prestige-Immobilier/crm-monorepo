@@ -1,6 +1,6 @@
 import 'package:uuid/uuid.dart';
 
-/// Fabrique d'identifiants — **Dart pur**, utilisable depuis l'isolat de fond.
+/// Fabrique d'identifiants : **Dart pur**, utilisable depuis l'isolat de fond.
 ///
 /// UUID v7 et jamais v4 : la clé primaire côté Postgres est un UUID, et v7
 /// préfixe l'identifiant d'un horodatage milliseconde, ce qui redonne la

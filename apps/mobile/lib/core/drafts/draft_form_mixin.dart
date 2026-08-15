@@ -11,7 +11,7 @@ import 'draft_debouncer.dart';
 /// **On vide sur `inactive`, pas sur `paused`.**
 ///
 /// `inactive` est émis *avant* `paused` : à l'apparition du sélecteur d'app, à
-/// l'arrivée d'un appel, au verrouillage de l'écran. `paused` arrive ensuite —
+/// l'arrivée d'un appel, au verrouillage de l'écran. `paused` arrive ensuite :
 /// et sur plusieurs ROM constructeurs (Transsion et Xiaomi en tête, c'est-à-dire
 /// l'essentiel du parc sénégalais visé) le processus peut être tué avant que le
 /// callback `paused` n'ait eu le temps de rendre la main à Dart. Écrire à
@@ -24,7 +24,7 @@ import 'draft_debouncer.dart';
 ///
 /// `AppLifecycleListener` plutôt que `implements WidgetsBindingObserver` :
 /// l'interface compte une quinzaine de méthodes dont aucune ne nous concerne, et
-/// Flutter en ajoute à chaque version — chaque ajout casserait la compilation de
+/// Flutter en ajoute à chaque version : chaque ajout casserait la compilation de
 /// tous les écrans de saisie pour rien.
 mixin DraftFormMixin<T extends StatefulWidget> on State<T> {
   DraftDebouncer? _debouncer;
@@ -58,14 +58,14 @@ mixin DraftFormMixin<T extends StatefulWidget> on State<T> {
   ///
   /// **Sans cette substitution, la restauration de brouillon ne peut pas
   /// marcher.** `draftId` vaut `widget.draftId ?? Ids.newId()` : un écran ouvert
-  /// depuis un bouton — « Nouveau représentant », « Ajouter un prospect » — tire
+  /// depuis un bouton : « Nouveau représentant », « Ajouter un prospect » : tire
   /// un identifiant neuf et l'garde en mémoire seulement. La mémoire de route
   /// enregistre alors `/representants/nouveau` **sans référence**, et au
   /// redémarrage l'écran se reconstruit, tire un *deuxième* identifiant neuf, et
   /// lit un brouillon qui n'a jamais été écrit sous cette clé.
   ///
   /// Le formulaire revenait donc vide après une éjection mémoire, alors que le
-  /// brouillon était bien en base — la donnée était sauvée, mais plus personne
+  /// brouillon était bien en base : la donnée était sauvée, mais plus personne
   /// ne savait sous quel nom la chercher. On publie l'identifiant dans l'URL dès
   /// le premier cadre, pour que la mémoire de route le capture.
   String? draftRouteWithId() => null;
@@ -78,10 +78,7 @@ mixin DraftFormMixin<T extends StatefulWidget> on State<T> {
     // routeur, et `replace` plutôt que `go` pour ne pas empiler une entrée
     // d'historique que le bouton retour devrait ensuite traverser.
     WidgetsBinding.instance.addPostFrameCallback((Duration _) {
-      if (!mounted) return;
-      final String? target = draftRouteWithId();
-      if (target == null) return;
-      GoRouter.of(context).replace(target);
+      republishDraftRoute();
     });
     _lifecycle = AppLifecycleListener(
       // `inactive` : la dernière notification garantie avant une éjection.
@@ -107,6 +104,22 @@ mixin DraftFormMixin<T extends StatefulWidget> on State<T> {
     _debouncer?.dispose();
     _debouncer = null;
     super.dispose();
+  }
+
+  /// (Re)publie `?draft=<id>` dans l'adresse.
+  ///
+  /// Appelée au premier cadre, et **de nouveau après l'adoption d'un brouillon
+  /// retrouvé sous un autre identifiant** : sans ce second appel, l'URL
+  /// continuerait de désigner l'identifiant neuf qui vient d'être abandonné, et
+  /// un redémarrage rouvrirait le formulaire vide alors que la saisie est là.
+  ///
+  /// `maybeOf` et non `of` : l'écran doit rester montable dans un test de widget
+  /// sans routeur, et une exception ici tuerait le premier cadre du formulaire.
+  void republishDraftRoute() {
+    if (!mounted) return;
+    final String? target = draftRouteWithId();
+    if (target == null) return;
+    GoRouter.maybeOf(context)?.replace(target);
   }
 
   /// À appeler à chaque changement de champ.

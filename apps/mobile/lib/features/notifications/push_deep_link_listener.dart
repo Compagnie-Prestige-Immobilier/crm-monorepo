@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/providers/app_providers.dart';
 import '../../core/router/app_router.dart';
@@ -14,7 +15,7 @@ import 'notifications_controller.dart';
 /// lecture du jeton de renouvellement n'ait donné son verdict. Naviguer à cet
 /// instant est sans effet : dès que le garde résout, sa redirection écrase la
 /// destination. C'est très exactement ainsi qu'un lien profond « marche quand
-/// l'application est déjà ouverte » et se perd au démarrage à froid — le seul
+/// l'application est déjà ouverte » et se perd au démarrage à froid : le seul
 /// cas qui compte, puisque c'est celui d'une notification tapée depuis l'écran
 /// de verrouillage.
 ///
@@ -24,7 +25,7 @@ import 'notifications_controller.dart';
 /// **Il navigue par `routerProvider`, PAS par `GoRouter.of(context)`.** Le
 /// `builder` de `MaterialApp.router` s'applique AU-DESSUS du `Router`, donc
 /// au-dessus de l'`InheritedGoRouter` : `GoRouter.of(context)` y échoue. C'est
-/// un piège discret — le widget se monte, se construit, et seule la navigation
+/// un piège discret : le widget se monte, se construit, et seule la navigation
 /// ne se produit jamais. Lire l'instance dans le conteneur Riverpod, qui est
 /// exactement celle passée à `routerConfig`, contourne la question.
 ///
@@ -79,13 +80,26 @@ class _PushDeepLinkListenerState extends ConsumerState<PushDeepLinkListener> {
     // Après le cadre courant : `_drain` peut être appelé depuis `build`, et
     // naviguer pendant une construction lève. Le cadre suivant laisse aussi la
     // redirection du garde se poser d'abord, ce qui garantit que notre `go`
-    // arrive en dernier — c'est tout l'objet de ce widget.
+    // arrive en dernier : c'est tout l'objet de ce widget.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _navigating = false;
       if (!mounted) return;
       final PendingPushRoute? route = ref.read(pendingPushRouteProvider.notifier).take();
       if (route == null) return;
-      ref.read(routerProvider).go(route.route);
+
+      final GoRouter router = ref.read(routerProvider);
+      // ═══ `go` ÉCRASE LA PILE, `push` L'EMPILE ═══
+      //
+      // Au démarrage à froid il n'y a rien à préserver : `go` pose la
+      // destination et c'est bien ce qu'on veut. Application déjà ouverte, en
+      // revanche, `go` effaçait l'écran où l'utilisateur travaillait : il tapait
+      // une annonce depuis un formulaire à moitié rempli et ne pouvait plus y
+      // revenir, la flèche de retour n'ayant plus rien à dépiler.
+      if (router.routerDelegate.currentConfiguration.matches.length <= 1) {
+        router.go(route.route);
+      } else {
+        router.push(route.route);
+      }
     });
   }
 }

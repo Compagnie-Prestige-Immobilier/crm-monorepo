@@ -12,8 +12,9 @@ import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
+import '../../../ui/widgets/offline_indicator.dart';
+import '../../../ui/widgets/sync_badge.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
-import '../../shell/app_shell.dart';
 
 /// Historique : mes représentants, dépliables vers leurs prospects.
 ///
@@ -21,7 +22,7 @@ import '../../shell/app_shell.dart';
 ///
 /// `sync_status` est lu depuis les **vues SQL**, jamais dénormalisé sur la ligne
 /// métier. Une colonne dénormalisée se désynchronise au premier chemin de code
-/// qui oublie de la mettre à jour — et ce chemin existe toujours : réessai,
+/// qui oublie de la mettre à jour : et ce chemin existe toujours : réessai,
 /// expiration de bail, purge, remappage d'identifiant. La vue joint l'outbox :
 /// il n'y a rien à tenir à jour, donc rien à oublier (ADR 0001).
 ///
@@ -40,10 +41,19 @@ class HistoriqueScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Historique')),
+      appBar: AppBar(
+        title: const Text('Historique'),
+        // La bannière d'attente n'est plus montée ici : elle vit dans la coque
+        // (`app_shell.dart`), donc sur les quatre branches. Ne restent dans
+        // l'AppBar que les deux indicateurs d'état.
+        actions: const <Widget>[
+          OfflineIndicator(),
+          SyncBadge(),
+          SizedBox(width: CpiSpacing.xs),
+        ],
+      ),
       body: Column(
         children: <Widget>[
-          const PendingBanner(),
           Padding(
             // 12 dp en haut au lieu de 16 : le champ de recherche est le
             // premier contenu utile, il n'a pas à commencer bas.

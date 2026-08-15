@@ -3,20 +3,21 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
-    <!-- Requise depuis Android 13 (API 33) pour afficher la moindre
-         notification. Elle est DEMANDÉE À L'EXÉCUTION, et uniquement à la
-         première ouverture du centre de notifications : la demander au
-         lancement, avant que l'utilisateur ait la moindre idée de ce que
-         l'application enverra, la fait refuser par réflexe — et Android ne
-         repose plus jamais la question. -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!--
-      CONFIDENTIALITÉ AU REPOS — voir android:allowBackup ci-dessous.
+      POST_NOTIFICATIONS a été RETIRÉE avec Firebase. Plus rien dans
+      l'application n'affiche de notification système : les annonces arrivent
+      par l'inbox applicative, tirée depuis /notifications/mine et lue dans
+      l'écran « Annonces ». Une permission déclarée mais jamais utilisée
+      apparaît quand même sur la fiche Play Store et dans les réglages, et fait
+      promettre à l'application ce qu'elle ne fait pas.
+    -->
+    <!--
+      CONFIDENTIALITÉ AU REPOS : voir android:allowBackup ci-dessous.
 
       La base locale vit dans le stockage privé de l'application
       (`getApplicationSupportDirectory`), donc hors de portée des autres
-      applications. Elle contient l'annuaire de phase 2 — jusqu'à 500 000
-      numéros de téléphone répliqués sur le téléphone PERSONNEL du commercial —
+      applications. Elle contient l'annuaire de phase 2 : jusqu'à 500 000
+      numéros de téléphone répliqués sur le téléphone PERSONNEL du commercial :
       et l'outbox des saisies non encore transmises.
 
       `allowBackup="false"` ferme la seule sortie qui restait : sans lui,
@@ -26,7 +27,7 @@
       sécurité si ce drapeau était un jour rouvert.
 
       Contrepartie assumée : un changement de téléphone repart d'une base vide,
-      et l'annuaire se retélécharge. C'est exactement le comportement voulu — la
+      et l'annuaire se retélécharge. C'est exactement le comportement voulu : la
       nouvelle installation passe par une authentification.
     -->
     <application

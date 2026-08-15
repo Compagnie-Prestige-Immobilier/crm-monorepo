@@ -1,7 +1,9 @@
+import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/ui/widgets/local_typeahead.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Recherche dans les référentiels — insensible à la casse ET aux accents.
+/// Recherche dans les référentiels : insensible à la casse ET aux accents.
 ///
 /// Le défaut d'origine a été observé sur émulateur : taper « Thies » dans le
 /// sélecteur de département ne remontait rien, alors que « Thi » trouvait
@@ -32,7 +34,7 @@ void main() {
     });
   });
 
-  group('matches — départements', () {
+  group('matches : départements', () {
     final TypeaheadOption thies = option('Thiès', secondary: 'TH-THI');
 
     test('la saisie SANS accent trouve le libellé accentué', () {
@@ -65,7 +67,7 @@ void main() {
     });
   });
 
-  group('matches — mots-clés', () {
+  group('matches : mots-clés', () {
     test('le sigle d’un syndicat mord, accentué ou non', () {
       final TypeaheadOption chues = option(
         'Coopérative d’Habitat de l’Union des Enseignants du Sénégal',
@@ -79,5 +81,88 @@ void main() {
 
   test('une requête vide laisse tout passer', () {
     expect(option('Thiès').matches(''), isTrue);
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  group('message d\'état : il DOIT être à l\'écran', () {
+    /// Monte un champ isolé, avec les options qu'on lui donne.
+    Future<
+      ({TextEditingController controller, FocusNode focus})
+    >
+    pumpField(
+      WidgetTester tester, {
+      required List<TypeaheadOption> options,
+      String emptyHint = 'Aucun département. Synchronisez.',
+      String text = '',
+    }) async {
+      final TextEditingController controller = TextEditingController(text: text);
+      final FocusNode focus = FocusNode();
+      addTearDown(controller.dispose);
+      addTearDown(focus.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: LocalTypeahead(
+              controller: controller,
+              focusNode: focus,
+              options: options,
+              label: 'Département',
+              emptyHint: emptyHint,
+              onSelected: (TypeaheadOption _) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return (controller: controller, focus: focus);
+    }
+
+    testWidgets('un référentiel vide s\'annonce, sans qu\'on touche à rien', (
+      WidgetTester tester,
+    ) async {
+      // ═══ LE DÉFAUT ═══
+      //
+      // `emptyHint` était rendu dans `optionsViewBuilder`. Flutter n'ouvre le
+      // panneau que si `hasFocus && _options.isNotEmpty` : quand la liste est
+      // vide, c'est-à-dire exactement quand ce message a quelque chose à dire,
+      // le panneau n'existe pas. Sur une installation neuve, les listes ne
+      // réagissaient à rien, « Enregistrer » restait grisé pour toujours, et
+      // AUCUN mot à l'écran ne l'expliquait.
+      await pumpField(tester, options: const <TypeaheadOption>[]);
+
+      expect(find.text('Aucun département. Synchronisez.'), findsOneWidget);
+    });
+
+    testWidgets('une recherche sans résultat le dit, sous le champ', (
+      WidgetTester tester,
+    ) async {
+      final ({TextEditingController controller, FocusNode focus}) f = await pumpField(
+        tester,
+        options: <TypeaheadOption>[option('Dakar'), option('Thiès')],
+      );
+
+      f.focus.requestFocus();
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Bamako');
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Aucun résultat'), findsOneWidget);
+    });
+
+    testWidgets('une recherche qui aboutit ne dit rien', (WidgetTester tester) async {
+      final ({TextEditingController controller, FocusNode focus}) f = await pumpField(
+        tester,
+        options: <TypeaheadOption>[option('Dakar'), option('Thiès')],
+      );
+
+      f.focus.requestFocus();
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Dak');
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Aucun résultat'), findsNothing);
+    });
   });
 }

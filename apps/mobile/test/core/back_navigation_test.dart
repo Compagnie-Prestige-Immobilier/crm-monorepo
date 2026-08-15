@@ -10,15 +10,15 @@ import 'package:go_router/go_router.dart';
 ///
 /// Le bug d'origine : les écrans pleine page étaient atteints par `context.go`,
 /// qui **remplace** la pile. Il ne restait qu'une route, donc `maybePop` ne
-/// pouvait rien dépiler et la flèche de l'AppBar n'avait aucun effet — signalé
+/// pouvait rien dépiler et la flèche de l'AppBar n'avait aucun effet : signalé
 /// sur Phase 2, mais vrai partout.
 ///
 /// Deux propriétés se testent séparément, parce qu'elles se cassent
 /// séparément :
 ///
 /// 1. **Empiler, pas remplacer.** Après `push`, la pile peut être dépilée.
-/// 2. **Toujours une issue.** Même quand la route est la première de la pile —
-///    ce qui arrive à chaque démarrage à froid sur une route restaurée —
+/// 2. **Toujours une issue.** Même quand la route est la première de la pile :
+///    ce qui arrive à chaque démarrage à froid sur une route restaurée :
 ///    [popOrHome] envoie ailleurs plutôt que de ne rien faire.
 void main() {
   /// Routeur minimal : les vrais écrans ne sont pas nécessaires pour observer
@@ -175,7 +175,7 @@ void main() {
   testWidgets('popOrHome sans routeur retombe sur le Navigator local', (
     WidgetTester tester,
   ) async {
-    // Un écran monté seul — test de widget, aperçu — ne doit pas lever à la
+    // Un écran monté seul : test de widget, aperçu : ne doit pas lever à la
     // construction sous prétexte qu'aucun `GoRouter` n'est au-dessus de lui.
     await tester.pumpWidget(
       MaterialApp(

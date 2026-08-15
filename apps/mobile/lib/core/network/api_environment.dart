@@ -1,10 +1,10 @@
-/// Adresse du serveur — **Dart pur**.
+/// Adresse du serveur : **Dart pur**.
 ///
 /// ═══════════════════════════════════════════════════════════════════════════
 /// POURQUOI LE DÉFAUT DÉPEND DU MODE DE COMPILATION
 /// ═══════════════════════════════════════════════════════════════════════════
 ///
-/// Le défaut était `http://10.0.2.2:3001` en toutes circonstances — l'alias de
+/// Le défaut était `http://10.0.2.2:3001` en toutes circonstances : l'alias de
 /// la machine du développeur vu depuis l'émulateur Android. Sur un vrai
 /// téléphone, cette adresse ne désigne rien : l'APK s'installait, l'écran de
 /// connexion s'affichait, et la connexion échouait sans que rien ne dise

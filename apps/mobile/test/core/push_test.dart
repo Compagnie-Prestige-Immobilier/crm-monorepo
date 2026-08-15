@@ -12,10 +12,11 @@ void main() {
   // ───────────────────────────────────────────────────────────────────────────
   group('pureté de lib/core/push', () {
     // Même contrainte que `lib/core/sync/`, vérifiée mécaniquement plutôt que
-    // par revue : le gestionnaire d'arrière-plan de FCM tourne dans un isolat
-    // neuf, sans arbre de widgets et sans conteneur Riverpod. Un import Flutter
-    // glissé ici ne casserait rien avant la production, sur un téléphone en
-    // veille — c'est-à-dire là où personne ne lit les journaux.
+    // par revue : la boîte de réception est écrite depuis l'interface comme
+    // depuis le worker WorkManager, qui tourne dans un isolat neuf, sans arbre
+    // de widgets et sans conteneur Riverpod. Un import Flutter glissé ici ne
+    // casserait rien avant la production, sur un téléphone en veille,
+    // c'est-à-dire là où personne ne lit les journaux.
     test('aucun fichier n\'importe flutter ni flutter_riverpod', () {
       final Directory dir = Directory('lib/core/push');
       expect(dir.existsSync(), isTrue, reason: 'exécuter depuis apps/mobile');
@@ -41,13 +42,26 @@ void main() {
       expect(offenders, isEmpty);
     });
 
-    test('le gestionnaire d\'arrière-plan porte son annotation d\'entrée', () {
-      // Sans `@pragma('vm:entry-point')`, l'arbre-secoueur AOT supprime la
-      // fonction : tout marche en debug et rien ne marche en release, ce qui
-      // est le pire mode de défaillance possible.
-      final String source = File('lib/core/push/push_background.dart').readAsStringSync();
-      expect(source, contains("@pragma('vm:entry-point')"));
-      expect(source, contains('DartPluginRegistrant.ensureInitialized()'));
+    test('AUCUNE trace de Firebase ne subsiste', () {
+      // Firebase a été retiré : il exigeait un compte Google. Le vérifier
+      // mécaniquement, parce qu'un `import 'package:firebase_messaging/...'`
+      // réintroduit par mégarde ferait revenir la dépendance, l'écran
+      // « Notifications indisponibles » et la permission POST_NOTIFICATIONS,
+      // sans que rien ne le signale avant le prochain build Android.
+      final List<String> offenders = <String>[];
+      for (final FileSystemEntity entity in Directory('lib').listSync(recursive: true)) {
+        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        for (final String line in entity.readAsLinesSync()) {
+          if (line.trim().startsWith('import ') && line.contains('firebase')) {
+            offenders.add('${entity.path}: ${line.trim()}');
+          }
+        }
+      }
+      expect(offenders, isEmpty);
+
+      final String pubspec = File('pubspec.yaml').readAsStringSync();
+      expect(pubspec.contains('\n  firebase_core:'), isFalse);
+      expect(pubspec.contains('\n  firebase_messaging:'), isFalse);
     });
   });
 
@@ -78,13 +92,18 @@ void main() {
       expect(PushMessage.fromData(<String, String>{'notificationId': ''}), isNull);
     });
 
-    test('retombe sur `data` quand le bloc notification est absent', () {
+    test('ne retombe PAS sur `data` : le serveur n\'y met ni titre ni corps', () {
+      // Ce repli n'a jamais eu de source. `data['title']` et `data['body']`
+      // n'existent dans aucun message émis par le serveur, si bien que le code
+      // décrivait une compatibilité imaginaire : à la lecture, on croyait
+      // qu'un message silencieux (data-only) arriverait tout de même titré.
       final PushMessage? message = PushMessage.fromData(<String, String>{
         'notificationId': 'ntf-2',
         'title': 'Depuis data',
         'body': 'Corps',
       });
-      expect(message!.title, 'Depuis data');
+      expect(message!.title, isEmpty);
+      expect(message.body, isEmpty);
     });
   });
 
@@ -228,7 +247,7 @@ void main() {
       expect(await store.watchUnreadCount().first, 0);
     });
 
-    test('la purge efface tout — le téléphone est personnel', () async {
+    test('la purge efface tout : le téléphone est personnel', () async {
       await store.upsert(message('a'));
       await store.purge();
       expect(await store.watchAll().first, isEmpty);
@@ -255,23 +274,14 @@ void main() {
       await transport.dispose();
     });
 
-    test('un transport indisponible ne rend ni jeton ni autorisation', () async {
-      final FakePushTransport transport = FakePushTransport(available: false);
-      expect(await transport.initialize(), isFalse);
-      expect(await transport.token(), isNull);
-      expect(await transport.requestPermission(), PushPermission.unavailable);
-      await transport.dispose();
-    });
-
     test('le transport inerte ne lève jamais', () async {
+      // C'est le transport RÉEL de l'application depuis le retrait de
+      // Firebase : rien ne pousse, et ce n'est pas une panne. Les annonces
+      // arrivent par l'inbox tirée depuis `/notifications/mine`.
       const NullPushTransport transport = NullPushTransport();
-      expect(await transport.initialize(), isFalse);
-      expect(transport.isAvailable, isFalse);
-      expect(await transport.token(), isNull);
       expect(await transport.initialMessage(), isNull);
-      expect(await transport.currentPermission(), PushPermission.unavailable);
-      await transport.deleteToken();
       expect(await transport.foregroundMessages.isEmpty, isTrue);
+      expect(await transport.openedMessages.isEmpty, isTrue);
     });
   });
 }

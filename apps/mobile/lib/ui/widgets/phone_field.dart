@@ -10,8 +10,8 @@ import '../../core/utils/phone.dart';
 ///
 /// Le formateur ne travaille que sur les **chiffres** : il les extrait, les
 /// regroupe, puis replace le curseur en comptant les chiffres à gauche de la
-/// position d'origine. Repositionner le curseur à `text.length` — la solution
-/// qu'on voit partout — renverrait le curseur en fin de champ à chaque
+/// position d'origine. Repositionner le curseur à `text.length` : la solution
+/// qu'on voit partout : renverrait le curseur en fin de champ à chaque
 /// correction au milieu du numéro, ce qui rend impossible de rattraper une
 /// faute de frappe sans tout effacer.
 class SenegalPhoneFormatter extends TextInputFormatter {
@@ -56,7 +56,7 @@ class SenegalPhoneFormatter extends TextInputFormatter {
 /// Champ téléphone : indicatif fixe, masque, validation vivante.
 ///
 /// L'indicatif `+221` est un **préfixe non éditable** et pas du texte dans le
-/// champ. Éditable, il finit toujours par être effacé par mégarde — et un
+/// champ. Éditable, il finit toujours par être effacé par mégarde : et un
 /// numéro sans indicatif produit une clé de déduplication différente, donc un
 /// doublon que rien ne rattrape.
 class PhoneField extends StatelessWidget {
@@ -100,6 +100,12 @@ class PhoneField extends StatelessWidget {
         final String? error = partial
             ? null
             : (parsed is PhoneInvalid ? parsed.message : null);
+        // Réserve non bloquante : le champ reste valide, le bouton reste actif,
+        // et l'utilisateur est simplement prévenu. Un préfixe hors de la liste
+        // embarquée est le plus souvent une faute de frappe, parfois une
+        // nouvelle tranche ARTP : dans les deux cas c'est le serveur, qui tient
+        // `libphonenumber-js` à jour, qui tranche.
+        final String? warning = parsed is PhoneValid ? parsed.warningMessage : null;
 
         return TextField(
           controller: controller,
@@ -116,12 +122,22 @@ class PhoneField extends StatelessWidget {
             prefixStyle: Theme.of(context).textTheme.bodyLarge,
             hintText: '77 123 45 67',
             errorText: error,
-            helperText: parsed is PhoneValid ? helper : null,
+            helperText: parsed is PhoneValid ? (warning ?? helper) : null,
+            helperStyle: warning == null
+                ? null
+                : Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: context.cpi.accentText),
+            helperMaxLines: 2,
             suffixIcon: parsed is PhoneValid
                 ? Icon(
-                    PhosphorIconsRegular.checkCircle,
+                    warning == null
+                        ? PhosphorIconsRegular.checkCircle
+                        : PhosphorIconsRegular.warningCircle,
                     size: 20,
-                    color: context.cpi.success,
+                    color: warning == null
+                        ? context.cpi.success
+                        : context.cpi.accentText,
                   )
                 : null,
             suffixIconConstraints: const BoxConstraints(

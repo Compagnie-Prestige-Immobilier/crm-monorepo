@@ -6,15 +6,15 @@ import '../../core/providers/app_providers.dart';
 import '../../core/sync/api_port.dart';
 import '../../core/sync/token_store.dart';
 import '../../data/secure/secure_token_store.dart';
+import '../notifications/notification_inbox.dart';
 import '../notifications/notifications_controller.dart';
-import '../notifications/push_registration.dart';
 import 'auth_state.dart';
 
 /// Contrôleur de session.
 ///
 /// Écrit à la main plutôt que généré par `riverpod_generator` : sur Flutter
 /// 3.41.7 (Dart 3.11.5), `riverpod_generator` et `drift_dev` n'ont aucun palier
-/// d'`analyzer` commun — voir le commentaire en tête de `pubspec.yaml`. Un
+/// d'`analyzer` commun : voir le commentaire en tête de `pubspec.yaml`. Un
 /// `Notifier` manuel a exactement la même sémantique, sans le générateur.
 class AuthController extends Notifier<AuthState> {
   @override
@@ -100,11 +100,14 @@ class AuthController extends Notifier<AuthState> {
         role: tokens.role,
         email: tokens.email,
       );
-      // L'appareil s'enregistre APRÈS que l'état est passé à `authenticated` :
-      // la requête a besoin du jeton d'accès. Elle ne bloque pas la connexion
-      // et n'échoue jamais bruyamment — l'utilisateur veut travailler, pas
-      // déboguer une notification.
-      unawaited(ref.read(pushRegistrationProvider).register());
+      // La boîte de réception se rapatrie APRÈS que l'état est passé à
+      // `authenticated` : la requête a besoin du jeton d'accès. Elle ne bloque
+      // pas la connexion et n'échoue jamais bruyamment : l'utilisateur veut
+      // travailler, pas déboguer une notification.
+      //
+      // Aucun jeton d'appareil n'est enregistré : sans Firebase il n'y en a
+      // plus, et `/devices/register` n'aurait rien à transmettre.
+      unawaited(ref.read(notificationInboxProvider).refresh(force: true));
       return true;
     } on ApiException catch (e) {
       state = AuthState.signedOut(errorMessage: _messageFor(e));
@@ -133,7 +136,7 @@ class AuthController extends Notifier<AuthState> {
   /// Pourquoi ici : cet appareil est le téléphone personnel du commercial, et
   /// l'annuaire y réplique jusqu'à 500 000 numéros. Le laisser survivre au
   /// départ de son propriétaire annulerait tout le bénéfice de l'avoir réduit à
-  /// six champs — le numéro est justement le champ qu'on distribue.
+  /// six champs : le numéro est justement le champ qu'on distribue.
   ///
   /// Pourquoi PAS dans [onSessionExpired] : une session expirée n'est pas un
   /// départ. Le commercial va se reconnecter avec le même compte, et effacer son
@@ -144,12 +147,10 @@ class AuthController extends Notifier<AuthState> {
   /// inverse, une interruption entre les deux laisserait un annuaire complet sur
   /// un appareil sans session, donc sans écran pour le purger.
   Future<void> signOut() async {
-    // Même ordre, et pour la même raison, que la purge de l'annuaire : la
-    // révocation du jeton d'appareil a besoin d'une session valide, donc elle
-    // passe AVANT l'effacement des jetons. Dans l'ordre inverse, l'appareil
-    // resterait enregistré au nom de quelqu'un qui a quitté le téléphone — et
-    // recevrait ses notifications.
-    await ref.read(pushRegistrationProvider).unregister();
+    // Les annonces sont purgées au même titre que l'annuaire : elles peuvent
+    // nommer des prospects, et le téléphone est personnel. Il n'y a plus de
+    // jeton d'appareil à révoquer côté serveur : sans Firebase, aucun jeton
+    // n'a été enregistré.
     await ref.read(pushInboxStoreProvider).purge();
     await ref.read(phase2DirectoryProvider).purge();
     final String? refresh = await _tokens.readRefreshToken();

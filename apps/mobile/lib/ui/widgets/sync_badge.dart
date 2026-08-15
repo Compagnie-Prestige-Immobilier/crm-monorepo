@@ -34,40 +34,46 @@ class SyncBadge extends ConsumerWidget {
       child: InkWell(
         onTap: () => context.go(Routes.corrections),
         borderRadius: CpiRadius.brFull,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: CpiSpacing.sm,
-            vertical: CpiSpacing.xs,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              // Le basculement « en attente » → « tout est envoyé » est le
-              // seul événement que ce badge a à raconter : il se voit.
-              AnimatedSwitcher(
-                duration: CpiMotion.of(context).micro,
-                switchInCurve: CpiMotion.of(context).easeSpring,
-                transitionBuilder: (Widget child, Animation<double> a) =>
-                    ScaleTransition(scale: a, child: child),
-                child: Icon(
-                  clean
-                      ? PhosphorIconsRegular.checkCircle
-                      : PhosphorIconsRegular.cloudSlash,
-                  key: ValueKey<bool>(clean),
-                  size: 22,
-                  color: clean ? theme.colorScheme.onPrimary : context.cpi.accentOnDark,
-                ),
-              ),
-              if (!clean) ...<Widget>[
-                const SizedBox(width: CpiSpacing.xxs + 2),
-                Text(
-                  count > 99 ? '99+' : '$count',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: context.cpi.accentOnDark,
+        child: ConstrainedBox(
+          // 48 dp, comme `NotificationBell` juste à côté. La cible faisait
+          // 38 dp : sous le plancher de 44 dp de docs/design.md §1, et la
+          // différence se paie debout, au soleil, avec un pouce.
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: CpiSpacing.sm,
+              vertical: CpiSpacing.xs,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                // Le basculement « en attente » → « tout est envoyé » est le
+                // seul événement que ce badge a à raconter : il se voit.
+                AnimatedSwitcher(
+                  duration: CpiMotion.of(context).micro,
+                  switchInCurve: CpiMotion.of(context).easeSpring,
+                  transitionBuilder: (Widget child, Animation<double> a) =>
+                      ScaleTransition(scale: a, child: child),
+                  child: Icon(
+                    clean
+                        ? PhosphorIconsRegular.checkCircle
+                        : PhosphorIconsRegular.cloudSlash,
+                    key: ValueKey<bool>(clean),
+                    size: 22,
+                    color: clean ? theme.colorScheme.onPrimary : context.cpi.accentOnDark,
                   ),
                 ),
+                if (!clean) ...<Widget>[
+                  const SizedBox(width: CpiSpacing.xxs + 2),
+                  Text(
+                    count > 99 ? '99+' : '$count',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: context.cpi.accentOnDark,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

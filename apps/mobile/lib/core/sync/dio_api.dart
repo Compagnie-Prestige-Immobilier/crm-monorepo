@@ -3,15 +3,45 @@ import 'package:dio/dio.dart';
 
 import '../network/api_environment.dart';
 import '../network/auth_interceptor.dart';
+import '../network/retry_after.dart' as retry_after;
 import '../network/session_expired.dart';
 import '../network/timeout_profile.dart';
 import 'api_port.dart';
+
+/// `FormatException` qui sait D'OÙ elle vient : le `content-type` du corps qui
+/// l'a produite.
+///
+/// C'est cette information, et elle seule, qui distingue « le serveur nous a
+/// répondu n'importe quoi » (terminal : le rejouer rendra le même corps) de
+/// « quelque chose a répondu à sa place » (lien mort : rien n'a été refusé).
+/// Sans elle, un portail captif condamnait deux cents saisies d'un coup.
+///
+/// **Aucun chemin de ce fichier ne la construit plus.** Le dernier décodage
+/// écrit à la main, celui de l'annuaire de phase 2, est passé au client généré,
+/// qui emballe ses échecs de désérialisation dans un `DioException` portant la
+/// réponse : c'est désormais [DioApi._guard] qui y lit le `content-type`. Elle
+/// reste ici parce que la règle, elle, n'est pas facultative : si un décodage
+/// manuscrit réapparaissait un jour, c'est par elle qu'il doit remonter, et non
+/// par une `FormatException` nue que `_guard` classerait `application/json`,
+/// donc terminale.
+class ResponseFormatException extends FormatException {
+  ResponseFormatException(String message, this.contentType, [Object? source])
+    : super(message, source);
+
+  /// En-tête `content-type` de la réponse, tel quel. `null` quand la réponse
+  /// n'en portait pas : ce qui est déjà, en soi, le signe d'un intermédiaire.
+  final String? contentType;
+
+  /// Vrai si le corps se présentait comme du JSON (`application/json`,
+  /// `application/problem+json`, …).
+  bool get isJson => (contentType ?? '').toLowerCase().contains('json');
+}
 
 /// Implémentation réelle de [ApiPort], adossée au client généré.
 ///
 /// **Tout passe par le client généré, jamais par Dio en direct.** Un
 /// `dio.post('/api/v1/sync/push', data: {...})` compilerait encore le jour où le
-/// serveur renommerait un champ, et échouerait à l'exécution — chez un
+/// serveur renommerait un champ, et échouerait à l'exécution : chez un
 /// commercial, hors ligne, sans personne pour lire l'erreur. En passant par
 /// `SyncApi.pushSyncBatch`, un changement de contrat casse le build.
 ///
@@ -26,6 +56,7 @@ class DioApi implements ApiPort {
 
   AuthApi get _auth => _client.getAuthApi();
   SyncApi get _sync => _client.getSyncApi();
+  Phase2Api get _phase2 => _client.getPhase2Api();
   RepresentantsApi get _representants => _client.getRepresentantsApi();
 
   // ── Authentification ───────────────────────────────────────────────────────
@@ -43,7 +74,7 @@ class DioApi implements ApiPort {
           ...TimeoutProfile.read.extra,
         },
       );
-      return _toTokens(response.data!);
+      return _toTokens(_body('login', response));
     });
   }
 
@@ -58,7 +89,7 @@ class DioApi implements ApiPort {
           ...TimeoutProfile.read.extra,
         },
       );
-      return _toTokens(response.data!);
+      return _toTokens(_body('refresh', response));
     });
   }
 
@@ -78,11 +109,15 @@ class DioApi implements ApiPort {
       refreshToken: dto.refreshToken,
       // `expiresIn` est une durée en secondes ; on la matérialise en instant une
       // fois pour toutes, ici, plutôt que de recalculer « maintenant + n » à
-      // chaque lecture — deux appelants ne partiraient pas du même « maintenant ».
+      // chaque lecture : deux appelants ne partiraient pas du même « maintenant ».
       expiresAt: DateTime.now().toUtc().add(Duration(seconds: dto.expiresIn.toInt())),
       userId: dto.user.id,
       fullName: dto.user.fullName,
-      role: dto.user.role.name,
+      // `.value` et non `.name` : `Role.BANQUE_FINANCE.name` rendrait
+      // `BANQUE_FINANCE` par chance (les deux coïncident), mais
+      // `Role.unknownDefaultOpenApi.name` rendrait `unknownDefaultOpenApi` au
+      // lieu de la chaîne réellement reçue. `.value` est le contrat.
+      role: dto.user.role.value,
       email: dto.user.email,
     );
   }
@@ -97,7 +132,7 @@ class DioApi implements ApiPort {
         limit: limit,
         extra: TimeoutProfile.read.extra,
       );
-      final SyncPullResponseDto body = response.data!;
+      final SyncPullResponseDto body = _body('pull', response);
       return PullPage(
         changes: body.changes,
         deletions: body.deletions,
@@ -118,7 +153,7 @@ class DioApi implements ApiPort {
       final Response<SyncPushResponseDto> response = await _sync.pushSyncBatch(
         // Paramètre nommé typé et non un en-tête posé à la main : le contrat
         // impose `Idempotency-Key == clientBatchId`, et les deux valeurs
-        // proviennent ici de la même variable — elles ne peuvent pas diverger.
+        // proviennent ici de la même variable : elles ne peuvent pas diverger.
         idempotencyKey: batchId,
         syncPushDto: SyncPushDto(
           clientBatchId: batchId,
@@ -127,7 +162,7 @@ class DioApi implements ApiPort {
         ),
         extra: TimeoutProfile.push.extra,
       );
-      final SyncPushResponseDto body = response.data!;
+      final SyncPushResponseDto body = _body('push', response);
       return PushResult(
         batchId: body.batchId,
         results: body.results,
@@ -136,54 +171,7 @@ class DioApi implements ApiPort {
     });
   }
 
-  // ── Phase 2 — chemin brut, en attendant le client généré ───────────────────
-  //
-  // TODO(generated-client): tout ce bloc disparaît quand `openapi.json` aura été
-  // régénéré. Il est isolé ici, et nulle part ailleurs, pour que la bascule soit
-  // mécanique : trois méthodes à remplacer, aucun appelant à toucher.
-  //
-  // Les URL et les noms de champs sont écrits en dur — c'est exactement ce que
-  // le reste de ce fichier interdit, et c'est assumé le temps d'un décalage de
-  // contrat. En contrepartie, le décodage est **strict** : un champ manquant ou
-  // d'un type inattendu lève ici, à l'endroit où l'on sait le classer, plutôt
-  // que de produire un `null` qui plantera trois écrans plus loin.
-
-  static const String _pushPath = '/api/v1/sync/push';
-  static const String _directoryPath = '/api/v1/phase2/directory';
-
-  @override
-  Future<PushResult> pushRaw({
-    required String batchId,
-    required int payloadVersion,
-    required List<Map<String, Object?>> operations,
-  }) async {
-    return _guard('push', () async {
-      final Response<dynamic> response = await _client.dio.post<dynamic>(
-        _pushPath,
-        // `Idempotency-Key` et `clientBatchId` viennent de la MÊME variable :
-        // le serveur refuse en 422 si les deux diffèrent, et c'est la seule
-        // écriture qui rend cette divergence impossible.
-        options: Options(
-          headers: <String, dynamic>{'Idempotency-Key': batchId},
-          extra: TimeoutProfile.push.extra,
-        ),
-        data: <String, Object?>{
-          'clientBatchId': batchId,
-          'payloadVersion': payloadVersion,
-          'operations': operations,
-        },
-      );
-      final Map<String, Object?> body = _asMap(response.data, 'push');
-      return PushResult(
-        batchId: _asString(body['batchId'], 'batchId'),
-        results: <SyncOperationResultDto>[
-          for (final Object? raw in _asList(body['results'], 'results'))
-            _toResult(_asMap(raw, 'results[]')),
-        ],
-        serverTime: _asDate(body['serverTime'], 'serverTime'),
-      );
-    });
-  }
+  // ── Phase 2 : annuaire hors ligne ─────────────────────────────────────────
 
   @override
   Future<Phase2DirectoryPage> pullPhase2Directory({
@@ -191,93 +179,63 @@ class DioApi implements ApiPort {
     int limit = 2000,
   }) async {
     return _guard('phase2Directory', () async {
-      final Response<dynamic> response = await _client.dio.get<dynamic>(
-        _directoryPath,
-        // `since` omis et non `null` : le serveur valide `MinLength(1)` sur ce
-        // paramètre, et une chaîne vide serait rejetée en 400 alors qu'elle
-        // veut dire « depuis le début ».
-        queryParameters: <String, Object?>{
-          if (cursor != null && cursor.isNotEmpty) 'since': cursor,
-          'limit': limit,
-        },
-        options: Options(extra: TimeoutProfile.read.extra),
+      final Response<DirectoryPageDto> response = await _phase2.pullPhase2Directory(
+        // ═══ `since` OMIS, JAMAIS VIDE ═══
+        //
+        // `DirectoryQueryDto` valide `@MinLength(1)` sur ce paramètre côté
+        // serveur, et cette contrainte **n'apparaît pas** dans `openapi.json` :
+        // le client généré n'omet donc que `null` et mettrait `since=` sur le
+        // fil pour une chaîne vide. Or une chaîne vide veut dire « depuis le
+        // début », c'est-à-dire le tout premier téléchargement d'annuaire, et
+        // le serveur la refuserait en 400 : classé `terminal`, ce refus rendrait
+        // la phase 2 inutilisable pour un commercial qui vient d'installer
+        // l'app. La normalisation se fait donc ici, à l'entrée du client généré.
+        since: (cursor == null || cursor.isEmpty) ? null : cursor,
+        limit: limit,
+        // Le client généré n'expose pas de paramètre de délai d'attente : le
+        // profil passe par `Options.extra`, que `TimeoutProfileInterceptor` lit
+        // pour poser `receiveTimeout`. Sans lui, les 3 s que Dio se donne par
+        // défaut ne ramènent jamais une page de 2 000 entrées sur un lien 2G.
+        extra: TimeoutProfile.read.extra,
       );
-      final Map<String, Object?> body = _asMap(response.data, 'directory');
+      final DirectoryPageDto body = _body('phase2Directory', response);
       return Phase2DirectoryPage(
         entries: <Phase2DirectoryEntry>[
-          for (final Object? raw in _asList(body['entries'], 'entries'))
-            _toDirectoryEntry(_asMap(raw, 'entries[]')),
+          for (final DirectoryEntryDto entry in body.entries) _toDirectoryEntry(entry),
         ],
-        nextCursor: _asString(body['nextCursor'], 'nextCursor'),
-        hasMore: body['hasMore'] == true,
-        serverTime: _asDate(body['serverTime'], 'serverTime'),
+        nextCursor: body.nextCursor,
+        hasMore: body.hasMore,
+        serverTime: body.serverTime,
       );
     });
   }
 
-  /// **Ne lit que les six champs autorisés.** Le serveur n'en envoie pas
-  /// d'autres, et si un jour il en envoyait, on ne les remonterait pas : la
-  /// frontière de confidentialité se tient ici aussi, pas seulement côté
-  /// serveur.
-  static Phase2DirectoryEntry _toDirectoryEntry(Map<String, Object?> m) {
-    final Object? method = m['enrollmentMethod'];
+  /// **Recopie les six champs autorisés, un par un.**
+  ///
+  /// Le DTO généré ne traverse PAS cette frontière : ni stocké, ni exposé au
+  /// domaine. L'annuaire est répliqué sur le téléphone personnel de chaque
+  /// commercial et couvre tout le portefeuille ; le nom, la banque et le
+  /// syndicat en sont absents délibérément. Le jour où le serveur ajoutera un
+  /// septième champ à `DirectoryEntryDto`, la régénération du client le fera
+  /// apparaître **sans bruit**, et cette recopie explicite est la seule chose
+  /// qui l'empêche d'atterrir dans la base locale. La frontière de
+  /// confidentialité se tient donc ici aussi, pas seulement côté serveur.
+  static Phase2DirectoryEntry _toDirectoryEntry(DirectoryEntryDto dto) {
     return Phase2DirectoryEntry(
-      prospectId: _asString(m['prospectId'], 'prospectId'),
-      phoneE164: _asString(m['phoneE164'], 'phoneE164'),
-      phase2Status: _asString(m['phase2Status'], 'phase2Status'),
-      enrollmentMethod: method == null ? null : _asString(method, 'enrollmentMethod'),
-      rev: _asInt(m['rev'], 'rev'),
-      updatedAt: _asDate(m['updatedAt'], 'updatedAt'),
+      prospectId: dto.prospectId,
+      phoneE164: dto.phoneE164,
+      // `.value` et non `.name` : sur un membre que ce client ne connaît pas
+      // encore, `.name` rendrait `unknownDefaultOpenApi`, un identifiant Dart
+      // qui n'existe nulle part dans le contrat. `.value` rend la chaîne du
+      // contrat, et pour ce membre-là la chaîne convenue pour « inconnu ».
+      phase2Status: dto.phase2Status.value,
+      enrollmentMethod: dto.enrollmentMethod?.value,
+      // `rev` est un `num` dans le contrat, parce que JSON ne distingue pas
+      // entier et flottant ; la colonne locale est un entier. La conversion se
+      // fait ici, une fois, plutôt qu'à chaque lecture.
+      rev: dto.rev.toInt(),
+      updatedAt: dto.updatedAt,
     );
-  }
-
-  static SyncOperationResultDto _toResult(Map<String, Object?> m) {
-    final Object? updatedAt = m['serverUpdatedAt'];
-    return SyncOperationResultDto(
-      opId: _asString(m['opId'], 'opId'),
-      // `unknown_default_open_api` et non une exception : un statut inconnu vaut
-      // « on ne sait pas », et le moteur le traite comme une dépendance non
-      // résolue — il remet la ligne en file sans consommer de tentative. Lever
-      // ici condamnerait tout le lot pour un mot nouveau.
-      status: SyncOpStatus.values.firstWhere(
-        (SyncOpStatus s) => s.value == m['status'],
-        orElse: () => SyncOpStatus.unknownDefaultOpenApi,
-      ),
-      entityId: m['entityId'] as String?,
-      rev: m['rev'] as num?,
-      serverUpdatedAt: updatedAt == null ? null : _asDate(updatedAt, 'serverUpdatedAt'),
-      errorCode: m['errorCode'] as String?,
-      error: m['error'] as String?,
-    );
-  }
-
-  static Map<String, Object?> _asMap(Object? value, String field) {
-    if (value is Map) return value.cast<String, Object?>();
-    throw FormatException('$field: objet attendu', '$value');
-  }
-
-  static List<Object?> _asList(Object? value, String field) {
-    if (value is List) return value;
-    throw FormatException('$field: tableau attendu', '$value');
-  }
-
-  static String _asString(Object? value, String field) {
-    if (value is String) return value;
-    throw FormatException('$field: chaîne attendue', '$value');
-  }
-
-  static int _asInt(Object? value, String field) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    throw FormatException('$field: nombre attendu', '$value');
-  }
-
-  static DateTime _asDate(Object? value, String field) {
-    if (value is String) {
-      final DateTime? parsed = DateTime.tryParse(value);
-      if (parsed != null) return parsed;
-    }
-    throw FormatException('$field: date ISO-8601 attendue', '$value');
   }
 
   @override
@@ -285,7 +243,7 @@ class DioApi implements ApiPort {
     return _guard('lookup', () async {
       final Response<RepresentantLookupDto> response = await _representants
           .lookupRepresentantByPhone(phone: phone, extra: TimeoutProfile.read.extra);
-      final RepresentantLookupDto body = response.data!;
+      final RepresentantLookupDto body = _body('lookup', response);
       return RepresentantLookup(
         found: body.found,
         phoneE164: body.phoneE164,
@@ -298,23 +256,112 @@ class DioApi implements ApiPort {
 
   // ── Classification ─────────────────────────────────────────────────────────
 
+  /// Le corps d'une réponse 2xx, ou une [ApiException] classée s'il est vide.
+  ///
+  /// ═══ `response.data!` LÈVE HORS DE TOUTE CLASSIFICATION ═══
+  ///
+  /// Le client généré rend `Response<T>` avec un `data` nullable, et un 2xx à
+  /// corps vide : c'est ce que renvoie un proxy d'opérateur qui tronque, un
+  /// portail captif qui répond 200 sans rien, un load balancer qui coupe :
+  /// laissait le `!` lever une `TypeError`. Ni `DioException`, ni
+  /// `FormatException` : [_guard] ne l'attrapait donc pas, elle traversait
+  /// `_sendBatch`, `drain` et `runOnce`, dont les `catch` ne visent que
+  /// [ApiException].
+  ///
+  /// Conséquence exacte : la ligne restait en `syncing`, bail vivant, plus
+  /// personne pour la reprendre avant l'expiration du bail, et le cycle entier
+  /// mourait sans que l'interface puisse rien en dire. Le worker WorkManager, à
+  /// qui l'exception remontait, ne se reprogrammait pas non plus.
+  ///
+  /// On repasse donc par [_undecodableBody], qui décide sur le `content-type` :
+  /// un corps vide non annoncé JSON est un lien mort (aucune tentative comptée,
+  /// aucun lot condamné), un corps vide annoncé JSON est bien une faute du
+  /// serveur.
+  static T _body<T>(String operation, Response<T> response) {
+    final T? data = response.data;
+    if (data == null) {
+      throw _undecodableBody(
+        operation,
+        response.headers.value(Headers.contentTypeHeader),
+        'corps vide sur une réponse ${response.statusCode ?? 2}xx',
+      );
+    }
+    return data;
+  }
+
   Future<T> _guard<T>(String operation, Future<T> Function() body) async {
     try {
       return await body();
     } on DioException catch (e) {
+      // ═══ UN 2xx INDÉCODABLE N'EST PAS UN 2xx ANORMAL ═══
+      //
+      // Le client généré emballe TOUT échec de désérialisation dans un
+      // `DioException(type: unknown)` auquel il attache la réponse. `classify`
+      // n'y lisait qu'un statut 200 inattendu et rendait `HTTP_200`, classé
+      // terminal : le portail captif d'un hôtel ou d'une salle de formation
+      // condamnait donc le lot entier, jusqu'à deux cents saisies à reprendre
+      // une par une dans « À corriger ».
+      //
+      // Cette protection n'existait que sur l'ancien chemin brut, écrit à la
+      // main, et donc que pour la phase 2. Elle vaut pour toutes les routes du
+      // client généré, et c'est ici qu'elle appartient.
+      final Response<dynamic>? response = e.response;
+      final int status = response?.statusCode ?? 0;
+      if (e.type == DioExceptionType.unknown && status >= 200 && status < 300) {
+        throw _undecodableBody(
+          operation,
+          response!.headers.value(Headers.contentTypeHeader),
+          '${e.error}',
+        );
+      }
       throw classify(e, operation);
     } on FormatException catch (e) {
-      // Le serveur a répondu 2xx avec un corps que le contrat ne décrit pas.
-      // Terminal et non réessayable : rejouer produira le même corps, et huit
-      // tentatives silencieuses ne feraient que retarder le moment où quelqu'un
-      // s'en aperçoit.
-      throw ApiException(
-        'RESPONSE_SCHEMA_MISMATCH',
-        message: 'Réponse serveur inattendue sur $operation : ${e.message}',
-        kind: FailureKind.terminal,
+      throw _undecodableBody(
+        operation,
+        e is ResponseFormatException ? e.contentType : 'application/json',
+        e.message,
       );
     }
   }
+
+  /// Classe un corps 2xx qu'on n'a pas su lire, à partir de son `content-type`.
+  ///
+  /// Un corps non annoncé JSON ne dit rien du serveur : il dit qu'on ne lui a
+  /// pas parlé. Portail captif, page d'erreur d'un proxy, redirection
+  /// d'opérateur : c'est un lien mort, donc aucune tentative comptée, aucun lot
+  /// condamné. Seul un corps annoncé JSON et illisible justifie un verdict
+  /// terminal : là c'est bien le serveur qui a tort, et le rejouer rendrait le
+  /// même corps.
+  static ApiException _undecodableBody(
+    String operation,
+    String? contentType,
+    String detail,
+  ) {
+    final bool isJson = (contentType ?? '').toLowerCase().contains('json');
+    if (!isJson) {
+      return ApiException(
+        nonJsonResponseCode,
+        message:
+            'Le réseau a répondu à la place du serveur '
+            '(${contentType ?? 'type inconnu'}). Vérifiez la connexion.',
+        kind: FailureKind.unreachable,
+      );
+    }
+    return ApiException(
+      'RESPONSE_SCHEMA_MISMATCH',
+      message: 'Réponse serveur inattendue sur $operation : $detail',
+      kind: FailureKind.terminal,
+    );
+  }
+
+  /// Code rendu quand le corps 2xx n'est pas du JSON.
+  static const String nonJsonResponseCode = 'NON_JSON_RESPONSE';
+
+  /// Codes de lien mort. Ils partagent tous [FailureKind.unreachable] : c'est
+  /// ce classement, et non le code, sur lequel le moteur et l'interface
+  /// raisonnent.
+  static const String networkCode = 'NETWORK';
+  static const String timeoutCode = 'TIMEOUT';
 
   /// Traduit une `DioException` en [ApiException] classée.
   ///
@@ -338,19 +385,26 @@ class DioApi implements ApiPort {
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.transformTimeout:
+        // `unreachable` et non `retryable` : un délai dépassé n'est pas un refus
+        // du serveur, c'est l'absence de réponse. Compté comme une tentative,
+        // il faisait mourir en `ATTEMPTS_EXHAUSTED` des saisies parfaitement
+        // valides au bout de quelques minutes de lien dégradé.
         return ApiException(
-          'TIMEOUT',
+          timeoutCode,
           message: 'Le serveur n\'a pas répondu à temps.',
-          kind: FailureKind.retryable,
+          kind: FailureKind.unreachable,
         );
       case DioExceptionType.connectionError:
         // Inclut la résolution DNS. `connectivity_plus` peut très bien
         // rapporter `mobile` pendant ce temps : c'est exactement pourquoi on ne
         // s'appuie jamais sur lui pour décider d'émettre.
+        //
+        // `unreachable` : pas de route, plus de crédit data, antenne absente.
+        // Le serveur n'a rien reçu, donc rien refusé, donc rien à compter.
         return ApiException(
-          'NETWORK',
+          networkCode,
           message: 'Réseau indisponible.',
-          kind: FailureKind.retryable,
+          kind: FailureKind.unreachable,
         );
       case DioExceptionType.cancel:
         return ApiException(
@@ -429,18 +483,13 @@ class DioApi implements ApiPort {
     );
   }
 
-  /// `Retry-After` en secondes ou en date HTTP. Les deux formes sont légales et
-  /// le serveur peut passer de l'une à l'autre derrière un proxy.
-  static Duration? retryAfterOf(Response<dynamic>? response) {
-    final Object? raw = response?.headers.value('retry-after');
-    if (raw == null) return null;
-    final int? seconds = int.tryParse(raw.toString().trim());
-    if (seconds != null) return Duration(seconds: seconds.clamp(0, 3600));
-    final DateTime? when = DateTime.tryParse(raw.toString());
-    if (when == null) return null;
-    final Duration delta = when.toUtc().difference(DateTime.now().toUtc());
-    return delta.isNegative ? Duration.zero : delta;
-  }
+  /// `Retry-After` en secondes ou en date HTTP.
+  ///
+  /// Délègue à `core/network/retry_after.dart` : l'intercepteur de réessai des
+  /// GET lit le même en-tête, et deux lectures divergentes produiraient deux
+  /// politiques de throttling contradictoires sur le même serveur.
+  static Duration? retryAfterOf(Response<dynamic>? response) =>
+      retry_after.retryAfterOf(response);
 
   static String? _serverCode(Object? data) {
     if (data is Map && data['code'] is String) return data['code'] as String;

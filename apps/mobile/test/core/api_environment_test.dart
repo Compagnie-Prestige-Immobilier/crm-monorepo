@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// Le défaut a été observé sur un vrai téléphone : l'APK s'installait, l'écran
 /// de connexion s'affichait, et rien ne se connectait. Le défaut de
-/// `CPI_API_BASE_URL` était `http://10.0.2.2:3001` — l'alias de la machine du
+/// `CPI_API_BASE_URL` était `http://10.0.2.2:3001` : l'alias de la machine du
 /// développeur vu depuis l'émulateur, qui ne désigne rien sur un appareil réel.
 ///
 /// Il fallait donc se souvenir de `--dart-define` à CHAQUE build de release, et
@@ -20,7 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// LIMITE CONNUE, à lire avant de faire confiance à ce fichier : `flutter test`
 /// s'exécute en mode DEBUG. Ces tests vérifient donc la branche développement
 /// et la mécanique de bascule, jamais la valeur produite par un vrai build de
-/// release — `dart.vm.product` y vaut toujours `false`. La garantie de bout en
+/// release : `dart.vm.product` y vaut toujours `false`. La garantie de bout en
 /// bout est l'écran « À propos », qui affiche l'adresse réellement compilée.
 void main() {
   group('adresse du serveur', () {
@@ -79,7 +79,7 @@ void main() {
       expect(ApiEnvironment.productionBaseUrl, isNot(contains('127.0.0.1')));
     });
 
-    test('l’en-tête user-agent est posé — /auth/login l’exige', () {
+    test('l’en-tête user-agent est posé : /auth/login l’exige', () {
       expect(ApiEnvironment.userAgent, isNotEmpty);
       expect(ApiEnvironment.userAgent, contains('CPI-GO'));
     });

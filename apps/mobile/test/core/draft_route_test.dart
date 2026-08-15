@@ -10,7 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../support/db_fixture.dart';
 
 /// Le trou que ces tests bouchent : la mémoire de route savait déjà conserver
-/// `?draft=<id>` — un test le vérifiait — mais **aucun écran ne produisait
+/// `?draft=<id>` : un test le vérifiait : mais **aucun écran ne produisait
 /// jamais une telle URL**. `Routes.newRepresentantWithDraft` n'avait pas un seul
 /// appelant. Le brouillon était bien écrit en base, sous un identifiant tiré au
 /// hasard et gardé en mémoire ; au redémarrage l'écran en tirait un second et

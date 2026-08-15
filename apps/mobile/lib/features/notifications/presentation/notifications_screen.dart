@@ -1,34 +1,37 @@
-import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/push/push_message.dart';
-import '../../../core/push/push_transport.dart';
+import '../../../core/router/back_navigation.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../data/local/database.dart';
+import '../notification_inbox.dart';
 import '../notifications_controller.dart';
 
-/// Centre de notifications.
+/// Centre d'annonces.
 ///
-/// ═══ L'AUTORISATION SE DEMANDE ICI, ET NULLE PART AILLEURS ═══
+/// ═══ IL N'Y A PLUS RIEN À AUTORISER, DONC PLUS RIEN À DEMANDER ═══
 ///
-/// Android 13 exige `POST_NOTIFICATIONS` à l'exécution. La demander au premier
-/// lancement — avant que l'utilisateur ait la moindre idée de ce que CPI GO
-/// pourrait lui envoyer — la fait refuser par réflexe. Et un refus n'est pas
-/// reposé : Android ne rouvre plus la boîte de dialogue, la seule issue devient
-/// les réglages système, et personne n'y va.
+/// Cet écran demandait `POST_NOTIFICATIONS` et affichait, quand le transport
+/// manquait, « Notifications indisponibles sur cet appareil ». Firebase ayant
+/// été abandonné, ce bandeau était devenu l'état permanent : l'application
+/// annonçait sa propre panne à chaque ouverture, pour une fonctionnalité qui
+/// marche. Il a disparu, ainsi que la demande d'autorisation et l'intent
+/// `APP_NOTIFICATION_SETTINGS` qui codait en dur le nom du paquet.
 ///
-/// Elle est donc demandée à la première ouverture de CET écran, c'est-à-dire au
-/// moment où l'intention est explicite. L'écran explique d'abord ce qu'il va
-/// envoyer, puis propose.
+/// Ce qui reste est la seule chose vraie : la liste, servie depuis SQLite (donc
+/// hors ligne), et complétée par `/notifications/mine` à chaque ouverture et à
+/// chaque retour au premier plan.
 ///
-/// **Un refus ne bloque rien.** La liste reste lisible, elle se remplit depuis
-/// la base locale, et le reste de l'application est intact — les notifications
-/// sont un confort, la prospection hors ligne est le métier.
+/// **Le retour arrière est explicite** (`CpiBackButton` + `CpiPopScope`) : c'est
+/// une route de premier niveau, hors coque de navigation, et sans les deux la
+/// flèche comme le geste système sortent de l'application. Voir
+/// `core/router/back_navigation.dart`.
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -37,19 +40,35 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  AppLifecycleListener? _lifecycle;
+
   @override
   void initState() {
     super.initState();
-    // Après le premier cadre : lire l'autorisation touche un canal de
-    // plateforme, et le faire pendant `initState` bloquerait la construction.
+    // Après le premier cadre : le rapatriement touche le réseau, et le lancer
+    // pendant `initState` retarderait la construction pour rien. La liste
+    // locale, elle, s'affiche immédiatement.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaitedRefresh();
+      _refresh();
     });
+    // Le coordinateur de session rafraîchit déjà au retour au premier plan ;
+    // l'écran le refait pour lui-même parce qu'il peut être ouvert alors que le
+    // coordinateur n'existe pas (test, aperçu). Le plancher et le verrou de
+    // `NotificationInbox` empêchent la requête en double.
+    _lifecycle = AppLifecycleListener(onResume: _refresh);
   }
 
-  void unawaitedRefresh() {
-    ref.read(pushPermissionProvider.notifier).refresh();
+  @override
+  void dispose() {
+    _lifecycle?.dispose();
+    super.dispose();
+  }
+
+  void _refresh() {
+    // `force` : l'utilisateur a lui-même ouvert cet écran, il attend la liste
+    // d'aujourd'hui, pas celle d'il y a deux minutes.
+    ref.read(notificationInboxProvider).refresh(force: true).ignore();
   }
 
   @override
@@ -59,166 +78,142 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final AsyncValue<List<StoredNotification>> notifications = ref.watch(
       notificationsProvider,
     );
-    final PushPermission permission = ref.watch(pushPermissionProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
-        actions: <Widget>[
-          IconButton(
-            tooltip: 'Tout marquer comme lu',
-            icon: const Icon(PhosphorIconsRegular.checks),
-            onPressed: () {
-              ref.read(pushInboxStoreProvider).markAllRead();
-            },
-          ),
-          const SizedBox(width: CpiSpacing.xxs),
-        ],
-      ),
-      body: Column(
-        children: <Widget>[
-          _PermissionBanner(permission: permission),
-          Expanded(
-            child: notifications.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (Object error, StackTrace stack) => _Empty(
-                icon: PhosphorIconsDuotone.warningCircle,
-                title: 'Liste indisponible',
-                message:
-                    'Les notifications enregistrées sur cet appareil n’ont pas pu être lues.',
-                color: cpi.syncFailed,
-              ),
-              data: (List<StoredNotification> rows) {
-                if (rows.isEmpty) {
-                  return _Empty(
-                    icon: PhosphorIconsDuotone.bellSlash,
-                    title: 'Aucune notification',
-                    message:
-                        'Les annonces et les rappels envoyés par le siège apparaîtront ici, même '
-                        'sans réseau.',
-                    color: theme.colorScheme.outline,
-                  );
-                }
-                return ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: CpiSpacing.xs),
-                  itemCount: rows.length,
-                  separatorBuilder: (BuildContext context, int index) => const Divider(
-                    height: 1,
-                    indent: CpiSpacing.md,
-                    endIndent: CpiSpacing.md,
-                  ),
-                  itemBuilder: (BuildContext context, int index) =>
-                      _NotificationTile(data: rows[index]),
-                );
+    return CpiPopScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Annonces'),
+          leading: const CpiBackButton(),
+          actions: <Widget>[
+            IconButton(
+              tooltip: 'Tout marquer comme lu',
+              icon: const Icon(PhosphorIconsRegular.checks),
+              onPressed: () {
+                ref.read(pushInboxStoreProvider).markAllRead();
               },
             ),
-          ),
-        ],
+            const SizedBox(width: CpiSpacing.xxs),
+          ],
+        ),
+        body: Column(
+          children: <Widget>[
+            // Bandeau d'actualité de la liste.
+            //
+            // « Aucune annonce » recouvrait TROIS situations différentes : la
+            // boîte est vraiment vide, le rapatriement n'a pas encore eu lieu,
+            // ou il a échoué. L'utilisateur en concluait que le siège n'avait
+            // rien envoyé, et le message le lui confirmait.
+            ValueListenableBuilder<InboxStatus>(
+              valueListenable: ref.read(notificationInboxProvider).status,
+              builder: (BuildContext context, InboxStatus status, Widget? _) {
+                if (status.state != InboxSync.offline) {
+                  return const SizedBox.shrink();
+                }
+                return _StaleStrip(lastSuccessAt: status.lastSuccessAt);
+              },
+            ),
+            Expanded(
+              child: notifications.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (Object error, StackTrace stack) => _Empty(
+                  icon: PhosphorIconsDuotone.warningCircle,
+                  title: 'Liste indisponible',
+                  message:
+                      'Les annonces enregistrées sur cet appareil n’ont pas pu '
+                      'être lues.',
+                  color: cpi.syncFailed,
+                ),
+                // Tirer pour rafraîchir enveloppe MAINTENANT les deux branches.
+                // Il ne couvrait que la liste non vide : sur un état vide : et
+                // c'est précisément l'état d'un premier lancement raté : il n'y
+                // avait aucun moyen de redemander la liste, aucun geste, aucun
+                // bouton.
+                data: (List<StoredNotification> rows) => RefreshIndicator(
+                  color: theme.colorScheme.primary,
+                  onRefresh: () async {
+                    await HapticFeedback.selectionClick();
+                    await ref.read(notificationInboxProvider).refresh(force: true);
+                  },
+                  child: rows.isEmpty
+                      ? ListView(
+                          // `AlwaysScrollableScrollPhysics` : sans elle, une
+                          // liste plus courte que l'écran ne défile pas, donc
+                          // le geste « tirer » ne part jamais.
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: <Widget>[
+                            SizedBox(
+                              height: MediaQuery.sizeOf(context).height * 0.7,
+                              child: _Empty(
+                                icon: PhosphorIconsDuotone.megaphone,
+                                title: 'Aucune annonce',
+                                message:
+                                    'Les annonces et les rappels envoyés par le '
+                                    'siège apparaîtront ici, même sans réseau.\n'
+                                    'Tirez vers le bas pour actualiser.',
+                                color: theme.colorScheme.outline,
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: CpiSpacing.xs,
+                          ),
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: rows.length,
+                          separatorBuilder: (BuildContext context, int index) =>
+                              const Divider(
+                                height: 1,
+                                indent: CpiSpacing.md,
+                                endIndent: CpiSpacing.md,
+                              ),
+                          itemBuilder: (BuildContext context, int index) =>
+                              _NotificationTile(data: rows[index]),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Bandeau d'autorisation.
+/// « Ce que vous voyez date d'avant. »
 ///
-/// Trois états, trois messages différents, et aucun ne culpabilise :
-///
-///  · jamais demandée → on explique et on propose ;
-///  · refusée         → on dit ce qui est perdu et on ouvre les réglages ;
-///  · indisponible    → on le dit franchement plutôt que de faire semblant.
-class _PermissionBanner extends ConsumerWidget {
-  const _PermissionBanner({required this.permission});
+/// Le bandeau nomme la dernière synchronisation réussie : une liste vieille de
+/// dix minutes et une liste jamais rapatriée n'appellent pas la même réaction.
+class _StaleStrip extends StatelessWidget {
+  const _StaleStrip({this.lastSuccessAt});
 
-  final PushPermission permission;
+  final DateTime? lastSuccessAt;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final CpiColors cpi = context.cpi;
+  Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-
-    if (permission == PushPermission.granted) return const SizedBox.shrink();
-
-    final (String title, String message, String action) = switch (permission) {
-      PushPermission.notRequested => (
-        'Recevoir les annonces du siège',
-        'Rappels de synchronisation, appels en attente et annonces. Rien de commercial, rien la '
-            'nuit.',
-        'Autoriser',
-      ),
-      PushPermission.denied => (
-        'Notifications désactivées',
-        'Vous ne serez pas prévenu des rappels ni des annonces. La liste ci-dessous continue de '
-            'se remplir à chaque ouverture de l’application.',
-        'Ouvrir les réglages',
-      ),
-      PushPermission.unavailable => (
-        'Notifications indisponibles sur cet appareil',
-        'La messagerie push n’est pas configurée. Les annonces restent consultables ici, à '
-            'chaque ouverture.',
-        '',
-      ),
-      PushPermission.granted => ('', '', ''),
-    };
-
+    final CpiColors cpi = context.cpi;
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(
-        CpiSpacing.md,
-        CpiSpacing.sm,
-        CpiSpacing.md,
-        CpiSpacing.xxs,
+      color: cpi.accentSurface,
+      padding: const EdgeInsets.symmetric(
+        horizontal: CpiSpacing.md,
+        vertical: CpiSpacing.xs,
       ),
-      padding: const EdgeInsets.all(CpiSpacing.sm),
-      decoration: BoxDecoration(
-        color: cpi.accentSurface,
-        borderRadius: CpiRadius.brMd,
-        border: Border.all(color: cpi.accentBorder.withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(PhosphorIconsRegular.bell, size: 20, color: cpi.accentText),
-              const SizedBox(width: CpiSpacing.xs),
-              Expanded(
-                child: Text(
-                  title,
-                  style: theme.textTheme.titleSmall?.copyWith(color: cpi.accentText),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: CpiSpacing.xxs),
-          Text(message, style: theme.textTheme.bodySmall),
-          if (action.isNotEmpty) ...<Widget>[
-            const SizedBox(height: CpiSpacing.xs),
-            Align(
-              alignment: Alignment.centerRight,
-              child: ConstrainedBox(
-                // 48 dp minimum : l'application sert debout, au soleil, parfois
-                // à une main.
-                constraints: const BoxConstraints(minHeight: 48),
-                child: FilledButton(
-                  onPressed: () async {
-                    if (permission == PushPermission.notRequested) {
-                      await ref.read(pushPermissionProvider.notifier).request();
-                      return;
-                    }
-                    // Android ne repose jamais une demande refusée : la seule
-                    // issue est la page de l'application dans les réglages.
-                    await const AndroidIntent(
-                      action: 'android.settings.APP_NOTIFICATION_SETTINGS',
-                      arguments: <String, dynamic>{
-                        'android.provider.extra.APP_PACKAGE': 'sn.cpi.go',
-                      },
-                    ).launch();
-                  },
-                  child: Text(action),
-                ),
-              ),
+          Icon(PhosphorIconsRegular.cloudSlash, size: 16, color: cpi.accentText),
+          const SizedBox(width: CpiSpacing.xs),
+          Expanded(
+            child: Text(
+              lastSuccessAt == null
+                  ? 'Liste non actualisée, hors ligne. '
+                        'Seules les annonces déjà reçues sont affichées.'
+                  : 'Liste non actualisée, hors ligne. '
+                        'Dernière mise à jour : ${_formatDate(lastSuccessAt!)}.',
+              style: theme.textTheme.bodySmall?.copyWith(color: cpi.accentText),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -243,8 +238,16 @@ class _NotificationTile extends ConsumerWidget {
         // laisserait une notification lue marquée non lue si l'écran de
         // destination remplaçait celui-ci pendant l'écriture.
         await ref.read(pushInboxStoreProvider).markRead(data.id);
+        // Remontée au serveur, en tâche de fond : c'est ce qui permet au siège
+        // de savoir qu'une annonce a été lue. Son échec ne change rien ici, la
+        // lecture locale est déjà écrite.
+        ref.read(notificationInboxProvider).markRead(data.id).ignore();
         if (!context.mounted) return;
-        if (hasRoute) context.go(data.route!);
+        // `push` et non `go` : `go` REMPLACE toute la pile, si bien que l'écran
+        // de destination n'avait plus rien derrière lui : le retour ne ramenait
+        // jamais à la boîte de réception, et sur une route de premier niveau il
+        // sortait de l'application. Voir `core/router/back_navigation.dart`.
+        if (hasRoute) context.push(data.route!);
       },
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 48),

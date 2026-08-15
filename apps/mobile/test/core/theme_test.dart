@@ -54,7 +54,7 @@ void main() {
         isNot(const Color(0xFF630210)),
         reason:
             'si un jour l\'algorithme Material tombait juste, la surcharge '
-            'deviendrait redondante — ce test le signalerait',
+            'deviendrait redondante : ce test le signalerait',
       );
     });
 
@@ -186,7 +186,8 @@ void main() {
       expect(cpi.chart5, const Color(0xFF8B5CF6));
     });
 
-    test('chaque statut de synchronisation a sa couleur', () {
+    test('chaque statut de synchronisation a SA couleur, distincte', () {
+      final Map<String, Color> seen = <String, Color>{};
       for (final String status in <String>[
         'draft',
         'pending',
@@ -196,10 +197,36 @@ void main() {
         'failed',
         'blocked',
       ]) {
-        expect(cpi.colorForSyncStatus(status), isA<Color>());
+        // `isA<Color>()` était garanti par la signature : l'assertion ne
+        // pouvait pas échouer, même si tous les statuts rendaient la même
+        // couleur. Ce qui compte, c'est qu'ils se DISTINGUENT : la couleur est
+        // le seul signal de la liste, et deux statuts confondus rendent
+        // « en conflit » indiscernable de « envoyé ».
+        seen[status] = cpi.colorForSyncStatus(status);
       }
+      // `draft`, `pending` et `blocked` partagent DÉLIBÉRÉMENT la même teinte
+      // neutre : ce sont trois nuances d'« en attente », et les distinguer à
+      // l'œil n'apprendrait rien à l'utilisateur. Les cinq FAMILLES, elles,
+      // doivent se distinguer : une liste où « en conflit » et « en échec »
+      // portent la même couleur ne dit plus laquelle des deux actions prendre.
+      expect(
+        <Color>{
+          seen['draft']!,
+          seen['syncing']!,
+          seen['synced']!,
+          seen['conflict']!,
+          seen['failed']!,
+        },
+        hasLength(5),
+        reason: 'deux familles qui partagent une couleur ne se distinguent plus',
+      );
+      expect(seen['pending'], seen['draft']);
+      expect(seen['blocked'], seen['draft']);
       expect(cpi.colorForSyncStatus('synced'), cpi.success);
       expect(cpi.colorForSyncStatus('failed'), cpi.syncFailed);
+      expect(cpi.colorForSyncStatus('conflict'), cpi.syncConflict);
+      // Un statut inconnu ne doit pas se confondre avec un statut sain.
+      expect(cpi.colorForSyncStatus('inconnu'), isNot(cpi.success));
     });
 
     test('copyWith et lerp respectent le contrat ThemeExtension', () {

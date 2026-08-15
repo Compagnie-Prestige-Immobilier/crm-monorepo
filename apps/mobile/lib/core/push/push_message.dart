@@ -1,14 +1,13 @@
 import 'dart:convert';
 
-/// Message push, modèle **Dart pur**.
+/// Message d'annonce, modèle **Dart pur**.
 ///
-/// Aucun import Flutter, aucun import Firebase : c'est ce qui rend l'analyse
-/// d'un message — et surtout la validation de sa route — testable sans
-/// appareil, sans arbre de widgets et sans projet Firebase.
+/// Aucun import Flutter : c'est ce qui rend l'analyse d'un message (et surtout
+/// la validation de sa route) testable sans appareil et sans arbre de widgets.
 ///
-/// La conversion depuis `RemoteMessage` vit dans `push_transport.dart` ; ici on
-/// ne connaît qu'une `Map<String, String>`, qui est exactement ce que FCM
-/// transporte dans `data`.
+/// Ici on ne connaît qu'une `Map<String, String>` : c'est la forme d'un message
+/// quel que soit le canal qui l'apporte, l'inbox tirée depuis
+/// `/notifications/mine` comme un transport temps réel futur.
 class PushMessage {
   const PushMessage({
     required this.id,
@@ -53,9 +52,9 @@ class PushMessage {
     return true;
   }
 
-  /// Construit un message depuis la charge utile FCM.
+  /// Construit un message depuis une charge utile brute.
   ///
-  /// Renvoie `null` si le message n'est pas exploitable — sans identifiant, il
+  /// Renvoie `null` si le message n'est pas exploitable : sans identifiant, il
   /// n'y a rien à dédupliquer ni à marquer lu. On préfère ignorer en silence
   /// plutôt que de créer une ligne fantôme dans la boîte de réception.
   static PushMessage? fromData(
@@ -67,8 +66,14 @@ class PushMessage {
     final String? id = data['notificationId'];
     if (id == null || id.isEmpty) return null;
 
-    final String title = notificationTitle ?? data['title'] ?? '';
-    final String body = notificationBody ?? data['body'] ?? '';
+    // `data['title']` et `data['body']` ne sont PAS lus : le serveur ne les
+    // émet jamais dans le bloc `data` (voir `apps/api`, service de push). Les
+    // interroger laissait croire à une source de repli qui n'a jamais existé, et
+    // masquait le vrai risque : une notification silencieuse (data-only) arrive
+    // sans bloc `notification`, donc sans titre ni corps, et c'est le CENTRE DE
+    // NOTIFICATIONS local qui doit alors la rendre lisible.
+    final String title = notificationTitle ?? '';
+    final String body = notificationBody ?? '';
     final String? rawRoute = data['route'];
 
     return PushMessage(

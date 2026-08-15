@@ -21,8 +21,8 @@ abstract final class CpiFonts {
 /// docs/design.md §4 exprime une échelle **web**, en `rem`, sur une racine de
 /// 16 px : `body 0.9375rem` (15 px), `small 0.8125rem` (13 px),
 /// `caption 0.75rem` (12 px), `label 0.6875rem` (11 px). Transposée telle
-/// quelle en `sp`, elle passe sous les planchers de Material 3 — **14 sp pour
-/// du corps de texte, 12 sp pour un libellé** — et c'est exactement ce que les
+/// quelle en `sp`, elle passe sous les planchers de Material 3 : **14 sp pour
+/// du corps de texte, 12 sp pour un libellé** : et c'est exactement ce que les
 /// utilisateurs ont signalé : libellés de section, sous-titres et libellés de
 /// navigation illisibles sur un vrai téléphone.
 ///
@@ -91,11 +91,11 @@ abstract final class CpiTypography {
   /// Material 3.
   static TextTheme textTheme(Color onSurface) {
     final TextTheme theme = TextTheme(
-      // display — clamp(2rem, 4vw, 2.75rem)
+      // display : clamp(2rem, 4vw, 2.75rem)
       displayLarge: _display(44, FontWeight.w800, leadingTight),
       displayMedium: _display(38, FontWeight.w800, leadingTight),
       displaySmall: _display(32, FontWeight.w700, leadingTight),
-      // h1 — clamp(1.625rem, 3vw, 2rem)
+      // h1 : clamp(1.625rem, 3vw, 2rem)
       headlineLarge: _display(32, FontWeight.w700, leadingTight),
       headlineMedium: _display(28, FontWeight.w700, leadingTight),
       headlineSmall: _display(26, FontWeight.w700, leadingTight),

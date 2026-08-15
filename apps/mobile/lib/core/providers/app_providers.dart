@@ -38,7 +38,7 @@ final Provider<AppDatabase> appDatabaseProvider = Provider<AppDatabase>((Ref ref
   throw UnimplementedError('appDatabaseProvider doit être surchargé dans main().');
 });
 
-/// Surchargé dans `main()` — la lecture des préférences est asynchrone et on ne
+/// Surchargé dans `main()` : la lecture des préférences est asynchrone et on ne
 /// veut pas d'un premier cadre incapable de restaurer la route.
 final Provider<SharedPreferences> sharedPreferencesProvider = Provider<SharedPreferences>(
   (Ref ref) {
@@ -89,6 +89,11 @@ final Provider<RouteMemory> routeMemoryProvider = Provider<RouteMemory>((Ref ref
   return RouteMemory(
     ref.watch(sharedPreferencesProvider),
     buildNumber: ref.watch(buildNumberProvider),
+    // Sans cette question, un simple retour arrière vers l'écran précédent
+    // remplaçait `/representants/nouveau?draft=X` par `/representants` : la
+    // saisie restait en base, et plus aucune adresse ne la désignait.
+    draftExists: (String draftId) =>
+        ref.read(draftRepositoryProvider).exists(draftId),
   );
 });
 
@@ -243,7 +248,7 @@ final StreamProvider<List<Departement>> departementsProvider =
 ///
 /// Paramétré par département et non global : il y a 59 IEF, et en proposer la
 /// liste entière alors que le département est déjà connu ferait chercher dans
-/// cinquante-huit entrées hors sujet. Sans département, la liste complète —
+/// cinquante-huit entrées hors sujet. Sans département, la liste complète :
 /// c'est le cas d'une fiche reprise dont le département n'est pas encore lu.
 final iefsProvider = StreamProvider.family<List<Ief>, String?>((
   Ref ref,
@@ -285,6 +290,31 @@ final StreamProvider<List<RepresentantSyncViewData>> representantListProvider =
           .watchRepresentants(search: ref.watch(historiqueSearchProvider));
     });
 
+/// Terme de recherche de l'écran de SÉLECTION d'un représentant.
+///
+/// Distinct de [historiqueSearchProvider], et pas par symétrie : les deux écrans
+/// coexistent dans l'arbre (l'un est une branche de la coque, l'autre une route
+/// de premier niveau). Partager l'état filtrerait l'Historique pendant qu'on
+/// cherche ailleurs, et l'utilisateur retrouverait sa liste amputée sans avoir
+/// rien tapé dedans.
+final NotifierProvider<RepresentantPickerSearch, String> representantPickerSearchProvider =
+    NotifierProvider<RepresentantPickerSearch, String>(RepresentantPickerSearch.new);
+
+class RepresentantPickerSearch extends Notifier<String> {
+  @override
+  String build() => '';
+
+  void set(String value) => state = value;
+}
+
+/// Représentants proposés à la sélection, filtrés côté SQL.
+final StreamProvider<List<RepresentantSyncViewData>> representantPickerListProvider =
+    StreamProvider<List<RepresentantSyncViewData>>((Ref ref) {
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchRepresentants(search: ref.watch(representantPickerSearchProvider));
+    });
+
 final prospectsForRepresentantProvider =
     StreamProvider.family<List<ProspectSyncViewData>, String>((
       Ref ref,
@@ -308,7 +338,7 @@ final StreamProvider<int> phase2DirectoryCountProvider = StreamProvider<int>((Re
   return ref.watch(phase2DirectoryProvider).watchCount();
 });
 
-/// État du curseur d'annuaire — porte la date du dernier téléchargement.
+/// État du curseur d'annuaire : porte la date du dernier téléchargement.
 final StreamProvider<SyncStateData?> phase2DirectoryStateProvider =
     StreamProvider<SyncStateData?>((Ref ref) {
       return ref.watch(phase2DirectoryProvider).watchState();
@@ -325,13 +355,13 @@ final StreamProvider<({int attempts, int methods, int closed})> phase2ProgressPr
       final AppDatabase db = ref.watch(appDatabaseProvider);
       // Trois flux fusionnés plutôt qu'une requête à trois sous-selects :
       // drift ne réémet que le flux dont la table a bougé, et les trois
-      // portent sur la même table — la fusion coûte donc un rebuild, pas
+      // portent sur la même table : la fusion coûte donc un rebuild, pas
       // trois requêtes.
       return db.countMyAttempts().watchSingle().asyncMap((int attempts) async {
         return (
           attempts: attempts,
           methods: await db.countMyMethods().getSingle(),
-          closed: await db.countMyClosed().getSingle(),
+          closed: await ref.read(phase2DirectoryProvider).countClosed(),
         );
       });
     });

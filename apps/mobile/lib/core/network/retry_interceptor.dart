@@ -3,6 +3,8 @@ import 'dart:math';
 
 import 'package:dio/dio.dart';
 
+import 'retry_after.dart';
+
 /// Réessai **sur les GET uniquement**.
 ///
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -21,7 +23,7 @@ import 'package:dio/dio.dart';
 /// à l'utilisateur. Dio ne sait rien de tout ça.
 ///
 /// Donc : pas de réessai global, jamais. Si quelqu'un lit ceci en se disant
-/// qu'ajouter un réessai sur POST rendrait service, la réponse est non — c'est
+/// qu'ajouter un réessai sur POST rendrait service, la réponse est non : c'est
 /// l'outbox qu'il faut regarder.
 /// ─────────────────────────────────────────────────────────────────────────────
 ///
@@ -30,13 +32,38 @@ import 'package:dio/dio.dart';
 /// sur une coupure de 200 ms n'a aucune raison de remonter jusqu'à l'utilisateur.
 class RetryInterceptor extends Interceptor {
   RetryInterceptor({
+    required Dio dio,
     this.maxRetries = 2,
     this.baseDelay = const Duration(milliseconds: 400),
+    this.maxRetryAfter = const Duration(minutes: 2),
     Random? random,
-  }) : _random = random ?? Random();
+  }) : _dio = dio,
+       _random = random ?? Random();
+
+  /// **Le transport de l'application, avec toute sa chaîne d'intercepteurs.**
+  ///
+  /// ═══ POURQUOI PAS UN DIO NEUF ═══
+  ///
+  /// Le rejeu partait sur un `Dio` fabriqué à la volée, donc **sans
+  /// `AuthInterceptor`**. Conséquence : un GET réessayé après l'expiration du
+  /// jeton d'accès : ce qui est le cas nominal, puisqu'on ne réessaie qu'après
+  /// plusieurs centaines de millisecondes de panne : revenait en 401 brut. Ce
+  /// 401 était ensuite passé à `handler.next()`, donc **vers l'avant**, sans
+  /// jamais repasser par le renouvellement : `DioApi.classify` le traduisait en
+  /// `SESSION_EXPIRED` et le commercial était déconnecté, alors qu'un jeton de
+  /// renouvellement parfaitement valide dormait dans le stockage chiffré.
+  ///
+  /// Rejouer à travers la chaîne réelle ne boucle pas : le compteur de
+  /// tentatives voyage dans `extra`, et [maxRetries] le borne.
+  final Dio _dio;
 
   final int maxRetries;
   final Duration baseDelay;
+
+  /// Plafond de l'attente imposée par `Retry-After`. Au-delà, il vaut mieux
+  /// rendre l'erreur à l'appelant que de figer un écran plusieurs minutes.
+  final Duration maxRetryAfter;
+
   final Random _random;
 
   static const String _attemptKey = 'cpi.getRetryAttempt';
@@ -56,30 +83,43 @@ class RetryInterceptor extends Interceptor {
       return;
     }
 
-    // Gigue complète, comme dans l'outbox : trente appareils qui retrouvent le
-    // réseau au retour d'une antenne ne doivent pas réessayer à la même
-    // milliseconde.
-    final int ceiling = baseDelay.inMilliseconds << attempt;
-    await Future<void>.delayed(Duration(milliseconds: _random.nextInt(ceiling + 1)));
+    final Duration wait = _delayFor(err, attempt);
+    if (wait > maxRetryAfter) {
+      // Le serveur demande plus que ce qu'on est prêt à attendre en ligne :
+      // c'est à l'appelant de décider, pas à un intercepteur de bloquer l'écran.
+      handler.next(err);
+      return;
+    }
+    await Future<void>.delayed(wait);
 
     try {
-      final Response<dynamic> response =
-          await Dio(
-            BaseOptions(
-              baseUrl: request.baseUrl,
-              connectTimeout: request.connectTimeout,
-              sendTimeout: request.sendTimeout,
-              receiveTimeout: request.receiveTimeout,
-            ),
-          ).fetch<dynamic>(
-            request.copyWith(
-              extra: <String, dynamic>{...request.extra, _attemptKey: attempt + 1},
-            ),
-          );
+      final Response<dynamic> response = await _dio.fetch<dynamic>(
+        request.copyWith(
+          extra: <String, dynamic>{...request.extra, _attemptKey: attempt + 1},
+        ),
+      );
       handler.resolve(response);
     } on DioException catch (e) {
       handler.next(e);
     }
+  }
+
+  /// Combien attendre avant le prochain essai.
+  ///
+  /// **`Retry-After` prime sur le back-off.** Sur un 429, le serveur dit
+  /// exactement quand revenir ; l'ignorer et repartir sur 400 ms est la façon la
+  /// plus sûre de se refaire limiter, deux fois de suite, et de transformer un
+  /// throttling passager en échec.
+  Duration _delayFor(DioException err, int attempt) {
+    if (err.response?.statusCode == 429) {
+      final Duration? asked = retryAfterOf(err.response);
+      if (asked != null) return asked;
+    }
+    // Gigue complète, comme dans l'outbox : trente appareils qui retrouvent le
+    // réseau au retour d'une antenne ne doivent pas réessayer à la même
+    // milliseconde.
+    final int ceiling = baseDelay.inMilliseconds << attempt;
+    return Duration(milliseconds: _random.nextInt(ceiling + 1));
   }
 
   /// Ce qui peut raisonnablement réussir au coup suivant. Un 404 ou un 422 n'en

@@ -2,7 +2,7 @@
 <!--
   Android 11 et antérieurs (API 24–30), où `android:allowBackup="false"` suffit
   déjà. Ce fichier est le filet de sécurité : si quelqu'un repasse un jour
-  `allowBackup` à `true` — pour restaurer une préférence, pour un test — la base
+  `allowBackup` à `true` : pour restaurer une préférence, pour un test : la base
   restera hors sauvegarde au lieu de partir vers Google Drive avec l'annuaire.
 
   `minSdk` vaut 24, donc ce fichier couvre une part réelle du parc sénégalais et

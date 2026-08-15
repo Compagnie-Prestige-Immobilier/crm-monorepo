@@ -6,17 +6,17 @@ import '../../core/sync/token_store.dart';
 ///
 /// Deux traitements différents, volontairement :
 ///
-/// * **Jeton d'accès — mémoire uniquement.** Il vit quinze minutes et se
+/// * **Jeton d'accès : mémoire uniquement.** Il vit quinze minutes et se
 ///   renouvelle. L'écrire sur disque n'allongerait pas la session d'une seconde
 ///   et ajouterait une copie de plus à voler.
-/// * **Jeton de renouvellement — stockage chiffré.** C'est lui qui porte la
+/// * **Jeton de renouvellement : stockage chiffré.** C'est lui qui porte la
 ///   session à travers les redémarrages, donc lui qu'il faut protéger.
 ///
 /// À propos de `AndroidOptions(encryptedSharedPreferences: true)` : ce drapeau
 /// est **déprécié et ignoré** depuis `flutter_secure_storage` 10.3. Il activait
 /// `EncryptedSharedPreferences` de Jetpack Security, que Google a lui-même
-/// déprécié. Le paquet chiffre désormais sans condition — AES-256-GCM, clé
-/// enveloppée par RSA-OAEP dans l'Android KeyStore — et migre les données
+/// déprécié. Le paquet chiffre désormais sans condition : AES-256-GCM, clé
+/// enveloppée par RSA-OAEP dans l'Android KeyStore : et migre les données
 /// existantes au premier accès. Le passer aujourd'hui n'ajoute rien et fait
 /// remonter un avertissement de dépréciation ; l'intention (« les jetons ne
 /// touchent jamais un fichier en clair ») est tenue par défaut.

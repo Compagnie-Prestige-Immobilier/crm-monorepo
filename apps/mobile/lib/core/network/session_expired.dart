@@ -1,4 +1,4 @@
-/// Erreur typée de fin de session — **Dart pur**.
+/// Erreur typée de fin de session : **Dart pur**.
 ///
 /// Typée et non « une `DioException` de plus » : quand le renouvellement du
 /// jeton échoue, *toutes* les requêtes en vol doivent échouer de la même façon

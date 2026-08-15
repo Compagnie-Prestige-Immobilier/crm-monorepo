@@ -7,6 +7,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/sync/phase2_directory_sync.dart';
+import '../../../core/utils/relative_time.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
@@ -16,12 +17,12 @@ import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../phase2_controller.dart';
 
-/// Phase 2 — saisie des méthodes d'enrôlement.
+/// Phase 2 : saisie des méthodes d'enrôlement.
 ///
 /// ## Ce que fait cet écran, et ce qu'il ne fait pas
 ///
 /// Le téléconseiller travaille depuis un **programme imprimé** qui ne liste que
-/// des numéros de téléphone — pas de noms, délibérément. Il appelle, puis vient
+/// des numéros de téléphone : pas de noms, délibérément. Il appelle, puis vient
 /// consigner ici soit la méthode d'enrôlement obtenue, soit la raison pour
 /// laquelle il n'en a pas obtenu. **Le papier est le programme ; l'app est
 /// l'outil d'enregistrement.** C'est pourquoi rien sur cet écran ne ressemble à
@@ -39,7 +40,7 @@ import '../phase2_controller.dart';
 ///
 /// ## Le retour haptique ne ment jamais
 ///
-/// `selectionClick` au choix d'une carte — c'est un retour de sélection, il est
+/// `selectionClick` au choix d'une carte : c'est un retour de sélection, il est
 /// exact au moment où il est émis. La vibration de succès, elle, n'est déclenchée
 /// **qu'après** que l'écriture locale a été commitée : une vibration qui précède
 /// l'écriture affirme un enregistrement qui peut encore échouer. Rien ne vibre à
@@ -98,7 +99,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     await ref.read(phase2ControllerProvider.notifier).search(e164);
     if (!mounted) return;
     // Numéro inconnu de l'annuaire : c'est une erreur d'orientation, pas une
-    // faute de frappe — le commercial vient peut-être de tourner une page du
+    // faute de frappe : le commercial vient peut-être de tourner une page du
     // mauvais programme. Le signaler par un retour tactile évite de lui faire
     // relire l'écran entre deux appels.
     if (ref.read(phase2ControllerProvider).stage == Phase2Stage.notFound) {
@@ -161,7 +162,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                     const SizedBox(height: CpiSpacing.md),
                     // `AnimatedSwitcher` et non trois `if` : le passage
                     // recherche → résultat → confirmation est le seul mouvement de
-                    // cet écran, et il porte une information — quelque chose a
+                    // cet écran, et il porte une information : quelque chose a
                     // changé sous les doigts. `CpiMotion.of` ramène la durée à
                     // zéro quand `MediaQuery.disableAnimations` est actif ; la
                     // logique, elle, ne change pas.
@@ -376,7 +377,7 @@ class _Metric extends StatelessWidget {
     // Le libellé sous la valeur, pas à côté d'elle.
     //
     // Côte à côte, les trois métriques se partagent 109 dp sur un écran de
-    // 360 dp — la largeur réelle des téléphones du parc — et « méthodes
+    // 360 dp : la largeur réelle des téléphones du parc : et « méthodes
     // obtenues » déborde de 97 px. Empilé, le libellé dispose de toute la
     // colonne et se replie sur deux lignes.
     return Expanded(
@@ -458,7 +459,7 @@ class _DirectoryLine extends ConsumerWidget {
     final DateTime? when = lastPulledAt;
     final String freshness = when == null
         ? 'jamais téléchargé'
-        : 'mis à jour ${_relative(when)}';
+        : 'mis à jour ${relativeTime(when)}';
 
     return Row(
       children: <Widget>[
@@ -497,13 +498,6 @@ class _DirectoryLine extends ConsumerWidget {
 
   static final NumberFormat _number = NumberFormat.decimalPattern('fr');
 
-  static String _relative(DateTime when) {
-    final Duration delta = DateTime.now().difference(when);
-    if (delta.inMinutes < 1) return 'à l\'instant';
-    if (delta.inHours < 1) return 'il y a ${delta.inMinutes} min';
-    if (delta.inDays < 1) return 'il y a ${delta.inHours} h';
-    return 'le ${DateFormat('d MMMM à HH:mm', 'fr').format(when)}';
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -638,7 +632,7 @@ class _NotFound extends StatelessWidget {
   }
 }
 
-/// Dossier déjà clos — **lecture seule**.
+/// Dossier déjà clos : **lecture seule**.
 ///
 /// Aucun bouton de correction, et c'est volontaire : le serveur refuserait toute
 /// nouvelle tentative (`PHASE2_ALREADY_COMPLETED`), et seul un ADMIN peut
@@ -996,7 +990,7 @@ class _NegativeResult {
 /// `OTHER` **exige** un commentaire non vide : un `CHECK` PostgreSQL
 /// (`call_attempts_other_requires_comment`) le refuse sinon. On le valide donc
 /// ici, à la seconde où le commercial appuie, plutôt que de découvrir le refus à
-/// la synchronisation — c'est-à-dire potentiellement trois semaines plus tard,
+/// la synchronisation : c'est-à-dire potentiellement trois semaines plus tard,
 /// quand plus personne ne se souvient de l'appel et que la saisie est
 /// irrécupérable.
 class _NegativeSheet extends StatefulWidget {
@@ -1127,7 +1121,7 @@ class _NegativeSheetState extends State<_NegativeSheet> {
             // SEULES les options défilent ; les actions restent ancrées.
             //
             // Avec un `SingleChildScrollView` englobant tout, « Enregistrer »
-            // passe sous la ligne de flottaison dès que le clavier s'ouvre —
+            // passe sous la ligne de flottaison dès que le clavier s'ouvre :
             // c'est-à-dire exactement au moment où l'on veut appuyer dessus. Le
             // commercial doit alors refermer le clavier ou faire défiler pour
             // valider ce qu'il vient de taper : deux gestes de plus, à chaque
