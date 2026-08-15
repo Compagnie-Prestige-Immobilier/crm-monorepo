@@ -37,6 +37,8 @@ class SyncOperationDto {
     this.baseRev,
 
     this.data,
+
+    this.clearedFields,
   });
 
   /// Identifiant unique de l’opération, stable entre deux rejeux.
@@ -78,12 +80,26 @@ class SyncOperationDto {
   @JsonKey(name: r'data', required: false, includeIfNull: false)
   final SyncEntityDataDto? data;
 
+  /// Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes.
+  @JsonKey(name: r'clearedFields', required: false, includeIfNull: false)
+  final List<String>? clearedFields;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SyncOperationDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [opId, seq, entity, op, entityId, clientUpdatedAt, baseRev, data],
+              [
+                opId,
+                seq,
+                entity,
+                op,
+                entityId,
+                clientUpdatedAt,
+                baseRev,
+                data,
+                clearedFields,
+              ],
               [
                 other.opId,
                 other.seq,
@@ -93,6 +109,7 @@ class SyncOperationDto {
                 other.clientUpdatedAt,
                 other.baseRev,
                 other.data,
+                other.clearedFields,
               ],
             );
   }
@@ -109,6 +126,7 @@ class SyncOperationDto {
         clientUpdatedAt,
         baseRev,
         data,
+        clearedFields,
       ]);
 
   factory SyncOperationDto.fromJson(Map<String, dynamic> json) =>
