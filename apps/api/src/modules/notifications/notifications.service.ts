@@ -12,7 +12,10 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { buildAudienceWhere, dedupe, type AudienceSelector } from './audience.js';
 import {
+  BREVO_MAX_CONCURRENT_CALLS,
+  BREVO_MAX_RECIPIENTS_PER_CALL,
   BREVO_TRANSPORT,
+  chunkRecipients,
   type BrevoRecipient,
   type BrevoTransport,
   type BrevoTransportStatus,
@@ -56,6 +59,35 @@ export const DELIVERY_RETRY_ERROR = 'EMAIL_RETRY';
  * échec, la personne verra le message dans sa boîte de réception.
  */
 export const DELIVERY_INBOX_ONLY = 'INBOX_ONLY';
+
+/**
+ * Nombre de destinataires servis AVANT que le sort de leurs livraisons ne soit
+ * écrit en base.
+ *
+ * ═══ POURQUOI ÉCRIRE EN COURS DE ROUTE ET NON À LA FIN ═══
+ *
+ * Confier un lot à Brevo est IRRÉVERSIBLE : l'e-mail est parti. Tant que la
+ * ligne de livraison correspondante n'est pas passée à `SENT`, la base ignore
+ * cet envoi, et toute reprise de la notification (bail expiré, processus tué,
+ * réessai d'une livraison voisine restée en file) relit la ligne `PENDING` et
+ * RENVOIE le même message à quelqu'un qui l'a déjà reçu.
+ *
+ * En écrivant une seule fois, à la fin, la fenêtre d'exposition couvrait TOUTE
+ * l'expédition : quelques milliers d'adresses acceptées pouvaient être renvoyées
+ * en bloc parce que le processus est mort sur la dernière. La borner à un groupe
+ * la ramène à ce qui est réellement en vol au même instant.
+ *
+ * ═══ POURQUOI CETTE TAILLE-LÀ ═══
+ *
+ * `BREVO_MAX_RECIPIENTS_PER_CALL × BREVO_MAX_CONCURRENT_CALLS`, c'est-à-dire
+ * exactement une VAGUE d'appels : le transport découpe le groupe en lots de 99
+ * et en lance 8 à la fois, donc les issues du groupe entier reviennent
+ * ensemble, au bout d'un aller-retour réseau. Découper plus fin ne réduirait
+ * pas la fenêtre, puisque les lots d'une même vague sont en vol simultanément ;
+ * découper plus gros ferait attendre l'écriture de la première vague derrière
+ * la seconde, sans rien gagner.
+ */
+export const EMAIL_PERSIST_GROUP_SIZE = BREVO_MAX_RECIPIENTS_PER_CALL * BREVO_MAX_CONCURRENT_CALLS;
 
 /**
  * Ce que l'éventail a réellement produit. Sert aux tests et au journal.
@@ -176,7 +208,12 @@ export class NotificationsService {
     // Les LIVRAISONS portent la même valeur : elles n'existent que par leur
     // notification, et une livraison visible accrochée à une notification
     // masquée afficherait une ligne vide dans la boîte de réception.
-    const isDemo = await this.demo.enabled();
+    //
+    // `enabledForWrite` et non `enabled` : cette valeur est ÉCRITE. Sur panne
+    // de lecture du réglage, `enabled()` rendrait `false` et l'annonce
+    // d'exemple atterrirait pour de bon dans la boîte de vrais commerciaux,
+    // avec un texte écrit pour une démonstration.
+    const isDemo = await this.demo.enabledForWrite();
 
     const created = await this.prisma.notification.create({
       data: {
@@ -294,7 +331,7 @@ export class NotificationsService {
 
     if (!deliveries.length) {
       const idle = await this.sendByEmail(notification, []);
-      await this.markNotificationSent(notificationId, idle.status);
+      await this.settleNotification(notificationId, idle.status, 0);
       return { sent: 0, failed: 0, pending: 0, emailed: idle.emailed, emailStatus: idle.status };
     }
 
@@ -306,7 +343,9 @@ export class NotificationsService {
     let sent = 0;
     let failed = 0;
     let pending = 0;
-    const now = new Date();
+    /** Livraisons qu'un passage ULTÉRIEUR doit reprendre. Voir `settleNotification`. */
+    let retryable = 0;
+    const inboxOnly: string[] = [];
 
     for (const delivery of deliveries) {
       const verdict = email.verdicts.get(delivery.userId);
@@ -315,46 +354,33 @@ export class NotificationsService {
         // Personne à servir par e-mail. `PENDING` et non `FAILED` : rien n'a
         // échoué, il n'y avait simplement rien à envoyer au-dehors.
         pending += 1;
-        await this.prisma.notificationDelivery.update({
-          where: { id: delivery.id },
-          data: { error: DELIVERY_INBOX_ONLY },
-        });
+        inboxOnly.push(delivery.id);
         continue;
       }
 
+      // Le sort des livraisons SERVIES est déjà écrit : `sendByEmail` l'a posé
+      // groupe par groupe, au fur et à mesure des acceptations. Il ne reste ici
+      // qu'à compter.
       if (verdict.kind === 'sent') {
         sent += 1;
-        await this.prisma.notificationDelivery.update({
-          where: { id: delivery.id },
-          data: { status: NotificationDeliveryStatus.SENT, error: null, sentAt: now },
-        });
         continue;
       }
-
       if (verdict.kind === 'retry') {
-        // Le statut RESTE `PENDING` : c'est ce qui rend la ligne éligible au
-        // prochain passage. Seul le marqueur d'erreur change, pour distinguer
-        // « à réessayer » de « rien à envoyer ».
         pending += 1;
-        await this.prisma.notificationDelivery.update({
-          where: { id: delivery.id },
-          data: { error: verdict.error },
-        });
+        retryable += 1;
         continue;
       }
-
       failed += 1;
-      await this.prisma.notificationDelivery.update({
-        where: { id: delivery.id },
-        data: {
-          status: NotificationDeliveryStatus.FAILED,
-          error: verdict.error,
-          failedAt: now,
-        },
+    }
+
+    if (inboxOnly.length) {
+      await this.prisma.notificationDelivery.updateMany({
+        where: { id: { in: inboxOnly } },
+        data: { error: DELIVERY_INBOX_ONLY },
       });
     }
 
-    await this.markNotificationSent(notificationId, email.status);
+    await this.settleNotification(notificationId, email.status, retryable);
     return { sent, failed, pending, emailed: email.emailed, emailStatus: email.status };
   }
 
@@ -389,6 +415,11 @@ export class NotificationsService {
     // marquer ces lignes-là à réessayer, et elles seules.
     let targeted: { userId: string; email: string; fullName: string }[] = [];
 
+    /** Verdicts DÉJÀ ÉCRITS en base, groupe par groupe. */
+    const verdicts = new Map<string, DeliveryVerdict>();
+    let emailed = 0;
+    let refused = false;
+
     try {
       const users = await this.prisma.user.findMany({
         where: { id: { in: [...userIds] }, role: Role.COMMERCIAL },
@@ -401,30 +432,65 @@ export class NotificationsService {
 
       if (!targeted.length) return { emailed: 0, status: 'SENT', verdicts: empty };
 
-      const recipients: BrevoRecipient[] = targeted.map((row) => ({
-        email: row.email,
-        name: row.fullName,
-      }));
-
       const content = buildEmailContent(notification.title, notification.body);
-      const result = await this.email.send([
-        {
-          recipients,
-          subject: notification.title,
-          htmlContent: content.html,
-          textContent: content.text,
-        },
-      ]);
 
-      const emailed = result.outcomes.filter((outcome) => outcome.ok).length;
+      // UNE VAGUE, PUIS SON ÉCRITURE, PUIS LA SUIVANTE. Voir
+      // `EMAIL_PERSIST_GROUP_SIZE` : ce qui a été accepté par Brevo est acquis
+      // en base avant qu'on n'expose la suite, faute de quoi une reprise
+      // renverrait le message à des gens qui l'ont déjà reçu.
+      for (const group of chunkRecipients(targeted, EMAIL_PERSIST_GROUP_SIZE)) {
+        const recipients: BrevoRecipient[] = group.map((row) => ({
+          email: row.email,
+          name: row.fullName,
+        }));
 
-      if (result.status === 'TRANSPORT_ERROR') {
-        // Aucun lot n'est passé : ce ne sont pas les adresses qui sont en
-        // cause, c'est le service ou la clé. Tout reste à réessayer.
-        this.logger.warn(
-          `Notification ${notification.id} : e-mail non parti (${result.detail ?? 'sans détail'}). Les livraisons restent en file.`,
-        );
-        return { emailed, status: result.status, verdicts: retryAll(targeted) };
+        const result = await this.email.send([
+          {
+            recipients,
+            subject: notification.title,
+            htmlContent: content.html,
+            textContent: content.text,
+          },
+        ]);
+
+        emailed += result.outcomes.filter((outcome) => outcome.ok).length;
+
+        const groupVerdicts = new Map<string, DeliveryVerdict>();
+
+        if (result.status === 'TRANSPORT_ERROR') {
+          // Aucun lot du groupe n'est passé : ce ne sont pas les adresses qui
+          // sont en cause, c'est le service ou la clé. Tout le groupe reste à
+          // réessayer.
+          refused = true;
+          this.logger.warn(
+            `Notification ${notification.id} : e-mail non parti (${result.detail ?? 'sans détail'}). Les livraisons restent en file.`,
+          );
+          for (const row of group) {
+            groupVerdicts.set(row.userId, { kind: 'retry', error: DELIVERY_RETRY_ERROR });
+          }
+        } else {
+          const byEmail = new Map(result.outcomes.map((outcome) => [outcome.email, outcome]));
+          for (const row of group) {
+            const outcome = byEmail.get(row.email);
+            if (outcome === undefined || outcome.ok) {
+              // Adresse acceptée, ou issue muette : un transport qui ne dit
+              // rien d'une adresse qu'il a reçue l'a prise en charge, et le
+              // doute ne justifie ni un échec ni un réessai.
+              groupVerdicts.set(row.userId, { kind: 'sent' });
+              continue;
+            }
+            const error = outcome.errorCode ?? 'UNKNOWN';
+            groupVerdicts.set(
+              row.userId,
+              outcome.kind === 'transient'
+                ? { kind: 'retry', error: DELIVERY_RETRY_ERROR }
+                : { kind: 'failed', error },
+            );
+          }
+        }
+
+        await this.persistVerdicts(notification.id, groupVerdicts);
+        for (const [userId, verdict] of groupVerdicts) verdicts.set(userId, verdict);
       }
 
       if (emailed) {
@@ -433,36 +499,154 @@ export class NotificationsService {
         );
       }
 
-      const byEmail = new Map(result.outcomes.map((outcome) => [outcome.email, outcome]));
-      const verdicts = new Map<string, DeliveryVerdict>();
-      for (const row of targeted) {
-        const outcome = byEmail.get(row.email);
-        if (outcome === undefined || outcome.ok) {
-          // Adresse acceptée, ou issue muette : un transport qui ne dit rien
-          // d'une adresse qu'il a reçue l'a prise en charge, et le doute ne
-          // justifie ni un échec ni un réessai.
-          verdicts.set(row.userId, { kind: 'sent' });
-          continue;
-        }
-        const error = outcome.errorCode ?? 'UNKNOWN';
-        verdicts.set(
-          row.userId,
-          outcome.kind === 'transient'
-            ? { kind: 'retry', error: DELIVERY_RETRY_ERROR }
-            : { kind: 'failed', error },
-        );
-      }
-      return { emailed, status: result.status, verdicts };
+      // `TRANSPORT_ERROR` ne se dit que si RIEN n'est passé. Un groupe refusé
+      // derrière un groupe accepté décrit une panne partielle : l'annoncer
+      // comme une panne de transport ferait croire que la clé est en cause,
+      // alors que des e-mails sont bel et bien partis.
+      return { emailed, status: refused && emailed === 0 ? 'TRANSPORT_ERROR' : 'SENT', verdicts };
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       this.logger.warn(
         `Notification ${notification.id} : branche e-mail interrompue (${detail}). Les livraisons restent en file.`,
       );
-      return { emailed: 0, status: 'TRANSPORT_ERROR', verdicts: retryAll(targeted) };
+
+      // SEULS LES DESTINATAIRES PAS ENCORE TRANCHÉS repartent en file. Remettre
+      // tout `targeted` à réessayer réécrirait en `PENDING` des lignes déjà
+      // passées à `SENT` par un groupe précédent, et le passage suivant leur
+      // renverrait l'e-mail qu'elles ont reçu.
+      const unresolved = retryAll(targeted.filter((row) => !verdicts.has(row.userId)));
+      // L'écriture peut échouer à son tour, c'est même le cas typique quand
+      // c'est la base qui a lâché. Sans marqueur, les lignes restent `PENDING`
+      // et la notification reste prenable : la reprise est assurée par le bail,
+      // pas par ce marqueur.
+      await this.persistVerdicts(notification.id, unresolved).catch(() => undefined);
+      for (const [userId, verdict] of unresolved) verdicts.set(userId, verdict);
+
+      return { emailed, status: 'TRANSPORT_ERROR', verdicts };
     }
   }
 
-  private async markNotificationSent(id: string, transportStatus: string): Promise<void> {
+  /**
+   * Écrit le sort d'un GROUPE de livraisons, par verdict et non ligne à ligne.
+   *
+   * `status: PENDING` figure dans chaque `where` : une ligne qu'un autre
+   * passage a déjà fait avancer (`SENT`, ou `READ` parce que la personne a
+   * ouvert l'application entre-temps) ne doit pas être ramenée en arrière par
+   * une écriture tardive.
+   */
+  private async persistVerdicts(
+    notificationId: string,
+    verdicts: ReadonlyMap<string, DeliveryVerdict>,
+  ): Promise<void> {
+    if (!verdicts.size) return;
+
+    const now = new Date();
+    const sent: string[] = [];
+    const retry = new Map<string, string[]>();
+    const failed = new Map<string, string[]>();
+
+    for (const [userId, verdict] of verdicts) {
+      if (verdict.kind === 'sent') {
+        sent.push(userId);
+        continue;
+      }
+      const bucket = verdict.kind === 'retry' ? retry : failed;
+      const ids = bucket.get(verdict.error);
+      if (ids) ids.push(userId);
+      else bucket.set(verdict.error, [userId]);
+    }
+
+    // L'ACCEPTATION D'ABORD, avant les réessais et les échecs : c'est la seule
+    // des trois écritures qu'une interruption ne pardonne pas, puisque son
+    // absence fait renvoyer un e-mail déjà remis.
+    if (sent.length) {
+      await this.prisma.notificationDelivery.updateMany({
+        where: {
+          notificationId,
+          userId: { in: sent },
+          status: NotificationDeliveryStatus.PENDING,
+        },
+        data: { status: NotificationDeliveryStatus.SENT, error: null, sentAt: now },
+      });
+    }
+
+    for (const [error, userIds] of retry) {
+      // Le statut RESTE `PENDING` : c'est ce qui rend la ligne éligible au
+      // prochain passage. Seul le marqueur d'erreur change, pour distinguer
+      // « à réessayer » de « rien à envoyer ».
+      await this.prisma.notificationDelivery.updateMany({
+        where: {
+          notificationId,
+          userId: { in: userIds },
+          status: NotificationDeliveryStatus.PENDING,
+        },
+        data: { error },
+      });
+    }
+
+    for (const [error, userIds] of failed) {
+      await this.prisma.notificationDelivery.updateMany({
+        where: {
+          notificationId,
+          userId: { in: userIds },
+          status: NotificationDeliveryStatus.PENDING,
+        },
+        data: { status: NotificationDeliveryStatus.FAILED, error, failedAt: now },
+      });
+    }
+  }
+
+  /**
+   * Arrête l'envoi sur l'état que ses LIVRAISONS justifient.
+   *
+   * ═══ POURQUOI CE N'EST PAS TOUJOURS `SENT` ═══
+   *
+   * Marquer `SENT` sans condition était un mensonge silencieux, et le pire de
+   * ce produit. Un lot Brevo refusé passagèrement laisse ses livraisons
+   * `PENDING` avec le marqueur de réessai ; la notification, elle, était écrite
+   * `SENT`. Or `dispatchDue` ne reprend que les `SCHEDULED` échues et les
+   * `SENDING` dont le bail a expiré : plus rien, jamais, ne revenait sur ces
+   * livraisons. Un téléconseiller ne recevait pas son e-mail, et la plateforme
+   * affirmait le lui avoir envoyé.
+   *
+   * `retryStalled` NE PEUT PAS servir de rattrapage ici, c'est vérifié et non
+   * supposé : il n'est appelé que depuis `emit()`, sur violation de contrainte
+   * unique, donc uniquement pour des rappels de la période COURANTE, et il
+   * cherche par `reminderKey`, que les envois composés à la main laissent à
+   * `null`. Toute la population de `dispatch()` lui est structurellement
+   * invisible.
+   *
+   * La notification RESTE donc `SENDING` tant qu'une livraison est à
+   * réessayer. C'est le mécanisme de reprise qui existe DÉJÀ, celui du bail :
+   * l'écriture renouvelle `updatedAt`, et le passage qui trouve le bail expiré
+   * reprend la notification et rejoue l'envoi. Il ne rejoue que les livraisons
+   * restées `PENDING`, les acceptées ayant été écrites au fil de l'eau.
+   *
+   * Un état « partiel » distinct aurait dit la même chose plus lisiblement,
+   * mais il faudrait l'ajouter à l'énumération `NotificationStatus`, donc au
+   * schéma et aux deux clients générés, pour une information que `SENDING` +
+   * marqueur de réessai porte déjà.
+   *
+   * CE QUI RESTE OUVERT, ET C'EST ASSUMÉ : rien ne compte les tentatives. Un
+   * transport durablement en 429 fait donc repartir la notification toutes les
+   * quinze minutes, indéfiniment. Le journal le montre à chaque passage. Borner
+   * demanderait un compteur sur la livraison, donc une colonne de plus ; entre
+   * réessayer trop et abandonner un envoi en silence, c'est l'abandon qui est
+   * le défaut grave.
+   */
+  private async settleNotification(
+    id: string,
+    transportStatus: string,
+    retryable: number,
+  ): Promise<void> {
+    if (retryable > 0) {
+      await this.prisma.notification.update({
+        where: { id },
+        data: { status: NotificationStatus.SENDING, transportStatus },
+      });
+      return;
+    }
+
     await this.prisma.notification.update({
       where: { id },
       data: { status: NotificationStatus.SENT, sentAt: new Date(), transportStatus },
