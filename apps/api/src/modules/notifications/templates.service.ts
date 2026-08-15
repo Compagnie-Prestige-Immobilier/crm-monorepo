@@ -82,7 +82,7 @@ export class NotificationTemplatesService {
           variables: mergedVariables(body.titleTemplate, body.bodyTemplate),
           createdById: user.id,
           // Aucune ligne source dont hériter : l'interrupteur décide seul.
-          isDemo: await this.demo.enabled(),
+          isDemo: await this.demo.enabledForWrite(),
         },
       });
       return toDto(row);
