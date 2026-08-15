@@ -153,6 +153,8 @@ export const queryKeys = {
   purgeCatalog: ['purge-catalog'] as const,
   supervision: ['supervision'] as const,
   androidUpdate: ['android-update'] as const,
+  /** Export intégral de la base : sondé pendant que `pg_dump` tourne. */
+  databaseDump: ['database-dump'] as const,
 
   // ─── Statistiques ─────────────────────────────────────────────────────────
   statsRoot: ['stats'] as const,
