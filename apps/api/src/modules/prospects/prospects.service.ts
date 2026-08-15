@@ -174,7 +174,7 @@ export class ProspectsService {
         // représentant. Un prospect visible accroché à une fiche de
         // rattachement filtrée montrerait un représentant que l'annuaire ne
         // connaît pas, et la paire se désolidariserait à l'extinction.
-        isDemo: (await this.demo.enabled()) || representant.isDemo,
+        isDemo: (await this.demo.enabledForWrite()) || representant.isDemo,
         ...(input.statut ? { statut: input.statut } : {}),
         clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
       },

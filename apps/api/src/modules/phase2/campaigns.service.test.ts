@@ -337,6 +337,58 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
       }),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
+
+  /**
+   * L'ADMISSION N'EST PAS UNE LECTURE.
+   *
+   * Le module jumeau des campagnes représentants cloisonnait déjà cette
+   * résolution ; celui-ci ne le faisait pas. Mode ÉTEINT, un POST portant
+   * l'UUID d'un compte de démonstration passait donc : le compte a le rôle
+   * COMMERCIAL et il est actif, rien ne le distinguait. La campagne créée était
+   * RÉELLE, ses adhésions et ses tâches pointaient vers des comptes invisibles,
+   * et `onDelete: Restrict` sur les deux relations bloquait ensuite la purge.
+   */
+  it('MODE ÉTEINT, un compte de démonstration n’est pas ADMIS dans une campagne', async () => {
+    const db = prismaStub();
+    // La doublure ne connaît que des comptes réels : c'est le `where` du
+    // service qui doit écarter le compte fictif, pas la doublure.
+    db.user.findMany.mockResolvedValue([]);
+    const service = new Phase2CampaignsService(
+      db as unknown as PrismaService,
+      fakeDemoVisibility(false),
+    );
+
+    await expect(
+      service.create(ADMIN, {
+        name: 'Avril',
+        scope: CampaignScope.ALL,
+        commercialIds: ['demo-awa'],
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+    // Le refus doit venir du CLOISONNEMENT, pas d'un hasard de la doublure :
+    // on vérifie que la requête portait bien la clause.
+    const where = (db.user.findMany.mock.calls[0]?.[0] as { where?: Record<string, unknown> })
+      .where;
+    expect(where).toMatchObject({ isDemo: false });
+  });
+
+  it('mode ALLUMÉ, la clause disparaît et les deux populations se mêlent', async () => {
+    const db = prismaStub();
+    db.user.findMany.mockResolvedValue([]);
+    const service = new Phase2CampaignsService(
+      db as unknown as PrismaService,
+      fakeDemoVisibility(true),
+    );
+
+    await service
+      .create(ADMIN, { name: 'Avril', scope: CampaignScope.ALL, commercialIds: ['demo-awa'] })
+      .catch(() => undefined);
+
+    const where = (db.user.findMany.mock.calls[0]?.[0] as { where?: Record<string, unknown> })
+      .where;
+    expect(where).not.toHaveProperty('isDemo');
+  });
 });
 
 describe('Phase2CampaignsService, étalement sur N jours', () => {

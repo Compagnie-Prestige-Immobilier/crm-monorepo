@@ -111,7 +111,10 @@ export class Phase2CampaignsService {
     const commerciaux = await this.resolveCommerciaux(body.commercialIds);
     const seed = newCampaignSeed();
     const spreadDays = body.spreadDays ?? MIN_SPREAD_DAYS;
-    const demoEnabled = await this.demo.enabled();
+    // `enabledForWrite` : cette valeur est ÉCRITE sur la campagne, puis héritée
+    // par ses tâches. Un repli `false` sur panne de lecture laisserait une
+    // campagne fictive dans la liste réelle, programmes imprimables compris.
+    const demoEnabled = await this.demo.enabledForWrite();
 
     const campaignId = await this.prisma
       .$transaction(
@@ -228,12 +231,32 @@ export class Phase2CampaignsService {
    * Un compte désactivé ou d'un autre rôle recevrait un programme que personne
    * n'appellerait : les prospects seraient marqués « affectés », donc exclus
    * de toute campagne ultérieure, et dormiraient indéfiniment.
+   *
+   * ═══ CE N'EST PAS UNE LECTURE, C'EST UNE ADMISSION ═══
+   *
+   * `demoScope` manquait ici, alors que le module jumeau des campagnes
+   * représentants le composait déjà. La dissymétrie n'était pas anodine : mode
+   * ÉTEINT, un POST portant l'UUID d'un compte de démonstration était ACCEPTÉ,
+   * puisque ce compte a bien le rôle COMMERCIAL et qu'il est actif. La campagne
+   * créée était RÉELLE, mais ses adhésions et ses tâches pointaient vers des
+   * comptes que plus aucun écran ne montre, et `onDelete: Restrict` sur les
+   * deux relations bloquait ensuite la purge de démonstration.
+   *
+   * La dispense écrite dans le balayage de visibilité, « relecture par lot de
+   * clés primaires », est juste pour ce qu'elle vise, empêcher une FUITE : ces
+   * identifiants viennent du client, ils ne révèlent rien. Elle ne dit rien du
+   * cas inverse, ADMETTRE une ligne fictive dans une écriture réelle, et c'est
+   * pourtant le même appel qui décide des deux.
    */
   private async resolveCommerciaux(
     ids: readonly string[],
   ): Promise<{ id: string; fullName: string; username: string }[]> {
     const found = await this.prisma.user.findMany({
-      where: { id: { in: [...ids] }, deletedAt: null },
+      where: {
+        id: { in: [...ids] },
+        deletedAt: null,
+        ...demoScope(await this.demo.enabled()),
+      },
       select: { id: true, fullName: true, username: true, role: true, isActive: true },
     });
 

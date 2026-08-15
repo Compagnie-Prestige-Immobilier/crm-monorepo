@@ -122,7 +122,10 @@ export class ClientRequestsService {
     // façon de reconnaître qu'un client « absent » est en réalité déjà en base
     // sous une autre présentation du même numéro.
     const phoneE164 = normalizePhone(body.phone);
-    const demoEnabled = await this.demo.enabled();
+    // `enabledForWrite` : cette valeur est ÉCRITE dans `isDemo`, et l'approbation
+    // la recopie sur le prospect. Un repli `false` sur panne de lecture ferait
+    // d'une demande d'exercice une VRAIE demande, arbitrée pour de bon.
+    const demoEnabled = await this.demo.enabledForWrite();
 
     const banque = await this.prisma.banque.findUnique({
       where: { id: body.banqueId },

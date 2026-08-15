@@ -51,10 +51,13 @@ export interface RepresentantRow {
   updatedAt: Date;
   deletedAt: Date | null;
   /**
-   * Facultatif À DESSEIN. `SyncService` ne pose PAS cette colonne : la
-   * remontée hors ligne est du travail réel, et le défaut du schéma vaut
-   * `false`. Le double l'enregistre tout de même s'il la reçoit, pour qu'un
-   * test puisse constater qu'elle est restée absente au lieu de le supposer.
+   * Posée par `SyncService` depuis la NATURE DE L'AUTEUR.
+   *
+   * Elle était auparavant absente, au motif que « la remontée hors ligne est
+   * du travail réel ». C'était faux : l'animateur d'une démonstration se
+   * connecte sur le téléphone avec un compte de démonstration, et ses fiches
+   * naissaient donc réelles. Reste facultative dans le double, pour qu'un test
+   * puisse constater l'absence au lieu de la supposer.
    */
   isDemo?: boolean;
 }
@@ -111,6 +114,20 @@ export class FakePrisma {
   operations = new Map<string, OperationRow>();
   representants = new Map<string, RepresentantRow>();
   prospects = new Map<string, ProspectRow>();
+  /**
+   * Comptes connus, pour la seule question que `SyncService` leur pose : cet
+   * auteur est-il un compte de démonstration ? Un compte ABSENT vaut « réel »,
+   * ce qui est l'état de la quasi-totalité des tests et leur évite d'avoir à
+   * déclarer un utilisateur qui ne les concerne pas.
+   */
+  users = new Map<string, { id: string; isDemo: boolean }>();
+  /** Entrées du registre de purge, dans leur ordre d'inscription. */
+  demoEntities: { entityType: string; entityId: string; sequence: number }[] = [];
+
+  /** Déclare un compte de démonstration, pour les tests qui parlent de lui. */
+  addDemoUser(id: string): void {
+    this.users.set(id, { id, isDemo: true });
+  }
 
   /** Compte les tentatives de transaction, pour vérifier une-transaction-par-groupe. */
   transactionCount = 0;
@@ -241,6 +258,39 @@ export class FakePrisma {
       if (!row) throw Object.assign(new Error('not found'), { code: 'P2025' });
       Object.assign(row, args.data);
       return Promise.resolve(row);
+    },
+  };
+
+  user = {
+    findUnique: (args: { where: { id: string } }) =>
+      Promise.resolve(this.users.get(args.where.id) ?? null),
+  };
+
+  /**
+   * Registre de purge. Le service y inscrit les lignes fictives nées hors
+   * ensemenceur ; sans cette inscription, elles retiendraient les lignes
+   * semées par `onDelete: Restrict` et rendraient la purge impossible.
+   */
+  demoEntity = {
+    aggregate: () =>
+      Promise.resolve({
+        _max: {
+          sequence: this.demoEntities.length
+            ? Math.max(...this.demoEntities.map((row) => row.sequence))
+            : null,
+        },
+      }),
+    upsert: (args: {
+      where: { entityType_entityId: { entityType: string; entityId: string } };
+      create: { entityType: string; entityId: string; sequence: number };
+    }) => {
+      const key = args.where.entityType_entityId;
+      const existing = this.demoEntities.find(
+        (row) => row.entityType === key.entityType && row.entityId === key.entityId,
+      );
+      if (existing) return Promise.resolve(existing);
+      this.demoEntities.push({ ...args.create });
+      return Promise.resolve(args.create);
     },
   };
 

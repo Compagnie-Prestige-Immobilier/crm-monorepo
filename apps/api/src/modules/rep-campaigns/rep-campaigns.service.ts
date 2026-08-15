@@ -150,7 +150,10 @@ export class RepCampaignsService {
     const commerciaux = await this.resolveCommerciaux(body.commercialIds);
     const seed = newCampaignSeed();
     const spreadDays = body.spreadDays ?? MIN_SPREAD_DAYS;
-    const demoEnabled = await this.demo.enabled();
+    // `enabledForWrite` : cette valeur est ÉCRITE sur la campagne, puis héritée
+    // par ses tâches. Un repli `false` sur panne de lecture laisserait une
+    // campagne fictive dans la liste réelle, programmes imprimables compris.
+    const demoEnabled = await this.demo.enabledForWrite();
 
     const campaignId = await this.prisma
       .$transaction(
@@ -837,7 +840,7 @@ export class RepCampaignsService {
  * rien, par construction : elles décrivent un appel à refaire, et c'est
  * exactement la population qu'une relance doit retrouver.
  */
-function eligibleWhere(scope: ScopeInput, demoEnabled: boolean): Prisma.RepresentantWhereInput {
+function eligibleWhere(scope: ScopeInput, demoPopulation: boolean): Prisma.RepresentantWhereInput {
   return {
     deletedAt: null,
     // UNE SEULE POPULATION, et non `demoScope`, qui ÉLARGIT quand le mode est
@@ -846,7 +849,7 @@ function eligibleWhere(scope: ScopeInput, demoEnabled: boolean): Prisma.Represen
     // durables et exclut les fiches retenues des campagnes suivantes. Mêler
     // les deux populations laissait des représentants réels bloqués par une
     // tâche de démonstration invisible, que la purge ne sait pas reprendre.
-    isDemo: demoEnabled,
+    isDemo: demoPopulation,
     ...(scope.departementId ? { departementId: scope.departementId } : {}),
     ...(scope.iefId ? { iefId: scope.iefId } : {}),
     ...(scope.onlyWithoutProspects ? { prospects: { none: { deletedAt: null } } } : {}),
