@@ -1,4 +1,4 @@
-# Infrastructure — CPI GO
+# Infrastructure, CPI GO
 
 Deux fichiers Compose, deux usages qui ne se ressemblent pas.
 
@@ -8,7 +8,7 @@ Deux fichiers Compose, deux usages qui ne se ressemblent pas.
 | `docker/docker-compose.prod.yml` | Production. La pile entière : Caddy, web, API, migrations, Postgres, sauvegardes.                                                                   |
 
 Les deux portent un `name:` explicite (`cpi-go`, `cpi-go-prod`). Sans lui, Compose
-déduit le nom du projet du dossier parent — ici `docker` — et ce dépôt
+déduit le nom du projet du dossier parent, ici `docker`, et ce dépôt
 partagerait son espace de noms avec tout autre projet CPI dont le compose vit
 aussi dans `infra/docker/`. Un `up` remplacerait alors silencieusement les
 conteneurs de l'autre projet, base de données comprise. Ce n'est pas
@@ -26,7 +26,7 @@ Debian 12 ou Ubuntu 24.04, 2 vCPU / 4 Go suffisent pour la charge visée.
 curl -fsSL https://get.docker.com | sh
 
 # Pare-feu : seuls 22, 80 et 443 sont exposés. Postgres n'a AUCUN port publié
-# dans le compose de production — cette règle est une seconde barrière, pas la
+# dans le compose de production, cette règle est une seconde barrière, pas la
 # première.
 ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw enable
 
@@ -62,7 +62,7 @@ postgres (healthy)  →  migrate (exit 0)  →  api (healthy)  →  web (healthy
 
 `migrate` est un conteneur éphémère qui lance `prisma migrate deploy` et
 s'arrête. `api` attend sa **terminaison réussie**, pas son démarrage : aucune
-requête n'est donc servie contre un schéma périmé. En `restart: "no"` — une
+requête n'est donc servie contre un schéma périmé. En `restart: "no"`, une
 migration qui échoue doit bloquer le déploiement, pas boucler indéfiniment.
 
 Vérifier :
@@ -83,7 +83,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 `migrate` se relance à chaque `up` et applique les migrations en attente ; sans
 migration nouvelle, il sort immédiatement en 0. Une brève coupure a lieu pendant
-le redémarrage de `api` et `web` — le déploiement sans interruption n'est pas un
+le redémarrage de `api` et `web`, le déploiement sans interruption n'est pas un
 objectif ici : le panel admin est utilisé aux heures de bureau et l'app mobile
 est _offline-first_, elle retentera sa synchronisation toute seule.
 
@@ -95,7 +95,7 @@ git checkout <tag précédent> && docker compose -f docker-compose.prod.yml up -
 
 ⚠️ Un retour en arrière **ne défait pas les migrations**. Une migration
 destructrice doit être déployée en deux temps (ajouter, migrer les données,
-puis supprimer dans une version ultérieure) — c'est la même contrainte que
+puis supprimer dans une version ultérieure), c'est la même contrainte que
 celle qu'impose le portillon `oasdiff` en CI, pour la même raison : le parc
 mobile installé n'est pas remplaçable à volonté.
 
@@ -108,7 +108,7 @@ une par jour à `BACKUP_HOUR`, avec rotation au-delà de
 Les dumps sont écrits dans `BACKUP_DIR`, un **bind mount de l'hôte**, jamais
 dans le volume `pgdata` : une sauvegarde qui disparaît avec le volume qu'elle
 protège n'est pas une sauvegarde. Chaque dump est écrit en `.partial` puis
-renommé — un VPS redémarré en plein `pg_dump` ne laisse pas derrière lui une
+renommé, un VPS redémarré en plein `pg_dump` ne laisse pas derrière lui une
 archive tronquée qui passerait pour valide.
 
 ```bash
@@ -169,7 +169,7 @@ Trois points qui ne sont pas évidents à la lecture :
 
 - **`migrator` dérive de `builder`, pas de l'image de production.**
   `prisma migrate deploy` a besoin du CLI Prisma **et** de
-  `packages/database/prisma.config.ts`, qui importe `prisma/config` — deux
+  `packages/database/prisma.config.ts`, qui importe `prisma/config`, deux
   `devDependencies` absentes d'une image `--prod`. Le conteneur vit trente
   secondes ; sa taille n'a pas d'importance, sa correction si.
 - **Le client Prisma est régénéré après l'installation `--prod`**, avec un CLI
@@ -179,7 +179,7 @@ Trois points qui ne sont pas évidents à la lecture :
 - **Les images compilent le code généré committé, elles ne le régénèrent pas.**
   Régénérer exigerait le workspace complet, plus Java et Flutter, dans le
   contexte de build. C'est la CI (job `contract`) qui garantit que l'arbre
-  committé correspond au contrat — voir `docs/adr/0002`.
+  committé correspond au contrat, voir `docs/adr/0002`.
 
 `apps/web/next.config.ts` **doit** déclarer `output: 'standalone'`, sinon
 `Dockerfile.web` échoue à l'étape finale sur un `COPY` introuvable.
@@ -197,7 +197,7 @@ $C down                    # sans -v : les volumes et les certificats restent
 ```
 
 Postgres n'a aucun port publié. Pour l'inspecter depuis un poste, passer par le
-conteneur (`exec psql` ci-dessus) ou par un tunnel SSH — ne pas ajouter un
+conteneur (`exec psql` ci-dessus) ou par un tunnel SSH, ne pas ajouter un
 `ports:` en clair sur l'interface publique.
 
 ---
@@ -206,7 +206,7 @@ conteneur (`exec psql` ci-dessus) ou par un tunnel SSH — ne pas ajouter un
 
 | Port    | Où            | Quoi                                             |
 | ------- | ------------- | ------------------------------------------------ |
-| 80, 443 | VPS, public   | Caddy — le seul service exposé                   |
+| 80, 443 | VPS, public   | Caddy, le seul service exposé                    |
 | 3001    | réseau Docker | API                                              |
 | 3000    | réseau Docker | web                                              |
 | 5432    | réseau Docker | Postgres, **jamais publié**                      |
