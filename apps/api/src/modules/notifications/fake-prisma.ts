@@ -1,5 +1,5 @@
 import {
-  DevicePlatform,
+  BankStageType,
   NotificationAudience,
   NotificationCategory,
   NotificationDeliveryStatus,
@@ -10,24 +10,23 @@ import {
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type {
-  FcmDispatchResult,
-  FcmMessage,
-  FcmSendOutcome,
-  FcmTransport,
-} from './fcm.transport.js';
+  BrevoDispatchResult,
+  BrevoMessage,
+  BrevoSendOutcome,
+  BrevoTransport,
+} from './brevo.transport.js';
 
 /**
  * Doublure Prisma en mémoire, réservée aux tests de notification.
  *
- * Elle n'imite pas PostgreSQL. Elle reproduit exactement les quatre
+ * Elle n'imite pas PostgreSQL. Elle reproduit exactement les trois
  * comportements dont dépend la logique du module, et rien d'autre :
  *
- *  1. les contraintes UNIQUE lèvent une `PrismaClientKnownRequestError` P2002 —
+ *  1. les contraintes UNIQUE lèvent une `PrismaClientKnownRequestError` P2002 :
  *     c'est sur elle que repose TOUTE l'idempotence des rappels ;
  *  2. `updateMany` renvoie un compte, ce qui permet de vérifier la prise en
  *     charge atomique d'un envoi programmé par une seule instance ;
- *  3. `upsert` sur `token` réattribue au lieu de dupliquer ;
- *  4. `groupBy` agrège, parce que les compteurs de livraison en dépendent.
+ *  3. `groupBy` agrège, parce que les compteurs de livraison en dépendent.
  *
  * Les garanties réelles sous concurrence ne se démontrent que contre un vrai
  * serveur ; c'est l'objet des tests d'intégration.
@@ -40,6 +39,9 @@ export interface UserRow {
   id: string;
   fullName: string;
   role: Role;
+  /** Le schéma la rend obligatoire. La chaîne vide tient lieu d'« aucune
+   *  adresse » : c'est le seul cas que la branche e-mail doit écarter. */
+  email: string;
   isActive: boolean;
   deletedAt: Date | null;
   departementId: string | null;
@@ -48,25 +50,12 @@ export interface UserRow {
   isDemo: boolean;
 }
 
-export interface DeviceTokenRow {
-  id: string;
-  userId: string;
-  token: string;
-  platform: DevicePlatform;
-  appVersion: string | null;
-  lastSeenAt: Date;
-  revokedAt: Date | null;
-  pendingOps: number;
-  pendingSince: Date | null;
-}
-
 export interface NotificationRow {
   id: string;
   title: string;
   body: string;
   category: NotificationCategory;
   route: string | null;
-  payload: unknown;
   audience: NotificationAudience;
   audienceRole: Role | null;
   audienceDepartementId: string | null;
@@ -81,6 +70,18 @@ export interface NotificationRow {
   reminderKey: string | null;
   period: string | null;
   createdAt: Date;
+  /**
+   * Horodatage `@updatedAt`, rafraîchi par la doublure à CHAQUE écriture.
+   *
+   * Il ne décore pas la ligne : c'est lui qui date le BAIL posé par
+   * `dispatchDue` sur une notification prise en charge. Une doublure qui le
+   * laisserait figé ferait passer la reprise des expéditions abandonnées pour
+   * correcte quel que soit le code, et le renouvellement du bail, qui interdit
+   * à deux repreneurs de gagner ensemble, ne serait plus exercé du tout.
+   */
+  updatedAt: Date;
+  /** Même raison que sur `UserRow` : le schéma le porte, la doublure aussi. */
+  isDemo: boolean;
 }
 
 export interface DeliveryRow {
@@ -88,7 +89,6 @@ export interface DeliveryRow {
   notificationId: string;
   userId: string;
   status: NotificationDeliveryStatus;
-  deviceToken: string | null;
   error: string | null;
   sentAt: Date | null;
   deliveredAt: Date | null;
@@ -97,6 +97,8 @@ export interface DeliveryRow {
   reminderKey: string | null;
   period: string | null;
   createdAt: Date;
+  /** Même raison que sur `UserRow` : le schéma le porte, la doublure aussi. */
+  isDemo: boolean;
 }
 
 export interface CallTaskRow {
@@ -109,10 +111,24 @@ export interface CallTaskRow {
   isDemo: boolean;
 }
 
+/** Dossier bancaire, réduit à ce que les rappels du pôle banque interrogent. */
+export interface BankCaseRow {
+  id: string;
+  /** Type de l'étape COURANTE, dénormalisé : la doublure ne porte pas d'étapes. */
+  stageType: BankStageType;
+  createdAt: Date;
+  /** Date de la dernière transition, ou `null` si le dossier n'a jamais bougé. */
+  lastTransitionAt: Date | null;
+  deletedAt: Date | null;
+  /** Même raison que sur `UserRow` : le schéma le porte, la doublure aussi. */
+  isDemo: boolean;
+}
+
 export const ADMIN: UserRow = {
   id: 'usr-admin',
   fullName: 'Administrateur CPI',
   role: Role.ADMIN,
+  email: 'admin@cpi.sn',
   isActive: true,
   deletedAt: null,
   isDemo: false,
@@ -135,6 +151,16 @@ const matches = (
   if (!where) return true;
   for (const [key, expected] of Object.entries(where)) {
     if (expected === undefined) continue;
+
+    if (key === 'OR') {
+      // Une seule branche suffit, et les autres clauses du même `where`
+      // continuent de s'appliquer : c'est la sémantique de Prisma, et c'est
+      // celle dont dépend la prise en charge d'une notification « ou bien
+      // programmée, ou bien abandonnée en cours d'envoi ».
+      const branches = expected as Record<string, unknown>[];
+      if (!branches.some((branch) => matches(row, branch, db))) return false;
+      continue;
+    }
 
     if (key === 'user') {
       const user = db.users.find((candidate) => candidate.id === row.userId);
@@ -171,6 +197,24 @@ const matches = (
       if (clause.status !== undefined && row.campaignStatus !== clause.status) return false;
       continue;
     }
+    if (key === 'currentStage') {
+      const clause = expected as { type?: unknown };
+      if (clause.type !== undefined && row.stageType !== clause.type) return false;
+      continue;
+    }
+    if (key === 'transitions') {
+      // Seule la forme employée par le rappel « sans mouvement » est reconnue :
+      // `none` sur une date. Une doublure qui accepterait n'importe quel filtre
+      // relationnel donnerait une fausse assurance sur des requêtes jamais
+      // écrites.
+      const clause = expected as { none?: { createdAt?: { gt?: Date } } };
+      const after = clause.none?.createdAt?.gt;
+      if (after !== undefined) {
+        const last = row.lastTransitionAt;
+        if (last instanceof Date && last.getTime() > after.getTime()) return false;
+      }
+      continue;
+    }
 
     const actual = row[key];
     if (expected === null) {
@@ -182,10 +226,19 @@ const matches = (
       continue;
     }
     if (typeof expected === 'object') {
-      const filter = expected as { in?: unknown[]; lte?: Date; gt?: number; not?: unknown };
+      const filter = expected as {
+        in?: unknown[];
+        lte?: Date;
+        lt?: Date;
+        gt?: number;
+        not?: unknown;
+      };
       if (filter.in && !filter.in.includes(actual)) return false;
       if (filter.lte !== undefined) {
         if (!(actual instanceof Date) || actual.getTime() > filter.lte.getTime()) return false;
+      }
+      if (filter.lt !== undefined) {
+        if (!(actual instanceof Date) || actual.getTime() >= filter.lt.getTime()) return false;
       }
       if (filter.gt !== undefined && !(typeof actual === 'number' && actual > filter.gt))
         return false;
@@ -198,11 +251,25 @@ const matches = (
 };
 
 export class FakePrisma {
+  /**
+   * Horloge des écritures, remplaçable par un test.
+   *
+   * `dispatchDue` compare `updatedAt` à l'instant qu'ON LUI PASSE. Si la
+   * doublure horodatait toujours sur l'horloge réelle, les deux dates
+   * appartiendraient à deux échelles de temps sans rapport, et le bail
+   * paraîtrait expiré ou frais au hasard de l'heure à laquelle la suite tourne.
+   * Un test qui pilote le temps doit donc pouvoir piloter les deux bouts de la
+   * comparaison.
+   */
+  clock: () => Date = () => new Date();
+
   readonly users: UserRow[] = [ADMIN];
-  readonly deviceTokens: DeviceTokenRow[] = [];
   readonly notifications: NotificationRow[] = [];
   readonly deliveries: DeliveryRow[] = [];
   readonly callTasks: CallTaskRow[] = [];
+  /** Même forme que `callTasks` : les campagnes représentants ont leur propre table. */
+  readonly repCallTasks: CallTaskRow[] = [];
+  readonly bankCases: BankCaseRow[] = [];
 
   // ── Amorces ───────────────────────────────────────────────────────────────
 
@@ -210,6 +277,7 @@ export class FakePrisma {
     const user: UserRow = {
       fullName: row.fullName ?? `Compte ${row.id}`,
       role: row.role ?? Role.COMMERCIAL,
+      email: row.email ?? `${row.id}@cpi.sn`,
       isActive: row.isActive ?? true,
       deletedAt: row.deletedAt ?? null,
       departementId: row.departementId ?? null,
@@ -218,22 +286,6 @@ export class FakePrisma {
     };
     this.users.push(user);
     return user;
-  }
-
-  addDevice(row: Partial<DeviceTokenRow> & { userId: string; token: string }): DeviceTokenRow {
-    const device: DeviceTokenRow = {
-      id: row.id ?? nextId('dev'),
-      userId: row.userId,
-      token: row.token,
-      platform: row.platform ?? DevicePlatform.ANDROID,
-      appVersion: row.appVersion ?? null,
-      lastSeenAt: row.lastSeenAt ?? new Date(),
-      revokedAt: row.revokedAt ?? null,
-      pendingOps: row.pendingOps ?? 0,
-      pendingSince: row.pendingSince ?? null,
-    };
-    this.deviceTokens.push(device);
-    return device;
   }
 
   addCallTask(row: Partial<CallTaskRow> & { assignedToId: string }): CallTaskRow {
@@ -249,6 +301,32 @@ export class FakePrisma {
     return task;
   }
 
+  addRepCallTask(row: Partial<CallTaskRow> & { assignedToId: string }): CallTaskRow {
+    const task: CallTaskRow = {
+      id: row.id ?? nextId('rep-task'),
+      assignedToId: row.assignedToId,
+      status: row.status ?? 'OPEN',
+      isActive: row.isActive ?? true,
+      campaignStatus: row.campaignStatus ?? 'ACTIVE',
+      isDemo: row.isDemo ?? false,
+    };
+    this.repCallTasks.push(task);
+    return task;
+  }
+
+  addBankCase(row: Partial<BankCaseRow> = {}): BankCaseRow {
+    const bankCase: BankCaseRow = {
+      id: row.id ?? nextId('case'),
+      stageType: row.stageType ?? BankStageType.OPEN,
+      createdAt: row.createdAt ?? new Date(),
+      lastTransitionAt: row.lastTransitionAt ?? null,
+      deletedAt: row.deletedAt ?? null,
+      isDemo: row.isDemo ?? false,
+    };
+    this.bankCases.push(bankCase);
+    return bankCase;
+  }
+
   // ── Délégués ──────────────────────────────────────────────────────────────
 
   get user() {
@@ -259,61 +337,6 @@ export class FakePrisma {
             matches(row as unknown as Record<string, unknown>, args.where, this),
           ),
         ),
-    };
-  }
-
-  get deviceToken() {
-    return {
-      findMany: (args: { where?: Record<string, unknown>; distinct?: string[] }) => {
-        let rows = this.deviceTokens.filter((row) =>
-          matches(row as unknown as Record<string, unknown>, args.where, this),
-        );
-        if (args.distinct?.includes('userId')) {
-          const seen = new Set<string>();
-          rows = rows.filter((row) =>
-            seen.has(row.userId) ? false : (seen.add(row.userId), true),
-          );
-        }
-        return Promise.resolve(
-          rows.map((row) => ({ ...row, user: this.users.find((user) => user.id === row.userId) })),
-        );
-      },
-
-      findUnique: (args: { where: { token: string } }) =>
-        Promise.resolve(this.deviceTokens.find((row) => row.token === args.where.token) ?? null),
-
-      upsert: (args: {
-        where: { token: string };
-        create: Record<string, unknown>;
-        update: Record<string, unknown>;
-      }) => {
-        const existing = this.deviceTokens.find((row) => row.token === args.where.token);
-        if (existing) {
-          Object.assign(existing, args.update);
-          return Promise.resolve(existing);
-        }
-        const created: DeviceTokenRow = {
-          id: nextId('dev'),
-          userId: String(args.create.userId),
-          token: args.where.token,
-          platform: (args.create.platform as DevicePlatform | undefined) ?? DevicePlatform.ANDROID,
-          appVersion: (args.create.appVersion as string | null | undefined) ?? null,
-          lastSeenAt: (args.create.lastSeenAt as Date | undefined) ?? new Date(),
-          revokedAt: null,
-          pendingOps: (args.create.pendingOps as number | undefined) ?? 0,
-          pendingSince: (args.create.pendingSince as Date | null | undefined) ?? null,
-        };
-        this.deviceTokens.push(created);
-        return Promise.resolve(created);
-      },
-
-      updateMany: (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
-        const rows = this.deviceTokens.filter((row) =>
-          matches(row as unknown as Record<string, unknown>, args.where, this),
-        );
-        for (const row of rows) Object.assign(row, args.data);
-        return Promise.resolve({ count: rows.length });
-      },
     };
   }
 
@@ -338,7 +361,6 @@ export class FakePrisma {
           category:
             (data.category as NotificationCategory | undefined) ?? NotificationCategory.ANNONCE,
           route: (data.route as string | null | undefined) ?? null,
-          payload: data.payload ?? null,
           audience: (data.audience as NotificationAudience | undefined) ?? NotificationAudience.ALL,
           audienceRole: (data.audienceRole as Role | null | undefined) ?? null,
           audienceDepartementId: (data.audienceDepartementId as string | null | undefined) ?? null,
@@ -352,7 +374,12 @@ export class FakePrisma {
           createdById: (data.createdById as string | null | undefined) ?? null,
           reminderKey,
           period,
-          createdAt: new Date(),
+          createdAt: this.clock(),
+          updatedAt: this.clock(),
+          // Pas de valeur par défaut « fausse » cachée ici : la doublure
+          // écrit CE QUE LE SERVICE LUI DONNE. Un `?? false` masquerait
+          // l'omission même que les tests de propagation cherchent.
+          isDemo: data.isDemo === true,
         };
 
         const nested = data.deliveries as
@@ -372,7 +399,6 @@ export class FakePrisma {
             status:
               (seed.status as NotificationDeliveryStatus | undefined) ??
               NotificationDeliveryStatus.PENDING,
-            deviceToken: null,
             error: null,
             sentAt: null,
             deliveredAt: null,
@@ -381,6 +407,7 @@ export class FakePrisma {
             reminderKey: (seed.reminderKey as string | null | undefined) ?? null,
             period: (seed.period as string | null | undefined) ?? null,
             createdAt: new Date(),
+            isDemo: seed.isDemo === true,
           };
 
           const clash =
@@ -401,8 +428,23 @@ export class FakePrisma {
         return Promise.resolve(row);
       },
 
+      // L'expédition résout par clé primaire, sans visibilité : elle sert la
+      // notification qu'on lui a désignée.
       findUnique: (args: { where: { id: string } }) =>
         Promise.resolve(this.decorate(this.notifications.find((row) => row.id === args.where.id))),
+
+      // Les LECTURES d'administration passent par `findFirst` : le service y
+      // compose la visibilité de démonstration, ce que `findUnique` n'accepte
+      // pas. La doublure suit, sans quoi elle rendrait la ligne masquée et le
+      // test de cloisonnement ne pourrait pas échouer.
+      findFirst: (args: { where?: Record<string, unknown> }) =>
+        Promise.resolve(
+          this.decorate(
+            this.notifications.find((row) =>
+              matches(row as unknown as Record<string, unknown>, args.where, this),
+            ),
+          ),
+        ),
 
       findMany: (args: {
         where?: Record<string, unknown>;
@@ -429,15 +471,20 @@ export class FakePrisma {
       update: (args: { where: { id: string }; data: Record<string, unknown> }) => {
         const row = this.notifications.find((candidate) => candidate.id === args.where.id);
         if (!row) return Promise.reject(new Error('notification introuvable'));
-        Object.assign(row, args.data);
+        Object.assign(row, args.data, { updatedAt: this.clock() });
         return Promise.resolve(this.decorate(row));
       },
 
+      // `@updatedAt` est posé par Prisma sur TOUTE écriture, même quand aucune
+      // valeur ne change. C'est ce qui renouvelle le bail d'une notification
+      // reprise, et donc ce qui empêche un second repreneur de gagner derrière
+      // le premier. La doublure doit le reproduire, sinon la reprise
+      // concurrente serait validée sans avoir été exercée.
       updateMany: (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
         const rows = this.notifications.filter((row) =>
           matches(row as unknown as Record<string, unknown>, args.where, this),
         );
-        for (const row of rows) Object.assign(row, args.data);
+        for (const row of rows) Object.assign(row, args.data, { updatedAt: this.clock() });
         return Promise.resolve({ count: rows.length });
       },
     };
@@ -510,22 +557,43 @@ export class FakePrisma {
     };
   }
 
+  /** Regroupement par destinataire, commun aux deux tables de tâches. */
+  private groupTasksBy(source: CallTaskRow[], where?: Record<string, unknown>) {
+    const rows = source.filter((row) =>
+      matches(row as unknown as Record<string, unknown>, where, this),
+    );
+    const buckets = new Map<string, number>();
+    for (const row of rows) buckets.set(row.assignedToId, (buckets.get(row.assignedToId) ?? 0) + 1);
+    return Promise.resolve(
+      [...buckets.entries()].map(([assignedToId, count]) => ({
+        assignedToId,
+        _count: { _all: count },
+      })),
+    );
+  }
+
   get callTask() {
     return {
-      groupBy: (args: { where?: Record<string, unknown> }) => {
-        const rows = this.callTasks.filter((row) =>
-          matches(row as unknown as Record<string, unknown>, args.where, this),
-        );
-        const buckets = new Map<string, number>();
-        for (const row of rows)
-          buckets.set(row.assignedToId, (buckets.get(row.assignedToId) ?? 0) + 1);
-        return Promise.resolve(
-          [...buckets.entries()].map(([assignedToId, count]) => ({
-            assignedToId,
-            _count: { _all: count },
-          })),
-        );
-      },
+      groupBy: (args: { where?: Record<string, unknown> }) =>
+        this.groupTasksBy(this.callTasks, args.where),
+    };
+  }
+
+  get repCallTask() {
+    return {
+      groupBy: (args: { where?: Record<string, unknown> }) =>
+        this.groupTasksBy(this.repCallTasks, args.where),
+    };
+  }
+
+  get bankCase() {
+    return {
+      count: (args: { where?: Record<string, unknown> }) =>
+        Promise.resolve(
+          this.bankCases.filter((row) =>
+            matches(row as unknown as Record<string, unknown>, args.where, this),
+          ).length,
+        ),
     };
   }
 
@@ -533,7 +601,7 @@ export class FakePrisma {
     const rows: Record<string, unknown>[] = [];
     return {
       findMany: () => Promise.resolve(rows),
-      findUnique: () => Promise.resolve(null),
+      findFirst: () => Promise.resolve(null),
     };
   }
 
@@ -555,17 +623,24 @@ export class FakePrisma {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Transport enregistreur. `outcomeFor` décide, jeton par jeton, du sort de
- * chaque message — c'est ce qui permet de composer un lot où UN seul jeton
- * échoue et de vérifier que les autres passent quand même.
+ * Transport e-mail enregistreur.
+ *
+ * `configured = false` par DÉFAUT, et c'est délibéré : le dépôt tourne sans
+ * clé Brevo, et les tests qui ne parlent pas d'e-mail doivent exercer cet
+ * état-là. Un test qui veut la seconde voie l'allume explicitement.
  */
-export class FakeTransport implements FcmTransport {
-  readonly batches: FcmMessage[][] = [];
-  configured = true;
+export class FakeBrevoTransport implements BrevoTransport {
+  readonly sent: BrevoMessage[] = [];
+  configured = false;
 
+  /**
+   * `outcomeFor` décide, ADRESSE PAR ADRESSE, du sort de chaque destinataire.
+   * C'est ce qui permet de composer un envoi où une seule adresse échoue, et de
+   * vérifier que les autres passent quand même.
+   */
   constructor(
-    private readonly outcomeFor: (message: FcmMessage) => FcmSendOutcome = (message) => ({
-      token: message.token,
+    private readonly outcomeFor: (recipient: string) => BrevoSendOutcome = (email) => ({
+      email,
       ok: true,
     }),
   ) {}
@@ -575,32 +650,38 @@ export class FakeTransport implements FcmTransport {
   }
 
   unavailableReason(): string | null {
-    return this.configured ? null : 'Transport de test désactivé.';
+    return this.configured ? null : 'Transport e-mail de test désactivé.';
   }
 
-  send(messages: readonly FcmMessage[]): Promise<FcmDispatchResult> {
+  send(messages: readonly BrevoMessage[]): Promise<BrevoDispatchResult> {
     if (!this.configured) {
       return Promise.resolve({
         status: 'NOT_CONFIGURED',
         outcomes: [],
-        detail: 'Transport de test désactivé.',
+        detail: 'Transport e-mail de test désactivé.',
       });
     }
-    this.batches.push([...messages]);
+    this.sent.push(...messages);
     return Promise.resolve({
       status: 'SENT',
-      outcomes: messages.map((message) => this.outcomeFor(message)),
+      outcomes: messages.flatMap((message) =>
+        message.recipients.map((recipient) => this.outcomeFor(recipient.email)),
+      ),
     });
   }
 
-  /** Tous les messages envoyés, tous lots confondus. */
-  get allMessages(): FcmMessage[] {
-    return this.batches.flat();
+  /** Toutes les adresses servies, tous messages confondus. */
+  get allAddresses(): string[] {
+    return this.sent.flatMap((message) => message.recipients.map((recipient) => recipient.email));
   }
 }
 
-/** Transport dont l'authentification échoue. Aucun jeton ne doit être élagué. */
-export class BrokenTransport implements FcmTransport {
+/**
+ * Transport e-mail qui échoue EN BLOC. Il est CONFIGURÉ : c'est la panne du
+ * service, pas son absence. Aucune ligne de livraison ne doit être enterrée
+ * pour autant.
+ */
+export class BrokenBrevoTransport implements BrevoTransport {
   isConfigured(): boolean {
     return true;
   }
@@ -609,11 +690,26 @@ export class BrokenTransport implements FcmTransport {
     return null;
   }
 
-  send(): Promise<FcmDispatchResult> {
+  send(): Promise<BrevoDispatchResult> {
     return Promise.resolve({
       status: 'TRANSPORT_ERROR',
       outcomes: [],
-      detail: 'token endpoint HTTP 401',
+      detail: 'HTTP_401',
     });
+  }
+}
+
+/** Transport e-mail qui LÈVE. La branche e-mail doit l'absorber, pas le propager. */
+export class ThrowingBrevoTransport implements BrevoTransport {
+  isConfigured(): boolean {
+    return true;
+  }
+
+  unavailableReason(): string | null {
+    return null;
+  }
+
+  send(): Promise<BrevoDispatchResult> {
+    return Promise.reject(new Error('socket hang up'));
   }
 }

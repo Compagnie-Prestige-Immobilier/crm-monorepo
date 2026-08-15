@@ -12,7 +12,7 @@ import {
  * ISOLÉE VOLONTAIREMENT, parce qu'elle est utilisée à DEUX endroits : l'aperçu
  * qui annonce « 412 destinataires » avant confirmation, et l'envoi qui crée les
  * lignes de livraison. Deux implémentations divergentes produiraient un
- * compteur qui ment — et « envoyer à 400 personnes » ne s'annule pas.
+ * compteur qui ment, et « envoyer à 400 personnes » ne s'annule pas.
  */
 
 export interface AudienceSelector {
@@ -26,7 +26,7 @@ export interface AudienceSelector {
  * Les comptes désactivés ou supprimés ne sont JAMAIS destinataires.
  *
  * Un commercial dont l'accès a été fermé ne doit pas continuer de recevoir des
- * consignes de travail sur son téléphone personnel — et le compter dans le
+ * consignes de travail sur son téléphone personnel, et le compter dans le
  * public gonflerait l'annonce de destinataires qui n'existent plus.
  */
 const ACTIVE_USER = { isActive: true, deletedAt: null } as const;
@@ -59,7 +59,7 @@ export const buildAudienceWhere = (selector: AudienceSelector): Prisma.UserWhere
  *
  * Sans cela, un admin qui choisit deux fois le même compte dans la liste verrait
  * « 2 destinataires » pour une seule personne. La contrainte unique en base
- * rattraperait l'insertion, mais après avoir affiché le mauvais chiffre — au
+ * rattraperait l'insertion, mais après avoir affiché le mauvais chiffre, au
  * moment précis où il décide de confirmer.
  */
 export const dedupe = (ids: readonly string[]): string[] => [...new Set(ids)];
