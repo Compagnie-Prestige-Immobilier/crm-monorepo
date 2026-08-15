@@ -1,14 +1,11 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import type { Role } from '@crm/database';
 
-import { ROLES_KEY } from '../decorators/roles.decorator.js';
 import type { AuthenticatedUser } from '../decorators/current-user.decorator.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 
 /**
- * Sur une route qui exige un RÔLE, l'autorité est relue en base.
+ * Sur TOUTE requête authentifiée, l'autorité est relue en base.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * LE DÉFAUT, ET IL DÉPASSE DE LOIN LA ROUTE QUI L'A RÉVÉLÉ
@@ -29,8 +26,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
  * empêche d'obtenir un NOUVEAU jeton, pas d'utiliser celui qu'on a déjà.
  *
  * Ce n'est pas un défaut de l'export intégral. C'est un défaut du contrôle
- * d'accès, et il est réparé ICI, une fois, pour les quarante-six routes qui
- * déclarent un rôle.
+ * d'accès, et il est réparé ICI, une fois, pour TOUTE requête authentifiée.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * CE QUE LA RELECTURE CORRIGE, ET DANS QUEL SENS
@@ -52,21 +48,35 @@ import { PrismaService } from '../../prisma/prisma.service.js';
  * `RolesGuard`, « Rôle insuffisant », qui est exactement la vérité.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * CE QUE CETTE GARDE NE FAIT PAS, ET IL FAUT LE DIRE
+ * POURQUOI TOUTES LES ROUTES, ET PLUS SEULEMENT CELLES QUI PORTENT `@Roles`
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Sur une route SANS `@Roles`, rien n'est relu, et `request.user.role` y reste
- * donc celui du jeton, périmé jusqu'à quinze minutes. C'est assumé, et ce n'est
- * pas un trou d'autorisation : ces routes n'accordent aucun droit d'après le
- * rôle, et ce qu'elles cloisonnent l'est par `id` en base, valeur que le jeton
- * ne peut pas périmer. Relire sur chacune d'elles ajouterait une requête à tout
- * le trafic du produit, la remontée mobile comprise, pour corriger une valeur
- * dont aucune décision ne dépend.
+ * La relecture n'a d'abord eu lieu que sur les routes déclarant `@Roles`, au
+ * motif que les autres « ne décident rien d'après le rôle ». C'ÉTAIT FAUX, et
+ * la liste des contre-exemples n'était pas courte : `isAdmin(user)` est lu à
+ * l'INTÉRIEUR des services, sur des routes qui ne portent aucun décorateur.
  *
- * Si un jour une route sans `@Roles` se met à DÉCIDER d'après le rôle, c'est
- * cette hypothèse-là qui tombe, et il faudra soit lui poser un `@Roles`, soit
- * élargir la relecture. Le test de cette garde épingle la limite pour qu'elle
- * se découvre ici, et non en production.
+ *   · `sync/push`      : un ADMIN peut modifier et supprimer des lignes dont
+ *                        il n'est pas l'auteur (`SyncService`, deux endroits) ;
+ *   · `prospects/reassign` : un ADMIN peut rattacher à un autre commercial ;
+ *   · `export/representants.xlsx` : un ADMIN exporte tout le monde ;
+ *   · les listes prospects et représentants, la lecture, la modification et la
+ *     suppression d'un représentant, et tout `analytics` : le cloisonnement
+ *     par auteur y saute pour un ADMIN.
+ *
+ * Un administrateur rétrogradé gardait donc son autorité sur tous ces chemins
+ * pendant la vie de son jeton, c'est-à-dire exactement le trou que cette garde
+ * a été écrite pour fermer, atteint par une autre porte.
+ *
+ * DEUX RÉPARATIONS ÉTAIENT POSSIBLES, et le choix n'est pas un arbitrage de
+ * coût. Énumérer les routes concernées demande une LISTE que rien n'oblige
+ * personne à tenir à jour : la prochaine route qui lira `request.user.role`
+ * dans son service rouvrira le trou en silence, et c'est précisément ainsi que
+ * ce défaut est né. Relire sur toute requête authentifiée supprime la liste.
+ * Il n'y a plus de cas particulier à connaître, donc plus rien à oublier.
+ *
+ * Le test de cette garde exerce nommément une route SANS `@Roles` : quiconque
+ * remet une condition ici le voit en rouge.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * TROIS REFUS, EUX, SONT IMMÉDIATS
@@ -87,14 +97,14 @@ import { PrismaService } from '../../prisma/prisma.service.js';
  * sont précisément ceux qu'un visiteur de passage a pu emporter.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * CE QUE CELA COÛTE, ET POURQUOI SEULEMENT LÀ
+ * CE QUE CELA COÛTE
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Une lecture par clé primaire, et UNIQUEMENT sur les routes qui déclarent
- * `@Roles(...)`. Une route sans décorateur, c'est-à-dire l'essentiel du trafic
- * (la remontée mobile, les listes, les tableaux de bord), ne paie rien : elle
- * n'affirme aucune autorité particulière, et le cloisonnement qui la protège
- * est fait en base sur `id`, pas sur le rôle porté par le jeton.
+ * UNE lecture par CLÉ PRIMAIRE, sur cinq colonnes, par requête authentifiée.
+ * C'est l'accès le moins cher que PostgreSQL sache faire, et il est comparé à
+ * ce qu'il remplace : un jeton qui porte l'autorité pendant quinze minutes.
+ * Les requêtes non authentifiées (santé, connexion, rafraîchissement) n'ont pas
+ * d'identité à relire et ne paient rien.
  *
  * L'état de la démonstration, lui, passe par le cache de deux secondes de
  * `DemoVisibilityService` : il n'ajoute pas un aller-retour par requête.
@@ -106,7 +116,6 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 @Injectable()
 export class FreshSessionGuard implements CanActivate {
   constructor(
-    private readonly reflector: Reflector,
     private readonly prisma: PrismaService,
     private readonly demo: DemoVisibilityService,
   ) {}
@@ -114,18 +123,11 @@ export class FreshSessionGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     if (context.getType() !== 'http') return true;
 
-    // Pas de rôle exigé, pas de relecture. C'est ce qui rend la garde gratuite
-    // sur la quasi-totalité du trafic.
-    const required = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (!required?.length) return true;
-
     const request = context.switchToHttp().getRequest<{ user?: AuthenticatedUser }>();
     const user = request.user;
-    // Route publique portant tout de même un `@Roles`, ou transport sans
-    // identité : `RolesGuard` refusera. Rien à rafraîchir.
+    // AUCUNE identité à rafraîchir : route publique, ou transport qui n'en
+    // porte pas. C'est le SEUL cas dispensé, et il ne dépend d'aucun
+    // décorateur, donc d'aucune liste à tenir.
     if (!user) return true;
 
     const fresh = await this.prisma.user.findUnique({
