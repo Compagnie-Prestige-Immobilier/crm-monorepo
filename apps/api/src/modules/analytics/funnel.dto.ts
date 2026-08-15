@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
- * L'entonnoir complet — du prospect à l'argent encaissé.
+ * L'entonnoir complet, du prospect à l'argent encaissé.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * POURQUOI CET OBJET EXISTE
@@ -34,18 +34,22 @@ export class FunnelStageDto {
 
   @ApiProperty({
     type: Number,
+    nullable: true,
     description:
       'Part de l’étape précédente, en pourcentage. Vaut 100 pour la première. ' +
       'C’est le taux qui montre OÙ la chaîne se casse, et non le taux global qui ' +
-      'noie la marche défaillante dans la moyenne.',
+      'noie la marche défaillante dans la moyenne. Nul quand l’étape précédente ' +
+      'est vide : un taux calculé sur zéro observation n’existe pas, et le ' +
+      'publier comme 0 le rendrait indistinguable d’un vrai 0 %.',
   })
-  tauxEtapePrecedente!: number;
+  tauxEtapePrecedente!: number | null;
 
   @ApiProperty({
     type: Number,
-    description: 'Part du sommet de l’entonnoir, en pourcentage.',
+    nullable: true,
+    description: 'Part du sommet de l’entonnoir, en pourcentage. Nul quand le sommet est vide.',
   })
-  tauxGlobal!: number;
+  tauxGlobal!: number | null;
 }
 
 export class AnalyticsFinanceDto {

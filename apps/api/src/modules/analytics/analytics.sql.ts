@@ -5,6 +5,8 @@ import { isAdmin } from '../../common/scope.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
+import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
+import { TASK, demoScopeOn } from './pilotage.sql.js';
 
 /**
  * Traduction du filtre commun en conditions SQL, pour les agrégats.
@@ -59,6 +61,10 @@ export function prospectConditions(
   if (filter.statut) {
     conditions.push(Prisma.sql`p."statut" = ${filter.statut}::"ProspectStatut"`);
   }
+  // La provenance suit la liste : un agrégat « par provenance » filtré sur une
+  // provenance doit compter exactement les lignes que l'export contient, sinon
+  // les deux écrans se contredisent sur la même question.
+  if (filter.origin) conditions.push(Prisma.sql`p."origin" = ${filter.origin}`);
   if (filter.departementId) {
     conditions.push(Prisma.sql`r."departementId" = ${filter.departementId}`);
   }
@@ -75,18 +81,26 @@ export function prospectConditions(
   }
   if (filter.segment) conditions.push(segmentCondition(filter.segment));
   if (filter.campaignId) {
+    // `ct."isDemo"` AUSSI, et pas seulement `p."isDemo"` posé plus haut.
+    // `call_tasks` porte sa propre colonne : une tâche de démonstration
+    // accrochée à un prospect réel faisait entrer ce prospect dans le total
+    // d'une campagne alors que la tâche qui l'y rattachait était fictive. Le
+    // balayage SQL reste au niveau du FICHIER et ne pouvait pas le dire, ce
+    // fichier cloisonnant déjà `p` quelques lignes plus haut.
     conditions.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "call_tasks" ct
-        WHERE ct."prospectId" = p."id" AND ct."campaignId" = ${filter.campaignId}
+        WHERE ct."prospectId" = p."id"
+          AND ct."campaignId" = ${filter.campaignId}
+          AND ${demoScopeOn(TASK, demoEnabled)}
       )`,
     );
   }
   if (filter.dateFrom) {
-    conditions.push(Prisma.sql`p."clientCreatedAt" >= ${new Date(filter.dateFrom)}`);
+    conditions.push(Prisma.sql`p."clientCreatedAt" >= ${inclusiveDateFrom(filter.dateFrom)}`);
   }
   if (filter.dateTo) {
-    conditions.push(Prisma.sql`p."clientCreatedAt" <= ${new Date(filter.dateTo)}`);
+    conditions.push(Prisma.sql`p."clientCreatedAt" <= ${inclusiveDateTo(filter.dateTo)}`);
   }
 
   const search = filter.search?.trim();
