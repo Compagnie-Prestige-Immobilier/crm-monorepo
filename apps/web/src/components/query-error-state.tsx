@@ -58,6 +58,29 @@ function presentation(error: unknown): { icon: LucideIcon; title: string; retrya
     if (error.status === 404) {
       return { icon: AlertTriangleIcon, title: 'Introuvable', retryable: false };
     }
+    /**
+     * 400 et 422 : la REQUÊTE est refusée, et la rejouer la refera refuser.
+     *
+     * C'est la même règle que pour le 403 ci-dessus, appliquée là où elle
+     * manquait. Ces deux statuts tombaient dans le repli « Chargement
+     * impossible », qui est rejouable : l'écran offrait donc un bouton
+     * « Réessayer » qui renvoie la MÊME requête, reçoit le MÊME refus, et
+     * n'aboutira jamais. C'est exactement le « recliquer dans le vide » que
+     * l'en-tête de ce fichier dit éviter.
+     *
+     * Le cas n'est pas théorique depuis que l'état des filtres vit dans l'URL :
+     * toutes les listes déclarent un 400 de validation de leurs paramètres, et
+     * une URL partagée, mise en signet ou retouchée à la main porte une valeur
+     * hors bornes jusqu'au chargement suivant. Le vrai remède est la barre de
+     * filtres, restée à l'écran ; le bouton en détournait.
+     *
+     * Le titre nomme ce qui est en cause. « Chargement impossible » décrit une
+     * panne et laisse chercher du côté du réseau, alors que la correction est
+     * dans les critères.
+     */
+    if (error.status === 400 || error.status === 422) {
+      return { icon: AlertTriangleIcon, title: 'Requête refusée', retryable: false };
+    }
     if (error.status >= 500) {
       return {
         icon: AlertTriangleIcon,
