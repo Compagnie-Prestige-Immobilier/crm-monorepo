@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { User } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { readEnv } from '../../env.js';
 import { hashPassword, verifyPassword } from './password.js';
 import type { AuthTokensDto, AuthUserDto } from './dto.js';
@@ -36,6 +37,16 @@ async function decoy(): Promise<string> {
 }
 
 /**
+ * Phrase rendue quand un compte de démonstration se présente hors démonstration.
+ *
+ * Elle nomme la cause ET le remède : « ce compte est désactivé » enverrait
+ * l'animateur vers un administrateur qui ne trouverait rien à réactiver.
+ */
+export const DEMO_SESSION_REFUSED =
+  'Ce compte de démonstration n’est utilisable que pendant une démonstration. ' +
+  'Demandez à un administrateur d’activer le mode démonstration.';
+
+/**
  * `typ` est déclaré `string` : le contenu d'un jeton vérifié reste une donnée
  * externe. Le typer en littéral ferait considérer le contrôle de `typ` comme
  * mort alors qu'il empêche un jeton d'accès de passer pour un refresh token.
@@ -54,7 +65,71 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly demo: DemoVisibilityService,
   ) {}
+
+  /**
+   * UN COMPTE DE DÉMONSTRATION NE VIT QUE PENDANT LA DÉMONSTRATION.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LA PORTE QUI N'EXISTAIT PAS
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Les six comptes semés sont créés `isActive: true`, et RIEN ne remettait
+   * jamais ce drapeau à `false` : `disable()` ne supprime rien et ne désactive
+   * rien, c'est même sa raison d'être. Or `isDemo` ne gouverne que la
+   * VISIBILITÉ DES LIGNES, jamais la SESSION. Conséquence : une fois la
+   * démonstration éteinte, `demo.admin@cpi.sn` restait connectable avec
+   * `DEMO_PASSWORD`, une constante publiée dans ce dépôt, et la session ADMIN
+   * ainsi ouverte lisait et écrivait les données RÉELLES de production.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * POURQUOI ICI, ET NON EN BASCULANT `isActive`
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Éteindre les comptes dans `disable()` et les rallumer dans `enable()` était
+   * l'autre forme possible. Elle est refusée pour trois raisons :
+   *
+   *   · elle crée une SECONDE source de vérité, qui peut diverger du réglage.
+   *     Un processus tué entre les deux écritures, une purge, une restauration
+   *     de sauvegarde, et les comptes restent ouverts sans que rien ne le dise ;
+   *   · elle DÉTRUIT de l'information : un administrateur qui a désactivé à la
+   *     main un compte de démonstration le verrait réactivé au rallumage
+   *     suivant, sans trace de sa décision ;
+   *   · elle ne ferme QUE la connexion, pas les sessions déjà ouvertes.
+   *
+   * Décider au moment où une session est ÉMISE ne peut pas diverger : la
+   * réponse est toujours celle du réglage courant. `isActive` garde son sens
+   * d'origine, une décision d'administrateur.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * `unknown` REFUSE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `state()` et non `enabled()` : une lecture de réglage en échec ne doit pas
+   * rendre `false` et laisser croire le mode éteint... ni l'inverse. Ici le
+   * doute REFUSE, parce que les deux erreurs ne se valent pas. Refuser à tort
+   * coûte une connexion de démonstration à retenter ; accepter à tort ouvre une
+   * session ADMIN sur la production avec un mot de passe public.
+   *
+   * CE QUE CELA NE COUVRE PAS, et c'est assumé : un jeton d'accès déjà émis
+   * reste valable jusqu'à son expiration, quinze minutes par défaut
+   * (`JWT_ACCESS_TTL`). Le refresh, lui, est refusé ET révoque la famille, si
+   * bien qu'un appareil resté ouvert pendant l'extinction est débranché au
+   * premier renouvellement.
+   */
+  private async assertDemoSessionAllowed(user: { isDemo: boolean }): Promise<void> {
+    if (!user.isDemo) return;
+    if ((await this.demo.state()) === 'on') return;
+
+    // MÊME CODE que le compte désactivé : le client a déjà le bon
+    // comportement pour ce code, et un code neuf n'apprendrait rien à
+    // l'utilisateur tout en élargissant le contrat.
+    throw new UnauthorizedException({
+      code: 'ACCOUNT_DISABLED',
+      message: DEMO_SESSION_REFUSED,
+    });
+  }
 
   async login(identifier: string, password: string, userAgent?: string): Promise<AuthTokensDto> {
     const trimmed = identifier.trim();
@@ -89,6 +164,10 @@ export class AuthService {
         message: 'Ce compte est désactivé. Contactez un administrateur.',
       });
     }
+
+    // APRÈS la vérification du mot de passe, comme le contrôle ci-dessus : le
+    // refus ne doit rien apprendre à qui ne connaît pas déjà le secret.
+    await this.assertDemoSessionAllowed(user);
 
     await this.prisma.user.update({
       where: { id: user.id },
@@ -163,6 +242,18 @@ export class AuthService {
       throw new UnauthorizedException({
         code: 'ACCOUNT_DISABLED',
         message: 'Ce compte est désactivé. Contactez un administrateur.',
+      });
+    }
+
+    // La famille est révoquée AVANT le refus : l'appareil resté ouvert pendant
+    // l'extinction ne doit pas pouvoir retenter indéfiniment avec le même
+    // jeton. C'est ce qui fait mourir les sessions de démonstration déjà
+    // émises, que le seul contrôle de `login` laisserait vivre.
+    if (stored.user.isDemo && (await this.demo.state()) !== 'on') {
+      await this.revokeFamily(stored.familyId);
+      throw new UnauthorizedException({
+        code: 'ACCOUNT_DISABLED',
+        message: DEMO_SESSION_REFUSED,
       });
     }
 

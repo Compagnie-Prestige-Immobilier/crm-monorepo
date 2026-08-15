@@ -98,9 +98,20 @@ const EXEMPT = new Map<string, string>([
   ['modules/phase2/phase2-sync.service.ts', 'chemin d’écriture, résolution par identifiant'],
 
   // L'authentification doit trouver le compte pour vérifier le mot de passe,
-  // mode de démonstration éteint ou non. Le refus se joue sur `isActive`, qui
-  // est la vraie porte ; masquer le compte ici rendrait une erreur de
-  // connexion indiscernable d'un compte inexistant.
+  // mode de démonstration éteint ou non : masquer la ligne ici rendrait un
+  // mot de passe faux indiscernable d'un compte inexistant, et le formulaire
+  // de connexion deviendrait un oracle d'existence.
+  //
+  // CE QUE CETTE DISPENSE DISAIT DE FAUX. Elle affirmait que « le refus se
+  // joue sur `isActive`, qui est la vraie porte ». Il n'y avait PAS de porte :
+  // les six comptes semés naissent `isActive: true` et rien ne les refermait,
+  // `disable()` ne désactivant rien par construction. `demo.admin@cpi.sn`,
+  // rôle ADMIN, restait donc connectable mode éteint avec un mot de passe
+  // publié dans ce dépôt, sur les données réelles.
+  //
+  // La porte existe maintenant, et elle est ailleurs : `login` et `refresh`
+  // refusent une session à un compte `isDemo` quand le mode n'est pas allumé.
+  // C'est `auth.service.test.ts` qui l'épingle, pas cette dispense.
   ['modules/auth/auth.service.ts', 'résolution du compte à la connexion'],
 ]);
 
