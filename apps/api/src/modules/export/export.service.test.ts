@@ -229,7 +229,7 @@ const stubAnalytics = (): AnalyticsService => {
 };
 
 /**
- * Produit le classeur et le relit — c'est le FICHIER qui est vérifié, pas les
+ * Produit le classeur et le relit, c'est le FICHIER qui est vérifié, pas les
  * intentions du code.
  *
  * La lecture est branchée AVANT l'écriture : le service pousse le XML au fil de
@@ -272,7 +272,7 @@ function sheetOf(workbook: ExcelJS.Workbook, name: string): ExcelJS.Worksheet {
 /**
  * Texte d'une cellule.
  *
- * Une `CellValue` peut être un objet — texte enrichi, formule, lien — que
+ * Une `CellValue` peut être un objet, texte enrichi, formule, lien, que
  * `String()` rendrait « [object Object] ». Le cas ne se présente pas dans ce
  * classeur, mais le traiter explicitement évite qu'une comparaison échoue un
  * jour sur cette chaîne au lieu de dire ce qui a changé.
@@ -465,7 +465,7 @@ describe('coût des requêtes', () => {
 
     // Cinq feuilles, une page chacune : cinq lectures de tentatives. Une
     // lecture par ligne en produirait 7 pour le seul onglet Consolidé, et le
-    // compteur grandirait avec le nombre de prospects — c'est exactement ce
+    // compteur grandirait avec le nombre de prospects, c'est exactement ce
     // que ce contrôle interdit.
     expect(queries()).toBe(5);
   });

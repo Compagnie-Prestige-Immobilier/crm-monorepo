@@ -3,23 +3,42 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
+import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
+import { Role } from '@crm/database';
+import type { FastifyRequest } from 'fastify';
 
 import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
 import { OkDto } from '../../common/dto/ok.dto.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
 import { RepresentantsService } from './representants.service.js';
+import { RepresentantsImportService } from './representants-import.service.js';
 import {
   CreateRepresentantDto,
   DeleteQueryDto,
+  ImportQueryDto,
+  ImportReportDto,
   RepresentantDto,
   RepresentantListDto,
   RepresentantLookupDto,
@@ -28,11 +47,36 @@ import {
   UpdateRepresentantDto,
 } from './dto.js';
 
+/**
+ * Le rôle est posé SUR LA CLASSE, et non route par route.
+ *
+ * Un représentant est une personne physique identifiée : nom, téléphone en
+ * E.164, notes de terrain, département. Rien de tout cela ne concerne le pôle
+ * Banque & Finance, qui travaille sur des dossiers déjà ouverts et n'a aucun
+ * usage de l'annuaire de prospection. Sans décorateur, `RolesGuard` laisse
+ * passer TOUTE identité authentifiée : `lookup` en particulier répondait à un
+ * agent bancaire avec la fiche complète d'un représentant qu'il n'a aucune
+ * raison de connaître.
+ *
+ * Sur la classe plutôt que sur chaque méthode : une route ajoutée demain hérite
+ * de la restriction au lieu de naître ouverte. `import` la resserre encore, à
+ * ADMIN seul, et `getAllAndOverride` fait gagner le décorateur de méthode.
+ */
 @ApiTags('representants')
 @ApiBearerAuth()
+@Roles(Role.COMMERCIAL, Role.ADMIN)
+// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
+// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
+// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
+// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
+// cas sur 116 opérations sur 119.
+@ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'representants', version: '1' })
 export class RepresentantsController {
-  constructor(private readonly representants: RepresentantsService) {}
+  constructor(
+    private readonly representants: RepresentantsService,
+    private readonly imports: RepresentantsImportService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -67,11 +111,52 @@ export class RepresentantsController {
     return this.representants.lookup(user, query.phone);
   }
 
+  @Post('import')
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    operationId: 'importRepresentants',
+    summary: 'Import de masse depuis un classeur Excel, en deux temps.',
+    description:
+      '`dryRun=true` (défaut) SIMULE : rien n’est écrit, et le rapport liste les erreurs avec leur numéro de ligne dans le fichier, ainsi que les doublons de téléphone (dans le fichier et contre la base). `dryRun=false` applique, en une seule transaction : tout ou rien. Le premier temps n’est pas une précaution décorative, c’est ce qui évite d’écrire quelques milliers de fiches dont personne ne sait lesquelles sont bonnes.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiResponse({ status: 200, type: ImportReportDto })
+  @ApiResponse({
+    status: 400,
+    type: ApiErrorDto,
+    description:
+      'REPRESENTANT_IMPORT_FILE_MISSING · REPRESENTANT_IMPORT_FILE_UNREADABLE · REPRESENTANT_IMPORT_SHEET_MISSING · REPRESENTANT_IMPORT_TOO_MANY_ROWS.',
+  })
+  @ApiResponse({
+    status: 413,
+    type: ApiErrorDto,
+    description: 'REPRESENTANT_IMPORT_FILE_TOO_LARGE.',
+  })
+  import(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: FastifyRequest,
+    @Query() query: ImportQueryDto,
+  ): Promise<ImportReportDto> {
+    return this.imports.import(user, request, query);
+  }
+
   @Get(':id')
   @ApiOperation({ operationId: 'getRepresentant', summary: 'Détail d’un représentant.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: RepresentantDto })
-  @ApiResponse({ status: 403, description: 'La fiche appartient à un autre commercial.' })
+  @ApiResponse({
+    status: 403,
+    type: ApiErrorDto,
+    description: 'La fiche appartient à un autre commercial.',
+  })
   get(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -85,8 +170,16 @@ export class RepresentantsController {
     summary: 'Crée un représentant. L’identifiant peut être fourni par le client.',
   })
   @ApiResponse({ status: 201, type: RepresentantDto })
-  @ApiResponse({ status: 409, description: 'Téléphone ou identifiant déjà pris.' })
-  @ApiResponse({ status: 403, description: 'L’identifiant appartient à un autre commercial.' })
+  @ApiResponse({
+    status: 409,
+    type: ApiErrorDto,
+    description: 'Téléphone ou identifiant déjà pris.',
+  })
+  @ApiResponse({
+    status: 403,
+    type: ApiErrorDto,
+    description: 'L’identifiant appartient à un autre commercial.',
+  })
   create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: CreateRepresentantDto,
@@ -113,7 +206,11 @@ export class RepresentantsController {
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: OkDto })
-  @ApiResponse({ status: 409, description: 'Des prospects sont rattachés ; exige cascade=true.' })
+  @ApiResponse({
+    status: 409,
+    type: ApiErrorDto,
+    description: 'Des prospects sont rattachés ; exige cascade=true.',
+  })
   remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,

@@ -12,7 +12,7 @@ import { toDakarCell } from './dakar.js';
 /**
  * Colonnes du classeur, définies une seule fois.
  *
- * Les deux modes d'export — vue filtrée et classeur consolidé — partagent cette
+ * Les deux modes d'export, vue filtrée et classeur consolidé, partagent cette
  * liste : l'onglet « BDD1 » et l'export filtré sur BDD1 ne peuvent donc pas
  * afficher des colonnes différentes, ni les mêmes colonnes dans un autre ordre.
  */
