@@ -80,6 +80,16 @@ export interface NotificationRow {
    * à deux repreneurs de gagner ensemble, ne serait plus exercé du tout.
    */
   updatedAt: Date;
+  /**
+   * Jeton du détenteur du bail, `null` quand personne ne tient l'envoi.
+   *
+   * La doublure DOIT le porter : c'est lui qui distingue « une notification que
+   * personne n'a réclamée » de « une notification tenue par un vivant », et
+   * c'est sur lui que se referme toute écriture d'expédition. Sans la colonne,
+   * `dispatchClaim: null` ne correspondrait à rien et la prise en charge
+   * passerait toujours, quel que soit le code.
+   */
+  dispatchClaim: string | null;
   /** Même raison que sur `UserRow` : le schéma le porte, la doublure aussi. */
   isDemo: boolean;
 }
@@ -189,6 +199,30 @@ const matches = (
         )
       ) {
         return false;
+      }
+      continue;
+    }
+    if (key === 'deliveries') {
+      // ═══ LE SOUS-SELECT DE LA CLÔTURE, ET RIEN D'AUTRE ═══
+      //
+      // `settleNotification` referme un envoi par une écriture CONDITIONNELLE :
+      // « passe SENT s'il ne reste AUCUNE livraison en attente ». La condition
+      // vit dans l'`UPDATE`, sous le verrou de la ligne, précisément pour qu'il
+      // n'y ait plus d'intervalle entre le décompte et la conclusion. Une
+      // doublure qui ignorerait ce `none` refermerait tous les envois sans
+      // condition, et le défaut qu'il répare passerait au vert.
+      //
+      // Seule la forme `none` est reconnue : accepter n'importe quel filtre
+      // relationnel donnerait une assurance sur des requêtes jamais écrites.
+      const clause = expected as { none?: Record<string, unknown> };
+      if (clause.none !== undefined) {
+        const id = row.id;
+        const found = db.deliveries.some(
+          (delivery) =>
+            delivery.notificationId === id &&
+            matches(delivery as unknown as Record<string, unknown>, clause.none, db),
+        );
+        if (found) return false;
       }
       continue;
     }
@@ -405,6 +439,9 @@ export class FakePrisma {
           period,
           createdAt: this.clock(),
           updatedAt: this.clock(),
+          // Personne ne tient un envoi qui vient d'être écrit, et c'est ce qui
+          // le rend immédiatement prenable par l'expédition qui suit.
+          dispatchClaim: (data.dispatchClaim as string | null | undefined) ?? null,
           // Pas de valeur par défaut « fausse » cachée ici : la doublure
           // écrit CE QUE LE SERVICE LUI DONNE. Un `?? false` masquerait
           // l'omission même que les tests de propagation cherchent.

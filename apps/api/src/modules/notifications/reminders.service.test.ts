@@ -388,6 +388,10 @@ describe('idempotence par période', () => {
     // coûterait une journée de rappel.
     db.addUser({ id: 'usr-tc', role: Role.COMMERCIAL, email: 'tc@cpi.sn', fullName: 'Awa Diop' });
     db.addCallTask({ assignedToId: 'usr-tc' });
+    // Les deux bouts de la comparaison de bail doivent appartenir à la MÊME
+    // échelle de temps : `updatedAt`, posé par la doublure, et l'instant du
+    // passage. Voir `FakePrisma.clock`.
+    db.clock = () => NOW;
 
     let refuse = true;
     brevo = new FakeBrevoTransport((email) =>
@@ -402,8 +406,21 @@ describe('idempotence par période', () => {
     expect(stalled?.status).toBe(NotificationDeliveryStatus.PENDING);
     expect(stalled?.error).toBe(DELIVERY_RETRY_ERROR);
 
+    // ═══ LE RÉESSAI ATTEND L'EXPIRATION DU BAIL, ET C'EST LE PRIX DU BAIL ═══
+    //
+    // `retryStalled` rejouait l'envoi SANS RIEN RÉCLAMER : deux passages
+    // simultanés servaient donc la même livraison deux fois. La prise en charge
+    // vit désormais dans `dispatch()` lui-même, pour tous ses appelants ; tant
+    // que le bail du passage précédent court, son détenteur est réputé vivant
+    // et le réessai est refusé.
+    //
+    // Le rappel n'est pas perdu pour autant, et c'est ce qui rend l'échange
+    // acceptable : quinze minutes plus tard, la même relance repart, très loin
+    // de la fin de la journée qu'elle décrit.
+    const APRES_LE_BAIL = new Date(NOW.getTime() + SENDING_LEASE_MS + 60_000);
+    db.clock = () => APRES_LE_BAIL;
     refuse = false;
-    const second = await reminders.remindOpenCallTasks(NOW);
+    const second = await reminders.remindOpenCallTasks(APRES_LE_BAIL);
 
     // Toujours AUCUNE notification supplémentaire : c'est l'envoi existant qui
     // est rejoué, pas un second qui est composé.
@@ -476,16 +493,25 @@ describe('expédition des envois programmés', () => {
    * LA FENÊTRE DE PANNE
    * ═════════════════════════════════════════════════════════════════════════
    *
-   * Le service qu'on branche ici prend la notification en charge par le VRAI
-   * chemin (`dispatchDue` exécute son `updateMany`), puis n'expédie jamais :
-   * `dispatch` rend une promesse qui ne se résout pas, et on abandonne le
-   * passage sans l'attendre. C'est ce que fait un `SIGKILL` reçu entre la prise
-   * en charge et l'envoi : l'écriture est validée, la suite n'arrive pas.
+   * Le processus meurt APRÈS avoir réclamé l'envoi et pendant qu'il expédie :
+   * le transport est entré, il ne rend jamais la main, et on abandonne le
+   * passage sans l'attendre. C'est ce que fait un `SIGKILL` reçu au milieu d'un
+   * appel Brevo : la prise en charge est validée en base, la suite n'arrive pas.
    *
-   * On ne pose donc AUCUN état à la main, et on n'appelle aucune reprise
-   * directement. L'état `SENDING` orphelin est produit par le code de
-   * production lui-même, ce qui est la seule façon de prouver que le passage
-   * suivant le rattrape vraiment.
+   * ═══ POURQUOI LE SERVICE EST RÉEL, ET NON UN `dispatch` EN DOUBLURE ═══
+   *
+   * La prise en charge vivait dans `dispatchDue`, qui posait son `updateMany`
+   * avant d'appeler `dispatch()` : une doublure de `dispatch` laissait donc
+   * quand même la ligne `SENDING`. Elle est DESCENDUE dans `dispatch()`, pour
+   * que tous ses appelants la reçoivent, y compris ceux qui n'existent pas
+   * encore. Doubler `dispatch` reviendrait maintenant à doubler la prise
+   * elle-même, c'est-à-dire à poser l'état à la main sous couvert de le
+   * produire.
+   *
+   * Le service est donc RÉEL et c'est son TRANSPORT qui se fige. L'état
+   * `SENDING` orphelin, jeton de bail compris, est produit par le code de
+   * production, ce qui est la seule façon de prouver que le passage suivant le
+   * rattrape vraiment.
    *
    * L'horloge de la doublure est calée sur `NOW` : `updatedAt`, qui date le
    * bail, et l'instant passé au tick doivent appartenir à la MÊME échelle de
@@ -502,16 +528,21 @@ describe('expédition des envois programmés', () => {
       entre = resolve;
     });
 
+    /** Transport qui accepte l'appel et ne répond jamais. */
+    const fige: BrevoTransport = {
+      isConfigured: () => true,
+      unavailableReason: () => null,
+      send: () => {
+        entre();
+        return new Promise<never>(() => {
+          /* le processus meurt ici : cette promesse ne se résout jamais */
+        });
+      },
+    };
+
     const moribond = new RemindersService(
       db.asService(),
-      {
-        dispatch: () => {
-          entre();
-          return new Promise<never>(() => {
-            /* le processus meurt ici : cette promesse ne se résout jamais */
-          });
-        },
-      } as unknown as NotificationsService,
+      new NotificationsService(db.asService(), fakeDemoVisibility(), fige),
       fakeDemoVisibility(),
     );
 
@@ -932,6 +963,10 @@ describe('visibilité de démonstration', () => {
   it('un échec passager survenu PENDANT la démonstration est réessayé après l’extinction', async () => {
     db.addUser({ id: 'usr-tc', role: Role.COMMERCIAL, email: 'tc@cpi.sn', fullName: 'Modou Sarr' });
     db.addCallTask({ assignedToId: 'usr-tc' });
+    // Même raison que le rattrapage de la section « idempotence » : le bail se
+    // compare à `updatedAt`, que la doublure horodate. Une heure sépare les
+    // deux passages, le bail est donc bien expiré au second.
+    db.clock = () => NOW;
 
     let refuse = true;
     brevo = new FakeBrevoTransport((email) =>
@@ -946,7 +981,9 @@ describe('visibilité de démonstration', () => {
     expect(stalled?.error).toBe(DELIVERY_RETRY_ERROR);
 
     refuse = false;
-    const second = await reminders.remindOpenCallTasks(new Date('2026-08-13T09:00:00Z'));
+    const uneHeurePlusTard = new Date('2026-08-13T09:00:00Z');
+    db.clock = () => uneHeurePlusTard;
+    const second = await reminders.remindOpenCallTasks(uneHeurePlusTard);
 
     expect(second.created).toBe(0);
     expect(db.deliveries.find((row) => row.userId === 'usr-tc')?.status).toBe(
@@ -971,5 +1008,126 @@ describe('visibilité de démonstration', () => {
 
     // Elle est MASQUÉE, pas perdue : le mode rallumé, elle repart.
     expect(await enDemonstration().dispatchDue(NOW)).toBe(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Le réessai d'un rappel est une PORTE D'ENVOI comme une autre
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * `retryStalled` ENVOYAIT SANS RIEN RÉCLAMER, ET PERSONNE NE L'AVAIT VU
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Cinq rondes de corrections ont porté sur le bail de `dispatchDue` : prise
+ * atomique, renouvellement par vague, écriture des acceptations au fil de l'eau.
+ * Toutes exactes, toutes sur la MÊME porte.
+ *
+ * `retryStalled` en est une autre, et elle était restée grande ouverte : il
+ * retrouve une livraison en file et appelle `dispatch()` DIRECTEMENT, sans
+ * prise en charge d'aucune sorte. Deux ticks de rappel simultanés, ou un
+ * réessai croisant le balayage d'échéances, servaient donc la même livraison en
+ * même temps. Les tests prouvaient la porte réparée sans jamais toucher à
+ * celle-là.
+ *
+ * La réparation n'ajoute pas une sixième prise ici : elle DESCEND la prise dans
+ * `dispatch()`, où tous les appelants la reçoivent, y compris ceux qui ne sont
+ * pas encore écrits. Ce test-ci exerce le croisement par les deux vraies
+ * portes, sans jamais poser d'état à la main.
+ */
+describe('réessai d’un rappel et tick d’échéance qui se croisent', () => {
+  /** Le bail du premier passage a expiré : le rattrapage est LÉGITIME. */
+  const APRES_LE_BAIL = new Date(NOW.getTime() + SENDING_LEASE_MS + 60_000);
+
+  /**
+   * Transport qui laisse un AUTRE passage tiquer pendant qu'il envoie.
+   *
+   * C'est le seul moyen d'obtenir un entrelacement RÉEL sans piloter
+   * l'ordonnanceur : le second passage s'exécute entièrement à l'intérieur du
+   * point d'attente du premier, exactement comme deux instances derrière un
+   * répartiteur de charge.
+   */
+  class TransportCroise implements BrevoTransport {
+    readonly servies: string[] = [];
+    refuse = true;
+    pendantLEnvoi: (() => Promise<unknown>) | null = null;
+
+    isConfigured(): boolean {
+      return true;
+    }
+
+    unavailableReason(): string | null {
+      return null;
+    }
+
+    async send(messages: readonly BrevoMessage[]): Promise<BrevoDispatchResult> {
+      const adresses = messages.flatMap((message) =>
+        message.recipients.map((recipient) => recipient.email),
+      );
+
+      if (this.refuse) {
+        return {
+          status: 'TRANSPORT_ERROR',
+          outcomes: adresses.map((email) => ({
+            email,
+            ok: false as const,
+            errorCode: 'HTTP_429',
+            kind: 'transient' as const,
+          })),
+          detail: 'HTTP_429',
+        };
+      }
+
+      // Une seule fois : le passage concurrent n'a pas à se rejouer lui-même.
+      const concurrent = this.pendantLEnvoi;
+      this.pendantLEnvoi = null;
+      if (concurrent) await concurrent();
+
+      this.servies.push(...adresses);
+      return { status: 'SENT', outcomes: adresses.map((email) => ({ email, ok: true })) };
+    }
+  }
+
+  it('NE SERVENT PAS LA MÊME LIVRAISON DEUX FOIS', async () => {
+    db.addUser({ id: 'usr-tc', role: Role.COMMERCIAL, email: 'tc@cpi.sn', fullName: 'Awa Diop' });
+    db.addCallTask({ assignedToId: 'usr-tc' });
+    db.clock = () => NOW;
+
+    const croise = new TransportCroise();
+    const passage = (): RemindersService =>
+      new RemindersService(
+        db.asService(),
+        new NotificationsService(db.asService(), fakeDemoVisibility(), croise),
+        fakeDemoVisibility(),
+      );
+
+    // ── Le rappel du matin bute sur un 429 : la livraison reste en file. ──
+    await passage().remindOpenCallTasks(NOW);
+    const enFile = db.deliveries.find((row) => row.userId === 'usr-tc');
+    expect(enFile?.status).toBe(NotificationDeliveryStatus.PENDING);
+    expect(enFile?.error).toBe(DELIVERY_RETRY_ERROR);
+    expect(croise.servies).toHaveLength(0);
+
+    // ── Le bail expire. Deux chemins visent alors la MÊME notification : le
+    //    réessai (par la contrainte unique) et le tick d'échéance (par le bail
+    //    expiré). Le second tique PENDANT que le premier envoie.
+    db.clock = () => APRES_LE_BAIL;
+    croise.refuse = false;
+    croise.pendantLEnvoi = () => passage().dispatchDue(APRES_LE_BAIL);
+
+    await passage().remindOpenCallTasks(APRES_LE_BAIL);
+
+    // LA PROPRIÉTÉ : une personne, un e-mail. Sans prise en charge dans
+    // `dispatch()`, les deux chemins lisaient la même ligne `PENDING` et la
+    // servaient tous les deux.
+    expect(croise.servies).toEqual(['tc@cpi.sn']);
+    expect(db.deliveries.find((row) => row.userId === 'usr-tc')?.status).toBe(
+      NotificationDeliveryStatus.SENT,
+    );
+    // Et l'envoi se referme proprement, sans propriétaire résiduel.
+    const rappel = db.notifications.find((row) => row.reminderKey?.startsWith('open-call-tasks'));
+    expect(rappel?.status).toBe(NotificationStatus.SENT);
+    expect(rappel?.dispatchClaim).toBeNull();
   });
 });
