@@ -147,7 +147,30 @@ export const isInFlight = (status: DumpStatus): boolean =>
  */
 export function effectiveStatus(job: DumpJob, now: Date): DumpStatus {
   if (job.status === 'ready') {
-    if (job.expiresAt !== null && Date.parse(job.expiresAt) <= now.getTime()) return 'expired';
+    // ═══════════════════════════════════════════════════════════════════════
+    // UNE ÉCHÉANCE ILLISIBLE EST UNE ÉCHÉANCE DÉPASSÉE
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // La condition portait `expiresAt !== null`, et ne disait rien de ce qui
+    // arrive quand la date manque : le travail restait `ready` À JAMAIS. Or
+    // c'est cette fonction, et elle seule, qui autorise la réconciliation
+    // horaire à détruire le fichier. Une valeur nulle ou illisible dans
+    // `app_settings`, écrite par une version antérieure ou corrompue, faisait
+    // donc vivre indéfiniment une archive contenant la base ENTIÈRE, très
+    // au-delà des six heures que tout le module annonce.
+    //
+    // `Date.parse` rend `NaN` sur une chaîne illisible, et `NaN <= t` est faux :
+    // la comparaison seule laissait passer ce cas-là aussi. Les deux se
+    // traitent ensemble, par le contrôle de finitude.
+    //
+    // LE SENS DU DOUTE EST CELUI DE LA DESTRUCTION, comme partout ailleurs
+    // dans ce module : détruire à tort coûte un export à relancer, en garder un
+    // à tort laisse un second exemplaire de la clientèle sur le volume, où
+    // passent les instantanés de sauvegarde du fournisseur. `execute()` écrit
+    // TOUJOURS une échéance en passant `ready` : une ligne sans échéance n'est
+    // pas un cas nominal, c'est une anomalie, et on ne prolonge pas une anomalie.
+    const expiresAt = job.expiresAt === null ? Number.NaN : Date.parse(job.expiresAt);
+    if (!Number.isFinite(expiresAt) || expiresAt <= now.getTime()) return 'expired';
     return 'ready';
   }
   if (isInFlight(job.status)) {
