@@ -180,16 +180,26 @@ export BACKUP_S3_PROVIDER='Scaleway'    # facultatif
 python3 infra/dokploy/deploy.py backup
 ```
 
-Le script éprouve l'accès au bucket **avant** d'enregistrer quoi que ce soit,
-puis déclenche une sauvegarde immédiate : un fichier doit apparaître dans le
-bucket et une notification de réussite arriver, sous la minute. Ne considérez
-l'étape faite qu'après avoir vu les deux.
+**À la première exécution seulement**, le script éprouve l'accès au bucket avant
+d'enregistrer quoi que ce soit. Il déclenche ensuite une sauvegarde immédiate :
+un fichier doit apparaître dans le bucket et une notification de réussite
+arriver, sous la minute. Ne considérez l'étape faite qu'après avoir vu les deux
+; le script, lui, ne vérifie pas le résultat de cette sauvegarde manuelle et
+sort en 0 sans rien en savoir.
 
-| Réglage       | Défaut      | Variable          |
-| ------------- | ----------- | ----------------- |
-| Horaire       | `0 2 * * *` | `BACKUP_SCHEDULE` |
-| Rétention     | 30 fichiers | `BACKUP_KEEP`     |
-| Nom du bucket | (requis)    | `BACKUP_S3_*`     |
+⚠️ **Les réglages ci-dessous ne s'appliquent qu'à la création.** Aux exécutions
+suivantes, `deploy.py` retrouve la destination et l'entrée de sauvegarde par leur
+nom et les reprend telles quelles : ni l'horaire, ni la rétention, ni les
+identifiants S3 ne sont comparés ni mis à jour, et l'accès au bucket n'est pas
+réévalué. Réexporter une variable puis relancer la commande est un **no-op
+silencieux**. Pour changer une valeur déjà en place, passer par l'interface
+Dokploy.
+
+| Réglage       | Défaut      | Variable          | Modifiable par relance |
+| ------------- | ----------- | ----------------- | ---------------------- |
+| Horaire       | `0 2 * * *` | `BACKUP_SCHEDULE` | non                    |
+| Rétention     | 30 fichiers | `BACKUP_KEEP`     | non                    |
+| Nom du bucket | (requis)    | `BACKUP_S3_*`     | non                    |
 
 L'heure serveur vaut l'heure de Dakar : `Africa/Dakar` est sur UTC toute l'année,
 il n'y a pas de décalage saisonnier à rattraper.

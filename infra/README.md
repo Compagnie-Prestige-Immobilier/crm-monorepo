@@ -130,9 +130,22 @@ export BACKUP_S3_BUCKET='cpi-go-sauvegardes'
 export BACKUP_S3_REGION='fr-par'
 export BACKUP_S3_ACCESS_KEY='…'
 export BACKUP_S3_SECRET_KEY='…'
+# À NE PAS OUBLIER : sans cette ligne, deploy.py enregistre la destination avec
+# le fournisseur générique `Other`, alors que la procédure de restauration
+# ci-dessous configure rclone en `Scaleway`. Sauvegarder et restaurer par deux
+# implémentations S3 différentes marche souvent, et échoue le jour où l'une
+# d'elles gère les métadonnées autrement.
+export BACKUP_S3_PROVIDER='Scaleway'
 
 python3 infra/dokploy/deploy.py backup
 ```
+
+⚠️ Ces six variables ne sont lues qu'à la **création** de la destination.
+`deploy.py` retrouve ensuite la destination par son nom et la réutilise telle
+quelle : réexporter une clé ou un point d'accès différent puis relancer
+`deploy.py backup` ne met **rien** à jour. Pour changer ces valeurs, passer par
+Dokploy → Settings → S3 Destinations. Même remarque pour `BACKUP_SCHEDULE` et
+`BACKUP_KEEP`, qui ne s'appliquent qu'à la création de l'entrée de sauvegarde.
 
 La commande **refuse de s'exécuter** si aucun canal de notification Dokploy
 n'écoute l'événement _Database Backup_ : une sauvegarde muette est précisément
@@ -193,7 +206,15 @@ export RCLONE_CONFIG_CPI_REGION=fr-par
 export RCLONE_CONFIG_CPI_ACCESS_KEY_ID='…'
 export RCLONE_CONFIG_CPI_SECRET_ACCESS_KEY='…'
 
-# 2. Choisir le fichier. Le chemin est <appName de la base>/cpi-go/postgres/<horodatage>.sql.gz
+# 2. Choisir le fichier. LISTER D'ABORD, ne pas composer le chemin de tête.
+#
+#    `deploy.py` ne configure qu'un préfixe, `cpi-go/postgres/` (BACKUP_PREFIX).
+#    Le reste de la clé S3, un éventuel segment d'application en tête et le
+#    nom exact du fichier, est composé par Dokploy et n'a jamais été observé sur
+#    ce
+#    bucket, faute d'exercice de restauration. Un chemin recopié à l'aveugle
+#    depuis cette page peut donc renvoyer un 404 au moment précis où l'on en a
+#    besoin. La liste, elle, est toujours juste.
 rclone ls cpi:cpi-go-sauvegardes/ | sort -k2
 
 # 3. Le conteneur de la base, dont le nom porte le suffixe engendré par Dokploy.
@@ -206,7 +227,10 @@ docker stop "$API"
 
 # 5. Restaurer. --clean --if-exists remplace le contenu existant ; -O ignore les
 #    propriétaires, qui n'existent pas dans un conteneur neuf.
-rclone cat 'cpi:cpi-go-sauvegardes/<appName>/cpi-go/postgres/<fichier>.sql.gz' \
+#    <clé> est la ligne EXACTE recopiée depuis la sortie de l'étape 2.
+#    Le suffixe est `.sql.gz` mais le contenu est une archive `custom` : c'est
+#    Dokploy qui nomme ainsi, et c'est pg_restore qui a raison, pas le nom.
+rclone cat 'cpi:cpi-go-sauvegardes/<clé>' \
   | gunzip \
   | docker exec -i "$PG" pg_restore -U crm -d crm -O --clean --if-exists
 
@@ -229,14 +253,25 @@ Dans une base jetable, à côté de la base réelle, sans jamais y toucher :
 PG=$(docker ps --filter name=cpi-go-postgres --format '{{.ID}}' | head -1)
 
 docker exec "$PG" createdb -U crm crm_restore_test
-rclone cat 'cpi:cpi-go-sauvegardes/<appName>/cpi-go/postgres/<fichier>.sql.gz' \
+# <clé> : la ligne exacte recopiée depuis `rclone ls`, cf. § 4.2 étape 2.
+rclone cat 'cpi:cpi-go-sauvegardes/<clé>' \
   | gunzip | docker exec -i "$PG" pg_restore -U crm -d crm_restore_test -O
 
 # Le contrôle qui compte : des lignes, pas seulement un schéma.
-docker exec "$PG" psql -U crm -d crm_restore_test \
-  -c 'select count(*) from "Prospect";' \
-  -c 'select count(*) from "Dossier";' \
-  -c 'select count(*) from "Encaissement";'
+#
+# Les noms sont EN MINUSCULES ET AU PLURIEL : ce sont les noms de tables
+# PostgreSQL réels, posés par les `@@map` de schema.prisma, et non les noms de
+# modèles Prisma. `select ... from "Prospect"` échoue avec
+# « relation "Prospect" does not exist ». Il n'existe par ailleurs aucune table
+# Dossier ni Encaissement : la table des dossiers bancaires est `bank_cases`.
+#
+# ON_ERROR_STOP=1 n'est pas décoratif. Sans lui, psql signale les trois erreurs
+# sur stderr, poursuit et sort en 0 : l'exercice de restauration se conclut par
+# un succès sur une base vide, ce qui est l'exact contraire de son objet.
+docker exec "$PG" psql -U crm -d crm_restore_test -v ON_ERROR_STOP=1 \
+  -c 'select count(*) from prospects;' \
+  -c 'select count(*) from bank_cases;' \
+  -c 'select count(*) from representants;'
 
 docker exec "$PG" dropdb -U crm crm_restore_test
 ```
@@ -262,14 +297,42 @@ docker compose -f docker-compose.prod.yml logs backup   # dernier cycle
 ls -lh /srv/cpi-go/backups
 ```
 
-Ici le dump est du **SQL en clair** gzippé, donc `psql` et non `pg_restore` :
+Ici le dump est du **SQL en clair** gzippé, donc `psql` et non `pg_restore`. Le
+suffixe le dit : `crm-AAAAMMJJ-HHMMSS.plain.sql.gz`. Les archives du § 4.1 se
+nomment `.sql.gz` alors qu'elles sont au format `custom` ; le `.plain.` est là
+pour qu'on ne confonde pas les deux fichiers à trois heures du matin.
 
 ```bash
 docker compose -f docker-compose.prod.yml stop api web
-gunzip -c /srv/cpi-go/backups/crm-AAAAMMJJ-HHMMSS.sql.gz \
-  | docker compose -f docker-compose.prod.yml exec -T postgres psql -U crm -d crm
+
+gunzip -c /srv/cpi-go/backups/crm-AAAAMMJJ-HHMMSS.plain.sql.gz \
+  | docker compose -f docker-compose.prod.yml exec -T postgres \
+      psql -U crm -d crm -v ON_ERROR_STOP=1
+
 docker compose -f docker-compose.prod.yml start api web
 ```
+
+Deux détails sans lesquels cette commande ne fait pas ce qu'elle annonce.
+
+- **`-v ON_ERROR_STOP=1`.** Par défaut `psql` signale chaque instruction en
+  échec et continue, puis sort en **0**. Une restauration à moitié appliquée se
+  lit alors comme une réussite, et l'API redémarre sur une base incohérente.
+- **Le dump doit contenir ses `DROP`.** `pg_dump --format=plain` sans `--clean`
+  n'émet que des `CREATE` : rejoué sur la base existante, il échoue à la
+  première table (« relation already exists ») et, avec `ON_ERROR_STOP=1`, ne
+  restaure rien du tout. `backup.sh` pose donc `--clean --if-exists`, et les
+  dumps produits depuis remplacent le contenu en place. **Pour une archive plus
+  ancienne, écrite avant ce changement**, il faut recréer la base d'abord :
+
+  ```bash
+  C="docker compose -f docker-compose.prod.yml"
+  $C stop api web
+  $C exec -T postgres dropdb -U crm --force crm
+  $C exec -T postgres createdb -U crm crm
+  gunzip -c /srv/cpi-go/backups/<ancien>.sql.gz \
+    | $C exec -T postgres psql -U crm -d crm -v ON_ERROR_STOP=1
+  $C start api web
+  ```
 
 Deux limites à connaître, qui sont la raison pour laquelle la production ne
 repose pas sur ce mécanisme :
