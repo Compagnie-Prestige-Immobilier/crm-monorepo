@@ -7,7 +7,7 @@ import { CategoryBarChart, RankBarChart } from '@/components/dashboard/charts';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
-import { QueryErrorState } from '@/components/query-error-state';
+import { QueryErrorInline, QueryErrorState } from '@/components/query-error-state';
 import {
   StatChartCard,
   StatChartsSkeleton,
@@ -37,6 +37,7 @@ import {
   formatRateOrNone,
   formatShortDate,
 } from '@/lib/format';
+import { shouldShowError } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 import type { NamedCount } from '@/lib/types';
 
@@ -203,6 +204,24 @@ export function CampaignsPanel() {
           badRate={quality.data?.badRate ?? null}
           attempts={quality.data?.attempts ?? 0}
           isPending={quality.isPending}
+          /**
+           * L'échec de CETTE requête doit voyager jusqu'à la carte.
+           *
+           * Seul `pilotage.isError` était traité, plus haut. La requête de
+           * qualité n'avait aucune branche d'erreur : `data` restait
+           * `undefined`, les valeurs par défaut ci-dessus prenaient le relais,
+           * et la carte affirmait « Aucun appel enregistré sur la sélection »,
+           * c'est-à-dire un FAIT sur l'activité, alors que rien n'avait été
+           * mesuré. Un responsable y lit que ses équipes n'ont pas appelé.
+           */
+          showError={shouldShowError({
+            isError: quality.isError,
+            hasData: quality.data !== undefined,
+          })}
+          error={quality.error}
+          onRetry={() => {
+            void quality.refetch();
+          }}
         />
       </div>
     </div>
@@ -221,6 +240,9 @@ function QualityCard({
   badRate,
   attempts,
   isPending,
+  showError,
+  error,
+  onRetry,
 }: {
   rows: readonly {
     id: string;
@@ -233,21 +255,36 @@ function QualityCard({
   badRate: number | null;
   attempts: number;
   isPending: boolean;
+  showError: boolean;
+  error: unknown;
+  onRetry: () => void;
 }) {
   return (
     <Card className="animate-rise">
       <CardHeader>
         <CardTitle className="text-[1.0625rem]">Qualité des numéros</CardTitle>
         <CardDescription>
-          {isPending
-            ? 'Calcul en cours…'
-            : badRate === null
-              ? 'Aucun appel enregistré sur la sélection.'
-              : `${formatRate(badRate)} de numéros inexploitables sur ${formatNumber(attempts)} appels.`}
+          {/* « Aucun appel enregistré » est une AFFIRMATION sur l'activité. Elle
+              ne doit sortir que d'une mesure qui a abouti. */}
+          {showError
+            ? 'Qualité indisponible.'
+            : isPending
+              ? 'Calcul en cours…'
+              : badRate === null
+                ? 'Aucun appel enregistré sur la sélection.'
+                : `${formatRate(badRate)} de numéros inexploitables sur ${formatNumber(attempts)} appels.`}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
-        {rows.length === 0 ? (
+        {showError ? (
+          <div className="px-5 pb-5">
+            <QueryErrorInline
+              error={error}
+              onRetry={onRetry}
+              fallback="La qualité des numéros n’a pas pu être calculée."
+            />
+          </div>
+        ) : rows.length === 0 ? (
           <p className="px-5 pb-5 text-[0.875rem] text-muted-foreground">
             {isPending ? '' : 'Aucun appel enregistré sur la sélection.'}
           </p>
