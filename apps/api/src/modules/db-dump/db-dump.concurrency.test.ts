@@ -180,6 +180,89 @@ describe('deux demandes simultanées', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// LA PRISE PERDUE AVANT LE DÉMARRAGE
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('la ligne d’état change de main pendant le passage à « running »', () => {
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * L'ÉCRITURE CONDITIONNELLE RENDAIT « TU AS PERDU », ET ON PARTAIT QUAND MÊME
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * `execute()` publie l'état `running` par `writeOwned`, dont la valeur rendue
+   * dit si la ligne durable nomme encore CE travail. Elle était ignorée à cette
+   * transition-là, et à elle seule : le passage à `ready` l'honore depuis
+   * toujours. L'export partait donc lancer `pg_dump` en sachant déjà que la clé
+   * appartenait à un autre.
+   *
+   * Deux conséquences, et aucune ne se voit :
+   *  · DEUX `pg_dump` sur la même base en même temps, alors que tout le module
+   *    est écrit pour qu'il n'y en ait jamais qu'un ;
+   *  · `sweepOrphans()` ne garde que le fichier que la ligne DURABLE nomme, et
+   *    cette ligne nomme désormais celui de l'autre travail : la sortie de
+   *    celui-ci devient un orphelin, effacé par le premier balayage qui passe,
+   *    sous le processus qui écrit dedans.
+   *
+   * Le crochet s'arme sur la PREMIÈRE écriture conditionnelle. Aucune ne la
+   * précède ici : la prise initiale passe par `create`, la clé n'existant pas
+   * encore. La première `updateMany` est donc exactement le passage à
+   * « running », ce qui place le vol à l'instant précis qui compte.
+   */
+  it('abandonne l’export sans jamais lancer pg_dump', async () => {
+    store.onBeforeConditionalWrite = () => {
+      // Un autre administrateur a inscrit un travail NEUF sous la clé unique.
+      store.seed({
+        id: 'job-voleur',
+        status: 'queued',
+        requestedById: FAKE_ADMIN.id,
+        requestedByName: FAKE_ADMIN.fullName,
+        requestedAt: new Date().toISOString(),
+        startedAt: null,
+        finishedAt: null,
+        fileName: null,
+        fileSize: null,
+        sha256: null,
+        expiresAt: null,
+        reservedAt: null,
+        downloadedAt: null,
+        failureReason: null,
+        noticeStatus: null,
+        noticeDetail: null,
+      });
+      return Promise.resolve();
+    };
+
+    const response = await app.inject({ method: 'POST', url: STATE_URL });
+    expect(response.statusCode).toBe(202);
+
+    // Le travail de fond n'est pas attendu par la requête : on lui laisse le
+    // temps d'aller au bout de ce qu'il aurait fait.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // LA propriété : aucun second `pg_dump`, et rien sur le volume.
+    expect(runner.calls).toBe(0);
+    expect(await files()).toEqual([]);
+    // Et pas une écriture de plus : la ligne appartient toujours au travail
+    // qui a pris la clé, dans l'état où il l'a laissée.
+    expect(store.stored()?.id).toBe('job-voleur');
+    expect(store.stored()?.status).toBe('queued');
+  });
+
+  /**
+   * Contre-épreuve : un `execute()` qui abandonnerait à chaque fois ferait
+   * passer le test ci-dessus en supprimant purement et simplement la
+   * fonctionnalité. Sans vol de la clé, l'export doit aller jusqu'au bout.
+   */
+  it('va au bout quand la ligne lui appartient encore', async () => {
+    await app.inject({ method: 'POST', url: STATE_URL });
+
+    expect((await settle()).status).toBe('ready');
+    expect(runner.calls).toBe(1);
+    expect(await files()).toHaveLength(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // UNE SEULE LIVRAISON
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -463,5 +546,87 @@ describe('réconciliation d’amorçage', () => {
 
     runner.release();
     expect((await settle()).status).toBe('ready');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA CADENCE DU BALAYAGE EST UNE BORNE, PAS UN RÉGLAGE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Le nombre de déclenchements par heure, LU SUR LA PLANIFICATION RÉELLE.
+ *
+ * `@Cron` dépose son expression en métadonnée ; c'est elle, et rien d'autre,
+ * qui décide de la fréquence en production. Un test qui appellerait `sweep()`
+ * à la main n'éprouverait pas la cadence, qui est justement ce dont dépend le
+ * dépassement de l'échéance.
+ *
+ * Seul le champ des minutes est lu : les deux formes d'expression employées par
+ * `CronExpression` diffèrent par leur nombre de champs (six avec les secondes,
+ * cinq sans), et le champ des minutes est le dernier à porter une périodicité
+ * inférieure à l'heure.
+ */
+function sweepsPerHour(expression: string): number {
+  const fields = expression.trim().split(/\s+/u);
+  const minute = (fields.length === 6 ? fields[1] : fields[0]) ?? '*';
+  const [range = '*', step] = minute.split('/');
+  const every = step === undefined ? 1 : Number(step);
+  const bounds = range === '*' ? [0, 59] : range.split('-').map(Number);
+  const from = bounds[0] ?? 0;
+  const to = bounds[1] ?? from;
+  let count = 0;
+  for (let m = from; m <= to; m += every) count += 1;
+  return count;
+}
+
+describe('cadence du balayage périodique', () => {
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * SIX HEURES ANNONCÉES, PRESQUE SEPT SUR LE DISQUE
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * `DUMP_TTL_MS` vaut six heures et le balayage tiquait TOUTES LES HEURES : un
+   * export que personne ne vient chercher et que personne ne regarde survivait
+   * jusqu'à une heure entière au-delà de sa borne, soit seize pour cent de vie
+   * en plus pour une copie complète et non chiffrée de la clientèle, sur un
+   * volume que traversent les instantanés de sauvegarde du fournisseur.
+   *
+   * `state()` et `download()` réconcilient à chaque appel : l'écart ne se
+   * produit donc QUE lorsque personne ne regarde, c'est-à-dire exactement la
+   * situation que ce balayage existe pour couvrir.
+   *
+   * Le test mesure le dépassement maximal réel, à partir de la planification
+   * elle-même, et exige qu'il reste une petite fraction de l'échéance.
+   */
+  it('borne le dépassement de l’échéance à une petite fraction des six heures', () => {
+    // Le descripteur plutôt que `DbDumpService.prototype.sweepExpired` : lire
+    // la méthode détachée de son objet est précisément ce que la règle
+    // `unbound-method` refuse, et on ne veut ici que le porteur de métadonnée.
+    const handler = Object.getOwnPropertyDescriptor(DbDumpService.prototype, 'sweepExpired')
+      ?.value as object | undefined;
+    const options = Reflect.getMetadata('SCHEDULE_CRON_OPTIONS', handler ?? {}) as
+      | { cronTime: string }
+      | undefined;
+    // Sans planification, le reste du test ne prouverait rien.
+    expect(options?.cronTime).toBeTypeOf('string');
+
+    const overshootMs = 3_600_000 / sweepsPerHour(options?.cronTime ?? '');
+
+    // La borne annoncée dans le doc-bloc de `sweepExpired`, en clair.
+    expect(overshootMs).toBe(10 * 60 * 1_000);
+    // Et ce qu'elle vaut vraiment : moins de trois pour cent des six heures.
+    expect(overshootMs / DUMP_TTL_MS).toBeLessThan(0.03);
+  });
+
+  /**
+   * Contre-épreuve du lecteur d'expression : sans elle, une fonction qui
+   * rendrait toujours six ferait passer le test ci-dessus quelle que soit la
+   * planification réelle, y compris la cadence horaire qu'il existe pour
+   * refuser.
+   */
+  it('lit bien la cadence, y compris la forme horaire à cinq champs', () => {
+    expect(sweepsPerHour('0 */10 * * * *')).toBe(6);
+    expect(sweepsPerHour('0 0-23/1 * * *')).toBe(1);
+    expect(sweepsPerHour('0 */30 * * * *')).toBe(2);
   });
 });

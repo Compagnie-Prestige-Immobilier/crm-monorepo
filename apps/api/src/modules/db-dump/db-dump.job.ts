@@ -129,6 +129,33 @@ export const DUMP_TTL_MS = 6 * 60 * 60 * 1_000;
  */
 export const DUMP_MAX_RUNTIME_MS = 30 * 60 * 1_000;
 
+/**
+ * Écart d'horloge TOLÉRÉ sur l'horodatage d'un travail en cours.
+ *
+ * Un travail qui aurait démarré DEVANT l'horloge n'existe pas dans un monde
+ * sain : personne ne démarre dans le futur. Deux causes le produisent pourtant,
+ * et tout tient à les séparer.
+ *
+ *  · LE PETIT ÉCART, banal et sans gravité. L'horodatage est écrit par le
+ *    processus qui démarre l'export, l'horloge est relue par celui qui sonde,
+ *    et entre les deux un ajustement NTP recule l'horloge de quelques
+ *    millisecondes à quelques secondes. Enterrer un export bien vivant pour
+ *    cela coûterait un export à relancer sans rien protéger.
+ *  · LE SAUT EN ARRIÈRE, qui est la panne. Un conteneur qui démarre avec une
+ *    horloge fausse, une machine restaurée depuis un instantané, un fuseau mal
+ *    appliqué : l'horloge recule de minutes, d'heures ou de jours. L'âge du
+ *    travail devient NÉGATIF, donc jamais supérieur à `DUMP_MAX_RUNTIME_MS`, et
+ *    la ligne « en cours » ne vieillit PLUS JAMAIS. Comme `isInFlight` interdit
+ *    toute nouvelle demande, la fonctionnalité meurt définitivement, sans
+ *    aucune route pour la réarmer.
+ *
+ * Cinq minutes tranchent entre les deux : deux ordres de grandeur au-dessus de
+ * ce que corrige un NTP en marche, et six fois en deçà de `DUMP_MAX_RUNTIME_MS`,
+ * donc sans le moindre effet sur un export sain. Ce n'est pas une durée
+ * d'exécution, c'est la largeur du doute qu'on accorde à l'horloge.
+ */
+export const DUMP_CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1_000;
+
 /** Un état encore en cours : il interdit d'en démarrer un second. */
 export const isInFlight = (status: DumpStatus): boolean =>
   status === 'queued' || status === 'running';
@@ -176,10 +203,44 @@ export function effectiveStatus(job: DumpJob, now: Date): DumpStatus {
   if (isInFlight(job.status)) {
     // `startedAt` quand il existe, `requestedAt` sinon : un `queued` n'a pas
     // encore de date de démarrage, et c'est justement lui qu'il ne faut pas
-    // laisser passer à travers la borne. Un horodatage illisible ne doit pas
-    // enterrer un travail vivant, d'où le contrôle de finitude.
+    // laisser passer à travers la borne.
     const since = Date.parse(job.startedAt ?? job.requestedAt);
-    if (Number.isFinite(since) && now.getTime() - since > DUMP_MAX_RUNTIME_MS) return 'failed';
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // UN HORODATAGE QUI NE VEUT RIEN DIRE EST UN TRAVAIL MORT
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Le contrôle de finitude protégeait le MAUVAIS côté : il était écrit
+    // `Number.isFinite(since) && …`, c'est-à-dire « en cas de doute, laisse
+    // courir ». Un `startedAt` ou un `requestedAt` illisible, écrit par une
+    // version antérieure ou corrompu dans `app_settings`, n'expirait donc
+    // JAMAIS. Et comme `isInFlight` interdit toute nouvelle demande, l'export
+    // devenait impossible POUR TOUJOURS : l'écran tourne indéfiniment, le
+    // bouton ne répond plus, et aucune route ne permet de réarmer.
+    //
+    // C'est exactement la doctrine déjà écrite pour la branche `ready`
+    // ci-dessus, et le même arbitrage : déclarer mort à tort coûte un export à
+    // relancer, laisser vivre à tort coûte la fonctionnalité entière. On
+    // déclare mort.
+    if (!Number.isFinite(since)) return 'failed';
+
+    const age = now.getTime() - since;
+    if (age > DUMP_MAX_RUNTIME_MS) return 'failed';
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // UN ÂGE NÉGATIF EST LA MÊME PANNE, PAR UNE AUTRE PORTE
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // La seule comparaison `age > DUMP_MAX_RUNTIME_MS` suppose une horloge qui
+    // avance. Qu'elle recule, et l'âge devient négatif : il ne dépasse plus
+    // jamais la borne, et la ligne « en cours » est de nouveau éternelle, avec
+    // la fonctionnalité morte derrière elle. Un instantané de machine restauré
+    // ou un conteneur démarré avant la synchronisation NTP suffisent.
+    //
+    // La tolérance existe pour ne pas confondre ce saut avec le décalage
+    // ordinaire de quelques secondes entre deux processus ; elle est justifiée
+    // chiffre en main sur `DUMP_CLOCK_SKEW_TOLERANCE_MS`.
+    if (age < -DUMP_CLOCK_SKEW_TOLERANCE_MS) return 'failed';
   }
   return job.status;
 }
