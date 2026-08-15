@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsInt,
@@ -11,6 +11,8 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+
+import { queryBoolean } from '../../common/dto/query-boolean.js';
 
 // ─── Lecture ────────────────────────────────────────────────────────────────
 
@@ -31,7 +33,7 @@ export class DepartementDto {
 }
 
 /**
- * Une IEF — Inspection de l'Éducation et de la Formation.
+ * Une IEF, Inspection de l'Éducation et de la Formation.
  *
  * `departementName` accompagne l'identifiant parce que le libellé seul est
  * ambigu à l'écran : « Bignona 1 » et « Bignona 2 » ne se distinguent qu'au
@@ -91,7 +93,7 @@ export class ReferentielQueryDto {
     description: 'Ne renvoyer que les entrées actives.',
   })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(queryBoolean)
   @IsBoolean()
   activeOnly?: boolean;
 }
