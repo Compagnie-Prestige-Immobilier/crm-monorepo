@@ -23,7 +23,17 @@ describe('buildRepresentantsExportUrl', () => {
     );
   });
 
-  it('reprend les critères de l’écran, tri compris', () => {
+  /**
+   * Les critères passent, le TRI non.
+   *
+   * La route d'export ne déclare que les filtres, et la validation globale
+   * tourne en `forbidNonWhitelisted` : un `sortBy` en trop n'est pas ignoré, il
+   * fait échouer l'export en 400. Ce test pinait auparavant l'inverse, et la
+   * panne restait invisible parce que le tri par défaut n'écrit rien dans
+   * l'URL : elle ne se déclenchait qu'une fois l'utilisateur ayant touché à une
+   * colonne, c'est-à-dire jamais en test et toujours en usage réel.
+   */
+  it('reprend les critères de l’écran, mais jamais le tri', () => {
     const url = buildRepresentantsExportUrl({
       ...EMPTY_REPRESENTANT_FILTERS,
       search: 'Diallo',
@@ -34,8 +44,8 @@ describe('buildRepresentantsExportUrl', () => {
     });
     expect(url).toContain('search=Diallo');
     expect(url).toContain('departementId=dep-1');
-    expect(url).toContain('sortBy=prospects');
-    expect(url).toContain('sortOrder=asc');
+    expect(url).not.toContain('sortBy');
+    expect(url).not.toContain('sortOrder');
   });
 
   /**

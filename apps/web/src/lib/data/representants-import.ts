@@ -90,15 +90,25 @@ export const REPRESENTANTS_TEMPLATE_FILE_NAME = 'cpi-representants-modele.xlsx';
  * yeux ». Un seul constructeur de requête est la seule façon de le tenir.
  *
  * La pagination est retirée : un export contient tout ce que le filtre
- * sélectionne, pas la page affichée. Le TRI est conservé : il ne restreint
- * aucune population, et l'ordre des lignes du classeur doit être celui du
- * tableau.
+ * sélectionne, pas la page affichée.
+ *
+ * LE TRI EST RETIRÉ AUSSI, et ce n'est pas un choix de confort. La route
+ * d'export lie `RepresentantExportQueryDto`, qui ne déclare QUE les filtres :
+ * le service parcourt la table en pagination par clé sur `id`, si bien qu'un
+ * `sortBy` n'y serait de toute façon pas honoré. Or la validation globale
+ * tourne en `forbidNonWhitelisted` : un paramètre non déclaré ne serait pas
+ * ignoré, il ferait échouer l'export en 400. Les laisser passer cassait donc
+ * le téléchargement dès que l'utilisateur touchait au tri du tableau, et le
+ * tri par défaut masquait la panne le reste du temps.
+ *
+ * Les deux exports voisins retirent déjà `sortBy` et `sortDir` pour la même
+ * raison, voir `lib/data/export.ts`.
  */
 export function buildRepresentantsExportUrl(filters: RepresentantFilters): string {
   const query = toRepresentantQuery(filters);
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
-    if (key === 'page' || key === 'pageSize') continue;
+    if (key === 'page' || key === 'pageSize' || key === 'sortBy' || key === 'sortOrder') continue;
     params.set(key, String(value));
   }
   const rendered = params.toString();
