@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class AppUpdateDto {
   @ApiProperty() available!: boolean;
@@ -29,17 +29,18 @@ export class AppUpdateDto {
   @ApiProperty({ type: String, nullable: true }) notes!: string | null;
 }
 
+/**
+ * Le formulaire de publication, RÉDUIT à ce que l'APK ne sait pas dire.
+ *
+ * `versionName` et `versionCode` n'y figurent plus : ils sont lus dans le
+ * manifeste du fichier (voir `apk-manifest.ts`). Les redemander à
+ * l'administrateur revenait à lui faire recopier une valeur que le serveur
+ * pouvait lire lui-même, avec le droit de se tromper en la recopiant.
+ *
+ * Ne restent donc que les deux décisions ÉDITORIALES, celles qu'aucun fichier
+ * ne porte : forcer ou non l'installation, et le texte des notes de version.
+ */
 export class AppUpdateUploadDto {
-  @ApiProperty({ description: 'Version visible par les utilisateurs, ex. 1.4.0.' })
-  @IsString()
-  @MaxLength(32)
-  versionName!: string;
-
-  @ApiProperty({ description: 'versionCode Android strictement positif.' })
-  @IsInt()
-  @Min(1)
-  versionCode!: number;
-
   @ApiProperty({ description: 'Bloque l’application jusqu’à installation.' })
   @IsBoolean()
   forceUpdate!: boolean;

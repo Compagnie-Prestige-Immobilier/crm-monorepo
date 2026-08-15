@@ -10,6 +10,7 @@ import {
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { Role } from '@crm/database';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -74,19 +75,34 @@ export class AppUpdatesController {
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ operationId: 'uploadAndroidUpdate', summary: 'Publie une release Android.' })
+  @ApiOperation({
+    operationId: 'uploadAndroidUpdate',
+    summary: 'Publie une release Android.',
+    description:
+      '`versionName` et `versionCode` ne sont PAS envoyés : ils sont lus dans le ' +
+      '`AndroidManifest.xml` de l’APK. Les envoyer quand même produit un 400, la ' +
+      'validation refusant tout champ inconnu. La publication est refusée si le ' +
+      'manifeste est illisible, si le paquet n’est pas `sn.cpi.go`, ou si le ' +
+      '`versionCode` n’est pas STRICTEMENT supérieur à celui de la release en ligne.',
+  })
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['file', 'versionName', 'versionCode', 'forceUpdate'],
+      required: ['file', 'forceUpdate'],
       properties: {
         file: { type: 'string', format: 'binary' },
-        versionName: { type: 'string' },
-        versionCode: { type: 'integer' },
         forceUpdate: { type: 'boolean' },
         notes: { type: 'string' },
       },
     },
+  })
+  @ApiErrors({
+    400: 'APK_MANIFEST_UNREADABLE · fichier absent, non-APK, trop volumineux, ou manifeste illisible.',
+    401: true,
+    403: true,
+    422:
+      'APK_FOREIGN_PACKAGE · le manifeste déclare un autre paquet que `sn.cpi.go`. ' +
+      'APK_VERSION_NOT_GREATER · le versionCode lu ne dépasse pas celui en ligne.',
   })
   @ApiResponse({ status: 201, type: AppUpdateDto })
   upload(

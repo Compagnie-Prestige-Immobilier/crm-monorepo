@@ -12,6 +12,7 @@ import type { MultipartFile } from '@fastify/multipart';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readEnv } from '../../env.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { assertPublishable, readApkIdentity, type ApkIdentity } from './apk-manifest.js';
 import type { AppUpdateDto } from './dto.js';
 import { AppUpdateUploadDto } from './dto.js';
 
@@ -57,23 +58,41 @@ export class AppUpdatesService {
     return this.toDto(release);
   }
 
+  /**
+   * Publie une release Android.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * L'ORDRE A CHANGÉ, ET C'EST LE CŒUR DE LA CORRECTION
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Avant, la version venait du FORMULAIRE : elle était donc connue avant même
+   * d'ouvrir le fichier, et la comparaison avec la release en ligne pouvait se
+   * faire en premier. Elle vient désormais du MANIFESTE de l'APK, qui ne se lit
+   * qu'une fois les octets sur le disque : un manifeste vit dans le ZIP, et le
+   * répertoire central d'un ZIP est écrit à la FIN de l'archive. Rien ne peut
+   * donc être décidé sur un flux encore en cours.
+   *
+   * La séquence est donc : écrire dans un `.part`, lire le manifeste, appliquer
+   * les règles, et seulement alors renommer vers le nom définitif. Le `.part`
+   * est effacé sur chaque chemin de refus. Un APK refusé ne laisse RIEN dans le
+   * répertoire des releases, et surtout jamais un fichier portant le nom
+   * définitif d'une version que la base n'annonce pas : `download()` sert le
+   * fichier nommé par la base, mais un orphelin de 70 Mo par tentative
+   * remplirait le volume en quelques semaines.
+   */
   async upload(request: FastifyRequest, actor: AuthenticatedUser): Promise<AppUpdateDto> {
     const file = await request.file();
     if (!file || !file.filename.toLowerCase().endsWith('.apk')) {
       throw new BadRequestException('Un fichier APK est requis.');
     }
     const input = await this.validateFields(this.readFields(file));
-    const current = await this.readRelease();
-    if (current !== null && input.versionCode <= current.versionCode) {
-      throw new BadRequestException(
-        `La version Android doit être supérieure à ${String(current.versionCode)}.`,
-      );
-    }
 
     await mkdir(this.directory, { recursive: true });
-    const fileName = `cpi-go-${String(input.versionCode)}-${randomUUID()}.apk`;
-    const temporaryPath = join(this.directory, `.${fileName}.part`);
-    const targetPath = join(this.directory, fileName);
+    // Le nom temporaire ne peut plus porter le versionCode, qui n'est pas
+    // encore connu : un UUID suffit, et il garantit que deux publications
+    // simultanées n'écrivent pas dans le même fichier.
+    const draft = randomUUID();
+    const temporaryPath = join(this.directory, `.${draft}.apk.part`);
     const hash = createHash('sha256');
     let fileSize = 0;
     try {
@@ -82,16 +101,32 @@ export class AppUpdatesService {
         hash.update(chunk);
       });
       await pipeline(file.file, createWriteStream(temporaryPath, { flags: 'wx' }));
-      await rename(temporaryPath, targetPath);
     } catch (error) {
       await rm(temporaryPath, { force: true });
       if (file.file.truncated) throw new BadRequestException('APK trop volumineux.');
       throw error;
     }
 
+    let identity: ApkIdentity;
+    let fileName: string;
+    try {
+      identity = await readApkIdentity(temporaryPath);
+      const current = await this.readRelease();
+      assertPublishable(identity, current?.versionCode ?? null);
+
+      fileName = `cpi-go-${String(identity.versionCode)}-${draft}.apk`;
+      await rename(temporaryPath, join(this.directory, fileName));
+    } catch (error) {
+      // `rm` AVANT de relever : sans ce nettoyage, chaque APK refusé (mauvais
+      // paquet, version pas assez haute, manifeste illisible) laisserait ses
+      // dizaines de mégaoctets sur le volume monté, que rien ne balaie.
+      await rm(temporaryPath, { force: true });
+      throw error;
+    }
+
     const release: ReleaseRecord = {
-      versionName: input.versionName,
-      versionCode: input.versionCode,
+      versionName: identity.versionName,
+      versionCode: identity.versionCode,
       forceUpdate: input.forceUpdate,
       fileName,
       fileSize,
@@ -171,29 +206,31 @@ export class AppUpdatesService {
    * l'un d'eux protège `notes`, une valeur renvoyée telle quelle par la route
    * PUBLIQUE `GET android/current` que chaque installation interroge au
    * démarrage : une note de 10 Mo se serait retrouvée dans toutes les réponses.
+   *
+   * `forbidNonWhitelisted` prend un sens NOUVEAU depuis que le DTO a perdu
+   * `versionName` et `versionCode` : un panel resté sur l'ancienne version, qui
+   * enverrait encore ces deux champs, reçoit un 400 nommant les champs de trop
+   * au lieu de les voir ignorés en silence. C'est le comportement voulu. Un
+   * client qui croit encore décider de la version doit l'apprendre, sans quoi
+   * il continuerait d'afficher deux formulaires que plus personne ne lit.
    */
   private async validateFields(fields: Record<string, string>): Promise<AppUpdateUploadDto> {
     // Le multipart ne transporte que du texte. La conversion est explicite ici
     // plutôt que confiée à `enableImplicitConversion`, qui transformerait
-    // n'importe quelle chaîne en nombre et ferait passer `@IsInt` pour un
-    // contrôle alors qu'il ne verrait plus jamais de valeur invalide.
+    // n'importe quelle chaîne en booléen sans jamais laisser `@IsBoolean` voir
+    // de valeur invalide.
     if (fields.forceUpdate !== 'true' && fields.forceUpdate !== 'false') {
       throw new BadRequestException('forceUpdate doit valoir true ou false.');
     }
-    const rawVersionCode = fields.versionCode?.trim() ?? '';
     const input = plainToInstance(AppUpdateUploadDto, {
       ...fields,
-      versionName: fields.versionName ?? '',
-      // Une chaîne non numérique donne NaN, que `@IsInt` refuse : c'est bien
-      // une erreur de saisie, pas un zéro implicite.
-      versionCode: /^-?\d+$/.test(rawVersionCode) ? Number(rawVersionCode) : Number.NaN,
       forceUpdate: fields.forceUpdate === 'true',
     });
     const failures = await validate(input, { whitelist: true, forbidNonWhitelisted: true });
     if (failures.length > 0) {
       // Même forme d'erreur que le reste du module : `HttpException` à message
       // simple. Les contraintes violées sont nommées, sans quoi l'administrateur
-      // n'a aucun moyen de savoir lequel des quatre champs il doit corriger.
+      // n'a aucun moyen de savoir quel champ il doit corriger.
       const details = failures
         .flatMap((failure) => Object.values(failure.constraints ?? {}))
         .join(' ; ');
