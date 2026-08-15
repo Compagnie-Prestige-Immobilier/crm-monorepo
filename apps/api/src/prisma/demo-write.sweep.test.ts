@@ -163,10 +163,11 @@ const SITES: Record<string, Site> = {
     verdict: 'BLOQUE',
     note: 'POST /v1/client-requests, refusé en 409 pendant une démonstration',
   },
-  'modules/prospects/prospects.service.ts → (await this.demo.enabledForWrite()) || representant.isDemo': {
-    verdict: 'BLOQUE',
-    note: 'POST /v1/prospects, refusé en 409 ; le terme de gauche ne peut donc jamais valoir true, et celui de droite hérite du représentant',
-  },
+  'modules/prospects/prospects.service.ts → (await this.demo.enabledForWrite()) || representant.isDemo':
+    {
+      verdict: 'BLOQUE',
+      note: 'POST /v1/prospects, refusé en 409 ; le terme de gauche ne peut donc jamais valoir true, et celui de droite hérite du représentant',
+    },
 
   // ── Héritage d'une ligne parente ─────────────────────────────────────────
   'modules/phase2/phase2-sync.service.ts → prospect.isDemo': {
@@ -208,6 +209,13 @@ const SITES: Record<string, Site> = {
   },
 
   // ── Lectures, filtres, déclarations de type ──────────────────────────────
+  'common/guards/fresh-session.guard.ts → true': {
+    verdict: 'LECTURE',
+    note:
+      'clause `select` de la relecture d’autorité sur les routes à rôle : la garde LIT isDemo pour ' +
+      'refuser une session de démonstration survivant à l’extinction du mode, et n’écrit rien. ' +
+      'C’est le pendant, pour les jetons DÉJÀ émis, du refus d’émission d’AuthService',
+  },
   'prisma/demo-visibility.ts → false': {
     verdict: 'LECTURE',
     note: 'le fragment `where` lui-même, celui que tout le reste compose',

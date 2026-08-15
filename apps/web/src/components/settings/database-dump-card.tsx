@@ -110,7 +110,7 @@ export function DatabaseDumpCard() {
       queryClient.setQueryData(queryKeys.databaseDump, next);
       setConfirming(false);
       setConfirmed(false);
-      toast.success('Export lancé. Un message vous préviendra dès qu’il sera prêt.');
+      toast.success('Export lancé. La cloche du panel vous préviendra dès qu’il sera prêt.');
     },
     onError: (error) => {
       setConfirming(false);
@@ -159,8 +159,8 @@ export function DatabaseDumpCard() {
                 <LoaderIcon className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden="true" />
                 <span>
                   <span className="font-[600]">Export en cours.</span> L’opération dure plusieurs
-                  minutes. Vous pouvez quitter cet écran&nbsp;: un message vous préviendra dès que
-                  l’archive sera prête.
+                  minutes. Vous pouvez quitter le panel&nbsp;: la cloche des notifications vous
+                  préviendra dès que l’archive sera prête.
                 </span>
               </p>
             ) : (
@@ -262,8 +262,9 @@ export function DatabaseDumpCard() {
           <p className="flex items-start gap-2 text-[0.75rem] text-muted-foreground">
             <InfoIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
             <span>
-              Le message d’avis ne contient AUCUN lien. Le téléchargement se fait depuis cet écran,
-              dans votre session. L’archive est détruite dès qu’elle a été téléchargée.
+              L’avis de fin arrive dans la cloche du panel, sans e-mail et sans AUCUN lien. Le
+              téléchargement se fait depuis cet écran, dans votre session. L’archive est détruite
+              dès qu’elle a été téléchargée.
             </span>
           </p>
         </CardContent>
@@ -298,6 +299,23 @@ export function DatabaseDumpCard() {
               <li>Tous les dossiers bancaires, avec les montants en francs CFA.</li>
               <li>Tous les comptes utilisateurs, avec les empreintes de leurs mots de passe.</li>
               <li>Toutes les campagnes, les demandes clients et l’historique des actions.</li>
+              {/*
+                CE POINT-LÀ SURPREND, DONC IL EST ÉCRIT.
+
+                Éteindre le mode démonstration ne supprime pas les lignes
+                semées : il les MASQUE. L'export, lui, ne masque rien, il copie
+                les tables entières. Un administrateur qui a fait une
+                démonstration le mois dernier et qui n'a pas purgé emporte donc
+                des prospects fictifs mêlés aux vrais, dans un fichier qui a
+                toutes les apparences d'un export de production. Le dire ici
+                coûte une ligne ; le découvrir six mois plus tard, dans une base
+                de travail alimentée par cet export, coûte beaucoup plus.
+              */}
+              <li>
+                Les lignes de démonstration éventuellement encore en base&nbsp;: elles sont masquées
+                à l’écran, pas dans l’archive. Purgez le jeu de démonstration avant l’export si vous
+                ne les voulez pas.
+              </li>
             </ul>
 
             <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.875rem] text-warning">
@@ -315,9 +333,10 @@ export function DatabaseDumpCard() {
             <p className="flex items-start gap-2 rounded-md border border-success/30 bg-success-surface px-3 py-2.5 text-[0.875rem] text-success">
               <MailIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>
-                <span className="font-[600]">Aucun lien ne circulera.</span> L’avis de fin annonce
-                seulement que l’archive est prête. Le téléchargement se fait sur cet écran, dans
-                votre session, et l’archive est détruite aussitôt après.
+                <span className="font-[600]">Aucun e-mail, aucun lien.</span> L’avis de fin arrive
+                dans la cloche du panel, et nulle part ailleurs&nbsp;: rien ne part par messagerie.
+                Le téléchargement se fait sur cet écran, dans votre session, et l’archive est
+                détruite aussitôt après.
               </span>
             </p>
 
