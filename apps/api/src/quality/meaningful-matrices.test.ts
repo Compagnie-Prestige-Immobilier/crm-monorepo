@@ -48,7 +48,7 @@ const phoneCases = Array.from({ length: 100 }, (_, index) => {
   ] as const;
 }).flat();
 
-describe('téléphones sénégalais — présentations terrain', () => {
+describe('téléphones sénégalais, présentations terrain', () => {
   it.each(phoneCases)('%s reste la même clé E.164 (%s)', (input, expected) => {
     expect(normalizePhone(input)).toBe(expected);
   });
@@ -82,7 +82,7 @@ const segmentCases = syndicates.flatMap((syndicatSigle) =>
   banks.map((banqueShortName) => [syndicatSigle, banqueShortName] as const),
 );
 
-describe('segmentation BDD — chaque combinaison réelle a un seul segment', () => {
+describe('segmentation BDD, chaque combinaison réelle a un seul segment', () => {
   it.each(segmentCases)('%s × %s est classé et filtré de façon cohérente', (syndicat, banque) => {
     const segment = classifySegment({ syndicatSigle: syndicat, banqueShortName: banque });
     const axes = segmentWhere(segment) as Record<string, unknown>;
@@ -102,7 +102,7 @@ const attemptCases = outcomes.flatMap((outcome) =>
   methods.flatMap((method) => comments.map((comment) => ({ outcome, method, comment }))),
 );
 
-describe('tentatives phase 2 — matrice issue × méthode × commentaire', () => {
+describe('tentatives phase 2, matrice issue × méthode × commentaire', () => {
   it.each(attemptCases)('$outcome avec méthode=$method et commentaire=$comment', (input) => {
     const isMethod = input.outcome === CallOutcome.METHOD_OBTAINED;
     const isOther = input.outcome === CallOutcome.OTHER;
@@ -179,7 +179,7 @@ const workflowCases = Array.from({ length: 250 }, (_, offset) => {
   return pairs;
 }).flat();
 
-describe('workflow bancaire — transitions successives sur des workflows variables', () => {
+describe('workflow bancaire, transitions successives sur des workflows variables', () => {
   it.each(workflowCases)(
     '$caseId applique la transition ouverte ou terminale correcte',
     ({ stages, current, expected }) => {
@@ -202,7 +202,7 @@ const distributionCases = Array.from({ length: 1000 }, (_, index) => {
   return { itemCount, bucketCount };
 });
 
-describe('distribution phase 2 — conservation et équilibrage', () => {
+describe('distribution phase 2, conservation et équilibrage', () => {
   it.each(distributionCases)(
     '$itemCount fiches / $bucketCount commerciaux',
     ({ itemCount, bucketCount }) => {
@@ -235,7 +235,7 @@ const cursorCases = Array.from({ length: 1000 }, (_, index) => {
   return { sync, directory: { v: 1 as const, ...position } };
 });
 
-describe('curseurs offline — reprise exacte après pagination', () => {
+describe('curseurs offline, reprise exacte après pagination', () => {
   it.each(cursorCases)(
     'curseur sync $sync.streams.prospects.id conserve sa position',
     ({ sync, directory }) => {

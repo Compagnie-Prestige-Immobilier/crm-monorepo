@@ -1,19 +1,23 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule, seconds } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
 import { envSchema, readEnv } from './env.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { DemoModeInterceptor } from './common/interceptors/demo-mode.interceptor.js';
+import { DemoReadOnlyGuard } from './common/guards/demo-read-only.guard.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { BankCasesModule } from './modules/bank-cases/bank-cases.module.js';
+import { ClientRequestsModule } from './modules/client-requests/client-requests.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { Phase2Module } from './modules/phase2/phase2.module.js';
+import { RepCampaignsModule } from './modules/rep-campaigns/rep-campaigns.module.js';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
 import { ExportModule } from './modules/export/export.module.js';
 import { HealthModule } from './modules/health/health.module.js';
@@ -38,7 +42,7 @@ const env = readEnv();
         ...(env.NODE_ENV === 'development' ? { transport: { target: 'pino-pretty' } } : {}),
         // Les jokers comptent : `password` seul ne couvre qu'une clé racine,
         // et un corps ou un en-tête imbriqué passerait à travers. Cette liste
-        // est la dernière ligne de défense, pas la première — les corps de
+        // est la dernière ligne de défense, pas la première, les corps de
         // requête ne sont pas journalisés.
         redact: {
           paths: [
@@ -77,7 +81,9 @@ const env = readEnv();
     ProspectsModule,
     SyncModule,
     Phase2Module,
+    RepCampaignsModule,
     BankCasesModule,
+    ClientRequestsModule,
     DemoModule,
     AdminModule,
     NotificationsModule,
@@ -88,11 +94,21 @@ const env = readEnv();
   providers: [
     // L'ordre compte. Le throttler s'applique avant toute lecture de base ;
     // JwtAuthGuard renseigne `request.user`, que RolesGuard lit ensuite. Les
-    // trois sont globaux : une route qui oublie un décorateur est refusée, pas
-    // exposée.
+    // quatre sont globaux : une route qui oublie un décorateur est refusée,
+    // pas exposée.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    // EN DERNIER, délibérément. Une requête sans jeton doit repartir en 401,
+    // pas en 409 : le mode démonstration n'est pas une raison de renseigner un
+    // anonyme sur l'état interne du serveur. Cette garde suspend les écritures
+    // interactives pendant une démonstration ; la remontée hors ligne du
+    // mobile en est dispensée, voir `DemoWritable`.
+    { provide: APP_GUARD, useClass: DemoReadOnlyGuard },
+    // Estampille `X-Demo-Mode` sur toute réponse non détournée : une capture
+    // d'écran de statistiques prise pendant une démonstration circule ensuite
+    // sans la bannière qui l'accompagnait.
+    { provide: APP_INTERCEPTOR, useClass: DemoModeInterceptor },
   ],
 })
 export class AppModule {}

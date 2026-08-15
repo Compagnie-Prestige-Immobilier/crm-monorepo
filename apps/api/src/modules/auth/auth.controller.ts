@@ -1,7 +1,9 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { seconds, Throttle } from '@nestjs/throttler';
 
+import { DemoWritable } from '../../common/decorators/demo-writable.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import {
   CurrentUser,
@@ -11,6 +13,15 @@ import { AuthService } from './auth.service.js';
 import { AuthTokensDto, AuthUserDto, LoginDto, LogoutResponseDto, RefreshDto } from './dto.js';
 
 @ApiTags('auth')
+// AUCUNE route de ce contrôleur n'écrit de donnée métier : elles ouvrent et
+// ferment une session. Les refuser pendant une démonstration empêcherait de se
+// connecter POUR ÉTEINDRE le mode, et couperait le renouvellement de jeton des
+// téléphones en cours de synchronisation, dont la file partirait en session
+// expirée pour une raison qui n'a rien à voir avec eux.
+//
+// `logout` révoque un refresh token, seule écriture du lot : une session qu'on
+// ferme est un geste de sécurité, jamais une donnée de production à protéger.
+@DemoWritable('ouvrir et fermer une session n’écrit aucune donnée métier')
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
@@ -24,8 +35,16 @@ export class AuthController {
     summary: 'Ouvre une session à partir d’un e-mail ou d’un nom d’utilisateur.',
   })
   @ApiResponse({ status: 200, type: AuthTokensDto })
-  @ApiResponse({ status: 401, description: 'Identifiants invalides ou compte désactivé.' })
-  @ApiResponse({ status: 429, description: 'Trop de tentatives (AUTH_LOGIN_RATE_LIMIT).' })
+  @ApiResponse({
+    status: 401,
+    type: ApiErrorDto,
+    description: 'Identifiants invalides ou compte désactivé.',
+  })
+  @ApiResponse({
+    status: 429,
+    type: ApiErrorDto,
+    description: 'Trop de tentatives (AUTH_LOGIN_RATE_LIMIT).',
+  })
   login(@Body() body: LoginDto, @Headers('user-agent') userAgent?: string): Promise<AuthTokensDto> {
     return this.auth.login(body.identifier, body.password, userAgent);
   }
@@ -40,7 +59,7 @@ export class AuthController {
       'Le jeton présenté est révoqué au passage. Présenter un jeton déjà consommé révoque toute la famille.',
   })
   @ApiResponse({ status: 200, type: AuthTokensDto })
-  @ApiResponse({ status: 401, description: 'Jeton inconnu, expiré ou rejoué.' })
+  @ApiResponse({ status: 401, type: ApiErrorDto, description: 'Jeton inconnu, expiré ou rejoué.' })
   refresh(
     @Body() body: RefreshDto,
     @Headers('user-agent') userAgent?: string,

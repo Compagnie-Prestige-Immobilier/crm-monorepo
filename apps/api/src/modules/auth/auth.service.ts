@@ -14,7 +14,7 @@ import type { AuthTokensDto, AuthUserDto } from './dto.js';
  *
  * La table `refresh_tokens` ne contient JAMAIS le jeton en clair : une fuite de
  * la base ne livre donc aucune session utilisable. SHA-256 nu (et non argon2)
- * suffit ici — contrairement à un mot de passe, le jeton est une valeur
+ * suffit ici, contrairement à un mot de passe, le jeton est une valeur
  * aléatoire de haute entropie, insensible aux attaques par dictionnaire, et la
  * vérification doit rester assez rapide pour tenir sur le chemin de refresh.
  */
@@ -143,7 +143,7 @@ export class AuthService {
     if (stored.revokedAt) {
       await this.revokeFamily(stored.familyId);
       this.logger.warn(
-        `Rejeu de refresh token détecté (famille ${stored.familyId}) — famille révoquée`,
+        `Rejeu de refresh token détecté (famille ${stored.familyId}), famille révoquée`,
       );
       throw new UnauthorizedException({
         code: 'REFRESH_TOKEN_REPLAYED',
