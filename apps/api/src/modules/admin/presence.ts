@@ -1,5 +1,5 @@
 /**
- * Présence d'un compte — DÉDUITE, jamais déclarée.
+ * Présence d'un compte, DÉDUITE, jamais déclarée.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * Rien n'enregistre « untel est en ligne ». Il faut donc le déduire, et le
@@ -9,20 +9,20 @@
  * Quatre traces existent déjà dans le schéma, et aucune n'a été ajoutée pour
  * cet écran :
  *
- *  - `User.lastLoginAt` — l'ouverture de session. Suffisant pour « s'est
+ *  - `User.lastLoginAt`, l'ouverture de session. Suffisant pour « s'est
  *    connecté un jour », inutilisable pour « est là maintenant » : une session
  *    vaut trente jours.
- *  - `RefreshToken` — chaque rotation crée une ligne dans la même famille. Le
+ *  - `RefreshToken`, chaque rotation crée une ligne dans la même famille. Le
  *    panel comme le mobile tournent leur jeton dès que l'accès approche de son
  *    terme (15 min). La date de la DERNIÈRE rotation d'une famille encore
  *    vivante est donc la meilleure approximation disponible de « dernière
  *    requête », sans instrumenter quoi que ce soit.
- *  - `SyncBatch.createdAt` — dernier lot poussé par un appareil mobile.
- *  - Les écritures métier — tentative d'appel, transition de dossier.
+ *  - `SyncBatch.createdAt`, dernier lot poussé par un appareil mobile.
+ *  - Les écritures métier, tentative d'appel, transition de dossier.
  *
  * D'où la fenêtre « connecté » : une rotation ne survient qu'au bout d'un
  * quart d'heure d'usage continu. Un seuil plus court afficherait « inactif »
- * un téléconseiller en pleine session, ce qui est le pire des deux défauts —
+ * un téléconseiller en pleine session, ce qui est le pire des deux défauts,
  * un superviseur qui voit un agent absent alors qu'il travaille appelle son
  * responsable pour rien.
  *
@@ -39,7 +39,7 @@ export const PRESENCE_RECENT_WINDOW_HOURS = 24;
 /**
  * Trois états, et trois seulement.
  *
- * Un quatrième — « peut-être » — serait vrai mais inexploitable : un
+ * Un quatrième, « peut-être », serait vrai mais inexploitable : un
  * superviseur agit ou n'agit pas, il n'agit pas « à moitié ».
  */
 export type PresenceState = 'ONLINE' | 'RECENT' | 'AWAY';

@@ -32,7 +32,7 @@ import { DEMO_TRACKED_STEPS, PURGE_STEPS, type PurgeContext } from './purge-step
  *    à cocher se coche par réflexe ; un identifiant se tape en conscience.
  *
  * L'opération est TRANSACTIONNELLE. Une purge à moitié faite laisserait une base
- * incohérente — des prospects sans représentants, des dossiers sans banque — ce
+ * incohérente, des prospects sans représentants, des dossiers sans banque, ce
  * qui est strictement pire que l'état de départ.
  */
 
@@ -73,7 +73,7 @@ export class PurgeService {
       allowed,
       // Ce que l'administrateur devra retaper. L'afficher n'affaiblit rien : la
       // ressaisie sert à interrompre un geste automatique, pas à prouver une
-      // identité — celle-ci est déjà établie par le jeton.
+      // identité, celle-ci est déjà établie par le jeton.
       confirmationHint: allowed ? firstAdmin.username : '',
       domains: PURGE_DOMAINS.map((domain) => ({
         key: domain.key,

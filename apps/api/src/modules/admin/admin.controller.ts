@@ -1,5 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
+import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { Role } from '@crm/database';
 
 import {
@@ -18,13 +20,19 @@ import { SupervisionService } from './supervision.service.js';
  *
  * `@Roles(ADMIN)` est posé sur la CLASSE : une route ajoutée sans décorateur
  * reste fermée plutôt que d'être ouverte par oubli. La purge ajoute un second
- * verrou — le premier administrateur — vérifié dans le service, et non ici :
+ * verrou, le premier administrateur, vérifié dans le service, et non ici :
  * un contrôle de garde se contourne en appelant le service d'ailleurs, un
  * contrôle dans le service ne se contourne pas.
  */
 @ApiTags('admin')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
+// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
+// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
+// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
+// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
+// cas sur 116 opérations sur 119.
+@ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'admin', version: '1' })
 export class AdminController {
   constructor(
@@ -56,8 +64,16 @@ export class AdminController {
       'n’est jamais supprimé. Journalisé.',
   })
   @ApiResponse({ status: 200, type: PurgeResultDto })
-  @ApiResponse({ status: 401, description: 'Identifiant de confirmation incorrect.' })
-  @ApiResponse({ status: 403, description: 'Compte administrateur autre que le premier.' })
+  @ApiResponse({
+    status: 401,
+    type: ApiErrorDto,
+    description: 'Identifiant de confirmation incorrect.',
+  })
+  @ApiResponse({
+    status: 403,
+    type: ApiErrorDto,
+    description: 'Compte administrateur autre que le premier.',
+  })
   purge(
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: PurgeRequestDto,

@@ -7,7 +7,7 @@ import type { PurgeStepKey } from './purge-plan.js';
  *
  * Table de correspondance plutôt que `switch` disséminé, pour la même raison que
  * `DEMO_DELETERS` : une étape ajoutée à `PURGE_STEP_ORDER` sans son exécution
- * ici casse la compilation, au lieu d'être silencieusement ignorée — c'est-à-dire
+ * ici casse la compilation, au lieu d'être silencieusement ignorée, c'est-à-dire
  * au lieu de laisser des lignes derrière une purge annoncée comme complète.
  *
  * `count` et `remove` portent la MÊME clause. C'est ce qui rend l'écran honnête :
@@ -16,7 +16,7 @@ import type { PurgeStepKey } from './purge-plan.js';
  *
  * Les délégués sont écrits en toutes lettres plutôt que dérivés d'une clé
  * générique : Prisma type chaque modèle séparément, et l'indexation dynamique
- * n'y survivrait qu'au prix d'une assertion — exactement la construction qui
+ * n'y survivrait qu'au prix d'une assertion, exactement la construction qui
  * laisse passer une faute de frappe sur un nom de table.
  */
 
@@ -91,6 +91,31 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.callCampaign.count(),
     remove: async (db) => (await db.callCampaign.deleteMany({})).count,
   },
+  repCallAttempts: {
+    table: 'rep_call_attempts',
+    count: (db) => db.repCallAttempt.count(),
+    remove: async (db) => (await db.repCallAttempt.deleteMany({})).count,
+  },
+  repCallTasks: {
+    table: 'rep_call_tasks',
+    count: (db) => db.repCallTask.count(),
+    remove: async (db) => (await db.repCallTask.deleteMany({})).count,
+  },
+  repCampaignMembers: {
+    table: 'rep_call_campaign_commerciaux',
+    count: (db) => db.repCallCampaignCommercial.count(),
+    remove: async (db) => (await db.repCallCampaignCommercial.deleteMany({})).count,
+  },
+  repCampaigns: {
+    table: 'rep_call_campaigns',
+    count: (db) => db.repCallCampaign.count(),
+    remove: async (db) => (await db.repCallCampaign.deleteMany({})).count,
+  },
+  clientRequests: {
+    table: 'client_creation_requests',
+    count: (db) => db.clientCreationRequest.count(),
+    remove: async (db) => (await db.clientCreationRequest.deleteMany({})).count,
+  },
   prospects: {
     table: 'prospects',
     count: (db) => db.prospect.count(),
@@ -115,11 +140,6 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     table: 'notification_templates',
     count: (db) => db.notificationTemplate.count(),
     remove: async (db) => (await db.notificationTemplate.deleteMany({})).count,
-  },
-  deviceTokens: {
-    table: 'device_tokens',
-    count: (db) => db.deviceToken.count(),
-    remove: async (db) => (await db.deviceToken.deleteMany({})).count,
   },
   syncOperations: {
     table: 'sync_operations',
@@ -158,6 +178,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.syndicat.count(),
     remove: async (db) => (await db.syndicat.deleteMany({})).count,
   },
+  iefs: {
+    table: 'iefs',
+    count: (db) => db.ief.count(),
+    remove: async (db) => (await db.ief.deleteMany({})).count,
+  },
   departements: {
     table: 'departements',
     count: (db) => db.departement.count(),
@@ -187,6 +212,11 @@ export const DEMO_TRACKED_STEPS: readonly PurgeStepKey[] = [
   'campaignMembers',
   'callTasks',
   'callAttempts',
+  'repCampaigns',
+  'repCampaignMembers',
+  'repCallTasks',
+  'repCallAttempts',
+  'clientRequests',
   'bankCases',
   'bankCaseTransitions',
 ];

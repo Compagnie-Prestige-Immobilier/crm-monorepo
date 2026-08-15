@@ -83,7 +83,7 @@ export class SupervisionService {
       /**
        * Familles de jetons ENCORE VIVANTES. Le filtre porte les deux
        * conditions : `revokedAt: null` élimine les jetons déjà tournés ou
-       * révoqués, `expiresAt` élimine les familles mortes de vieillesse — un
+       * révoqués, `expiresAt` élimine les familles mortes de vieillesse, un
        * compte inactif depuis trente et un jours garderait sinon une ligne non
        * révoquée et serait annoncé « en session ».
        */
@@ -99,6 +99,16 @@ export class SupervisionService {
         _max: { createdAt: true },
       }),
 
+      /**
+       * LECTURE GLOBALE délibérée : ces deux agrégats rendent une DATE PAR
+       * COMPTE, et rien d'autre. Le tableau ne montre que les comptes de la
+       * liste ci-dessus, elle-même cloisonnée : une ligne de démonstration ne
+       * peut donc apparaître qu'en face d'un compte de démonstration, déjà
+       * masqué. Filtrer ici ferait en revanche paraître « inactif depuis
+       * toujours » un vrai compte dont la dernière action porte, elle, sur une
+       * fiche de démonstration, ce qui est un contresens sur un écran dont le
+       * seul objet est de repérer les comptes dormants.
+       */
       this.prisma.callAttempt.groupBy({
         by: ['performedById'],
         _max: { createdAt: true },

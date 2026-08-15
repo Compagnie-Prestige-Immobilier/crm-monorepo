@@ -91,7 +91,7 @@ function makePrisma(options: { firstAdmin?: typeof FIRST_ADMIN | null } = {}): {
   return { prisma: client as PrismaService, trace };
 }
 
-describe('PurgeService — autorisation', () => {
+describe('PurgeService, autorisation', () => {
   it('refuse un administrateur qui n’est pas le premier', async () => {
     const { prisma, trace } = makePrisma();
     const service = new PurgeService(prisma);
@@ -158,7 +158,7 @@ describe('PurgeService — autorisation', () => {
   });
 });
 
-describe('PurgeService — exécution', () => {
+describe('PurgeService, exécution', () => {
   it('supprime les enfants avant les parents', async () => {
     const { prisma, trace } = makePrisma();
     await new PurgeService(prisma).purge(actor(), {
