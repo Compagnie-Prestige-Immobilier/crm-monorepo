@@ -99,23 +99,39 @@ test('filtrage du tableau puis export xlsx', async ({ page }) => {
 });
 
 test('chaque écran du panel se charge sans état d’erreur', async ({ page }) => {
-  // Balayage large : chaque écran rend son contenu, jamais l'état d'erreur ni
-  // un squelette permanent.
-  for (const [path, heading] of [
-    ['/tableau-de-bord', 'Tableau de bord'],
-    ['/prospects', 'Prospects'],
-    ['/campagnes', 'Campagnes'],
-    ['/dossiers', 'Dossiers'],
-    ['/dossiers/nouveau', 'Nouveau dossier'],
-    ['/dossiers/export', 'Export'],
-    ['/dossiers/etapes', 'Étapes bancaires'],
-    ['/representants', 'Représentants'],
-    ['/commerciaux', 'Téléconseillers'],
-    ['/referentiels', 'Référentiels'],
-    ['/parametres', 'Paramètres'],
+  /**
+   * Balayage large : chaque écran rend son contenu, jamais l'état d'erreur ni
+   * un squelette permanent.
+   *
+   * Le troisième élément nomme un repère PROPRE à l'écran, pour les routes
+   * dont le titre de niveau 1 est celui de leur parent : `navTitle` le dérive
+   * de la route, si bien que `/representants/import` affiche « Représentants ».
+   * Sans ce repère, le balayage se satisferait d'une coquille montée par le
+   * layout au-dessus d'une page qui n'a rien rendu.
+   */
+  for (const [path, heading, marker] of [
+    ['/tableau-de-bord', 'Tableau de bord', null],
+    ['/prospects', 'Prospects', null],
+    ['/campagnes', 'Campagnes', 'Appels prospects'],
+    ['/campagnes/representants', 'Campagnes', 'Appels représentants'],
+    ['/dossiers', 'Dossiers', null],
+    ['/dossiers/nouveau', 'Nouveau dossier', null],
+    ['/dossiers/export', 'Export', null],
+    ['/dossiers/etapes', 'Étapes bancaires', null],
+    ['/demandes-clients', 'Demandes clients', null],
+    ['/representants', 'Représentants', null],
+    ['/representants/import', 'Représentants', 'Partir du modèle'],
+    ['/commerciaux', 'Téléconseillers', null],
+    ['/supervision', 'Supervision', null],
+    ['/referentiels', 'Référentiels', null],
+    ['/parametres', 'Paramètres', null],
+    ['/notifications', 'Notifications', null],
   ] as const) {
     await page.goto(path);
     await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
+    if (marker !== null) {
+      await expect(page.getByText(marker).first()).toBeVisible();
+    }
 
     /**
      * On vise les titres de `QueryErrorState`, pas `getByRole('alert')` tout

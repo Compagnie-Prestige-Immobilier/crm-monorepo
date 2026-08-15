@@ -29,17 +29,28 @@ export default async function globalSetup(): Promise<void> {
   }
 
   /**
-   * Un 429 prouve que l'API est VIVANTE, c'est son limiteur de débit qui
-   * répond, pas un serveur absent. Le traiter comme une panne faisait échouer
-   * la suite entière alors que la seule chose à faire est d'attendre la
-   * fenêtre suivante.
+   * Un 429 fait ÉCHOUER la préparation, il ne l'endort plus.
+   *
+   * Le raisonnement précédent était juste sur un point : un 429 prouve que
+   * l'API est vivante, c'est son limiteur qui répond. Il était faux sur la
+   * conclusion. Attendre la fenêtre puis rendre la main SANS RIEN REVÉRIFIER
+   * laissait partir la suite sur une API qui refuse déjà les requêtes :
+   * `auth.setup.ts` n'obtenait pas de session, l'état sauvegardé sur disque
+   * était inutilisable, et chaque parcours suivant tournait DÉCONNECTÉ. Les
+   * échecs tombaient alors sur des écrans qui n'étaient pour rien dans
+   * l'affaire, à des dizaines de lignes de trace de la cause réelle.
+   *
+   * Une préparation qui ne peut pas garantir sa précondition doit le dire ici,
+   * au seul endroit où le message peut encore être lisible.
    */
   if (response.status === 429) {
-    const retryAfter = Number(response.headers.get('retry-after') ?? '5');
-    await new Promise((resolve) =>
-      setTimeout(resolve, (Number.isFinite(retryAfter) ? retryAfter : 5) * 1_000),
+    const retryAfter = response.headers.get('retry-after') ?? 'quelques';
+    throw new Error(
+      `L'API CPI limite déjà le débit sur ${API_URL} (429).\n` +
+        `Attendez ${retryAfter} secondes, puis relancez la suite.\n` +
+        'Si le 429 revient immédiatement, une autre suite tourne contre la même ' +
+        'API, ou un précédent processus n’a pas rendu la main.',
     );
-    return;
   }
 
   if (!response.ok) {
