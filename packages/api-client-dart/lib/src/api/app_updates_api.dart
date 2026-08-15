@@ -159,12 +159,10 @@ class AppUpdatesApi {
   }
 
   /// Publie une release Android.
-  ///
+  /// &#x60;versionName&#x60; et &#x60;versionCode&#x60; ne sont PAS envoyés : ils sont lus dans le &#x60;AndroidManifest.xml&#x60; de l’APK. Les envoyer quand même produit un 400, la validation refusant tout champ inconnu. La publication est refusée si le manifeste est illisible, si le paquet n’est pas &#x60;sn.cpi.go&#x60;, ou si le &#x60;versionCode&#x60; n’est pas STRICTEMENT supérieur à celui de la release en ligne.
   ///
   /// Parameters:
   /// * [file]
-  /// * [versionName]
-  /// * [versionCode]
   /// * [forceUpdate]
   /// * [notes]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -178,8 +176,6 @@ class AppUpdatesApi {
   /// Throws [DioException] if API call or serialization fails
   Future<Response<AppUpdateDto>> uploadAndroidUpdate({
     required MultipartFile file,
-    required String versionName,
-    required int versionCode,
     required bool forceUpdate,
     String? notes,
     CancelToken? cancelToken,
@@ -208,8 +204,6 @@ class AppUpdatesApi {
     try {
       _bodyData = FormData.fromMap(<String, dynamic>{
         r'file': file,
-        r'versionName': versionName,
-        r'versionCode': versionCode,
         r'forceUpdate': forceUpdate,
         if (notes != null) r'notes': notes,
       });

@@ -56,6 +56,7 @@ import 'package:crm_api_client/src/model/create_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/create_user_dto.dart';
 import 'package:crm_api_client/src/model/data_quality_dto.dart';
 import 'package:crm_api_client/src/model/data_quality_row_dto.dart';
+import 'package:crm_api_client/src/model/database_dump_job_dto.dart';
 import 'package:crm_api_client/src/model/delay_leg_dto.dart';
 import 'package:crm_api_client/src/model/demo_counts_dto.dart';
 import 'package:crm_api_client/src/model/demo_status_dto.dart';
@@ -361,6 +362,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'DataQualityRowDto':
       return DataQualityRowDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'DatabaseDumpJobDto':
+      return DatabaseDumpJobDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'DelayLeg':
     case 'DelayLegDto':

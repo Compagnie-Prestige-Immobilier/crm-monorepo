@@ -1807,8 +1807,55 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Publie une release Android. */
+    /**
+     * Publie une release Android.
+     * @description `versionName` et `versionCode` ne sont PAS envoyés : ils sont lus dans le `AndroidManifest.xml` de l’APK. Les envoyer quand même produit un 400, la validation refusant tout champ inconnu. La publication est refusée si le manifeste est illisible, si le paquet n’est pas `sn.cpi.go`, ou si le `versionCode` n’est pas STRICTEMENT supérieur à celui de la release en ligne.
+     */
     post: operations['uploadAndroidUpdate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/database-dump': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * État de l’export intégral en cours ou du dernier produit.
+     * @description Route de SONDAGE : l’écran des paramètres l’interroge pendant que l’export court. Elle réconcilie aussi l’état avec l’horloge : un fichier échu est détruit ici, et un export interrompu par un redémarrage passe en `failed` plutôt que de bloquer indéfiniment toute nouvelle demande.
+     */
+    get: operations['getDatabaseDump'];
+    put?: never;
+    /**
+     * Demande un export intégral de la base (schéma et données).
+     * @description Rend IMMÉDIATEMENT, avec un identifiant et un état ; `pg_dump` tourne en arrière-plan. Un avis part ensuite dans la boîte de réception et par e-mail, SANS aucun lien : le fichier ne se télécharge que dans une session authentifiée, par `GET admin/database-dump/download`. Un export déjà en cours est renvoyé tel quel, aucun second `pg_dump` n’est lancé. Refusé pendant une démonstration, un export y mêlerait des lignes fictives aux vraies. Le fichier est détruit dès son téléchargement, et de toute façon à son échéance.
+     */
+    post: operations['requestDatabaseDump'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/database-dump/download': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Télécharge l’export prêt, puis le détruit.
+     * @description Ne prend aucun paramètre : le fichier servi est celui de l’export courant. Le téléchargement est journalisé au nom de l’administrateur, et le fichier est détruit une fois la réponse entièrement émise. Un téléchargement interrompu ne détruit rien, il peut être repris.
+     */
+    get: operations['downloadDatabaseDump'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -3884,6 +3931,38 @@ export interface components {
       downloadUrl: string;
       publishedAt: string;
       notes: string | null;
+    };
+    DatabaseDumpJobDto: {
+      /**
+       * Format: uuid
+       * @description Absent tant qu’aucun export n’a jamais été demandé.
+       */
+      id: string | null;
+      /**
+       * @description `idle` : aucun export n’a jamais été demandé. `queued` puis `running` : le travail court, l’écran affiche son attente. `ready` : le fichier est téléchargeable. `failed` : le motif est dans `failureReason`. `expired` : le fichier a été détruit, par échéance ou après téléchargement ; ce n’est pas une erreur.
+       * @enum {string}
+       */
+      status: 'idle' | 'queued' | 'running' | 'ready' | 'failed' | 'expired';
+      requestedByName: string | null;
+      /** Format: date-time */
+      requestedAt: string | null;
+      /** Format: date-time */
+      finishedAt: string | null;
+      /** @description Taille de l’archive compressée, en octets. */
+      fileSize: number | null;
+      /** @description Empreinte de l’archive, à vérifier après téléchargement. */
+      sha256: string | null;
+      /**
+       * Format: date-time
+       * @description Au-delà, le fichier est détruit. Il l’est aussi dès qu’il a été téléchargé.
+       */
+      expiresAt: string | null;
+      failureReason: string | null;
+      /** @description Issue de l’avis de fin. `SENT` : l’e-mail est parti. `NOT_CONFIGURED` : aucun compte Brevo n’est branché, l’export est prêt et seule la boîte de réception le signale. `TRANSPORT_ERROR` : Brevo a refusé. Un export prêt dont personne n’a été prévenu doit se voir, pas se deviner. */
+      noticeStatus: string | null;
+      noticeDetail: string | null;
+      /** @description Vrai quand le fichier est servi par GET /admin/database-dump/download. Le téléchargement le détruit. */
+      downloadable: boolean;
     };
   };
   responses: never;
@@ -10553,8 +10632,6 @@ export interface operations {
         'multipart/form-data': {
           /** Format: binary */
           file: string;
-          versionName: string;
-          versionCode: number;
           forceUpdate: boolean;
           notes?: string;
         };
@@ -10567,6 +10644,207 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AppUpdateDto'];
+        };
+      };
+      /** @description APK_MANIFEST_UNREADABLE · fichier absent, non-APK, trop volumineux, ou manifeste illisible. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description APK_FOREIGN_PACKAGE · le manifeste déclare un autre paquet que `sn.cpi.go`. APK_VERSION_NOT_GREATER · le versionCode lu ne dépasse pas celui en ligne. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getDatabaseDump: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DatabaseDumpJobDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  requestDatabaseDump: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DatabaseDumpJobDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif. DATABASE_DUMP_IN_PROGRESS · un export démarre à l’instant même. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Trop de requêtes : réessayez plus tard. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  downloadDatabaseDump: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/gzip': string;
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description DATABASE_DUMP_NOT_READY · aucun export disponible, échu, ou déjà téléchargé. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
         };
       };
     };
