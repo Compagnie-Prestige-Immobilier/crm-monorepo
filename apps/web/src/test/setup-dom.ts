@@ -1,5 +1,28 @@
 import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
+
+import { currentPathname, currentSearchParams, resetRouterMock, routerMock } from './router-mock';
+
+/**
+ * Le routeur d'application de Next, remplacé pour TOUS les tests de rendu.
+ *
+ * Déclaré ici plutôt que fichier par fichier : `useRouter()` lève hors du
+ * serveur de Next, et presque tout écran du panel l'appelle, directement ou par
+ * ses filtres d'URL. Le répéter dans chaque test en ferait un rite recopié, donc
+ * un rite qu'on finit par oublier, et l'échec serait alors un « invariant
+ * expected app router to be mounted » sans rapport avec ce qu'on éprouve.
+ *
+ * Voir `router-mock.ts` pour le détail, et `setUrl()` pour poser une URL.
+ */
+vi.mock('next/navigation', () => ({
+  useRouter: () => routerMock,
+  usePathname: () => currentPathname(),
+  useSearchParams: () => currentSearchParams(),
+}));
+
+beforeEach(() => {
+  resetRouterMock();
+});
 
 /**
  * Amorce du projet `dom` de Vitest (voir `vitest.config.ts`).
