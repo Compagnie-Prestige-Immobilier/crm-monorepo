@@ -43,6 +43,25 @@ describe('curseur d’annuaire', () => {
     expect(() => decodeDirectoryCursor(noTime)).toThrow(BadRequestException);
   });
 
+  // Régression : `Number.isFinite` acceptait 1e300, qui devient un
+  // `Invalid Date`. Prisma le refuse avec une erreur SANS code P####, donc un
+  // 500 au lieu du 400 annoncé, et le mobile rejoue le curseur indéfiniment.
+  it.each([
+    ['hors du domaine des dates', 1e300],
+    ['négatif', -1],
+    ['fractionnaire', 1_775_000_123_456_000.5],
+  ])('refuse un horodatage %s au lieu de le passer à Prisma', (_label, t) => {
+    const poisoned = Buffer.from(JSON.stringify({ v: 1, t, id: 'a' })).toString('base64url');
+    expect(() => decodeDirectoryCursor(poisoned)).toThrow(BadRequestException);
+  });
+
+  it('accepte un horodatage réaliste et rend une Date valide', () => {
+    const t = toMicros(new Date('2026-04-08T14:30:00.123Z'));
+    const encoded = encodeDirectoryCursor({ v: 1, t, id: 'a' });
+    expect(decodeDirectoryCursor(encoded)).toEqual({ v: 1, t, id: 'a' });
+    expect(Number.isNaN(fromMicros(t).getTime())).toBe(false);
+  });
+
   it('porte un code métier exploitable par le mobile', () => {
     try {
       decodeDirectoryCursor('!!!');

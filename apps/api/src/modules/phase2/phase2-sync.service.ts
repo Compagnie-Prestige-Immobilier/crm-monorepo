@@ -11,7 +11,7 @@ import {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * CONTRAT — opération `call_attempt` du push de synchronisation
+ * CONTRAT, opération `call_attempt` du push de synchronisation
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Le module de synchronisation appartient à un autre périmètre : il n'y a donc
@@ -55,7 +55,7 @@ import {
  * - `NotFoundException`    PHASE2_PROSPECT_NOT_FOUND
  *                          → le prospect n'existe pas (ou plus) côté serveur.
  *                            Également définitif.
- * - `ConflictException`    PHASE2_ALREADY_COMPLETED, avec `state` — l'état
+ * - `ConflictException`    PHASE2_ALREADY_COMPLETED, avec `state`, l'état
  *                          serveur courant du prospect.
  *                          → un autre commercial a clos le dossier avant.
  *                            Le client garde son entrée locale comme CONFLIT
@@ -63,7 +63,7 @@ import {
  *                            peut corriger ensuite depuis le web.
  *
  * Une exception ANNULE la transaction de l'appelant : c'est voulu pour les
- * conflits — la tentative refusée ne doit pas laisser de trace — mais cela
+ * conflits, la tentative refusée ne doit pas laisser de trace, mais cela
  * impose au push d'isoler chaque opération dans sa propre transaction s'il veut
  * que les opérations voisines survivent.
  *
@@ -93,6 +93,7 @@ interface ProspectState {
   updatedAt: Date;
   enrollmentCapturedById: string | null;
   enrollmentCapturedAt: Date | null;
+  isDemo: boolean;
 }
 
 const PROSPECT_STATE_SELECT = {
@@ -103,6 +104,9 @@ const PROSPECT_STATE_SELECT = {
   updatedAt: true,
   enrollmentCapturedById: true,
   enrollmentCapturedAt: true,
+  // Lu pour la SEULE écriture de la tentative, jamais rendu au client : le
+  // DTO d'état ne porte pas la nature de la ligne, et n'a pas à la porter.
+  isDemo: true,
 } satisfies Prisma.ProspectSelect;
 
 const toState = (row: ProspectState): ProspectPhase2StateDto => ({
@@ -191,6 +195,17 @@ export class Phase2SyncService {
           method: attempt.method,
           comment: attempt.comment,
           clientCreatedAt: new Date(op.clientCreatedAt),
+          // La tentative SUIT LE PROSPECT sur lequel elle porte, exactement
+          // comme `RepCallAttempt` suit son représentant. Les deux tables
+          // portent la colonne ; seule celle-ci l'oubliait, et le taux de
+          // joignabilité affiché mode éteint comptait donc des appels passés
+          // sur des fiches fictives.
+          //
+          // Le prospect, et non l'interrupteur : le chemin est celui de la
+          // synchronisation mobile, où le lot arrive longtemps après la
+          // saisie. L'état du mode au moment de la remontée ne dit rien de la
+          // nature de la fiche appelée.
+          isDemo: prospect.isDemo,
         },
       ],
       skipDuplicates: true,

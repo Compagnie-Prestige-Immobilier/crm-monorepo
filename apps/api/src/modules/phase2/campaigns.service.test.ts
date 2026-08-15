@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import {
   CallOutcome,
   CallTaskStatus,
@@ -30,11 +26,13 @@ type MockFn = ReturnType<typeof vi.fn>;
 type MockDb = {
   callCampaign: Record<'count' | 'findMany' | 'findFirst' | 'create' | 'update', MockFn>;
   callCampaignCommercial: Record<'findUnique' | 'createMany', MockFn>;
-  callTask: Record<'groupBy' | 'findMany' | 'updateMany' | 'createMany', MockFn>;
+  callTask: Record<'groupBy' | 'findMany' | 'count' | 'updateMany' | 'createMany', MockFn>;
   callAttempt: Record<'findMany', MockFn>;
   prospect: Record<'findMany', MockFn>;
   user: Record<'findMany', MockFn>;
   $transaction: MockFn;
+  $executeRawUnsafe: MockFn;
+  $queryRawUnsafe: MockFn;
 };
 
 const ADMIN: AuthenticatedUser = {
@@ -56,11 +54,21 @@ function prismaStub(): MockDb {
       update: vi.fn(),
     },
     callCampaignCommercial: { findUnique: vi.fn(), createMany: vi.fn() },
-    callTask: { groupBy: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), createMany: vi.fn() },
+    callTask: {
+      groupBy: vi.fn(),
+      findMany: vi.fn(),
+      // Voir `programme` : la journée demandée est bornée sur l'étalement
+      // EFFECTIF du commercial, donc sur la taille de sa file.
+      count: vi.fn().mockResolvedValue(100),
+      updateMany: vi.fn(),
+      createMany: vi.fn(),
+    },
     callAttempt: { findMany: vi.fn() },
     prospect: { findMany: vi.fn() },
     user: { findMany: vi.fn() },
     $transaction: vi.fn(),
+    $executeRawUnsafe: vi.fn(),
+    $queryRawUnsafe: vi.fn(),
   };
   // Prisma's interactive transaction callback is intentionally asynchronous.
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -75,7 +83,7 @@ describe('scopeLabel', () => {
   });
 });
 
-describe('Phase2CampaignsService — parcours de campagne', () => {
+describe('Phase2CampaignsService, parcours de campagne', () => {
   it('liste les campagnes et reconstruit la progression depuis les tâches', async () => {
     const db = prismaStub();
     db.callCampaign.count.mockResolvedValue(1);
@@ -86,6 +94,7 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
         scope: CampaignScope.BDD1,
         status: CampaignStatus.ACTIVE,
         seed: 'seed',
+        spreadDays: 1,
         createdById: ADMIN.id,
         createdAt: date,
         closedAt: null,
@@ -109,6 +118,25 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
     expect(result.meta).toEqual({ total: 1, page: 1, pageSize: 25, pageCount: 1 });
   });
 
+  // Régression : une liste vide rendait `pageCount: 0` ici alors que les
+  // campagnes représentants, les dossiers bancaires et les demandes clients
+  // rendaient tous `1`. Chaque écran devait donc savoir de quelle liste il
+  // venait pour décider si « page 1 sur 0 » était normal.
+  it('une liste vide reste UNE page vide, comme partout ailleurs', async () => {
+    const db = prismaStub();
+    db.callCampaign.findMany.mockResolvedValue([]);
+    db.callCampaign.count.mockResolvedValue(0);
+    db.callTask.groupBy.mockResolvedValue([]);
+
+    const result = await new Phase2CampaignsService(
+      db as unknown as PrismaService,
+      fakeDemoVisibility(),
+    ).list({});
+
+    expect(result.items).toEqual([]);
+    expect(result.meta).toEqual({ total: 0, page: 1, pageSize: 25, pageCount: 1 });
+  });
+
   it('rend le détail avec progression par commercial et tentative récente', async () => {
     const db = prismaStub();
     db.callCampaign.findFirst.mockResolvedValue({
@@ -117,6 +145,7 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
       scope: CampaignScope.ALL,
       status: CampaignStatus.ACTIVE,
       seed: 'seed',
+      spreadDays: 1,
       createdById: ADMIN.id,
       createdAt: date,
       closedAt: null,
@@ -165,6 +194,54 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  /**
+   * UN IDENTIFIANT DE CAMPAGNE SURVIT DANS UN SIGNET.
+   *
+   * `get` et `close` résolvaient la campagne par sa seule clé primaire. Le
+   * mode éteint, l'identifiant d'une campagne de démonstration, conservé dans
+   * l'historique du navigateur ou collé dans une conversation, rouvrait donc
+   * l'écran, et son avancement fictif passait pour un chiffre de production.
+   *
+   * Le balayage de visibilité ne le dénonce pas : il tient une lecture par
+   * `id` pour une résolution d'entité et la dispense. Le module campagnes
+   * REPRÉSENTANTS cloisonnait déjà ; les deux divergeaient sur la même
+   * question.
+   */
+  it('CLOISONNE le détail : mode éteint, l’identifiant ne suffit pas', async () => {
+    const db = prismaStub();
+    db.callCampaign.findFirst.mockResolvedValue(null);
+
+    await expect(
+      new Phase2CampaignsService(db as unknown as PrismaService, fakeDemoVisibility(false)).get(
+        'camp-demo',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    const where = (
+      db.callCampaign.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }]
+    )[0].where;
+    expect(where).toMatchObject({ id: 'camp-demo', isDemo: false });
+  });
+
+  it('CLOISONNE la clôture, qui est une ÉCRITURE décidée par cette lecture', async () => {
+    const db = prismaStub();
+    db.callCampaign.findFirst.mockResolvedValue(null);
+
+    await expect(
+      new Phase2CampaignsService(db as unknown as PrismaService, fakeDemoVisibility(false)).close(
+        'camp-demo',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    const where = (
+      db.callCampaign.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }]
+    )[0].where;
+    expect(where).toMatchObject({ id: 'camp-demo', isDemo: false });
+    // Rien n'a été annulé : une campagne que la plateforme prétend ne pas voir
+    // ne doit pas pouvoir être mutée.
+    expect(db.callTask.updateMany).not.toHaveBeenCalled();
+  });
+
   it('annule les tâches ouvertes à la clôture', async () => {
     const db = prismaStub();
     db.callCampaign.findFirst.mockResolvedValueOnce({ status: CampaignStatus.ACTIVE });
@@ -176,6 +253,7 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
       scope: CampaignScope.ALL,
       status: CampaignStatus.CLOSED,
       seed: 'seed',
+      spreadDays: 1,
       createdById: ADMIN.id,
       createdAt: date,
       closedAt: date,
@@ -203,7 +281,7 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
   it('retourne le programme dans la position persistée, sans nom de prospect', async () => {
     const db = prismaStub();
     db.callCampaignCommercial.findUnique.mockResolvedValue({
-      campaign: { name: 'Avril', scope: CampaignScope.BDD4 },
+      campaign: { name: 'Avril', scope: CampaignScope.BDD4, spreadDays: 1 },
       user: { fullName: 'Awa' },
     });
     db.callTask.findMany.mockResolvedValue([
@@ -233,13 +311,17 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
       fakeDemoVisibility(),
     );
 
+    // 422 et NON 400 : la requête est bien formée, elle est refusée par une
+    // règle métier. Les demandes clients tranchaient déjà ainsi, et deux
+    // statuts pour la même classe de faute obligeaient le client à savoir de
+    // quel module venait l'erreur avant de pouvoir la traiter.
     await expect(
       service.create(ADMIN, {
         name: 'Avril',
         scope: CampaignScope.ALL,
         commercialIds: ['com-missing'],
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
 
     db.user.findMany.mockResolvedValue([
       { id: 'com-1', fullName: 'Awa', username: 'awa', role: Role.COMMERCIAL, isActive: true },
@@ -254,5 +336,92 @@ describe('Phase2CampaignsService — parcours de campagne', () => {
         commercialIds: ['com-1'],
       }),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+});
+
+describe('Phase2CampaignsService, étalement sur N jours', () => {
+  it('découpe la file de CHAQUE commercial, pas la liste globale', async () => {
+    // Un découpage avant le tourniquet donnerait des journées de tailles
+    // inégales d'un commercial à l'autre : l'un finirait le jour 2, l'autre le
+    // jour 7, sur la même campagne.
+    const db = prismaStub();
+    db.user.findMany.mockResolvedValue([
+      { id: 'com-1', fullName: 'Awa', username: 'awa', role: Role.COMMERCIAL, isActive: true },
+      { id: 'com-2', fullName: 'Bara', username: 'bara', role: Role.COMMERCIAL, isActive: true },
+    ]);
+    db.callCampaign.create.mockResolvedValue({ id: 'camp-1' });
+    const ids = Array.from({ length: 12 }, (_, index) => ({ id: `p${String(index)}` }));
+    db.prospect.findMany.mockResolvedValue(ids);
+    db.$queryRawUnsafe = vi.fn().mockResolvedValue(ids);
+    db.callCampaign.findFirst.mockResolvedValue({
+      id: 'camp-1',
+      name: 'Avril',
+      scope: CampaignScope.ALL,
+      status: CampaignStatus.ACTIVE,
+      seed: 'seed',
+      spreadDays: 3,
+      createdById: ADMIN.id,
+      createdAt: date,
+      closedAt: null,
+      createdBy: { fullName: ADMIN.fullName },
+      commerciaux: [],
+    });
+    db.callTask.groupBy.mockResolvedValue([]);
+    db.callAttempt.findMany.mockResolvedValue([]);
+
+    await new Phase2CampaignsService(db as unknown as PrismaService, fakeDemoVisibility()).create(
+      ADMIN,
+      { name: 'Avril', scope: CampaignScope.ALL, commercialIds: ['com-1', 'com-2'], spreadDays: 3 },
+    );
+
+    const rows = (
+      db.callTask.createMany.mock.calls[0] as [
+        { data: { assignedToId: string; position: number; dayIndex: number }[] },
+      ]
+    )[0].data;
+
+    for (const commercial of ['com-1', 'com-2']) {
+      const days = rows
+        .filter((row) => row.assignedToId === commercial)
+        .sort((left, right) => left.position - right.position)
+        .map((row) => row.dayIndex);
+      // 6 lignes sur 3 jours : 2, 2, 2, et toujours dans l'ordre du programme.
+      expect(days).toEqual([0, 0, 1, 1, 2, 2]);
+    }
+  });
+
+  it('laisse tout au jour 0 quand l’étalement n’est pas demandé', async () => {
+    const db = prismaStub();
+    db.user.findMany.mockResolvedValue([
+      { id: 'com-1', fullName: 'Awa', username: 'awa', role: Role.COMMERCIAL, isActive: true },
+    ]);
+    db.callCampaign.create.mockResolvedValue({ id: 'camp-1' });
+    const ids = [{ id: 'p0' }, { id: 'p1' }, { id: 'p2' }];
+    db.prospect.findMany.mockResolvedValue(ids);
+    db.$queryRawUnsafe = vi.fn().mockResolvedValue(ids);
+    db.callCampaign.findFirst.mockResolvedValue({
+      id: 'camp-1',
+      name: 'Avril',
+      scope: CampaignScope.ALL,
+      status: CampaignStatus.ACTIVE,
+      seed: 'seed',
+      spreadDays: 1,
+      createdById: ADMIN.id,
+      createdAt: date,
+      closedAt: null,
+      createdBy: { fullName: ADMIN.fullName },
+      commerciaux: [],
+    });
+    db.callTask.groupBy.mockResolvedValue([]);
+    db.callAttempt.findMany.mockResolvedValue([]);
+
+    await new Phase2CampaignsService(db as unknown as PrismaService, fakeDemoVisibility()).create(
+      ADMIN,
+      { name: 'Avril', scope: CampaignScope.ALL, commercialIds: ['com-1'] },
+    );
+
+    const rows = (db.callTask.createMany.mock.calls[0] as [{ data: { dayIndex: number }[] }])[0]
+      .data;
+    expect(rows.every((row) => row.dayIndex === 0)).toBe(true);
   });
 });
