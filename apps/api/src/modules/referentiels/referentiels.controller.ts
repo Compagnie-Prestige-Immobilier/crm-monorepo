@@ -10,7 +10,7 @@ import {
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { Role } from '@crm/database';
 
-import { Roles } from '../../common/decorators/roles.decorator.js';
+import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
 import { ReferentielsService } from './referentiels.service.js';
 import {
   BanqueDto,
@@ -41,7 +41,19 @@ import {
 export class ReferentielsController {
   constructor(private readonly referentiels: ReferentielsService) {}
 
+  // ═══ LECTURES OUVERTES À TOUS LES RÔLES, ET C'EST UNE DÉCISION ═══
+  //
+  // Ces sept lectures sont les valeurs des menus déroulants de TOUS les
+  // formulaires du produit, mobile compris : les fermer à un rôle fermerait la
+  // saisie de ce rôle, y compris celle d'un dossier bancaire. Aucune ne porte
+  // de donnée de client, ce sont des nomenclatures.
+  //
+  // Elles ne portaient AUCUN décorateur, ce qui produisait le même effet mais
+  // ne le disait pas : impossible de distinguer « ouvert à dessein » de
+  // « personne n'y a pensé ». Les ÉCRITURES du même contrôleur, elles, sont
+  // toutes `@Roles(ADMIN)` : la frontière est là, entre lire et modifier.
   @Get()
+  @Roles(...ANY_AUTHENTICATED)
   @ApiOperation({
     operationId: 'getReferentiels',
     summary: 'Tous les référentiels en un appel (amorçage du mobile).',
@@ -52,6 +64,7 @@ export class ReferentielsController {
   }
 
   @Get('banques')
+  @Roles(...ANY_AUTHENTICATED)
   @ApiOperation({ operationId: 'listBanques', summary: 'Liste des banques.' })
   @ApiResponse({ status: 200, type: [BanqueDto] })
   listBanques(@Query() query: ReferentielQueryDto): Promise<BanqueDto[]> {
@@ -59,6 +72,7 @@ export class ReferentielsController {
   }
 
   @Get('syndicats')
+  @Roles(...ANY_AUTHENTICATED)
   @ApiOperation({ operationId: 'listSyndicats', summary: 'Liste des syndicats.' })
   @ApiResponse({ status: 200, type: [SyndicatDto] })
   listSyndicats(@Query() query: ReferentielQueryDto): Promise<SyndicatDto[]> {
@@ -66,6 +80,7 @@ export class ReferentielsController {
   }
 
   @Get('departements')
+  @Roles(...ANY_AUTHENTICATED)
   @ApiOperation({ operationId: 'listDepartements', summary: 'Liste des départements.' })
   @ApiResponse({ status: 200, type: [DepartementDto] })
   listDepartements(@Query() query: ReferentielQueryDto): Promise<DepartementDto[]> {
@@ -73,6 +88,7 @@ export class ReferentielsController {
   }
 
   @Get('iefs')
+  @Roles(...ANY_AUTHENTICATED)
   @ApiOperation({
     operationId: 'listIefs',
     summary: 'Liste des IEF, éventuellement restreinte à un département.',
@@ -91,6 +107,7 @@ export class ReferentielsController {
   }
 
   @Get('regions')
+  @Roles(...ANY_AUTHENTICATED)
   @ApiOperation({ operationId: 'listRegions', summary: 'Liste des régions.' })
   @ApiResponse({ status: 200, type: [RegionDto] })
   listRegions(): Promise<RegionDto[]> {
@@ -98,6 +115,7 @@ export class ReferentielsController {
   }
 
   @Get('regions/departements')
+  @Roles(...ANY_AUTHENTICATED)
   @ApiOperation({
     operationId: 'listRegionsWithDepartements',
     summary: 'Régions et leurs départements, pour les sélecteurs en cascade.',

@@ -4,7 +4,7 @@ import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { Role } from '@crm/database';
 
-import { Roles } from '../../common/decorators/roles.decorator.js';
+import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
 import { DemoWritable } from '../../common/decorators/demo-writable.decorator.js';
 import {
   CurrentUser,
@@ -26,7 +26,6 @@ import {
 } from './dto.js';
 
 /** Tous les rôles authentifiés. Sert aux deux routes qui ne sont pas d'administration. */
-const ANY_AUTHENTICATED = [Role.ADMIN, Role.COMMERCIAL, Role.BANQUE_FINANCE] as const;
 
 /**
  * Notifications push.
