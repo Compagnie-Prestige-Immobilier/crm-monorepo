@@ -186,14 +186,6 @@ export const SEGMENT_LABELS: Record<BddSegment, string> = {
   BDD4: 'BDD4 : autre syndicat / autre banque',
 };
 
-/** Version courte, pour une cellule de tableau où le libellé complet déborde. */
-export const SEGMENT_SHORT_LABELS: Record<BddSegment, string> = {
-  BDD1: 'BDD1',
-  BDD2: 'BDD2',
-  BDD3: 'BDD3',
-  BDD4: 'BDD4',
-};
-
 export const CAMPAIGN_SCOPES = [
   'ALL',
   'BDD1',

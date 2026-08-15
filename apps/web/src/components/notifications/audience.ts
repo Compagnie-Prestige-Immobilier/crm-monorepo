@@ -48,19 +48,35 @@ export function audienceProblem(selection: AudienceSelection): string | null {
   }
 }
 
-/** Paramètres de requête de l'aperçu. Doit refléter exactement l'envoi. */
-export function audienceQuery(selection: AudienceSelection): Record<string, string> {
-  const query: Record<string, string> = { audience: selection.audience };
-  if (selection.audience === 'ROLE' && selection.audienceRole !== null) {
-    query.audienceRole = selection.audienceRole;
-  }
-  if (selection.audience === 'DEPARTEMENT' && selection.audienceDepartementId !== null) {
-    query.audienceDepartementId = selection.audienceDepartementId;
-  }
-  if (selection.audience === 'USERS' && selection.audienceUserIds.length > 0) {
-    query.audienceUserIds = selection.audienceUserIds.join(',');
-  }
-  return query;
+/**
+ * Paramètres de requête de l'aperçu. Doit refléter EXACTEMENT l'envoi.
+ *
+ * Typé champ par champ plutôt qu'en `Record<string, string>` : la forme est
+ * alors vérifiée contre le contrat engendré au point d'appel, et un paramètre
+ * renommé côté API casse ici. Un dictionnaire de chaînes passait, lui, tous les
+ * contrôles jusqu'à ce que le serveur réponde 400 à l'étape de confirmation, au
+ * moment précis où l'admin attend un nombre de destinataires.
+ */
+export interface AudienceQuery {
+  audience: NotificationAudience;
+  audienceRole?: Role;
+  audienceDepartementId?: string;
+  audienceUserIds?: string;
+}
+
+export function audienceQuery(selection: AudienceSelection): AudienceQuery {
+  return {
+    audience: selection.audience,
+    ...(selection.audience === 'ROLE' && selection.audienceRole !== null
+      ? { audienceRole: selection.audienceRole }
+      : {}),
+    ...(selection.audience === 'DEPARTEMENT' && selection.audienceDepartementId !== null
+      ? { audienceDepartementId: selection.audienceDepartementId }
+      : {}),
+    ...(selection.audience === 'USERS' && selection.audienceUserIds.length > 0
+      ? { audienceUserIds: selection.audienceUserIds.join(',') }
+      : {}),
+  };
 }
 
 /**

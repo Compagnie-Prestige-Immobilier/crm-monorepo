@@ -1,60 +1,76 @@
-import {
-  apiFetch,
-  apiUpload,
-  asBoolean,
-  asNullableString,
-  asNumber,
-  asRecord,
-  asString,
-} from '@/lib/api/raw';
+import type { ApiClient, components } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 
-export type AndroidUpdate = {
-  available: boolean;
-  forceUpdate: boolean;
-  versionName: string;
-  versionCode: number;
-  fileName: string;
-  fileSize: number;
-  sha256: string;
-  downloadUrl: string;
-  publishedAt: string;
-  notes: string | null;
-};
+import { getApiClient } from '@/lib/api/browser';
 
-function parseAndroidUpdate(value: unknown): AndroidUpdate {
-  const root = asRecord(value, 'release Android');
-  return {
-    available: asBoolean(root.available, 'available'),
-    forceUpdate: asBoolean(root.forceUpdate, 'forceUpdate'),
-    versionName: asString(root.versionName, 'versionName'),
-    versionCode: asNumber(root.versionCode, 'versionCode'),
-    fileName: asString(root.fileName, 'fileName'),
-    fileSize: asNumber(root.fileSize, 'fileSize'),
-    sha256: asString(root.sha256, 'sha256'),
-    downloadUrl: asString(root.downloadUrl, 'downloadUrl'),
-    publishedAt: asString(root.publishedAt, 'publishedAt'),
-    notes: asNullableString(root.notes, 'notes'),
-  };
+/**
+ * Releases Android : lecture de la dernière version, et publication d'un APK.
+ *
+ * La forme vient du contrat engendré. Elle était redéclarée ici avec son
+ * validateur, sur la promesse que la route n'y figurait pas encore : elle y
+ * figure (`/api/v1/app-updates/android*`). Deux déclarations d'un même contrat
+ * finissent toujours par diverger, et c'est celle qui n'est pas engendrée qui a
+ * tort, sans que rien ne le signale.
+ */
+export type AndroidUpdate = components['schemas']['AppUpdateDto'];
+
+/**
+ * `versionCode: 0` : on demande « la dernière, quelle qu'elle soit ».
+ *
+ * L'appelant ici est le PANEL, qui administre les releases ; il n'a pas de
+ * version installée à comparer. Le mobile, lui, envoie la sienne pour que l'API
+ * réponde `available: false` quand il est déjà à jour.
+ */
+export async function fetchAndroidUpdate(
+  client: ApiClient = getApiClient(),
+): Promise<AndroidUpdate> {
+  return unwrap(
+    await client.GET('/api/v1/app-updates/android/current', {
+      params: { query: { versionCode: 0 } },
+    }),
+  );
 }
 
-export function fetchAndroidUpdate(): Promise<AndroidUpdate> {
-  return apiFetch('/app-updates/android/current?versionCode=0', parseAndroidUpdate);
-}
-
-export function uploadAndroidUpdate(input: {
-  file: File;
-  versionName: string;
-  versionCode: string;
-  forceUpdate: boolean;
-  notes: string;
-}): Promise<AndroidUpdate> {
+/**
+ * Publication d'un APK : le second appel MULTIPART du panel.
+ *
+ * `bodySerializer` rend le `FormData` tel quel. Sans lui, `openapi-fetch`
+ * sérialiserait en JSON et l'APK partirait en `{}`. Le laisser intact permet
+ * aussi au navigateur de poser l'en-tête `content-type` avec sa frontière, qu'on
+ * ne peut pas fabriquer correctement à la main.
+ *
+ * `versionCode` est envoyé en CHAÎNE dans le corps multipart, comme tout champ
+ * de formulaire : c'est l'API qui le convertit. Le contrat le déclare `number`
+ * parce qu'il décrit la valeur, pas son encodage sur le fil.
+ */
+export async function uploadAndroidUpdate(
+  input: {
+    file: File;
+    versionName: string;
+    versionCode: string;
+    forceUpdate: boolean;
+    notes: string;
+  },
+  client: ApiClient = getApiClient(),
+): Promise<AndroidUpdate> {
   const form = new FormData();
   form.append('versionName', input.versionName.trim());
   form.append('versionCode', input.versionCode.trim());
   form.append('forceUpdate', String(input.forceUpdate));
   if (input.notes.trim() !== '') form.append('notes', input.notes.trim());
   form.append('file', input.file, input.file.name);
-  return apiUpload('/app-updates/android', form, parseAndroidUpdate);
+
+  return unwrap(
+    await client.POST('/api/v1/app-updates/android', {
+      body: {
+        file: '',
+        versionName: input.versionName.trim(),
+        versionCode: Number(input.versionCode.trim()),
+        forceUpdate: input.forceUpdate,
+      },
+      bodySerializer: () => form,
+    }),
+  );
 }
 
 export function formatFileSize(bytes: number): string {
