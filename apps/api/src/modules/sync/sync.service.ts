@@ -299,6 +299,10 @@ export class SyncService {
         // prospects ne peuvent alors plus être rattachés à quoi que ce soit.
         let parentUnavailable = false;
 
+        // LU UNE FOIS PAR GROUPE, et non par opération : c'est le même auteur
+        // pour tout le lot, et un groupe peut porter deux cents créations.
+        const authorIsDemo = await isDemoAuthor(tx, user.id);
+
         for (const operation of operations) {
           // NIVEAU 2, l'opération. Première instruction, systématiquement.
           // Indispensable : le niveau 1 ne couvre pas le cas où 3 opérations
@@ -321,7 +325,7 @@ export class SyncService {
               error: 'Le représentant de rattachement n’a pas pu être enregistré.',
             };
           } else {
-            outcome = await this.applyOperation(tx, user, operation);
+            outcome = await this.applyOperation(tx, user, operation, authorIsDemo);
             if (
               operation.entity === SyncEntity.REPRESENTANT &&
               outcome.status !== SyncOpStatus.APPLIED
@@ -350,15 +354,18 @@ export class SyncService {
     tx: Prisma.TransactionClient,
     user: AuthenticatedUser,
     operation: SyncOperationDto,
+    authorIsDemo: boolean,
   ): Promise<OperationOutcome> {
     try {
       if (operation.entity === SyncEntity.REPRESENTANT) {
-        return await this.applyRepresentant(tx, user, operation);
+        return await this.applyRepresentant(tx, user, operation, authorIsDemo);
       }
       if (operation.entity === SyncEntity.CALL_ATTEMPT) {
+        // La tentative hérite de SON PROSPECT, que `phase2-sync` lit déjà :
+        // rien à transmettre ici.
         return await this.applyCallAttempt(tx, user, operation);
       }
-      return await this.applyProspect(tx, user, operation);
+      return await this.applyProspect(tx, user, operation, authorIsDemo);
     } catch (error) {
       if (error instanceof OperationError) {
         return {
@@ -383,6 +390,7 @@ export class SyncService {
     tx: Prisma.TransactionClient,
     user: AuthenticatedUser,
     operation: SyncOperationDto,
+    authorIsDemo: boolean,
   ): Promise<OperationOutcome> {
     const existing = await tx.representant.findUnique({ where: { id: operation.entityId } });
 
@@ -436,6 +444,12 @@ export class SyncService {
           ...(data.iefId ? { iefId: data.iefId } : {}),
           createdById: user.id,
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
+          // LA FICHE SUIT SON AUTEUR. Voir `isDemoAuthor` : la remontée hors
+          // ligne est dispensée de la garde, et l'animateur d'une démonstration
+          // saisit sur le téléphone avec un compte de démonstration. Sans cette
+          // valeur, la colonne prenait son défaut `false` et la fiche fictive
+          // entrait dans l'annuaire RÉEL.
+          isDemo: authorIsDemo,
         },
         update: {
           fullName: data.fullName.trim(),
@@ -447,6 +461,9 @@ export class SyncService {
           rev: { increment: 1 },
         },
       });
+      // Inscrite au registre pour que la purge sache la reprendre : sans cela
+      // elle retiendrait le compte semé qui l'a créée. Voir `recordDemoEntity`.
+      if (authorIsDemo) await recordDemoEntity(tx, 'representant', row.id);
       return applied(row.id, row.rev, row.updatedAt);
     }
 
@@ -549,6 +566,7 @@ export class SyncService {
     tx: Prisma.TransactionClient,
     user: AuthenticatedUser,
     operation: SyncOperationDto,
+    authorIsDemo: boolean,
   ): Promise<OperationOutcome> {
     const existing = await tx.prospect.findUnique({ where: { id: operation.entityId } });
 
@@ -581,7 +599,7 @@ export class SyncService {
       requireUuid(data.banqueId, 'banqueId');
       requireUuid(data.syndicatId, 'syndicatId');
       requireUuid(data.representantId, 'representantId');
-      await assertRepresentantUsable(tx, user, data.representantId);
+      const parent = await assertRepresentantUsable(tx, user, data.representantId);
       await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
 
       const row = await tx.prospect.upsert({
@@ -597,6 +615,20 @@ export class SyncService {
           createdById: user.id,
           ...(data.statut ? { statut: data.statut } : {}),
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
+          // DEUX SOURCES, EXACTEMENT COMME `prospects.service.ts`. La route
+          // HTTP composait déjà `interrupteur || representant.isDemo` ; ce
+          // chemin-ci ne posait rien du tout et la colonne prenait son défaut
+          // `false`. Une fiche fictive naissait donc RÉELLE sous un
+          // représentant fictif : elle entrait dans les listes, les exports et
+          // les tirages de campagne (un faux numéro sur une vraie feuille
+          // d'appel), et comme `representantId` et `createdById` sont en
+          // `onDelete: Restrict`, la purge de démonstration s'arrêtait dessus,
+          // rendant le jeu de démonstration indéboulonnable.
+          //
+          // L'auteur ET le parent, parce qu'aucun des deux ne suffit :
+          // l'annuaire de phase 2 n'est pas cloisonné par commercial, un
+          // commercial réel peut donc rattacher au représentant d'un autre.
+          isDemo: authorIsDemo || parent.isDemo,
         },
         update: {
           nom: data.nom.trim(),
@@ -610,6 +642,7 @@ export class SyncService {
           rev: { increment: 1 },
         },
       });
+      if (authorIsDemo || parent.isDemo) await recordDemoEntity(tx, 'prospect', row.id);
       return applied(row.id, row.rev, row.updatedAt);
     }
 
@@ -965,14 +998,85 @@ function requireUuid(value: string | undefined, field: string): asserts value is
 const clientDate = (clientCreatedAt: string | undefined, fallback: string): Date =>
   new Date(clientCreatedAt ?? fallback);
 
+/**
+ * Nature de l'AUTEUR d'une remontée hors ligne.
+ *
+ * ═══ POURQUOI CE CHEMIN A BESOIN DE LE SAVOIR ═══
+ *
+ * `DemoReadOnlyGuard` suspend les écritures pendant une démonstration, mais la
+ * synchronisation en est DISPENSÉE, sans condition : refuser la file d'un
+ * commercial revenu d'un village sans réseau parce qu'un administrateur a
+ * basculé un interrupteur au bureau ferait remonter des saisies valides dans
+ * « À corriger ». Cette dispense est une exigence dure.
+ *
+ * L'en-tête de la garde en tirait la conclusion que « tout ce qui arrive encore
+ * par un chemin dispensé est du travail RÉEL, ces chemins écrivent donc
+ * isDemo: false ». Cette conclusion était FAUSSE, et elle l'était déjà :
+ * l'animateur d'une démonstration se connecte sur le téléphone avec un compte
+ * de démonstration, précisément pour montrer la saisie terrain. Ce qu'il pousse
+ * n'est pas du travail réel.
+ *
+ * On lit donc la nature de l'auteur plutôt que de la supposer.
+ */
+async function isDemoAuthor(tx: Prisma.TransactionClient, userId: string): Promise<boolean> {
+  const author = await tx.user.findUnique({ where: { id: userId }, select: { isDemo: true } });
+  // Un auteur introuvable ne peut pas être un compte de démonstration : le
+  // jeton vient d'être validé sur une ligne existante.
+  return author?.isDemo ?? false;
+}
+
+/**
+ * Inscrit au registre de purge une ligne fictive née HORS ensemenceur.
+ *
+ * ═══ POURQUOI L'HÉRITAGE D'`isDemo` NE SUFFIT PAS ═══
+ *
+ * `DemoService.purge()` ne supprime QUE les identifiants inscrits dans
+ * `demo_entities`, et c'est une propriété qu'il ne faut surtout pas
+ * assouplir : purger « tout ce qui porte isDemo » effacerait le jour où un
+ * vrai prospect s'y retrouverait par erreur.
+ *
+ * Mais une ligne fictive absente du registre n'est pas seulement non
+ * supprimée : elle BLOQUE la purge entière. `Prospect.representantId`,
+ * `Prospect.createdById` et `Representant.createdById` sont tous en
+ * `onDelete: Restrict`, si bien qu'un prospect poussé par l'animateur retient
+ * le représentant semé, qui retient le compte semé. La purge échoue, et le jeu
+ * de démonstration devient indéboulonnable.
+ *
+ * L'inscription se fait DANS la transaction du groupe : une remontée annulée
+ * ne laisse ni la ligne ni son entrée de registre, jamais l'une sans l'autre.
+ *
+ * `upsert` et non `create` : une fiche supprimée puis ressaisie repasse par la
+ * branche de création, et `(entityType, entityId)` est unique.
+ */
+async function recordDemoEntity(
+  tx: Prisma.TransactionClient,
+  entityType: 'representant' | 'prospect',
+  entityId: string,
+): Promise<void> {
+  // Le rang le plus élevé : la purge parcourt le registre à l'envers, une
+  // ligne née après l'ensemencement doit donc partir avant lui. C'est ce qui
+  // fait sortir le prospect de l'animateur avant le représentant semé auquel
+  // il est accroché.
+  const highest = await tx.demoEntity.aggregate({ _max: { sequence: true } });
+
+  await tx.demoEntity.upsert({
+    where: { entityType_entityId: { entityType, entityId } },
+    create: { entityType, entityId, sequence: (highest._max.sequence ?? -1) + 1 },
+    update: {},
+  });
+}
+
 async function assertRepresentantUsable(
   tx: Prisma.TransactionClient,
   user: AuthenticatedUser,
   representantId: string,
-): Promise<void> {
+): Promise<{ isDemo: boolean }> {
   const representant = await tx.representant.findFirst({
     where: { id: representantId, deletedAt: null },
-    select: { id: true, createdById: true },
+    // `isDemo` est LU ici, et c'est le seul endroit où le chemin de
+    // synchronisation peut apprendre la nature du parent : le prospect créé en
+    // hérite, comme sur la route HTTP.
+    select: { id: true, createdById: true, isDemo: true },
   });
   if (!representant) {
     throw new OperationError(
@@ -988,6 +1092,7 @@ async function assertRepresentantUsable(
       'Ce représentant appartient à un autre commercial.',
     );
   }
+  return { isDemo: representant.isDemo };
 }
 
 /**
