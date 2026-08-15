@@ -5,7 +5,14 @@ Deux fichiers Compose, deux usages qui ne se ressemblent pas.
 | Fichier                          | Usage                                                                                                                                               |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docker/docker-compose.yml`      | Développement. Postgres **seul**, sur le port hôte 5434. L'API et le web tournent sur la machine via `pnpm dev`, pour rester rechargeables à chaud. |
-| `docker/docker-compose.prod.yml` | Production. La pile entière : Caddy, web, API, migrations, Postgres, sauvegardes.                                                                   |
+| `docker/docker-compose.prod.yml` | **VPS nu**, sans Dokploy. La pile entière : Caddy, web, API, migrations, Postgres, sauvegardes.                                                     |
+
+> **Ce dépôt n'est PAS déployé par `docker-compose.prod.yml`.** La production
+> tourne sur un hôte Dokploy, approvisionné par `dokploy/deploy.py`, et ce
+> compose ne peut pas y tourner : son Caddy réclame les ports 80 et 443, que
+> Traefik occupe déjà. Les sections 1 à 5 ci-dessous décrivent donc le cas du
+> VPS nu. Pour la production réelle, lisez `dokploy/README.md`, et pour les
+> sauvegardes la section 4, qui traite les deux cas séparément.
 
 Les deux portent un `name:` explicite (`cpi-go`, `cpi-go-prod`). Sans lui, Compose
 déduit le nom du projet du dossier parent, ici `docker`, et ce dépôt
@@ -101,22 +108,161 @@ mobile installé n'est pas remplaçable à volonté.
 
 ## 4. Sauvegardes
 
-Le service `backup` boucle en tâche de fond : une sauvegarde au démarrage, puis
-une par jour à `BACKUP_HOUR`, avec rotation au-delà de
-`BACKUP_RETENTION_DAYS` (14 par défaut).
+**Deux mécanismes, sans rapport l'un avec l'autre, et un seul concerne la
+production.** Les confondre a coûté cher : le service `backup` du compose a
+longtemps été documenté ici comme s'il tournait, alors qu'il n'a jamais été lancé
+sur l'hôte de production, qui est un hôte Dokploy. Lisez la section qui
+correspond à votre serveur, pas l'autre.
 
-Les dumps sont écrits dans `BACKUP_DIR`, un **bind mount de l'hôte**, jamais
-dans le volume `pgdata` : une sauvegarde qui disparaît avec le volume qu'elle
-protège n'est pas une sauvegarde. Chaque dump est écrit en `.partial` puis
-renommé, un VPS redémarré en plein `pg_dump` ne laisse pas derrière lui une
-archive tronquée qui passerait pour valide.
+| Serveur                  | Mécanisme                                       | Où atterrit le dump  |
+| ------------------------ | ----------------------------------------------- | -------------------- |
+| Hôte Dokploy, production | routeur `backup` de Dokploy, § 4.1              | bucket S3, hors VPS  |
+| VPS nu, sans Dokploy     | service `backup` du compose, `backup.sh`, § 4.4 | bind mount de l'hôte |
+
+### 4.1 Production, hôte Dokploy
+
+Configuré une seule fois, depuis un poste :
+
+```bash
+export DOKPLOY_KEY='…'
+export BACKUP_S3_ENDPOINT='https://s3.fr-par.scw.cloud'
+export BACKUP_S3_BUCKET='cpi-go-sauvegardes'
+export BACKUP_S3_REGION='fr-par'
+export BACKUP_S3_ACCESS_KEY='…'
+export BACKUP_S3_SECRET_KEY='…'
+
+python3 infra/dokploy/deploy.py backup
+```
+
+La commande **refuse de s'exécuter** si aucun canal de notification Dokploy
+n'écoute l'événement _Database Backup_ : une sauvegarde muette est précisément
+la panne que ce dispositif corrige. Créez le canal d'abord, dans Dokploy →
+Settings → Notifications, en cochant _Database Backup_.
+
+Ce qu'elle met en place : chaque nuit à 2 h (heure serveur, identique à Dakar,
+qui n'a pas d'heure d'été), Dokploy lance `pg_dump -Fc` dans le conteneur de la
+base et pousse la sortie gzippée par `rclone` vers le bucket. Le fichier **ne
+touche jamais le disque du VPS** ; c'est plus fort que « hors du volume de
+données », et c'est la seule forme qui survive à la perte de la machine.
+La rétention est bornée à 30 fichiers (`BACKUP_KEEP`), soit un mois : le bucket
+ne peut pas gonfler indéfiniment, et une borne en _nombre de fichiers_ tient même
+si la fréquence du cron change un jour, ce qu'une borne en jours ne ferait pas.
+
+Vérifier l'état à tout moment :
+
+```bash
+python3 infra/dokploy/deploy.py status
+```
+
+La section « Sauvegardes » y affiche l'entrée, son horaire, sa rétention et le
+résultat de la dernière exécution, ou une ligne rouge s'il n'y en a aucune.
+
+**Comment un échec se voit.** Dokploy notifie sur le même canal la réussite _et_
+l'échec. Un message arrive donc chaque nuit, et il se lit à trois niveaux :
+
+| Ce que vous recevez | Ce que cela veut dire                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `success`           | rien à faire                                                                                                     |
+| `error`             | la cause est dans le message ; corrigez, puis relancez à la main (Dokploy → la base → Backups → _Run manual_)    |
+| **rien du tout**    | le cas le plus grave : ni succès ni échec signifie que rien ne s'est lancé. C'est ce silence qu'il faut traquer. |
+
+Une alerte d'échec seule ne dirait jamais rien d'un ordonnanceur arrêté ou d'une
+entrée désactivée par mégarde. C'est pour cela que la réussite est notifiée aussi :
+le message nocturne est une preuve de vie, et son absence est le signal.
+
+### 4.2 Restaurer, en production
+
+⚠️ Les dumps Dokploy sont au **format `custom` de `pg_dump` (`-Fc`), puis
+gzippés**. Ils se restaurent avec `pg_restore`, **jamais** avec `psql` : un
+`gunzip | psql` sur ce fichier ne produit que des caractères illisibles et une
+erreur de syntaxe à la première ligne. C'est l'inverse du format produit par
+`backup.sh` (§ 4.4), qui lui est du SQL en clair.
+
+Le plus simple et le plus sûr, sous pression : **Dokploy → la base
+`cpi-go-postgres` → onglet Backups → le fichier voulu → _Restore_**. L'interface
+affiche les journaux en direct et applique exactement la commande ci-dessous.
+
+À la main, depuis une session SSH sur le VPS, si l'interface est indisponible :
+
+```bash
+# 1. Le remote rclone, défini par variables d'environnement, sans fichier de config.
+export RCLONE_CONFIG_CPI_TYPE=s3
+export RCLONE_CONFIG_CPI_PROVIDER=Scaleway
+export RCLONE_CONFIG_CPI_ENDPOINT='https://s3.fr-par.scw.cloud'
+export RCLONE_CONFIG_CPI_REGION=fr-par
+export RCLONE_CONFIG_CPI_ACCESS_KEY_ID='…'
+export RCLONE_CONFIG_CPI_SECRET_ACCESS_KEY='…'
+
+# 2. Choisir le fichier. Le chemin est <appName de la base>/cpi-go/postgres/<horodatage>.sql.gz
+rclone ls cpi:cpi-go-sauvegardes/ | sort -k2
+
+# 3. Le conteneur de la base, dont le nom porte le suffixe engendré par Dokploy.
+PG=$(docker ps --filter name=cpi-go-postgres --format '{{.ID}}' | head -1)
+API=$(docker ps --filter name=cpi-go-api --format '{{.ID}}' | head -1)
+
+# 4. Arrêter l'API AVANT de restaurer : --clean supprime les objets un par un,
+#    et une requête qui arrive au milieu lit une base à moitié démontée.
+docker stop "$API"
+
+# 5. Restaurer. --clean --if-exists remplace le contenu existant ; -O ignore les
+#    propriétaires, qui n'existent pas dans un conteneur neuf.
+rclone cat 'cpi:cpi-go-sauvegardes/<appName>/cpi-go/postgres/<fichier>.sql.gz' \
+  | gunzip \
+  | docker exec -i "$PG" pg_restore -U crm -d crm -O --clean --if-exists
+
+docker start "$API"
+```
+
+`pg_restore` signale des avertissements sur les objets absents même avec
+`--if-exists` ; ce sont des avertissements. Seule une sortie non nulle compte.
+
+### 4.3 Éprouver la restauration, chaque trimestre
+
+**Une sauvegarde non testée n'est pas une sauvegarde**, et jusqu'à la mise en
+place décrite en § 4.1 aucun exercice de ce genre n'avait jamais eu lieu ici :
+il n'y avait rien à restaurer. Le premier est donc à faire dès l'activation, pas
+au trimestre prochain.
+
+Dans une base jetable, à côté de la base réelle, sans jamais y toucher :
+
+```bash
+PG=$(docker ps --filter name=cpi-go-postgres --format '{{.ID}}' | head -1)
+
+docker exec "$PG" createdb -U crm crm_restore_test
+rclone cat 'cpi:cpi-go-sauvegardes/<appName>/cpi-go/postgres/<fichier>.sql.gz' \
+  | gunzip | docker exec -i "$PG" pg_restore -U crm -d crm_restore_test -O
+
+# Le contrôle qui compte : des lignes, pas seulement un schéma.
+docker exec "$PG" psql -U crm -d crm_restore_test \
+  -c 'select count(*) from "Prospect";' \
+  -c 'select count(*) from "Dossier";' \
+  -c 'select count(*) from "Encaissement";'
+
+docker exec "$PG" dropdb -U crm crm_restore_test
+```
+
+Un schéma restauré avec zéro ligne partout est un échec, pas une réussite. C'est
+la seule vérification qui distingue une sauvegarde d'une archive vide.
+
+### 4.4 VPS nu, sans Dokploy
+
+**Ne s'applique pas à la production actuelle.** Sur un VPS lancé avec
+`docker-compose.prod.yml`, le service `backup` boucle en tâche de fond : une
+sauvegarde au démarrage, puis une par jour à `BACKUP_HOUR`, avec rotation au-delà
+de `BACKUP_RETENTION_DAYS` (14 par défaut).
+
+Les dumps sont écrits dans `BACKUP_DIR`, un **bind mount de l'hôte**, jamais dans
+le volume `pgdata` : une sauvegarde qui disparaît avec le volume qu'elle protège
+n'est pas une sauvegarde. Chaque dump est écrit en `.partial` puis renommé, un
+VPS redémarré en plein `pg_dump` ne laisse pas derrière lui une archive tronquée
+qui passerait pour valide.
 
 ```bash
 docker compose -f docker-compose.prod.yml logs backup   # dernier cycle
 ls -lh /srv/cpi-go/backups
 ```
 
-Restaurer :
+Ici le dump est du **SQL en clair** gzippé, donc `psql` et non `pg_restore` :
 
 ```bash
 docker compose -f docker-compose.prod.yml stop api web
@@ -125,17 +271,14 @@ gunzip -c /srv/cpi-go/backups/crm-AAAAMMJJ-HHMMSS.sql.gz \
 docker compose -f docker-compose.prod.yml start api web
 ```
 
-**Une sauvegarde non testée n'est pas une sauvegarde.** Restaurer le dernier
-dump dans une base jetable au moins une fois par trimestre :
+Deux limites à connaître, qui sont la raison pour laquelle la production ne
+repose pas sur ce mécanisme :
 
-```bash
-docker compose -f docker-compose.prod.yml exec postgres createdb -U crm crm_restore_test
-gunzip -c <dump> | docker compose -f docker-compose.prod.yml exec -T postgres psql -U crm -d crm_restore_test
-docker compose -f docker-compose.prod.yml exec postgres dropdb -U crm crm_restore_test
-```
-
-Le `BACKUP_DIR` doit être répliqué hors du VPS (rclone, rsync, snapshot du
-fournisseur). Un serveur perdu emporte sinon la base _et_ ses sauvegardes.
+- **Rien ne prévient en cas d'échec.** `backup.sh` écrit `ÉCHEC` sur sa sortie
+  standard et continue ; encore faut-il lire `docker compose logs backup`.
+- **Le `BACKUP_DIR` reste sur le VPS.** Il doit être répliqué ailleurs (rclone,
+  rsync, snapshot du fournisseur), sans quoi un serveur perdu emporte la base
+  _et_ ses sauvegardes.
 
 ## 5. TLS
 

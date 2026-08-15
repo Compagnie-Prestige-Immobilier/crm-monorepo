@@ -12,8 +12,14 @@ USAGE
     python3 infra/dokploy/deploy.py provision   # Postgres + les 2 applications
     python3 infra/dokploy/deploy.py configure   # dépôt, build, variables, domaines
     python3 infra/dokploy/deploy.py deploy      # démarrage
+    python3 infra/dokploy/deploy.py backup      # sauvegarde nocturne hors du VPS
     python3 infra/dokploy/deploy.py status      # état courant
     python3 infra/dokploy/deploy.py all         # les trois premières d'affilée
+
+`backup` reste HORS de `all` : il réclame les coordonnées d'un stockage S3 que
+l'opérateur seul détient, et un `all` qui échoue faute de bucket ferait échouer
+un déploiement par ailleurs correct. Il n'est pas facultatif pour autant, et
+`status` affiche en rouge tant qu'il n'a pas été lancé.
 
 Chaque étape est IDEMPOTENTE : elle cherche l'existant avant de créer.
 
@@ -70,6 +76,59 @@ APK_RELEASE_VOLUME = "cpi-go-apk-releases"
 # pour accumuler des copies de la clientèle.
 DB_DUMP_MOUNT = "/repo/storage/db-dumps"
 DB_DUMP_VOLUME = "cpi-go-db-dumps"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sauvegarde nocturne de la base
+#
+# CE QUI NE MARCHAIT PAS
+#     infra/docker/backup.sh fait exactement le bon travail, mais il n'est câblé
+#     que dans docker-compose.prod.yml, et ce compose ne peut PAS tourner ici :
+#     son Caddy réclame les ports 80 et 443, déjà tenus par le Traefik de
+#     Dokploy. Le seul fichier qui définissait une sauvegarde était donc le seul
+#     qui ne s'exécutait jamais sur l'hôte de production. Il reste valable pour
+#     un VPS nu, sans Dokploy, et pour rien d'autre.
+#
+# CE QUI A ÉTÉ ÉCARTÉ, ET POURQUOI
+#     Une troisième application lançant backup.sh, avec un volume monté sur le
+#     modèle des APK. Le volume vivrait dans /var/lib/docker/volumes, sur le
+#     MÊME disque et le MÊME hôte que celui de Postgres. C'est un volume
+#     distinct, donc il survit à un `docker volume rm pgdata` malheureux, mais
+#     pas à la perte du VPS, qui est précisément le sinistre à couvrir. Il
+#     faudrait en outre réécrire à la main l'alerte, la rotation et la
+#     restauration.
+#
+#     Une programmation côté Postgres (pg_cron, ou un cron glissé dans l'image).
+#     Même défaut, en pire : le dump se retrouve dans le conteneur qui porte les
+#     données qu'il protège, et l'image gérée par Dokploy serait à maintenir.
+#
+# CE QUI EST RETENU
+#     Le routeur `backup` de Dokploy, natif et déjà présent sur l'hôte. Il lance
+#     pg_dump dans le conteneur de la base et pousse la sortie gzippée par
+#     `rclone rcat` vers un stockage S3, donc HORS DU VPS : plus fort que « hors
+#     du volume de données », et c'est la seule forme qui survive à la perte de
+#     la machine. La rétention est bornée par keepLatestCount. L'échec COMME la
+#     réussite déclenchent une notification, ce qui donne au passage une veille
+#     par absence de signal, voir require_alerting().
+#
+#     Le prix à payer est réel et assumé : sans coordonnées S3, `backup` refuse
+#     de s'exécuter. Un stockage objet est une dépendance externe, pas un
+#     détail de configuration.
+# ─────────────────────────────────────────────────────────────────────────────
+
+BACKUP_DESTINATION_NAME = "cpi-go-sauvegardes"
+# Préfixe de chemin DANS le bucket. Le bucket peut être partagé avec un autre
+# projet CPI ; sans préfixe, deux séries de dumps se mélangeraient et la
+# rotation de l'une compterait les fichiers de l'autre.
+BACKUP_PREFIX = "cpi-go/postgres/"
+# Cron évalué par Dokploy, à l'heure du serveur. Africa/Dakar est sur UTC toute
+# l'année, sans heure d'été : 2 h ici est 2 h à Dakar, il n'y a pas de décalage
+# à corriger, contrairement à ce qu'exigerait un fuseau européen.
+BACKUP_SCHEDULE = os.environ.get("BACKUP_SCHEDULE", "0 2 * * *")
+# Rétention EN NOMBRE DE FICHIERS, pas en jours. Une sauvegarde par nuit, donc
+# environ un mois d'historique. Une borne en nombre est ce qu'il faut ici : si
+# le cron se met à tourner plus souvent, une borne en jours laisserait le bucket
+# grossir sans limite, une borne en fichiers non.
+BACKUP_KEEP_DEFAULT = 30
 
 HERE = Path(__file__).resolve().parent
 SECRETS_FILE = HERE / ".secrets.generated"
@@ -744,6 +803,277 @@ IDENTIFIANTS
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Étape 4, sauvegarde nocturne
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+S3_HELP = """
+  Il faut un stockage objet compatible S3, chez un tiers, et surtout PAS sur ce
+  VPS : un bucket MinIO installé à côté de Postgres retomberait avec lui. Un
+  bucket Scaleway (fr-par), Backblaze B2 ou Wasabi coûte quelques centimes par
+  mois pour ce volume. Créez le bucket, puis une clé d'accès qui n'a le droit
+  d'écrire QUE dans ce bucket, et exportez :
+
+    export BACKUP_S3_ENDPOINT='https://s3.fr-par.scw.cloud'
+    export BACKUP_S3_BUCKET='cpi-go-sauvegardes'
+    export BACKUP_S3_REGION='fr-par'
+    export BACKUP_S3_ACCESS_KEY='…'
+    export BACKUP_S3_SECRET_KEY='…'
+    export BACKUP_S3_PROVIDER='Scaleway'   # facultatif, « Other » par défaut
+
+  Ces valeurs ne sont pas écrites dans le dépôt : elles transitent une fois vers
+  Dokploy, qui les conserve, puis disparaissent avec la session.
+"""
+
+ALERT_HELP = """
+  Créez un canal dans Dokploy → Settings → Notifications, et cochez « Database
+  Backup » dessus. Telegram ou Slack demandent une minute et n'ont pas de
+  serveur SMTP à configurer. Le canal doit aboutir sur une boîte RELEVÉE : une
+  alerte envoyée à une adresse que personne n'ouvre reproduit exactement la
+  situation qu'on corrige ici.
+"""
+
+
+def _s3_settings() -> dict:
+    """Coordonnées du stockage, reprises de l'environnement de l'opérateur.
+
+    Même règle que DOKPLOY_KEY et BREVO_API_KEY : jamais dans le dépôt, elles ne
+    vivent que le temps de la session. Une valeur manquante INTERROMPT, elle
+    n'est pas devinée : une destination à moitié renseignée serait acceptée par
+    Dokploy et n'échouerait qu'à la première sauvegarde, la nuit, sans témoin.
+    """
+    required = {
+        "BACKUP_S3_ENDPOINT": "endpoint",
+        "BACKUP_S3_BUCKET": "bucket",
+        "BACKUP_S3_REGION": "region",
+        "BACKUP_S3_ACCESS_KEY": "accessKey",
+        "BACKUP_S3_SECRET_KEY": "secretAccessKey",
+    }
+    values: dict = {}
+    missing: list[str] = []
+    for variable, field in required.items():
+        value = os.environ.get(variable, "").strip()
+        if not value:
+            missing.append(variable)
+        values[field] = value
+    if missing:
+        fail(f"stockage de sauvegarde non renseigné : {', '.join(missing)}")
+        print(S3_HELP, file=sys.stderr)
+        sys.exit(1)
+    values["provider"] = os.environ.get("BACKUP_S3_PROVIDER", "").strip() or "Other"
+    values["additionalFlags"] = []
+    return values
+
+
+def _keep_latest_count() -> int:
+    raw = os.environ.get("BACKUP_KEEP", "").strip()
+    if not raw:
+        return BACKUP_KEEP_DEFAULT
+    try:
+        value = int(raw)
+    except ValueError:
+        fail(f"BACKUP_KEEP n'est pas un entier : {raw!r}")
+        sys.exit(1)
+    if value < 1:
+        # Zéro voudrait dire « ne garder aucun fichier », ce qui est une manière
+        # coûteuse de n'avoir aucune sauvegarde.
+        fail("BACKUP_KEEP doit valoir au moins 1")
+        sys.exit(1)
+    return value
+
+
+def require_alerting() -> list:
+    """Exige au moins un canal relayant l'événement « sauvegarde de base ».
+
+    C'est un PRÉALABLE, vérifié avant de créer quoi que ce soit, et non un
+    avertissement en fin de course. Une sauvegarde muette est la panne qu'on
+    vient de corriger : elle a l'air de marcher jusqu'au jour où on en a besoin.
+
+    Dokploy émet sur ce même drapeau la réussite ET l'échec. C'est voulu et
+    c'est le seul garde-fou contre la panne la plus vicieuse, celle où rien
+    n'échoue parce que rien ne se lance : un message arrive chaque nuit, donc
+    l'ABSENCE de message est elle-même le signal. Une notification d'échec seule
+    ne dirait jamais rien d'un ordonnanceur arrêté.
+    """
+    channels = [
+        row for row in (call("notification.all", method="GET") or []) if row.get("databaseBackup")
+    ]
+    if not channels:
+        fail("aucun canal de notification n'écoute l'événement « Database Backup »")
+        print(ALERT_HELP, file=sys.stderr)
+        sys.exit(1)
+    for channel in channels:
+        ok(f"alerte via {channel.get('notificationType', '?')} « {channel.get('name', '?')} »")
+    return channels
+
+
+def ensure_destination() -> str:
+    """Destination S3, créée une fois puis relue.
+
+    Une destination portant déjà ce nom est REPRISE telle quelle, ses
+    identifiants ne sont jamais réécrits. Dokploy exclut `accessKey` et
+    `secretAccessKey` de ses réponses en lecture : impossible de comparer, donc
+    impossible d'écraser à bon escient. Réécrire à l'aveugle échangerait une
+    destination qui fonctionne contre des variables d'environnement peut-être
+    périmées, et les sauvegardes suivantes partiraient dans le vide.
+    """
+    for row in call("destination.all", method="GET") or []:
+        if row.get("name") == BACKUP_DESTINATION_NAME:
+            ok(f"destination « {BACKUP_DESTINATION_NAME} » déjà enregistrée")
+            return row.get("destinationId", "")
+
+    settings = _s3_settings()
+    # Éprouvée AVANT d'être enregistrée. Sans ce test, des identifiants faux ne
+    # se manifestent qu'à la première fenêtre nocturne, et sous la forme d'une
+    # notification d'échec qu'il faut avoir pensé à lire.
+    call("destination.testConnection", settings)
+    ok(f"accès au bucket {settings['bucket']} vérifié")
+
+    call("destination.create", {"name": BACKUP_DESTINATION_NAME, **settings})
+    for row in call("destination.all", method="GET") or []:
+        if row.get("name") == BACKUP_DESTINATION_NAME:
+            ok(f"destination créée, {row.get('destinationId', '')}")
+            return row.get("destinationId", "")
+    raise DokployError("destination créée mais introuvable à la relecture")
+
+
+def postgres_backups(postgres_id: str) -> list:
+    """Sauvegardes déclarées sur le service Postgres, avec leurs exécutions."""
+    database = call("postgres.one", {"postgresId": postgres_id}, method="GET") or {}
+    return database.get("backups", []) or []
+
+
+def ensure_backup(postgres_id: str, destination_id: str) -> str:
+    """Entrée de sauvegarde sur le service Postgres, idempotente.
+
+    Reconnue par son préfixe. Une entrée existante qui pointe sur une AUTRE
+    destination lève au lieu d'être réécrite, même raison que pour les montages
+    dans ensure_volume_mount : rebasculer la destination en silence laisserait
+    croire que tout l'historique est dans le nouveau bucket, alors qu'il serait
+    coupé en deux, et on ne s'en apercevrait qu'en cherchant un dump ancien.
+    """
+    for backup in postgres_backups(postgres_id):
+        if backup.get("prefix") != BACKUP_PREFIX:
+            continue
+        backup_id = backup.get("backupId", "")
+        if backup.get("destinationId") != destination_id:
+            raise DokployError(
+                f"la sauvegarde {backup_id} vise déjà une autre destination "
+                f"({backup.get('destinationId')}), à trancher à la main"
+            )
+        if backup.get("enabled"):
+            ok(f"sauvegarde déjà déclarée, {backup_id}, {backup.get('schedule')}")
+            return backup_id
+
+        warn("la sauvegarde existe mais elle est DÉSACTIVÉE, réactivation")
+        try:
+            call(
+                "backup.update",
+                {
+                    "backupId": backup_id,
+                    "enabled": True,
+                    "schedule": backup.get("schedule") or BACKUP_SCHEDULE,
+                    "prefix": BACKUP_PREFIX,
+                    "destinationId": destination_id,
+                    "database": backup.get("database") or "crm",
+                    "keepLatestCount": backup.get("keepLatestCount") or _keep_latest_count(),
+                    "serviceName": backup.get("serviceName"),
+                    "metadata": backup.get("metadata"),
+                    "databaseType": "postgres",
+                },
+            )
+            ok("réactivée")
+        except DokployError as exc:
+            fail(f"réactivation refusée ({exc})")
+            info("réactivez-la depuis Dokploy → la base → onglet Backups → interrupteur")
+            sys.exit(1)
+        return backup_id
+
+    keep = _keep_latest_count()
+    call(
+        "backup.create",
+        {
+            "postgresId": postgres_id,
+            "databaseType": "postgres",
+            "backupType": "database",
+            "database": "crm",
+            "destinationId": destination_id,
+            "prefix": BACKUP_PREFIX,
+            "schedule": BACKUP_SCHEDULE,
+            "keepLatestCount": keep,
+            "enabled": True,
+        },
+    )
+    for backup in postgres_backups(postgres_id):
+        if backup.get("prefix") == BACKUP_PREFIX:
+            ok(f"sauvegarde créée, {backup.get('backupId')}, {BACKUP_SCHEDULE}, {keep} fichiers")
+            return backup.get("backupId", "")
+    raise DokployError("sauvegarde créée mais introuvable à la relecture")
+
+
+def cmd_backup() -> None:
+    ids = load_ids()
+    ids.update({k: v for k, v in find_existing().items() if v})
+    if not ids.get("POSTGRES_ID"):
+        fail("Postgres introuvable, lancez d'abord `provision`.")
+        sys.exit(1)
+    save_ids(ids)
+
+    # L'ordre compte. On refuse d'abord faute d'alerte, ENSUITE seulement on
+    # crée. Une sauvegarde posée sans destinataire d'alerte serait un progrès
+    # apparent et un piège réel.
+    step("Destinataire des alertes")
+    require_alerting()
+
+    step("Stockage des sauvegardes, hors du VPS")
+    destination_id = ensure_destination()
+
+    step("Sauvegarde nocturne de la base")
+    backup_id = ensure_backup(ids["POSTGRES_ID"], destination_id)
+
+    # Une sauvegarde immédiate, tout de suite, sous les yeux de l'opérateur.
+    # Attendre la première fenêtre nocturne pour découvrir qu'une permission
+    # manque sur le bucket, c'est perdre une nuit et, pire, prendre l'habitude
+    # de croire le travail terminé.
+    step("Sauvegarde de vérification, immédiate")
+    call("backup.manualBackupPostgres", {"backupId": backup_id})
+    ok("demandée, le fichier doit apparaître dans le bucket sous une minute")
+    info("une notification de RÉUSSITE doit suivre sur le canal ci-dessus")
+
+    print(_backup_epilogue())
+
+
+def _backup_epilogue() -> str:
+    return f"""
+{'─' * 76}
+SAUVEGARDE EN PLACE
+
+  Chaque nuit ({BACKUP_SCHEDULE}, heure serveur, identique à Dakar), Dokploy
+  lance pg_dump dans le conteneur de la base et pousse la sortie gzippée vers
+  le bucket. Le fichier n'est jamais posé sur le VPS.
+
+  Chemin dans le bucket :
+    <appName de la base>/{BACKUP_PREFIX}<horodatage>.sql.gz
+
+CE QUI VOUS PRÉVIENT
+
+  Un message arrive CHAQUE NUIT, en réussite comme en échec. Trois lectures :
+
+    message « success »   rien à faire
+    message « error »     lisez la cause, relancez à la main depuis Dokploy
+    AUCUN message         c'est le cas le plus grave : ni succès ni échec
+                          signifie que rien ne s'est lancé. Vérifiez que
+                          l'entrée est toujours active, puis relancez.
+
+  Contrôle mensuel, deux minutes : `deploy.py status` doit annoncer la
+  sauvegarde active, et le bucket doit contenir un fichier daté de cette nuit.
+
+RESTAURER, la procédure est dans infra/README.md, section Sauvegardes.
+{'─' * 76}
+"""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # État
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -769,6 +1099,56 @@ def cmd_status() -> None:
                 f"{app.get('applicationStatus', '?'):10s} {domains}"
             )
 
+    step("Sauvegardes")
+    _print_backup_status(project)
+
+
+def _print_backup_status(project: dict) -> None:
+    """Dit la vérité sur les sauvegardes, à chaque `status`.
+
+    C'est délibérément bruyant. L'absence de sauvegarde s'est installée parce
+    que rien, nulle part, ne la signalait : le fichier qui la définissait ne
+    tournait pas et aucune commande ne s'en plaignait. Une ligne rouge à chaque
+    consultation de l'état est le prix à payer pour que cela ne recommence pas.
+    """
+    total = 0
+    for environment in project.get("environments", []) or []:
+        for db in environment.get("postgres", []) or []:
+            try:
+                backups = postgres_backups(db.get("postgresId", ""))
+            except DokployError as exc:
+                warn(f"{db.get('name')} : lecture impossible ({exc})")
+                continue
+            for backup in backups:
+                total += 1
+                # L'ordre renvoyé n'est pas garanti : on trie explicitement,
+                # sinon « dernière exécution » pourrait afficher un succès
+                # vieux de trois semaines et masquer l'échec d'hier.
+                runs = sorted(
+                    backup.get("deployments", []) or [],
+                    key=lambda run: str(run.get("createdAt") or ""),
+                    reverse=True,
+                )
+                last = runs[0] if runs else {}
+                state = "active" if backup.get("enabled") else "DÉSACTIVÉE"
+                colour = GREEN if backup.get("enabled") else RED
+                print(
+                    f"  {colour}{state}{RESET}  {db.get('name')}  {backup.get('schedule')}  "
+                    f"{backup.get('keepLatestCount')} fichiers  "
+                    f"→ {(backup.get('destination') or {}).get('name', '?')}"
+                )
+                if last:
+                    print(
+                        f"           dernière exécution : {last.get('status', '?')} "
+                        f"{last.get('createdAt', '')}"
+                    )
+                else:
+                    warn("aucune exécution enregistrée pour l'instant")
+
+    if total == 0:
+        fail("AUCUNE SAUVEGARDE CONFIGURÉE. La perte du VPS serait définitive.")
+        info("corrigez avec : python3 infra/dokploy/deploy.py backup")
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -776,6 +1156,7 @@ COMMANDS = {
     "provision": cmd_provision,
     "configure": cmd_configure,
     "deploy": cmd_deploy,
+    "backup": cmd_backup,
     "status": cmd_status,
 }
 
