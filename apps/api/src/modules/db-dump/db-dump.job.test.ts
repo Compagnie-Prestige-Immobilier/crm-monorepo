@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DUMP_CLOCK_SKEW_TOLERANCE_MS,
   DUMP_MAX_RUNTIME_MS,
   DUMP_TTL_MS,
   dumpFileName,
@@ -140,6 +141,77 @@ describe('effectiveStatus', () => {
   it('laisse « ready » un export dont l’échéance est encore devant', () => {
     const expiresAt = new Date(NOW.getTime() + 60_000).toISOString();
     expect(effectiveStatus(job({ status: 'ready', expiresAt }), NOW)).toBe('ready');
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LA BRANCHE « EN COURS » LAISSAIT VIVRE CE QUE LA BRANCHE « ready » ENTERRE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Le contrôle était écrit `Number.isFinite(since) && âge > borne`, donc
+   * protégeait le mauvais côté : un horodatage illisible ne franchissait JAMAIS
+   * la borne. La ligne restait « en cours » indéfiniment, `isInFlight` interdit
+   * toute nouvelle demande, et l'export devenait impossible POUR TOUJOURS, sans
+   * aucune route pour réarmer. Une valeur écrite par une version antérieure ou
+   * corrompue dans `app_settings` suffisait.
+   *
+   * Même doctrine que l'échéance illisible d'un `ready` : le doute penche du
+   * côté qui déclare mort.
+   */
+  it('enterre un « running » dont la date de démarrage est illisible', () => {
+    expect(effectiveStatus(job({ status: 'running', startedAt: 'jamais' }), NOW)).toBe('failed');
+  });
+
+  /**
+   * Le même trou par l'autre horodatage : un `queued` n'a pas de `startedAt`,
+   * c'est `requestedAt` qui le fait vieillir. C'est aussi l'état le plus court,
+   * donc celui qu'aucune recette n'observe et que la panne fige pour de bon.
+   */
+  it('enterre un « queued » dont la date de demande est illisible', () => {
+    expect(
+      effectiveStatus(job({ status: 'queued', startedAt: null, requestedAt: 'jamais' }), NOW),
+    ).toBe('failed');
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * L'HORLOGE QUI RECULE FIGEAIT LA LIGNE AUSSI SÛREMENT
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Une machine restaurée depuis un instantané, un conteneur démarré avant la
+   * synchronisation NTP : l'horloge recule, l'âge du travail devient négatif,
+   * et un nombre négatif ne dépasse jamais `DUMP_MAX_RUNTIME_MS`. La ligne « en
+   * cours » ne vieillit donc PLUS JAMAIS, et la fonctionnalité meurt comme dans
+   * le cas de l'horodatage illisible.
+   */
+  it('enterre un travail en cours daté au-delà de la tolérance dans le futur', () => {
+    const startedAt = new Date(NOW.getTime() + DUMP_CLOCK_SKEW_TOLERANCE_MS + 1_000).toISOString();
+    expect(effectiveStatus(job({ status: 'running', startedAt }), NOW)).toBe('failed');
+  });
+
+  /**
+   * Contre-épreuve indispensable : une fonction qui enterrerait tout ce qui est
+   * daté dans le futur ferait passer le test ci-dessus en tuant les exports
+   * sains. L'horodatage est écrit par un processus, l'horloge relue par un
+   * autre, et un ajustement NTP de quelques secondes entre les deux est banal.
+   * Il ne doit rien coûter.
+   */
+  it('laisse courir un travail que quelques secondes d’écart d’horloge mettent en avance', () => {
+    const startedAt = new Date(NOW.getTime() + 2_000).toISOString();
+    expect(effectiveStatus(job({ status: 'running', startedAt }), NOW)).toBe('running');
+  });
+});
+
+describe('DUMP_CLOCK_SKEW_TOLERANCE_MS', () => {
+  /**
+   * La tolérance n'est pas une durée d'exécution : c'est la largeur du doute
+   * accordé à l'horloge. Elle doit rester très au-dessus de ce que corrige un
+   * NTP en marche, et très en deçà de la borne d'exécution, faute de quoi elle
+   * repousserait l'enterrement d'un travail réellement mort.
+   */
+  it('reste très en deçà de la borne d’exécution', () => {
+    expect(DUMP_CLOCK_SKEW_TOLERANCE_MS).toBeGreaterThan(60_000);
+    expect(DUMP_CLOCK_SKEW_TOLERANCE_MS).toBeLessThan(DUMP_MAX_RUNTIME_MS);
   });
 });
 
