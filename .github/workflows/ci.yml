@@ -77,6 +77,30 @@ jobs:
 
       - name: Migrations
         run: pnpm db:deploy
+
+      # -----------------------------------------------------------------------
+      # RIEN ne vérifiait que la chaîne de migrations produit bien le schéma
+      # décrit par schema.prisma, et les deux se lisent séparément :
+      # `db:deploy` applique les migrations, `db:generate` engendre le client
+      # depuis schema.prisma. Ajouter un champ au schéma en oubliant sa
+      # migration donnait donc une CI verte de bout en bout, le client typé
+      # connaît la colonne et la base ne l'a pas, et la panne n'apparaissait qu'à
+      # la première requête qui touche ce champ, en production.
+      #
+      # `prisma migrate diff --exit-code` compare la base réellement migrée au
+      # schéma et sort en 2 s'il reste quoi que ce soit à appliquer. Vérifié en
+      # local dans les deux sens : 0 sur la chaîne intacte, 2 après ajout d'une
+      # colonne à la main. Un portillon qui ne sait pas devenir rouge ne vaut
+      # rien ; celui-ci sait.
+      # -----------------------------------------------------------------------
+      - name: Dérive entre les migrations et schema.prisma
+        run: |
+          if ! pnpm --filter @crm/database db:diff; then
+            echo "::error::La base issue de prisma/migrations ne correspond pas à schema.prisma."
+            echo "::error::Créer la migration manquante avec \`pnpm db:migrate\`, puis la committer."
+            exit 1
+          fi
+
       - name: Données de test
         run: pnpm db:seed
       - run: pnpm test:integration
@@ -148,20 +172,35 @@ jobs:
       # ---------------------------------------------------------------------
       # `turbo-cache: 'false'`, et c'est le seul job où on le désactive.
       #
-      # Ce job ne demande à turbo qu'UNE chose : régénérer le contrat et les
-      # deux clients. Or la tâche `generate` de turbo.json déclare ses `inputs`
-      # nommément (openapi.json, openapi-config.yaml, openapitools.json,
-      # scripts/**, .openapi-generator-ignore), et `pubspec.lock` n'y figure
-      # pas. Un relèvement de version de json_serializable ou de build_runner
-      # côté Dart ne changerait donc PAS l'empreinte de `generate` : turbo
-      # restaurerait les `*.g.dart` de l'ancien générateur et le portillon
-      # anti-dérive passerait au vert sur du code que le générateur courant
-      # n'écrit plus. C'est exactement le vert-sur-artefact-périmé que ce job
-      # existe pour attraper.
+      # Les `inputs` de la tâche `generate` ont été complétés dans turbo.json :
+      # la version épinglée du générateur (`../../openapitools.json`, qui ne
+      # correspondait à AUCUN fichier), le script de génération lui-même
+      # (`tools/dev/generate-dart-client.mjs`), `build.yaml`, `pubspec.yaml` et
+      # `analysis_options.yaml` y figurent désormais. La justification
+      # historique de cette ligne, « pubspec.lock n'est pas dans les inputs »,
+      # n'est donc plus la bonne. Elle reste vraie, mais pour une raison qu'AUCUN
+      # réglage de turbo.json ne peut corriger, et c'est pour celle-là que le
+      # cache reste coupé ici :
       #
-      # Le coût est nul : les seules tâches turbo lancées ici sont
-      # `@crm/database#build` (qui ne déclare aucun `outputs`, donc n'est pas
-      # mis en cache de toute façon) et cette génération, qui doit réellement
+      #   1. `packages/api-client-dart/pubspec.lock` est ignoré par git
+      #      (convention Dart pour une bibliothèque). Turbo hache par l'index
+      #      git : un fichier ignoré n'est jamais haché, l'inscrire dans
+      #      `inputs` ne changerait rien. Les contraintes en `^x.y.z` de
+      #      pubspec.yaml peuvent donc se résoudre sur un json_serializable plus
+      #      récent, qui écrit d'autres `*.g.dart`, sans qu'un seul fichier suivi
+      #      ne bouge.
+      #   2. Les versions du SDK Flutter/Dart et du JDK sont épinglées DANS CE
+      #      FICHIER, que turbo ne hache pas davantage. `dart format` et
+      #      build_runner sortent des octets différents d'une version à l'autre.
+      #
+      # Dans les deux cas une entrée de cache retrouvée ferait SAUTER la
+      # génération et le portillon anti-dérive comparerait le code committé à
+      # lui-même : vert garanti, vérification nulle. Ce job existe précisément
+      # pour attraper ce vert-là ; il ne peut pas s'appuyer sur le mécanisme
+      # qu'il doit contrôler.
+      #
+      # Le coût est faible et il est délibéré : les seules tâches turbo lancées
+      # ici sont `@crm/database#build` et cette génération, qui doit réellement
       # s'exécuter pour que le portillon veuille dire quelque chose.
       # ---------------------------------------------------------------------
       - uses: ./.github/actions/setup-node
@@ -206,16 +245,26 @@ jobs:
       # cache, jamais un artefact faux, y compris pour le relèvement de
       # version Dart qui justifie la coupure du cache turbo juste au-dessus.
       #
-      # Le préfixe de restauration s'arrête à l'empreinte de pubspec.lock et de
-      # build.yaml : un jeu de générateurs différent n'est jamais restauré,
-      # même si build_runner saurait le rejeter.
+      # `pubspec.yaml` ET NON `pubspec.lock` dans la clé, et c'est une
+      # correction, pas un détail de style. Ce `pubspec.lock` est ignoré par git
+      # (packages/api-client-dart/.gitignore) : il n'existe donc PAS sur le
+      # disque au moment où cette étape s'exécute, `dart pub get` ne tournant
+      # que plus bas, dans l'étape de génération. `hashFiles` sur un chemin
+      # inexistant ne remonte rien : il ne râle pas, il l'ignore. La clé ne
+      # portait en réalité que l'empreinte de build.yaml, et le commentaire qui
+      # affirmait le contraire décrivait une protection qui n'était pas là.
+      # pubspec.yaml, lui, est suivi et présent dès le checkout.
+      #
+      # Le préfixe de restauration s'arrête donc à pubspec.yaml + build.yaml :
+      # un jeu de générateurs différent n'est jamais restauré, même si
+      # build_runner saurait le rejeter.
       # ---------------------------------------------------------------------
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: packages/api-client-dart/.dart_tool/build
-          key: build-runner-dart-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('packages/api-client-dart/pubspec.lock', 'packages/api-client-dart/build.yaml') }}-${{ github.job }}-${{ github.sha }}
+          key: build-runner-dart-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('packages/api-client-dart/pubspec.yaml', 'packages/api-client-dart/build.yaml') }}-${{ github.job }}-${{ github.sha }}
           restore-keys: |
-            build-runner-dart-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('packages/api-client-dart/pubspec.lock', 'packages/api-client-dart/build.yaml') }}-
+            build-runner-dart-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('packages/api-client-dart/pubspec.yaml', 'packages/api-client-dart/build.yaml') }}-
 
       # Le jar du générateur pèse 30 Mo. `generator-cli.storageDir` le place
       # dans l'arbre de travail (openapitools.json) précisément pour qu'il soit
