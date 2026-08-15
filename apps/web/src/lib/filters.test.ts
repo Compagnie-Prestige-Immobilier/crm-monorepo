@@ -375,3 +375,40 @@ describe('filtrage avancé', () => {
     expect(initialAdvancedOpen(EMPTY_FILTERS, null)).toBe(false);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Le lien « Voir le prospect créé » porte un numéro E.164, avec son « + ».
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `client-requests-view.tsx` construit `/prospects?search=<E164>` : c'est la
+ * seule façon d'atteindre la fiche, le panel n'ayant pas d'écran de détail de
+ * prospect ni de critère par identifiant.
+ *
+ * Le piège est le « + » : dans une chaîne de requête, il vaut une ESPACE. Un
+ * lien écrit sans `encodeURIComponent` livrerait donc « 221771234567 » sans
+ * indicatif, la recherche ne trouverait rien, et l'admin conclurait que le
+ * prospect n'a pas été créé alors qu'il l'a bien été.
+ */
+describe('un numéro E.164 survit à l’aller-retour d’URL', () => {
+  it('conserve l’indicatif quand le lien encode le terme', () => {
+    const phone = '+221771234567';
+    const params = new URLSearchParams(`search=${encodeURIComponent(phone)}`);
+
+    expect(parseProspectFilters(params).search).toBe(phone);
+  });
+
+  it('le sérialiseur du panel le réécrit à l’identique', () => {
+    const phone = '+221771234567';
+    const restored = parseProspectFilters(
+      serializeProspectFilters({ ...EMPTY_FILTERS, search: phone }),
+    );
+
+    expect(restored.search).toBe(phone);
+  });
+
+  /** La preuve du défaut évité : sans encodage, l'indicatif disparaît. */
+  it('un « + » NON encodé serait lu comme une espace', () => {
+    expect(new URLSearchParams('search=+221771234567').get('search')).toBe(' 221771234567');
+  });
+});

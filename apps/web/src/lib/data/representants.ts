@@ -64,8 +64,17 @@ export function toRepresentantQuery(filters: RepresentantFilters): RepresentantQ
   if (filters.dateTo !== null) query.dateTo = endOfDay(filters.dateTo);
   if (filters.hasProspects !== null) query.hasProspects = filters.hasProspects;
   if (filters.sortBy !== EMPTY_REPRESENTANT_FILTERS.sortBy) query.sortBy = filters.sortBy;
-  if (filters.sortOrder !== EMPTY_REPRESENTANT_FILTERS.sortOrder) {
-    query.sortOrder = filters.sortOrder;
+  /*
+    `sortDir` dans l'URL, `sortOrder` sur le fil : la MÊME traduction que
+    `toProspectQuery` et `toBankCaseQuery`.
+
+    Cet écran écrivait `sortOrder` jusque dans la barre d'adresse, seul des
+    trois. Deux mots pour un même critère, c'est deux façons d'écrire un lien
+    partagé, et un « trier par date, croissant » qui se recopie d'un écran à
+    l'autre sans marcher.
+  */
+  if (filters.sortDir !== EMPTY_REPRESENTANT_FILTERS.sortDir) {
+    query.sortOrder = filters.sortDir;
   }
 
   return query;

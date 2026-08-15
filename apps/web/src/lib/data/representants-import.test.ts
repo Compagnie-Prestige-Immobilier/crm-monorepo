@@ -30,7 +30,7 @@ describe('buildRepresentantsExportUrl', () => {
       departementId: 'dep-1',
       hasProspects: false,
       sortBy: 'prospects',
-      sortOrder: 'asc',
+      sortDir: 'asc',
     });
     expect(url).toContain('search=Diallo');
     expect(url).toContain('departementId=dep-1');

@@ -24,7 +24,7 @@ const ADAPTER: UrlFilterAdapter<RepresentantFilters> = {
   cleared: (current) => ({
     ...EMPTY_REPRESENTANT_FILTERS,
     sortBy: current.sortBy,
-    sortOrder: current.sortOrder,
+    sortDir: current.sortDir,
   }),
 };
 
