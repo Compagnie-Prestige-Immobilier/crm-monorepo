@@ -72,7 +72,7 @@ export class SyncBatchStore {
 
     // IN_PROGRESS. Reprise conditionnelle : le prédicat sur `createdAt` est
     // évalué par PostgreSQL au moment de l'UPDATE, donc deux repreneurs
-    // simultanés ne peuvent pas réussir tous les deux — le second voit la date
+    // simultanés ne peuvent pas réussir tous les deux, le second voit la date
     // déjà rafraîchie et repart avec 0 ligne.
     const reclaimed = await this.prisma.$executeRaw`
       UPDATE "sync_batches"

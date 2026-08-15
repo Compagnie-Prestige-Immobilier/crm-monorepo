@@ -5,7 +5,7 @@
  * comportements dont dépend la logique d'idempotence, et rien d'autre.
  *
  *  1. `INSERT ... ON CONFLICT DO NOTHING` renvoie 1 ou 0 lignes affectées.
- *  2. `$transaction` restaure l'état antérieur si le rappel lève — c'est ce qui
+ *  2. `$transaction` restaure l'état antérieur si le rappel lève, c'est ce qui
  *     permet de vérifier qu'un groupe défaillant n'emporte pas le groupe voisin.
  *  3. Le marqueur de lot vit HORS des transactions : les tests peuvent donc
  *     constater qu'un rollback ne l'efface pas.
@@ -50,6 +50,13 @@ export interface RepresentantRow {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
+  /**
+   * Facultatif À DESSEIN. `SyncService` ne pose PAS cette colonne : la
+   * remontée hors ligne est du travail réel, et le défaut du schéma vaut
+   * `false`. Le double l'enregistre tout de même s'il la reçoit, pour qu'un
+   * test puisse constater qu'elle est restée absente au lieu de le supposer.
+   */
+  isDemo?: boolean;
 }
 
 export interface ProspectRow {
@@ -67,6 +74,8 @@ export interface ProspectRow {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
+  /** Facultatif à dessein, même raison que sur `RepresentantRow`. */
+  isDemo?: boolean;
 }
 
 type Row = Record<string, unknown>;
@@ -169,7 +178,7 @@ export class FakePrisma {
       return Promise.resolve(1);
     }
 
-    throw new Error(`FakePrisma : SQL non pris en charge — ${sql}`);
+    throw new Error(`FakePrisma : SQL non pris en charge, ${sql}`);
   };
 
   $queryRaw = (strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown[]> => {
@@ -179,7 +188,7 @@ export class FakePrisma {
       const row = this.batches.get(this.key(userId, key));
       return Promise.resolve(row ? [clone(row)] : []);
     }
-    throw new Error(`FakePrisma : requête non prise en charge — ${sql}`);
+    throw new Error(`FakePrisma : requête non prise en charge, ${sql}`);
   };
 
   // ─── Transactions ─────────────────────────────────────────────────────────

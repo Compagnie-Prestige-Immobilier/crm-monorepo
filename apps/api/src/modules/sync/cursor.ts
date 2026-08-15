@@ -1,19 +1,21 @@
 import { BadRequestException } from '@nestjs/common';
 
+import { isValidCursorMicros } from '../../common/cursor-micros.js';
+
 /**
  * Curseur de pagination du pull delta.
  *
  * IL NE PEUT PAS ÊTRE UN SIMPLE HORODATAGE. Deux lignes écrites dans la même
  * milliseconde et séparées par une frontière de page se perdent silencieusement :
  * la page 1 se termine sur la première, la page 2 demande « strictement après
- * cette milliseconde » et saute la seconde. Le client ne voit jamais l'erreur —
+ * cette milliseconde » et saute la seconde. Le client ne voit jamais l'erreur,
  * il lui manque simplement un prospect, pour toujours.
  *
  * On pagine donc en keyset sur le COUPLE `(updatedAt, id)`, exactement l'index
  * composite posé dans le schéma. Le curseur transporte les deux moitiés.
  *
- * `t` est exprimé en MICROsecondes. Les colonnes sont en `TIMESTAMP(3)` — donc
- * à la milliseconde — mais l'unité microseconde est celle de PostgreSQL, et
+ * `t` est exprimé en MICROsecondes. Les colonnes sont en `TIMESTAMP(3)`, donc
+ * à la milliseconde, mais l'unité microseconde est celle de PostgreSQL, et
  * l'adopter dès maintenant évite d'avoir à faire migrer des curseurs déjà
  * distribués sur des téléphones le jour où la précision de la colonne change.
  *
@@ -93,7 +95,7 @@ export function decodeCursor(raw: string | undefined): SyncCursor {
     // Un curseur partiellement corrompu est refusé plutôt que réparé : le
     // « réparer » en repartant de zéro sur un flux ferait retélécharger toute
     // la base sans que personne ne comprenne pourquoi.
-    if (typeof t !== 'number' || !Number.isFinite(t) || typeof id !== 'string' || !id) {
+    if (!isValidCursorMicros(t) || typeof id !== 'string' || !id) {
       throw new BadRequestException({
         code: 'SYNC_CURSOR_INVALID',
         message: `Position de curseur illisible pour le flux ${stream}.`,
