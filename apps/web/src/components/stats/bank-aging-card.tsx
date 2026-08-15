@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
+import { QueryErrorInline } from '@/components/query-error-state';
 import { StatInfo } from '@/components/stats/stat-info';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,6 +17,7 @@ import {
 import { EMPTY_FILTERS } from '@/lib/filters';
 import { fetchBankAging, formatDelayDays } from '@/lib/data/advanced-stats';
 import { formatNumber, formatRateOrNone } from '@/lib/format';
+import { shouldShowError } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 
 /**
@@ -42,11 +44,33 @@ import { queryKeys } from '@/lib/query-keys';
  * sous le même écran), la carte s'annonce comme une vue non filtrée.
  */
 export function BankAgingCard() {
-  const { data, isPending } = useQuery({
+  const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: queryKeys.statsVieillissement(EMPTY_FILTERS),
     queryFn: () => fetchBankAging(EMPTY_FILTERS),
     placeholderData: keepPreviousData,
   });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * Une requête EN ÉCHEC ne doit pas se donner pour un calcul EN COURS.
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * La carte ne lisait que `isPending` et `data === undefined`. Or TanStack pose
+   * `isPending` à `false` dès qu'une requête échoue, en laissant `data` à
+   * `undefined` : l'échec passait donc exactement par la branche du chargement.
+   * L'en-tête annonçait « Calcul en cours… » et le corps affichait un squelette,
+   * l'un comme l'autre INDÉFINIMENT, pour un calcul que plus rien ne mène.
+   *
+   * Un utilisateur devant ce squelette attend. Il n'a aucune raison de
+   * soupçonner une panne, et rien ne lui propose de réessayer : c'est la
+   * variante silencieuse du défaut que `QueryErrorState` a été écrit pour
+   * corriger ailleurs, où un 500 s'affichait en « aucun résultat ».
+   *
+   * `shouldShowError` plutôt qu'`isError` nu : un cycle de sondage raté ne doit
+   * pas effacer des chiffres déjà lisibles à l'écran.
+   */
+  const hasData = data !== undefined;
+  const showError = shouldShowError({ isError, hasData });
 
   return (
     <Card className="animate-rise">
@@ -56,13 +80,23 @@ export function BankAgingCard() {
           <StatInfo stat="bankAging" label="Ancienneté des dossiers en cours" />
         </CardTitle>
         <CardDescription>
-          {isPending || data === undefined
-            ? 'Calcul en cours…'
-            : `${formatNumber(data.total)} dossier${data.total > 1 ? 's' : ''} encore ouvert${data.total > 1 ? 's' : ''}. Les dossiers encaissés ou rejetés sont sortis du portefeuille.`}
+          {showError
+            ? 'Ancienneté indisponible.'
+            : isPending || !hasData
+              ? 'Calcul en cours…'
+              : `${formatNumber(data.total)} dossier${data.total > 1 ? 's' : ''} encore ouvert${data.total > 1 ? 's' : ''}. Les dossiers encaissés ou rejetés sont sortis du portefeuille.`}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {data === undefined ? (
+        {showError ? (
+          <QueryErrorInline
+            error={error}
+            onRetry={() => {
+              void refetch();
+            }}
+            fallback="L’ancienneté des dossiers n’a pas pu être calculée."
+          />
+        ) : data === undefined ? (
           <Skeleton className="h-40 w-full" aria-hidden="true" />
         ) : data.total === 0 ? (
           <p className="text-[0.875rem] text-muted-foreground">
