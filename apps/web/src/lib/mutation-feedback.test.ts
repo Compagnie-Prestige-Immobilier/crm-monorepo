@@ -197,3 +197,91 @@ describe('le refus d’écriture du mode démonstration', () => {
     expect(toastError.mock.calls[0]).toEqual(['Le nom est obligatoire.']);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Le SECOND refus transverse : « l'état du mode est inconnu ».
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `DEMO_MODE_STATE_UNKNOWN` sort en 409 sur TOUTE écriture non dispensée, comme
+ * `DEMO_MODE_READ_ONLY`, quand le serveur n'arrive pas à lire l'interrupteur et
+ * refuse d'écrire une ligne dont il ne saurait pas dire si elle est réelle.
+ *
+ * Il n'était traité NULLE PART. Comme le contrat garantit un `message` non
+ * vide, la prose du serveur atteignait bien l'écran par la branche 409
+ * générique : le texte n'était donc pas faux. Ce qui manquait est le traitement
+ * de forme, qui découle du caractère TRANSVERSE et non du texte :
+ *
+ *  1. le message fait deux phrases longues et durait quatre secondes, le défaut
+ *     de Sonner : il disparaît avant que « Réessayez » ait été lu ;
+ *  2. une action en lot lance N écritures, toutes refusées pour la même cause
+ *     unique, et empilait N pavés identiques dans le coin de l'écran.
+ *
+ * Et ce qui ne doit SURTOUT pas arriver : que ce refus soit confondu avec une
+ * démonstration en cours. Il n'en annonce aucune.
+ */
+const UNKNOWN_MESSAGE =
+  'Impossible de lire l’état du mode démonstration : l’écriture est refusée pour ne pas ' +
+  'enregistrer une ligne dont on ne saurait pas dire si elle est réelle. Réessayez.';
+
+const stateUnknown = (body: unknown = { code: 'DEMO_MODE_STATE_UNKNOWN', message: UNKNOWN_MESSAGE }) =>
+  fail(409, body);
+
+describe('le refus d’écriture quand l’état du mode est inconnu', () => {
+  beforeEach(() => {
+    toastError.mockClear();
+  });
+
+  it('laisse au message le temps d’être lu, comme l’autre refus transverse', () => {
+    toastApiError(stateUnknown(), 'Échec.');
+
+    const [text, options] = toastError.mock.calls[0] as [string, { duration?: number } | undefined];
+    expect(text).toBe(UNKNOWN_MESSAGE);
+    expect(options?.duration).toBeGreaterThan(8000);
+  });
+
+  it('n’empile pas un pavé identique par écriture partie', () => {
+    toastApiError(stateUnknown(), 'Échec.');
+    toastApiError(stateUnknown(), 'Échec.');
+    toastApiError(stateUnknown(), 'Échec.');
+
+    const ids = toastError.mock.calls.map((call) => (call[1] as { id?: string } | undefined)?.id);
+    expect(new Set(ids).size).toBe(1);
+    expect(ids[0]).toBe('DEMO_MODE_STATE_UNKNOWN');
+  });
+
+  it('n’efface PAS le refus de lecture seule : deux états distincts, deux toasts', () => {
+    // Une bascule pendant une panne de base peut produire les deux. Partager un
+    // identifiant ferait disparaître le premier au profit du second, et
+    // l'utilisateur ne lirait jamais la cause qui le concerne.
+    toastApiError(demoRefusal(), 'Échec.');
+    toastApiError(stateUnknown(), 'Échec.');
+
+    const ids = toastError.mock.calls.map((call) => (call[1] as { id?: string } | undefined)?.id);
+    // Les identifiants sont nommés un par un, et non seulement comptés : sans
+    // traitement du second code, son toast ne porte AUCUN identifiant, ce qui
+    // ferait bien deux valeurs distinctes tout en le laissant s'empiler.
+    expect(ids).toEqual(['DEMO_MODE_READ_ONLY', 'DEMO_MODE_STATE_UNKNOWN']);
+  });
+
+  it('n’annonce AUCUNE démonstration en cours', () => {
+    // Le piège serait de le traiter comme un alias de `DEMO_MODE_READ_ONLY` :
+    // l'utilisateur partirait faire éteindre un interrupteur qui n'est
+    // peut-être pas allumé, pendant que la base est en difficulté.
+    expect(demoReadOnlyMessage(stateUnknown())).toBeNull();
+
+    const text = apiErrorText(stateUnknown({ code: 'DEMO_MODE_STATE_UNKNOWN' }), 'Échec.');
+    expect(text).not.toMatch(/désactiver le mode démonstration/u);
+    expect(text).not.toMatch(/écritures sont suspendues/u);
+    expect(text).toMatch(/Réessayez/u);
+  });
+
+  it('n’accuse PAS un doublon quand le corps porte le code sans prose', () => {
+    // Le contrat garantit un `message`, mais un relais qui tronque le corps
+    // ferait retomber ce refus sur la branche 409 générique, c'est-à-dire sur
+    // un doublon inexistant.
+    const text = apiErrorText(stateUnknown({ code: 'DEMO_MODE_STATE_UNKNOWN' }), 'Échec.');
+
+    expect(text).not.toMatch(/existe déjà/u);
+  });
+});
