@@ -264,7 +264,7 @@ describe('isolation transactionnelle par groupe', () => {
   });
 });
 
-describe('pull — pagination keyset', () => {
+describe('pull, pagination keyset', () => {
   it('ne perd AUCUNE ligne quand elles partagent la même milliseconde', async () => {
     const repId = randomUUID();
     await sync.push(alice, push([repOp(repId, nextPhone())]));

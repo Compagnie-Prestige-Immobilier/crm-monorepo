@@ -71,7 +71,7 @@ export enum SyncOpStatus {
  * déballer, alors qu'un objet plat aux champs optionnels donne un type utile
  * immédiatement. La validation par entité (quels champs sont obligatoires pour
  * un `representant.create`) est faite dans le service, et une opération mal
- * formée ressort en `invalid` DANS le corps de réponse — jamais en 400 pour
+ * formée ressort en `invalid` DANS le corps de réponse, jamais en 400 pour
  * tout le lot, ce qui condamnerait les 199 autres opérations.
  */
 export class SyncEntityDataDto {
@@ -156,7 +156,7 @@ export class SyncEntityDataDto {
   // Ces champs ne sont lus que pour `entity = call_attempt`. Les règles
   // croisées (méthode obligatoire si et seulement si METHOD_OBTAINED,
   // commentaire obligatoire pour OTHER) sont vérifiées par le module phase 2,
-  // qui en est la seule autorité — les dupliquer ici les ferait diverger.
+  // qui en est la seule autorité, les dupliquer ici les ferait diverger.
 
   @ApiPropertyOptional({
     format: 'uuid',
@@ -250,8 +250,8 @@ export class SyncOperationDto {
  *
  * Le nombre de groupes ne se déduit pas d'un décorateur de cardinalité : il
  * dépend du contenu des opérations. Le contrôle est donc porté par une
- * contrainte dédiée, pour qu'il reste une règle de validation du DTO — refusée
- * en 400 avant tout accès à la base — et non un test enfoui dans le service.
+ * contrainte dédiée, pour qu'il reste une règle de validation du DTO, refusée
+ * en 400 avant tout accès à la base, et non un test enfoui dans le service.
  */
 @ValidatorConstraint({ name: 'maxDependencyGroups', async: false })
 export class MaxDependencyGroupsConstraint implements ValidatorConstraintInterface {

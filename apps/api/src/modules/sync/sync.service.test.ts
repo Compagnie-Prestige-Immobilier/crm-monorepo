@@ -97,7 +97,7 @@ const statuses = (results: { status: SyncOpStatus }[]): SyncOpStatus[] =>
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('idempotence — niveau 1 (le lot)', () => {
+describe('idempotence, niveau 1 (le lot)', () => {
   it('rejouer le MÊME lot n’écrit qu’une fois et rejoue la réponse mémorisée', async () => {
     const body = batch([createRep(REP_A, '77 123 45 67')]);
 
@@ -176,7 +176,7 @@ describe('idempotence — niveau 1 (le lot)', () => {
   });
 });
 
-describe('idempotence — niveau 2 (l’opération)', () => {
+describe('idempotence, niveau 2 (l’opération)', () => {
   it('une opération déjà appliquée dans un AUTRE lot ressort en duplicate, sans réécriture', async () => {
     const operation = createRep(REP_A, '77 123 45 67');
     await sync.push(alice, batch([operation], 'batch-1'));
@@ -193,9 +193,112 @@ describe('idempotence — niveau 2 (l’opération)', () => {
     expect(db.representants.get(REP_A)?.rev).toBe(1);
     expect(db.representants.size).toBe(2);
   });
+
+  it('une opération REFUSÉE rejouée réémet son refus, pas un duplicate', async () => {
+    // Le scénario de perte de données. Le serveur mémorisait le verdict mais
+    // réémettait un `DUPLICATE` constant : le téléphone lisait « déjà fait »,
+    // classait la ligne close, et la saisie du commercial disparaissait sans
+    // trace. Il faut que le refus survive au rejeu, sinon le client ne peut
+    // pas faire la différence entre « c'est passé » et « ça a été refusé ».
+    await sync.push(alice, batch([createRep(REP_A, '77 123 45 67')], 'batch-1'));
+
+    const stale: SyncOperationDto = {
+      opId: opId(),
+      seq: 0,
+      entity: SyncEntity.REPRESENTANT,
+      op: SyncOp.UPDATE,
+      entityId: REP_A,
+      clientUpdatedAt: '2026-08-10T11:00:00.000Z',
+      baseRev: 99,
+      data: { fullName: 'Écrasé', phone: '77 123 45 67' },
+    };
+
+    const first = await sync.push(alice, batch([stale], 'batch-2'));
+    expect(statuses(first.body.results)).toEqual([SyncOpStatus.CONFLICT]);
+    expect(first.body.results[0]?.errorCode).toBe('REV_CONFLICT');
+
+    // Même opération, lot reconstitué : le verdict doit être IDENTIQUE.
+    const replay = await sync.push(alice, batch([stale], 'batch-3'));
+    expect(statuses(replay.body.results)).toEqual([SyncOpStatus.CONFLICT]);
+    expect(replay.body.results[0]?.errorCode).toBe('REV_CONFLICT');
+    expect(db.representants.get(REP_A)?.fullName).not.toBe('Écrasé');
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * DÉCALAGE DE DÉPLOIEMENT : UN VERDICT QUE CE BINAIRE NE CONNAÎT PAS
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `FROM_DB_RESULT` traduit l'énumération PostgreSQL en statut de protocole.
+   * Les deux évoluent SÉPARÉMENT : les migrations partent avec le déploiement
+   * de la base, le binaire de l'API arrive après. Il existe donc une fenêtre,
+   * de quelques secondes à quelques minutes, pendant laquelle la colonne
+   * `result` peut porter un membre ajouté que cette version ne sait pas lire.
+   * La table rend alors `undefined`.
+   *
+   * Ce qu'il ne faut À AUCUN PRIX, c'est que ce trou se referme sur
+   * `DUPLICATE`. `DUPLICATE` veut dire « c'est passé, tu peux clore la ligne » :
+   * le téléphone efface la saisie du commercial et personne ne l'apprend
+   * jamais. C'est exactement la perte de données que le rejeu de verdict
+   * existe pour empêcher, réintroduite par la porte de derrière.
+   *
+   * Le repli est donc `INVALID`, assorti d'un code qui NOMME la cause : la
+   * ligne remonte dans « À corriger », un humain la voit, et l'exploitant
+   * comprend en lisant le code que c'est le serveur qui est en retard, pas la
+   * saisie qui est fautive.
+   *
+   * La conversion ci-dessous est le cœur de l'épreuve, pas un contournement :
+   * elle SIMULE la base en avance sur le code. Sans elle, le cas est
+   * inatteignable depuis TypeScript, et c'est bien pour cela qu'il n'était
+   * couvert par rien.
+   */
+  it('un verdict INCONNU du serveur se rejoue en INVALID, JAMAIS en duplicate', async () => {
+    await sync.push(alice, batch([createRep(REP_A, '77 123 45 67')], 'batch-1'));
+
+    const operation = createRep(REP_B, '77 222 22 22');
+    const premier = await sync.push(alice, batch([operation], 'batch-2'));
+    expect(statuses(premier.body.results)).toEqual([SyncOpStatus.APPLIED]);
+
+    // La base part en avant : elle mémorise un verdict d'une version future.
+    // `OperationRow.result` est volontairement typé `string` dans la doublure,
+    // et c'est la vérité du système : la colonne PostgreSQL est une énumération
+    // que les migrations font évoluer AVANT que ce binaire ne soit reconstruit.
+    // Le type TypeScript décrit ce que le code sait lire, pas ce que la base
+    // peut contenir, et c'est tout l'objet de cette épreuve.
+    const memoire = db.operations.get(operation.opId);
+    expect(memoire, 'l’opération devrait être mémorisée').toBeDefined();
+    if (memoire) memoire.result = 'QUARANTINED';
+
+    const rejeu = await sync.push(alice, batch([operation], 'batch-3'));
+    const ligne = rejeu.body.results[0];
+
+    expect(ligne?.status).toBe(SyncOpStatus.INVALID);
+    expect(ligne?.status).not.toBe(SyncOpStatus.DUPLICATE);
+    expect(ligne?.errorCode).toBe('UNKNOWN_STORED_RESULT');
+    // Le message est destiné à l'exploitant, pas au commercial : il doit dire
+    // que c'est le SERVEUR qui ne sait pas lire, sinon le support cherche du
+    // côté de la saisie.
+    expect(ligne?.error).toContain('inconnu');
+  });
+
+  /**
+   * Le témoin. Sans lui, un repli qui rendrait `INVALID` pour TOUT rejeu
+   * satisferait l'épreuve ci-dessus sans rien prouver : c'est la DIFFÉRENCE
+   * entre un verdict connu et un verdict inconnu qui est en jeu.
+   */
+  it('un verdict CONNU se rejoue toujours en duplicate, sans code d’erreur', async () => {
+    const operation = createRep(REP_A, '77 123 45 67');
+    await sync.push(alice, batch([operation], 'batch-1'));
+
+    const rejeu = await sync.push(alice, batch([operation], 'batch-2'));
+    const ligne = rejeu.body.results[0];
+
+    expect(ligne?.status).toBe(SyncOpStatus.DUPLICATE);
+    expect(ligne?.errorCode).toBeNull();
+  });
 });
 
-describe('granularité transactionnelle — une transaction par groupe', () => {
+describe('granularité transactionnelle, une transaction par groupe', () => {
   it('groupe le prospect avec SON représentant', () => {
     expect(dependencyKeyOf(createRep(REP_A, '77 123 45 67'))).toBe(`representant:${REP_A}`);
     expect(dependencyKeyOf(createProspect('p-1', REP_A, '77 111 11 11', 1))).toBe(
@@ -380,5 +483,59 @@ describe('réponse du push', () => {
 
     expect(result.body.results.map((row) => row.opId)).toEqual(operations.map((row) => row.opId));
     expect(result.body.batchId).toBe('batch-1');
+  });
+});
+
+/**
+ * LA CONSÉQUENCE DE L'EXEMPTION ABSOLUE.
+ *
+ * `DemoReadOnlyGuard` refuse toute écriture interactive tant que le mode
+ * démonstration est allumé, SAUF la remontée hors ligne du mobile. Il ne reste
+ * donc, par ce chemin, que du travail RÉEL : une file constituée des heures
+ * plus tôt, dans un village sans réseau, par quelqu'un qui ignore tout de la
+ * réunion en cours au bureau.
+ *
+ * Ces lignes ne doivent SURTOUT PAS hériter de l'interrupteur. C'est
+ * exactement le défaut que toute cette correction répare : quatre prospects
+ * réels écrits `isDemo: true` pendant la fenêtre, puis disparus de tous les
+ * écrans et de tous les exports à l'extinction, sans que la purge sache même
+ * les reprendre.
+ */
+describe('mode démonstration allumé, la remontée hors ligne reste du travail RÉEL', () => {
+  let demoDb: FakePrisma;
+  let demoSync: SyncService;
+
+  beforeEach(() => {
+    demoDb = new FakePrisma();
+    const prisma = demoDb as unknown as PrismaService;
+    demoSync = new SyncService(
+      prisma,
+      new SyncBatchStore(prisma),
+      new Phase2SyncService(),
+      // L'interrupteur est ALLUMÉ pendant tout ce bloc.
+      fakeDemoVisibility(true),
+    );
+  });
+
+  it('un représentant remonté n’est PAS marqué de démonstration', async () => {
+    await demoSync.push(alice, batch([createRep(REP_A, '77 123 45 67')]));
+
+    // `?? false` : le service ne pose pas la colonne du tout, c'est le défaut
+    // du schéma qui vaut `false`. L'assertion échoue si quelqu'un se remet à
+    // recopier l'interrupteur ici.
+    expect(demoDb.representants.get(REP_A)?.isDemo ?? false).toBe(false);
+  });
+
+  it('un prospect remonté n’est PAS marqué de démonstration', async () => {
+    const prospectId = '0198f000-0000-7000-8000-000000000001';
+    await demoSync.push(
+      alice,
+      batch([
+        createRep(REP_A, '77 123 45 67', 0),
+        createProspect(prospectId, REP_A, '78 222 33 44', 1),
+      ]),
+    );
+
+    expect(demoDb.prospects.get(prospectId)?.isDemo ?? false).toBe(false);
   });
 });

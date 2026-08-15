@@ -54,6 +54,29 @@ describe('curseur de pull', () => {
     expect(() => decodeCursor(broken)).toThrow(BadRequestException);
   });
 
+  // Régression : `Number.isFinite` laissait passer 1e300, qui donne un
+  // `Invalid Date` refusé par Prisma avec une erreur SANS code P####, donc un
+  // 500 au lieu du 400 documenté. Le client hors ligne ne réessaie pas un 400
+  // mais réessaie un 500 : il rejouait le curseur empoisonné pour toujours.
+  it.each([
+    ['un horodatage hors du domaine des dates', 1e300],
+    ['un horodatage négatif', -1],
+    ['un horodatage fractionnaire', 1_760_000_000_123_000.5],
+  ])('refuse %s plutôt que de le passer à Prisma', (_label, t) => {
+    const poisoned = Buffer.from(
+      JSON.stringify({ v: 1, streams: { prospects: { t, id: 'p-1' } } }),
+      'utf8',
+    ).toString('base64url');
+    expect(() => decodeCursor(poisoned)).toThrow(BadRequestException);
+  });
+
+  it('accepte un horodatage réaliste et rend une Date valide', () => {
+    const t = toMicros(new Date('2026-08-12T10:00:00.123Z'));
+    const encoded = encodeCursor({ v: 1, streams: { prospects: { t, id: 'p-1' } } });
+    expect(decodeCursor(encoded).streams.prospects).toEqual({ t, id: 'p-1' });
+    expect(Number.isNaN(fromMicros(t).getTime())).toBe(false);
+  });
+
   it('conserve chaque flux indépendamment : avancer les prospects ne rejoue pas les banques', () => {
     const start = advance(EMPTY_CURSOR, 'banques', { t: 5_000, id: 'b-1' });
     const next = advance(start, 'prospects', { t: 9_000, id: 'p-1' });
