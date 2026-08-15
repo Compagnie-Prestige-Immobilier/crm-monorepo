@@ -88,7 +88,13 @@ const SECTIONS: readonly NavSection[] = [
         href: '/campagnes',
         label: 'Campagnes',
         icon: MegaphoneIcon,
-        description: 'Appels et programmes',
+        /*
+          « programmes » est retiré : dans ce produit, un PROGRAMME est le PDF
+          imprimé qu'un téléconseiller emporte en tournée, et rien d'autre.
+          L'employer aussi pour désigner les campagnes elles-mêmes faisait du
+          même mot deux choses, dont l'une est un fichier.
+        */
+        description: 'Campagnes d’appels prospects et représentants',
         roles: ['ADMIN'],
       },
     ],

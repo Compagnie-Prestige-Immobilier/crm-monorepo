@@ -58,6 +58,7 @@ export function FilterCombobox({
   value,
   onChange,
   className,
+  required = false,
 }: {
   label: string;
   placeholder: string;
@@ -65,6 +66,17 @@ export function FilterCombobox({
   value: string | null;
   onChange: (value: string | null) => void;
   className?: string | undefined;
+  /**
+   * Champ OBLIGATOIRE : ajoute l'astérisque et `aria-required`.
+   *
+   * Le composant sert d'abord de filtre, où rien n'est obligatoire, d'où le
+   * défaut à `false`. Mais il sert aussi de champ de formulaire, et il y était
+   * alors le SEUL des trois à ne rien signaler : sur le dialogue d'approbation
+   * d'une demande client, « Représentant de rattachement » bloquait l'envoi
+   * exactement comme « Syndicat » et « Méthode d'enrôlement », sans porter leur
+   * astérisque. L'agent cherchait ce qui manquait dans les deux champs marqués.
+   */
+  required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -90,6 +102,11 @@ export function FilterCombobox({
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       <Label id={labelId} htmlFor={triggerId}>
         {label}
+        {required ? (
+          <span className="text-destructive" aria-label="obligatoire">
+            *
+          </span>
+        ) : null}
       </Label>
 
       <div className="relative">
@@ -109,6 +126,7 @@ export function FilterCombobox({
               aria-labelledby={`${labelId} ${triggerId}`}
               aria-haspopup="listbox"
               aria-expanded={open}
+              aria-required={required || undefined}
               className={cn(
                 'h-11 w-full justify-between gap-2 font-[400]',
                 // Place réservée à la croix : sans elle, le libellé passerait
