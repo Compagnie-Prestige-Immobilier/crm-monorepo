@@ -1,5 +1,7 @@
-import { Catch, HttpStatus, Logger, type ArgumentsHost } from '@nestjs/common';
+import { Catch, HttpException, HttpStatus, Logger, type ArgumentsHost } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
+
+import { normalizeErrorBody, type NormalizedError } from '../errors/normalize.js';
 
 /**
  * Traduit les erreurs Prisma en réponses HTTP typées.
@@ -11,7 +13,7 @@ import { BaseExceptionFilter } from '@nestjs/core';
  *
  * Il étend `BaseExceptionFilter` plutôt que d'être posé à côté : un filtre
  * global `@Catch()` intercepte TOUT, et relancer l'erreur depuis un filtre ne
- * la fait pas retomber sur le filtre suivant — elle sort du cycle Nest et la
+ * la fait pas retomber sur le filtre suivant, elle sort du cycle Nest et la
  * requête reste pendante. On délègue donc explicitement au comportement par
  * défaut pour tout ce qui n'est pas une erreur Prisma traduisible.
  */
@@ -73,18 +75,53 @@ export function mapPrismaError(error: KnownPrismaError): PrismaErrorBody | undef
         message: 'Référence invalide : l’enregistrement lié n’existe pas.',
         ...(target ? { target } : {}),
       };
+    // Pool de connexions saturé : la requête n'a jamais atteint PostgreSQL.
+    // C'est une SURCHARGE, pas une panne, et surtout pas une faute du client.
+    // En 500, le mobile abandonnait le lot et l'utilisateur voyait « erreur
+    // serveur » là où réessayer dans dix secondes suffisait. En 503, la
+    // condition est temporaire par définition et le rejeu est légitime : c'est
+    // exactement ce que la file de synchronisation sait faire.
+    case 'P2024':
+      return {
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        code: 'DATABASE_BUSY',
+        message: 'Base momentanément saturée. Réessayez dans quelques instants.',
+      };
     default:
       return undefined;
   }
 }
 
+/**
+ * Filtre global des erreurs.
+ *
+ * Il fait DEUX choses, et les deux tiennent dans le même filtre parce qu'un
+ * filtre global `@Catch()` intercepte tout et qu'un second filtre ne verrait
+ * jamais rien passer :
+ *
+ * 1. il traduit les erreurs Prisma connues en réponses HTTP typées ;
+ * 2. il NORMALISE le corps de toutes les autres, vers `ApiErrorDto`.
+ *
+ * Le point 2 est ce qui rend le contrat honnête. Sans lui, quatre chemins
+ * produisaient quatre formes de corps : le client ne pouvait pas lire `code`
+ * sans se demander d'où venait l'erreur. Normaliser ICI plutôt que dans chaque
+ * service garde les services inchangés : ils lèvent leurs exceptions typées
+ * comme avant, le filtre complète ce qui manque.
+ *
+ * Rien n'est effacé au passage, sauf le champ `error` de Nest (« Bad Request »),
+ * qui faisait double emploi avec `code` en moins stable.
+ */
 @Catch()
 export class PrismaExceptionFilter extends BaseExceptionFilter {
   private readonly logger = new Logger('PrismaException');
 
   override catch(error: unknown, host: ArgumentsHost): void {
-    const body = isPrismaKnownError(error) ? mapPrismaError(error) : undefined;
-    if (!body) {
+    const prismaBody = isPrismaKnownError(error) ? mapPrismaError(error) : undefined;
+
+    // Tout ce qui n'est ni une erreur Prisma traduisible ni une exception HTTP
+    // est une panne : on laisse Nest la journaliser et rendre son 500, plutôt
+    // que d'habiller en contrat ce qui n'en est pas un.
+    if (!prismaBody && !(error instanceof HttpException)) {
       super.catch(error, host);
       return;
     }
@@ -92,16 +129,17 @@ export class PrismaExceptionFilter extends BaseExceptionFilter {
     const http = host.switchToHttp();
     const request = http.getRequest<{ id?: string; method?: string; url?: string } | undefined>();
     const reply = http.getResponse<{
-      code: (status: number) => { send: (payload: PrismaErrorBody) => void };
+      code: (status: number) => { send: (payload: NormalizedError) => void };
     }>();
 
+    const status = prismaBody ? prismaBody.statusCode : (error as HttpException).getStatus();
+    const payload = prismaBody ?? (error as HttpException).getResponse();
+    const body = normalizeErrorBody(status, payload, request?.id);
+
     this.logger.warn(
-      `${request?.method ?? '?'} ${request?.url ?? '?'} -> ${String(body.statusCode)}`,
+      `${request?.method ?? '?'} ${request?.url ?? '?'} -> ${String(status)} ${body.code}`,
     );
 
-    reply.code(body.statusCode).send({
-      ...body,
-      ...(request?.id ? { requestId: request.id } : {}),
-    });
+    reply.code(status).send(body);
   }
 }
