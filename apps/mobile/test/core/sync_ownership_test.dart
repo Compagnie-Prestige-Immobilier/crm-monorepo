@@ -860,6 +860,227 @@ void main() {
       );
     });
   });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // B4 : les actions manuelles face à une réservation vivante
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// Le jeton de possession fenêtrait toutes les écritures DU MOTEUR. Restaient
+  /// dehors les deux écritures que l'UTILISATEUR déclenche : l'abandon et
+  /// l'amendement. Ce sont pourtant les deux seules qui peuvent détruire ou
+  /// réécrire une ligne qu'un envoi porte déjà.
+  group('actions manuelles : le bail n\'est pas une preuve d\'absence', () {
+    late WriteRepository repo;
+
+    setUp(() => repo = WriteRepository(db, clock: clock));
+
+    /// ═══ L'ABANDON QUI EFFAÇAIT UNE LIGNE EN VOL ═══
+    ///
+    /// L'ancienne garde disait « `syncing` ET bail encore valide ». Elle
+    /// laissait donc passer exactement la ligne la plus dangereuse : celle dont
+    /// l'envoi dure plus longtemps que ses deux minutes de bail, ce qui est
+    /// l'ordinaire d'un lien 2G, pas un cas limite. L'utilisateur ouvre
+    /// « À corriger », appuie sur Supprimer, et la ligne d'outbox comme la
+    /// fiche métier disparaissent pendant que le serveur applique la requête.
+    /// Il reste alors côté serveur un enregistrement que rien, sur ce
+    /// téléphone, ne sait plus rattacher.
+    test('un abandon ne supprime pas une ligne dont l\'envoi est en vol', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+
+      final _GatedApi slow = _GatedApi();
+      final SyncEngine isolateA = workerOn(slow);
+      final Future<int> pushA = isolateA.drain();
+      await slow.entered.future;
+
+      // L'envoi dépasse son bail, et il est TOUJOURS en vol.
+      clock.advance(engine.leaseDuration + const Duration(seconds: 1));
+
+      final OutboxData row = await outboxById(db, 'A1');
+      final DiscardResult result = await repo.discardOperation(row.seq);
+
+      expect(result.outcome, DiscardOutcome.claimed);
+      expect(result.removed, 0);
+      expect(
+        await allOutbox(db),
+        hasLength(1),
+        reason: 'la ligne d\'outbox est le seul lien qui reste vers l\'envoi en vol',
+      );
+      expect(await db.select(db.representants).get(), hasLength(1));
+
+      // L'envoi aboutit : le serveur a la fiche, et le téléphone aussi.
+      slow.release();
+      await pushA;
+
+      expect(slow.rows.keys, contains('repA'));
+      expect((await outboxById(db, 'A1')).status, OutboxStatus.done);
+    });
+
+    /// La cascade emporte les prospects du représentant. Ne contrôler que la
+    /// ligne visée revenait donc à ne contrôler qu'une des lignes qu'on
+    /// supprime : les deux partent dans le MÊME lot, donc les deux sont en vol
+    /// en même temps.
+    test('l\'abandon en cascade ne vide pas un lot en cours d\'envoi', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await insertProspect(
+        db,
+        id: 'pA1',
+        representantId: 'repA',
+        phone: '+221770000002',
+      );
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+      await queueOp(
+        db,
+        id: 'A2',
+        entityType: 'prospect',
+        entityId: 'pA1',
+        dependencyKey: 'repA',
+      );
+
+      final _GatedApi slow = _GatedApi();
+      final SyncEngine isolateA = workerOn(slow);
+      final Future<int> pushA = isolateA.drain();
+      await slow.entered.future;
+      // Les deux lignes sont réservées par le même lot : c'est ce qui rend la
+      // cascade dangereuse.
+      expect(
+        (await allOutbox(db))
+            .map((OutboxData o) => o.status)
+            .toSet(),
+        <String>{OutboxStatus.syncing},
+      );
+
+      clock.advance(engine.leaseDuration + const Duration(seconds: 1));
+
+      final OutboxData head = await outboxById(db, 'A1');
+      expect(
+        (await repo.discardOperation(head.seq)).outcome,
+        DiscardOutcome.claimed,
+      );
+
+      expect(await allOutbox(db), hasLength(2));
+      expect(await db.select(db.representants).get(), hasLength(1));
+      expect(
+        await db.select(db.prospects).get(),
+        hasLength(1),
+        reason: 'le prospect part dans le même lot que son parent, donc il est en vol aussi',
+      );
+
+      slow.release();
+      await pushA;
+      expect(slow.rows.keys, containsAll(<String>['repA', 'pA1']));
+    });
+
+    /// ═══ L'AMENDEMENT NE VOLE PAS LA RÉSERVATION D'UN AUTRE ═══
+    ///
+    /// **Ce test n'est pas un entrelacement, et c'est délibéré.** L'état qu'il
+    /// construit, une ligne `failed` portant encore un jeton, aucun chemin du
+    /// moteur ne le produit aujourd'hui : toutes les transitions vers `failed`
+    /// et `conflict` effacent le jeton, si bien que l'amendement ne pouvait pas
+    /// entrer en collision. La sûreté de l'amendement reposait donc entièrement
+    /// sur un invariant tenu AILLEURS, que rien n'obligeait à durer.
+    ///
+    /// Ce qui est testé ici est donc le contrat local, celui qui rend
+    /// l'invariant distant inutile : présentée une ligne réservée, la
+    /// correction ne l'écrase pas et ne remet pas son jeton à NULL. Elle
+    /// s'empile, et surtout elle n'est pas perdue : c'est le défaut qui a
+    /// ouvert ce fil.
+    test('une correction n\'écrase pas une ligne réservée, elle s\'empile', () async {
+      await insertRepresentant(
+        db,
+        id: 'repA',
+        phone: '+221770000001',
+        rev: 3,
+        serverUpdatedAt: t0,
+      );
+      await queueOp(
+        db,
+        id: 'A1',
+        entityType: 'representant',
+        entityId: 'repA',
+        op: 'update',
+        status: OutboxStatus.failed,
+        payload: <String, Object?>{'fullName': 'Awa'},
+        claimToken: 'jeton-d-un-envoi-en-vol',
+      );
+
+      await repo.updateRepresentant(
+        id: 'repA',
+        fullName: 'Awa Ndiaye',
+        phoneE164: '+221770000001',
+        departementId: 'dep-1',
+      );
+
+      final OutboxData untouched = await outboxById(db, 'A1');
+      expect(
+        untouched.claimToken,
+        'jeton-d-un-envoi-en-vol',
+        reason: 'effacer le jeton d\'un autre, c\'est lui retirer sa ligne sous les pieds',
+      );
+      expect(untouched.status, OutboxStatus.failed);
+      expect(jsonDecode(untouched.payload), <String, Object?>{'fullName': 'Awa'});
+
+      // La correction existe, en clair, dans une opération à elle.
+      final List<OutboxData> all = await allOutbox(db);
+      expect(all, hasLength(2));
+      final OutboxData appended = all.last;
+      expect(appended.status, OutboxStatus.pending);
+      expect(appended.id, isNot('A1'));
+      expect(
+        (jsonDecode(appended.payload) as Map<String, Object?>)['fullName'],
+        'Awa Ndiaye',
+      );
+    });
+
+    /// Le pendant réel du test précédent : la tête est en vol pour de bon, donc
+    /// `syncing`, et l'utilisateur enregistre une correction pendant ce
+    /// temps-là. Elle doit exister ensuite comme opération à part entière, sans
+    /// avoir touché à la ligne en vol ni à son jeton.
+    test('corriger pendant un envoi laisse partir les deux, chacun une fois', () async {
+      await insertRepresentant(
+        db,
+        id: 'repA',
+        phone: '+221770000001',
+        rev: 3,
+        serverUpdatedAt: t0,
+      );
+      await queueOp(
+        db,
+        id: 'A1',
+        entityType: 'representant',
+        entityId: 'repA',
+        op: 'update',
+        payload: <String, Object?>{'fullName': 'Awa'},
+      );
+
+      final _GatedApi slow = _GatedApi();
+      final SyncEngine isolateA = workerOn(slow);
+      final Future<int> pushA = isolateA.drain();
+      await slow.entered.future;
+
+      final String? tokenInFlight = (await outboxById(db, 'A1')).claimToken;
+      expect(tokenInFlight, isNotNull);
+
+      await repo.updateRepresentant(
+        id: 'repA',
+        fullName: 'Awa Ndiaye',
+        phoneE164: '+221770000001',
+        departementId: 'dep-1',
+      );
+
+      expect((await outboxById(db, 'A1')).claimToken, tokenInFlight);
+      expect(await allOutbox(db), hasLength(2));
+
+      slow.release();
+      await pushA;
+
+      // La correction part au tour suivant, sous son propre identifiant.
+      await engine.drain();
+      final List<String> sent = api.receivedOpIds + slow.receivedOpIds;
+      expect(sent.toSet(), hasLength(2));
+      expect(sent, hasLength(2), reason: 'aucune opération ne part deux fois');
+    });
+  });
 }
 
 /// Une page vide, avec son curseur de suite et son drapeau de pagination.

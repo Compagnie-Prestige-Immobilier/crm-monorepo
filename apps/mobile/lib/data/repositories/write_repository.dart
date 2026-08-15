@@ -623,16 +623,18 @@ class WriteRepository {
       final OutboxData? head = await headOperation(entityType, entityId);
       if (head != null &&
           OutboxStatus.needsAttention.contains(head.status) &&
-          head.op != 'delete' &&
-          !_isClaimed(head)) {
+          head.op != 'delete') {
+        // La possession n'est PAS vérifiée ici. Elle l'est dans le `WHERE` de
+        // l'amendement, et là seulement : deux contrôles, l'un en Dart sur une
+        // ligne déjà lue, l'autre en SQL au moment d'écrire, se contrediraient
+        // un jour, et c'est le contrôle en Dart qui aurait tort. Un amendement
+        // refusé retombe sur l'empilement, voir [_amendInPlace].
         final bool amended = await _amendInPlace(
           head: head,
           payload: payload,
           now: now,
           baseRev: baseRev,
         );
-        // Amendement refusé : la ligne a été réservée entre la lecture et
-        // l'écriture. On empile, voir [_amendInPlace].
         if (amended) return;
       }
     }
