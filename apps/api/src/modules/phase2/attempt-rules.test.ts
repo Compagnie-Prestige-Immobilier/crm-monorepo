@@ -40,7 +40,7 @@ describe('isTerminalOutcome', () => {
   });
 });
 
-describe('normalizeAttempt — méthode et issue', () => {
+describe('normalizeAttempt, méthode et issue', () => {
   it('accepte les trois méthodes avec METHOD_OBTAINED', () => {
     for (const method of Object.values(EnrollmentMethod)) {
       const result = normalizeAttempt({ outcome: CallOutcome.METHOD_OBTAINED, method });
@@ -97,7 +97,7 @@ describe('normalizeAttempt — méthode et issue', () => {
   });
 });
 
-describe('normalizeAttempt — commentaire', () => {
+describe('normalizeAttempt, commentaire', () => {
   it('exige un commentaire non vide pour OTHER', () => {
     expect(codeOf(() => normalizeAttempt({ outcome: CallOutcome.OTHER }))).toBe(
       'PHASE2_COMMENT_REQUIRED',

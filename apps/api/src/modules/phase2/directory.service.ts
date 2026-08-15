@@ -17,7 +17,7 @@ import { demoScope } from '../../prisma/demo-visibility.js';
  * Annuaire hors ligne de la phase 2.
  *
  * Un commercial en zone sans réseau doit pouvoir consulter n'importe quel
- * numéro de la base — y compris un numéro attribué à un collègue — pour ne pas
+ * numéro de la base, y compris un numéro attribué à un collègue, pour ne pas
  * rappeler quelqu'un qui a déjà donné sa méthode. D'où une réplique locale,
  * tirée par delta.
  *
@@ -28,7 +28,7 @@ import { demoScope } from '../../prisma/demo-visibility.js';
  *    `include`, pas de relation, pas de `nom`. Voir `DirectoryEntryDto`.
  *
  * 2. VOLUME. 50 000 à 500 000 lignes. La pagination est un keyset sur
- *    `(updatedAt, id)` — jamais un OFFSET, dont le coût croît linéairement avec
+ *    `(updatedAt, id)`, jamais un OFFSET, dont le coût croît linéairement avec
  *    la profondeur et qui saute des lignes dès qu'une écriture s'intercale.
  *    L'index partiel `prospects_phase2_directory` est posé exactement pour ce
  *    couple, filtré sur `deletedAt IS NULL`.
@@ -105,7 +105,7 @@ export class Phase2DirectoryService {
       // `deletedAt: null` sert deux fins : il aligne la requête sur l'index
       // partiel, et il évite de répliquer des fiches supprimées. Conséquence
       // assumée : une fiche supprimée cesse simplement d'être renvoyée, sans
-      // marqueur de suppression — en porter un exigerait un septième champ, et
+      // marqueur de suppression, en porter un exigerait un septième champ, et
       // la frontière à six champs prime.
       where: {
         deletedAt: null,

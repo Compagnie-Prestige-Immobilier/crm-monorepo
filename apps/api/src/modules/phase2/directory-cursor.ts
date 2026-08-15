@@ -1,12 +1,14 @@
 import { BadRequestException } from '@nestjs/common';
 
+import { isValidCursorMicros } from '../../common/cursor-micros.js';
+
 /**
  * Curseur de l'annuaire hors ligne.
  *
  * Même mécanique que celle du pull de synchronisation, et pour la même raison :
  * un simple horodatage PERD des lignes. Deux prospects écrits dans la même
  * milliseconde et séparés par une frontière de page se répartissent entre « fin
- * de page 1 » et « strictement après cette milliseconde » — la seconde ligne
+ * de page 1 » et « strictement après cette milliseconde », la seconde ligne
  * n'est jamais servie, et le commercial ne le saura jamais. On pagine donc en
  * keyset sur le COUPLE `(updatedAt, id)`, exactement l'index partiel
  * `prospects_phase2_directory`.
@@ -56,7 +58,10 @@ export function decodeDirectoryCursor(raw: string | undefined): DirectoryCursor 
   if (candidate.v !== 1) {
     return invalid('Curseur d’annuaire d’une version non prise en charge.');
   }
-  if (typeof candidate.t !== 'number' || !Number.isFinite(candidate.t)) {
+  // Pas seulement « un nombre » : un `t` fini mais hors domaine (1e300) donne
+  // un `Invalid Date` que Prisma rejette en 500, et le client hors ligne
+  // rejoue éternellement un curseur qu'un 400 lui aurait fait abandonner.
+  if (!isValidCursorMicros(candidate.t)) {
     return invalid('Position de curseur illisible.');
   }
   if (typeof candidate.id !== 'string' || candidate.id === '') {

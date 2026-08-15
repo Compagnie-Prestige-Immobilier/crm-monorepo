@@ -6,7 +6,7 @@ import { Phase2DirectoryService } from './directory.service.js';
 import { Phase2SyncService } from './phase2-sync.service.js';
 
 /**
- * Phase 2 — campagnes d'appels et collecte des méthodes d'enrôlement.
+ * Phase 2, campagnes d'appels et collecte des méthodes d'enrôlement.
  *
  * `Phase2SyncService` est EXPORTÉ sans route ni contrôleur : c'est le point
  * d'entrée que le module de synchronisation appelle pour appliquer une

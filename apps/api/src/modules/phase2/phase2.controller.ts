@@ -17,7 +17,10 @@ import {
   ApiProduces,
   ApiResponse,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
+import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import type { FastifyReply } from 'fastify';
 import { Role } from '@crm/database';
 
@@ -36,12 +39,13 @@ import {
   CreateCampaignDto,
   DirectoryPageDto,
   DirectoryQueryDto,
+  ProgrammeQueryDto,
 } from './dto.js';
 
 const PDF_MIME = 'application/pdf';
 
 /**
- * Phase 2 — campagnes d'appels et annuaire.
+ * Phase 2, campagnes d'appels et annuaire.
  *
  * Deux publics, deux régimes d'autorisation :
  *
@@ -57,6 +61,12 @@ const PDF_MIME = 'application/pdf';
  */
 @ApiTags('phase2')
 @ApiBearerAuth()
+// Toute route de ce contrôleur peut refuser pour ces trois raisons :
+// jeton absent ou expiré, rôle insuffisant, et entrée refusée par la
+// validation globale (`forbidNonWhitelisted` transforme un paramètre mal
+// orthographié en 400). Les déclarer ici évite de les oublier route par
+// route, ce qui était le cas sur 116 opérations sur 119.
+@ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'phase2', version: '1' })
 export class Phase2Controller {
   constructor(
@@ -65,7 +75,7 @@ export class Phase2Controller {
   ) {}
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Annuaire — déclaré AVANT les routes paramétrées, par lisibilité
+  // Annuaire, déclaré AVANT les routes paramétrées, par lisibilité
   // ───────────────────────────────────────────────────────────────────────────
 
   @Get('directory')
@@ -77,7 +87,7 @@ export class Phase2Controller {
       'Pagination keyset sur (updatedAt, id), page de 2 000 par défaut, retard de sécurité de 2 secondes. Chaque entrée porte exactement six champs : ni nom, ni banque, ni syndicat.',
   })
   @ApiResponse({ status: 200, type: DirectoryPageDto })
-  @ApiResponse({ status: 400, description: 'PHASE2_DIRECTORY_CURSOR_INVALID.' })
+  @ApiResponse({ status: 400, type: ApiErrorDto, description: 'PHASE2_DIRECTORY_CURSOR_INVALID.' })
   pullDirectory(@Query() query: DirectoryQueryDto): Promise<DirectoryPageDto> {
     return this.directory.pull(query);
   }
@@ -107,16 +117,19 @@ export class Phase2Controller {
   })
   @ApiResponse({ status: 201, type: CampaignDetailDto })
   @ApiResponse({
-    status: 400,
+    status: 409,
+    type: ApiErrorDto,
     description:
-      'PHASE2_COMMERCIAL_NOT_FOUND · PHASE2_NOT_A_COMMERCIAL · PHASE2_COMMERCIAL_INACTIVE.',
+      'PHASE2_PROSPECT_ALREADY_ASSIGNED, une campagne concurrente a pris les mêmes prospects.',
   })
   @ApiResponse({
-    status: 409,
+    status: 422,
+    type: ApiErrorDto,
     description:
-      'PHASE2_PROSPECT_ALREADY_ASSIGNED — une campagne concurrente a pris les mêmes prospects.',
+      'PHASE2_NO_ELIGIBLE_PROSPECT · PHASE2_COMMERCIAL_NOT_FOUND · ' +
+      'PHASE2_NOT_A_COMMERCIAL · PHASE2_COMMERCIAL_INACTIVE. Requête bien formée, ' +
+      'refusée par une règle métier.',
   })
-  @ApiResponse({ status: 422, description: 'PHASE2_NO_ELIGIBLE_PROSPECT.' })
   createCampaign(
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: CreateCampaignDto,
@@ -132,7 +145,7 @@ export class Phase2Controller {
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: CampaignDetailDto })
-  @ApiResponse({ status: 404, description: 'PHASE2_CAMPAIGN_NOT_FOUND.' })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'PHASE2_CAMPAIGN_NOT_FOUND.' })
   getCampaign(@Param('id', ParseUUIDPipe) id: string): Promise<CampaignDetailDto> {
     return this.campaigns.get(id);
   }
@@ -148,7 +161,7 @@ export class Phase2Controller {
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: CampaignDetailDto })
-  @ApiResponse({ status: 404, description: 'PHASE2_CAMPAIGN_NOT_FOUND.' })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'PHASE2_CAMPAIGN_NOT_FOUND.' })
   closeCampaign(@Param('id', ParseUUIDPipe) id: string): Promise<CampaignDetailDto> {
     return this.campaigns.close(id);
   }
@@ -164,7 +177,7 @@ export class Phase2Controller {
     operationId: 'downloadCallProgrammePdf',
     summary: 'Programme d’appels imprimable d’un commercial.',
     description:
-      'Ordre identique aux positions persistées. AUCUN nom de prospect n’y figure : chaque ligne se rapproche de sa fiche par son code court à six caractères.',
+      'Ordre identique aux positions persistées. AUCUN nom de prospect n’y figure : chaque ligne se rapproche de sa fiche par son code court à six caractères. Le paramètre `jour` restreint la liasse à une journée d’étalement ; sans lui, tout le programme est rendu.',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiParam({ name: 'userId', format: 'uuid' })
@@ -175,13 +188,22 @@ export class Phase2Controller {
     // méthode qui tente de désérialiser le PDF en JSON.
     content: { [PDF_MIME]: { schema: { type: 'string', format: 'binary' } } },
   })
-  @ApiResponse({ status: 404, description: 'PHASE2_CAMPAIGN_COMMERCIAL_NOT_FOUND.' })
+  @ApiResponse({
+    status: 404,
+    description: 'PHASE2_CAMPAIGN_COMMERCIAL_NOT_FOUND · PHASE2_CAMPAIGN_DAY_NOT_FOUND.',
+    // `@ApiProduces` s'applique à TOUTES les réponses de la route, y compris
+    // aux erreurs : sans ce `content` explicite, le contrat annonçait un corps
+    // d'erreur servi en PDF, alors qu'une erreur sort toujours en JSON. Les
+    // générateurs en tiraient un désérialiseur incapable de lire le refus.
+    content: { 'application/json': { schema: { $ref: getSchemaPath(ApiErrorDto) } } },
+  })
   async downloadProgramme(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('userId', ParseUUIDPipe) userId: string,
+    @Query() query: ProgrammeQueryDto,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const programme = await this.campaigns.programme(id, userId);
+    const programme = await this.campaigns.programme(id, userId, query.jour);
     const generatedAt = new Date();
 
     // On écrit dans le flux Node brut : pdfkit pousse les pages au fil de
@@ -191,7 +213,7 @@ export class Phase2Controller {
     reply.raw.setHeader('Content-Type', PDF_MIME);
     reply.raw.setHeader(
       'Content-Disposition',
-      `attachment; filename="${programmeFilename({ generatedAt })}"`,
+      `attachment; filename="${programmeFilename({ generatedAt, ...(query.jour === undefined ? {} : { dayNumber: query.jour }) })}"`,
     );
     reply.raw.setHeader('Cache-Control', 'no-store');
 
@@ -200,7 +222,7 @@ export class Phase2Controller {
     } catch (error) {
       // Les en-têtes sont déjà partis : impossible de renvoyer un code
       // d'erreur. On coupe, ce que le client lit comme un téléchargement
-      // incomplet — préférable à un PDF tronqué qui s'ouvrirait normalement.
+      // incomplet, préférable à un PDF tronqué qui s'ouvrirait normalement.
       reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
