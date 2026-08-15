@@ -88,22 +88,25 @@ export function dumpStatusLabel(dump: DatabaseDump | undefined): string {
 /**
  * Ce que l'avis de fin est devenu, dit à quelqu'un qui n'a pas le code.
  *
- * `null` quand il n'y a rien à signaler : un e-mail parti n'a pas à occuper
- * une ligne à l'écran. Ce qui doit se voir, c'est l'ABSENCE d'avis, sinon un
+ * `null` quand il n'y a rien à signaler : un avis correctement déposé n'a pas à
+ * occuper une ligne à l'écran. Ce qui doit se voir, c'est son ABSENCE, sinon un
  * export prêt attend indéfiniment un message qui ne viendra jamais.
+ *
+ * `INBOX_ONLY` est l'issue NOMINALE, et elle ne dit rien : l'avis est arrivé
+ * là où il devait arriver, dans la cloche du panel. Aucun e-mail n'est envoyé
+ * pour cet avis, ce que la carte annonce désormais AVANT l'export plutôt que de
+ * le rattraper après.
  */
 export function dumpNoticeWarning(dump: DatabaseDump | undefined): string | null {
   switch (dump?.noticeStatus) {
+    case 'INBOX_ONLY':
+      return null;
     case 'NOT_CONFIGURED':
-      return (
-        'Aucun service d’e-mail n’est configuré : l’export est prêt, mais aucun ' +
-        'message n’est parti. Seule la cloche du panel le signale.'
-      );
     case 'TRANSPORT_ERROR':
     case 'FAILED':
       return (
-        'L’export est prêt, mais l’avis n’a pas pu être envoyé. Ne comptez pas ' +
-        'sur l’e-mail : téléchargez depuis cet écran.'
+        'L’export est prêt, mais l’avis de fin n’a pas pu être déposé dans la ' +
+        'cloche du panel. Ne comptez pas sur une alerte : téléchargez depuis cet écran.'
       );
     default:
       return null;

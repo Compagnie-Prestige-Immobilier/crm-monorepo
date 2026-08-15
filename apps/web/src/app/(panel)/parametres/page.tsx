@@ -5,7 +5,7 @@ import { redirect, unstable_rethrow } from 'next/navigation';
 import { PermissionDenied } from '@/components/permission-denied';
 import { DemoModeCard } from '@/components/settings/demo-mode-card';
 import { AndroidReleaseCard } from '@/components/settings/android-release-card';
-import { DatabaseDumpCard } from '@/components/settings/database-dump-card';
+import { DatabaseDumpSection } from '@/components/settings/database-dump-section';
 import { PurgeCard } from '@/components/settings/purge-card';
 import { getServerApiClient } from '@/lib/api/server';
 import { fetchDemoStatus } from '@/lib/data/demo';
@@ -57,8 +57,12 @@ export default async function ParametresPage() {
           complète de la clientèle : ce n'est pas une commande de tous les
           jours, et la placer plus haut inviterait à la lancer par curiosité.
           Comme la purge, la carte n'est pas préchargée côté serveur : son état
-          ne vaut rien tant que personne n'a demandé d'export. */}
-      <DatabaseDumpCard />
+          ne vaut rien tant que personne n'a demandé d'export.
+
+          `DatabaseDumpSection` et non la carte directement : sans
+          `DB_DUMP_ENABLED=true` dans l'environnement, il n'y a pas de carte du
+          tout, et l'API rend 404 de son côté. */}
+      <DatabaseDumpSection />
     </div>
   );
 }
