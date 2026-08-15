@@ -47,6 +47,23 @@ export default defineConfig({
    */
   oxc: { jsx: { runtime: 'automatic', importSource: 'react' } },
   test: {
+    /**
+     * `lcov` EST LA RAISON D'ÊTRE DE CE BLOC.
+     *
+     * SonarCloud lit `sonar.javascript.lcov.reportPaths`, qui pointe sur
+     * `coverage/lcov.info`. Le jeu de rapporteurs par défaut de vitest est
+     * `['text', 'html', 'clover', 'json']` : lcov n'y figure pas. Le fichier
+     * n'était donc jamais écrit, Sonar lisait une couverture de ZÉRO, et le
+     * portillon échouait sans que rien n'indique que la mesure manquait.
+     *
+     * La couverture se déclare au niveau RACINE et non dans chaque projet :
+     * les deux projets, `node` et `dom`, couvrent le même `src/`, et deux
+     * rapports séparés se remplaceraient l'un l'autre dans le même dossier.
+     * Déclarée ici, elle agrège les deux en un seul `lcov.info`.
+     */
+    coverage: {
+      reporter: ['text', 'html', 'clover', 'json', 'lcov'],
+    },
     projects: [
       {
         extends: true,
