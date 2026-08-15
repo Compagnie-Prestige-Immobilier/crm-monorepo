@@ -15,10 +15,17 @@ import { AnalyticsService } from '../analytics/analytics.service.js';
 import { EXPORT_INCLUDE, PROSPECT_COLUMNS, cellValue } from './columns.js';
 import type { ExportRow } from './columns.js';
 import { CONSOLIDATED_SHEET, ExportMode } from './dto.js';
+import { markWorkbook, writeDemoWarningRow } from './demo-marking.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { CPI_BURGUNDY_ARGB } from '../../common/brand.js';
 
-/** Bordeaux CPI. ARGB, sans le dièse : exceljs n'accepte pas la notation CSS. */
-const CPI_BURGUNDY = 'FF630210';
+/**
+ * Bordeaux CPI, ARGB sans le dièse : exceljs n'accepte pas la notation CSS.
+ * Dérivé de la constante partagée plutôt que réécrit : la couleur vivait en
+ * double, ici et nulle part ailleurs, si bien que le PDF et le classeur sortis
+ * le même jour n'avaient pas la même identité.
+ */
+const CPI_BURGUNDY = CPI_BURGUNDY_ARGB;
 
 /** Taille de page de lecture. Borne la mémoire quel que soit le volume exporté. */
 const PAGE_SIZE = 500;
@@ -75,14 +82,19 @@ export class ExportService {
     stream: Writable,
     mode: ExportMode = ExportMode.FILTERED,
   ): Promise<void> {
+    // Lu UNE fois pour tout le classeur, et non par feuille : une bascule
+    // survenue en cours d'export produirait sinon un fichier dont une feuille
+    // porte l'avertissement et pas l'autre, ce que personne ne saurait
+    // expliquer en le relisant.
+    const demoEnabled = await this.demo.enabled();
+
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
-    workbook.creator = 'CPI GO';
-    workbook.created = new Date();
+    markWorkbook(workbook, demoEnabled);
 
     if (mode === ExportMode.CONSOLIDATED) {
-      await this.writeConsolidated(user, filter, workbook);
+      await this.writeConsolidated(user, filter, workbook, demoEnabled);
     } else {
-      await this.writeFiltered(user, filter, workbook);
+      await this.writeFiltered(user, filter, workbook, demoEnabled);
     }
 
     await workbook.commit();
@@ -96,12 +108,14 @@ export class ExportService {
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
+    demoEnabled: boolean,
   ): Promise<void> {
-    const where = buildProspectWhere(user, filter, await this.demo.enabled());
+    const where = buildProspectWhere(user, filter, demoEnabled);
     const { rows: total, representants } = await this.writeProspectSheet(
       workbook,
       'Prospects',
       where,
+      demoEnabled,
     );
 
     // ─ Feuille Représentants ─
@@ -118,6 +132,7 @@ export class ExportService {
     ];
     styleHeader(repSheet);
     repSheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 6 } };
+    writeDemoWarningRow(repSheet, demoEnabled, 6);
     for (const representant of [...representants.values()].sort(
       (left, right) => right.prospects - left.prospects,
     )) {
@@ -153,6 +168,7 @@ export class ExportService {
       { header: 'Part (%)', key: 'share', width: 12 },
     ];
     styleHeader(summary);
+    writeDemoWarningRow(summary, demoEnabled, 3);
 
     const addSection = (title: string): void => {
       const row = summary.addRow({ label: title });
@@ -223,17 +239,13 @@ export class ExportService {
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
+    demoEnabled: boolean,
   ): Promise<void> {
-    // Lu UNE fois pour tout le classeur. Relire à chaque feuille laisserait une
-    // bascule survenue en cours d'export produire un fichier incohérent : un
-    // onglet consolidé sans les fiches de démonstration et un onglet BDD3 avec.
-    // Personne ne pourrait expliquer l'écart en relisant le fichier.
-    const demoEnabled = await this.demo.enabled();
-
     await this.writeProspectSheet(
       workbook,
       CONSOLIDATED_SHEET,
       buildProspectWhere(user, filterForSegment(filter, undefined), demoEnabled),
+      demoEnabled,
     );
 
     for (const segment of ALL_SEGMENTS) {
@@ -241,6 +253,7 @@ export class ExportService {
         workbook,
         segment,
         buildProspectWhere(user, filterForSegment(filter, segment), demoEnabled),
+        demoEnabled,
       );
     }
   }
@@ -250,6 +263,7 @@ export class ExportService {
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
     name: string,
     where: Prisma.ProspectWhereInput,
+    demoEnabled: boolean,
   ): Promise<SheetResult> {
     // Première page lue AVANT de créer la feuille : les largeurs de colonnes
     // font partie de l'en-tête du XML et ne peuvent plus être ajustées une fois
@@ -270,6 +284,7 @@ export class ExportService {
       from: { row: 1, column: 1 },
       to: { row: 1, column: PROSPECT_COLUMNS.length },
     };
+    writeDemoWarningRow(sheet, demoEnabled, PROSPECT_COLUMNS.length);
 
     const representants = new Map<string, RepresentantTally>();
     let rows = 0;
@@ -332,7 +347,7 @@ export class ExportService {
 }
 
 /**
- * Le filtre reçu, réécrit sur un segment donné — ou débarrassé du sien.
+ * Le filtre reçu, réécrit sur un segment donné, ou débarrassé du sien.
  *
  * `Object.assign` plutôt que l'opérateur de diffusion : le filtre est une
  * instance de classe, et la diffuser en perdrait le prototype. Sans conséquence
