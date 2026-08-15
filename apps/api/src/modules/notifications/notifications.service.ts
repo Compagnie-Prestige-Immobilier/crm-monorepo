@@ -41,6 +41,7 @@ import {
 } from './dto.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { demoScope } from '../../prisma/demo-visibility.js';
+import { DispatchClaim, SENDING_LEASE_MS } from './dispatch-claim.js';
 
 /**
  * Marqueur d'une livraison LAISSÉE EN FILE après un échec passager.
@@ -78,6 +79,74 @@ export const DELIVERY_RETRY_ERROR = 'EMAIL_RETRY';
  * attend encore un envoi, et retient la notification en SENDING.
  */
 export const DELIVERY_INBOX_ONLY = 'INBOX_ONLY';
+
+/**
+ * Marqueur d'une livraison ABANDONNÉE : le transport n'a pas pu la servir dans
+ * le délai que la plateforme s'accorde, et plus personne ne réessaiera.
+ *
+ * Voir `DISPATCH_DEADLINE_MS`. C'est un ÉCHEC, pas une mise en file : la ligne
+ * passe `FAILED`, elle apparaît dans les compteurs de l'écran d'administration
+ * comme n'importe quel refus définitif, et le destinataire lit tout de même le
+ * message dans l'application.
+ */
+export const DELIVERY_ABANDONED = 'EMAIL_ABANDONED';
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * VINGT-QUATRE HEURES, PUIS ON ARRÊTE D'ESSAYER, ET ON LE DIT
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * ═══ CE QUI ARRIVAIT SANS BORNE ═══
+ *
+ * Une notification dont au moins une livraison attend encore un e-mail reste
+ * `SENDING`, et le bail la fait reprendre à chaque expiration. C'est le bon
+ * comportement pour un incident : un 429 de trente secondes ne doit pas
+ * enterrer un envoi. Mais RIEN ne l'arrêtait, et l'état le plus banal du dépôt
+ * le déclenche : sans clé Brevo, tout téléconseiller visé reste en file sans
+ * marqueur terminal, donc la notification repart TOUTES LES QUINZE MINUTES,
+ * indéfiniment. Quatre-vingt-seize reprises par jour, pour toujours, sur chaque
+ * notification jamais servie.
+ *
+ * « Mieux que l'ancien SENT silencieux » n'est pas une spécification : une
+ * panne de vivacité non bornée reste une panne. Il fallait décider.
+ *
+ * ═══ CE QUI ARRIVE MAINTENANT, ET LA BORNE ═══
+ *
+ * Une notification est reprise pendant AU PLUS vingt-quatre heures après son
+ * heure d'envoi (`scheduledFor`, à défaut `createdAt`), soit au plus 96
+ * tentatives à raison d'une par bail. Passé ce délai, la première reprise qui
+ * la trouve encore en attente ÉCRIT L'ÉCHEC : les livraisons encore en file
+ * passent `FAILED` avec `EMAIL_ABANDONED`, la notification se referme, et une
+ * ligne de journal de niveau ERREUR nomme l'envoi, le nombre de personnes qui
+ * n'ont pas été servies et l'état du transport.
+ *
+ * ═══ POURQUOI VINGT-QUATRE HEURES ═══
+ *
+ * C'est la durée qui sépare deux passages du balayage de rappels : au-delà, le
+ * rappel du jour est de toute façon remplacé par celui du lendemain, et
+ * insister ne sert plus personne. C'est aussi une journée ouvrée pleine, de
+ * quoi laisser un exploitant provisionner une clé Brevo le matin pour que les
+ * envois de la nuit partent quand même.
+ *
+ * ═══ POURQUOI `FAILED` ET NON UN NOUVEL ÉTAT DE NOTIFICATION ═══
+ *
+ * Un état `PARTIEL` sur `NotificationStatus` dirait la même chose plus
+ * lisiblement, mais il faudrait l'ajouter à l'énumération, donc au schéma et
+ * aux deux clients générés. Or le produit sait DÉJÀ décrire cet envoi-là : une
+ * notification dont toutes les livraisons sont tranchées se referme, et ses
+ * livraisons `FAILED` s'affichent avec leur motif. Un refus définitif de Brevo
+ * produit exactement la même forme ; l'abandon n'invente donc rien.
+ *
+ * ═══ COMMENT UN EXPLOITANT LE DÉCOUVRE, SANS OUVRIR LA BASE ═══
+ *
+ *   · à chaque reprise, une ligne d'AVERTISSEMENT dit combien de livraisons
+ *     attendent encore et dans combien de temps l'envoi sera abandonné ;
+ *   · à l'abandon, une ligne d'ERREUR, la seule de tout le module, nomme
+ *     l'envoi et le nombre de destinataires perdus ;
+ *   · l'écran d'administration montre `transportStatus` (`NOT_CONFIGURED`) et
+ *     le compteur d'échecs de l'envoi.
+ */
+export const DISPATCH_DEADLINE_MS = 24 * 60 * 60 * 1_000;
 
 /**
  * Nombre de destinataires servis AVANT que le sort de leurs livraisons ne soit
@@ -126,6 +195,16 @@ export const EMAIL_PERSIST_GROUP_SIZE = BREVO_MAX_RECIPIENTS_PER_CALL * BREVO_MA
  * annonce générale, la majorité des destinataires y tombe légitimement.
  */
 export interface DispatchSummary {
+  /**
+   * L'expédition a-t-elle seulement EU LIEU ?
+   *
+   * `false` veut dire « un autre processus tient cet envoi, ou il n'y a rien à
+   * tenir » : la notification est déjà partie, annulée, programmée plus tard,
+   * ou aux mains d'un expéditeur vivant. Tous les compteurs valent alors zéro
+   * parce que RIEN n'a été tenté, ce qui n'est pas la même chose que « tenté
+   * sans succès ». Les deux se confondraient sans ce drapeau.
+   */
+  readonly claimed: boolean;
   readonly sent: number;
   readonly failed: number;
   readonly pending: number;
@@ -140,8 +219,19 @@ export interface DispatchSummary {
    * `emailed`, celui de la base est `sent`.
    */
   readonly emailed: number;
-  readonly emailStatus: BrevoTransportStatus;
+  /** `null` quand rien n'a été tenté : voir `claimed`. */
+  readonly emailStatus: BrevoTransportStatus | null;
 }
+
+/** Résumé d'un passage qui n'a RIEN fait, faute de tenir l'envoi. */
+const NOT_CLAIMED: DispatchSummary = {
+  claimed: false,
+  sent: 0,
+  failed: 0,
+  pending: 0,
+  emailed: 0,
+  emailStatus: null,
+};
 
 /** Sort réservé à UNE ligne de livraison par la branche e-mail. */
 type DeliveryVerdict =
@@ -181,6 +271,24 @@ interface EmailLegResult {
 interface DeliveryRowSeed {
   readonly userId: string;
 }
+
+/**
+ * UNE LIVRAISON QUI ATTEND ENCORE QUELQUE CHOSE.
+ *
+ * Écrit une seule fois parce que deux endroits en dépendent et qu'ils doivent
+ * dire EXACTEMENT la même chose : la clôture d'un envoi (qui ne se referme que
+ * s'il n'en reste aucune) et l'abandon (qui ne tranche que celles-là). Deux
+ * copies auraient divergé, et la divergence se serait vue soit par un envoi
+ * refermé sur des e-mails jamais partis, soit par un envoi qui ne se referme
+ * jamais.
+ *
+ * `PENDING` sans `INBOX_ONLY` : la ligne marquée `INBOX_ONLY` a beau être
+ * `PENDING`, elle est TERMINALE, son destinataire lit dans l'application.
+ */
+const OUTSTANDING_DELIVERY: Prisma.NotificationDeliveryWhereInput = {
+  status: NotificationDeliveryStatus.PENDING,
+  OR: [{ error: null }, { error: { not: DELIVERY_INBOX_ONLY } }],
+};
 
 /** Sélection minimale d'un envoi, avec de quoi construire le DTO. */
 const NOTIFICATION_SELECT = {
@@ -354,13 +462,42 @@ export class NotificationsService {
    *
    * RIEN ICI NE LÈVE À CAUSE DE L'E-MAIL : une panne Brevo laisse les lignes en
    * file, elle ne fait pas échouer l'appel.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LA PRISE EN CHARGE EST FAITE ICI, ET NON CHEZ L'APPELANT
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Elle vivait chez `dispatchDue`, qui posait son `updateMany` conditionnel
+   * avant d'appeler cette méthode. Les trois autres appelants n'en posaient
+   * aucune : `create()`, `emit()` et surtout `retryStalled()`, qui relit une
+   * livraison en file et expédie sans rien réclamer. Deux ticks de rappel
+   * simultanés, ou un réessai croisant `dispatchDue`, envoyaient donc tous les
+   * deux. Cinq rondes de corrections ont porté sur la porte gardée pendant que
+   * celle-là restait ouverte.
+   *
+   * Réclamer ICI supprime la question : il n'existe aucun moyen d'expédier sans
+   * passer par cette méthode, donc aucun moyen d'envoyer sans détenir le bail,
+   * y compris pour un appelant qui n'est pas encore écrit. Voir `DispatchClaim`
+   * pour ce qui rend la chose structurelle plutôt que disciplinaire.
+   *
+   * `claimed: false` n'est PAS une erreur : c'est le cas ordinaire d'une
+   * notification déjà partie, annulée, programmée plus tard, ou tenue par un
+   * expéditeur vivant.
    */
-  async dispatch(notificationId: string): Promise<DispatchSummary> {
+  async dispatch(notificationId: string, now: Date = new Date()): Promise<DispatchSummary> {
     const notification = await this.prisma.notification.findUnique({
       where: { id: notificationId },
       select: NOTIFICATION_SELECT,
     });
     if (!notification) throw notificationNotFound();
+
+    const claim = await DispatchClaim.take(this.prisma, notificationId, now);
+    if (claim === null) {
+      this.logger.debug(
+        `Notification ${notificationId} : envoi non réclamé (état ${notification.status}).`,
+      );
+      return NOT_CLAIMED;
+    }
 
     // LECTURE GLOBALE délibérée : l'expédition doit servir TOUTES les
     // livraisons de la notification qu'on lui a désignée. Une livraison écartée
@@ -375,12 +512,27 @@ export class NotificationsService {
     });
 
     if (!deliveries.length) {
-      const idle = await this.sendByEmail(notification, []);
-      await this.settleNotification(notificationId, idle.status);
-      return { sent: 0, failed: 0, pending: 0, emailed: idle.emailed, emailStatus: idle.status };
+      const idle = await this.sendByEmail(claim, notification, []);
+      await this.settleNotification(claim, idle.status, 0, now);
+      return {
+        claimed: true,
+        sent: 0,
+        failed: 0,
+        pending: 0,
+        emailed: idle.emailed,
+        emailStatus: idle.status,
+      };
+    }
+
+    // L'ABANDON SE DÉCIDE AVANT D'ENVOYER, jamais après : passé le délai, il
+    // n'y a plus de tentative à faire, et en faire une de plus serait
+    // exactement la boucle sans fin qu'on ferme ici.
+    if (this.pastDeadline(notification, now)) {
+      return this.abandon(claim, notification, deliveries, now);
     }
 
     const email = await this.sendByEmail(
+      claim,
       notification,
       deliveries.map((delivery) => delivery.userId),
     );
@@ -428,8 +580,65 @@ export class NotificationsService {
       });
     }
 
-    await this.settleNotification(notificationId, email.status);
-    return { sent, failed, pending, emailed: email.emailed, emailStatus: email.status };
+    await this.settleNotification(claim, email.status, pending, now);
+    return { claimed: true, sent, failed, pending, emailed: email.emailed, emailStatus: email.status };
+  }
+
+  /** L'envoi a-t-il dépassé le délai que la plateforme s'accorde ? */
+  private pastDeadline(notification: NotificationRow, now: Date): boolean {
+    // `scheduledFor` d'abord : un envoi programmé pour dans trois jours n'est
+    // pas en retard parce qu'il a été COMPOSÉ il y a trois jours.
+    const origin = notification.scheduledFor ?? notification.createdAt;
+    return now.getTime() - origin.getTime() > DISPATCH_DEADLINE_MS;
+  }
+
+  /**
+   * Arrête définitivement un envoi que le transport n'a jamais pu servir.
+   *
+   * Voir `DISPATCH_DEADLINE_MS` pour la borne et pour ce qui la justifie. Les
+   * livraisons DÉJÀ tranchées ne sont pas touchées : le `where` ne prend que les
+   * lignes encore en file, et celles qui portent `INBOX_ONLY` n'attendent rien.
+   *
+   * Le journal est le SEUL endroit où un exploitant apprend qu'il vient de
+   * perdre des destinataires sans ouvrir la base ; c'est la seule ligne de
+   * niveau ERREUR de tout le module, et elle porte de quoi agir : l'envoi, le
+   * nombre de personnes, et l'état du transport qui l'a causé.
+   */
+  private async abandon(
+    claim: DispatchClaim,
+    notification: NotificationRow,
+    deliveries: readonly { id: string }[],
+    now: Date,
+  ): Promise<DispatchSummary> {
+    const abandoned = await this.prisma.notificationDelivery.updateMany({
+      where: {
+        notificationId: claim.notificationId,
+        id: { in: deliveries.map((delivery) => delivery.id) },
+        ...OUTSTANDING_DELIVERY,
+      },
+      data: {
+        status: NotificationDeliveryStatus.FAILED,
+        error: DELIVERY_ABANDONED,
+        failedAt: now,
+      },
+    });
+
+    this.logger.error(
+      `Notification ${notification.id} « ${notification.title} » : abandonnée après ` +
+        `${String(Math.round(DISPATCH_DEADLINE_MS / 3_600_000))} h. ` +
+        `${String(abandoned.count)} destinataire(s) n'ont jamais reçu leur e-mail ` +
+        `(transport : ${notification.transportStatus ?? 'inconnu'}).`,
+    );
+
+    await this.settleNotification(claim, notification.transportStatus, 0, now);
+    return {
+      claimed: true,
+      sent: 0,
+      failed: abandoned.count,
+      pending: 0,
+      emailed: 0,
+      emailStatus: null,
+    };
   }
 
   /**
@@ -463,6 +672,7 @@ export class NotificationsService {
    * réappliqué sur une liste qui en sort.
    */
   private async sendByEmail(
+    claim: DispatchClaim,
     notification: NotificationRow,
     userIds: readonly string[],
   ): Promise<EmailLegResult> {
@@ -615,13 +825,27 @@ export class NotificationsService {
           );
         }
 
-        await this.persistVerdicts(notification.id, groupVerdicts);
+        await this.persistVerdicts(claim, groupVerdicts);
         for (const [userId, verdict] of groupVerdicts) verdicts.set(userId, verdict);
 
-        // LE BAIL EST RENOUVELÉ À CHAQUE VAGUE. Voir `renewLease` : sans cela,
-        // une expédition plus longue que le bail était reprise par un second
-        // passage pendant que le premier envoyait encore.
-        await this.renewLease(notification.id);
+        // ═══ LE BAIL EST RENOUVELÉ ENTRE DEUX VAGUES, ET SA RÉPONSE EST LUE ═══
+        //
+        // Sans renouvellement, une expédition plus longue que le bail était
+        // reprise par un second passage pendant que le premier envoyait encore.
+        //
+        // Et sans LIRE la réponse, le renouvellement lui-même devenait l'arme
+        // du crime : un expéditeur figé au-delà du bail, repris entre-temps,
+        // renouvelait le bail DU REPRENEUR et poursuivait ses vagues. On
+        // s'arrête donc ici, tout de suite, avant d'exposer la vague suivante.
+        // Les livraisons déjà servies sont écrites, les autres restent en file
+        // et appartiennent désormais au nouveau détenteur.
+        if (!(await claim.renew())) {
+          this.logger.warn(
+            `Notification ${notification.id} : bail perdu en cours d'expédition, ` +
+              `les vagues restantes sont abandonnées au détenteur suivant.`,
+          );
+          break;
+        }
       }
 
       if (emailed) {
@@ -659,7 +883,7 @@ export class NotificationsService {
       // c'est la base qui a lâché. Sans marqueur, les lignes restent `PENDING`
       // et la notification reste prenable : la reprise est assurée par le bail,
       // pas par ce marqueur.
-      await this.persistVerdicts(notification.id, unresolved).catch(() => undefined);
+      await this.persistVerdicts(claim, unresolved).catch(() => undefined);
       for (const [userId, verdict] of unresolved) verdicts.set(userId, verdict);
 
       // MÊME RÈGLE QUE LE CHEMIN NOMINAL, et pour la même raison : annoncer
@@ -671,57 +895,26 @@ export class NotificationsService {
   }
 
   /**
-   * Renouvelle le BAIL posé sur la notification en cours d'expédition.
-   *
-   * ═══════════════════════════════════════════════════════════════════════════
-   * LE DÉFAUT : UNE EXPÉDITION VIVANTE ÉTAIT REPRISE COMME UNE MORTE
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * `dispatchDue` reprend une notification `SENDING` dont `updatedAt` a plus de
-   * `SENDING_LEASE_MS`, sur le motif que le processus qui la tenait est mort.
-   * Or RIEN n'écrivait la notification pendant l'expédition : `persistVerdicts`
-   * touche les LIVRAISONS, et `settleNotification` n'écrit qu'à la fin. Une
-   * annonce générale plus longue que le bail voyait donc son `updatedAt` rester
-   * figé sur l'instant de la prise, et un second passage la réclamait pendant
-   * que le premier envoyait encore.
-   *
-   * Les deux expéditions lisaient alors les MÊMES livraisons `PENDING` et les
-   * servaient toutes les deux : le destinataire recevait le message en double.
-   *
-   * Un bail n'a de sens que si son détenteur le renouvelle : c'est ce qui
-   * distingue « il travaille » de « il est mort ». Une écriture par VAGUE, donc
-   * au plus une toutes les quinze secondes environ, contre un bail de quinze
-   * minutes : la marge est de trois ordres de grandeur, et un processus tué
-   * cesse de renouveler à l'instant même où il tombe.
-   *
-   * Le `where` porte `SENDING` : une notification annulée ou déjà refermée par
-   * un autre chemin ne doit pas être ramenée en arrière par ce renouvellement.
-   * L'échec est ignoré, il coûte au pire une reprise inutile.
-   */
-  private async renewLease(notificationId: string): Promise<void> {
-    await this.prisma.notification
-      .updateMany({
-        where: { id: notificationId, status: NotificationStatus.SENDING },
-        // La valeur ne change pas, et ce n'est pas le sujet : c'est
-        // `@updatedAt` qu'on vient chercher, posé par Prisma sur toute écriture.
-        data: { status: NotificationStatus.SENDING },
-      })
-      .catch(() => undefined);
-  }
-
-  /**
    * Écrit le sort d'un GROUPE de livraisons, par verdict et non ligne à ligne.
    *
    * `status: PENDING` figure dans chaque `where` : une ligne qu'un autre
    * passage a déjà fait avancer (`SENT`, ou `READ` parce que la personne a
    * ouvert l'application entre-temps) ne doit pas être ramenée en arrière par
    * une écriture tardive.
+   *
+   * LE BAIL EST EXIGÉ EN PARAMÈTRE, alors que le `where` n'en porte pas la
+   * trace, et ce n'est pas une décoration : c'est ce qui rend impossible
+   * d'écrire des verdicts sans avoir réclamé l'envoi. Le prédicat de statut
+   * suffit à rendre une écriture tardive inoffensive (un `SENT` déjà posé n'est
+   * pas défait), mais rien n'empêchait un futur chemin d'écrire des verdicts
+   * pour des e-mails que personne n'avait le droit d'envoyer.
    */
   private async persistVerdicts(
-    notificationId: string,
+    claim: DispatchClaim,
     verdicts: ReadonlyMap<string, DeliveryVerdict>,
   ): Promise<void> {
     if (!verdicts.size) return;
+    const notificationId = claim.notificationId;
 
     const now = new Date();
     const sent: string[] = [];
@@ -810,12 +1003,10 @@ export class NotificationsService {
    * schéma et aux deux clients générés, pour une information que `SENDING` +
    * marqueur de réessai porte déjà.
    *
-   * CE QUI RESTE OUVERT, ET C'EST ASSUMÉ : rien ne compte les tentatives. Un
-   * transport durablement en 429 fait donc repartir la notification toutes les
-   * quinze minutes, indéfiniment. Le journal le montre à chaque passage. Borner
-   * demanderait un compteur sur la livraison, donc une colonne de plus ; entre
-   * réessayer trop et abandonner un envoi en silence, c'est l'abandon qui est
-   * le défaut grave.
+   * LA REPRISE EST BORNÉE, et ce n'est plus « assumé » : voir
+   * `DISPATCH_DEADLINE_MS`. Elle l'est par le TEMPS et non par un compteur de
+   * tentatives, ce qui évite la colonne supplémentaire que le compteur aurait
+   * demandée, et donne une borne qu'on peut énoncer sans connaître la cadence.
    *
    * ═══════════════════════════════════════════════════════════════════════════
    * LA DÉCISION SE LIT EN BASE, ET NON DANS UN COMPTEUR DE L'APPELANT
@@ -849,35 +1040,79 @@ export class NotificationsService {
    * `error <> 'INBOX_ONLY'` ne sélectionne PAS les `NULL`. L'écrire ainsi
    * aurait rendu « aucune livraison en attente » exactement dans le cas que
    * cette méthode existe pour rattraper.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * COMPTER PUIS ÉCRIRE ÉTAIT DEUX DÉCISIONS LÀ OÙ IL N'EN FAUT QU'UNE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Le décompte se lisait dans une requête, la conclusion s'écrivait dans une
+   * autre, et rien ne tenait entre les deux. Deux conséquences, toutes deux
+   * observées :
+   *
+   *   · un autre passage pouvait faire avancer les livraisons dans l'intervalle.
+   *     Celui qui avait compté des lignes en attente écrivait alors `SENDING`
+   *     PAR-DESSUS le `SENT` que l'autre venait de conclure, et l'envoi
+   *     repartait pour un tour à chaque expiration de bail ;
+   *   · si le décompte lui-même levait, les verdicts étaient déjà persistés et
+   *     la notification restait telle quelle, sans que l'appelant puisse
+   *     distinguer « rien à faire » de « on ne sait pas ».
+   *
+   * LA CONDITION EST DONC PASSÉE DANS L'ÉCRITURE. `deliveries: { none: ... }`
+   * devient un sous-select évalué par PostgreSQL DANS l'UPDATE, sous le verrou
+   * de la ligne : il n'y a plus d'intervalle où l'état puisse changer, et plus
+   * de requête de décompte qui puisse échouer toute seule. Le nombre de
+   * livraisons encore en attente ne sert plus qu'au journal, et il vient du
+   * passage lui-même, sans lecture supplémentaire.
+   *
+   * LE JETON DU BAIL FIGURE DANS LES DEUX `where`. Un expéditeur qui a perdu la
+   * main n'écrit donc plus rien du tout, ni la clôture ni le maintien.
    */
-  private async settleNotification(id: string, transportStatus: string): Promise<void> {
-    // LECTURE GLOBALE délibérée, et pour la MÊME raison que celle de
-    // `dispatch()` : ce décompte décide du sort de la notification qu'on vient
-    // d'expédier, dont les livraisons portent déjà sa nature. Une livraison
-    // masquée par la visibilité de démonstration attendrait toujours son
-    // e-mail ; l'écarter du décompte ferait refermer l'envoi sur SENT, et le
-    // simple fait de basculer l'interrupteur suffirait alors à enterrer des
-    // livraisons en attente.
-    const outstanding = await this.prisma.notificationDelivery.count({
-      where: {
-        notificationId: id,
-        status: NotificationDeliveryStatus.PENDING,
-        OR: [{ error: null }, { error: { not: DELIVERY_INBOX_ONLY } }],
+  private async settleNotification(
+    claim: DispatchClaim,
+    transportStatus: string | null,
+    outstanding: number,
+    now: Date,
+  ): Promise<void> {
+    // PORTÉE GLOBALE délibérée sur les livraisons, et pour la MÊME raison que
+    // celle de `dispatch()` : une livraison masquée par la visibilité de
+    // démonstration attend toujours son e-mail. L'écarter ferait refermer
+    // l'envoi sur SENT, et le simple fait de basculer l'interrupteur suffirait
+    // à enterrer des livraisons en attente.
+    const closed = await this.prisma.notification.updateMany({
+      where: { ...claim.fence, deliveries: { none: OUTSTANDING_DELIVERY } },
+      data: {
+        status: NotificationStatus.SENT,
+        sentAt: now,
+        transportStatus,
+        // Plus personne ne tient cet envoi : il est terminé. La valeur n'est
+        // plus lue une fois `SENT` (l'état ne rend plus la ligne prenable),
+        // mais la laisser nommerait un propriétaire qui n'existe plus.
+        dispatchClaim: null,
       },
     });
+    if (closed.count === 1) return;
 
-    if (outstanding > 0) {
-      await this.prisma.notification.update({
-        where: { id },
-        data: { status: NotificationStatus.SENDING, transportStatus },
-      });
-      return;
-    }
-
-    await this.prisma.notification.update({
-      where: { id },
-      data: { status: NotificationStatus.SENT, sentAt: new Date(), transportStatus },
+    // Il reste des livraisons à servir. LE BAIL EST CONSERVÉ, et c'est ce qui
+    // fixe la cadence de reprise à une par bail : le relâcher ferait reprendre
+    // l'envoi au tick suivant, soit soixante fois par heure contre un transport
+    // déjà en panne.
+    const held = await this.prisma.notification.updateMany({
+      where: claim.fence,
+      data: { transportStatus },
     });
+    // Le bail nous a échappé pendant l'expédition : le détenteur suivant dira
+    // ce qu'il en est. Se plaindre ici ferait deux lignes de journal pour un
+    // seul envoi.
+    if (held.count === 0) return;
+
+    // CE QUE L'EXPLOITANT DOIT POUVOIR LIRE SANS OUVRIR LA BASE : combien de
+    // personnes attendent encore, et combien de temps on va continuer d'essayer.
+    this.logger.warn(
+      `Notification ${claim.notificationId} : reste en cours, ` +
+        `${String(outstanding)} livraison(s) en attente (transport : ${transportStatus ?? 'inconnu'}). ` +
+        `Nouvelle tentative dans ${String(Math.round(SENDING_LEASE_MS / 60_000))} min, ` +
+        `abandon au-delà de ${String(Math.round(DISPATCH_DEADLINE_MS / 3_600_000))} h.`,
+    );
   }
 
   // ───────────────────────────────────────────────────────────────────────────

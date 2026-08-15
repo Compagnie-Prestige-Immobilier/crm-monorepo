@@ -8,13 +8,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import {
+  DELIVERY_ABANDONED,
   DELIVERY_INBOX_ONLY,
   DELIVERY_RETRY_ERROR,
+  DISPATCH_DEADLINE_MS,
   EMAIL_PERSIST_GROUP_SIZE,
   NotificationsService,
   buildEmailContent,
 } from './notifications.service.js';
 import { NotificationError } from './errors.js';
+import { SENDING_LEASE_MS } from './dispatch-claim.js';
 import {
   BrokenBrevoTransport,
   FakeBrevoTransport,
@@ -62,6 +65,25 @@ async function refusal(run: () => Promise<unknown>): Promise<unknown> {
 
 const codeOf = (error: unknown): string | undefined =>
   ((error as { response?: { code?: string } }).response ?? {}).code;
+
+/**
+ * L'instant d'une REPRISE LÉGITIME, c'est-à-dire après expiration du bail.
+ *
+ * ═══ POURQUOI LES REPRISES DE CES TESTS SONT DATÉES ═══
+ *
+ * `dispatch()` réclame l'envoi avant d'envoyer quoi que ce soit, et une
+ * notification laissée `SENDING` par un passage précédent GARDE son bail
+ * jusqu'à expiration. C'est ce qui fixe la cadence de réessai à une tentative
+ * par bail : relâcher le bail en fin de passage ferait reprendre l'envoi à
+ * chaque tick de `dispatchDue`, soit soixante fois par heure contre un
+ * transport déjà en panne.
+ *
+ * Un test qui rejoue l'envoi à la seconde suivante décrirait donc une reprise
+ * que la production ne fait pas. Il avance l'horloge, comme le vrai passage
+ * suivant l'aurait trouvée.
+ */
+const apresLeBail = (from: Date = new Date()): Date =>
+  new Date(from.getTime() + SENDING_LEASE_MS + 60_000);
 
 let db: FakePrisma;
 let brevo: FakeBrevoTransport;
@@ -308,7 +330,7 @@ describe('éventail', () => {
     expect(created.counts.pending).toBe(1);
 
     refuse = false;
-    const retry = await service.dispatch(created.id);
+    const retry = await service.dispatch(created.id, apresLeBail());
 
     expect(retry.sent).toBe(1);
     expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.SENT);
@@ -373,6 +395,16 @@ describe('éventail', () => {
    * en file estampillées « boîte de réception seule », et une plateforme qui
    * affirme avoir envoyé.
    */
+  /**
+   * L'échéance de `scheduleThree`, dépassée d'une minute.
+   *
+   * `dispatch()` juge lui-même si l'heure est venue, depuis que c'est lui qui
+   * réclame l'envoi : expédier une notification programmée pour dans une heure
+   * parce qu'un appelant a demandé l'enverrait AVANT l'heure choisie. Les
+   * reprises ci-dessous se datent donc, comme le tick réel les daterait.
+   */
+  const apresEcheance = (): Date => new Date(Date.now() + 3_600_000 + 60_000);
+
   /** Un envoi programmé, donc écrit sans être expédié : la panne vient après. */
   const scheduleThree = async (): Promise<string> => {
     brevo.configured = true;
@@ -389,7 +421,7 @@ describe('éventail', () => {
   it('UNE PANNE DE BASE AVANT LE CIBLAGE LAISSE L’ENVOI PRENABLE', async () => {
     const id = await scheduleThree();
 
-    await service.dispatch(id);
+    await service.dispatch(id, apresEcheance());
     db.faults.clear();
     const detail = await service.get(id);
 
@@ -412,10 +444,11 @@ describe('éventail', () => {
     // Contre-épreuve du test précédent : laisser l'envoi prenable ne vaut que
     // si la reprise aboutit réellement.
     const id = await scheduleThree();
-    await service.dispatch(id);
+    const echeance = apresEcheance();
+    await service.dispatch(id, echeance);
 
     db.faults.clear();
-    const retry = await service.dispatch(id);
+    const retry = await service.dispatch(id, apresLeBail(echeance));
 
     expect(retry.sent).toBe(3);
     expect(brevo.allAddresses).toHaveLength(3);
@@ -450,7 +483,7 @@ describe('éventail', () => {
 
     // La clé disparaît entre deux passages (rotation ratée, variable perdue).
     brevo.configured = false;
-    await service.dispatch(created.id);
+    await service.dispatch(created.id, apresLeBail());
 
     expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.PENDING);
     expect(db.deliveries[0]?.error).toBe(DELIVERY_RETRY_ERROR);
@@ -609,7 +642,7 @@ describe('écriture des acceptations au fil de l’eau', () => {
     // LA PROPRIÉTÉ QUI COMPTE : la reprise ne réexpédie que les 8 restantes.
     // Sans écriture au fil de l'eau, les 800 repartaient, et 792 personnes
     // recevaient le message une seconde fois.
-    await service.dispatch(created.id);
+    await service.dispatch(created.id, apresLeBail());
     expect(dying.served[2]).toHaveLength(8);
   });
 });
@@ -710,7 +743,7 @@ describe('absence de clé Brevo', () => {
 
     // Second passage, qui ne juge personne : la clé a disparu entre-temps.
     service = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
-    await service.dispatch(created.id);
+    await service.dispatch(created.id, apresLeBail());
 
     const detail = await service.get(created.id);
     expect(detail.notification.status).toBe(NotificationStatus.SENDING);
@@ -731,7 +764,7 @@ describe('absence de clé Brevo', () => {
     expect(brevo.sent).toHaveLength(0);
 
     brevo.configured = true;
-    await service.dispatch(created.id);
+    await service.dispatch(created.id, apresLeBail());
 
     expect(brevo.allAddresses).toEqual(['un@cpi.sn']);
     const detail = await service.get(created.id);
@@ -853,7 +886,7 @@ describe('boîte de réception', () => {
     // L'utilisateur ouvre l'application AVANT que la reprise n'ait lieu.
     await isolated.markRead(asUser('usr-1'), created.id);
     refuse = false;
-    const retry = await isolated.dispatch(created.id);
+    const retry = await isolated.dispatch(created.id, apresLeBail());
 
     // La reprise a bien retrouvé la ligne, et l'e-mail est parti.
     expect(retry.sent).toBe(1);
@@ -963,11 +996,19 @@ describe('canal e-mail', () => {
     db.addUser({ id: 'usr-banque', role: Role.BANQUE_FINANCE, email: 'banque@cpi.sn' });
   });
 
+  /**
+   * `status: SENDING` comme `create()` l'écrit, et ce n'est pas un détail de
+   * doublure : `dispatch()` RÉCLAME l'envoi avant d'envoyer, et une
+   * notification déjà `SENT` n'est pas à prendre. Le défaut de colonne du
+   * schéma est justement `SENT` ; amorcer une expédition dessus décrirait un
+   * état que le service ne produit jamais.
+   */
   const dispatchTo = async (userIds: readonly string[]) => {
     const row = await db.notification.create({
       data: {
         title: 'Réunion demain',
         body: 'Point commercial à 9 h au siège.',
+        status: NotificationStatus.SENDING,
         deliveries: { createMany: { data: userIds.map((userId) => ({ userId })) } },
       },
     });
@@ -1430,5 +1471,355 @@ describe('visibilité de démonstration', () => {
 
     const error = await refusal(() => service.markRead(asUser('usr-1'), cachee.id));
     expect(codeOf(error)).toBe('NOTIFICATION_NOT_FOUND');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Le bail a un PROPRIÉTAIRE, et celui qui l'a perdu se tait
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UN BAIL SANS IDENTITÉ DE PROPRIÉTAIRE N'EST PAS UN BAIL
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Le renouvellement s'écrivait « poser SENDING sur une ligne SENDING ». Cela
+ * prouve QU'UN processus est vivant, jamais que c'est LE BON. L'enchaînement,
+ * qui n'a rien d'exotique :
+ *
+ *   1. un expéditeur se fige plus longtemps que le bail (base lente, transport
+ *      en 429 sur chaque vague) ;
+ *   2. un second le reprend LÉGITIMEMENT, puisque le bail a expiré ;
+ *   3. le premier se réveille, renouvelle le bail DU SECOND, et poursuit ses
+ *      vagues sur les mêmes livraisons.
+ *
+ * Le renouvellement lui-même devenait l'arme du crime : il empêchait toute
+ * autre reprise pendant que le mort continuait d'envoyer.
+ *
+ * Chaque prise écrit désormais un JETON, et toute écriture d'expédition le
+ * porte. Ces tests-ci exercent le croisement RÉEL : le second passage tourne
+ * entièrement à l'intérieur du point d'attente du premier, comme deux instances
+ * derrière un répartiteur de charge.
+ */
+describe('bail perdu en cours d’expédition', () => {
+  /** Trois vagues : la reprise a lieu pendant la deuxième. */
+  const TOTAL = 2 * EMAIL_PERSIST_GROUP_SIZE + 8;
+
+  beforeEach(() => {
+    for (let index = 0; index < TOTAL; index += 1) {
+      const suffix = String(index);
+      db.addUser({ id: `usr-${suffix}`, role: Role.COMMERCIAL, email: `${suffix}@cpi.sn` });
+    }
+  });
+
+  it('LE DÉTENTEUR ÉVINCÉ N’EXPOSE PAS LA VAGUE SUIVANTE', async () => {
+    const created = await db.notification.create({
+      data: {
+        title: 'Annonce générale',
+        body: 'Corps',
+        status: NotificationStatus.SENDING,
+        deliveries: {
+          createMany: {
+            data: Array.from({ length: TOTAL }, (_unused, index) => ({
+              userId: `usr-${String(index)}`,
+            })),
+          },
+        },
+      },
+    });
+
+    /** Vagues confiées au transport par le PREMIER expéditeur. */
+    let vaguesDuPremier = 0;
+    /** Vrai pendant que le repreneur travaille : ses vagues ne sont pas au premier. */
+    let dansLaReprise = false;
+
+    const lent = new (class implements BrevoTransport {
+      calls = 0;
+      readonly servies: string[] = [];
+
+      isConfigured(): boolean {
+        return true;
+      }
+
+      unavailableReason(): string | null {
+        return null;
+      }
+
+      async send(messages: readonly BrevoMessage[]): Promise<BrevoDispatchResult> {
+        this.calls += 1;
+        if (!dansLaReprise) vaguesDuPremier += 1;
+        const adresses = messages.flatMap((message) =>
+          message.recipients.map((recipient) => recipient.email),
+        );
+
+        // La DEUXIÈME vague du premier expéditeur s'éternise : le bail expire
+        // pendant qu'elle est en vol, et un autre passage reprend la
+        // notification pour de bon. Le premier n'en sait encore rien.
+        //
+        // LE REPRENEUR ÉCHOUE PASSAGÈREMENT, ET C'EST ESSENTIEL : la
+        // notification reste `SENDING`, donc un renouvellement qui ne
+        // regarderait que le STATUT passerait encore. Seule l'identité du
+        // propriétaire distingue ici le vivant du mort, et c'est exactement la
+        // propriété qu'on veut exercer. Un repreneur qui refermerait l'envoi
+        // ferait passer ce test pour la mauvaise raison.
+        if (this.calls === 2 && !dansLaReprise) {
+          const apres = new Date(Date.now() + 10 * SENDING_LEASE_MS);
+          db.clock = () => apres;
+          dansLaReprise = true;
+          await new NotificationsService(
+            db.asService(),
+            fakeDemoVisibility(),
+            new BrokenBrevoTransport(),
+          ).dispatch(created.id, apres);
+          dansLaReprise = false;
+        }
+
+        this.servies.push(...adresses);
+        return { status: 'SENT', outcomes: adresses.map((email) => ({ email, ok: true })) };
+      }
+    })();
+
+    const premier = new NotificationsService(db.asService(), fakeDemoVisibility(), lent);
+    await premier.dispatch(created.id);
+
+    // LE POINT DU TEST : le premier s'arrête à sa deuxième vague. Sans jeton,
+    // son renouvellement passait (la notification est toujours `SENDING`), et
+    // il exposait la troisième vague à des destinataires dont il n'a plus la
+    // charge, pendant que le repreneur les servait de son côté.
+    expect(vaguesDuPremier).toBe(2);
+
+    // Les huit derniers n'ont donc PAS été confiés au transport par l'évincé.
+    expect(lent.servies).toHaveLength(2 * EMAIL_PERSIST_GROUP_SIZE);
+    expect(lent.servies).not.toContain(`${String(TOTAL - 1)}@cpi.sn`);
+
+    // Et la notification appartient toujours au repreneur : elle reste
+    // `SENDING`, avec SON jeton, prête à être reprise au prochain bail.
+    const row = db.notifications.find((candidate) => candidate.id === created.id);
+    expect(row?.status).toBe(NotificationStatus.SENDING);
+    expect(row?.dispatchClaim).not.toBeNull();
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LA CONCLUSION D'UN MORT NE DOIT PAS ÉCRASER CELLE D'UN VIVANT
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * La clôture comptait les livraisons en attente dans une requête, puis
+   * écrivait sa conclusion dans une autre. Entre les deux, un autre passage
+   * pouvait tout terminer : celui qui avait compté des lignes en attente
+   * écrivait alors son propre verdict PAR-DESSUS. Le décompte est passé DANS
+   * l'écriture, et l'écriture porte le jeton : un expéditeur évincé n'écrit
+   * plus rien du tout.
+   *
+   * L'état du TRANSPORT rend la substitution visible : le repreneur a réussi,
+   * l'évincé a échoué. Si l'évincé pouvait encore conclure, l'écran
+   * d'administration afficherait « panne de transport » sur un envoi
+   * intégralement remis.
+   */
+  it('L’ÉVINCÉ NE RÉÉCRIT PAS LA CONCLUSION DU REPRENEUR', async () => {
+    const tardif = new FakePrisma();
+    tardif.addUser({ id: 'usr-tc', role: Role.COMMERCIAL, email: 'tc@cpi.sn' });
+    const created = await tardif.notification.create({
+      data: {
+        title: 'Annonce',
+        body: 'Corps',
+        status: NotificationStatus.SENDING,
+        deliveries: { createMany: { data: [{ userId: 'usr-tc' }] } },
+      },
+    });
+
+    const bon = new FakeBrevoTransport();
+    bon.configured = true;
+
+    /** Transport de l'évincé : il échoue, et il échoue APRÈS la reprise. */
+    const casse = new (class implements BrevoTransport {
+      isConfigured(): boolean {
+        return true;
+      }
+
+      unavailableReason(): string | null {
+        return null;
+      }
+
+      async send(): Promise<BrevoDispatchResult> {
+        // Le bail expire pendant l'appel, et un repreneur sert la notification
+        // en entier avant que celui-ci ne rende la main.
+        const apres = new Date(Date.now() + 10 * SENDING_LEASE_MS);
+        tardif.clock = () => apres;
+        await new NotificationsService(tardif.asService(), fakeDemoVisibility(), bon).dispatch(
+          created.id,
+          apres,
+        );
+        return { status: 'TRANSPORT_ERROR', outcomes: [], detail: 'HTTP_503' };
+      }
+    })();
+
+    await new NotificationsService(tardif.asService(), fakeDemoVisibility(), casse).dispatch(
+      created.id,
+    );
+
+    const row = tardif.notifications.find((candidate) => candidate.id === created.id);
+    expect(row?.status).toBe(NotificationStatus.SENT);
+    // La conclusion du REPRENEUR, pas celle de l'évincé.
+    expect(row?.transportStatus).toBe('SENT');
+    expect(row?.dispatchClaim).toBeNull();
+    expect(tardif.deliveries[0]?.status).toBe(NotificationDeliveryStatus.SENT);
+    expect(bon.allAddresses).toEqual(['tc@cpi.sn']);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// La reprise est BORNÉE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * « MIEUX QUE LE DÉFAUT PRÉCÉDENT » N'EST PAS UNE SPÉCIFICATION
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Refermer un envoi sur SENT alors qu'aucun e-mail n'est parti était le pire
+ * défaut de ce module, et il est réparé : la notification RESTE `SENDING` tant
+ * qu'une livraison attend. Mais l'état le plus banal du dépôt, l'absence de clé
+ * Brevo, produit exactement cette attente : la notification repartait donc
+ * toutes les quinze minutes, POUR TOUJOURS, quatre-vingt-seize fois par jour et
+ * par envoi. Une panne de vivacité non bornée reste une panne.
+ *
+ * La borne est le TEMPS, pas un compteur de tentatives : voir
+ * `DISPATCH_DEADLINE_MS`. Ces deux tests-ci l'épinglent des deux côtés, parce
+ * qu'une borne dont on ne teste qu'un côté est une borne qu'on peut mettre à
+ * zéro sans que rien ne rougisse.
+ */
+describe('borne de reprise', () => {
+  beforeEach(() => {
+    db.addUser({ id: 'usr-tc', role: Role.COMMERCIAL, email: 'tc@cpi.sn' });
+  });
+
+  /** L'envoi composé, jamais servi faute de clé, tel que le dépôt le produit. */
+  const jamaisServi = async (): Promise<string> => {
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-tc'],
+    });
+    // L'état de départ : rien n'est parti, rien n'est enterré, l'envoi est dû.
+    expect(created.status).toBe(NotificationStatus.SENDING);
+    expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.PENDING);
+    expect(db.deliveries[0]?.error).toBeNull();
+    return created.id;
+  };
+
+  it('AVANT L’ÉCHÉANCE, l’envoi reste dû et rien n’est enterré', async () => {
+    const id = await jamaisServi();
+
+    const veille = await service.dispatch(id, new Date(Date.now() + DISPATCH_DEADLINE_MS - 60_000));
+
+    expect(veille.claimed).toBe(true);
+    expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.PENDING);
+    expect((await service.get(id)).notification.status).toBe(NotificationStatus.SENDING);
+  });
+
+  it('PASSÉE L’ÉCHÉANCE, l’envoi est abandonné, et l’échec est ÉCRIT', async () => {
+    const id = await jamaisServi();
+
+    const tardif = await service.dispatch(id, new Date(Date.now() + DISPATCH_DEADLINE_MS + 60_000));
+
+    // L'échec est celui de la LIVRAISON, la seule qui puisse le porter sans
+    // mentir : la personne n'a pas reçu son e-mail, et personne ne réessaiera.
+    expect(tardif.failed).toBe(1);
+    expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.FAILED);
+    expect(db.deliveries[0]?.error).toBe(DELIVERY_ABANDONED);
+
+    // L'envoi se referme : plus rien ne l'attend, donc plus rien ne le reprend.
+    const detail = await service.get(id);
+    expect(detail.notification.status).toBe(NotificationStatus.SENT);
+    expect(detail.notification.counts.failed).toBe(1);
+
+    // Et la reprise s'arrête pour de bon : le passage suivant ne réclame plus.
+    const encore = await service.dispatch(id, new Date(Date.now() + 3 * DISPATCH_DEADLINE_MS));
+    expect(encore.claimed).toBe(false);
+  });
+
+  /**
+   * La boîte de réception, elle, n'est PAS abandonnée. C'est tout l'intérêt de
+   * ne pas avoir enterré la notification elle-même : le destinataire lit son
+   * message dans l'application, et seul l'e-mail est perdu.
+   */
+  it('l’abandon ne retire rien à la boîte de réception', async () => {
+    const id = await jamaisServi();
+    await service.dispatch(id, new Date(Date.now() + DISPATCH_DEADLINE_MS + 60_000));
+
+    const inbox = await service.inbox(asUser('usr-tc'), {});
+    expect(inbox.items).toHaveLength(1);
+    expect(inbox.items[0]?.notificationId).toBe(id);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// On n'envoie pas sans détenir l'envoi
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LA PORTE EST UNE SEULE, ET ELLE EST GARDÉE POUR TOUT LE MONDE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * La prise en charge vivait chez `dispatchDue` : les trois autres appelants de
+ * `dispatch()` envoyaient sans rien réclamer, et le prochain appelant écrit
+ * aurait fait de même, puisque rien ne l'y obligeait. Ces tests-ci épinglent la
+ * propriété au niveau où elle vaut désormais pour TOUS les appelants, présents
+ * et à venir : `dispatch()` ne sert que ce qu'il a pu RÉCLAMER.
+ */
+describe('prise en charge de l’envoi', () => {
+  beforeEach(() => {
+    db.addUser({ id: 'usr-tc', role: Role.COMMERCIAL, email: 'tc@cpi.sn' });
+    brevo.configured = true;
+  });
+
+  it('N’ENVOIE PAS un envoi programmé dont l’heure n’est pas venue', async () => {
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-tc'],
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+    });
+
+    // L'échéance est jugée par la PRISE, et non par l'appelant : sans cela, un
+    // appel direct expédierait une annonce programmée pour la semaine
+    // prochaine, avec son texte au futur.
+    const tropTot = await service.dispatch(created.id);
+
+    expect(tropTot.claimed).toBe(false);
+    expect(brevo.sent).toHaveLength(0);
+    expect((await service.get(created.id)).notification.status).toBe(NotificationStatus.SCHEDULED);
+  });
+
+  it('N’ENVOIE PAS une seconde fois un envoi déjà refermé', async () => {
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-tc'],
+    });
+    expect(created.status).toBe(NotificationStatus.SENT);
+    expect(brevo.allAddresses).toEqual(['tc@cpi.sn']);
+
+    const encore = await service.dispatch(created.id, apresLeBail());
+
+    expect(encore.claimed).toBe(false);
+    expect(brevo.allAddresses).toEqual(['tc@cpi.sn']);
+  });
+
+  it('N’ENVOIE PAS un envoi annulé', async () => {
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-tc'],
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+    });
+    await service.cancel(created.id);
+
+    const apres = await service.dispatch(created.id, new Date(Date.now() + 7_200_000));
+
+    expect(apres.claimed).toBe(false);
+    expect(brevo.sent).toHaveLength(0);
   });
 });
