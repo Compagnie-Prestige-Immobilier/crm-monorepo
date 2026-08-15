@@ -266,7 +266,15 @@ def _read_kv(path: Path) -> dict[str, str]:
 def _write_kv(path: Path, values: dict[str, str], header: str) -> None:
     lines = [f"# {header}", "# NE PAS COMMITER."]
     lines += [f"{k}='{v}'" for k, v in values.items()]
-    path.write_text("\n".join(lines) + "\n")
+    # Le fichier est CRÉÉ en 0600, il n'est pas restreint après coup. La
+    # séquence précédente, `write_text` puis `chmod`, laissait le mot de
+    # passe Postgres, les deux secrets JWT et le mot de passe administrateur
+    # lisibles par tout le monde selon l'umask, le temps de deux appels
+    # système. Court, mais sur une machine partagée c'est tout ce qu'il faut.
+    # `O_TRUNC` conserve le comportement d'écrasement de `write_text`.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    with os.fdopen(os.open(path, flags, 0o600), "w") as handle:
+        handle.write("\n".join(lines) + "\n")
     path.chmod(0o600)
 
 
@@ -372,11 +380,15 @@ def ensure_ssh_key(ids: dict[str, str]) -> str:
 def find_existing() -> dict[str, str]:
     """Retrouve les services déjà créés, par leur nom."""
     found: dict[str, str] = {}
-    try:
-        project = project_contents()
-    except DokployError as exc:
-        warn(f"lecture du projet impossible : {exc}")
-        return found
+    # PAS de `warn` suivi d'un dictionnaire vide ici, et c'est la correction la
+    # plus importante de ce fichier. Un dictionnaire vide se lit exactement
+    # comme « rien n'existe encore » : sur un simple 5xx ou un délai dépassé,
+    # `cmd_provision` enchaînait sur `postgres.create` et deux
+    # `application.create`, imprimait « ✓ créée » trois fois, et laissait sur
+    # l'hôte une SECONDE base de données de production à côté de la vraie. Le
+    # fichier promet en tête que chaque étape est idempotente ; l'idempotence
+    # repose entièrement sur cette lecture, donc son échec doit interrompre.
+    project = project_contents()
 
     for environment in project.get("environments", []) or []:
         for app in environment.get("applications", []) or []:
@@ -582,22 +594,27 @@ def service_app_names(ids: dict[str, str]) -> dict[str, str]:
     échouer la résolution DNS : `migrate deploy` ne trouve pas la base, le point
     d'entrée refuse de démarrer, et le conteneur redémarre en boucle avec un
     build pourtant vert.
+
+    Le repli sur le nom court est donc DÉLIBÉRÉMENT absent. Il existait, sous
+    la forme d'un `except DokployError` qui posait un avertissement et rendait
+    les noms courts : `cmd_configure` écrivait alors la `DATABASE_URL` que le
+    paragraphe ci-dessus décrit comme cassée, puis affichait « ✓ API, N
+    variables ». Le script signalait une réussite en ayant configuré à coup sûr
+    une panne. Une résolution impossible doit interrompre.
     """
     names = {"postgres": PG_NAME, "api": API_NAME, "web": WEB_NAME}
-    try:
-        if ids.get("POSTGRES_ID"):
-            db = call(
-                "postgres.one", {"postgresId": ids["POSTGRES_ID"]}, method="GET"
-            ) or {}
-            names["postgres"] = db.get("appName") or PG_NAME
-        for key, slot in (("API_ID", "api"), ("WEB_ID", "web")):
-            if ids.get(key):
-                app = call(
-                    "application.one", {"applicationId": ids[key]}, method="GET"
-                ) or {}
-                names[slot] = app.get("appName") or names[slot]
-    except DokployError as exc:
-        warn(f"noms de service non résolus ({exc}), noms courts utilisés")
+    if ids.get("POSTGRES_ID"):
+        db = call("postgres.one", {"postgresId": ids["POSTGRES_ID"]}, method="GET") or {}
+        appname = db.get("appName")
+        if not appname:
+            raise DokployError(
+                "nom de service Docker de Postgres illisible : DATABASE_URL serait fausse."
+            )
+        names["postgres"] = appname
+    for key, slot in (("API_ID", "api"), ("WEB_ID", "web")):
+        if ids.get(key):
+            app = call("application.one", {"applicationId": ids[key]}, method="GET") or {}
+            names[slot] = app.get("appName") or names[slot]
     return names
 
 
@@ -748,6 +765,13 @@ def cmd_deploy() -> None:
     info("attente de 45 s avant de déployer l'API…")
     time.sleep(45)
 
+    # Le compteur d'absents existe pour une raison précise : la boucle
+    # imprimait un « ✗ … introuvable » rouge, passait au suivant, puis
+    # `_epilogue` annonçait « Déploiements lancés » et le script sortait en 0.
+    # Un enveloppeur ou un pipeline qui regarde `$?`, la seule chose qu'une
+    # automatisation regarde, voyait une réussite alors que la moitié de la
+    # pile n'avait pas été déployée.
+    manquants = []
     for key, label, dockerfile in (
         ("API_ID", "API", "Dockerfile.api"),
         ("WEB_ID", "panel web", "Dockerfile.web"),
@@ -755,9 +779,14 @@ def cmd_deploy() -> None:
         step(f"Déploiement, {label}")
         if not ids.get(key):
             fail(f"{label} introuvable")
+            manquants.append(label)
             continue
         call("application.deploy", {"applicationId": ids[key]})
         ok(f"demandé, construction depuis infra/docker/{dockerfile}")
+
+    if manquants:
+        fail(f"non déployé : {', '.join(manquants)}. Lancez d'abord `provision`.")
+        sys.exit(1)
 
     print(_epilogue(secrets_))
 
@@ -920,6 +949,13 @@ def ensure_destination() -> str:
     for row in call("destination.all", method="GET") or []:
         if row.get("name") == BACKUP_DESTINATION_NAME:
             ok(f"destination « {BACKUP_DESTINATION_NAME} » déjà enregistrée")
+            # Dit à voix haute, parce que c'est une réserve sur ce qui vient
+            # d'être affiché comme une réussite : sur cette voie le test d'accès
+            # plus bas n'a PAS lieu, et les BACKUP_S3_* de la session ne sont
+            # même pas lues. Une destination existante qui pointe sur un bucket
+            # supprimé ou dont la clé a été révoquée est reprise telle quelle.
+            warn("accès au bucket NON réévalué : destination existante reprise en l'état")
+            info("pour en changer, passez par Dokploy → Settings → S3 Destinations")
             return row.get("destinationId", "")
 
     settings = _s3_settings()
@@ -1088,15 +1124,22 @@ def cmd_status() -> None:
         print(f"\n  environnement {environment.get('name', '?')}")
         if not apps and not dbs:
             info("  (vide)")
+        # Le défaut '?' n'est pas de la coquetterie : `.get('name')` sans
+        # défaut rend None, et `format(None, '24s')` lève une TypeError que
+        # `main()` n'attrape pas : il ne guette que DokployError. Une seule
+        # ligne de service sans `name` faisait donc tomber `status` sur une
+        # trace brute, alors que `status` est précisément l'outil qu'on lance
+        # quand quelque chose va déjà mal.
         for db in dbs:
             print(
-                f"    postgres  {db.get('name'):24s} {db.get('applicationStatus', '?')}"
+                f"    postgres  {db.get('name') or '?':24s} "
+                f"{db.get('applicationStatus', '?')}"
             )
         for app in apps:
             domains = ", ".join(d.get("host", "") for d in app.get("domains", []) or [])
             print(
-                f"    app       {app.get('name'):24s} "
-                f"{app.get('applicationStatus', '?'):10s} {domains}"
+                f"    app       {app.get('name') or '?':24s} "
+                f"{app.get('applicationStatus') or '?':10s} {domains}"
             )
 
     step("Sauvegardes")
@@ -1163,15 +1206,19 @@ COMMANDS = {
 
 def main() -> None:
     argument = sys.argv[1] if len(sys.argv) > 1 else ""
-    if argument == "all":
-        for name in ("provision", "configure", "deploy"):
-            COMMANDS[name]()
-        return
-    if argument not in COMMANDS:
+    if argument != "all" and argument not in COMMANDS:
         print(__doc__)
         sys.exit(1)
+
+    # `all` passait AVANT le `try` et sortait par son propre `return` : une
+    # DokployError pendant la voie recommandée par le README produisait une
+    # trace Python brute au lieu du « ✗ » formaté, ce que l'en-tête de ce
+    # fichier promet explicitement de ne pas faire. Les deux voies partagent
+    # désormais le même traitement d'erreur, et donc le même code de sortie.
+    sequence = ("provision", "configure", "deploy") if argument == "all" else (argument,)
     try:
-        COMMANDS[argument]()
+        for name in sequence:
+            COMMANDS[name]()
     except DokployError as exc:
         fail(str(exc))
         sys.exit(1)
