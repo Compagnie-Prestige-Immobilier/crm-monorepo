@@ -421,8 +421,21 @@
      seuil à CINQ SECONDES au total, pas à un nombre de cycles. 3 × 2,4 s
      ferait encore 7,2 s. On resserre donc le cycle à 1,6 s, ce qui donne
      3 × 1,6 s = 4,8 s : sous le seuil, sans commande de pause à inventer pour
-     une pastille de seize pixels. L'animation redémarre au remontage du
-     composant, donc à chaque nouvelle arrivée. */
+     une pastille de seize pixels.
+
+     QUAND elle rejoue, exactement : au MONTAGE de la pastille, c'est-à-dire au
+     passage de zéro non-lu à un. Une arrivée suivante, alors que le compteur
+     est déjà à un ou plus, ne change que le chiffre : React réutilise le même
+     noeud, et une animation CSS ne redémarre pas parce que son contenu change.
+     Cette ligne a longtemps affirmé le contraire (« à chaque nouvelle
+     arrivée »), ce qui est faux.
+
+     C'est aussi le comportement qu'il faut GARDER, et la raison est le calcul
+     ci-dessus : forcer le rejeu à chaque arrivée (par une `key` sur le
+     compteur) rallongerait le mouvement de 4,8 s à chaque message pendant une
+     rafale, et ferait repasser la pastille au-dessus du seuil que ce bloc
+     entier existe pour tenir. Le chiffre, lui, se met bien à jour : c'est lui
+     qui porte l'information. */
   --animate-badge-pulse: badge-pulse 1.6s var(--ease-out) 3;
 
   @keyframes bell-swing {
