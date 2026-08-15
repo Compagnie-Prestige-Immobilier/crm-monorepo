@@ -109,6 +109,41 @@ export async function rotateRefreshTokenDetailed(
   }
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Une réponse d'échec ne tue la session QUE si elle a JUGÉ le jeton.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Tout statut non 2xx valait `invalid`, c'est-à-dire « cette famille de jetons
+ * est morte », et les trois appelants qui tiennent des cookies effacent la
+ * session sur ce verdict. Or `invalid` était rendu pour des réponses qui ne
+ * disent RIEN du jeton :
+ *
+ *  - un 429. `ThrottlerGuard` est posé en garde GLOBALE (`app.module.ts`), donc
+ *    `/auth/refresh` est plafonné comme le reste, et le contrat ne déclare pour
+ *    cette route que 200 et 401 : le 429 est précisément le genre de réponse que
+ *    le client n'attendait pas. Plusieurs onglets qui reprennent la main
+ *    ensemble suffisent à le déclencher, et il déconnectait tout le monde ;
+ *  - un 502, un 503 ou un 504. C'est une passerelle ou une API en cours de
+ *    redémarrage, pas un jeton révoqué. Le jeton redeviendra valable tout seul.
+ *
+ * C'est le défaut que `rotateRefreshTokenDetailed` disait justement empêcher :
+ * sa documentation nomme « la déconnexion prématurée observée en production »,
+ * mais la distinction n'était honorée que pour un `fetch` qui LÈVE. Un serveur
+ * qui répond mal était traité plus durement qu'un serveur muet.
+ *
+ * Ne restent `invalid` que les statuts par lesquels l'API se prononce sur le
+ * jeton lui-même : 401 (révoqué, expiré, rejoué) et, par prudence, les autres
+ * refus de la famille 4xx, où c'est bien la requête qui est en cause. Le doute
+ * penche du côté qui NE détruit PAS une session valide, parce que l'erreur
+ * inverse coûte une ressaisie à l'utilisateur alors que celle-ci ne coûte qu'un
+ * message temporaire.
+ */
+function refusalReason(status: number): 'invalid' | 'unavailable' {
+  if (status === 429) return 'unavailable';
+  return status >= 500 ? 'unavailable' : 'invalid';
+}
+
 async function rotateRefreshTokenOnce(
   origin: string,
   refreshToken: string,
@@ -129,7 +164,7 @@ async function rotateRefreshTokenOnce(
     return { ok: false, reason: 'unavailable' };
   }
 
-  if (!response.ok) return { ok: false, reason: 'invalid' };
+  if (!response.ok) return { ok: false, reason: refusalReason(response.status) };
 
   try {
     const body: unknown = await response.json();
