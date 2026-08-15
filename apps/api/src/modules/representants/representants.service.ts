@@ -12,6 +12,7 @@ import { normalizePhone } from '../../common/phone.js';
 import { assertOwnership, isAdmin, ownerScope } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
+import { RepresentantSortField } from './dto.js';
 import type {
   CreateRepresentantDto,
   DeleteQueryDto,
@@ -23,6 +24,7 @@ import type {
 } from './dto.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { demoScope } from '../../prisma/demo-visibility.js';
+import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 
 export const REPRESENTANT_INCLUDE = {
   departement: { select: { name: true } },
@@ -32,6 +34,35 @@ export const REPRESENTANT_INCLUDE = {
 } satisfies Prisma.RepresentantInclude;
 
 const INCLUDE = REPRESENTANT_INCLUDE;
+
+/**
+ * Tri de la liste, toujours DÉPARTAGÉ par l'identifiant.
+ *
+ * Sans ce second critère, deux représentants saisis dans la même seconde
+ * peuvent changer de place d'une page à l'autre : la ligne 25 réapparaît en
+ * tête de la page 2 et une autre disparaît, ce qui se lit comme une perte de
+ * données. `id` est un UUID v7, donc lexicographiquement ordonné dans le temps :
+ * il départage sans jamais introduire d'ordre arbitraire.
+ *
+ * `PROSPECTS` trie sur le COMPTE de la relation, ce que Prisma sait faire par
+ * `_count`. Le calculer côté Node imposerait de charger toute la population
+ * avant de pouvoir paginer.
+ */
+function orderByFor(query: RepresentantQueryDto): Prisma.RepresentantOrderByWithRelationInput[] {
+  const direction = query.sortOrder ?? 'desc';
+
+  switch (query.sortBy) {
+    case RepresentantSortField.FULL_NAME:
+      return [{ fullName: direction }, { id: 'desc' }];
+    case RepresentantSortField.CREATED_AT:
+      return [{ createdAt: direction }, { id: 'desc' }];
+    case RepresentantSortField.PROSPECTS:
+      return [{ prospects: { _count: direction } }, { id: 'desc' }];
+    case RepresentantSortField.CLIENT_CREATED_AT:
+    default:
+      return [{ clientCreatedAt: direction }, { id: 'desc' }];
+  }
+}
 
 type RepresentantRow = Prisma.RepresentantGetPayload<{ include: typeof REPRESENTANT_INCLUDE }>;
 
@@ -83,6 +114,19 @@ export class RepresentantsService {
     if (query.departementId) where.departementId = query.departementId;
     if (query.iefId) where.iefId = query.iefId;
 
+    if (query.dateFrom || query.dateTo) {
+      where.clientCreatedAt = {
+        ...(query.dateFrom ? { gte: inclusiveDateFrom(query.dateFrom) } : {}),
+        ...(query.dateTo ? { lte: inclusiveDateTo(query.dateTo) } : {}),
+      };
+    }
+
+    // `deletedAt: null` dans les deux branches : un représentant dont toutes
+    // les fiches ont été effacées est REDEVENU dormant, et le compter comme
+    // actif ferait manquer exactement les cas qu'une relance doit rattraper.
+    if (query.hasProspects === true) where.prospects = { some: { deletedAt: null } };
+    if (query.hasProspects === false) where.prospects = { none: { deletedAt: null } };
+
     const search = query.search?.trim();
     if (search) {
       where.OR = [
@@ -96,7 +140,7 @@ export class RepresentantsService {
       this.prisma.representant.findMany({
         where,
         include: INCLUDE,
-        orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
+        orderBy: orderByFor(query),
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -110,7 +154,7 @@ export class RepresentantsService {
 
   async get(user: AuthenticatedUser, id: string): Promise<RepresentantDto> {
     const row = await this.prisma.representant.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
       include: INCLUDE,
     });
     if (!row) {
@@ -129,13 +173,24 @@ export class RepresentantsService {
    * Répond même quand la fiche appartient à un AUTRE commercial : c'est tout
    * l'objet de l'endpoint. Le commercial doit apprendre que ce représentant est
    * déjà connu et par qui, sinon il ressaisit une fiche que la contrainte
-   * d'unicité rejettera sans lui dire pourquoi. Seul le nom du propriétaire est
-   * divulgué, pas ses prospects.
+   * d'unicité rejettera sans lui dire pourquoi.
+   *
+   * MAIS SEUL LE NOM DU PROPRIÉTAIRE EST DIVULGUÉ, et c'est ce que la réponse
+   * doit refléter. La version précédente rendait le DTO COMPLET de la fiche
+   * d'autrui : nom du représentant, téléphone E.164, notes de terrain,
+   * département, nombre de prospects portés, identifiant du propriétaire. Un
+   * annuaire nominatif entier, énumérable numéro par numéro par n'importe quel
+   * compte. Ici, une fiche qui n'appartient pas à l'appelant ne rend que « ce
+   * numéro est pris, par untel » : exactement ce qui évite la double saisie,
+   * rien de plus.
+   *
+   * L'ADMIN garde la vue complète : c'est lui qui arbitre les doublons, et lui
+   * masquer la fiche rendrait l'arbitrage impossible.
    */
   async lookup(user: AuthenticatedUser, phone: string): Promise<RepresentantLookupDto> {
     const phoneE164 = normalizePhone(phone);
     const row = await this.prisma.representant.findFirst({
-      where: { phoneE164, deletedAt: null },
+      where: { phoneE164, deletedAt: null, ...demoScope(await this.demo.enabled()) },
       include: INCLUDE,
     });
 
@@ -146,6 +201,19 @@ export class RepresentantsService {
         representant: null,
         ownedByCommercialId: null,
         ownedByCommercialName: null,
+      };
+    }
+
+    if (!isAdmin(user) && row.createdById !== user.id) {
+      return {
+        found: true,
+        phoneE164,
+        representant: null,
+        // L'identifiant du propriétaire est tu lui aussi : il ne sert qu'à
+        // reconnaître SA PROPRE fiche, ce que l'appelant sait déjà quand elle
+        // lui appartient. Le nom suffit à savoir vers qui se tourner.
+        ownedByCommercialId: null,
+        ownedByCommercialName: row.createdBy.fullName,
       };
     }
 
@@ -166,7 +234,7 @@ export class RepresentantsService {
     // en poster un qui existe déjà. Écraser silencieusement la fiche d'un
     // collègue serait la pire issue possible.
     await this.assertIdAvailable(user, id);
-    await this.assertPhoneFree(phoneE164);
+    await this.assertPhoneFree(user, phoneE164);
 
     const created = await this.prisma.representant.create({
       data: {
@@ -178,6 +246,14 @@ export class RepresentantsService {
         iefId: input.iefId ?? null,
         createdById: user.id,
         clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
+        // Aucune ligne source dont hériter : un représentant est une racine,
+        // l'interrupteur décide donc seul.
+        //
+        // Sans cette valeur, la fiche saisie pendant une démonstration est
+        // une VRAIE fiche de l'annuaire : encore listée après l'extinction,
+        // comptée dans la productivité, et que rien ne désigne comme fictive,
+        // ni le filtre d'affichage ni un nettoyage ultérieur par `isDemo`.
+        isDemo: await this.demo.enabled(),
       },
       include: INCLUDE,
     });
@@ -189,7 +265,9 @@ export class RepresentantsService {
     id: string,
     input: UpdateRepresentantDto,
   ): Promise<RepresentantDto> {
-    const existing = await this.prisma.representant.findFirst({ where: { id, deletedAt: null } });
+    const existing = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+    });
     if (!existing) {
       throw new NotFoundException({
         code: 'REPRESENTANT_NOT_FOUND',
@@ -199,7 +277,7 @@ export class RepresentantsService {
     assertOwnership(user, existing);
 
     const phoneE164 = input.phone ? normalizePhone(input.phone) : undefined;
-    if (phoneE164 && phoneE164 !== existing.phoneE164) await this.assertPhoneFree(phoneE164);
+    if (phoneE164 && phoneE164 !== existing.phoneE164) await this.assertPhoneFree(user, phoneE164);
 
     const updated = await this.prisma.representant.update({
       where: { id },
@@ -219,7 +297,7 @@ export class RepresentantsService {
 
   async remove(user: AuthenticatedUser, id: string, query: DeleteQueryDto): Promise<OkDto> {
     const existing = await this.prisma.representant.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
       include: { _count: { select: { prospects: { where: { deletedAt: null } } } } },
     });
     if (!existing) {
@@ -261,6 +339,10 @@ export class RepresentantsService {
    * d'un autre en devinant un UUID.
    */
   private async assertIdAvailable(user: AuthenticatedUser, id: string): Promise<void> {
+    // LECTURE GLOBALE délibérée, sans `demoScope` : c'est la clé PRIMAIRE qui
+    // est testée, et elle est unique quel que soit le mode. Filtrer ici ferait
+    // répondre « identifiant libre » sur une ligne existante, et l'écriture
+    // suivante avorterait sur une violation de clé primaire illisible.
     const existing = await this.prisma.representant.findUnique({
       where: { id },
       select: { id: true, createdById: true },
@@ -279,23 +361,46 @@ export class RepresentantsService {
     });
   }
 
-  private async assertPhoneFree(phoneE164: string): Promise<void> {
+  /**
+   * Refuse un numéro déjà pris, sans révéler la fiche qui le porte.
+   *
+   * LECTURE GLOBALE délibérée, sans `demoScope` : l'index unique partiel
+   * `representants_phone_e164_active_key` est global, il ne connaît pas le mode
+   * démonstration. Filtrer ici ferait répondre « numéro libre » sur un numéro
+   * que la base refusera ensuite, et le commercial recevrait un 409
+   * UNIQUE_CONSTRAINT_VIOLATION générique au lieu de ce message-ci. Même
+   * raisonnement que `existingPhones` dans l'import de masse.
+   *
+   * Le corps de l'erreur suit la même règle que `lookup` : quand la fiche
+   * appartient à quelqu'un d'autre, seul le nom du propriétaire sort. Renvoyer
+   * son identifiant, son nom complet et sa date de saisie donnait à n'importe
+   * quel compte un moyen d'énumérer l'annuaire numéro par numéro, à raison
+   * d'une tentative de création par ligne.
+   */
+  private async assertPhoneFree(user: AuthenticatedUser, phoneE164: string): Promise<void> {
     const clash = await this.prisma.representant.findFirst({
       where: { phoneE164, deletedAt: null },
       include: { createdBy: { select: { id: true, fullName: true } } },
     });
     if (!clash) return;
+
+    const visible = isAdmin(user) || clash.createdById === user.id;
     throw new ConflictException({
       code: 'REPRESENTANT_PHONE_CONFLICT',
       message: 'Ce numéro est déjà enregistré pour un représentant.',
-      existing: {
-        id: clash.id,
-        fullName: clash.fullName,
-        phoneE164: clash.phoneE164,
-        ownedByCommercialId: clash.createdBy.id,
-        ownedByCommercialName: clash.createdBy.fullName,
-        createdAt: clash.createdAt.toISOString(),
-      },
+      existing: visible
+        ? {
+            id: clash.id,
+            fullName: clash.fullName,
+            phoneE164: clash.phoneE164,
+            ownedByCommercialId: clash.createdBy.id,
+            ownedByCommercialName: clash.createdBy.fullName,
+            createdAt: clash.createdAt.toISOString(),
+          }
+        : {
+            phoneE164: clash.phoneE164,
+            ownedByCommercialName: clash.createdBy.fullName,
+          },
     });
   }
 }

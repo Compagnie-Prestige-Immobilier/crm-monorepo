@@ -4,14 +4,14 @@
  * Une cellule date d'Excel est un NOMBRE de jours depuis 1900 : le format ne
  * transporte aucun fuseau. Le tableur affiche donc littéralement ce qu'on y a
  * écrit, et exceljs convertit un `Date` JavaScript en sérialisant son instant
- * UTC. Écrire l'objet brut revient donc à publier des heures UTC — un appel
+ * UTC. Écrire l'objet brut revient donc à publier des heures UTC, un appel
  * passé à 23 h 30 à Dakar apparaîtrait daté du lendemain dès que le fuseau du
  * serveur s'en écarterait.
  *
  * On réécrit donc chaque date sur son heure MURALE à Dakar avant de la
  * confier au classeur. Le décalage est aujourd'hui nul, ce qui rend la
  * transformation invisible ; elle reste néanmoins nécessaire, parce que rien
- * dans le code n'impose que le serveur tourne à l'heure de Dakar — un
+ * dans le code n'impose que le serveur tourne à l'heure de Dakar, un
  * conteneur déployé ailleurs, ou une base configurée sur un autre fuseau,
  * produirait sans elle un fichier décalé sans le moindre avertissement.
  */
@@ -51,7 +51,7 @@ export function toDakarCell(date: Date): Date {
   return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
 }
 
-/** Même heure murale, en texte — pour les noms de fichiers et les libellés. */
+/** Même heure murale, en texte, pour les noms de fichiers et les libellés. */
 export function formatDakarDate(date: Date): string {
   const { year, month, day } = wallClock(date);
   return `${String(year)}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
