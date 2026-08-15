@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -18,6 +19,39 @@ import { PURGE_STEPS } from './purge-steps.js';
  * supprimé et DANS QUEL ORDRE. Une erreur ici ne produit pas un écran fautif,
  * elle produit une base incohérente ou une transaction en échec.
  */
+
+/**
+ * Le schéma Prisma, seule source de vérité sur les tables existantes.
+ *
+ * Chemin relatif au fichier de test et non au répertoire de travail : la suite
+ * s'exécute depuis `apps/api`, mais un lancement depuis la racine du dépôt ne
+ * doit pas transformer ce contrôle en faux vert.
+ */
+const SCHEMA_PATH = new URL(
+  '../../../../../packages/database/prisma/schema.prisma',
+  import.meta.url,
+).pathname;
+
+/**
+ * Tables volontairement HORS purge, chacune pour une raison NOMMÉE.
+ *
+ * Une dispense sans motif est une table oubliée qui a trouvé où se cacher : la
+ * liste reste courte et commentée ligne à ligne.
+ */
+const PURGE_EXEMPT = new Map<string, string>([
+  [
+    'app_settings',
+    'réglages de la plateforme (mode démo, workflow) et non données métier ; la purge les remet à zéro explicitement',
+  ],
+  [
+    'demo_entities',
+    'registre du jeu de démonstration, vidé dans la MÊME transaction par DEMO_TRACKED_STEPS',
+  ],
+  [
+    'refresh_tokens',
+    'sessions, emportées en cascade avec leur compte ; les purger seules déconnecterait tout le monde sans rien effacer',
+  ],
+]);
 
 /** Sous-mot : `sequence` apparaît-elle dans `reference`, dans le même ordre ? */
 function isSubsequenceOf(
@@ -53,13 +87,97 @@ describe('catalogue des domaines', () => {
     expect(covered).toEqual([...PURGE_STEP_ORDER].sort());
   });
 
-  it('sait exécuter chaque étape déclarée', () => {
-    // Une étape ajoutée à l'ordre sans son exécution laisserait des lignes
-    // derrière une purge annoncée comme complète.
+  /**
+   * Le contrôle qui compte : la référence est le SCHÉMA, pas nous-mêmes.
+   *
+   * Comparer `PURGE_DOMAINS` à `PURGE_STEP_ORDER`, comme le faisait la version
+   * précédente, ne peut jamais échouer sur le défaut redouté : les deux listes
+   * sont écrites dans le même fichier, par la même personne, dans le même
+   * geste. Une table AJOUTÉE au schéma et oubliée des deux passe inaperçue, et
+   * la purge annoncée comme complète laisse ses lignes derrière elle.
+   *
+   * Ici la source est `schema.prisma`. Un modèle ajouté demain fait rougir ce
+   * test tant qu'il n'a pas soit son étape, soit sa dispense motivée. C'est la
+   * même mécanique que `demo-visibility.sweep.test.ts`.
+   */
+  it('couvre toutes les tables du schéma, ou les dispense avec un motif', async () => {
+    const schema = await readFile(SCHEMA_PATH, 'utf8');
+    const tables = [...schema.matchAll(/@@map\("([a-z_]+)"\)/g)].map((match) => match[1] ?? '');
+
+    expect(tables.length, 'aucun @@map lu : le chemin du schéma a bougé').toBeGreaterThan(20);
+
+    const purged = new Set(PURGE_STEP_ORDER.map((step) => PURGE_STEPS[step].table));
+    const orphelines = tables.filter((table) => !purged.has(table) && !PURGE_EXEMPT.has(table));
+
+    expect(
+      orphelines.sort(),
+      `Ces tables du schéma ne sont emportées par aucune étape de purge. Ajoutez ` +
+        `l’étape à PURGE_STEP_ORDER et son exécution à PURGE_STEPS, ou, si la table ` +
+        `ne relève délibérément pas de la purge, inscrivez-la dans PURGE_EXEMPT avec ` +
+        `son motif.\n  ${orphelines.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  it('ne déclare aucune étape sur une table absente du schéma', async () => {
+    const schema = await readFile(SCHEMA_PATH, 'utf8');
+    const tables = new Set([...schema.matchAll(/@@map\("([a-z_]+)"\)/g)].map((match) => match[1]));
+
     for (const step of PURGE_STEP_ORDER) {
-      expect(PURGE_STEPS[step]).toBeDefined();
-      expect(PURGE_STEPS[step].table).not.toBe('');
+      expect(tables.has(PURGE_STEPS[step].table), `table inconnue : ${step}`).toBe(true);
     }
+  });
+
+  /**
+   * `motif.length > 10` était vrai de toute phrase française jamais écrite : ce
+   * contrôle ne pouvait pas échouer. Ce qui peut échouer, et ce qui compte, est
+   * que la dispense porte sur une table QUI EXISTE. Une table renommée laisse
+   * derrière elle une dispense orpheline, et le nouveau nom, lui, n'est couvert
+   * par rien : la purge le laisse debout sans que personne ne le voie.
+   */
+  it('chaque dispense vise une table du schéma et porte un motif', async () => {
+    const schema = await readFile(SCHEMA_PATH, 'utf8');
+    const tables = new Set([...schema.matchAll(/@@map\("([a-z_]+)"\)/g)].map((match) => match[1]));
+
+    const fantomes: string[] = [];
+    for (const [table, motif] of PURGE_EXEMPT) {
+      expect(motif.trim(), `dispense sans motif : ${table}`).not.toBe('');
+      if (!tables.has(table)) fantomes.push(table);
+    }
+
+    expect(
+      fantomes,
+      'Ces dispenses nomment une table absente du schéma : elles ne dispensent ' +
+        'plus rien, et la table qui a pris leur place n’est couverte par aucune étape.',
+    ).toEqual([]);
+  });
+
+  /**
+   * `expect(PURGE_STEPS[step]).toBeDefined()` était garanti par le TYPE :
+   * `PURGE_STEPS` est un `Record<PurgeStepKey, PurgeStep>`, une clé manquante
+   * ne compile pas. Le contrôle ne pouvait donc pas plus échouer que le
+   * compilateur ne pouvait mentir. Ce qui n'est PAS garanti par le type, en
+   * revanche :
+   *
+   *  - qu'aucune étape déclarée ne reste hors de `PURGE_STEP_ORDER`, donc
+   *    jamais exécutée ;
+   *  - qu'aucune table ne soit visée par deux étapes, ce qui la ferait compter
+   *    deux fois dans le total annoncé avant validation.
+   */
+  it('exécute chaque étape déclarée, exactement une fois par table', () => {
+    expect(Object.keys(PURGE_STEPS).sort()).toEqual([...PURGE_STEP_ORDER].sort());
+
+    const parTable = new Map<string, PurgeStepKey[]>();
+    for (const step of PURGE_STEP_ORDER) {
+      const table = PURGE_STEPS[step].table;
+      parTable.set(table, [...(parTable.get(table) ?? []), step]);
+    }
+
+    // `users` est la seule table légitimement visée par plusieurs étapes : un
+    // domaine par rôle, et les rôles ne se recouvrent pas.
+    const doublons = [...parTable.entries()].filter(
+      ([table, steps]) => steps.length > 1 && table !== 'users',
+    );
+    expect(doublons).toEqual([]);
   });
 
   it('ne dépend que de domaines existants', () => {
@@ -78,10 +196,19 @@ describe('catalogue des domaines', () => {
 
 describe('fermeture de la sélection', () => {
   it('entraîne les dépendances transitivement', () => {
-    // Représentants → Prospects → Dossiers, Tentatives, File d'appels.
+    // Représentants -> Prospects -> Demandes de clients, Dossiers, Tentatives,
+    // File d'appels. Les demandes entrent par les prospects : une demande
+    // approuvée pointe en `Restrict` vers la fiche qu'elle a produite.
+    //
+    // `campagnesRepresentants` entre par les représentants, et en CASCADE :
+    // tâches et tentatives d'appel pendent du représentant. Sans cette arête,
+    // purger les seuls représentants les emportait sans les compter, et le
+    // rapport rendu à l'administrateur sous-estimait ce qui avait disparu.
     expect(expandPurgeSelection(['representants'])).toEqual([
       'representants',
       'prospects',
+      'campagnesRepresentants',
+      'demandesClients',
       'fileAppels',
       'tentatives',
       'dossiers',

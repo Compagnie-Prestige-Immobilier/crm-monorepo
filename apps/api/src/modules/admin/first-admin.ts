@@ -1,7 +1,7 @@
 import { Role } from '@crm/database';
 
 /**
- * Le PREMIER administrateur — le compte d'amorçage.
+ * Le PREMIER administrateur, le compte d'amorçage.
  *
  * Il n'existe pas de colonne « compte d'amorçage » dans le schéma, et en ajouter
  * une supposerait une migration pour une information déjà présente : le seed
