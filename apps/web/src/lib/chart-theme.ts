@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
  * Chart.js peint dans un `<canvas>` : les classes Tailwind et les variables CSS
  * ne l'atteignent pas. Les couleurs doivent lui être passées en valeurs
  * littérales. On les LIT donc sur `document.documentElement` au lieu de les
- * recopier en dur, pour que la source reste `globals.css` — et pour que la
+ * recopier en dur, pour que la source reste `globals.css` : et pour que la
  * bascule clair/sombre reteinte réellement les graphes plutôt que de laisser un
  * bordeaux #630210 illisible sur fond #140206.
  *
@@ -16,17 +16,17 @@ import { useEffect, useState } from 'react';
  *
  * `next-themes` pose la classe `.dark` sur `<html>` depuis SON PROPRE effet,
  * dans le `ThemeProvider`. React vide les effets passifs des ENFANTS D'ABORD.
- * Un effet dépendant de `resolvedTheme`, monté dans un graphique — donc sous le
- * provider —, s'exécutait donc AVANT que la classe ne change :
+ * Un effet dépendant de `resolvedTheme`, monté dans un graphique : donc sous le
+ * provider , s'exécutait donc AVANT que la classe ne change :
  *
  *   1. `setTheme('dark')` : le contexte change, les graphiques re-rendent ;
  *   2. l'effet du graphique lit `getComputedStyle(document.documentElement)`
- *      — mais `<html>` porte encore la classe CLAIRE ;
+ *      : mais `<html>` porte encore la classe CLAIRE ;
  *   3. la palette claire est rangée dans l'état, étiquetée « sombre » ;
- *   4. l'effet du provider ajoute enfin `.dark` — plus rien ne relit.
+ *   4. l'effet du provider ajoute enfin `.dark` : plus rien ne relit.
  *
  * Résultat observé : les graphiques restaient en permanence UNE bascule en
- * retard — bordeaux #630210 sur fond #140206 en sombre, soit exactement ce que
+ * retard : bordeaux #630210 sur fond #140206 en sombre, soit exactement ce que
  * ce module existe pour empêcher. Un `useLayoutEffect` n'y changerait rien : les
  * effets de disposition sont eux aussi vidés enfant d'abord.
  *
@@ -152,7 +152,7 @@ const GOLD_SERIES_INDEX = 1;
  * `accent-border` `#A87A15` (3,85:1) : c'est ce trait, et non le remplissage,
  * qui délimite la forme. Sans lui, l'or redevient interdit.
  *
- * Les autres séries reprennent le repli fourni par l'appelant — la couleur de
+ * Les autres séries reprennent le repli fourni par l'appelant : la couleur de
  * la carte pour un anneau, la couleur de la série pour une barre.
  */
 export function seriesBorderColor(theme: ChartTheme, index: number, fallback: string): string {

@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
  * Pastille d'étape, teintée d'après la CONFIGURATION.
  *
  * `BankCaseStageDto.color` porte un rôle du design system (`info`, `warning`,
- * `success`…), jamais un hex — c'est écrit dans le contrat, et c'est ce qui
+ * `success`…), jamais un hex : c'est écrit dans le contrat, et c'est ce qui
  * permet à une étape créée par un administrateur de rester lisible dans les
  * deux thèmes sans qu'on ait à mesurer un contraste à sa place. Une couleur
  * inconnue retombe sur la variante neutre plutôt que de casser la ligne.

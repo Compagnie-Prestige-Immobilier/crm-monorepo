@@ -159,6 +159,13 @@ catalog:
   'cmdk': '1.1.1'
   # Fait échouer le build si un module serveur est importé depuis un composant client.
   'server-only': '0.0.1'
+  # Rendu de composants React sous Vitest. `environment: 'node'` ne fournit aucun
+  # DOM : sans jsdom, aucun écran du panel ne peut être monté dans un test.
+  # `@testing-library/dom` est une dépendance de pair de `react`, donc déclarée.
+  'jsdom': '30.0.1'
+  '@testing-library/react': '16.3.2'
+  '@testing-library/dom': '10.4.1'
+  '@testing-library/user-event': '14.6.4'
 
 # ── Politique d'approvisionnement ────────────────────────────────────────────
 #

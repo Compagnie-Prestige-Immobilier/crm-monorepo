@@ -14,6 +14,7 @@ import { useBankFilters } from '@/components/bank/use-bank-filters';
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
 import { QueryErrorState } from '@/components/query-error-state';
+import { BankAgingCard } from '@/components/stats/bank-aging-card';
 import {
   StatChartCard,
   StatChartsSkeleton,
@@ -227,7 +228,7 @@ export function BanksPanel() {
               {data.byBank.map((bank) => {
                 const days = hoursToDays(bank.meanProcessingHours);
                 return (
-                  <tr key={bank.bankId}>
+                  <tr key={bank.banqueId}>
                     <th scope="row" className="px-5 py-2 text-left font-[400]">
                       {bank.label}
                     </th>
@@ -260,6 +261,11 @@ export function BanksPanel() {
           </table>
         </CardContent>
       </Card>
+
+      {/* L'ancienneté porte sa PROPRE requête : elle interroge
+          `/analytics/bank-aging`, qui prend le filtre PROSPECTS et non le
+          filtre dossiers. Les deux ne se mélangent pas, et le bloc le dit. */}
+      <BankAgingCard />
     </div>
   );
 }

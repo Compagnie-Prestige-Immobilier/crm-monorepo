@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
  *
  * La nuance est décisive et l'erreur était bien réelle : le nom accessible d'un
  * `<button>` se calcule par `aria-labelledby`, puis `aria-label`, puis son
- * propre contenu — un `<label for>` n'entre nulle part dans cette chaîne
+ * propre contenu : un `<label for>` n'entre nulle part dans cette chaîne
  * (contrairement à `input`, `select` ou `textarea`). Le `<label>` rendait donc
  * le clic pratique, et rien de plus : un lecteur d'écran annonçait « Tous les
  * commerciaux, bouton » sans jamais prononcer « Commercial ». Avec

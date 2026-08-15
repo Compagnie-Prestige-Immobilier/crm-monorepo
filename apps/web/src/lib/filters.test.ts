@@ -241,7 +241,7 @@ describe('countActiveFilters', () => {
  *
  * Ces cinq critères sont arrivés APRÈS le tableau, les graphiques et l'export.
  * S'ils avaient été rangés dans un second objet de filtre, un lien « BDD2,
- * méthode obtenue » aurait rouvert le tableau filtré et l'export non filtré —
+ * méthode obtenue » aurait rouvert le tableau filtré et l'export non filtré -
  * et personne ne s'en serait aperçu avant qu'un classeur ne parte au siège.
  * Ces tests fixent l'aller-retour et la présence dans l'export.
  */
@@ -286,7 +286,7 @@ describe('filtres de phase 2', () => {
 
 /**
  * Le classeur consolidé porte SA PROPRE segmentation, en cinq feuilles fixes.
- * Y relayer `segment=BDD2` produirait quatre feuilles vides sur cinq — et
+ * Y relayer `segment=BDD2` produirait quatre feuilles vides sur cinq : et
  * l'utilisateur ne le découvrirait qu'en ouvrant Excel.
  */
 describe('classeur consolidé', () => {

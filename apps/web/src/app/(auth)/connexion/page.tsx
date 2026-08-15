@@ -39,7 +39,7 @@ export default async function ConnexionPage({
   return (
     <main id="contenu-principal" className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
       {/* Volet de marque : bordeaux CPI, logo inversé, or réservé au MARQUAGE
-          (le filet), jamais au texte — design.md §2.3.
+          (le filet), jamais au texte : design.md §2.3.
 
           Le contenu est GROUPÉ en bas de colonne plutôt qu'étalé en
           `justify-between` : réparti sur toute la hauteur, il laissait deux

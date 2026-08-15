@@ -20,7 +20,7 @@ import { RETIRED_SUFFIX } from '@/lib/types';
  * Ce dialogue existe pour une seule raison : lever la confusion entre
  * « désactiver » et « supprimer ». Les deux mots se ressemblent, les
  * conséquences pas du tout. Il annonce donc, avec le nombre de fiches
- * concernées sous les yeux, que RIEN n'est supprimé — les prospects gardent
+ * concernées sous les yeux, que RIEN n'est supprimé : les prospects gardent
  * leur valeur et l'affichent suivie de « {RETIRED_SUFFIX} ». Sans ce compteur,
  * un administrateur désactive une banque en croyant nettoyer une liste, et
  * découvre 400 prospects marqués « retiré » le lendemain.

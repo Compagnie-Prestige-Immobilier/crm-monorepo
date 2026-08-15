@@ -6,7 +6,7 @@ import { mockCookies, type FakeCookieStore } from '@/test/cookie-store';
 /**
  * Route Handlers d'authentification.
  *
- * Ce qui est vérifié ici n'est pas « le login marche » — c'est la frontière de
+ * Ce qui est vérifié ici n'est pas « le login marche » : c'est la frontière de
  * sécurité : aucun jeton ne doit franchir la limite serveur → navigateur
  * autrement que dans un cookie `httpOnly`. Un JWT dans le corps de la réponse
  * atterrit dans le JavaScript de la page, donc à portée de la première XSS, et

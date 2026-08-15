@@ -1,5 +1,5 @@
 /**
- * Types du contrat de notification, ÉCRITS À LA MAIN — et c'est une exception
+ * Types du contrat de notification, ÉCRITS À LA MAIN : et c'est une exception
  * assumée à la règle du dépôt.
  *
  * Partout ailleurs, `apps/web` lit ses types dans
@@ -126,7 +126,7 @@ export interface CreateTemplateInput {
 export type UpdateTemplateInput = Partial<CreateTemplateInput> & { isActive?: boolean };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Libellés — français, une seule source
+// Libellés : français, une seule source
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const CATEGORY_LABELS: Record<NotificationCategory, string> = {

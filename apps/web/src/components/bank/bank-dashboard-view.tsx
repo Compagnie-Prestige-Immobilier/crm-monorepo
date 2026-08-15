@@ -42,7 +42,7 @@ import type { FilterOption } from '@/lib/types';
  * Deux propriétés le distinguent d'un simple assemblage de graphiques :
  *
  * 1. Il partage l'OBJET DE FILTRE de la liste et de l'export. Un chiffre lu ici
- *    décrit exactement la population du tableau et du classeur — c'est une
+ *    décrit exactement la population du tableau et du classeur : c'est une
  *    propriété testée côté API, on ne la casse pas côté écran en réintroduisant
  *    une seconde source de critères.
  * 2. Chaque tranche de graphique est un LIEN vers la liste correspondante.
@@ -175,7 +175,7 @@ export function BankDashboardView() {
                 items={data.byBank.map((bank): ClickableSlice => ({
                   label: bank.label,
                   value: bank.cases,
-                  onSelect: drillTo({ bankId: bank.bankId }),
+                  onSelect: drillTo({ banqueId: bank.banqueId }),
                 }))}
               />
             </ChartCard>
@@ -231,7 +231,7 @@ export function BankDashboardView() {
           </div>
 
           {/* Montants par banque : un tableau et non un graphique. Comparer des
-              sommes en francs CFA se fait sur des chiffres alignés — un axe de
+              sommes en francs CFA se fait sur des chiffres alignés : un axe de
               barres à sept chiffres est illisible, et le montant exact est
               justement ce qu'on vient chercher. */}
           <Card>
@@ -261,7 +261,7 @@ export function BankDashboardView() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {data.byBank.map((bank) => (
-                    <tr key={bank.bankId}>
+                    <tr key={bank.banqueId}>
                       <th scope="row" className="px-5 py-2 text-left font-[400]">
                         {bank.label}
                       </th>

@@ -25,7 +25,7 @@ const FULL: BankCaseFilters = {
   search: 'CPI-2026',
   stageId: 'stage-1',
   stageType: 'OPEN',
-  bankId: 'bank-1',
+  banqueId: 'bank-1',
   agentId: 'agent-1',
   rejectionReasonId: 'reason-1',
   dateFrom: '2026-01-01',
@@ -49,8 +49,8 @@ describe('aller-retour filtres ⇄ URL', () => {
   });
 
   it('la clé de cache est stable quel que soit l’ordre d’écriture', () => {
-    const a = bankFiltersQueryKey({ ...EMPTY_BANK_FILTERS, bankId: 'b', stageType: 'CASHED' });
-    const b = bankFiltersQueryKey({ ...EMPTY_BANK_FILTERS, stageType: 'CASHED', bankId: 'b' });
+    const a = bankFiltersQueryKey({ ...EMPTY_BANK_FILTERS, banqueId: 'b', stageType: 'CASHED' });
+    const b = bankFiltersQueryKey({ ...EMPTY_BANK_FILTERS, stageType: 'CASHED', banqueId: 'b' });
     expect(a).toBe(b);
   });
 
@@ -75,7 +75,7 @@ describe('analyse défensive', () => {
     expect(parseBankFilters(new URLSearchParams('amountMin=1200000')).amountMin).toBe('1200000');
   });
 
-  it('accepte une borne de 18 chiffres — la borne exacte de la colonne', () => {
+  it('accepte une borne de 18 chiffres : la borne exacte de la colonne', () => {
     const huge = '9'.repeat(18);
     expect(parseBankFilters(new URLSearchParams(`amountMax=${huge}`)).amountMax).toBe(huge);
     // Et la garde tel quel : aucun passage par un nombre en chemin.

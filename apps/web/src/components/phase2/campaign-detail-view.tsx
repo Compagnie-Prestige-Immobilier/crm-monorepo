@@ -1,18 +1,11 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  ArrowLeftIcon,
-  DownloadIcon,
-  LoaderIcon,
-  LockIcon,
-  PhoneIcon,
-  UsersIcon,
-} from 'lucide-react';
-import Link from 'next/link';
+import { DownloadIcon, LoaderIcon, LockIcon, PhoneIcon, UsersIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { DetailBackLink } from '@/components/detail-back-link';
 import { useFileDownload } from '@/components/exports/download-button';
 import { CampaignProgressBar } from '@/components/phase2/campaign-progress-bar';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -84,15 +77,27 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
 
   if (isPending) return <CampaignDetailSkeleton />;
 
+  /**
+   * Le retour à la liste est rendu AVANT l'état d'erreur, pas après.
+   *
+   * Un identifiant périmé (un signet, un lien collé dans un message, une
+   * campagne purgée) produit un 404, que `QueryErrorState` ne propose pas de
+   * rejouer : recliquer ne fera pas réapparaître la campagne. Sans ce lien,
+   * l'écran n'avait plus aucune issue, et le bouton « Précédent » du
+   * navigateur n'est pas une réponse de conception.
+   */
   if (isError) {
     return (
-      <QueryErrorState
-        error={error}
-        onRetry={() => {
-          void refetch();
-        }}
-        fallback="Cette campagne n’a pas pu être chargée."
-      />
+      <div className="flex flex-col gap-6">
+        <DetailBackLink href="/campagnes">Toutes les campagnes</DetailBackLink>
+        <QueryErrorState
+          error={error}
+          onRetry={() => {
+            void refetch();
+          }}
+          fallback="Cette campagne n’a pas pu être chargée."
+        />
+      </div>
     );
   }
 
@@ -100,12 +105,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <Button asChild variant="ghost" className="w-fit -ml-2">
-        <Link href="/campagnes">
-          <ArrowLeftIcon aria-hidden="true" />
-          Toutes les campagnes
-        </Link>
-      </Button>
+      <DetailBackLink href="/campagnes">Toutes les campagnes</DetailBackLink>
 
       <Card className="animate-rise">
         <CardHeader>
@@ -157,6 +157,17 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                 )}
               </dd>
             </div>
+            {/* L'étalement n'est affiché QUE s'il a été demandé : « Étalement :
+                1 jour » sur une campagne ordinaire ajouterait une ligne à lire
+                pour une information qui n'en est pas une. */}
+            {data.spreadDays > 1 ? (
+              <div>
+                <dt className="text-muted-foreground">Étalement</dt>
+                <dd className="font-[600] tabular-nums">
+                  {formatNumber(data.spreadDays)} journées
+                </dd>
+              </div>
+            ) : null}
           </dl>
         </CardContent>
       </Card>
@@ -172,6 +183,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
               <CommercialCard
                 campaignId={data.id}
                 campaignName={data.name}
+                spreadDays={data.spreadDays}
                 commercial={commercial}
               />
             </li>
@@ -306,13 +318,37 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
 function CommercialCard({
   campaignId,
   campaignName,
+  spreadDays,
   commercial,
 }: {
   campaignId: string;
   campaignName: string;
+  spreadDays: number;
   commercial: CampaignCommercial;
 }) {
   const { pending, download } = useFileDownload();
+
+  /**
+   * UN BOUTON PAR JOURNÉE dès que la campagne est étalée.
+   *
+   * Le bouton unique reste servi quand `spreadDays` vaut 1 : c'est le cas
+   * courant, et le remplacer par « Jour 1 » ferait poser une question là où il
+   * n'y en a pas. Au-delà, un seul bouton rendrait la liasse entière : soit
+   * plusieurs centaines de pages, ce que l'étalement existe précisément pour
+   * éviter. Le commercial ne doit pas avoir à trier son propre programme.
+   */
+  const days = spreadDays > 1 ? commercial.perDay : [];
+
+  const downloadDay = (day?: number): void => {
+    void download({
+      url: programmePdfUrl(campaignId, commercial.userId, day),
+      fileName: programmePdfFileName(campaignName, commercial.fullName, day),
+      failureMessage:
+        day === undefined
+          ? 'Le programme n’a pas pu être généré.'
+          : `Le programme du jour ${String(day)} n’a pas pu être généré.`,
+    });
+  };
 
   return (
     <Card className="h-full">
@@ -329,28 +365,59 @@ function CommercialCard({
 
         <CampaignProgressBar progress={commercial.progress} compact />
 
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-auto w-full"
-          disabled={pending || commercial.progress.total === 0}
-          onClick={() => {
-            void download({
-              url: programmePdfUrl(campaignId, commercial.userId),
-              fileName: programmePdfFileName(campaignName, commercial.fullName),
-              failureMessage: 'Le programme n’a pas pu être généré.',
-            });
-          }}
-        >
-          {pending ? (
-            <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <DownloadIcon aria-hidden="true" />
-          )}
-          {commercial.progress.total === 0
-            ? 'Aucun appel affecté'
-            : `Programme PDF (${formatNumber(commercial.progress.total)} appels)`}
-        </Button>
+        {days.length > 1 ? (
+          <div className="mt-auto flex flex-col gap-2">
+            <p className="text-[0.75rem] text-muted-foreground">
+              {formatNumber(days.length)} programmes, un par journée
+            </p>
+            <ul className="grid grid-cols-2 gap-1.5">
+              {days.map((count, index) => {
+                const day = index + 1;
+                return (
+                  <li key={day}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-between"
+                      disabled={pending || count === 0}
+                      onClick={() => {
+                        downloadDay(day);
+                      }}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <DownloadIcon className="size-3.5" aria-hidden="true" />
+                        Jour {day}
+                      </span>
+                      <span className="text-muted-foreground tabular-nums">
+                        {formatNumber(count)}
+                      </span>
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-auto w-full"
+            disabled={pending || commercial.progress.total === 0}
+            onClick={() => {
+              downloadDay();
+            }}
+          >
+            {pending ? (
+              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <DownloadIcon aria-hidden="true" />
+            )}
+            {commercial.progress.total === 0
+              ? 'Aucun appel affecté'
+              : `Programme PDF (${formatNumber(commercial.progress.total)} appels)`}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

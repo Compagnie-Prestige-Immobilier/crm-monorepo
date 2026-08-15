@@ -10,7 +10,7 @@ import {
 import type { Role } from '@/lib/types';
 
 /**
- * Purge de la base et supervision des comptes — `GET|POST /admin/purge`,
+ * Purge de la base et supervision des comptes : `GET|POST /admin/purge`,
  * `GET /admin/supervision`. Premier administrateur et ADMIN, respectivement.
  *
  * Toute la logique de décision vit ICI, en fonctions pures, pour qu'elle soit
@@ -176,7 +176,7 @@ export function selectionRows(
  *  - le compte est le premier administrateur ;
  *  - au moins un domaine est coché ;
  *  - l'identifiant a été ressaisi à l'identique ;
- *  - aucun appel n'est déjà en cours — sans quoi un double-clic envoie deux
+ *  - aucun appel n'est déjà en cours : sans quoi un double-clic envoie deux
  *    purges, et la seconde échoue bruyamment au moment où la première réussit.
  */
 export function canSubmitPurge(input: {
@@ -234,25 +234,56 @@ export interface Supervision {
   counts: { online: number; recent: number; away: number };
 }
 
-const PRESENCE_STATES: readonly string[] = ['ONLINE', 'RECENT', 'AWAY'];
-const ROLES: readonly string[] = ['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE'];
+const PRESENCE_STATES = ['ONLINE', 'RECENT', 'AWAY'] as const satisfies readonly PresenceState[];
 
+/**
+ * Les rôles du CONTRAT, et non un tableau de chaînes.
+ *
+ * `readonly string[]` acceptait n'importe quoi : la liste pouvait dériver du
+ * contrat sans que rien ne le signale. Typée `readonly Role[]`, elle est
+ * vérifiée par le compilateur, et `ROLE_LABELS` ci-contre casse déjà le build si
+ * un rôle est ajouté sans libellé.
+ */
+const ROLES = ['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE'] as const satisfies readonly Role[];
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Une valeur inconnue DÉGRADE la ligne ; elle ne fait pas tomber l'écran.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Ces deux contrôles LEVAIENT. Comme `parseSupervision` analyse la réponse
+ * entière d'un bloc, un seul compte portant un rôle que le panel ne connaît pas
+ * encore : un rôle livré côté API avant que le panel ne soit redéployé -
+ * emportait la Supervision TOUT ENTIÈRE. L'écran qui sert à savoir qui est en
+ * ligne devenait le premier à disparaître, précisément le jour d'une mise en
+ * production.
+ *
+ * On replie donc sur une valeur sûre plutôt que de refuser la page :
+ *  - une présence inconnue vaut `AWAY`, l'état le moins affirmatif : dire
+ *    « inactif » de quelqu'un qui est peut-être connecté induit moins en erreur
+ *    que l'inverse ;
+ *  - un rôle inconnu vaut `COMMERCIAL`, le rôle par défaut du terrain. La ligne
+ *    reste listée, nommée, avec sa dernière activité : c'est cette information
+ *    que l'écran doit rendre, pas la taxonomie des rôles.
+ *
+ * Les champs STRUCTURANTS (identifiant, nom, dates) continuent, eux, de lever :
+ * une ligne sans identifiant n'est pas une ligne dégradée, c'est une réponse
+ * dont la forme a changé.
+ */
 function parseSupervisedUser(value: unknown, where: string): SupervisedUser {
   const row = asRecord(value, where);
   const presence = asString(row.presence, `${where}.presence`);
   const role = asString(row.role, `${where}.role`);
-  if (!PRESENCE_STATES.includes(presence)) throw new Error(`${where}.presence inconnu`);
-  if (!ROLES.includes(role)) throw new Error(`${where}.role inconnu`);
 
   return {
     id: asString(row.id, `${where}.id`),
     fullName: asString(row.fullName, `${where}.fullName`),
     username: asString(row.username, `${where}.username`),
     email: asString(row.email, `${where}.email`),
-    role: role as Role,
+    role: knownRole(role),
     isActive: asBoolean(row.isActive, `${where}.isActive`),
     departementName: asNullableString(row.departementName, `${where}.departementName`),
-    presence: presence as PresenceState,
+    presence: knownPresence(presence),
     hasLiveSession: asBoolean(row.hasLiveSession, `${where}.hasLiveSession`),
     sessionCount: asNumber(row.sessionCount, `${where}.sessionCount`),
     lastSeenAt: asNullableString(row.lastSeenAt, `${where}.lastSeenAt`),
@@ -260,6 +291,15 @@ function parseSupervisedUser(value: unknown, where: string): SupervisedUser {
     lastSyncAt: asNullableString(row.lastSyncAt, `${where}.lastSyncAt`),
     lastWriteAt: asNullableString(row.lastWriteAt, `${where}.lastWriteAt`),
   };
+}
+
+/** Repli explicite, plutôt qu'un `as` qui mentirait au compilateur. */
+export function knownRole(value: string): Role {
+  return (ROLES as readonly string[]).includes(value) ? (value as Role) : 'COMMERCIAL';
+}
+
+export function knownPresence(value: string): PresenceState {
+  return (PRESENCE_STATES as readonly string[]).includes(value) ? (value as PresenceState) : 'AWAY';
 }
 
 function parseSupervision(value: unknown): Supervision {

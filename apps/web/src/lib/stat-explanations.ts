@@ -7,7 +7,7 @@
  *
  * Elle répond à une seule question : que compte ce nombre, et sur quelle
  * population. Elle ne décrit ni les appels d'API, ni le cache, ni la
- * synchronisation, ni la façon dont l'écran est construit — rien de tout cela
+ * synchronisation, ni la façon dont l'écran est construit : rien de tout cela
  * n'aide un directeur à décider.
  *
  * Une ou deux phrases. Au-delà, personne ne lit, et une bulle qu'on ne lit pas
@@ -46,6 +46,23 @@ export const STAT_KEYS = [
   'bankCashingsOverTime',
   'bankByStage',
   'bankByRejectionReason',
+
+  // ── Volet campagnes ──────────────────────────────────────────────────────
+  'campaignContactRate',
+  'campaignReachRate',
+  'campaignAttemptsPerMethod',
+  'campaignRemaining',
+  'campaignClosedPerDay',
+  'campaignClosedPerCommercial',
+  'dataQuality',
+
+  // ── Tuiles ajoutées aux volets existants ─────────────────────────────────
+  'delayLegs',
+  'weeklyCohorts',
+  'representantProductivity',
+  'departementYield',
+  'originBreakdown',
+  'bankAging',
 
   // ── Entonnoir et argent, en tête du tableau de bord ──────────────────────
   'moneyCashed',
@@ -98,6 +115,34 @@ export const STAT_EXPLANATIONS: Record<StatKey, string> = {
   bankByStage: 'Dossiers actuellement positionnés sur chaque étape du flux de traitement.',
   bankByRejectionReason:
     'Répartition des motifs de rejet. Elle nomme la cause la plus fréquente de perte d’un dossier.',
+
+  campaignContactRate:
+    'Part des fiches de la campagne ayant reçu au moins un appel. Elle mesure l’avancement du travail, pas son résultat.',
+  campaignReachRate:
+    'Part des appels qui ont abouti à quelqu’un. Les numéros injoignables et les faux numéros en sont exclus : ils disent la qualité de la base, pas celle du téléconseil.',
+  campaignAttemptsPerMethod:
+    'Nombre moyen d’appels nécessaires pour obtenir une méthode d’enrôlement. Plus il monte, plus la base résiste.',
+  campaignRemaining:
+    'Fiches encore à appeler, et date de fin projetée à la cadence des sept derniers jours. Sans cadence observée, aucune date n’est annoncée.',
+  campaignClosedPerDay:
+    'Fiches clôturées chaque jour, tous téléconseillers confondus. La pente donne la cadence réelle de la campagne.',
+  campaignClosedPerCommercial:
+    'Fiches clôturées par chaque téléconseiller. Le classement porte sur les fiches abouties, pas sur le nombre d’appels passés.',
+  dataQuality:
+    'Part de numéros injoignables ou erronés, par représentant ayant apporté les fiches. Elle désigne l’origine d’une base inexploitable.',
+
+  delayLegs:
+    'Durées médianes des trois tronçons de la chaîne, du prospect saisi au dossier encaissé. La médiane, et non la moyenne, pour qu’un dossier oublié six mois ne déplace pas le chiffre.',
+  weeklyCohorts:
+    'Suivi des prospects par semaine d’entrée, jusqu’à l’encaissement. La seule mesure qui distingue une amélioration réelle d’un simple effet de volume.',
+  representantProductivity:
+    'Prospects apportés par représentant et part convertie. Un représentant dormant n’a rien apporté depuis le seuil indiqué.',
+  departementYield:
+    'Rendement par département : conversion et montant encaissé, pas seulement volume de fiches.',
+  originBreakdown:
+    'Répartition des fiches selon leur provenance. Une fiche née d’une demande bancaire n’a pas de représentant de terrain, et se compte à part.',
+  bankAging:
+    'Ancienneté des dossiers encore ouverts, par étape. Elle désigne l’étape qui bloque, là où l’entonnoir ne donne qu’un volume.',
 
   moneyCashed:
     'Somme des montants des dossiers encaissés, sur la sélection courante. C’est la seule étape de la chaîne qui rapporte.',

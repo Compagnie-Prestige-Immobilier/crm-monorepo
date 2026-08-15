@@ -1,5 +1,5 @@
 /**
- * Mouvement — docs/design.md §7, transposé en JavaScript.
+ * Mouvement : docs/design.md §7, transposé en JavaScript.
  *
  * Le CSS couvre tout ce qui est déclaratif. Restent les valeurs qu'un moteur
  * de rendu ne sait pas interpoler : le CONTENU TEXTUEL d'un compteur. Aucune
@@ -12,11 +12,11 @@
  * et l'œil voit très bien deux ralentissements qui ne finissent pas ensemble.
  */
 
-/** §7 — micro-retours. */
+/** §7 : micro-retours. */
 export const DUR_1_MS = 150;
-/** §7 — transitions de composant. C'est la durée d'une valeur qui change. */
+/** §7 : transitions de composant. C'est la durée d'une valeur qui change. */
 export const DUR_2_MS = 220;
-/** §7 — transitions d'écran. */
+/** §7 : transitions d'écran. */
 export const DUR_3_MS = 300;
 
 /**
@@ -24,7 +24,7 @@ export const DUR_3_MS = 300;
  *
  * Une courbe de Bézier est paramétrée par `t`, pas par `x` : `bezier(0.5)` ne
  * donne PAS la valeur à mi-parcours du temps. Il faut d'abord retrouver le `t`
- * dont l'abscisse vaut le temps écoulé, ce que fait Newton-Raphson ci-dessous —
+ * dont l'abscisse vaut le temps écoulé, ce que fait Newton-Raphson ci-dessous -
  * c'est la méthode des navigateurs eux-mêmes.
  *
  * Sans cette inversion, `cubic-bezier(0.34, 1.56, 0.64, 1)` (le rebond) rendrait
@@ -60,7 +60,7 @@ export function cubicBezier(
       if (Math.abs(error) < 1e-6) break;
       const slope = slopeX(t);
       // Pente nulle : Newton diverge. On s'arrête plutôt que de partir à
-      // l'infini — la valeur courante est déjà proche.
+      // l'infini : la valeur courante est déjà proche.
       if (Math.abs(slope) < 1e-6) break;
       t -= error / slope;
     }
@@ -69,10 +69,10 @@ export function cubicBezier(
   };
 }
 
-/** §7 — entrées et sorties. */
+/** §7 : entrées et sorties. */
 export const easeOut = cubicBezier(0.22, 1, 0.36, 1);
 
-/** §7 — confirmations, rebond léger. */
+/** §7 : confirmations, rebond léger. */
 export const easeSpring = cubicBezier(0.34, 1.56, 0.64, 1);
 
 /**

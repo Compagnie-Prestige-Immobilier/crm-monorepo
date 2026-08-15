@@ -40,7 +40,7 @@ const NO_DEPARTEMENT = '__aucun__';
  * Création et modification d'un compte commercial.
  *
  * Un seul composant pour les deux : les champs sont identiques à un près (le
- * mot de passe, exigé à la création et jamais modifiable ici — la
+ * mot de passe, exigé à la création et jamais modifiable ici : la
  * réinitialisation passe par un endpoint dédié). Deux formulaires jumeaux
  * finissent toujours par diverger sur une validation.
  */

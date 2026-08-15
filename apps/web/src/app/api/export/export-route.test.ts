@@ -8,7 +8,7 @@ import { mockCookies, type FakeCookieStore } from '@/test/cookie-store';
  *
  * Deux exigences que rien d'autre ne couvre :
  *
- *  - Le fichier doit arriver comme un vrai `.xlsx` — bon `Content-Type`, bon
+ *  - Le fichier doit arriver comme un vrai `.xlsx` : bon `Content-Type`, bon
  *    `Content-Disposition`. Un octet-stream nommé sans extension s'ouvre dans
  *    le navigateur au lieu d'Excel.
  *  - En cas d'échec amont, surtout PAS de fichier de repli. Un `.xlsx`
@@ -108,6 +108,49 @@ describe('export en régime normal', () => {
     expect(upstream.searchParams.has('page')).toBe(false);
     expect(upstream.searchParams.has('pageSize')).toBe(false);
     expect(upstream.searchParams.has('sortBy')).toBe(false);
+  });
+
+  /**
+   * Les marques de démonstration ne se perdent pas au relais.
+   *
+   * L'API pose `X-Demo-Mode` et suffixe le nom en `-DEMONSTRATION` ; ce relais
+   * reconstruit ses en-têtes, et les laissait donc tomber tous les deux. C'est
+   * le SEUL chemin par lequel un utilisateur télécharge un classeur : un
+   * fichier de chiffres fictifs arrivait dans Téléchargements sous le nom d'un
+   * vrai export, puis repartait par courriel sans aucune marque extérieure.
+   */
+  it('relaie `X-Demo-Mode` et suffixe le nom du fichier en mode démonstration', async () => {
+    fetchMock.mockResolvedValueOnce(json(SESSION_USER)).mockResolvedValueOnce(
+      new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), {
+        status: 200,
+        headers: { 'Content-Type': XLSX_MIME, 'X-Demo-Mode': 'true' },
+      }),
+    );
+    const { GET } = await import('@/app/api/export/prospects/route');
+
+    const response = await GET(exportRequest());
+
+    expect(response.headers.get('X-Demo-Mode')).toBe('true');
+    expect(response.headers.get('Content-Disposition')).toMatch(
+      /^attachment; filename="cpi-prospects-\d{4}-\d{2}-\d{2}-DEMONSTRATION\.xlsx"$/,
+    );
+  });
+
+  it('annonce explicitement l’absence de mode démonstration', async () => {
+    // Toujours posé, `true` comme `false` : un en-tête absent est ambigu, et le
+    // client ne doit pas avoir à deviner.
+    fetchMock.mockResolvedValueOnce(json(SESSION_USER)).mockResolvedValueOnce(
+      new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), {
+        status: 200,
+        headers: { 'Content-Type': XLSX_MIME, 'X-Demo-Mode': 'false' },
+      }),
+    );
+    const { GET } = await import('@/app/api/export/prospects/route');
+
+    const response = await GET(exportRequest());
+
+    expect(response.headers.get('X-Demo-Mode')).toBe('false');
+    expect(response.headers.get('Content-Disposition')).not.toContain('DEMONSTRATION');
   });
 
   it('n’envoie pas à l’API un paramètre inventé dans l’URL', async () => {

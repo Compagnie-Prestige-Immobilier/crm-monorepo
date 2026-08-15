@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright — parcours de bout en bout contre une pile VIVANTE.
+ * Playwright : parcours de bout en bout contre une pile VIVANTE.
  *
  * `test:e2e` était déclaré dans `package.json` sans ce fichier : la commande
  * échouait immédiatement, faute de configuration.
@@ -14,7 +14,7 @@ import { defineConfig, devices } from '@playwright/test';
  * L'API NestJS n'est PAS démarrée ici : elle porte une base de données et des
  * migrations, et la faire tomber en cours de suite laisserait des données à
  * moitié écrites. On la suppose lancée (`pnpm --filter @crm/api dev`) et on
- * échoue avec un message clair si elle manque — voir `e2e/global-setup.ts`.
+ * échoue avec un message clair si elle manque, voir `e2e/global-setup.ts`.
  */
 
 const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
@@ -48,7 +48,7 @@ export default defineConfig({
        * Les parcours `*.anon.spec.ts` sont explicitement EXCLUS d'ici.
        *
        * Sans cette exclusion ils tourneraient deux fois : une fois dans le
-       * projet anonyme, et une fois ici — mais avec la session déjà posée.
+       * projet anonyme, et une fois ici, mais avec la session déjà posée.
        * « Se connecter » n'existe pas sur un panel déjà ouvert : `/connexion`
        * renvoie vers le tableau de bord, et le test échoue en cherchant un
        * champ e-mail que le serveur n'a jamais rendu.
@@ -66,7 +66,7 @@ export default defineConfig({
     },
   ],
   /**
-   * Le serveur Next est démarré si le port est libre, et réutilisé sinon —
+   * Le serveur Next est démarré si le port est libre, et réutilisé sinon :
    * pendant le développement, on garde son `pnpm dev` ouvert.
    */
   webServer: {

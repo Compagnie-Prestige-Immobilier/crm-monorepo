@@ -16,12 +16,12 @@ import {
 import { rotateRefreshTokenDetailed } from '@/lib/api/tokens';
 
 /**
- * Relais `/api/v1/*` — la seule voie par laquelle le navigateur atteint NestJS.
+ * Relais `/api/v1/*` : la seule voie par laquelle le navigateur atteint NestJS.
  *
  * Raison d'être : le jeton d'accès vit dans un cookie `httpOnly`. Le JavaScript
  * de la page ne peut donc pas poser l'en-tête `Authorization`, et un appel
  * direct au backend partirait anonyme. Le client généré tourne pourtant bien
- * dans le navigateur — il vise simplement l'origine de Next, et c'est ici que
+ * dans le navigateur : il vise simplement l'origine de Next, et c'est ici que
  * le jeton est rattaché.
  *
  * Bénéfice qui n'est pas un effet de bord : le panel n'a aucun besoin de CORS,
@@ -41,8 +41,20 @@ type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
  */
 const FORWARDED_REQUEST_HEADERS = ['content-type', 'accept', 'accept-language'];
 
-/** En-têtes recopiés vers le navigateur. */
-const FORWARDED_RESPONSE_HEADERS = ['content-type', 'content-disposition', 'content-length'];
+/**
+ * En-têtes recopiés vers le navigateur.
+ *
+ * `x-demo-mode` en fait partie : c'est la marque hors fichier que l'API pose
+ * sur tout export produit en mode démonstration. Les exports de représentants
+ * et les programmes PDF passent par CE relais ; le laisser tomber livrait un
+ * classeur de chiffres fictifs sans qu'aucune marque extérieure ne subsiste.
+ */
+const FORWARDED_RESPONSE_HEADERS = [
+  'content-type',
+  'content-disposition',
+  'content-length',
+  'x-demo-mode',
+];
 
 function buildUpstreamUrl(segments: string[], search: string): string {
   // `encodeURIComponent` par segment : un identifiant tordu ne doit pas pouvoir

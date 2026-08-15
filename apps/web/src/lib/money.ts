@@ -4,14 +4,14 @@
  *
  * La colonne est un `Decimal(18,0)` : 18 chiffres, soit jusqu'à
  * 999 999 999 999 999 999 FCFA. `Number.MAX_SAFE_INTEGER` s'arrête à
- * 9 007 199 254 740 991 — quinze chiffres et demi. Un `Number(montant)` sur un
+ * 9 007 199 254 740 991 : quinze chiffres et demi. Un `Number(montant)` sur un
  * portefeuille consolidé perd donc des unités SILENCIEUSEMENT, et le total
  * affiché diverge de celui du classeur Excel sans qu'aucune erreur ne soit
  * levée. Ce module ne fait donc que du texte : découpage en tranches de trois
  * chiffres, jamais d'arithmétique flottante.
  *
  * `Intl.NumberFormat` n'est pas utilisé sur un `number` pour la même raison. Il
- * l'est en revanche sur un `bigint`, qui est exact quelle que soit la taille —
+ * l'est en revanche sur un `bigint`, qui est exact quelle que soit la taille -
  * mais on garde le chemin manuel comme repli, parce qu'un montant mal formé
  * (chaîne vide, `null`, valeur inattendue) ne doit pas faire tomber une ligne
  * de tableau.
@@ -45,7 +45,7 @@ export function groupDigits(digits: string): string {
  * `"1200000"` → `"1 200 000 FCFA"`.
  *
  * Une valeur nulle ou absente rend `placeholder` : « 0 FCFA » et « pas de
- * montant » ne sont pas la même information — un dossier en cours d'instruction
+ * montant » ne sont pas la même information : un dossier en cours d'instruction
  * n'a AUCUN montant, il n'a pas un montant nul.
  */
 export function formatXof(value: string | null | undefined, placeholder = '–'): string {
@@ -179,7 +179,7 @@ export function sumXof(values: readonly (string | null | undefined)[]): string {
  *
  * Chart.js ne trace que des `number` : c'est le seul endroit où la conversion
  * est inévitable. Elle est isolée ici, nommée pour ce qu'elle est, et jamais
- * réutilisée pour un affichage ou un calcul — la valeur écrite à l'écran vient
+ * réutilisée pour un affichage ou un calcul : la valeur écrite à l'écran vient
  * toujours de `formatXof` sur la chaîne d'origine.
  */
 export function xofToChartNumber(value: string | null | undefined): number {

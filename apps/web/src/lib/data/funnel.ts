@@ -3,7 +3,7 @@ import { toFilterQuery } from '@/lib/api/query-params';
 import type { ProspectFilters } from '@/lib/types';
 
 /**
- * `GET /analytics/funnel` — l'entonnoir complet et les montants encaissés.
+ * `GET /analytics/funnel` : l'entonnoir complet et les montants encaissés.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * Pourquoi le montant est une CHAÎNE, de bout en bout.
@@ -67,7 +67,7 @@ export interface Funnel {
  *
  * Un nombre est refusé au lieu d'être converti. La conversion serait
  * silencieuse et le montant affiché deviendrait faux à partir du seizième
- * chiffre — exactement le genre de dérive qu'on ne remarque qu'en comparant
+ * chiffre : exactement le genre de dérive qu'on ne remarque qu'en comparant
  * avec la comptabilité, des semaines plus tard.
  */
 function asMoney(value: unknown, where: string): string {

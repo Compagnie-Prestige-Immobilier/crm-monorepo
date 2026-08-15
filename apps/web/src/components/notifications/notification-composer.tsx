@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { dakarLocalToIso, formatDakarDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { cn } from '@/lib/utils';
 import { AndroidPreview } from './android-preview';
@@ -59,8 +60,8 @@ import {
  *
  * DEUX ÉTAPES, ET LA SECONDE N'EST PAS DÉCORATIVE. Envoyer à 400 personnes ne
  * s'annule pas : la notification est sur les téléphones. L'étape de
- * confirmation existe pour qu'un nombre de destinataires — calculé par le
- * SERVEUR, avec exactement le filtre de l'envoi — soit lu avant que le geste
+ * confirmation existe pour qu'un nombre de destinataires : calculé par le
+ * SERVEUR, avec exactement le filtre de l'envoi : soit lu avant que le geste
  * ne devienne irréversible. Le bouton d'envoi reste bloqué tant que ce nombre
  * n'a pas abouti : confirmer sans l'avoir vu annulerait tout l'intérêt de
  * l'étape.
@@ -123,7 +124,7 @@ export function NotificationComposer({
 
   const template = templates.data?.items.find((item) => item.id === templateId);
 
-  // Le texte affiché — et envoyé — est le texte SUBSTITUÉ. L'aperçu montre donc
+  // Le texte affiché : et envoyé : est le texte SUBSTITUÉ. L'aperçu montre donc
   // exactement ce qui partira, gabarit compris.
   const rendered = useMemo(
     () => renderNotification(title, body, variables),
@@ -132,8 +133,18 @@ export function NotificationComposer({
 
   const audienceIssue = audienceProblem(selection);
   const routeIssue = routeProblem(route);
+  /**
+   * L'heure saisie est lue à DAKAR, pas dans le fuseau du poste.
+   *
+   * `<input type="datetime-local">` rend une chaîne sans fuseau. `new Date()`
+   * l'interprétait donc localement : un administrateur en déplacement à Paris
+   * qui programmait « 9 h » envoyait à 7 h, heure de Dakar, à quatre cents
+   * personnes, et rien à l'écran ne le disait. `dakarLocalToIso` fixe le
+   * décalage (UTC+00:00 toute l'année, pas d'heure d'été au Sénégal).
+   */
+  const scheduledIso = when === 'later' ? dakarLocalToIso(scheduledFor) : null;
   const scheduleIssue =
-    when === 'later' && (scheduledFor === '' || new Date(scheduledFor).getTime() <= Date.now())
+    when === 'later' && (scheduledIso === null || Date.parse(scheduledIso) <= Date.now())
       ? 'Choisissez une date et une heure à venir.'
       : null;
 
@@ -167,7 +178,7 @@ export function NotificationComposer({
         ...(selection.audienceUserIds.length === 0
           ? {}
           : { audienceUserIds: selection.audienceUserIds }),
-        ...(when === 'later' ? { scheduledFor: new Date(scheduledFor).toISOString() } : {}),
+        ...(when === 'later' && scheduledIso !== null ? { scheduledFor: scheduledIso } : {}),
         ...(templateId === '' ? {} : { templateId }),
       }),
     onSuccess: (created) => {
@@ -496,14 +507,22 @@ export function NotificationComposer({
                 {when === 'later' ? (
                   <Field label="Date et heure" required error={scheduleIssue ?? undefined}>
                     {(props) => (
-                      <Input
-                        {...props}
-                        type="datetime-local"
-                        value={scheduledFor}
-                        onChange={(event) => {
-                          setScheduledFor(event.target.value);
-                        }}
-                      />
+                      <>
+                        <Input
+                          {...props}
+                          type="datetime-local"
+                          value={scheduledFor}
+                          onChange={(event) => {
+                            setScheduledFor(event.target.value);
+                          }}
+                        />
+                        {/* Le fuseau du CHAMP, dit une fois, sous le champ :
+                            l'entrée `datetime-local` n'en porte aucun, et le
+                            navigateur affiche l'heure du poste sans l'annoncer. */}
+                        <p className="mt-1 text-[0.75rem] text-muted-foreground">
+                          Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste.
+                        </p>
+                      </>
                     )}
                   </Field>
                 ) : null}
@@ -702,9 +721,12 @@ function ConfirmationStep({
               ) : (
                 <Badge variant="info">Programmé, annulable jusqu’au départ</Badge>
               )}
-              {when === 'later' && scheduledFor !== '' ? (
+              {/* Le fuseau est ÉCRIT, pas déduit : c'est la dernière ligne lue
+                  avant d'engager un envoi, et « 09:00 » ne veut rien dire pour
+                  quelqu'un qui n'est pas à Dakar ce jour-là. */}
+              {when === 'later' && formatDakarDateTime(scheduledFor) !== null ? (
                 <span className="ml-2 text-muted-foreground">
-                  {new Date(scheduledFor).toLocaleString('fr-SN')}
+                  {formatDakarDateTime(scheduledFor)}
                 </span>
               ) : null}
             </dd>

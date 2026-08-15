@@ -11,7 +11,7 @@ import { expect, test, type Page } from '@playwright/test';
  *
  * Le compte BANQUE_FINANCE utilisé vient du JEU DE DÉMONSTRATION : il n'existe
  * donc que pendant que le mode est actif. Les parcours sont ignorés proprement
- * sinon — c'est préférable à un échec qui accuserait le code alors que la
+ * sinon, c'est préférable à un échec qui accuserait le code alors que la
  * précondition manque.
  *
  * `.anon.spec.ts` : ces parcours doivent partir d'un navigateur VIERGE, sans

@@ -8,6 +8,7 @@ import { navTitle } from '@/components/layout/nav-items';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { UserMenu } from '@/components/layout/user-menu';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import type { SessionUser } from '@/lib/types';
@@ -57,6 +58,12 @@ export function Topbar({ user }: { user: SessionUser }) {
         {title}
       </h1>
 
+      {/* La cloche n'est montée que pour les rôles qui reçoivent réellement des
+          notifications dans le panel : l'ADMIN (demandes de création de client,
+          rappels système) et l'agent BANQUE_FINANCE (réponse à ses demandes,
+          dossiers sans mouvement). Un COMMERCIAL n'entre pas dans le panel, et
+          poser une cloche toujours vide serait une promesse non tenue. */}
+      {user.role === 'ADMIN' || user.role === 'BANQUE_FINANCE' ? <NotificationBell /> : null}
       <ThemeToggle />
       <UserMenu user={user} />
     </header>

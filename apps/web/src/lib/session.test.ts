@@ -13,8 +13,8 @@ import { mockCookies, type FakeCookieStore } from '@/test/cookie-store';
  *
  * ...alors que `cpi_at` et `cpi_rt` étaient tous deux valides. La cause : un
  * `catch` qui renvoyait `null` pour n'importe quelle exception. L'utilisateur
- * était déconnecté par une pointe de charge, se reconnectait — consommant le
- * quota de connexion, 10/min — et se faisait éjecter de nouveau.
+ * était déconnecté par une pointe de charge, se reconnectait : consommant le
+ * quota de connexion, 10/min : et se faisait éjecter de nouveau.
  */
 
 const ACCESS = 'access.jwt';
@@ -80,7 +80,7 @@ describe('readSession', () => {
     expect((await readSession()).status).toBe('anonymous');
   });
 
-  it('rend « unavailable » — PAS « anonymous » — sur un 429', async () => {
+  it('rend « unavailable » : PAS « anonymous » : sur un 429', async () => {
     // LE test de non-régression. Auparavant : `null`, donc redirection vers
     // /connexion malgré une session parfaitement valide.
     fetchMock.mockResolvedValue(json({ statusCode: 429, message: 'Too Many Requests' }, 429));

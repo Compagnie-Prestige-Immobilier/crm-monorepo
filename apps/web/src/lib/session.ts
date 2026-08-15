@@ -9,7 +9,7 @@ import { fetchSessionUser } from '@/lib/data/auth';
 import type { SessionUser } from '@/lib/types';
 
 /**
- * Session du panel — surface publique côté serveur.
+ * Session du panel : surface publique côté serveur.
  *
  * Le stockage lui-même (cookies `httpOnly`, rotation du refresh token) vit dans
  * `src/lib/api/server.ts`, avec le client qui les consomme : séparer les deux
@@ -54,13 +54,13 @@ export type SessionResult =
  *
  * Défaut corrigé ici, observé en conditions réelles : la version précédente
  * avalait TOUTE exception et renvoyait `null`, que le jeton soit refusé ou que
- * l'API soit simplement injoignable. Conséquence constatée dans les journaux —
+ * l'API soit simplement injoignable. Conséquence constatée dans les journaux -
  * `GET /auth/me` répond 429 (limiteur de débit de l'API, 300 req/min), la
  * session est déclarée absente, et `/tableau-de-bord` renvoie un 307 vers
  * `/connexion` alors que les DEUX cookies sont valides.
  *
- * Le pire est la boucle : l'administrateur, éjecté, se reconnecte — ce qui
- * consomme le quota de connexion (10/min) — et se fait éjecter de nouveau. Une
+ * Le pire est la boucle : l'administrateur, éjecté, se reconnecte : ce qui
+ * consomme le quota de connexion (10/min) : et se fait éjecter de nouveau. Une
  * pointe de charge devient une panne d'authentification totale.
  */
 export async function readSession(): Promise<SessionResult> {
@@ -119,8 +119,8 @@ export async function getAdminSession(): Promise<SessionUser | null> {
  * Garde de rôle pour une page serveur.
  *
  * Trois issues, et elles ne se confondent pas :
- *  - `null` : pas de session — l'appelant redirige vers `/connexion` ;
- *  - `{ denied: true }` : session valide, rôle insuffisant — l'appelant rend un
+ *  - `null` : pas de session : l'appelant redirige vers `/connexion` ;
+ *  - `{ denied: true }` : session valide, rôle insuffisant : l'appelant rend un
  *    refus explicite, PAS une redirection. Rebondir vers l'accueil laisserait
  *    croire à un lien mort là où la vraie réponse est « ce n'est pas votre
  *    écran » ;

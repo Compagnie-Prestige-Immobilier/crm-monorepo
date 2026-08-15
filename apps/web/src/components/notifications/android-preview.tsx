@@ -18,7 +18,7 @@ import { previewClamp } from './template';
  * troncatures qu'une notification repliée, même hiérarchie (nom de
  * l'application, titre, corps), même horodatage.
  *
- * Ce n'est pas un rendu fidèle au pixel d'une ROM Android donnée — il n'y en a
+ * Ce n'est pas un rendu fidèle au pixel d'une ROM Android donnée : il n'y en a
  * pas deux identiques. C'est un modèle honnête des limites communes à toutes.
  */
 

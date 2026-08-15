@@ -10,9 +10,11 @@ import {
   PowerIcon,
   PowerOffIcon,
 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import { SearchField } from '@/components/filters/search-field';
 import { DeactivateReferentielDialog } from '@/components/referentiels/deactivate-dialog';
 import {
   BanqueFormDialog,
@@ -51,17 +53,56 @@ import { cn } from '@/lib/utils';
  *
  * Ces trois listes descendent EN LECTURE SEULE vers l'application mobile. Toute
  * modification faite ici change ce que les commerciaux peuvent choisir lors de
- * leur prochaine synchronisation — d'où le compteur d'usage affiché sur chaque
+ * leur prochaine synchronisation : d'où le compteur d'usage affiché sur chaque
  * ligne et la confirmation explicite avant désactivation.
+ *
+ * L'onglet ouvert et la recherche vivent dans l'URL, comme les critères des
+ * autres écrans : « le référentiel des syndicats, filtré sur SUDES » se colle
+ * dans un message, et le rechargement ne renvoie plus l'administrateur sur
+ * l'onglet des banques.
  */
+const TABS = ['banques', 'syndicats', 'departements'] as const;
+
+type ReferentielTab = (typeof TABS)[number];
+
 export function ReferentielsView() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const tab: ReferentielTab = useMemo(() => {
+    const raw = searchParams.get('onglet');
+    return (TABS as readonly string[]).includes(raw ?? '') ? (raw as ReferentielTab) : 'banques';
+  }, [searchParams]);
+
+  const search = searchParams.get('recherche') ?? '';
+
+  const write = useCallback(
+    (nextTab: ReferentielTab, nextSearch: string) => {
+      const params = new URLSearchParams();
+      if (nextTab !== 'banques') params.set('onglet', nextTab);
+      if (nextSearch.trim() !== '') params.set('recherche', nextSearch.trim());
+      const query = params.toString();
+      router.replace(query === '' ? pathname : `${pathname}?${query}`, { scroll: false });
+    },
+    [pathname, router],
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-3xl text-[0.9375rem] text-muted-foreground">
         Listes de valeurs proposées à la saisie des prospects.
       </p>
 
-      <Tabs defaultValue="banques">
+      <Tabs
+        value={tab}
+        onValueChange={(value) => {
+          // La recherche est ABANDONNÉE au changement d'onglet : « CBAO » n'a
+          // aucun sens sur les syndicats, et un onglet qui s'ouvre déjà filtré
+          // sur un mot venu d'ailleurs se lit comme une liste vide.
+          write(value as ReferentielTab, '');
+        }}
+      >
         <TabsList>
           <TabsTrigger value="banques">Banques</TabsTrigger>
           <TabsTrigger value="syndicats">Syndicats</TabsTrigger>
@@ -69,17 +110,54 @@ export function ReferentielsView() {
         </TabsList>
 
         <TabsContent value="banques">
-          <BanquesTab />
+          <BanquesTab
+            search={search}
+            onSearch={(value) => {
+              write('banques', value);
+            }}
+          />
         </TabsContent>
         <TabsContent value="syndicats">
-          <SyndicatsTab />
+          <SyndicatsTab
+            search={search}
+            onSearch={(value) => {
+              write('syndicats', value);
+            }}
+          />
         </TabsContent>
         <TabsContent value="departements">
-          <DepartementsTab />
+          <DepartementsTab
+            search={search}
+            onSearch={(value) => {
+              write('departements', value);
+            }}
+          />
         </TabsContent>
       </Tabs>
     </div>
   );
+}
+
+/**
+ * Recherche par nom, appliquée EN MÉMOIRE.
+ *
+ * Les trois référentiels descendent en entier dans une seule requête (une
+ * quinzaine de banques, une quarantaine de syndicats, quarante-six
+ * départements) : filtrer ici évite un aller-retour par frappe pour un gain
+ * nul. La comparaison est insensible à la casse et aux accents, sinon
+ * « departement » ne trouverait jamais « Département ».
+ */
+function normalize(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+}
+
+function matches(search: string, ...fields: readonly (string | null)[]): boolean {
+  const needle = normalize(search.trim());
+  if (needle === '') return true;
+  return fields.some((field) => field !== null && normalize(field).includes(needle));
 }
 
 /** Compteurs d'usage, partagés par les trois onglets. */
@@ -97,12 +175,18 @@ function TabShell({
   description,
   onCreate,
   createLabel,
+  search,
+  onSearch,
+  searchPlaceholder,
   children,
 }: {
   title: string;
   description: string;
   onCreate: () => void;
   createLabel: string;
+  search: string;
+  onSearch: (value: string) => void;
+  searchPlaceholder: string;
   children: ReactNode;
 }) {
   return (
@@ -117,6 +201,18 @@ function TabShell({
           {createLabel}
         </Button>
       </div>
+
+      {/* Le filtrage est en mémoire : la valeur part directement dans l'URL,
+          sans temporisation de frappe, puisqu'aucune requête n'en dépend. */}
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
+        <SearchField
+          label="Rechercher"
+          value={search}
+          onChange={onSearch}
+          placeholder={searchPlaceholder}
+        />
+      </div>
+
       {children}
     </div>
   );
@@ -139,7 +235,7 @@ function TableSkeleton() {
 /** Ligne désactivée : atténuée, badge explicite, liseré. Pas juste un booléen. */
 const inactiveRowClass =
   // Liseré à pleine opacité : à `/40` il tombait à 1,90:1, sous les 3:1 exigés
-  // d'un élément graphique porteur de sens — et c'est le seul marqueur visuel
+  // d'un élément graphique porteur de sens : et c'est le seul marqueur visuel
   // qui distingue une ligne désactivée.
   'bg-muted/50 [&>td:first-child]:border-l-2 [&>td:first-child]:border-l-muted-foreground';
 
@@ -153,7 +249,7 @@ function UsageCell({ count }: { count: number }) {
 
 // ─── Banques ────────────────────────────────────────────────────────────────
 
-function BanquesTab() {
+function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: string) => void }) {
   const queryClient = useQueryClient();
   const usage = useUsage();
 
@@ -214,15 +310,25 @@ function BanquesTab() {
     },
   });
 
-  const rows = [...(data ?? [])].sort(
+  /**
+   * Le tri porte sur la liste COMPLÈTE, la recherche ne fait que masquer : les
+   * flèches « Monter » et « Descendre » échangent le `sortOrder` avec le voisin
+   * réel, pas avec le voisin affiché. Réordonner depuis une liste filtrée
+   * produirait sinon un ordre que personne n'a demandé.
+   */
+  const allRows = [...(data ?? [])].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.shortName.localeCompare(b.shortName, 'fr'),
   );
+  const rows = allRows.filter((banque) => matches(search, banque.shortName, banque.name));
 
   return (
     <TabShell
       title="Banques"
       description="Domiciliation bancaire du prospect."
       createLabel="Nouvelle banque"
+      search={search}
+      onSearch={onSearch}
+      searchPlaceholder="Abréviation ou nom complet…"
       onCreate={() => {
         setEditing(undefined);
         setFormOpen(true);
@@ -254,89 +360,96 @@ function BanquesTab() {
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
-                <EmptyRow colSpan={6}>Aucune banque enregistrée.</EmptyRow>
+                <EmptyRow colSpan={6}>
+                  {search.trim() === ''
+                    ? 'Aucune banque enregistrée.'
+                    : 'Aucune banque ne correspond à cette recherche.'}
+                </EmptyRow>
               ) : null}
-              {rows.map((banque, index) => (
-                <TableRow key={banque.id} className={cn(!banque.isActive && inactiveRowClass)}>
-                  <TableCell>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={cn('font-[600]', !banque.isActive && 'text-muted-foreground')}
-                      >
-                        {banque.shortName}
-                      </span>
-                      {banque.isActive ? null : <Badge variant="outline">Retirée</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{banque.name}</TableCell>
-                  <TableCell className="text-right">
-                    <UsageCell count={usage.banques[banque.id] ?? 0} />
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{banque.sortOrder}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Monter ${banque.shortName}`}
-                        disabled={index === 0 || swap.isPending}
-                        onClick={() => {
-                          const previous = rows[index - 1];
-                          if (previous !== undefined) swap.mutate({ a: banque, b: previous });
-                        }}
-                      >
-                        <ChevronUpIcon className="size-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Descendre ${banque.shortName}`}
-                        disabled={index === rows.length - 1 || swap.isPending}
-                        onClick={() => {
-                          const next = rows[index + 1];
-                          if (next !== undefined) swap.mutate({ a: banque, b: next });
-                        }}
-                      >
-                        <ChevronDownIcon className="size-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Modifier ${banque.shortName}`}
-                        onClick={() => {
-                          setEditing(banque);
-                          setFormOpen(true);
-                        }}
-                      >
-                        <PencilIcon className="size-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={
-                          banque.isActive
-                            ? `Désactiver ${banque.shortName}`
-                            : `Réactiver ${banque.shortName}`
-                        }
-                        disabled={setActive.isPending}
-                        onClick={() => {
-                          if (banque.isActive) {
-                            setDeactivating(banque);
-                          } else {
-                            setActive.mutate({ banque, isActive: true });
+              {rows.map((banque) => {
+                const index = allRows.indexOf(banque);
+                return (
+                  <TableRow key={banque.id} className={cn(!banque.isActive && inactiveRowClass)}>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={cn('font-[600]', !banque.isActive && 'text-muted-foreground')}
+                        >
+                          {banque.shortName}
+                        </span>
+                        {banque.isActive ? null : <Badge variant="outline">Retirée</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{banque.name}</TableCell>
+                    <TableCell className="text-right">
+                      <UsageCell count={usage.banques[banque.id] ?? 0} />
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{banque.sortOrder}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Monter ${banque.shortName}`}
+                          disabled={index === 0 || swap.isPending}
+                          onClick={() => {
+                            const previous = allRows[index - 1];
+                            if (previous !== undefined) swap.mutate({ a: banque, b: previous });
+                          }}
+                        >
+                          <ChevronUpIcon className="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Descendre ${banque.shortName}`}
+                          disabled={index === allRows.length - 1 || swap.isPending}
+                          onClick={() => {
+                            const next = allRows[index + 1];
+                            if (next !== undefined) swap.mutate({ a: banque, b: next });
+                          }}
+                        >
+                          <ChevronDownIcon className="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Modifier ${banque.shortName}`}
+                          onClick={() => {
+                            setEditing(banque);
+                            setFormOpen(true);
+                          }}
+                        >
+                          <PencilIcon className="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={
+                            banque.isActive
+                              ? `Désactiver ${banque.shortName}`
+                              : `Réactiver ${banque.shortName}`
                           }
-                        }}
-                      >
-                        {banque.isActive ? (
-                          <PowerOffIcon className="size-4" aria-hidden="true" />
-                        ) : (
-                          <PowerIcon className="size-4" aria-hidden="true" />
-                        )}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                          disabled={setActive.isPending}
+                          onClick={() => {
+                            if (banque.isActive) {
+                              setDeactivating(banque);
+                            } else {
+                              setActive.mutate({ banque, isActive: true });
+                            }
+                          }}
+                        >
+                          {banque.isActive ? (
+                            <PowerOffIcon className="size-4" aria-hidden="true" />
+                          ) : (
+                            <PowerIcon className="size-4" aria-hidden="true" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -362,7 +475,7 @@ function BanquesTab() {
 
 // ─── Syndicats ──────────────────────────────────────────────────────────────
 
-function SyndicatsTab() {
+function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: string) => void }) {
   const queryClient = useQueryClient();
   const usage = useUsage();
 
@@ -412,8 +525,12 @@ function SyndicatsTab() {
     },
   });
 
-  const rows = [...(data ?? [])].sort(
+  // Ordre complet d'un côté, affichage filtré de l'autre : voir `BanquesTab`.
+  const allRows = [...(data ?? [])].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.sigle.localeCompare(b.sigle, 'fr'),
+  );
+  const rows = allRows.filter((syndicat) =>
+    matches(search, syndicat.sigle, syndicat.name, syndicat.secteur),
   );
 
   return (
@@ -421,6 +538,9 @@ function SyndicatsTab() {
       title="Syndicats"
       description="Appartenance syndicale du prospect."
       createLabel="Nouveau syndicat"
+      search={search}
+      onSearch={onSearch}
+      searchPlaceholder="Sigle, nom ou secteur…"
       onCreate={() => {
         setEditing(undefined);
         setFormOpen(true);
@@ -453,90 +573,105 @@ function SyndicatsTab() {
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
-                <EmptyRow colSpan={7}>Aucun syndicat enregistré.</EmptyRow>
+                <EmptyRow colSpan={7}>
+                  {search.trim() === ''
+                    ? 'Aucun syndicat enregistré.'
+                    : 'Aucun syndicat ne correspond à cette recherche.'}
+                </EmptyRow>
               ) : null}
-              {rows.map((syndicat, index) => (
-                <TableRow key={syndicat.id} className={cn(!syndicat.isActive && inactiveRowClass)}>
-                  <TableCell>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={cn('font-[600]', !syndicat.isActive && 'text-muted-foreground')}
-                      >
-                        {syndicat.sigle}
-                      </span>
-                      {syndicat.isActive ? null : <Badge variant="outline">Retiré</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{syndicat.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{syndicat.secteur ?? '–'}</TableCell>
-                  <TableCell className="text-right">
-                    <UsageCell count={usage.syndicats[syndicat.id] ?? 0} />
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{syndicat.sortOrder}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Monter ${syndicat.sigle}`}
-                        disabled={index === 0 || swap.isPending}
-                        onClick={() => {
-                          const previous = rows[index - 1];
-                          if (previous !== undefined) swap.mutate({ a: syndicat, b: previous });
-                        }}
-                      >
-                        <ChevronUpIcon className="size-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Descendre ${syndicat.sigle}`}
-                        disabled={index === rows.length - 1 || swap.isPending}
-                        onClick={() => {
-                          const next = rows[index + 1];
-                          if (next !== undefined) swap.mutate({ a: syndicat, b: next });
-                        }}
-                      >
-                        <ChevronDownIcon className="size-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Modifier ${syndicat.sigle}`}
-                        onClick={() => {
-                          setEditing(syndicat);
-                          setFormOpen(true);
-                        }}
-                      >
-                        <PencilIcon className="size-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={
-                          syndicat.isActive
-                            ? `Désactiver ${syndicat.sigle}`
-                            : `Réactiver ${syndicat.sigle}`
-                        }
-                        disabled={setActive.isPending}
-                        onClick={() => {
-                          if (syndicat.isActive) {
-                            setDeactivating(syndicat);
-                          } else {
-                            setActive.mutate({ syndicat, isActive: true });
+              {rows.map((syndicat) => {
+                const index = allRows.indexOf(syndicat);
+                return (
+                  <TableRow
+                    key={syndicat.id}
+                    className={cn(!syndicat.isActive && inactiveRowClass)}
+                  >
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={cn(
+                            'font-[600]',
+                            !syndicat.isActive && 'text-muted-foreground',
+                          )}
+                        >
+                          {syndicat.sigle}
+                        </span>
+                        {syndicat.isActive ? null : <Badge variant="outline">Retiré</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{syndicat.name}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {syndicat.secteur ?? '–'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <UsageCell count={usage.syndicats[syndicat.id] ?? 0} />
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{syndicat.sortOrder}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Monter ${syndicat.sigle}`}
+                          disabled={index === 0 || swap.isPending}
+                          onClick={() => {
+                            const previous = allRows[index - 1];
+                            if (previous !== undefined) swap.mutate({ a: syndicat, b: previous });
+                          }}
+                        >
+                          <ChevronUpIcon className="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Descendre ${syndicat.sigle}`}
+                          disabled={index === allRows.length - 1 || swap.isPending}
+                          onClick={() => {
+                            const next = allRows[index + 1];
+                            if (next !== undefined) swap.mutate({ a: syndicat, b: next });
+                          }}
+                        >
+                          <ChevronDownIcon className="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Modifier ${syndicat.sigle}`}
+                          onClick={() => {
+                            setEditing(syndicat);
+                            setFormOpen(true);
+                          }}
+                        >
+                          <PencilIcon className="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={
+                            syndicat.isActive
+                              ? `Désactiver ${syndicat.sigle}`
+                              : `Réactiver ${syndicat.sigle}`
                           }
-                        }}
-                      >
-                        {syndicat.isActive ? (
-                          <PowerOffIcon className="size-4" aria-hidden="true" />
-                        ) : (
-                          <PowerIcon className="size-4" aria-hidden="true" />
-                        )}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                          disabled={setActive.isPending}
+                          onClick={() => {
+                            if (syndicat.isActive) {
+                              setDeactivating(syndicat);
+                            } else {
+                              setActive.mutate({ syndicat, isActive: true });
+                            }
+                          }}
+                        >
+                          {syndicat.isActive ? (
+                            <PowerOffIcon className="size-4" aria-hidden="true" />
+                          ) : (
+                            <PowerIcon className="size-4" aria-hidden="true" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -562,7 +697,13 @@ function SyndicatsTab() {
 
 // ─── Départements ───────────────────────────────────────────────────────────
 
-function DepartementsTab() {
+function DepartementsTab({
+  search,
+  onSearch,
+}: {
+  search: string;
+  onSearch: (value: string) => void;
+}) {
   const queryClient = useQueryClient();
   const usage = useUsage();
 
@@ -596,15 +737,25 @@ function DepartementsTab() {
 
   // Pas de `sortOrder` sur les départements dans le contrat : ils sont
   // présentés par région puis par nom, comme dans le découpage administratif.
-  const rows = [...(data ?? [])].sort(
-    (a, b) => a.regionName.localeCompare(b.regionName, 'fr') || a.name.localeCompare(b.name, 'fr'),
-  );
+  const rows = [...(data ?? [])]
+    .sort(
+      (a, b) =>
+        a.regionName.localeCompare(b.regionName, 'fr') || a.name.localeCompare(b.name, 'fr'),
+    )
+    // La région entre dans la recherche : « Kolda » doit ramener ses trois
+    // départements, c'est la façon dont on cherche sur cette liste de 46 lignes.
+    .filter((departement) =>
+      matches(search, departement.name, departement.code, departement.regionName),
+    );
 
   return (
     <TabShell
       title="Départements"
       description="Triés par région, puis par nom."
       createLabel="Nouveau département"
+      search={search}
+      onSearch={onSearch}
+      searchPlaceholder="Département, code ou région…"
       onCreate={() => {
         setEditing(undefined);
         setFormOpen(true);
@@ -636,7 +787,11 @@ function DepartementsTab() {
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
-                <EmptyRow colSpan={6}>Aucun département enregistré.</EmptyRow>
+                <EmptyRow colSpan={6}>
+                  {search.trim() === ''
+                    ? 'Aucun département enregistré.'
+                    : 'Aucun département ne correspond à cette recherche.'}
+                </EmptyRow>
               ) : null}
               {rows.map((departement) => (
                 <TableRow
@@ -732,7 +887,7 @@ function DepartementsTab() {
  * Ligne « aucun élément » d'un référentiel.
  *
  * Les trois tableaux rendaient `rows.map(...)` sans garde : un référentiel vide
- * — installation neuve, ou réponse filtrée par l'API — n'affichait qu'une ligne
+ * : installation neuve, ou réponse filtrée par l'API : n'affichait qu'une ligne
  * d'en-tête au-dessus d'une carte blanche, sans un mot d'explication. Les
  * tableaux voisins (prospects, représentants, commerciaux) traitent tous ce cas.
  */

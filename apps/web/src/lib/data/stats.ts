@@ -3,32 +3,22 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { toFilterQuery } from '@/lib/api/query-params';
+import { MAX_CHART_SERIES, groupTail } from '@/lib/data/series';
 import type { DashboardStats, NamedCount, ProspectFilters, TimeSeriePoint } from '@/lib/types';
 
-/** Au-delà de 5 séries on regroupe — docs/design.md §2.6. On n'allonge pas la palette. */
-export const MAX_CHART_SERIES = 5;
-
 /**
- * Réduit une distribution à `limit` tranches plus « Autres ».
- *
- * La règle §2.6 vient du rendu, pas de l'esthétique : au-delà de cinq teintes,
- * l'œil ne rattache plus une part à sa légende. Une catégorie « Autres » se lit,
- * douze couleurs proches ne se lisent pas.
+ * Le regroupement de la queue est PARTAGÉ avec l'écran Statistiques
+ * (`lib/data/series.ts`). Il en existait deux copies identiques ; réexporté ici
+ * pour ne rien casser chez les appelants, défini une seule fois.
  */
-export function groupTail(items: NamedCount[], limit = MAX_CHART_SERIES): NamedCount[] {
-  if (items.length <= limit) return items;
-  const head = items.slice(0, limit - 1);
-  const tail = items.slice(limit - 1);
-  const rest = tail.reduce((sum, item) => sum + item.value, 0);
-  return [...head, { id: '__autres__', label: 'Autres', value: rest }];
-}
+export { MAX_CHART_SERIES, groupTail };
 
 /**
  * `NamedCountDto` → `NamedCount`.
  *
  * `id` est nullable dans le contrat : l'API regroupe sous `null` les prospects
  * dont le référentiel a été supprimé. On retombe sur le libellé pour garder une
- * clé React stable — deux tranches « null » écraseraient sinon la même clé.
+ * clé React stable : deux tranches « null » écraseraient sinon la même clé.
  */
 function toNamedCounts(
   items: readonly { id?: string | null; label: string; prospects: number }[],

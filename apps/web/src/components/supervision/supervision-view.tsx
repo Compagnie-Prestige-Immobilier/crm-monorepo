@@ -25,7 +25,7 @@ import { queryKeys } from '@/lib/query-keys';
  * Supervision des comptes.
  *
  * L'écran répond à une seule question : QUI EST LÀ, MAINTENANT. Tout le reste
- * — l'historique, les droits, les mots de passe — vit ailleurs et n'a rien à
+ * : l'historique, les droits, les mots de passe : vit ailleurs et n'a rien à
  * faire ici.
  *
  * Les colonnes ne racontent pas comment la présence est déduite. Un superviseur

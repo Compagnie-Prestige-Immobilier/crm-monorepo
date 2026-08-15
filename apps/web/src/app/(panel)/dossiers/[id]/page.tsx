@@ -31,8 +31,8 @@ export default async function DossierPage({ params }: { params: Promise<{ id: st
     // `unstable_rethrow` d'abord : un `catch` nu avale aussi les erreurs de
     // contrôle de Next (redirection, `notFound()`, bascule en rendu dynamique).
     unstable_rethrow(error);
-    // Un dossier introuvable doit se présenter comme une erreur DANS la vue —
-    // qui sait la rendre avec un message et un retour — et non comme une
+    // Un dossier introuvable doit se présenter comme une erreur DANS la vue -
+    // qui sait la rendre avec un message et un retour : et non comme une
     // exception de rendu serveur qui ferait tomber l'écran entier.
   }
 

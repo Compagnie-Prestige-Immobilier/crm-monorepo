@@ -190,7 +190,7 @@ describe('bulles d’explication', () => {
 
   it('n’emploie ni tiret cadratin, ni emoji, ni jargon technique', () => {
     for (const [key, text] of Object.entries(STAT_EXPLANATIONS)) {
-      expect(text, `${key} contient un tiret cadratin`).not.toContain('—');
+      expect(text, `${key} contient un tiret cadratin`).not.toContain('\u2014');
       expect(text, `${key} contient une flèche`).not.toContain('→');
       for (const jargon of ['API', 'cache', 'requête', 'endpoint', 'synchronis']) {
         expect(text.toLowerCase(), `${key} parle de « ${jargon} »`).not.toContain(

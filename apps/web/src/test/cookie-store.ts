@@ -5,7 +5,7 @@ import { vi } from 'vitest';
  * Route Handlers.
  *
  * Les handlers d'authentification n'ont qu'un seul effet observable qui compte
- * — ce qu'ils écrivent dans les cookies — et Next refuse de fournir
+ * : ce qu'ils écrivent dans les cookies : et Next refuse de fournir
  * `cookies()` hors d'un contexte de requête. Sans ce double, la logique de
  * session ne serait vérifiable qu'en bout de chaîne, dans un navigateur.
  */

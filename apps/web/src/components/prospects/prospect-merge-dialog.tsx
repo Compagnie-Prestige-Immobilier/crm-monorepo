@@ -24,6 +24,7 @@ import { formatDate, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { PROSPECT_STATUT_LABELS, type ProspectRow } from '@/lib/types';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
 /**
@@ -31,7 +32,7 @@ import { cn } from '@/lib/utils';
  *
  * L'opération n'est PAS réversible : la fiche absorbée part en suppression
  * logique et son historique suit la survivante. L'écran est donc construit
- * autour d'une seule question — LAQUELLE SURVIT — posée avant tout le reste,
+ * autour d'une seule question : LAQUELLE SURVIT : posée avant tout le reste,
  * avec les deux fiches côte à côte et la valeur retenue mise en évidence
  * champ par champ. Un simple « Confirmer ? » ne suffit pas quand on ne peut
  * pas revenir en arrière.
@@ -61,15 +62,11 @@ export function ProspectMergeDialog({
     setKeepOriginal(true);
   }, [prospect]);
 
+  const debouncedSearch = useDebouncedValue(searchDraft);
   useEffect(() => {
-    if (searchDraft === search) return;
-    const timer = setTimeout(() => {
-      setSearch(searchDraft);
-    }, 350);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [searchDraft, search]);
+    if (debouncedSearch === search) return;
+    setSearch(debouncedSearch);
+  }, [debouncedSearch, search]);
 
   const candidateFilters = { ...EMPTY_FILTERS, search, pageSize: 10 };
 

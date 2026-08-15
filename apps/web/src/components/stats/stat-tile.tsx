@@ -13,7 +13,7 @@ import type { StatKey } from '@/lib/stat-explanations';
  * Tuile de statistique : un libellé, une valeur, une précision, une bulle.
  *
  * La valeur peut être un NOMBRE, qui glisse d'un cycle à l'autre, ou un contenu
- * déjà mis en forme — un pourcentage, une durée, un montant en francs CFA rendu
+ * déjà mis en forme : un pourcentage, une durée, un montant en francs CFA rendu
  * par `MoneyText`. Les deux cas existent réellement et méritaient d'être
  * distingués plutôt que d'obliger l'appelant à formater partout : seuls les
  * nombres bruts peuvent s'interpoler.

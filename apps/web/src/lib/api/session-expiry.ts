@@ -3,7 +3,7 @@
  *
  * Constat fait en conditions réelles : avec un refresh token révoqué, le relais
  * `/api/v1/*` efface bien les deux cookies et répond
- * `401 {"code":"SESSION_EXPIRED"}` — mais le navigateur, lui, ne faisait RIEN.
+ * `401 {"code":"SESSION_EXPIRED"}` : mais le navigateur, lui, ne faisait RIEN.
  * L'écran restait affiché, chaque requête échouait, et un toast conseillait de
  * « recharger la page ». L'administrateur se retrouvait devant un panel mort
  * dont les données à l'écran étaient périmées, sans comprendre pourquoi.
@@ -27,7 +27,7 @@ export const SESSION_EXPIRED_VALUE = 'expiree';
 /**
  * Verrou de processus : une page de tableau de bord lance sept requêtes en
  * parallèle, qui échouent toutes ensemble. Sans ce garde-fou, sept
- * redirections concurrentes partiraient — et sur certains navigateurs, la
+ * redirections concurrentes partiraient : et sur certains navigateurs, la
  * dernière écrase l'URL de retour de la première.
  */
 let redirecting = false;
@@ -41,7 +41,7 @@ export function resetSessionExpiryGuard(): void {
  * `true` si la redirection a été déclenchée par CET appel.
  *
  * Ne fait rien côté serveur (aucun `window`), ni si l'on est déjà sur l'écran
- * de connexion — s'y rediriger en boucle empêcherait de se reconnecter.
+ * de connexion : s'y rediriger en boucle empêcherait de se reconnecter.
  */
 export function redirectToLogin(): boolean {
   if (typeof window === 'undefined') return false;
@@ -53,7 +53,7 @@ export function redirectToLogin(): boolean {
   const target = new URL(LOGIN_PATH, window.location.origin);
   target.searchParams.set(SESSION_EXPIRED_PARAM, SESSION_EXPIRED_VALUE);
 
-  // On mémorise l'écran quitté pour y revenir après reconnexion — filtres
+  // On mémorise l'écran quitté pour y revenir après reconnexion : filtres
   // compris, puisqu'ils vivent dans l'URL. Un administrateur qui expire au
   // milieu d'un tri filtré le retrouve intact.
   const from = `${window.location.pathname}${window.location.search}`;

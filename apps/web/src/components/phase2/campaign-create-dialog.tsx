@@ -16,10 +16,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { SpreadDaysField, SpreadPreview } from '@/components/phase2/spread-days-field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { createCampaign, fetchCampaignPreview } from '@/lib/data/phase2';
+import { createCampaign, fetchCampaignPreview, MIN_SPREAD_DAYS } from '@/lib/data/phase2';
 import { fetchReferenceData } from '@/lib/data/reference';
 import { formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -38,7 +39,7 @@ import { cn } from '@/lib/utils';
  * L'aperçu est la raison d'être de cet écran, pas un ornement final. Le tirage
  * est IRRÉVERSIBLE : il matérialise une tâche par prospect, exclut ces
  * prospects de toute campagne ultérieure, et la seule façon d'annuler est de
- * clôturer la campagne — ce qui annule aussi les tâches déjà en cours chez les
+ * clôturer la campagne : ce qui annule aussi les tâches déjà en cours chez les
  * commerciaux. Un administrateur qui découvre après coup qu'il vient de
  * distribuer huit cents fiches à trois personnes au lieu de quatre-vingts à
  * dix n'a aucun moyen simple de revenir en arrière.
@@ -66,6 +67,7 @@ export function CampaignCreateDialog({
   const [name, setName] = useState('');
   const [scope, setScope] = useState<CampaignScope>('ALL');
   const [selected, setSelected] = useState<string[]>([]);
+  const [spreadDays, setSpreadDays] = useState(MIN_SPREAD_DAYS);
 
   const reference = useQuery({
     queryKey: queryKeys.reference,
@@ -78,13 +80,13 @@ export function CampaignCreateDialog({
 
   /**
    * L'aperçu n'est demandé QU'À l'étape 2. Le charger dès l'ouverture
-   * relancerait deux requêtes à chaque coche d'un commercial — or le décompte
+   * relancerait deux requêtes à chaque coche d'un commercial : or le décompte
    * de prospects ne dépend pas de QUI reçoit, seulement du périmètre. Seule la
    * répartition change, et elle est calculée localement.
    */
   const preview = useQuery({
-    queryKey: queryKeys.campaignPreview(scope, selected.length),
-    queryFn: () => fetchCampaignPreview(scope, selected.length),
+    queryKey: queryKeys.campaignPreview(scope, selected.length, spreadDays),
+    queryFn: () => fetchCampaignPreview(scope, selected.length, spreadDays),
     enabled: open && step === 'apercu' && selected.length > 0,
     staleTime: 15_000,
   });
@@ -94,7 +96,8 @@ export function CampaignCreateDialog({
   const canPreview = nameValid && selected.length > 0;
 
   const create = useMutation({
-    mutationFn: () => createCampaign({ name: trimmedName, scope, commercialIds: selected }),
+    mutationFn: () =>
+      createCampaign({ name: trimmedName, scope, commercialIds: selected, spreadDays }),
     onSuccess: (campaign) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.campaignsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
@@ -116,6 +119,7 @@ export function CampaignCreateDialog({
     setName('');
     setScope('ALL');
     setSelected([]);
+    setSpreadDays(MIN_SPREAD_DAYS);
   }
 
   function toggle(id: string): void {
@@ -209,6 +213,8 @@ export function CampaignCreateDialog({
                 ))}
               </div>
             </fieldset>
+
+            <SpreadDaysField value={spreadDays} onChange={setSpreadDays} />
 
             <fieldset className="flex flex-col gap-2">
               <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
@@ -366,6 +372,8 @@ function CampaignPreviewPanel({
     alreadyAssigned: number;
     maximum: number;
     perCommercial: number[];
+    spreadDays: number;
+    perDay: number[];
   } | null;
   onRetry: () => void;
 }) {
@@ -435,10 +443,12 @@ function CampaignPreviewPanel({
         {/* On dit « au maximum » plutôt que d'annoncer un total exact : le
             serveur exclut au moment du tirage les prospects déjà pris par une
             campagne concurrente, et il est seul à connaître leur segment. Le
-            chiffre affiché est une borne haute — le dire vaut mieux que
+            chiffre affiché est une borne haute : le dire vaut mieux que
             promettre un total qui pourrait être plus bas de quelques unités. */}
         Borne haute : le total réel peut être inférieur.
       </p>
+
+      <SpreadPreview spreadDays={data.spreadDays} perDay={data.perDay} />
 
       <div>
         <h3 className="flex items-center gap-2 pb-2 text-[0.8125rem] font-[600]">

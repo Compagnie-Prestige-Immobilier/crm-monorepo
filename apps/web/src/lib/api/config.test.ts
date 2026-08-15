@@ -13,7 +13,7 @@ import { ApiError } from '@crm/api-client/query';
 
 /**
  * Une configuration incomplète et un réseau coupé produisent le MÊME symptôme
- * — aucune donnée — et appellent deux réparations opposées.
+ * : aucune donnée : et appellent deux réparations opposées.
  *
  * Le panel affichait « Serveur injoignable. Vérifiez la connexion, puis
  * réessayez. » dans les deux cas. Un administrateur a cherché une panne de

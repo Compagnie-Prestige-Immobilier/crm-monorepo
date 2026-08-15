@@ -13,7 +13,9 @@ import {
 import { useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
 
+import { DeactivateUserDialog } from '@/components/commerciaux/deactivate-user-dialog';
 import { PasswordDialog } from '@/components/commerciaux/password-dialog';
+import { useUserFilters } from '@/components/commerciaux/use-user-filters';
 import { UserFormDialog } from '@/components/commerciaux/user-form-dialog';
 import { Badge } from '@/components/ui/badge';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -43,16 +45,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  DEFAULT_USER_FILTERS,
-  fetchUsers,
-  setUserActive,
-  type UserFilters,
-} from '@/lib/data/users';
+import { fetchUsers, setUserActive } from '@/lib/data/users';
 import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { UserRow } from '@/lib/types';
+import { ROLE_LABELS, type Role, type UserRow } from '@/lib/types';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { ROLES } from '@/lib/user-filters';
 import { cn } from '@/lib/utils';
 
 type ActiveFilterValue = 'tous' | 'actifs' | 'desactives';
@@ -63,35 +62,51 @@ const ACTIVE_FILTER: Record<ActiveFilterValue, boolean | null> = {
   desactives: false,
 };
 
+/** « Tous les rôles » porte une valeur explicite : voir `lib/user-filters.ts`. */
+const ALL_ROLES = 'tous';
+
 /**
  * Comptes commerciaux.
  *
  * Un compte désactivé n'est pas rendu par une case à cocher dans une colonne :
  * la LIGNE ENTIÈRE change d'aspect (fond atténué, liseré, nom en gris, badge
- * explicite). Une désactivation coupe l'accès de quelqu'un au terrain — cela
+ * explicite). Une désactivation coupe l'accès de quelqu'un au terrain : cela
  * doit se voir en balayant la liste, pas en lisant la septième colonne.
+ *
+ * Le RÔLE est un filtre à part entière depuis qu'il est exposé : l'écran
+ * envoyait `COMMERCIAL` en dur, si bien qu'un compte Banque & Finance restait
+ * introuvable et qu'aucun champ ne disait pourquoi. Les critères vivent dans
+ * l'URL, comme partout ailleurs dans le panel.
  */
 export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
   const queryClient = useQueryClient();
   const searchId = useId();
 
-  const [searchDraft, setSearchDraft] = useState('');
-  const [filters, setFilters] = useState<UserFilters>(DEFAULT_USER_FILTERS);
+  const { filters, setFilters } = useUserFilters();
+  const [searchDraft, setSearchDraft] = useState(filters.search);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | undefined>(undefined);
   const [passwordTarget, setPasswordTarget] = useState<UserRow | null>(null);
+  /**
+   * Le compte dont on est sur le point de FERMER l'accès.
+   *
+   * La désactivation partait auparavant d'un simple `onSelect` de menu : un
+   * téléconseiller perdait sa connexion mobile en pleine tournée, sans qu'aucun
+   * écran n'ait annoncé la portée du geste. La réactivation, elle, reste
+   * immédiate : elle ne coupe l'accès de personne.
+   */
+  const [deactivating, setDeactivating] = useState<UserRow | null>(null);
 
   // La recherche est appliquée après une pause de frappe : une requête par
   // caractère saturerait l'API pour rien.
   useEffect(() => {
-    if (searchDraft === filters.search) return;
-    const timer = setTimeout(() => {
-      setFilters((current) => ({ ...current, search: searchDraft, page: 1 }));
-    }, 350);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [searchDraft, filters.search]);
+    setSearchDraft(filters.search);
+  }, [filters.search]);
+  const debouncedSearch = useDebouncedValue(searchDraft);
+  useEffect(() => {
+    if (debouncedSearch === filters.search) return;
+    setFilters({ search: debouncedSearch });
+  }, [debouncedSearch, filters.search, setFilters]);
 
   const { data, isPending, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.commerciaux(filters),
@@ -103,7 +118,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
     mutationFn: ({ user, isActive }: { user: UserRow; isActive: boolean }) =>
       setUserActive(user.id, isActive),
     // État optimiste : la ligne change d'aspect immédiatement. La bascule est
-    // sûre à anticiper — un seul booléen, et l'échec la remet en place.
+    // sûre à anticiper : un seul booléen, et l'échec la remet en place.
     onMutate: async ({ user, isActive }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.commerciaux(filters) });
       const previous = queryClient.getQueryData(queryKeys.commerciaux(filters));
@@ -128,6 +143,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
       toastApiError(error, "Changement d'état impossible. Réessayez.");
     },
     onSuccess: (saved) => {
+      setDeactivating(null);
       toast.success(
         saved.isActive
           ? `${saved.fullName} réactivé.`
@@ -186,15 +202,33 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
         </div>
 
         <div className="flex w-48 flex-col gap-1.5">
+          <Label htmlFor="role-compte">Rôle</Label>
+          <Select
+            value={filters.role ?? ALL_ROLES}
+            onValueChange={(value) => {
+              setFilters({ role: value === ALL_ROLES ? null : (value as Role) });
+            }}
+          >
+            <SelectTrigger id="role-compte">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_ROLES}>Tous les rôles</SelectItem>
+              {ROLES.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {ROLE_LABELS[role]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex w-48 flex-col gap-1.5">
           <Label htmlFor="etat-compte">État du compte</Label>
           <Select
             value={activeValue}
             onValueChange={(value) => {
-              setFilters((current) => ({
-                ...current,
-                isActive: ACTIVE_FILTER[value as ActiveFilterValue],
-                page: 1,
-              }));
+              setFilters({ isActive: ACTIVE_FILTER[value as ActiveFilterValue] });
             }}
           >
             <SelectTrigger id="etat-compte">
@@ -336,7 +370,11 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                             disabled={user.id === currentUserId || toggleActive.isPending}
                             variant={user.isActive ? 'destructive' : 'default'}
                             onSelect={() => {
-                              toggleActive.mutate({ user, isActive: !user.isActive });
+                              // Fermer un accès passe par une confirmation qui
+                              // NOMME le compte et CHIFFRE ses prospects. Le
+                              // rouvrir ne coupe rien à personne : immédiat.
+                              if (user.isActive) setDeactivating(user);
+                              else toggleActive.mutate({ user, isActive: true });
                             }}
                           >
                             {user.isActive ? (
@@ -357,6 +395,18 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
         </div>
       )}
 
+      <DeactivateUserDialog
+        user={deactivating}
+        pending={toggleActive.isPending}
+        onOpenChange={(open) => {
+          if (!open) setDeactivating(null);
+        }}
+        onConfirm={() => {
+          if (deactivating !== null) {
+            toggleActive.mutate({ user: deactivating, isActive: false });
+          }
+        }}
+      />
       <UserFormDialog open={formOpen} onOpenChange={setFormOpen} user={editing} />
       <PasswordDialog
         open={passwordTarget !== null}

@@ -6,6 +6,8 @@ import {
   expandSelection,
   formatElapsed,
   impliedDomains,
+  knownPresence,
+  knownRole,
   matchesHint,
   minutesSince,
   selectionRows,
@@ -15,7 +17,7 @@ import {
 
 /**
  * L'écran de purge ne se teste pas au clic : ce qu'il faut protéger, c'est la
- * décision — quels domaines sont entraînés, combien de lignes cela fait, et
+ * décision : quels domaines sont entraînés, combien de lignes cela fait, et
  * quand le bouton part.
  */
 
@@ -178,5 +180,40 @@ describe('présence', () => {
       RECENT: 'Récent',
       AWAY: 'Inactif',
     });
+  });
+});
+
+describe('un rôle ou un état inconnu ne fait PAS tomber la Supervision', () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * Le défaut : `parseSupervisedUser` LEVAIT sur une valeur non reconnue.
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * L'analyse porte sur la réponse entière : un seul compte au rôle inconnu -
+   * un rôle livré côté API avant que le panel ne soit redéployé : emportait la
+   * page complète. L'écran qui sert à savoir qui est en ligne était donc le
+   * premier à disparaître, précisément le jour d'une mise en production.
+   */
+  it('replie un rôle inconnu sur le rôle de terrain, sans lever', () => {
+    expect(() => knownRole('SUPERVISEUR_REGIONAL')).not.toThrow();
+    expect(knownRole('SUPERVISEUR_REGIONAL')).toBe('COMMERCIAL');
+  });
+
+  it('conserve évidemment les rôles connus', () => {
+    expect(knownRole('ADMIN')).toBe('ADMIN');
+    expect(knownRole('BANQUE_FINANCE')).toBe('BANQUE_FINANCE');
+    expect(knownRole('COMMERCIAL')).toBe('COMMERCIAL');
+  });
+
+  it('replie une présence inconnue sur l’état le moins affirmatif', () => {
+    // Dire « inactif » de quelqu'un peut-être connecté induit moins en erreur
+    // que d'annoncer « connecté » sans le savoir.
+    expect(knownPresence('EN_PAUSE')).toBe('AWAY');
+    expect(knownPresence('ONLINE')).toBe('ONLINE');
+    expect(knownPresence('RECENT')).toBe('RECENT');
+  });
+
+  it('rend une valeur toujours affichable, donc jamais un libellé vide', () => {
+    expect(PRESENCE_LABELS[knownPresence('QUOI_QUE_CE_SOIT')]).toBe('Inactif');
   });
 });

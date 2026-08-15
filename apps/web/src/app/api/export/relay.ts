@@ -14,6 +14,7 @@ import {
   toAuthTokens,
 } from '@/lib/api/server';
 import { rotateRefreshTokenDetailed } from '@/lib/api/tokens';
+import { DEMO_MODE_HEADER, isDemoResponse, withDemoSuffix } from '@/lib/demo-marking';
 import { getSession } from '@/lib/session';
 import type { Role } from '@/lib/types';
 
@@ -30,7 +31,7 @@ import type { Role } from '@/lib/types';
  *
  * Ces exports ne passent pas par `/api/v1/[...path]` : il leur faut un
  * `Content-Disposition` daté que l'API ne fabrique pas sous ce nom, et une
- * vérification de session — et de RÔLE — explicite avant d'ouvrir le flux.
+ * vérification de session : et de RÔLE : explicite avant d'ouvrir le flux.
  */
 
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -127,11 +128,32 @@ export async function relayXlsx(options: XlsxRelayOptions): Promise<Response> {
     );
   }
 
+  /**
+   * Les marques de démonstration SURVIVENT au relais.
+   *
+   * Ce bloc reconstruit les en-têtes de la réponse plutôt que de recopier ceux
+   * de l'amont : il le faut, puisque le nom de fichier daté est fabriqué ici.
+   * Mais il perdait au passage les deux marques hors fichier posées par
+   * `apps/api/src/modules/export/demo-marking.ts` : l'en-tête `X-Demo-Mode` et
+   * le suffixe `-DEMONSTRATION`.
+   *
+   * Ce chemin est le SEUL par lequel un utilisateur télécharge un classeur. Les
+   * perdre, c'est livrer un fichier de chiffres fictifs sous le nom d'un vrai
+   * export : il part ensuite par courriel, et plus rien à l'extérieur ne dit
+   * d'où il vient.
+   */
+  const demo = isDemoResponse(upstream.headers);
+
   return new Response(upstream.body, {
     status: 200,
     headers: {
       'Content-Type': XLSX_MIME,
-      'Content-Disposition': `attachment; filename="${options.filename}"`,
+      'Content-Disposition': `attachment; filename="${withDemoSuffix(options.filename, demo)}"`,
+      // Relayé tel quel, `true` comme `false` : le navigateur enregistre le
+      // blob sous le nom que lui donne `useFileDownload`, pas sous celui du
+      // `Content-Disposition`. Sans cet en-tête, le client n'a aucun moyen de
+      // savoir qu'il doit marquer le fichier.
+      [DEMO_MODE_HEADER]: demo ? 'true' : 'false',
       'Cache-Control': 'no-store',
     },
   });

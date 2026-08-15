@@ -1,4 +1,11 @@
 import {
+  readEnum,
+  readIsoDate,
+  readPositiveInt,
+  readString,
+  type RawSearchParams,
+} from '@/lib/search-params';
+import {
   BDD_SEGMENTS,
   ENROLLMENT_METHODS,
   PHASE2_STATUSES,
@@ -44,74 +51,20 @@ export const EMPTY_FILTERS: ProspectFilters = {
 };
 
 /** Ce que Next passe à une page serveur, et ce que `URLSearchParams` sait lire. */
-export type RawSearchParams = Record<string, string | string[] | undefined>;
-
-function readOne(params: RawSearchParams | URLSearchParams, key: string): string | null {
-  if (params instanceof URLSearchParams) return params.get(key);
-  const raw = params[key];
-  if (Array.isArray(raw)) return raw[0] ?? null;
-  return raw ?? null;
-}
-
-function readNullableString(params: RawSearchParams | URLSearchParams, key: string): string | null {
-  const value = readOne(params, key);
-  if (value === null) return null;
-  const trimmed = value.trim();
-  return trimmed === '' ? null : trimmed;
-}
-
-function readPositiveInt(
-  params: RawSearchParams | URLSearchParams,
-  key: string,
-  fallback: number,
-): number {
-  const value = readNullableString(params, key);
-  if (value === null) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-/** `YYYY-MM-DD` uniquement — toute autre forme est ignorée plutôt que devinée. */
-function readIsoDate(params: RawSearchParams | URLSearchParams, key: string): string | null {
-  const value = readNullableString(params, key);
-  if (value === null) return null;
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
-}
+export type { RawSearchParams };
 
 function readStatut(params: RawSearchParams | URLSearchParams): ProspectStatut | null {
-  const value = readNullableString(params, 'statut');
-  if (value === null) return null;
-  return PROSPECT_STATUTS.includes(value as ProspectStatut) ? (value as ProspectStatut) : null;
-}
-
-/**
- * Lecteur d'énumération générique.
- *
- * Écrit une fois plutôt que recopié cinq fois : chaque copie serait une
- * occasion d'oublier la validation, et une valeur inconnue collée dans l'URL
- * partirait telle quelle vers l'API — qui répondrait 400 sur un écran que
- * l'utilisateur n'a fait qu'ouvrir depuis un lien.
- */
-function readEnum<T extends string>(
-  params: RawSearchParams | URLSearchParams,
-  key: string,
-  allowed: readonly T[],
-): T | null {
-  const value = readNullableString(params, key);
-  if (value === null) return null;
-  return (allowed as readonly string[]).includes(value) ? (value as T) : null;
+  return readEnum<ProspectStatut>(params, 'statut', PROSPECT_STATUTS);
 }
 
 function readSortBy(params: RawSearchParams | URLSearchParams): ProspectSortField {
-  const value = readNullableString(params, 'sortBy');
-  if (value === null) return EMPTY_FILTERS.sortBy;
-  return PROSPECT_SORT_FIELDS.includes(value as ProspectSortField)
-    ? (value as ProspectSortField)
-    : EMPTY_FILTERS.sortBy;
+  return (
+    readEnum<ProspectSortField>(params, 'sortBy', PROSPECT_SORT_FIELDS) ?? EMPTY_FILTERS.sortBy
+  );
 }
 
 function readSortDir(params: RawSearchParams | URLSearchParams): SortDirection {
-  return readNullableString(params, 'sortDir') === 'asc' ? 'asc' : 'desc';
+  return readString(params, 'sortDir') === 'asc' ? 'asc' : 'desc';
 }
 
 /**
@@ -121,18 +74,18 @@ function readSortDir(params: RawSearchParams | URLSearchParams): SortDirection {
 export function parseProspectFilters(params: RawSearchParams | URLSearchParams): ProspectFilters {
   const pageSize = readPositiveInt(params, 'pageSize', DEFAULT_PAGE_SIZE);
   return {
-    search: readNullableString(params, 'search') ?? '',
-    commercialId: readNullableString(params, 'commercialId'),
-    representantId: readNullableString(params, 'representantId'),
-    departementId: readNullableString(params, 'departementId'),
-    banqueId: readNullableString(params, 'banqueId'),
-    syndicatId: readNullableString(params, 'syndicatId'),
+    search: readString(params, 'search') ?? '',
+    commercialId: readString(params, 'commercialId'),
+    representantId: readString(params, 'representantId'),
+    departementId: readString(params, 'departementId'),
+    banqueId: readString(params, 'banqueId'),
+    syndicatId: readString(params, 'syndicatId'),
     statut: readStatut(params),
     segment: readEnum<BddSegment>(params, 'segment', BDD_SEGMENTS),
     phase2Status: readEnum<Phase2Status>(params, 'phase2Status', PHASE2_STATUSES),
     enrollmentMethod: readEnum<EnrollmentMethod>(params, 'enrollmentMethod', ENROLLMENT_METHODS),
-    campaignId: readNullableString(params, 'campaignId'),
-    enrollmentCapturedById: readNullableString(params, 'enrollmentCapturedById'),
+    campaignId: readString(params, 'campaignId'),
+    enrollmentCapturedById: readString(params, 'enrollmentCapturedById'),
     dateFrom: readIsoDate(params, 'dateFrom'),
     dateTo: readIsoDate(params, 'dateTo'),
     page: readPositiveInt(params, 'page', 1),
@@ -147,7 +100,7 @@ export function parseProspectFilters(params: RawSearchParams | URLSearchParams):
 /**
  * Sérialisation canonique : les valeurs par défaut sont omises, et les clés
  * sont écrites dans un ordre fixe. Deux filtres égaux produisent donc la même
- * chaîne — ce qui en fait une clé de cache React Query utilisable telle quelle.
+ * chaîne : ce qui en fait une clé de cache React Query utilisable telle quelle.
  */
 export function serializeProspectFilters(filters: ProspectFilters): URLSearchParams {
   const params = new URLSearchParams();
@@ -194,7 +147,7 @@ export function filtersQueryKey(filters: ProspectFilters): string {
  * Treize champs empilés en permanence poussaient les indicateurs sous la ligne
  * de flottaison : la première chose visible du tableau de bord était un
  * formulaire, pas un chiffre. Restent visibles les trois critères qu'on touche
- * à chaque session — la recherche, la période, le téléconseiller. Les dix
+ * à chaque session : la recherche, la période, le téléconseiller. Les dix
  * autres servent à une question précise, quelques fois par mois.
  *
  * La liste est ORDONNÉE comme les champs à l'écran : les puces de rappel
@@ -267,10 +220,23 @@ export function clearAdvancedFilters(): Partial<ProspectFilters> {
  * croyant lire le total.
  *
  * `stored` vaut `null` tant que rien n'a été enregistré, et pendant le rendu
- * serveur — où `localStorage` n'existe pas.
+ * serveur : où `localStorage` n'existe pas.
  */
 export function initialAdvancedOpen(filters: ProspectFilters, stored: boolean | null): boolean {
-  if (hasAdvancedFilters(filters)) return true;
+  return advancedOpenFrom(hasAdvancedFilters(filters), stored);
+}
+
+/**
+ * La même règle, débarrassée du type des prospects.
+ *
+ * Le panneau avancé sert maintenant six écrans (prospects, dossiers, export,
+ * représentants, campagnes) dont les objets de filtre n'ont rien en commun.
+ * Seule cette arbitrage-là est commun, et il ne doit exister qu'une fois :
+ * un écran où l'URL ne l'emporterait pas sur la préférence enregistrée
+ * afficherait une population restreinte sans le dire.
+ */
+export function advancedOpenFrom(hasAdvanced: boolean, stored: boolean | null): boolean {
+  if (hasAdvanced) return true;
   return stored ?? false;
 }
 

@@ -29,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   canSubmitDisable,
   canSubmitEnable,
+  DEMO_SEEDED_KINDS,
   demoBreakdown,
   demoControl,
   disableDemoMode,
@@ -55,7 +56,7 @@ import { queryKeys } from '@/lib/query-keys';
  *    pas touchées. C'est le point le plus important de tout l'écran : l'API
  *    tient un registre des lignes qu'elle a créées et ne supprime que
  *    celles-là. Sans cette phrase, un administrateur qui craint de perdre la
- *    base de production n'osera jamais appuyer — et le jeu de démonstration
+ *    base de production n'osera jamais appuyer : et le jeu de démonstration
  *    restera en place, mêlé aux vraies données, ce qui est précisément le
  *    scénario qu'on cherche à éviter.
  * 3. Le bouton est verrouillé pendant l'appel, et aucun succès n'est annoncé
@@ -70,6 +71,16 @@ export function DemoModeCard() {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  /**
+   * L'ACTIVATION se confirme, elle aussi.
+   *
+   * L'asymétrie précédente était à l'envers : retirer le jeu de démonstration
+   * exigeait une case à cocher, l'installer partait au premier clic. C'est
+   * pourtant l'activation qui pollue les chiffres de TOUT LE MONDE : elle
+   * ensemence des milliers de lignes crédibles qui apparaissent aussitôt dans
+   * les tableaux de bord, les statistiques et les exports de chaque rôle.
+   */
+  const [confirmingEnable, setConfirmingEnable] = useState(false);
   const confirmId = useId();
 
   const status = useQuery({
@@ -80,7 +91,7 @@ export function DemoModeCard() {
   function afterToggle(): void {
     void queryClient.invalidateQueries({ queryKey: queryKeys.demoStatus });
     // Tout le panel change de contenu : on vide le cache de données plutôt que
-    // d'énumérer les clés — un écran oublié afficherait des chiffres de
+    // d'énumérer les clés : un écran oublié afficherait des chiffres de
     // démonstration après désactivation, ce qui est exactement le défaut que le
     // bandeau global sert à empêcher.
     void queryClient.invalidateQueries();
@@ -93,6 +104,7 @@ export function DemoModeCard() {
     mutationFn: () => enableDemoMode(),
     onSuccess: (next) => {
       afterToggle();
+      setConfirmingEnable(false);
       toast.success(
         `Mode démonstration activé : ${formatNumber(totalDemoRows(next.counts))} lignes créées.`,
       );
@@ -219,7 +231,9 @@ export function DemoModeCard() {
                 type="button"
                 disabled={!canSubmitEnable({ status: data, pending: enable.isPending })}
                 onClick={() => {
-                  enable.mutate();
+                  // Confirmation AVANT l'ensemencement : ce clic remplit la
+                  // base de milliers de lignes crédibles, visibles par tous.
+                  setConfirmingEnable(true);
                 }}
               >
                 {enable.isPending ? (
@@ -257,6 +271,97 @@ export function DemoModeCard() {
           )}
         </CardContent>
       </Card>
+
+      {/*
+        Confirmation de l'ACTIVATION.
+
+        Elle NOMME ce qui va être créé plutôt que de promettre « un jeu de
+        démonstration » : un administrateur doit savoir, avant de cliquer, que
+        des comptes, des prospects, des campagnes et des dossiers bancaires
+        fictifs vont apparaître dans les écrans de TOUS les rôles, et dans leurs
+        exports. Pas de case à cocher ici : l'action est entièrement réversible
+        (l'API tient le registre des lignes qu'elle a créées), et exiger le même
+        rituel que la suppression banaliserait celui de la suppression.
+      */}
+      <Dialog
+        open={confirmingEnable}
+        onOpenChange={(open) => {
+          if (!open && enable.isPending) return;
+          setConfirmingEnable(open);
+        }}
+      >
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Créer le jeu de démonstration ?</DialogTitle>
+            <DialogDescription>
+              Des lignes fictives vont être ajoutées à cette base et apparaître dans les écrans de
+              tous les rôles.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4">
+            <ul className="flex flex-col gap-1 rounded-md border border-border p-3 text-[0.875rem]">
+              {DEMO_SEEDED_KINDS.map((kind) => (
+                <li key={kind} className="text-muted-foreground">
+                  {kind}
+                </li>
+              ))}
+            </ul>
+
+            <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.875rem] text-warning">
+              <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <span>
+                <span className="font-[600]">
+                  Les chiffres affichés ne seront plus des chiffres réels.
+                </span>{' '}
+                Un bandeau le signalera sur tous les écrans, et les classeurs exportés porteront la
+                mention «&nbsp;DEMONSTRATION&nbsp;» dans leur nom. Ne lancez pas cette bascule
+                pendant qu’une équipe travaille sur des données réelles.
+              </span>
+            </p>
+
+            <p className="flex items-start gap-2 rounded-md border border-success/30 bg-success-surface px-3 py-2.5 text-[0.875rem] text-success">
+              <ShieldCheckIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <span>
+                <span className="font-[600]">Réversible.</span> L’API enregistre chaque ligne
+                qu’elle crée et le retrait ne supprimera que celles-là.
+              </span>
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={enable.isPending}
+              onClick={() => {
+                setConfirmingEnable(false);
+              }}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              disabled={!canSubmitEnable({ status: data, pending: enable.isPending })}
+              onClick={() => {
+                enable.mutate();
+              }}
+            >
+              {enable.isPending ? (
+                <>
+                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+                  Création du jeu de démonstration…
+                </>
+              ) : (
+                <>
+                  <FlaskConicalIcon aria-hidden="true" />
+                  Créer le jeu de démonstration
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={confirming}
@@ -343,7 +448,7 @@ export function DemoModeCard() {
             <Button
               type="button"
               variant="destructive"
-              // Trois conditions ET l'absence d'appel en cours — la logique
+              // Trois conditions ET l'absence d'appel en cours : la logique
               // vit dans `canSubmitDisable`, testée à part.
               disabled={!canSubmitDisable({ status: data, confirmed, pending: disable.isPending })}
               onClick={() => {

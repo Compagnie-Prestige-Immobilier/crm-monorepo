@@ -69,8 +69,8 @@ function Empty() {
  *
  * `id` reprend le nom du champ trié CÔTÉ SERVEUR (`ProspectSortField` du
  * contrat) : le clic sur l'en-tête envoie donc `sortBy` sans table de
- * correspondance. Les colonnes dérivées d'une jointure — représentant,
- * département, commercial — ne sont pas triables : l'API ne le propose pas, et
+ * correspondance. Les colonnes dérivées d'une jointure : représentant,
+ * département, commercial : ne sont pas triables : l'API ne le propose pas, et
  * une flèche qui ne trie rien est pire que pas de flèche.
  *
  * Les colonnes de phase 2 répondent à une question qu'on posait jusqu'ici en
@@ -110,7 +110,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       accessorKey: 'segment',
       header: 'Segment',
       cell: ({ row }) => (
-        // Le sigle en cellule, le libellé complet en info-bulle : « BDD1 —
+        // Le sigle en cellule, le libellé complet en info-bulle : « BDD1 -
         // CHUES / CBAO » dans chaque ligne pousserait les colonnes suivantes
         // hors de l'écran.
         <Badge variant="outline" title={SEGMENT_LABELS[row.original.segment]}>
@@ -243,7 +243,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
               /* `size="icon"` (44 px) et non `icon-sm` (36 px) : docs/design.md
                  §6 fixe la cible tactile minimale à 44 px, et le panel est aussi
                  consulté sur tablette. Un menu de ligne à 36 px se manque une
-                 fois sur trois au doigt — et l'action manquée juste à côté est
+                 fois sur trois au doigt : et l'action manquée juste à côté est
                  « Supprimer ». */
               size="icon"
               aria-label={`Actions pour ${row.original.prenom} ${row.original.nom}`}

@@ -6,7 +6,7 @@ import { flattenPage, toProspectQuery } from '@/lib/api/query-params';
 import type { Paginated, ProspectFilters, ProspectRow, UpdateProspectInput } from '@/lib/types';
 
 /**
- * Prospects — `GET /prospects` et ses mutations.
+ * Prospects : `GET /prospects` et ses mutations.
  *
  * Le filtrage, le tri et la pagination sont exécutés CÔTÉ SERVEUR, en SQL.
  * Rapatrier la table pour trier dans le navigateur bloquerait l'onglet dès

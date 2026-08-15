@@ -5,7 +5,7 @@ import { bankExportFileName } from '@/lib/data/export';
 /**
  * `GET /api/export/bank-cases`
  *
- * Relais vers `GET {API_URL}/api/v1/export/bank-cases.xlsx` — trois feuilles :
+ * Relais vers `GET {API_URL}/api/v1/export/bank-cases.xlsx` : trois feuilles :
  * Dossiers, Historique, Synthèse.
  *
  * Le rôle est vérifié ICI en plus de l'API. L'API l'exigerait de toute façon,
