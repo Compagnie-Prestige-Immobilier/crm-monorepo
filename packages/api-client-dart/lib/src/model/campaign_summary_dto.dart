@@ -40,6 +40,8 @@ class CampaignSummaryDto {
 
     required this.commercialCount,
 
+    required this.spreadDays,
+
     required this.progress,
 
     required this.createdAt,
@@ -86,6 +88,10 @@ class CampaignSummaryDto {
   @JsonKey(name: r'commercialCount', required: true, includeIfNull: false)
   final num commercialCount;
 
+  /// Journées d’étalement. 1 : programme unique.
+  @JsonKey(name: r'spreadDays', required: true, includeIfNull: false)
+  final num spreadDays;
+
   @JsonKey(name: r'progress', required: true, includeIfNull: false)
   final CampaignProgressDto progress;
 
@@ -110,6 +116,7 @@ class CampaignSummaryDto {
                 createdById,
                 createdByName,
                 commercialCount,
+                spreadDays,
                 progress,
                 createdAt,
                 closedAt,
@@ -124,6 +131,7 @@ class CampaignSummaryDto {
                 other.createdById,
                 other.createdByName,
                 other.commercialCount,
+                other.spreadDays,
                 other.progress,
                 other.createdAt,
                 other.closedAt,
@@ -144,6 +152,7 @@ class CampaignSummaryDto {
         createdById,
         createdByName,
         commercialCount,
+        spreadDays,
         progress,
         createdAt,
         closedAt,

@@ -35,13 +35,13 @@ class FunnelStageDto {
   @JsonKey(name: r'count', required: true, includeIfNull: false)
   final num count;
 
-  /// Part de l’étape précédente, en pourcentage. Vaut 100 pour la première. C’est le taux qui montre OÙ la chaîne se casse, et non le taux global qui noie la marche défaillante dans la moyenne.
-  @JsonKey(name: r'tauxEtapePrecedente', required: true, includeIfNull: false)
-  final num tauxEtapePrecedente;
+  /// Part de l’étape précédente, en pourcentage. Vaut 100 pour la première. C’est le taux qui montre OÙ la chaîne se casse, et non le taux global qui noie la marche défaillante dans la moyenne. Nul quand l’étape précédente est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %.
+  @JsonKey(name: r'tauxEtapePrecedente', required: true, includeIfNull: true)
+  final num? tauxEtapePrecedente;
 
-  /// Part du sommet de l’entonnoir, en pourcentage.
-  @JsonKey(name: r'tauxGlobal', required: true, includeIfNull: false)
-  final num tauxGlobal;
+  /// Part du sommet de l’entonnoir, en pourcentage. Nul quand le sommet est vide.
+  @JsonKey(name: r'tauxGlobal', required: true, includeIfNull: true)
+  final num? tauxGlobal;
 
   bool operator ==(Object other) {
     return identical(this, other) ||

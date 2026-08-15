@@ -10,6 +10,7 @@ import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
 import 'dart:typed_data';
+import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/app_update_dto.dart';
 
 class AppUpdatesApi {

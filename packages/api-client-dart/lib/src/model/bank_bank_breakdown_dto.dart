@@ -19,7 +19,7 @@ part 'bank_bank_breakdown_dto.g.dart';
 class BankBankBreakdownDto {
   /// Returns a new [BankBankBreakdownDto] instance.
   BankBankBreakdownDto({
-    required this.bankId,
+    required this.banqueId,
 
     required this.label,
 
@@ -36,8 +36,8 @@ class BankBankBreakdownDto {
     required this.meanProcessingHours,
   });
 
-  @JsonKey(name: r'bankId', required: true, includeIfNull: false)
-  final String bankId;
+  @JsonKey(name: r'banqueId', required: true, includeIfNull: false)
+  final String banqueId;
 
   @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
@@ -67,7 +67,7 @@ class BankBankBreakdownDto {
             runtimeType == other.runtimeType &&
             equals(
               [
-                bankId,
+                banqueId,
                 label,
                 cases,
                 cashed,
@@ -77,7 +77,7 @@ class BankBankBreakdownDto {
                 meanProcessingHours,
               ],
               [
-                other.bankId,
+                other.banqueId,
                 other.label,
                 other.cases,
                 other.cashed,
@@ -93,7 +93,7 @@ class BankBankBreakdownDto {
   int get hashCode =>
       runtimeType.hashCode ^
       mapPropsToHashCode([
-        bankId,
+        banqueId,
         label,
         cases,
         cashed,

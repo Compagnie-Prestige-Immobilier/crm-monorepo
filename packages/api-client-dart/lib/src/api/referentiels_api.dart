@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
+import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/banque_dto.dart';
 import 'package:crm_api_client/src/model/create_banque_dto.dart';
 import 'package:crm_api_client/src/model/create_departement_dto.dart';

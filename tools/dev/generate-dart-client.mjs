@@ -27,9 +27,9 @@
 // ---------------------------------------------------------------------------
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, normalize, relative as relative_, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -203,6 +203,55 @@ runAtRoot(
   ],
   { env: childEnv },
 );
+
+// --- 4 bis. Élagage des fichiers d'un contrat révolu ------------------------
+//
+// openapi-generator ÉCRIT mais n'EFFACE JAMAIS. Une route ou un schéma retiré
+// du contrat laisse donc son fichier Dart sur le disque, indéfiniment.
+//
+// Ce n'est pas cosmétique. Le fichier orphelin continue de compiler, reste
+// importable, et se met à mentir : `devices_api.dart` proposait encore
+// `POST /devices/register` des semaines après la disparition de la route côté
+// serveur. Un développeur mobile qui suit l'autocomplétion écrit alors du code
+// contre une route qui répond 404, sans qu'aucun outil ne l'avertisse.
+//
+// Le manifeste `.openapi-generator/FILES`, réécrit à chaque génération, EST la
+// liste de ce qui doit exister. Tout le reste sous `lib/src` est un vestige.
+// Les fichiers `*.g.dart` de build_runner n'y figurent pas et sont rattachés à
+// leur source : ils disparaissent avec elle.
+const manifestPath = join(packageDir, '.openapi-generator', 'FILES');
+const manifest = new Set(
+  readFileSync(manifestPath, 'utf8')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => normalize(line)),
+);
+
+const pruned = [];
+const walk = (dir) => {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walk(full);
+      continue;
+    }
+    const relative = normalize(relative_(packageDir, full));
+    const source = relative.endsWith('.g.dart')
+      ? `${relative.slice(0, -'.g.dart'.length)}.dart`
+      : relative;
+    if (!manifest.has(source)) {
+      rmSync(full);
+      pruned.push(relative);
+    }
+  }
+};
+walk(join(packageDir, 'lib', 'src'));
+
+if (pruned.length) {
+  console.log(`  ${pruned.length} fichier(s) d'un contrat révolu supprimé(s) :`);
+  for (const file of pruned) console.log(`    - ${file}`);
+}
 
 // `dart pub get` avant build_runner : sur une machine fraîche le .dart_tool
 // n'existe pas et build_runner échoue avec un message peu clair.

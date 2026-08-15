@@ -119,7 +119,7 @@ class NotificationDto {
   @JsonKey(name: r'cancelledAt', required: true, includeIfNull: true)
   final DateTime? cancelledAt;
 
-  /// NOT_CONFIGURED quand aucun compte de service FCM n’est fourni : les lignes de livraison existent, la remise n’a pas eu lieu. TRANSPORT_ERROR quand Google a refusé l’authentification.
+  /// Issue de la branche E-MAIL, seul canal sortant. NOT_CONFIGURED quand aucune clé Brevo n’est fournie : les lignes de livraison existent et la boîte de réception les montre, aucun e-mail n’est parti. TRANSPORT_ERROR quand Brevo a tout refusé ; les livraisons restent en file et seront réessayées.
   @JsonKey(name: r'transportStatus', required: true, includeIfNull: true)
   final String? transportStatus;
 

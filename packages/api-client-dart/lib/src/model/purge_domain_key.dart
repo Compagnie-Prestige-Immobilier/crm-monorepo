@@ -16,6 +16,10 @@ enum PurgeDomainKey {
   prospects(r'prospects'),
   @JsonValue(r'campagnes')
   campagnes(r'campagnes'),
+  @JsonValue(r'campagnesRepresentants')
+  campagnesRepresentants(r'campagnesRepresentants'),
+  @JsonValue(r'demandesClients')
+  demandesClients(r'demandesClients'),
   @JsonValue(r'fileAppels')
   fileAppels(r'fileAppels'),
   @JsonValue(r'tentatives')

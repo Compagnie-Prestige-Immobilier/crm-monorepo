@@ -6,7 +6,7 @@
 // The `git add --intent-to-add` matters far more here than on the TypeScript
 // side. openapi-typescript writes ONE file, so a plain `git diff` at least
 // catches every change to an existing endpoint. dart-dio writes one file per
-// model and per API group, plus a *.g.dart beside each — adding a single DTO
+// model and per API group, plus a *.g.dart beside each : adding a single DTO
 // server-side produces four brand-new untracked files and a `git diff` that is
 // completely empty. The gate would go green while apps/mobile compiles against
 // a contract that no longer exists.

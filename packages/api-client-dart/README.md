@@ -1,4 +1,4 @@
-# `crm_api_client` — client Dart généré
+# `crm_api_client` : client Dart généré
 
 **Aucun fichier de `lib/` n'est écrit à la main.** Tout est produit par
 `openapi-generator` (7.24.0, générateur `dart-dio`) depuis `apps/api/openapi.json`,
@@ -40,5 +40,5 @@ JDK installés.
 ## Fichiers protégés
 
 `.openapi-generator-ignore` empêche le générateur d'écraser `pubspec.yaml`,
-`analysis_options.yaml`, `README.md` et `.gitignore` — il en écrit sa propre
+`analysis_options.yaml`, `README.md` et `.gitignore` : il en écrit sa propre
 version à chaque exécution.

@@ -59,6 +59,10 @@ abstract class _$ProspectDtoCWProxy {
 
   ProspectDto lastAttemptAt(DateTime? lastAttemptAt);
 
+  ProspectDto origin(String? origin);
+
+  ProspectDto originLabel(String? originLabel);
+
   ProspectDto clientCreatedAt(DateTime clientCreatedAt);
 
   ProspectDto createdAt(DateTime createdAt);
@@ -100,6 +104,8 @@ abstract class _$ProspectDtoCWProxy {
     CallOutcome? lastOutcome,
     String? lastComment,
     DateTime? lastAttemptAt,
+    String? origin,
+    String? originLabel,
     DateTime clientCreatedAt,
     DateTime createdAt,
     DateTime updatedAt,
@@ -208,6 +214,13 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
       this(lastAttemptAt: lastAttemptAt);
 
   @override
+  ProspectDto origin(String? origin) => this(origin: origin);
+
+  @override
+  ProspectDto originLabel(String? originLabel) =>
+      this(originLabel: originLabel);
+
+  @override
   ProspectDto clientCreatedAt(DateTime clientCreatedAt) =>
       this(clientCreatedAt: clientCreatedAt);
 
@@ -254,6 +267,8 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? lastOutcome = const $CopyWithPlaceholder(),
     Object? lastComment = const $CopyWithPlaceholder(),
     Object? lastAttemptAt = const $CopyWithPlaceholder(),
+    Object? origin = const $CopyWithPlaceholder(),
+    Object? originLabel = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? createdAt = const $CopyWithPlaceholder(),
     Object? updatedAt = const $CopyWithPlaceholder(),
@@ -368,6 +383,14 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.lastAttemptAt
           // ignore: cast_nullable_to_non_nullable
           : lastAttemptAt as DateTime?,
+      origin: origin == const $CopyWithPlaceholder()
+          ? _value.origin
+          // ignore: cast_nullable_to_non_nullable
+          : origin as String?,
+      originLabel: originLabel == const $CopyWithPlaceholder()
+          ? _value.originLabel
+          // ignore: cast_nullable_to_non_nullable
+          : originLabel as String?,
       clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -430,6 +453,8 @@ ProspectDto _$ProspectDtoFromJson(
       'lastOutcome',
       'lastComment',
       'lastAttemptAt',
+      'origin',
+      'originLabel',
       'clientCreatedAt',
       'createdAt',
       'updatedAt',
@@ -519,6 +544,8 @@ ProspectDto _$ProspectDtoFromJson(
       'lastAttemptAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    origin: $checkedConvert('origin', (v) => v as String?),
+    originLabel: $checkedConvert('originLabel', (v) => v as String?),
     clientCreatedAt: $checkedConvert(
       'clientCreatedAt',
       (v) => DateTime.parse(v as String),
@@ -561,6 +588,8 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'lastOutcome': _$CallOutcomeEnumMap[instance.lastOutcome],
       'lastComment': instance.lastComment,
       'lastAttemptAt': instance.lastAttemptAt?.toIso8601String(),
+      'origin': instance.origin,
+      'originLabel': instance.originLabel,
       'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),

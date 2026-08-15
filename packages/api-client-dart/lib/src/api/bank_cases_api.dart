@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
+import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/bank_case_analytics_dto.dart';
 import 'package:crm_api_client/src/model/bank_case_detail_dto.dart';
 import 'package:crm_api_client/src/model/bank_case_dto.dart';
@@ -16,12 +17,12 @@ import 'package:crm_api_client/src/model/bank_case_list_dto.dart';
 import 'package:crm_api_client/src/model/bank_case_sort_field.dart';
 import 'package:crm_api_client/src/model/bank_rejection_reason_list_dto.dart';
 import 'package:crm_api_client/src/model/bank_stage_type.dart';
-import 'package:crm_api_client/src/model/bank_time_granularity.dart';
 import 'package:crm_api_client/src/model/create_bank_case_correction_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_transition_dto.dart';
 import 'package:crm_api_client/src/model/prospect_search_list_dto.dart';
 import 'package:crm_api_client/src/model/sort_order.dart';
+import 'package:crm_api_client/src/model/time_granularity.dart';
 import 'package:crm_api_client/src/model/update_bank_case_dto.dart';
 
 class BankCasesApi {
@@ -408,7 +409,7 @@ class BankCasesApi {
   /// * [search] - Recherche libre sur la référence, le nom du client ou son téléphone.
   /// * [stageId]
   /// * [stageType]
-  /// * [bankId] - Banque de traitement du dossier.
+  /// * [banqueId] - Banque de traitement du dossier.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
   /// * [rejectionReasonId]
   /// * [dateFrom] - Borne basse sur la création, incluse.
@@ -429,14 +430,14 @@ class BankCasesApi {
     String? search,
     String? stageId,
     BankStageType? stageType,
-    String? bankId,
+    String? banqueId,
     String? agentId,
     String? rejectionReasonId,
     DateTime? dateFrom,
     DateTime? dateTo,
     String? amountMin,
     String? amountMax,
-    BankTimeGranularity? granularity,
+    TimeGranularity? granularity,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -461,7 +462,7 @@ class BankCasesApi {
       if (search != null) r'search': search,
       if (stageId != null) r'stageId': stageId,
       if (stageType != null) r'stageType': stageType,
-      if (bankId != null) r'bankId': bankId,
+      if (banqueId != null) r'banqueId': banqueId,
       if (agentId != null) r'agentId': agentId,
       if (rejectionReasonId != null) r'rejectionReasonId': rejectionReasonId,
       if (dateFrom != null) r'dateFrom': dateFrom,
@@ -520,7 +521,7 @@ class BankCasesApi {
   /// * [search] - Recherche libre sur la référence, le nom du client ou son téléphone.
   /// * [stageId]
   /// * [stageType]
-  /// * [bankId] - Banque de traitement du dossier.
+  /// * [banqueId] - Banque de traitement du dossier.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
   /// * [rejectionReasonId]
   /// * [dateFrom] - Borne basse sur la création, incluse.
@@ -544,7 +545,7 @@ class BankCasesApi {
     String? search,
     String? stageId,
     BankStageType? stageType,
-    String? bankId,
+    String? banqueId,
     String? agentId,
     String? rejectionReasonId,
     DateTime? dateFrom,
@@ -579,7 +580,7 @@ class BankCasesApi {
       if (search != null) r'search': search,
       if (stageId != null) r'stageId': stageId,
       if (stageType != null) r'stageType': stageType,
-      if (bankId != null) r'bankId': bankId,
+      if (banqueId != null) r'banqueId': banqueId,
       if (agentId != null) r'agentId': agentId,
       if (rejectionReasonId != null) r'rejectionReasonId': rejectionReasonId,
       if (dateFrom != null) r'dateFrom': dateFrom,
@@ -720,7 +721,7 @@ class BankCasesApi {
   /// Projection VOLONTAIREMENT étroite : identité, téléphone et banque courante, rien d’autre. Un agent Banque &amp; Finance n’a pas à voir le commercial propriétaire, le syndicat ni le statut de prospection.
   ///
   /// Parameters:
-  /// * [q] - Nom (insensible à la casse et aux accents) ou téléphone sous n’importe quelle forme écrite.
+  /// * [search] - Nom (insensible à la casse et aux accents) ou téléphone sous n’importe quelle forme écrite.
   /// * [page]
   /// * [pageSize]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -733,7 +734,7 @@ class BankCasesApi {
   /// Returns a [Future] containing a [Response] with a [ProspectSearchListDto] as data
   /// Throws [DioException] if API call or serialization fails
   Future<Response<ProspectSearchListDto>> searchBankCaseProspects({
-    required String q,
+    required String search,
     num? page = 1,
     num? pageSize = 20,
     CancelToken? cancelToken,
@@ -757,7 +758,7 @@ class BankCasesApi {
     );
 
     final _queryParameters = <String, dynamic>{
-      r'q': q,
+      r'search': search,
       if (page != null) r'page': page,
       if (pageSize != null) r'pageSize': pageSize,
     };

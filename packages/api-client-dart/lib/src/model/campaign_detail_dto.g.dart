@@ -25,11 +25,15 @@ abstract class _$CampaignDetailDtoCWProxy {
 
   CampaignDetailDto commercialCount(num commercialCount);
 
+  CampaignDetailDto spreadDays(num spreadDays);
+
   CampaignDetailDto progress(CampaignProgressDto progress);
 
   CampaignDetailDto createdAt(DateTime createdAt);
 
   CampaignDetailDto closedAt(DateTime? closedAt);
+
+  CampaignDetailDto perDay(List<num> perDay);
 
   CampaignDetailDto commerciaux(List<CampaignCommercialDto> commerciaux);
 
@@ -51,9 +55,11 @@ abstract class _$CampaignDetailDtoCWProxy {
     String createdById,
     String createdByName,
     num commercialCount,
+    num spreadDays,
     CampaignProgressDto progress,
     DateTime createdAt,
     DateTime? closedAt,
+    List<num> perDay,
     List<CampaignCommercialDto> commerciaux,
     List<CampaignAttemptDto> recentAttempts,
   });
@@ -97,6 +103,9 @@ class _$CampaignDetailDtoCWProxyImpl implements _$CampaignDetailDtoCWProxy {
       this(commercialCount: commercialCount);
 
   @override
+  CampaignDetailDto spreadDays(num spreadDays) => this(spreadDays: spreadDays);
+
+  @override
   CampaignDetailDto progress(CampaignProgressDto progress) =>
       this(progress: progress);
 
@@ -105,6 +114,9 @@ class _$CampaignDetailDtoCWProxyImpl implements _$CampaignDetailDtoCWProxy {
 
   @override
   CampaignDetailDto closedAt(DateTime? closedAt) => this(closedAt: closedAt);
+
+  @override
+  CampaignDetailDto perDay(List<num> perDay) => this(perDay: perDay);
 
   @override
   CampaignDetailDto commerciaux(List<CampaignCommercialDto> commerciaux) =>
@@ -131,9 +143,11 @@ class _$CampaignDetailDtoCWProxyImpl implements _$CampaignDetailDtoCWProxy {
     Object? createdById = const $CopyWithPlaceholder(),
     Object? createdByName = const $CopyWithPlaceholder(),
     Object? commercialCount = const $CopyWithPlaceholder(),
+    Object? spreadDays = const $CopyWithPlaceholder(),
     Object? progress = const $CopyWithPlaceholder(),
     Object? createdAt = const $CopyWithPlaceholder(),
     Object? closedAt = const $CopyWithPlaceholder(),
+    Object? perDay = const $CopyWithPlaceholder(),
     Object? commerciaux = const $CopyWithPlaceholder(),
     Object? recentAttempts = const $CopyWithPlaceholder(),
   }) {
@@ -174,6 +188,10 @@ class _$CampaignDetailDtoCWProxyImpl implements _$CampaignDetailDtoCWProxy {
           ? _value.commercialCount
           // ignore: cast_nullable_to_non_nullable
           : commercialCount as num,
+      spreadDays: spreadDays == const $CopyWithPlaceholder()
+          ? _value.spreadDays
+          // ignore: cast_nullable_to_non_nullable
+          : spreadDays as num,
       progress: progress == const $CopyWithPlaceholder()
           ? _value.progress
           // ignore: cast_nullable_to_non_nullable
@@ -186,6 +204,10 @@ class _$CampaignDetailDtoCWProxyImpl implements _$CampaignDetailDtoCWProxy {
           ? _value.closedAt
           // ignore: cast_nullable_to_non_nullable
           : closedAt as DateTime?,
+      perDay: perDay == const $CopyWithPlaceholder()
+          ? _value.perDay
+          // ignore: cast_nullable_to_non_nullable
+          : perDay as List<num>,
       commerciaux: commerciaux == const $CopyWithPlaceholder()
           ? _value.commerciaux
           // ignore: cast_nullable_to_non_nullable
@@ -224,9 +246,11 @@ CampaignDetailDto _$CampaignDetailDtoFromJson(
       'createdById',
       'createdByName',
       'commercialCount',
+      'spreadDays',
       'progress',
       'createdAt',
       'closedAt',
+      'perDay',
       'commerciaux',
       'recentAttempts',
     ],
@@ -255,6 +279,7 @@ CampaignDetailDto _$CampaignDetailDtoFromJson(
     createdById: $checkedConvert('createdById', (v) => v as String),
     createdByName: $checkedConvert('createdByName', (v) => v as String),
     commercialCount: $checkedConvert('commercialCount', (v) => v as num),
+    spreadDays: $checkedConvert('spreadDays', (v) => v as num),
     progress: $checkedConvert(
       'progress',
       (v) => CampaignProgressDto.fromJson(v as Map<String, dynamic>),
@@ -263,6 +288,10 @@ CampaignDetailDto _$CampaignDetailDtoFromJson(
     closedAt: $checkedConvert(
       'closedAt',
       (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    perDay: $checkedConvert(
+      'perDay',
+      (v) => (v as List<dynamic>).map((e) => e as num).toList(),
     ),
     commerciaux: $checkedConvert(
       'commerciaux',
@@ -291,9 +320,11 @@ Map<String, dynamic> _$CampaignDetailDtoToJson(CampaignDetailDto instance) =>
       'createdById': instance.createdById,
       'createdByName': instance.createdByName,
       'commercialCount': instance.commercialCount,
+      'spreadDays': instance.spreadDays,
       'progress': instance.progress.toJson(),
       'createdAt': instance.createdAt.toIso8601String(),
       'closedAt': instance.closedAt?.toIso8601String(),
+      'perDay': instance.perDay,
       'commerciaux': instance.commerciaux.map((e) => e.toJson()).toList(),
       'recentAttempts': instance.recentAttempts.map((e) => e.toJson()).toList(),
     };
