@@ -83,6 +83,10 @@ beforeAll(() => {
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'cpi-dumps-'));
   process.env.DB_DUMP_DIR = directory;
+  // La fonctionnalité est ÉTEINTE par défaut. Ce fichier éprouve ce qu'elle
+  // fait quand elle est allumée ; `db-dump.enabled.test.ts` éprouve
+  // l'interrupteur lui-même, dans les deux positions.
+  process.env.DB_DUMP_ENABLED = 'true';
   store = new FakeDumpStore();
   runner = new FakeDumpRunner();
   notifications = new FakeNotifications();
@@ -399,11 +403,26 @@ describe('avis de fin', () => {
   });
 
   /**
-   * Sans compte Brevo, l'export DOIT aboutir, et l'état DOIT le dire. Un
-   * fichier prêt dont personne n'est prévenu, sans que rien ne le signale, est
-   * exactement la panne silencieuse qu'on refuse.
+   * ═══════════════════════════════════════════════════════════════════════════
+   * L'AVIS N'EST QUE LA CLOCHE, ET L'ÉTAT NE PRÉTEND PLUS AUTRE CHOSE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Ce test épinglait `NOT_CONFIGURED`, c'est-à-dire l'issue du TRANSPORT
+   * e-mail, comme si cet avis en empruntait un. Il n'en emprunte aucun : la
+   * sélection des destinataires d'e-mail ne retient que les comptes COMMERCIAL,
+   * et le demandeur d'un export est toujours un ADMIN. Aucun e-mail n'est donc
+   * jamais tenté, et l'état recopiait pourtant `SENT`, que l'écran présentait
+   * comme « l'e-mail est parti ».
+   *
+   * La conséquence n'était pas cosmétique : l'administrateur attend un message
+   * qui ne viendra pas, conclut à une panne, et relance l'export, ce qui remet
+   * un exemplaire complet de la clientèle sur le disque.
+   *
+   * L'issue est donc `INBOX_ONLY`, QUOI QUE dise le transport : le test le
+   * vérifie précisément en posant une valeur de transport qui, autrefois,
+   * traversait jusqu'à l'écran.
    */
-  it('aboutit sans transport e-mail, et l’annonce dans l’état', async () => {
+  it('n’annonce que la cloche, quoi que dise le transport e-mail', async () => {
     notifications.transportStatus = 'NOT_CONFIGURED';
 
     await app.inject({ method: 'POST', url: STATE_URL });
@@ -411,7 +430,25 @@ describe('avis de fin', () => {
 
     expect(body.status).toBe('ready');
     expect(body.downloadable).toBe(true);
-    expect(body.noticeStatus).toBe('NOT_CONFIGURED');
+    expect(body.noticeStatus).toBe('INBOX_ONLY');
+    expect(body.noticeStatus).not.toBe('SENT');
+    // L'avis a bien été déposé, lui : la cloche fonctionne réellement.
+    expect(notifications.sent).toHaveLength(1);
+    expect(notifications.sent[0]?.audienceUserIds).toEqual([
+      '0199a000-0000-7000-8000-000000000001',
+    ]);
+  });
+
+  /**
+   * Et la carte ne doit pas non plus promettre un e-mail : le corps de l'avis
+   * dit où aller, pas d'attendre un message. Il n'y a rien à attendre.
+   */
+  it('n’annonce aucun e-mail dans le corps de l’avis', async () => {
+    await app.inject({ method: 'POST', url: STATE_URL });
+    await settle();
+
+    const message = `${notifications.sent[0]?.title ?? ''} ${notifications.sent[0]?.body ?? ''}`;
+    expect(message).not.toMatch(/e-mail|courriel|mail/iu);
   });
 
   it('aboutit même si l’avis lève, et porte le motif', async () => {

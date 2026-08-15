@@ -24,6 +24,7 @@ const job = (overrides: Partial<DumpJob>): DumpJob => ({
   fileSize: 1_024,
   sha256: 'a'.repeat(64),
   expiresAt: null,
+  reservedAt: null,
   downloadedAt: null,
   failureReason: null,
   noticeStatus: 'SENT',
@@ -70,10 +71,39 @@ describe('effectiveStatus', () => {
     expect(effectiveStatus(job({ status: 'running', startedAt }), NOW)).toBe('failed');
   });
 
-  it('ne touche ni à « queued » ni à « failed » ni à « expired »', () => {
-    expect(effectiveStatus(job({ status: 'queued', startedAt: null }), NOW)).toBe('queued');
+  it('ne touche ni à « failed » ni à « expired », qui sont des états finaux', () => {
     expect(effectiveStatus(job({ status: 'failed' }), NOW)).toBe('failed');
     expect(effectiveStatus(job({ status: 'expired' }), NOW)).toBe('expired');
+  });
+
+  it('laisse « queued » un travail inscrit à l’instant', () => {
+    const requestedAt = new Date(NOW.getTime() - 1_000).toISOString();
+    expect(effectiveStatus(job({ status: 'queued', startedAt: null, requestedAt }), NOW)).toBe(
+      'queued',
+    );
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LE TEST QUI REMPLACE UNE ASSERTION FAUSSE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Ce fichier ÉPINGLAIT le contraire : « ne touche pas à queued », dans la
+   * même phrase que `failed` et `expired`, comme si les trois étaient des états
+   * finaux. `queued` n'en est pas un, c'est le plus fugace de tous, et le
+   * laisser passer à travers la borne rendait la panne DÉFINITIVE.
+   *
+   * Un conteneur qui meurt entre l'écriture de `queued` et celle de `running`
+   * laissait une ligne que rien ne faisait vieillir. `isInFlight('queued')`
+   * étant vrai, toute demande ultérieure rendait ce fantôme au lieu de démarrer
+   * un export, pour toujours, sans aucune route pour réarmer. Le test précédent
+   * faisait passer ce trou pour une décision.
+   */
+  it('enterre un « queued » plus vieux que la durée maximale', () => {
+    const requestedAt = new Date(NOW.getTime() - DUMP_MAX_RUNTIME_MS - 1_000).toISOString();
+    expect(effectiveStatus(job({ status: 'queued', startedAt: null, requestedAt }), NOW)).toBe(
+      'failed',
+    );
   });
 
   /**

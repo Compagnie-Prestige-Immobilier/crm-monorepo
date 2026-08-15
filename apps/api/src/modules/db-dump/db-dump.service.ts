@@ -1,15 +1,23 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { createReadStream } from 'node:fs';
-import { mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { constants, createReadStream } from 'node:fs';
+import { mkdir, open, readdir, rm, stat, type FileHandle } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 
-import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  type OnModuleInit,
+} from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { NotificationAudience, NotificationCategory, type Prisma } from '@crm/database';
 import type { FastifyReply } from 'fastify';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { readEnv } from '../../env.js';
+import { isOpenApiGeneration, readEnv } from '../../env.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import {
   dumpFileName,
@@ -43,12 +51,28 @@ import type { DatabaseDumpJobDto } from './dto.js';
  * 2. PAS PENDANT UNE DÉMONSTRATION. Rien n'est écrit ici pour l'obtenir :
  *    `DemoReadOnlyGuard` refuse toute méthode mutante tant que l'interrupteur
  *    est allumé, et la demande est un POST. La route ne porte donc PAS
- *    `@DemoWritable`, et c'est la décision, pas un oubli. Un export pris
- *    pendant une démonstration contiendrait les milliers de lignes fictives que
- *    le semeur vient d'écrire, mêlées aux vraies, dans un fichier qui a toutes
- *    les apparences d'un export de production. Le TÉLÉCHARGEMENT, lui, est un
- *    GET : il reste possible, ce qui est correct, puisqu'un fichier prêt a
- *    nécessairement été produit hors démonstration.
+ *    `@DemoWritable`, et c'est la décision, pas un oubli.
+ *
+ *    ATTENTION À LA RAISON, QUI A LONGTEMPS ÉTÉ ÉCRITE FAUSSE ICI. Ce refus ne
+ *    garantit PAS un export exempt de lignes fictives. `pg_dump` est lancé
+ *    sans `--exclude-table` et sans filtre de lignes (voir
+ *    `PG_DUMP_ARGUMENTS`) : il exporte TOUTE ligne de TOUTE table. Or éteindre
+ *    la démonstration ne supprime rien, cela masque : les lignes semées gardent
+ *    `isDemo: true` et ne disparaissent des écrans que par `demoScope`. Un
+ *    export pris interrupteur ÉTEINT contient donc exactement les mêmes lignes
+ *    fictives qu'un export pris interrupteur allumé, tant que le jeu de
+ *    démonstration n'a pas été PURGÉ.
+ *
+ *    Ce que le 409 contrôle réellement est le MOMENT, et cela vaut d'être
+ *    gardé : on ne produit pas une copie complète de la base pendant que le
+ *    jeu fictif est à son maximum et que l'attention de l'opérateur est
+ *    ailleurs. Ce qu'il ne contrôle pas, c'est la contamination, et c'est
+ *    l'écran de confirmation qui le dit à l'administrateur.
+ *
+ *    Le TÉLÉCHARGEMENT, lui, est un GET : il reste possible, et c'est correct.
+ *    L'archive porte en revanche `X-Demo-Mode: false` de façon explicite, sans
+ *    quoi le panel l'enregistrerait sous un nom la déclarant fictive alors
+ *    qu'elle contient la clientèle réelle (voir `setDownloadHeaders`).
  *
  * 3. AUCUN LIEN NE VOYAGE. L'avis de fin ne contient pas d'URL, pas de jeton,
  *    pas de pièce jointe : il dit que l'export est prêt et invite à se
@@ -91,27 +115,124 @@ const DUMP_CONTENT_TYPE = 'application/gzip';
 const AUDIT_REQUESTED = 'DATABASE_DUMP_REQUESTED';
 const AUDIT_DOWNLOADED = 'DATABASE_DUMP_DOWNLOADED';
 
+/**
+ * Au-delà, une RÉSERVATION de téléchargement est réputée abandonnée.
+ *
+ * La réservation est ce qui garantit UNE livraison (voir `DumpJob.reservedAt`).
+ * Comme tout verrou posé par un processus, elle doit avoir une durée de vie
+ * propre : un conteneur tué pendant l'envoi laisserait sinon une archive
+ * réservée pour l'éternité, c'est-à-dire un fichier que plus personne ne peut
+ * ni télécharger ni faire détruire par un téléchargement.
+ *
+ * Dix minutes : très au-delà de ce que prend l'envoi d'une archive compressée,
+ * même sur une liaison mobile à Dakar, et très en deçà de l'échéance du fichier.
+ */
+const RESERVATION_LEASE_MS = 10 * 60 * 1_000;
+
+/**
+ * Refus d'une seconde livraison simultanée.
+ *
+ * 409 et non 404 : l'archive existe, elle est simplement en train de partir
+ * ailleurs. Un 404 enverrait l'administrateur relancer un export dont il n'a
+ * pas besoin, ce qui remettrait un exemplaire de plus sur le disque.
+ */
+const alreadyDelivering = (): ConflictException =>
+  new ConflictException({
+    code: 'DATABASE_DUMP_DELIVERING',
+    message:
+      'Cet export est déjà en cours de téléchargement. Attendez la fin du transfert, ou ' +
+      'réessayez dans quelques minutes s’il a été interrompu.',
+  });
+
+/** L'état enregistré, avec la chaîne EXACTE qui le porte en base. */
+interface Stored {
+  readonly job: DumpJob;
+  readonly value: string;
+}
+
+/**
+ * Relecture DÉFENSIVE de la ligne. Une valeur illisible vaut « pas d'export ».
+ *
+ * Écrit à part pour être appelé aussi bien par le service que par la
+ * réconciliation d'amorçage, qui n'a pas d'acteur sous la main.
+ */
+function parseJob(raw: string): DumpJob | null {
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== 'object') return null;
+    const record = value as Partial<DumpJob>;
+    if (typeof record.id !== 'string' || typeof record.status !== 'string') return null;
+    // `reservedAt` a été ajouté après coup : une ligne écrite par une version
+    // antérieure n'en a pas, et `undefined` traverserait ensuite tous les
+    // contrôles d'égalité à `null`.
+    return { ...record, reservedAt: record.reservedAt ?? null } as DumpJob;
+  } catch {
+    return null;
+  }
+}
+
 @Injectable()
-export class DbDumpService {
+export class DbDumpService implements OnModuleInit {
   private readonly logger = new Logger(DbDumpService.name);
   private readonly directory = resolve(readEnv().DB_DUMP_DIR);
-
-  /**
-   * Verrou DANS LE PROCESSUS, en complément de la clé unique.
-   *
-   * Deux POST arrivés à la même milliseconde liraient tous deux « aucun export
-   * en cours » avant que le premier n'ait écrit son état, et deux `pg_dump`
-   * partiraient sur la même base. Ce drapeau ferme la fenêtre. Il ne remplace
-   * pas l'état persisté, qui est le seul à survivre à un redémarrage : c'est
-   * l'inverse, l'un couvre les millisecondes, l'autre les heures.
-   */
-  private starting = false;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     @Inject(DUMP_RUNNER) private readonly runner: DumpRunner,
   ) {}
+
+  /**
+   * RÉCONCILIATION D'AMORÇAGE. C'est elle qui rattrape les arrêts brutaux.
+   *
+   * Tout le reste du module ne s'exécute que si quelqu'un appelle une route.
+   * Or ce qu'un redémarrage laisse derrière lui est précisément ce que personne
+   * ne regarde : une archive partielle abandonnée en plein `pg_dump`, une
+   * archive complète dont la destruction après envoi n'a pas eu le temps
+   * d'aboutir, une réservation dont le processus détenteur n'existe plus. Ces
+   * fichiers survivaient au redéploiement sur le volume, sans que rien ne
+   * sache plus ni les servir ni les détruire.
+   *
+   * `deliveriesLost` est vrai ici, et seulement ici : au démarrage, TOUTE
+   * réservation appartient à un processus mort, sans avoir à attendre son bail.
+   *
+   * L'échec ne fait pas échouer l'amorçage : une base indisponible à la
+   * seconde du démarrage ne doit pas empêcher l'API de servir le reste. Le
+   * balayage périodique repassera.
+   */
+  async onModuleInit(): Promise<void> {
+    // Le conteneur est monté sans base pendant `pnpm openapi:generate`.
+    if (isOpenApiGeneration()) return;
+    try {
+      await this.sweep(new Date(), true);
+    } catch (error) {
+      this.logger.error(`Export de la base : réconciliation d’amorçage impossible. ${String(error)}`);
+    }
+  }
+
+  /**
+   * Balayage PÉRIODIQUE, le seul mécanisme d'échéance qui ne dépende de personne.
+   *
+   * L'échéance reposait sur un `setTimeout` armé à la fin de l'export, perdu au
+   * moindre redémarrage, doublé d'une application paresseuse au premier regard
+   * porté sur l'écran. Un fichier produit un vendredi soir, jamais téléchargé,
+   * pouvait donc rester sur le volume tout le week-end, très au-delà des six
+   * heures annoncées, et se retrouver dans les instantanés de sauvegarde du
+   * fournisseur, qui passent la nuit.
+   *
+   * Toutes les heures : l'échéance est de six heures, le dépassement maximal
+   * est donc d'une heure, et le balayage ne coûte qu'une lecture de ligne et un
+   * `readdir` sur un répertoire qui contient zéro ou un fichier.
+   */
+  @Cron(CronExpression.EVERY_HOUR, { name: 'cpi.db-dump.sweep' })
+  async sweepExpired(): Promise<void> {
+    if (isOpenApiGeneration()) return;
+    try {
+      await this.sweep();
+    } catch (error) {
+      this.logger.error(`Export de la base : balayage périodique impossible. ${String(error)}`);
+    }
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
   // Lecture
@@ -131,8 +252,8 @@ export class DbDumpService {
    * assumé, pas oublié.
    */
   async state(now = new Date()): Promise<DatabaseDumpJobDto> {
-    const job = await this.reconcile(now);
-    return this.toDto(job, now);
+    const current = await this.reconcile(now);
+    return this.toDto(current?.job ?? null, now);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -152,52 +273,72 @@ export class DbDumpService {
    */
   async request(actor: AuthenticatedUser, now = new Date()): Promise<DatabaseDumpJobDto> {
     const existing = await this.reconcile(now);
-    if (existing !== null && isInFlight(existing.status)) return this.toDto(existing, now);
-    if (this.starting) {
+    if (existing !== null && isInFlight(effectiveStatus(existing.job, now))) {
+      return this.toDto(existing.job, now);
+    }
+
+    // UNE ARCHIVE PRÊTE N'EST PAS REMPLACÉE EN SILENCE.
+    //
+    // La demande détruisait l'archive courante pour en produire une autre. Deux
+    // conséquences, et la seconde est la pire : l'administrateur qui téléchargeait
+    // au même instant voyait son transfert mourir sans explication, et celui qui
+    // recliquait par réflexe perdait un fichier déjà produit, déjà annoncé, pour
+    // attendre plusieurs minutes de plus. Le refus est explicite, et il nomme le
+    // geste qui débloque : télécharger, ou laisser l'échéance passer.
+    if (existing !== null && effectiveStatus(existing.job, now) === 'ready') {
+      throw new ConflictException({
+        code: 'DATABASE_DUMP_ALREADY_READY',
+        message:
+          'Un export est déjà prêt au téléchargement. Téléchargez-le, ou attendez son ' +
+          'échéance, avant d’en demander un autre.',
+      });
+    }
+
+    const job: DumpJob = {
+      id: randomUUID(),
+      status: 'queued',
+      requestedById: actor.id,
+      requestedByName: actor.fullName,
+      requestedAt: now.toISOString(),
+      startedAt: null,
+      finishedAt: null,
+      fileName: null,
+      fileSize: null,
+      sha256: null,
+      expiresAt: null,
+      reservedAt: null,
+      downloadedAt: null,
+      failureReason: null,
+      noticeStatus: null,
+      noticeDetail: null,
+    };
+
+    // LA PRISE, et tout le reste en découle. Le drapeau `private starting` qui
+    // tenait ce rôle ne valait que dans un processus : deux répliques
+    // démarraient deux `pg_dump` sur la même base. Ici, la base arbitre.
+    if (!(await this.claim(job, actor.id, existing?.value ?? null))) {
       throw new ConflictException({
         code: 'DATABASE_DUMP_IN_PROGRESS',
         message: 'Un export est déjà en cours de démarrage.',
       });
     }
-    this.starting = true;
 
-    try {
-      // Balayage AVANT de commencer : un fichier laissé par un travail dont
-      // l'état a été perdu (redéploiement en plein export) doit disparaître, et
-      // c'est le seul moment où l'on sait qu'aucun export n'est en cours et
-      // qu'aucun fichier n'est donc légitimement ouvert.
-      await this.sweepOrphans(null);
+    await this.audit(actor, AUDIT_REQUESTED, { jobId: job.id });
 
-      const job: DumpJob = {
-        id: randomUUID(),
-        status: 'queued',
-        requestedById: actor.id,
-        requestedByName: actor.fullName,
-        requestedAt: now.toISOString(),
-        startedAt: null,
-        finishedAt: null,
-        fileName: null,
-        fileSize: null,
-        sha256: null,
-        expiresAt: null,
-        downloadedAt: null,
-        failureReason: null,
-        noticeStatus: null,
-        noticeDetail: null,
-      };
-      await this.write(job, actor.id);
-      await this.audit(actor, AUDIT_REQUESTED, { jobId: job.id });
+    // Balayage APRÈS la prise, et l'ordre est une correction. Balayer avant
+    // revenait à effacer le répertoire sans détenir aucun droit dessus : une
+    // réplique en plein `pg_dump` voyait son fichier partiel disparaître sous
+    // elle. Une fois la clé prise, on sait qu'aucun autre export n'est en
+    // cours, et ce qui traîne est donc bien un orphelin.
+    await this.sweepOrphans(null);
 
-      // Non attendu, EXPRÈS. `void` et un `catch` : une promesse rejetée sans
-      // gestionnaire ferait tomber le processus Node entier.
-      void this.execute(job, actor).catch((error: unknown) => {
-        this.logger.error(`Export de la base : échec non rattrapé. ${String(error)}`);
-      });
+    // Non attendu, EXPRÈS. `void` et un `catch` : une promesse rejetée sans
+    // gestionnaire ferait tomber le processus Node entier.
+    void this.execute(job, actor).catch((error: unknown) => {
+      this.logger.error(`Export de la base : échec non rattrapé. ${String(error)}`);
+    });
 
-      return this.toDto(job, now);
-    } finally {
-      this.starting = false;
-    }
+    return this.toDto(job, now);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -220,62 +361,207 @@ export class DbDumpService {
    * recommencerait, et il n'y aurait plus rien à reprendre.
    */
   async download(actor: AuthenticatedUser, reply: FastifyReply, now = new Date()): Promise<void> {
-    const job = await this.reconcile(now);
-    if (job === null || effectiveStatus(job, now) !== 'ready' || job.fileName === null) {
+    const current = await this.reconcile(now);
+    if (
+      current === null ||
+      effectiveStatus(current.job, now) !== 'ready' ||
+      current.job.fileName === null
+    ) {
       throw new NotFoundException({
         code: 'DATABASE_DUMP_NOT_READY',
         message: 'Aucun export n’est disponible au téléchargement.',
       });
     }
 
-    const fileName = basename(job.fileName);
+    const job = current.job;
+    // Le nom vient de la ligne écrite par ce service, jamais de la requête, et
+    // repasse tout de même par `basename` : une valeur corrompue en base ne
+    // doit pas pouvoir faire sortir la lecture du répertoire des exports.
+    const fileName = basename(job.fileName ?? '');
     const path = join(this.directory, fileName);
-    let size: number;
-    try {
-      size = (await stat(path)).size;
-    } catch {
-      // La base annonce un fichier que le disque n'a pas : on le dit, et on
-      // remet l'état d'accord avec la réalité plutôt que de laisser l'écran
-      // proposer indéfiniment un téléchargement impossible.
-      await this.write({ ...job, status: 'expired', fileName: null }, actor.id);
-      throw new NotFoundException({
-        code: 'DATABASE_DUMP_NOT_READY',
-        message: 'Le fichier d’export n’est plus disponible. Relancez un export.',
-      });
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // UN HEAD NE CONSOMME RIEN
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Fastify inscrit automatiquement un HEAD pour chaque GET, servi par le
+    // MÊME gestionnaire. Un `HEAD .../download` authentifié administrateur
+    // traversait donc tout ce qui suit : la ligne d'audit « téléchargé » était
+    // écrite, la réponse s'achevait normalement (`writableFinished` est vrai
+    // pour un HEAD, la garde `finish` plutôt que `close` n'y change rien), et
+    // l'archive était DÉTRUITE sans qu'un seul octet ne soit parti. Une sonde,
+    // un préchargement de navigateur ou un antivirus de passerelle suffisaient
+    // à faire disparaître l'export, en laissant une trace affirmant qu'un
+    // administrateur l'avait emporté.
+    //
+    // On rend les en-têtes, et rien d'autre : pas de réservation, pas d'audit,
+    // pas de destruction.
+    if (reply.request.method.toUpperCase() !== 'GET') {
+      const probe = await this.openSealed(path);
+      if (probe === null) return this.forgetMissingFile(job);
+      await probe.handle.close();
+      this.setDownloadHeaders(reply, fileName, probe.size);
+      await reply.send();
+      return;
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // LA RÉSERVATION, ET POURQUOI ELLE PRÉCÈDE LE PREMIER OCTET
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // « Détruit après téléchargement » ne garantit UNE livraison que si la prise
+    // est exclusive AVANT l'envoi. Deux requêtes simultanées passaient toutes
+    // deux le contrôle `ready` et recevaient toutes deux l'archive intégrale ;
+    // la destruction, qui n'a lieu qu'à la fin, arrivait trop tard pour
+    // empêcher quoi que ce soit. Deux exemplaires complets de la clientèle
+    // sortaient donc d'une fonctionnalité écrite pour n'en laisser sortir qu'un.
+    //
+    // Deux verrous, parce qu'il y a deux courses différentes :
+    //  · le contrôle explicite ci-dessous arrête la seconde requête quand la
+    //    première a déjà inscrit sa réservation ;
+    //  · la comparaison-et-échange arbitre les deux requêtes qui ont lu la même
+    //    ligne au même instant, et qui voient donc toutes deux `reservedAt` nul.
+    // L'un sans l'autre laisse passer une des deux courses.
+    if (job.reservedAt !== null) throw alreadyDelivering();
+
+    const reserved: DumpJob = { ...job, reservedAt: now.toISOString() };
+    if (!(await this.claim(reserved, actor.id, current.value))) throw alreadyDelivering();
+
+    const opened = await this.openSealed(path);
+    if (opened === null) {
+      // La base annonce un fichier que le disque n'a pas : on remet l'état
+      // d'accord avec la réalité plutôt que de laisser l'écran proposer
+      // indéfiniment un téléchargement impossible.
+      return this.forgetMissingFile(reserved);
+    }
+    const { handle, size } = opened;
+
+    this.setDownloadHeaders(reply, fileName, size);
+
+    // `finish` et NON `close`. `finish` ne se déclenche que lorsque la réponse
+    // a été entièrement écrite ; `close` se déclenche AUSSI quand la connexion
+    // tombe.
+    // `once` et non `on`, pour les deux : la destruction de l'archive et
+    // l'écriture de la trace ne doivent avoir lieu QU'UNE fois. Un émetteur qui
+    // signalerait deux fois la fin d'une même réponse produirait deux lignes
+    // d'audit pour un seul téléchargement, dans le journal qui sert justement à
+    // savoir combien de copies de la clientèle circulent.
+    reply.raw.once('finish', () => {
+      // L'AUDIT EST ÉCRIT ICI, ET PAS AVANT.
+      //
+      // Il l'était avant l'envoi : un flux qui mourait au premier octet
+      // laissait donc une ligne affirmant que l'administrateur avait emporté la
+      // base. Le journal servait précisément à répondre « qui détient une copie
+      // de la clientèle ? », et il répondait faux, dans le sens qui accuse.
+      void this.finishDelivery(reserved, actor, fileName, size).catch((error: unknown) => {
+        this.logger.error(
+          `Export de la base : destruction après envoi impossible. ${String(error)}`,
+        );
+      });
+    });
+    reply.raw.once('close', () => {
+      if (reply.raw.writableFinished) return;
+      // Envoi interrompu : la réservation est RELÂCHÉE par le processus qui la
+      // détient, seul à savoir que les octets ne sont pas tous partis. Le
+      // téléchargement coupé sur une liaison mobile reste donc reprenable, ce
+      // qui était la promesse d'origine.
+      this.logger.warn('Export de la base : téléchargement interrompu, le fichier est conservé.');
+      void this.writeOwned({ ...reserved, reservedAt: null }, actor.id).catch(() => undefined);
+    });
+
+    await reply.send(handle.createReadStream({ autoClose: true }));
+  }
+
+  private setDownloadHeaders(reply: FastifyReply, fileName: string, size: number): void {
+    reply.header('Content-Type', DUMP_CONTENT_TYPE);
+    reply.header('Content-Disposition', `attachment; filename="${fileName}"`);
+    reply.header('Content-Length', String(size));
+    // Un export de la clientèle ne doit rester dans aucun cache intermédiaire.
+    reply.header('Cache-Control', 'no-store');
+    // ═══════════════════════════════════════════════════════════════════════
+    // CE FICHIER N'EST JAMAIS UNE DÉMONSTRATION, ET L'EN-TÊTE DOIT LE DIRE
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // `DemoModeInterceptor` estampille `X-Demo-Mode: true` sur toute réponse
+    // pendant une démonstration, et `useFileDownload`, côté panel, renomme
+    // alors le fichier en « …-DEMONSTRATION ». Le téléchargement reste ouvert
+    // pendant une démonstration, délibérément, puisque l'archive a
+    // nécessairement été produite hors démonstration : la conséquence était
+    // qu'un administrateur enregistrait la base RÉELLE de ses clients sous un
+    // nom affirmant le contraire. C'est l'inverse exact de ce que le marquage
+    // existe pour éviter, et c'est le sens dangereux de l'erreur : un fichier
+    // réel pris pour un jouet est un fichier qu'on ne protège plus.
+    //
+    // L'en-tête est posé EXPLICITEMENT à `false`. L'intercepteur ne l'écrase
+    // pas, il n'estampille que ce qui ne porte rien.
+    reply.header('X-Demo-Mode', 'false');
+  }
+
+  /**
+   * Ouvre l'archive SANS SUIVRE DE LIEN SYMBOLIQUE.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * CE QUE `basename` NE COUVRAIT PAS
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `basename` empêche de SORTIR du répertoire par le nom : aucun `../` ne
+   * survit. Il ne dit rien de ce que le nom DÉSIGNE une fois dans le
+   * répertoire. `stat` et `createReadStream` suivent les liens symboliques :
+   * qui peut écrire sur le volume (un conteneur voisin, une sauvegarde
+   * restaurée, un opérateur) pouvait y déposer un lien portant le nom attendu
+   * et faire servir n'importe quel fichier local par une route authentifiée
+   * administrateur, `/etc/passwd` ou la clé privée du serveur.
+   *
+   * `O_NOFOLLOW` fait échouer l'ouverture si le dernier élément du chemin est
+   * un lien. Le contrôle porte sur le descripteur OUVERT, pas sur le chemin :
+   * il n'y a donc aucune fenêtre entre la vérification et l'usage, contrairement
+   * à un `lstat` suivi d'un `open`. La taille rendue vient elle aussi du
+   * descripteur, et décrit donc exactement ce qui sera envoyé.
+   */
+  private async openSealed(path: string): Promise<{ handle: FileHandle; size: number } | null> {
+    let handle: FileHandle;
+    try {
+      handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    } catch {
+      return null;
+    }
+    try {
+      const info = await handle.stat();
+      if (!info.isFile()) {
+        this.logger.error(`Export de la base : ${path} n’est pas un fichier ordinaire.`);
+        await handle.close();
+        return null;
+      }
+      return { handle, size: info.size };
+    } catch {
+      await handle.close().catch(() => undefined);
+      return null;
+    }
+  }
+
+  /** La ligne annonce un fichier que le disque n'a pas. On remet d'accord. */
+  private async forgetMissingFile(job: DumpJob): Promise<never> {
+    await this.expire(job);
+    throw new NotFoundException({
+      code: 'DATABASE_DUMP_NOT_READY',
+      message: 'Le fichier d’export n’est plus disponible. Relancez un export.',
+    });
+  }
+
+  /** Réponse entièrement émise : on trace, PUIS on détruit. */
+  private async finishDelivery(
+    job: DumpJob,
+    actor: AuthenticatedUser,
+    fileName: string,
+    size: number,
+  ): Promise<void> {
     await this.audit(actor, AUDIT_DOWNLOADED, {
       jobId: job.id,
       fileName,
       fileSize: size,
       sha256: job.sha256,
     });
-
-    reply.header('Content-Type', DUMP_CONTENT_TYPE);
-    reply.header('Content-Disposition', `attachment; filename="${fileName}"`);
-    reply.header('Content-Length', String(size));
-    // Un export de la clientèle ne doit rester dans aucun cache intermédiaire.
-    reply.header('Cache-Control', 'no-store');
-
-    // `finish` et NON `close`. `finish` ne se déclenche que lorsque la réponse
-    // a été entièrement écrite ; `close` se déclenche AUSSI quand la connexion
-    // tombe, et détruirait alors le fichier au beau milieu d'un téléchargement
-    // coupé par une liaison mobile. L'administrateur relancerait, et il n'y
-    // aurait plus rien à reprendre.
-    reply.raw.on('finish', () => {
-      void this.consume(job, actor.id).catch((error: unknown) => {
-        this.logger.error(
-          `Export de la base : destruction après envoi impossible. ${String(error)}`,
-        );
-      });
-    });
-    reply.raw.on('close', () => {
-      if (!reply.raw.writableFinished) {
-        this.logger.warn('Export de la base : téléchargement interrompu, le fichier est conservé.');
-      }
-    });
-
-    await reply.send(createReadStream(path));
+    await this.consume(job, actor.id);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -285,7 +571,9 @@ export class DbDumpService {
   private async execute(job: DumpJob, actor: AuthenticatedUser): Promise<void> {
     const startedAt = new Date();
     let running: DumpJob = { ...job, status: 'running', startedAt: startedAt.toISOString() };
-    await this.write(running, actor.id);
+    // `writeOwned` partout dans ce chemin : si la ligne a changé de main, ce
+    // travail n'existe plus pour personne et n'a plus rien à y écrire.
+    await this.writeOwned(running, actor.id);
 
     const fileName = dumpFileName(job.id, startedAt);
     const path = join(this.directory, fileName);
@@ -298,7 +586,7 @@ export class DbDumpService {
       // indiscernable d'un export valide pour qui le trouverait sur le volume.
       await rm(path, { force: true });
       const reason = error instanceof Error ? error.message : String(error);
-      await this.write(
+      await this.writeOwned(
         {
           ...running,
           status: 'failed',
@@ -322,56 +610,85 @@ export class DbDumpService {
       sha256: await this.sha256(path),
       expiresAt: new Date(finishedAt.getTime() + DUMP_TTL_MS).toISOString(),
     };
-    await this.write(running, actor.id);
+
+    // Si la ligne ne nous appartient plus, le fichier qu'on vient de produire
+    // n'a AUCUN moyen d'être nommé, donc servi, donc détruit. On l'efface
+    // immédiatement plutôt que de le laisser en orphelin sur le volume.
+    if (!(await this.writeOwned(running, actor.id))) {
+      await rm(path, { force: true });
+      this.logger.warn(
+        `Export de la base ${job.id} : la ligne d’état a changé de main, l’archive est détruite.`,
+      );
+      return;
+    }
 
     // L'avis part APRÈS que l'état soit prêt : l'administrateur qui clique dans
     // la seconde qui suit la réception doit trouver un fichier téléchargeable,
     // et non un écran qui dit encore « en cours ».
     const notice = await this.notify(running, actor);
-    await this.write({ ...running, ...notice }, actor.id);
+    await this.writeOwned({ ...running, ...notice }, actor.id);
 
-    // Minuteur de destruction. `unref` : il ne doit pas retenir le processus à
-    // l'arrêt. Il ne survit pas à un redémarrage, et c'est pour cela qu'il
-    // n'est PAS le mécanisme d'échéance : `effectiveStatus` l'est. Celui-ci
-    // n'est qu'un raccourci pour le cas courant, où personne ne rouvre l'écran.
-    setTimeout(() => {
-      void this.reconcile(new Date()).catch(() => undefined);
-    }, DUMP_TTL_MS).unref();
+    // Aucun minuteur de destruction n'est armé ici, et c'est un CHANGEMENT.
+    // Un `setTimeout` ne survit pas au processus : il donnait l'illusion d'une
+    // échéance tout en laissant le fichier vivre indéfiniment dès le premier
+    // redéploiement. L'échéance est désormais tenue par `sweepExpired()`, qui
+    // repasse toutes les heures quoi qu'il arrive, et par la réconciliation
+    // d'amorçage. Voir `sweep()`.
   }
 
   /**
-   * Avis de fin, sur les DEUX canaux, sans le moindre lien.
+   * Avis de fin : LA CLOCHE DU PANEL, et elle seule. Sans le moindre lien.
    *
-   * `NotificationsService.create` est réutilisé tel quel : il écrit la ligne de
-   * boîte de réception (la cloche du panel, que l'administrateur voit sans
-   * quitter son écran) ET déclenche l'e-mail par Brevo. Écrire un second envoi
-   * ici dupliquerait le transport, sa gestion des lots, ses classifications
-   * d'échec et son mode dégradé.
+   * ═══════════════════════════════════════════════════════════════════════════
+   * IL N'Y A PAS D'E-MAIL, ET CE FICHIER L'A LONGTEMPS AFFIRMÉ
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `NotificationsService.create` écrit la ligne de boîte de réception ET
+   * déclenche un envoi Brevo. Mais la sélection des destinataires de l'e-mail
+   * filtre sur `role: COMMERCIAL`, par conception : ce sont les commerciaux sur
+   * le terrain qu'on va chercher hors du panel. L'ADMINISTRATEUR qui demande un
+   * export n'est jamais dans cette liste. Aucun e-mail ne part donc JAMAIS pour
+   * cet avis-ci, et l'état enregistrait pourtant `SENT`, que l'écran présentait
+   * comme « l'e-mail est parti ».
+   *
+   * La conséquence n'était pas cosmétique : l'administrateur attend un message
+   * qui ne viendra pas, conclut à une panne, et relance l'export, ce qui remet
+   * un exemplaire complet de la clientèle sur le disque. Une promesse fausse,
+   * sur cette fonctionnalité-là, PRODUIT des copies.
+   *
+   * Deux réparations étaient possibles : élargir la sélection des destinataires
+   * aux ADMIN, ou dire la vérité. La première touche une règle partagée par
+   * toutes les notifications du produit, dont ce module n'est pas propriétaire
+   * et dont il ne peut pas juger l'intention ; on ne l'élargit pas depuis ici.
+   * La seconde est écrite ci-dessous, et la cloche, elle, fonctionne
+   * réellement.
+   *
+   * `INBOX_ONLY` est donc l'issue nominale, et l'écran ne promet plus rien
+   * d'autre. `transportStatus` n'est PAS relu : il vaudrait `SENT` pour un
+   * envoi qui n'a eu aucun destinataire, ce qui est la valeur qui a menti.
    *
    * L'ÉCHEC DE L'AVIS N'EST PAS L'ÉCHEC DE L'EXPORT. Le fichier est prêt ; il
    * le reste. Ce qui serait inacceptable, c'est de n'en rien dire : l'issue est
-   * donc RENDUE et enregistrée dans l'état, où l'écran la lit. Sans compte
-   * Brevo, l'export aboutit, la cloche sonne, et l'état porte
-   * `NOT_CONFIGURED`.
+   * donc RENDUE et enregistrée dans l'état, où l'écran la lit.
    */
   private async notify(
     job: DumpJob,
     actor: AuthenticatedUser,
   ): Promise<{ noticeStatus: string | null; noticeDetail: string | null }> {
     try {
-      const created = await this.notifications.create(actor, {
+      await this.notifications.create(actor, {
         title: 'Export de la base prêt',
         body:
-          'L’export intégral que vous avez demandé est terminé. Connectez-vous au ' +
-          'panel, ouvrez Paramètres, et téléchargez-le depuis la carte « Export ' +
-          'intégral ». Aucun lien n’est joint à ce message, et il n’y en aura pas : ' +
-          'le fichier contient toute la base et ne quitte le serveur que dans une ' +
-          'session authentifiée.',
+          'L’export intégral que vous avez demandé est terminé. Ouvrez Paramètres ' +
+          'dans le panel et téléchargez-le depuis la carte « Export intégral ». ' +
+          'Aucun lien n’est joint à cet avis, et il n’y en aura pas : le fichier ' +
+          'contient toute la base et ne quitte le serveur que dans une session ' +
+          'authentifiée.',
         category: NotificationCategory.SYSTEME,
         audience: NotificationAudience.USERS,
         audienceUserIds: [actor.id],
       });
-      return { noticeStatus: created.transportStatus ?? 'SENT', noticeDetail: null };
+      return { noticeStatus: 'INBOX_ONLY', noticeDetail: null };
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Export de la base : avis de fin non envoyé. ${detail}`);
@@ -389,36 +706,137 @@ export class DbDumpService {
    * C'est le seul endroit qui DÉTRUIT sur échéance et qui enterre un travail
    * mort avec le conteneur. Toutes les entrées du service passent par lui.
    */
-  private async reconcile(now: Date): Promise<DumpJob | null> {
-    const job = await this.read();
-    if (job === null) return null;
+  private async reconcile(now: Date, deliveriesLost = false): Promise<Stored | null> {
+    const current = await this.read();
+    if (current === null) return null;
+    const { job } = current;
 
     const status = effectiveStatus(job, now);
-    if (status === job.status) return job;
 
-    if (status === 'expired') {
-      await this.removeFile(job.fileName);
-      const next: DumpJob = { ...job, status: 'expired', fileName: null };
-      await this.write(next, null);
-      return next;
+    // ═══════════════════════════════════════════════════════════════════════
+    // UNE RÉSERVATION ABANDONNÉE FAIT DÉTRUIRE, ELLE NE FAIT PAS RELÂCHER
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Le réflexe serait de relâcher la prise et de rendre l'archive de nouveau
+    // téléchargeable. Ce serait le mauvais côté du doute. Une réservation
+    // abandonnée veut dire « un processus a commencé à livrer ce fichier, puis
+    // a disparu » ; personne ne peut dire si les octets sont arrivés. Relâcher,
+    // c'est risquer une SECONDE livraison d'un exemplaire complet de la
+    // clientèle ; détruire, c'est coûter un export à relancer.
+    //
+    // Le second coût est payé par un administrateur qui recliquera. Le premier
+    // ne se voit jamais. On détruit.
+    //
+    // `deliveriesLost` est posé par la réconciliation d'AMORÇAGE, où le doute
+    // n'existe même pas : le processus qui tenait la réservation est
+    // nécessairement mort, quel que soit son âge. En marche, on laisse le bail
+    // s'écouler, pour ne pas détruire sous les pieds d'une réplique qui livre.
+    if (
+      status === 'ready' &&
+      job.reservedAt !== null &&
+      (deliveriesLost || now.getTime() - Date.parse(job.reservedAt) > RESERVATION_LEASE_MS)
+    ) {
+      this.logger.warn(
+        `Export de la base : réservation abandonnée (${job.id}), l’archive est détruite.`,
+      );
+      return this.expire(job);
     }
 
-    // `running` trop vieux : le processus est mort sans écrire son échec.
+    if (status === job.status) return current;
+
+    if (status === 'expired') return this.expire(job);
+
+    // Travail en cours trop vieux : le processus est mort sans écrire son
+    // échec. `queued` compris, voir `DUMP_MAX_RUNTIME_MS`.
     const next: DumpJob = {
       ...job,
       status,
       finishedAt: now.toISOString(),
       failureReason: STALLED_REASON,
+      reservedAt: null,
     };
-    await this.write(next, null);
-    return next;
+    const value = JSON.stringify(next);
+    if (await this.writeOwned(next, null)) return { job: next, value };
+    return this.read();
+  }
+
+  /**
+   * Détruit l'archive et enterre la ligne. Le seul chemin vers `expired`.
+   *
+   * `writeOwned` et non une écriture nue : entre la lecture et ici, un autre
+   * administrateur a pu inscrire un travail NEUF sous la même clé unique.
+   * L'écraser avec un état « échu » le ferait disparaître alors qu'il vient de
+   * démarrer, et rouvrirait la porte à un second `pg_dump` concurrent.
+   *
+   * Le fichier est effacé DANS TOUS LES CAS, y compris quand l'écriture perd :
+   * il est nommé par la ligne qu'on vient de remplacer, donc plus rien ne le
+   * désigne, et un orphelin est exactement ce qu'on refuse de laisser.
+   */
+  private async expire(job: DumpJob): Promise<Stored | null> {
+    await this.removeFile(job.fileName);
+    const next: DumpJob = { ...job, status: 'expired', fileName: null, reservedAt: null };
+    const value = JSON.stringify(next);
+    if (await this.writeOwned(next, null)) return { job: next, value };
+    return this.read();
+  }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LA VIE DU FICHIER EST BORNÉE, Y COMPRIS À TRAVERS UN REDÉMARRAGE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * C'est le filet, et il manquait. Trois trous se rejoignaient pour rendre la
+   * durée de vie de l'archive INDÉFINIE, alors que tout le reste du module est
+   * écrit autour de l'idée qu'elle est courte :
+   *
+   *  · la destruction après envoi était lancée sans être attendue, depuis un
+   *    gestionnaire d'événement. Un processus qui tombe entre la fin de la
+   *    réponse et la destruction laissait une ligne `ready` DURABLE et un
+   *    fichier téléchargeable, qui repassaient tels quels le redémarrage ;
+   *  · un conteneur tué pendant `pg_dump` laissait une archive partielle que
+   *    RIEN n'effaçait, jusqu'à une éventuelle demande suivante. S'il n'y en
+   *    avait pas, le fichier restait ;
+   *  · l'échéance reposait sur un `setTimeout`, perdu au redémarrage, doublé
+   *    d'une application PARESSEUSE au premier regard. Sans regard, un `ready`
+   *    échu depuis des jours restait sur le volume, où passent les instantanés
+   *    de sauvegarde du fournisseur.
+   *
+   * Ensemble, ces trois trous faisaient de « le fichier ne survit pas » une
+   * intention, pas une propriété. Ce balayage la rétablit : il est appelé à
+   * L'AMORÇAGE (le seul moment qui rattrape ce qu'un arrêt brutal a laissé) et
+   * périodiquement (le seul moyen de borner un fichier que personne ne regarde).
+   *
+   * Il compare le RÉPERTOIRE à la LIGNE DURABLE, et le répertoire perd toujours :
+   * un fichier que la ligne ne nomme pas n'a par construction plus aucun moyen
+   * d'être servi ni détruit par le reste du module. Il ne peut que traîner.
+   */
+  async sweep(now = new Date(), deliveriesLost = false): Promise<void> {
+    const current = await this.reconcile(now, deliveriesLost);
+    const keep =
+      current !== null &&
+      effectiveStatus(current.job, now) === 'ready' &&
+      current.job.fileName !== null
+        ? basename(current.job.fileName)
+        : null;
+    await this.sweepOrphans(keep);
   }
 
   /** Le fichier a été livré : il n'a plus de raison d'exister. */
   private async consume(job: DumpJob, actorId: string): Promise<void> {
     await this.removeFile(job.fileName);
-    await this.write(
-      { ...job, status: 'expired', fileName: null, downloadedAt: new Date().toISOString() },
+    // `writeOwned` : ce gestionnaire s'exécute APRÈS la réponse, donc
+    // potentiellement longtemps après. Un administrateur a pu inscrire un
+    // travail neuf entre-temps, et une écriture nue l'aurait écrasé avec
+    // l'état « échu » du travail précédent. Le fichier, lui, est effacé dans
+    // tous les cas : il porte le nom de l'archive livrée, pas celui du neuf.
+    await this.writeOwned(
+      {
+        ...job,
+        status: 'expired',
+        fileName: null,
+        reservedAt: null,
+        downloadedAt: new Date().toISOString(),
+      },
       actorId,
     );
     this.logger.log(`Export de la base téléchargé puis détruit (${job.id}).`);
@@ -460,27 +878,99 @@ export class DbDumpService {
     return hash.digest('hex');
   }
 
-  private async read(): Promise<DumpJob | null> {
+  /**
+   * L'état enregistré ET la chaîne exacte qui le porte.
+   *
+   * La chaîne est rendue avec l'objet, et ce n'est pas un détail : c'est le
+   * témoin des écritures conditionnelles. Une comparaison-et-échange sur cette
+   * table ne peut porter que sur `value`, puisqu'`app_settings` n'a ni colonne
+   * de version ni identifiant de travail (voir le bloc `LA PRISE EST
+   * CONDITIONNELLE` plus haut).
+   */
+  private async read(): Promise<Stored | null> {
     const setting = await this.prisma.appSetting.findUnique({ where: { key: SETTING_KEY } });
     if (!setting) return null;
-    try {
-      const value: unknown = JSON.parse(setting.value);
-      if (!value || typeof value !== 'object') return null;
-      const record = value as Partial<DumpJob>;
-      if (typeof record.id !== 'string' || typeof record.status !== 'string') return null;
-      return record as DumpJob;
-    } catch {
-      return null;
-    }
+    const job = parseJob(setting.value);
+    return job === null ? null : { job, value: setting.value };
   }
 
-  private async write(job: DumpJob, actorId: string | null): Promise<void> {
-    const value = JSON.stringify(job);
-    await this.prisma.appSetting.upsert({
-      where: { key: SETTING_KEY },
-      create: { key: SETTING_KEY, value, updatedById: actorId },
-      update: { value, updatedById: actorId },
+  /**
+   * PRISE ATOMIQUE de la clé, en une seule instruction SQL.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * POURQUOI UN `upsert` NE VERROUILLAIT RIEN
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * L'ancienne écriture était un `upsert` inconditionnel, précédé d'une lecture
+   * et d'un drapeau `private starting` en mémoire. Ce drapeau ne vaut que dans
+   * UN processus : sur deux répliques, les deux lisent « aucun export en
+   * cours », les deux passent leur drapeau local, les deux écrivent la clé, et
+   * DEUX `pg_dump` partent sur la même base. Le second écrase l'état du
+   * premier, dont le fichier devient un orphelin que plus rien ne nomme.
+   *
+   * Une ligne d'`app_settings` n'est un verrou que si l'écriture est
+   * CONDITIONNELLE. C'est l'idiome déjà employé pour l'arbitrage des demandes
+   * clients (`updateMany` sur `status: PENDING`, puis `count === 0` pour le
+   * perdant) et pour le bail des rappels programmés. Sous READ COMMITTED, la
+   * seconde transaction se bloque sur le verrou de ligne, réévalue son `where`
+   * après le commit de la première, et ne met à jour AUCUNE ligne.
+   *
+   * Le cas « la ligne n'existe pas encore » est traité à part, par un `create` :
+   * la clé est la clé primaire, donc le second insérant reçoit une violation
+   * d'unicité, qui est exactement le même arbitrage rendu par la base.
+   *
+   * Rend `true` au gagnant, `false` au perdant. Aucun appelant n'a le droit
+   * d'ignorer cette valeur.
+   */
+  private async claim(next: DumpJob, actorId: string | null, previous: string | null): Promise<
+    boolean
+  > {
+    const value = JSON.stringify(next);
+    if (previous === null) {
+      try {
+        await this.prisma.appSetting.create({
+          data: { key: SETTING_KEY, value, updatedById: actorId },
+        });
+        return true;
+      } catch {
+        // Violation d'unicité : une autre réplique a inscrit la clé entre notre
+        // lecture et notre écriture. Elle a gagné, et c'est très bien.
+        return false;
+      }
+    }
+    const claimed = await this.prisma.appSetting.updateMany({
+      where: { key: SETTING_KEY, value: previous },
+      data: { value, updatedById: actorId },
     });
+    return claimed.count === 1;
+  }
+
+  /**
+   * Écriture de PROGRESSION, réservée au propriétaire du travail.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * CE QU'ELLE EMPÊCHE : L'ÉCRASEMENT D'UN TRAVAIL PAR UN AUTRE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * La clé est UNIQUE, donc partagée par tous les travaux successifs. Une
+   * écriture inconditionnelle laissait un travail terminé écraser la ligne d'un
+   * travail SUIVANT : le gestionnaire de fin d'un téléchargement encore en
+   * cours réinscrivait son propre état `expired` par-dessus le `queued` qu'un
+   * administrateur venait de créer. Dans la fenêtre ainsi ouverte, le nouveau
+   * travail n'était plus « en cours » pour personne, un POST de plus lançait
+   * un SECOND `pg_dump`, et le balayage d'orphelins effaçait le fichier partiel
+   * du premier en pleine écriture.
+   *
+   * Le prédicat porte sur l'identifiant du travail, présent en clair dans le
+   * JSON. `count === 0` veut dire « la ligne ne t'appartient plus » : l'appelant
+   * doit alors se taire, jamais réécrire.
+   */
+  private async writeOwned(job: DumpJob, actorId: string | null): Promise<boolean> {
+    const written = await this.prisma.appSetting.updateMany({
+      where: { key: SETTING_KEY, value: { contains: `"id":"${job.id}"` } },
+      data: { value: JSON.stringify(job), updatedById: actorId },
+    });
+    return written.count === 1;
   }
 
   /**

@@ -1,4 +1,4 @@
-import { Controller, Get, HttpCode, Post, Res } from '@nestjs/common';
+import { Controller, Get, HttpCode, Post, Res, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
@@ -18,6 +18,7 @@ import {
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { DbDumpEnabledGuard } from './db-dump-enabled.guard.js';
 import { DbDumpService } from './db-dump.service.js';
 import { DatabaseDumpJobDto } from './dto.js';
 
@@ -28,20 +29,35 @@ import { DatabaseDumpJobDto } from './dto.js';
  * reste fermée plutôt que d'être ouverte par oubli.
  *
  * ═══════════════════════════════════════════════════════════════════════════
+ * D'ABORD, L'INTERRUPTEUR : SANS LUI, IL N'Y A PAS DE ROUTE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `DbDumpEnabledGuard` est posé sur la CLASSE, pour la même raison que
+ * `@Roles` : les trois routes rendent 404 tant que `DB_DUMP_ENABLED` ne vaut
+ * pas true dans l'environnement, et une quatrième route ajoutée demain
+ * héritera du refus sans qu'on ait à y penser. Un déploiement qui ne pose pas
+ * la variable n'offre PAS cet export, quel que soit le rôle de l'appelant.
+ *
+ * Voir le bloc de tête de la garde pour le choix du 404 plutôt que du 403, et
+ * pour la raison qui interdit de désenregistrer le module à la place.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
  * AUCUNE ROUTE NE PORTE `@DemoWritable`, ET C'EST LA DÉCISION
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * `DemoReadOnlyGuard` refuse tout POST tant que le mode démonstration est
- * allumé. La demande d'export en est un, donc elle est refusée : c'est
- * exactement ce qu'il faut. Un export pris pendant une démonstration
- * emporterait les milliers de lignes fictives que le semeur vient d'écrire,
- * dans un fichier qui a par ailleurs toutes les apparences d'un export de
- * production, et que personne ne pourrait plus distinguer six mois plus tard.
+ * allumé. La demande d'export en est un, donc elle est refusée.
+ *
+ * CE QUE CE REFUS FAIT, ET CE QU'IL NE FAIT PAS. Il empêche de produire une
+ * copie complète de la base au moment précis où le jeu fictif est à son
+ * maximum. Il ne rend PAS l'archive exempte de lignes fictives : `pg_dump`
+ * n'exclut aucune table et ne filtre aucune ligne, et éteindre la démonstration
+ * ne supprime rien, cela masque. Tant que le jeu de démonstration n'a pas été
+ * purgé, tout export en contient les lignes. C'est l'écran de confirmation qui
+ * l'annonce à l'administrateur, et ce fichier ne prétend plus le contraire.
  *
  * Une dispense aurait été le réflexe (« ce n'est qu'une lecture »). Elle serait
- * fausse : la demande ÉCRIT, elle inscrit un travail, et surtout ce qu'elle
- * produit est précisément ce que le mode démonstration existe pour empêcher de
- * confondre.
+ * fausse : la demande ÉCRIT, elle inscrit un travail.
  *
  * Le TÉLÉCHARGEMENT est un GET : il reste possible pendant une démonstration,
  * et c'est correct. Un fichier prêt a nécessairement été produit alors que
@@ -50,6 +66,7 @@ import { DatabaseDumpJobDto } from './dto.js';
 @ApiTags('admin')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
+@UseGuards(DbDumpEnabledGuard)
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'admin/database-dump', version: '1' })
 export class DbDumpController {
