@@ -96,10 +96,47 @@ const TO_DB_RESULT: Record<SyncOpStatus, OperationResult> = {
 };
 
 /**
+ * Le chemin retour : du verdict stocké vers le statut réémis au téléphone.
+ *
+ * POURQUOI CETTE TABLE EXISTE
+ *
+ * Une opération rejouée doit réémettre le verdict qu'elle avait obtenu, et non
+ * un `DUPLICATE` uniforme. Répondre `DUPLICATE` à une opération qui avait été
+ * REFUSÉE fait croire au client qu'elle a abouti : il classe la ligne « faite »
+ * et la saisie du commercial disparaît sans que personne ne le voie. C'est une
+ * perte de données silencieuse, pas une imprécision de rapport.
+ *
+ * `APPLIED` est la seule valeur qui se traduit en `DUPLICATE` : l'écriture a
+ * bien eu lieu, on ne la refait pas, et le client peut clore la ligne. Tous les
+ * autres verdicts sont réémis tels quels.
+ */
+const FROM_DB_RESULT: Record<OperationResult, SyncOpStatus> = {
+  [OperationResult.APPLIED]: SyncOpStatus.DUPLICATE,
+  [OperationResult.DUPLICATE]: SyncOpStatus.DUPLICATE,
+  [OperationResult.CONFLICT]: SyncOpStatus.CONFLICT,
+  [OperationResult.INVALID]: SyncOpStatus.INVALID,
+  [OperationResult.SKIPPED_DEPENDENCY_FAILED]: SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
+};
+
+/**
  * Les exceptions Nest portent leur corps typé dans `getResponse()`. On y lit le
  * code métier plutôt que de se fier au message, qui est destiné à l'humain et
  * peut être reformulé sans préavis.
  */
+/**
+ * Verdict mémorisé, lu SANS présumer que la base parle la même langue.
+ *
+ * Le paramètre est volontairement élargi à `string` : le type de colonne promet
+ * un membre d'`OperationResult`, mais une migration déployée avant la
+ * reconstruction de l'API met dans cette colonne une valeur que ce binaire ne
+ * connaît pas. Typé `OperationResult`, l'accès serait réputé total et le
+ * compilateur comme le linter effaceraient le seul repli qui compte. La
+ * fonction rend donc `undefined` sur un verdict inconnu, et l'appelant refuse.
+ */
+function storedStatusOf(result: string): SyncOpStatus | undefined {
+  return (FROM_DB_RESULT as Partial<Record<string, SyncOpStatus>>)[result];
+}
+
 function errorCodeOf(error: { getResponse: () => unknown }): string | null {
   const body = error.getResponse();
   if (typeof body === 'object' && body !== null && 'code' in body) {
@@ -137,7 +174,7 @@ export class SyncService {
     const env = readEnv();
     const hash = requestHash(body);
 
-    // NIVEAU 1 — le lot. Marqueur posé hors de la transaction de travail.
+    // NIVEAU 1, le lot. Marqueur posé hors de la transaction de travail.
     const claim = await this.batches.claim(
       user.id,
       body.clientBatchId,
@@ -195,7 +232,7 @@ export class SyncService {
    * enregistré alors que la création de son représentant a échoué, et il
    * pointe vers une ligne qui n'existe pas.
    *
-   * Le groupe — un représentant et ses prospects — est la plus petite unité
+   * Le groupe, un représentant et ses prospects, est la plus petite unité
    * qui préserve cette dépendance.
    */
   private async applyBatch(
@@ -263,10 +300,10 @@ export class SyncService {
         let parentUnavailable = false;
 
         for (const operation of operations) {
-          // NIVEAU 2 — l'opération. Première instruction, systématiquement.
+          // NIVEAU 2, l'opération. Première instruction, systématiquement.
           // Indispensable : le niveau 1 ne couvre pas le cas où 3 opérations
           // sur 5 passent et où le client reconstitue un lot DIFFÉRENT sous un
-          // NOUVEAU batchId — la clé de lot ne reconnaît alors plus rien.
+          // NOUVEAU batchId, la clé de lot ne reconnaît alors plus rien.
           const stored = await claimOperation(tx, user.id, batchKey, operation);
           if (stored) {
             results.push(stored);
@@ -442,7 +479,7 @@ export class SyncService {
    * l'opération, délègue, puis convertit le résultat ou l'exception en
    * `OperationOutcome`.
    *
-   * `tx` est transmis tel quel — la transaction ouverte par le lot est ce qui
+   * `tx` est transmis tel quel, la transaction ouverte par le lot est ce qui
    * donne au verrou de ligne PostgreSQL sa portée, et donc ce qui fait tenir la
    * règle « la première transition terminale validée gagne ».
    */
@@ -655,7 +692,7 @@ export class SyncService {
     // Le cloisonnement suffirait presque : les fiches de démonstration
     // appartiennent à des comptes de démonstration, et un vrai commercial ne
     // tire que les siennes. On pose quand même le filtre, pour la seule
-    // situation où l'un ne couvre pas l'autre — le compte de démonstration
+    // situation où l'un ne couvre pas l'autre, le compte de démonstration
     // lui-même, qui ne doit plus rien recevoir une fois le mode éteint.
     const scope = { ...ownerScope(user), ...demoScope(await this.demo.enabled()) };
 
@@ -817,7 +854,7 @@ const missingResult = (operation: SyncOperationDto): SyncOperationResultDto => (
  * NIVEAU 2 de l'idempotence.
  *
  * Renvoie `undefined` si l'opération est neuve (la ligne vient d'être posée),
- * ou le résultat mémorisé si elle avait déjà été appliquée — auquel cas on
+ * ou le résultat mémorisé si elle avait déjà été appliquée, auquel cas on
  * réémet ce résultat sans refaire l'écriture.
  */
 async function claimOperation(
@@ -836,14 +873,32 @@ async function claimOperation(
 
   const stored = await tx.syncOperation.findUnique({ where: { opId: operation.opId } });
   const memorised = stored?.resultJson as SyncOperationResultDto | null | undefined;
+
+  // Le statut réémis vient du verdict MÉMORISÉ, jamais d'une constante. La
+  // ligne `sync_operations` est écrite `APPLIED` à la réservation puis corrigée
+  // par `finalizeOperation` : c'est `result` qui porte la vérité. Réémettre un
+  // `DUPLICATE` fixe ferait passer un refus pour une réussite, et le téléphone
+  // effacerait la saisie en la croyant partie.
+  //
+  // Le repli n'est PAS `DUPLICATE`. Une base migrée avant que l'API ne soit
+  // reconstruite peut porter une valeur que cette version ne connaît pas, et la
+  // table rendrait alors `undefined`. Dans le doute on refuse : `INVALID` fait
+  // remonter la ligne dans « À corriger », là où un humain la voit. Un statut
+  // inconnu ne doit jamais pouvoir se lire comme une réussite.
+  const memorisedStatus = stored ? storedStatusOf(stored.result) : SyncOpStatus.DUPLICATE;
+  const unknownResult = memorisedStatus === undefined;
+  const status = memorisedStatus ?? SyncOpStatus.INVALID;
+
   return {
     opId: operation.opId,
-    status: SyncOpStatus.DUPLICATE,
+    status,
     entityId: memorised?.entityId ?? stored?.entityId ?? operation.entityId,
     rev: memorised?.rev ?? null,
     serverUpdatedAt: memorised?.serverUpdatedAt ?? null,
-    errorCode: memorised?.errorCode ?? null,
-    error: memorised?.error ?? null,
+    errorCode: unknownResult ? 'UNKNOWN_STORED_RESULT' : (memorised?.errorCode ?? null),
+    error: unknownResult
+      ? 'Verdict enregistré inconnu de cette version du serveur. Opération à revoir manuellement.'
+      : (memorised?.error ?? null),
   };
 }
 
@@ -950,6 +1005,11 @@ async function assertProspectPhoneFree(
   phoneE164: string,
   exceptId: string,
 ): Promise<void> {
+  // LECTURE GLOBALE : contrôle d'unicité adossé à l'index global sur le
+  // téléphone. Une fiche de démonstration occupe la ligne aussi sûrement
+  // qu'une vraie ; la masquer ferait annoncer « numéro libre » puis échouer
+  // l'insertion sur une violation d'index, à l'intérieur du lot, sans message
+  // exploitable pour l'appareil qui a poussé l'opération.
   const clash = await tx.prospect.findFirst({
     where: { phoneE164, deletedAt: null, id: { not: exceptId } },
     include: {
@@ -970,6 +1030,7 @@ async function assertRepresentantPhoneFree(
   phoneE164: string,
   exceptId: string,
 ): Promise<void> {
+  // LECTURE GLOBALE : même contrôle d'unicité, même index global, même raison.
   const clash = await tx.representant.findFirst({
     where: { phoneE164, deletedAt: null, id: { not: exceptId } },
     select: { id: true, createdBy: { select: { fullName: true } } },
