@@ -39,35 +39,29 @@ export async function fetchAndroidUpdate(
  * aussi au navigateur de poser l'en-tête `content-type` avec sa frontière, qu'on
  * ne peut pas fabriquer correctement à la main.
  *
- * `versionCode` est envoyé en CHAÎNE dans le corps multipart, comme tout champ
- * de formulaire : c'est l'API qui le convertit. Le contrat le déclare `number`
- * parce qu'il décrit la valeur, pas son encodage sur le fil.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LA VERSION N'EST PLUS ENVOYÉE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `versionName` et `versionCode` sont lus par l'API dans le
+ * `AndroidManifest.xml` de l'APK. Les envoyer quand même n'est pas neutre :
+ * l'API refuse tout champ inconnu, donc un appel resté sur l'ancienne forme
+ * reçoit un 400 explicite au lieu de voir sa saisie ignorée en silence. C'est
+ * voulu, et c'est aussi pourquoi ces deux champs ne sont plus dans la signature
+ * de cette fonction : un appelant qui les passerait ne compilerait pas.
  */
 export async function uploadAndroidUpdate(
-  input: {
-    file: File;
-    versionName: string;
-    versionCode: string;
-    forceUpdate: boolean;
-    notes: string;
-  },
+  input: { file: File; forceUpdate: boolean; notes: string },
   client: ApiClient = getApiClient(),
 ): Promise<AndroidUpdate> {
   const form = new FormData();
-  form.append('versionName', input.versionName.trim());
-  form.append('versionCode', input.versionCode.trim());
   form.append('forceUpdate', String(input.forceUpdate));
   if (input.notes.trim() !== '') form.append('notes', input.notes.trim());
   form.append('file', input.file, input.file.name);
 
   return unwrap(
     await client.POST('/api/v1/app-updates/android', {
-      body: {
-        file: '',
-        versionName: input.versionName.trim(),
-        versionCode: Number(input.versionCode.trim()),
-        forceUpdate: input.forceUpdate,
-      },
+      body: { file: '', forceUpdate: input.forceUpdate },
       bodySerializer: () => form,
     }),
   );
