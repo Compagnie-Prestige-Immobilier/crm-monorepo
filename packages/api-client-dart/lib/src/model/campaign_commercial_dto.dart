@@ -29,6 +29,8 @@ class CampaignCommercialDto {
     required this.position,
 
     required this.progress,
+
+    required this.perDay,
   });
 
   @JsonKey(name: r'userId', required: true, includeIfNull: false)
@@ -47,18 +49,23 @@ class CampaignCommercialDto {
   @JsonKey(name: r'progress', required: true, includeIfNull: false)
   final CampaignProgressDto progress;
 
+  /// Lignes par journée, jour 1 en tête.
+  @JsonKey(name: r'perDay', required: true, includeIfNull: false)
+  final List<num> perDay;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is CampaignCommercialDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [userId, fullName, username, position, progress],
+              [userId, fullName, username, position, progress, perDay],
               [
                 other.userId,
                 other.fullName,
                 other.username,
                 other.position,
                 other.progress,
+                other.perDay,
               ],
             );
   }
@@ -66,7 +73,14 @@ class CampaignCommercialDto {
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([userId, fullName, username, position, progress]);
+      mapPropsToHashCode([
+        userId,
+        fullName,
+        username,
+        position,
+        progress,
+        perDay,
+      ]);
 
   factory CampaignCommercialDto.fromJson(Map<String, dynamic> json) =>
       _$CampaignCommercialDtoFromJson(json);

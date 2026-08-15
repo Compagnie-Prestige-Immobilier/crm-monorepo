@@ -9,7 +9,7 @@
 # ---------------------------------------------------------------------------
 # À `true`, tout modèle qui reçoit une clé JSON absente du contrat compilé lève
 # une CheckedFromJsonException. Autrement dit : le jour où l'API ajoute un
-# champ à une réponse — un ajout rétrocompatible par définition — toutes les
+# champ à une réponse : un ajout rétrocompatible par définition : toutes les
 # versions déjà installées sur les téléphones du terrain cessent de parser
 # cette réponse. Il n'existe aucun moyen de forcer la mise à jour de ces
 # appareils, et la panne se manifesterait comme une synchronisation qui échoue

@@ -9,7 +9,7 @@ part of 'campaign_list_dto.dart';
 abstract class _$CampaignListDtoCWProxy {
   CampaignListDto items(List<CampaignSummaryDto> items);
 
-  CampaignListDto meta(Phase2PageMetaDto meta);
+  CampaignListDto meta(PageMetaDto meta);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CampaignListDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
@@ -17,10 +17,7 @@ abstract class _$CampaignListDtoCWProxy {
   /// ```dart
   /// CampaignListDto(...).copyWith(id: 12, name: "My name")
   /// ````
-  CampaignListDto call({
-    List<CampaignSummaryDto> items,
-    Phase2PageMetaDto meta,
-  });
+  CampaignListDto call({List<CampaignSummaryDto> items, PageMetaDto meta});
 }
 
 /// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfCampaignListDto.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfCampaignListDto.copyWith.fieldName(...)`
@@ -33,7 +30,7 @@ class _$CampaignListDtoCWProxyImpl implements _$CampaignListDtoCWProxy {
   CampaignListDto items(List<CampaignSummaryDto> items) => this(items: items);
 
   @override
-  CampaignListDto meta(Phase2PageMetaDto meta) => this(meta: meta);
+  CampaignListDto meta(PageMetaDto meta) => this(meta: meta);
 
   @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CampaignListDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -54,7 +51,7 @@ class _$CampaignListDtoCWProxyImpl implements _$CampaignListDtoCWProxy {
       meta: meta == const $CopyWithPlaceholder()
           ? _value.meta
           // ignore: cast_nullable_to_non_nullable
-          : meta as Phase2PageMetaDto,
+          : meta as PageMetaDto,
     );
   }
 }
@@ -83,7 +80,7 @@ CampaignListDto _$CampaignListDtoFromJson(Map<String, dynamic> json) =>
         ),
         meta: $checkedConvert(
           'meta',
-          (v) => Phase2PageMetaDto.fromJson(v as Map<String, dynamic>),
+          (v) => PageMetaDto.fromJson(v as Map<String, dynamic>),
         ),
       );
       return val;

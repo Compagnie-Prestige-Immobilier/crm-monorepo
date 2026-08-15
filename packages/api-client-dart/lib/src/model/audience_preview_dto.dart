@@ -18,60 +18,22 @@ part 'audience_preview_dto.g.dart';
 )
 class AudiencePreviewDto {
   /// Returns a new [AudiencePreviewDto] instance.
-  AudiencePreviewDto({
-    required this.recipientCount,
+  AudiencePreviewDto({required this.recipientCount});
 
-    required this.reachableCount,
-
-    required this.transportConfigured,
-
-    required this.transportReason,
-  });
-
-  /// Comptes actifs visés.
+  /// Comptes actifs visés. Tous liront la notification dans l’application : il n’y a plus de « joignable » distinct de « visé ».
   @JsonKey(name: r'recipientCount', required: true, includeIfNull: false)
   final num recipientCount;
-
-  /// Destinataires possédant au moins un appareil enregistré. L’écart avec `recipientCount` est le nombre de personnes qui ne verront le message qu’en ouvrant l’application.
-  @JsonKey(name: r'reachableCount', required: true, includeIfNull: false)
-  final num reachableCount;
-
-  /// Faux quand aucun compte de service FCM n’est configuré.
-  @JsonKey(name: r'transportConfigured', required: true, includeIfNull: false)
-  final bool transportConfigured;
-
-  @JsonKey(name: r'transportReason', required: true, includeIfNull: true)
-  final String? transportReason;
 
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is AudiencePreviewDto &&
             runtimeType == other.runtimeType &&
-            equals(
-              [
-                recipientCount,
-                reachableCount,
-                transportConfigured,
-                transportReason,
-              ],
-              [
-                other.recipientCount,
-                other.reachableCount,
-                other.transportConfigured,
-                other.transportReason,
-              ],
-            );
+            equals([recipientCount], [other.recipientCount]);
   }
 
   @override
   int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
-        recipientCount,
-        reachableCount,
-        transportConfigured,
-        transportReason,
-      ]);
+      runtimeType.hashCode ^ mapPropsToHashCode([recipientCount]);
 
   factory AudiencePreviewDto.fromJson(Map<String, dynamic> json) =>
       _$AudiencePreviewDtoFromJson(json);

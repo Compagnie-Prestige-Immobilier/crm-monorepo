@@ -1,10 +1,10 @@
-# Lints assouplis — TOUT le code de ce paquet est généré.
+# Lints assouplis : TOUT le code de ce paquet est généré.
 #
 # apps/mobile garde `package:flutter_lints` en entier. Si les règles strictes
 # s'appliquaient ici, chaque régénération produirait des centaines
 # d'avertissements qu'aucun développeur ne peut corriger (le fichier serait
 # réécrit au prochain `generate`), et `flutter analyze` deviendrait un bruit
-# qu'on apprend à ignorer — ce qui masque les vrais problèmes dans apps/mobile.
+# qu'on apprend à ignorer : ce qui masque les vrais problèmes dans apps/mobile.
 #
 # On ne désactive pas l'analyse : les erreurs de type restent des erreurs. On
 # ne désactive que les règles de style et les avertissements que le générateur

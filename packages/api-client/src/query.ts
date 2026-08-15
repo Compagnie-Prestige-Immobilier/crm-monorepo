@@ -4,7 +4,7 @@
 // Why this file exists at all
 // ---------------------------------------------------------------------------
 // `openapi-fetch` never throws. Every call resolves to `{ data, error,
-// response }` — a 500, a 422 and a 200 all come back as a fulfilled promise.
+// response }` : a 500, a 422 and a 200 all come back as a fulfilled promise.
 // TanStack Query decides success versus error purely on whether the queryFn
 // promise rejects. Wire the two together naively:
 //
@@ -74,7 +74,7 @@ export function unwrap<TData, TError>(result: ApiResult<TData, TError>): TData {
 /**
  * Retry policy shared by every generated query.
  *
- * A 4xx will never succeed on retry — a malformed filter stays malformed — and
+ * A 4xx will never succeed on retry : a malformed filter stays malformed : and
  * retrying a 401 three times just delays the redirect to /login by a few
  * seconds while the user stares at a spinner. Only 408, 429 and 5xx are worth
  * a second attempt.
@@ -99,8 +99,8 @@ export const apiQueryKey = (path: string, params?: unknown): QueryKey =>
  * Typed `queryOptions()` factory.
  *
  * `request` is a thunk that performs one `client.GET(...)` call: passing the
- * call itself rather than a path string keeps every generic — path, query
- * params, response body — inferred by `openapi-fetch` with no duplicated type
+ * call itself rather than a path string keeps every generic : path, query
+ * params, response body : inferred by `openapi-fetch` with no duplicated type
  * plumbing here, and no `any` anywhere. The path string is only used to build
  * the cache key.
  *
@@ -108,7 +108,7 @@ export const apiQueryKey = (path: string, params?: unknown): QueryKey =>
  *       apiQuery('/prospects', query, () => client.GET('/prospects', { params: { query } }));
  *
  * Per-endpoint factories live below this line, added as the contract grows.
- * They are thin — one line each — and they all go through `apiQuery`, so none
+ * They are thin : one line each : and they all go through `apiQuery`, so none
  * of them can forget to `unwrap`.
  */
 export function apiQuery<TData, TError>(

@@ -12,7 +12,7 @@
 # `cwd = process.env.PWD || process.env.INIT_CWD || process.cwd()`. Autrement
 # dit le cache du jar suit le répertoire courant : lancé depuis ce paquet, le
 # jar de 30 Mo atterrit dans packages/api-client-dart/node_modules/.cache/ et
-# non dans le node_modules/.cache/openapi-generator que la CI met en cache —
+# non dans le node_modules/.cache/openapi-generator que la CI met en cache :
 # on retéléchargerait le générateur à chaque exécution, et deux copies
 # traîneraient dans l'arbre. `PWD` ne peut pas être forcé de l'extérieur : le
 # shim shell de pnpm le réécrit au démarrage.
@@ -31,7 +31,7 @@ additionalProperties:
   pubName: crm_api_client
   pubLibrary: crm_api_client
 
-  # BETA en 7.24.0 — le défaut reste built_value. Choix délibéré, voir
+  # BETA en 7.24.0 : le défaut reste built_value. Choix délibéré, voir
   # docs/adr/0002. built_value impose BuiltList/BuiltMap et un registre
   # Serializers global qui traverse toute l'application : chaque état Riverpod,
   # chaque conversion Drift, chaque payload d'outbox (`outbox.payload` est
@@ -40,7 +40,7 @@ additionalProperties:
   # REPLI si cette voie beta produit du code cassé : remettre
   # `serializationLibrary: built_value` ici, et confiner le résultat derrière
   # des mappers dans ce paquet pour qu'aucun BuiltList n'atteigne apps/mobile.
-  # C'est un changement d'une ligne — l'inverse (désimbriquer built_value d'une
+  # C'est un changement d'une ligne : l'inverse (désimbriquer built_value d'une
   # application entière) ne l'est pas.
   serializationLibrary: json_serializable
 

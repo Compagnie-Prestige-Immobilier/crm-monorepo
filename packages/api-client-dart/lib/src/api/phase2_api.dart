@@ -10,8 +10,10 @@ import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
 import 'dart:typed_data';
+import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/campaign_detail_dto.dart';
 import 'package:crm_api_client/src/model/campaign_list_dto.dart';
+import 'package:crm_api_client/src/model/campaign_scope.dart';
 import 'package:crm_api_client/src/model/campaign_status.dart';
 import 'package:crm_api_client/src/model/create_campaign_dto.dart';
 import 'package:crm_api_client/src/model/directory_page_dto.dart';
@@ -196,11 +198,12 @@ class Phase2Api {
   }
 
   /// Programme d’appels imprimable d’un commercial.
-  /// Ordre identique aux positions persistées. AUCUN nom de prospect n’y figure : chaque ligne se rapproche de sa fiche par son code court à six caractères.
+  /// Ordre identique aux positions persistées. AUCUN nom de prospect n’y figure : chaque ligne se rapproche de sa fiche par son code court à six caractères. Le paramètre &#x60;jour&#x60; restreint la liasse à une journée d’étalement ; sans lui, tout le programme est rendu.
   ///
   /// Parameters:
   /// * [id]
   /// * [userId]
+  /// * [jour] - Journée d’étalement, à partir de 1. Absent : tout le programme du commercial.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -213,6 +216,7 @@ class Phase2Api {
   Future<Response<Uint8List>> downloadCallProgrammePdf({
     required String id,
     required String userId,
+    num? jour,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -247,9 +251,12 @@ class Phase2Api {
       validateStatus: validateStatus,
     );
 
+    final _queryParameters = <String, dynamic>{if (jour != null) r'jour': jour};
+
     final _response = await _dio.request<Object>(
       _path,
       options: _options,
+      queryParameters: _queryParameters,
       cancelToken: cancelToken,
       onSendProgress: onSendProgress,
       onReceiveProgress: onReceiveProgress,
@@ -369,6 +376,11 @@ class Phase2Api {
   ///
   /// Parameters:
   /// * [status]
+  /// * [search] - Recherche libre sur le nom de la campagne.
+  /// * [scope] - Périmètre du tirage.
+  /// * [createdById] - Administrateur qui a créé la campagne.
+  /// * [dateFrom] - Borne basse sur la date de création, incluse.
+  /// * [dateTo] - Borne haute sur la date de création, incluse.
   /// * [page]
   /// * [pageSize]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -382,6 +394,11 @@ class Phase2Api {
   /// Throws [DioException] if API call or serialization fails
   Future<Response<CampaignListDto>> listCallCampaigns({
     CampaignStatus? status,
+    String? search,
+    CampaignScope? scope,
+    String? createdById,
+    DateTime? dateFrom,
+    DateTime? dateTo,
     num? page = 1,
     num? pageSize = 25,
     CancelToken? cancelToken,
@@ -406,6 +423,11 @@ class Phase2Api {
 
     final _queryParameters = <String, dynamic>{
       if (status != null) r'status': status,
+      if (search != null) r'search': search,
+      if (scope != null) r'scope': scope,
+      if (createdById != null) r'createdById': createdById,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
       if (page != null) r'page': page,
       if (pageSize != null) r'pageSize': pageSize,
     };

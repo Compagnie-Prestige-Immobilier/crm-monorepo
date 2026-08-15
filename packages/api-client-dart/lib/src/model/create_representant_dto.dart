@@ -48,7 +48,7 @@ class CreateRepresentantDto {
   @JsonKey(name: r'departementId', required: true, includeIfNull: false)
   final String departementId;
 
-  /// IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire — il se déduit de l’IEF, jamais l’inverse.
+  /// IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire, il se déduit de l’IEF, jamais l’inverse.
   @JsonKey(name: r'iefId', required: false, includeIfNull: false)
   final String? iefId;
 

@@ -42,11 +42,15 @@ class CampaignDetailDto {
 
     required this.commercialCount,
 
+    required this.spreadDays,
+
     required this.progress,
 
     required this.createdAt,
 
     required this.closedAt,
+
+    required this.perDay,
 
     required this.commerciaux,
 
@@ -90,6 +94,10 @@ class CampaignDetailDto {
   @JsonKey(name: r'commercialCount', required: true, includeIfNull: false)
   final num commercialCount;
 
+  /// Journées d’étalement. 1 : programme unique.
+  @JsonKey(name: r'spreadDays', required: true, includeIfNull: false)
+  final num spreadDays;
+
   @JsonKey(name: r'progress', required: true, includeIfNull: false)
   final CampaignProgressDto progress;
 
@@ -98,6 +106,10 @@ class CampaignDetailDto {
 
   @JsonKey(name: r'closedAt', required: true, includeIfNull: true)
   final DateTime? closedAt;
+
+  /// Lignes par journée, toutes affectations confondues. Jour 1 en tête.
+  @JsonKey(name: r'perDay', required: true, includeIfNull: false)
+  final List<num> perDay;
 
   /// Ordonnés par position.
   @JsonKey(name: r'commerciaux', required: true, includeIfNull: false)
@@ -122,9 +134,11 @@ class CampaignDetailDto {
                 createdById,
                 createdByName,
                 commercialCount,
+                spreadDays,
                 progress,
                 createdAt,
                 closedAt,
+                perDay,
                 commerciaux,
                 recentAttempts,
               ],
@@ -138,9 +152,11 @@ class CampaignDetailDto {
                 other.createdById,
                 other.createdByName,
                 other.commercialCount,
+                other.spreadDays,
                 other.progress,
                 other.createdAt,
                 other.closedAt,
+                other.perDay,
                 other.commerciaux,
                 other.recentAttempts,
               ],
@@ -160,9 +176,11 @@ class CampaignDetailDto {
         createdById,
         createdByName,
         commercialCount,
+        spreadDays,
         progress,
         createdAt,
         closedAt,
+        perDay,
         commerciaux,
         recentAttempts,
       ]);

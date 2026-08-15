@@ -3,7 +3,7 @@
 // Wrapped in a script rather than chained in package.json for one reason: the
 // spec is itself generated (by `@crm/api#openapi:generate`) and may legitimately
 // not exist yet on a fresh clone whose API has never been booted. `turbo run
-// generate` must not die with an ENOENT stack trace in that case — but it must
+// generate` must not die with an ENOENT stack trace in that case : but it must
 // absolutely die in CI, where a missing spec means the upstream task silently
 // did nothing.
 
@@ -20,7 +20,7 @@ const out = join(packageDir, 'src', 'generated', 'schema.ts');
 if (!existsSync(spec)) {
   const message =
     `apps/api/openapi.json not found.\n` +
-    `It is generated from the NestJS app — run:\n\n` +
+    `It is generated from the NestJS app : run:\n\n` +
     `  pnpm --filter @crm/api openapi:generate\n\n` +
     `(or simply \`pnpm turbo run generate\`, which resolves that task first).\n`;
 

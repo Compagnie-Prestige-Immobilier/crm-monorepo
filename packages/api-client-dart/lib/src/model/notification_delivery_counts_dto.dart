@@ -35,11 +35,11 @@ class NotificationDeliveryCountsDto {
   @JsonKey(name: r'total', required: true, includeIfNull: false)
   final num total;
 
-  /// En file : aucun push tenté (ou aucun appareil).
+  /// En file. Soit le destinataire n’est pas servi par e-mail et lira dans l’application, soit l’envoi a échoué de façon passagère et sera réessayé. Ce n’est pas un échec.
   @JsonKey(name: r'pending', required: true, includeIfNull: false)
   final num pending;
 
-  /// Accepté par FCM. N’implique pas « affiché ».
+  /// E-mail accepté par Brevo. N’implique pas « lu », ni même « remis ».
   @JsonKey(name: r'sent', required: true, includeIfNull: false)
   final num sent;
 

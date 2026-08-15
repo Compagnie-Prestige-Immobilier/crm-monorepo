@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
+import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/create_notification_template_dto.dart';
 import 'package:crm_api_client/src/model/notification_template_dto.dart';
 import 'package:crm_api_client/src/model/notification_template_list_dto.dart';

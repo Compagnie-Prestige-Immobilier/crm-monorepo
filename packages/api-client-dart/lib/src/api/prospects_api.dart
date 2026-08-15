@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
+import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/bdd_segment.dart';
 import 'package:crm_api_client/src/model/create_prospect_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
@@ -298,6 +299,7 @@ class ProspectsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -327,6 +329,7 @@ class ProspectsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -368,6 +371,7 @@ class ProspectsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
