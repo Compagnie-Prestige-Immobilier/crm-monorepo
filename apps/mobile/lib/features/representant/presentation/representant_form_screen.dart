@@ -222,10 +222,49 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     // l'écran vient d'être ouvert depuis un bouton. Le dernier brouillon de ce
     // formulaire est alors la seule piste, et c'est la bonne.
     if (snapshot == null && widget.draftId == null) {
-      snapshot = await drafts.latestFor(formKey);
+      final DraftSnapshot? latest = await drafts.latestFor(formKey);
+      // **La fiche visée doit être neuve.** Voir [_isCreationDraft] : sans ce
+      // filtre, une correction interrompue remontait dans un formulaire de
+      // création et détruisait la correction qu'elle prétendait reprendre.
+      if (latest != null && await _isCreationDraft(latest)) snapshot = latest;
     }
     if (snapshot == null || !mounted) return;
     _offer(snapshot);
+  }
+
+  /// Le brouillon décrit-il bien une CRÉATION ?
+  ///
+  /// ═══ LE BROUILLON D'UNE CORRECTION REMONTAIT DANS UN FORMULAIRE NEUF ═══
+  ///
+  /// [DraftRepository.latestFor] ne filtre que sur `formKey`, et la création
+  /// comme la modification écrivent sous `representant.create` : c'est le même
+  /// écran. La séquence tenait en deux gestes ordinaires : sortir d'une
+  /// correction de la fiche R, puis appuyer sur « Nouveau représentant » dans
+  /// la minute. Le brouillon de R était le dernier de ce formulaire, donc
+  /// retrouvé ; à moins de 60 secondes, [DraftAge.crash] l'appliquait **sans
+  /// rien demander**. Le formulaire neuf se remplissait du nom, du numéro et du
+  /// département de R, l'écran ADOPTAIT le `draftId` de R, et l'enregistrement
+  /// appelait `createRepresentant` avec un identifiant neuf ET ce `draftId`.
+  /// Deux dégâts d'un coup : la correction en cours sur R était supprimée dans
+  /// la transaction d'écriture, et une fiche en doublon partait à sa place.
+  ///
+  /// **Ce qui sépare les deux brouillons est l'existence de la fiche visée.**
+  /// Un brouillon de création porte un `entityId` qu'aucune fiche ne réclame :
+  /// la transaction d'enregistrement supprime le brouillon au moment même où la
+  /// fiche apparaît, donc les deux ne coexistent jamais. Un brouillon de
+  /// correction, lui, nomme forcément une fiche présente en base.
+  ///
+  /// C'est la forme du garde `_acceptsParent` de la saisie de prospects, posé
+  /// pour le même genre de confusion. On ne sépare PAS les deux `formKey` :
+  /// changer la clé rendrait invisibles, donc perdus, les brouillons déjà
+  /// écrits sous l'ancienne, jusqu'à sept jours de saisies.
+  Future<bool> _isCreationDraft(DraftSnapshot snapshot) async {
+    final String? entityId = snapshot.entityId;
+    if (entityId == null) return true;
+    final Representant? existing = await ref
+        .read(referenceRepositoryProvider)
+        .representantById(entityId);
+    return existing == null;
   }
 
   void _offer(DraftSnapshot snapshot) {
@@ -478,8 +517,17 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                 _ResumeBanner(
                   label: (_pendingRestore!.values['fullName'] as String?)?.trim(),
                   onResume: () => _apply(_pendingRestore!),
+                  // L'identifiant du brouillon RETROUVÉ, pas celui de l'écran.
+                  // L'adoption n'a lieu que dans `_apply` : sur les chemins de
+                  // restauration par `latestFor` et `forEntity`, `_draftId` est
+                  // encore l'identifiant neuf tiré au montage, et la suppression
+                  // ne touchait aucune ligne. La bannière disparaissait, le
+                  // brouillon survivait, et la même saisie périmée était
+                  // reproposée à chaque ouverture pendant sept jours.
                   onDiscard: () async {
-                    await ref.read(draftRepositoryProvider).delete(_draftId);
+                    await ref
+                        .read(draftRepositoryProvider)
+                        .delete(_pendingRestore!.draftId);
                     if (mounted) setState(() => _pendingRestore = null);
                   },
                 ),

@@ -653,6 +653,71 @@ void main() {
       expect(await engine.selectBatch(), isEmpty);
     });
 
+    /// ═══ LA RÉPARATION D'HORLOGE EFFAÇAIT L'ATTENTE EXIGÉE PAR LE SERVEUR ═══
+    ///
+    /// Le plafond de plausibilité était celui du back-off, 15 minutes. Or la
+    /// branche `FailureKind.throttled` écrit `now + retryAfter`, c'est-à-dire ce
+    /// que le serveur impose, et `retryAfterOf` admet jusqu'à une heure. Un
+    /// `Retry-After: 1800` était donc pris pour une horloge déréglée et ramené à
+    /// maintenant au tour de vidange suivant, moins de 60 secondes plus tard :
+    /// le client repartait pousser dans le limiteur de débit, qui le limitait de
+    /// nouveau, indéfiniment.
+    ///
+    /// Les deux mécanismes sont exercés ENSEMBLE ici : les tests d'origine
+    /// restaient tous sous les 15 minutes, donc aucun ne pouvait les voir se
+    /// contredire.
+    test('une limitation de 30 minutes survit à la réparation d\'horloge', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+
+      api.failNextPush = const ApiException(
+        'RATE_LIMITED',
+        statusCode: 429,
+        kind: FailureKind.throttled,
+        retryAfter: Duration(minutes: 30),
+      );
+      await engine.drain();
+
+      final DateTime due = (await outboxById(db, 'A1')).nextAttemptAt;
+      expect(due, t0.add(const Duration(minutes: 30)));
+
+      // Le tour suivant, une minute plus tard : c'est là que la réparation
+      // d'horloge passait l'éponge sur l'attente.
+      clock.advance(const Duration(minutes: 1));
+      expect(await engine.repairClockDrift(), 0);
+      expect(
+        (await outboxById(db, 'A1')).nextAttemptAt,
+        due,
+        reason: 'le serveur a dit d\'attendre : c\'est lui qui décide',
+      );
+      expect(await engine.selectBatch(), isEmpty);
+      expect(
+        api.calls,
+        hasLength(1),
+        reason: 'repousser tout de suite, c\'est se faire limiter à nouveau',
+      );
+
+      // Et l'attente reste bornée : passé le délai, la file repart seule.
+      clock.advance(const Duration(minutes: 30));
+      expect((await engine.selectBatch()).map((OutboxData o) => o.id), <String>['A1']);
+    });
+
+    /// Une échéance VRAIMENT absurde reste rabotée : le correctif déplace la
+    /// borne, il ne la supprime pas.
+    test('au-delà de la borne commune, l\'échéance est toujours ramenée', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await queueOp(
+        db,
+        id: 'A1',
+        entityType: 'representant',
+        entityId: 'repA',
+        nextAttemptAt: t0.add(const Duration(hours: 2)),
+      );
+
+      expect(await engine.repairClockDrift(), 1);
+      expect((await engine.selectBatch()).map((OutboxData o) => o.id), <String>['A1']);
+    });
+
     test('un bail plus long que la durée de bail est ramené, la file repart', () async {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
       await queueOp(

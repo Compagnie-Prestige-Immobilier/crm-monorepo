@@ -4,8 +4,13 @@ import 'package:cpi_go/core/settings/display_settings.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/draft_repository.dart';
+import 'package:cpi_go/core/updates/app_update_controller.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
+import 'package:cpi_go/features/auth/presentation/login_screen.dart';
+import 'package:cpi_go/features/notifications/presentation/notifications_screen.dart';
+import 'package:cpi_go/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:cpi_go/features/updates/presentation/app_update_screen.dart';
 import 'package:cpi_go/features/about/presentation/about_screen.dart';
 import 'package:cpi_go/features/corrections/presentation/corrections_screen.dart';
 import 'package:cpi_go/features/historique/presentation/historique_screen.dart';
@@ -171,8 +176,31 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
-  /// Tous les écrans que l'utilisateur peut atteindre, sauf la connexion (elle
-  /// n'a pas de session).
+  /// Les écrans de **premier niveau**, dans leur état d'ouverture.
+  ///
+  /// ═══ CE QUE CETTE LISTE COUVRE, ET CE QU'ELLE NE COUVRE PAS ═══
+  ///
+  /// Elle se donnait pour « tous les écrans que l'utilisateur peut atteindre,
+  /// sauf la connexion ». C'était faux, et une exhaustivité qu'on croit acquise
+  /// est pire que pas de balayage du tout : elle éteint la question. Quatre
+  /// écrans de premier niveau manquaient, dont la connexion elle-même ; ils
+  /// sont ajoutés ci-dessous.
+  ///
+  /// **Ce qui reste dehors, énoncé pour ne pas se rendormir dessus** :
+  ///
+  /// * les états NON INITIAUX des écrans listés : le formulaire en mode
+  ///   MODIFICATION (`?id=`), les listes remplies, les états d'erreur ;
+  /// * les modales et feuilles : `_NegativeSheet`, `_Capture`, `_MethodCard`,
+  ///   `_AlreadyClosed` de la phase 2, `showOwnershipSheet`, la boîte de
+  ///   déconnexion avec saisies en attente.
+  ///
+  /// Ce sont des formes à risque, pas des oublis anodins : une feuille modale
+  /// empile des boutons pleine largeur dans une colonne contrainte, c'est-à-dire
+  /// exactement la géométrie qui débordait sur les formulaires. Les peindre
+  /// demande de piloter chaque écran jusqu'à l'état qui les ouvre, ce que ce
+  /// balayage-ci ne sait pas faire : il construit des widgets, il ne joue pas de
+  /// parcours. Tant que ce travail n'est pas fait, la liste dit ce qu'elle
+  /// couvre et rien de plus.
   ///
   /// ═══ LES DEUX FORMULAIRES SONT DEDANS MAINTENANT ═══
   ///
@@ -205,6 +233,32 @@ void main() {
     'Nouveau représentant': RepresentantFormScreen.new,
     'Saisie de prospects sans représentant': ProspectEntryScreen.new,
     'Saisie de prospects': () => const ProspectEntryScreen(representantId: 'repA'),
+    // Les quatre que la liste oubliait en se croyant complète. Trois sont
+    // atteignables sans session ou juste après, donc jamais vus par un
+    // balayage qui partait de l'accueil.
+    'Connexion': LoginScreen.new,
+    'Premier lancement': OnboardingScreen.new,
+    'Notifications': NotificationsScreen.new,
+    // Version longue et notes multi-lignes : c'est l'état le plus haut de
+    // l'écran, et `forceUpdate` retire le bouton « Plus tard », ce qui change
+    // la barre d'actions.
+    'Mise à jour obligatoire': () => AppUpdateScreen(
+      state: AppUpdateState(
+        status: AppUpdateStatus.ready,
+        localPath: '/data/cpi-go.apk',
+        release: AndroidRelease(
+          forceUpdate: true,
+          versionName: '2.14.0-hotfix.3',
+          versionCode: 21403,
+          fileSize: 48234567,
+          sha256: 'a' * 64,
+          downloadUrl: 'https://exemple.test/cpi-go.apk',
+          notes:
+              'Correction de la synchronisation hors ligne et de la reprise '
+              'des saisies interrompues sur les appareils Transsion.',
+        ),
+      ),
+    ),
   };
 
   for (final double widthDp in <double>[360, 320]) {

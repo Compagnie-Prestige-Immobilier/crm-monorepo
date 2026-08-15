@@ -66,6 +66,77 @@ void main() {
       expect(e.kind, FailureKind.retryable);
       expect(e.isUnreachable, isFalse);
     });
+
+    /// ═══ LE PORTAIL CAPTIF NE RÉPOND PAS QUE 200 ═══
+    ///
+    /// La règle du corps non-JSON ne portait que sur les 2xx. Beaucoup de
+    /// portails, et les proxys d'entreprise, rendent 403 avec leur page HTML de
+    /// connexion : cette réponse tombait dans la branche terminale et condamnait
+    /// le lot entier, jusqu'à deux cents saisies à reprendre une par une, pour
+    /// un problème qui se règle en acceptant les conditions du wifi.
+    test('un 403 en HTML est un lien mort, pas un refus qui condamne le lot', () {
+      final ApiException e = DioApi.classify(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+          type: DioExceptionType.badResponse,
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+            statusCode: 403,
+            data: '<html><body>Connectez-vous au wifi</body></html>',
+            headers: Headers.fromMap(<String, List<String>>{
+              'content-type': <String>['text/html; charset=utf-8'],
+            }),
+          ),
+        ),
+        'push',
+      );
+      expect(e.code, DioApi.nonJsonResponseCode);
+      expect(e.kind, FailureKind.unreachable);
+      expect(e.isUnreachable, isTrue);
+    });
+
+    /// Le filet ne doit PAS avaler un vrai refus. Notre serveur rend toujours du
+    /// JSON avec un `code` : c'est ce couple qui le distingue d'un équipement
+    /// intermédiaire, et le rejouer reproduirait le même refus.
+    test('un 403 du serveur, en JSON, reste terminal', () {
+      final ApiException e = DioApi.classify(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+          type: DioExceptionType.badResponse,
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+            statusCode: 403,
+            data: <String, Object?>{
+              'code': 'FORBIDDEN',
+              'message': 'Accès refusé.',
+            },
+            headers: Headers.fromMap(<String, List<String>>{
+              'content-type': <String>['application/json'],
+            }),
+          ),
+        ),
+        'push',
+      );
+      expect(e.code, 'FORBIDDEN');
+      expect(e.kind, FailureKind.terminal);
+    });
+
+    /// 511 n'a pas besoin du filet : il est déjà `>= 500`, donc rejouable.
+    test('un 511 reste rejouable sans passer par le filet', () {
+      final ApiException e = DioApi.classify(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+          type: DioExceptionType.badResponse,
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+            statusCode: 511,
+            data: '<html>portail</html>',
+          ),
+        ),
+        'push',
+      );
+      expect(e.kind, FailureKind.retryable);
+    });
   });
 
   group('corps 2xx illisible', () {

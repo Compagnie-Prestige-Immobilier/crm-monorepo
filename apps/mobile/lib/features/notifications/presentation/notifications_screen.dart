@@ -135,25 +135,42 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     await ref.read(notificationInboxProvider).refresh(force: true);
                   },
                   child: rows.isEmpty
-                      ? ListView(
-                          // `AlwaysScrollableScrollPhysics` : sans elle, une
-                          // liste plus courte que l'écran ne défile pas, donc
-                          // le geste « tirer » ne part jamais.
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          children: <Widget>[
-                            SizedBox(
-                              height: MediaQuery.sizeOf(context).height * 0.7,
-                              child: _Empty(
-                                icon: PhosphorIconsDuotone.megaphone,
-                                title: 'Aucune annonce',
-                                message:
-                                    'Les annonces et les rappels envoyés par le '
-                                    'siège apparaîtront ici, même sans réseau.\n'
-                                    'Tirez vers le bas pour actualiser.',
-                                color: theme.colorScheme.outline,
+                      // ═══ UNE HAUTEUR MINIMALE, PAS UNE HAUTEUR FIXE ═══
+                      //
+                      // L'état vide était enfermé dans un `SizedBox` de 70 % de
+                      // la hauteur d'écran. Une fraction fixe ne grandit pas
+                      // avec le texte : l'icône de 56 px, le titre et les trois
+                      // lignes du message tenaient à 1,0× et débordaient dès
+                      // 1,3×, c'est-à-dire chez tout utilisateur ayant poussé la
+                      // taille de texte d'Android.
+                      //
+                      // `LayoutBuilder` + `minHeight` donne la même chose en
+                      // mieux : l'état vide occupe au moins la fenêtre, donc
+                      // reste centré, et pousse le défilement au lieu de
+                      // déborder quand il ne rentre plus.
+                      ? LayoutBuilder(
+                          builder: (BuildContext context, BoxConstraints box) {
+                            return SingleChildScrollView(
+                              // `AlwaysScrollableScrollPhysics` : sans elle, un
+                              // contenu plus court que l'écran ne défile pas,
+                              // donc le geste « tirer » ne part jamais.
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: box.maxHeight,
+                                ),
+                                child: _Empty(
+                                  icon: PhosphorIconsDuotone.megaphone,
+                                  title: 'Aucune annonce',
+                                  message:
+                                      'Les annonces et les rappels envoyés par le '
+                                      'siège apparaîtront ici, même sans réseau.\n'
+                                      'Tirez vers le bas pour actualiser.',
+                                  color: theme.colorScheme.outline,
+                                ),
                               ),
-                            ),
-                          ],
+                            );
+                          },
                         )
                       : ListView.separated(
                           padding: const EdgeInsets.symmetric(

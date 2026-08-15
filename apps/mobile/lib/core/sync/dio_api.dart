@@ -474,6 +474,37 @@ class DioApi implements ApiPort {
       );
     }
 
+    // ═══ UN REFUS QUI N'EST PAS DU JSON NE VIENT PAS DU SERVEUR ═══
+    //
+    // La règle du portail captif ne s'appliquait qu'aux 2xx (voir [_guard]).
+    // Or un portail ne répond pas forcément 200 : beaucoup rendent 403 avec une
+    // page HTML de connexion, et certains proxys d'entreprise font pareil. Cette
+    // réponse-là tombait dans la branche terminale ci-dessous et condamnait le
+    // lot entier, jusqu'à deux cents saisies à reprendre une par une dans
+    // « À corriger », pour un problème qui se règle en acceptant les conditions
+    // du wifi de l'hôtel.
+    //
+    // Les deux conditions comptent, et il faut les deux. Un refus légitime de
+    // notre API porte TOUJOURS un corps JSON avec un `code` : c'est le contrat
+    // du serveur. Une réponse sans code lisible ET dont le `content-type`
+    // n'annonce pas du JSON ne dit rien de nos données ; elle dit qu'on n'a pas
+    // parlé au serveur. On la classe donc comme un lien mort : aucune tentative
+    // comptée, aucun lot condamné, et la file repart d'elle-même dès que le
+    // portail est franchi.
+    //
+    // 511 et 302 n'ont pas besoin de ce filet : le premier est déjà `>= 500`
+    // donc rejouable, le second est suivi par dio avant d'arriver ici.
+    if (_serverCode(e.response?.data) == null && !_announcesJson(e.response)) {
+      return ApiException(
+        nonJsonResponseCode,
+        message:
+            'Le réseau a répondu à la place du serveur (HTTP $status). '
+            'Vérifiez la connexion.',
+        statusCode: status,
+        kind: FailureKind.unreachable,
+      );
+    }
+
     // 400, 403, 404, 409 autre, 422 : le rejouer reproduira le même refus.
     return ApiException(
       code,
@@ -482,6 +513,15 @@ class DioApi implements ApiPort {
       kind: FailureKind.terminal,
     );
   }
+
+  /// Le corps s'annonce-t-il comme du JSON ?
+  ///
+  /// Un `content-type` absent compte comme « pas du JSON » : notre serveur le
+  /// renseigne toujours, un équipement intermédiaire non.
+  static bool _announcesJson(Response<dynamic>? response) =>
+      (response?.headers.value(Headers.contentTypeHeader) ?? '')
+          .toLowerCase()
+          .contains('json');
 
   /// `Retry-After` en secondes ou en date HTTP.
   ///

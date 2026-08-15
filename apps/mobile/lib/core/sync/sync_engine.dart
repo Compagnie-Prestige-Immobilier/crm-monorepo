@@ -352,13 +352,30 @@ class SyncEngine {
   /// se fige jusqu'à ce que l'horloge rattrape la valeur absurde qu'on y a
   /// écrite. Rien dans l'interface ne peut expliquer ça.
   ///
-  /// On ramène donc toute échéance **plus lointaine que le plafond du back-off**
-  /// à maintenant : au-delà de ce plafond, la valeur ne peut pas avoir été
-  /// produite par le moteur, elle vient forcément d'une horloge qui a bougé.
-  /// Même raisonnement pour un bail plus long que [leaseDuration].
+  /// On ramène donc toute échéance **plus lointaine que ce que le moteur peut
+  /// écrire** à maintenant : au-delà, la valeur ne peut pas avoir été produite
+  /// ici, elle vient forcément d'une horloge qui a bougé. Même raisonnement
+  /// pour un bail plus long que [leaseDuration].
+  ///
+  /// ═══ CE PLAFOND N'EST PAS CELUI DU BACK-OFF ═══
+  ///
+  /// Il l'était, et c'était faux. Le back-off plafonne à 15 minutes, mais ce
+  /// n'est pas la seule échéance que le moteur inscrive : la branche
+  /// `FailureKind.throttled` écrit `now + error.retryAfter`, c'est-à-dire ce que
+  /// le SERVEUR impose, jusqu'à [kMaxRetryAfter]. Un `Retry-After: 1800` était
+  /// donc systématiquement pris pour une horloge déréglée et effacé au tour
+  /// suivant, moins de 60 secondes plus tard. Le client repartait pousser dans
+  /// le limiteur de débit, qui le limitait de nouveau, indéfiniment : la
+  /// réparation d'horloge annulait le seul mécanisme censé faire attendre.
+  ///
+  /// Les deux écritures partagent donc maintenant la même borne, et c'est la
+  /// plus haute des deux qui décide de ce qui est plausible.
   Future<int> repairClockDrift() async {
     final DateTime now = _clock.now();
-    final DateTime attemptCeiling = now.add(_backoff.cap);
+    final Duration writable = _backoff.cap > kMaxRetryAfter
+        ? _backoff.cap
+        : kMaxRetryAfter;
+    final DateTime attemptCeiling = now.add(writable);
     final DateTime leaseCeiling = now.add(leaseDuration);
 
     final int repairedAttempts =
@@ -1021,7 +1038,51 @@ class SyncEngine {
         afterSeq: row.seq,
         rev: verdict.rev?.toInt(),
       );
+      await _unblockFollowers(row.seq);
     });
+  }
+
+  /// Rend leur budget aux opérations qui attendaient derrière celle-ci.
+  ///
+  /// ═══ `blockedAttempts` MESURAIT UNE VIE ENTIÈRE, PAS UN BLOCAGE ═══
+  ///
+  /// Le compteur n'était jamais remis à zéro par un envoi réussi : seuls
+  /// `WriteRepository.retryOperation` et `_amendInPlace`, c'est-à-dire deux
+  /// gestes de l'UTILISATEUR, le rouvraient. Or il compte des rejeux dont
+  /// l'opération n'est pas responsable, et il a un plafond de
+  /// [maxBlockedAttempts] au terme duquel la ligne part en `failed`.
+  ///
+  /// Deux épisodes de blocage sans rapport, séparés de plusieurs jours,
+  /// partageaient donc le même budget : un parent réparé depuis longtemps
+  /// laissait derrière lui des enfants à moitié condamnés, et quelques
+  /// `GROUP_TRANSACTION_FAILED` intermittents : un code transitoire, mais classé
+  /// bloquant : suffisaient à les achever. L'utilisateur lisait alors dans
+  /// « À corriger » qu'il devait réparer une fiche parente qui, elle, allait
+  /// parfaitement bien.
+  ///
+  /// **L'acquittement de la tête est précisément l'événement qui clôt
+  /// l'épisode.** Ce sont ses échecs à elle qui ont fait monter le compteur de
+  /// ses suiveurs ; son succès dit que la cause a disparu. On repart donc de
+  /// zéro, pour eux seulement, et sans toucher à `attempts`, qui compte, lui,
+  /// des fautes que l'opération porte vraiment.
+  ///
+  /// La clé est **relue** au lieu d'être prise sur [afterSeq] : un remappage
+  /// d'identifiant vient peut-être de la réécrire, et viser l'ancienne ne
+  /// toucherait plus personne.
+  Future<void> _unblockFollowers(int afterSeq) async {
+    final OutboxData? head = await (_db.select(
+      _db.outbox,
+    )..where((Outbox o) => o.seq.equals(afterSeq))).getSingleOrNull();
+    final String? key = head?.dependencyKey;
+    if (key == null) return;
+    await (_db.update(_db.outbox)..where(
+          (Outbox o) =>
+              o.dependencyKey.equals(key) &
+              o.seq.isBiggerThanValue(afterSeq) &
+              o.status.isIn(OutboxStatus.open) &
+              o.blockedAttempts.isBiggerThanValue(0),
+        ))
+        .write(const OutboxCompanion(blockedAttempts: Value<int>(0)));
   }
 
   /// Recale le `baseRev` des opérations qui suivent, sur la même entité.
@@ -1439,9 +1500,7 @@ class SyncEngine {
       await _markFailed(
         row,
         code ?? ServerErrorCodes.parentRepresentantFailed,
-        message ??
-            'Cette saisie dépend d\'une autre qui ne passe pas. '
-                'Corrigez d\'abord la fiche parente.',
+        message ?? _blockedFailureMessage(code),
         blockedAttempts: blocked,
       );
       return;
@@ -1460,6 +1519,22 @@ class SyncEngine {
       ),
     );
   }
+
+  /// Le message d'un abandon pour blocage doit nommer le VRAI blocage.
+  ///
+  /// Le message par défaut envoyait toujours l'utilisateur « corriger la fiche
+  /// parente ». C'est juste pour `PARENT_REPRESENTANT_FAILED` et
+  /// `REPRESENTANT_NOT_FOUND` ; ça ne l'est pas pour
+  /// `GROUP_TRANSACTION_FAILED`, qui dit que le lot n'a pas pu être écrit côté
+  /// serveur et n'accuse aucun parent. L'utilisateur partait alors chercher un
+  /// défaut sur une fiche qui n'en a pas, et n'avait aucun moyen de découvrir
+  /// qu'il n'y avait rien à y trouver.
+  static String _blockedFailureMessage(String? code) =>
+      code == ServerErrorCodes.groupTransactionFailed
+      ? 'Le serveur n\'a pas pu enregistrer ce groupe de saisies. '
+            'Réessayez ; si le refus persiste, signalez-le.'
+      : 'Cette saisie dépend d\'une autre qui ne passe pas. '
+            'Corrigez d\'abord la fiche parente.';
 
   Future<void> _markFailed(
     OutboxData row,
