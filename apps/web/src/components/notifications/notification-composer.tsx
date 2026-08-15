@@ -44,7 +44,7 @@ import {
   fetchDepartements,
   fetchTemplates,
   notificationKeys,
-} from './api';
+} from '@/lib/data/notifications';
 import { renderNotification } from './template';
 import {
   AUDIENCE_LABELS,
@@ -117,7 +117,7 @@ export function NotificationComposer({
 
   const departements = useQuery({
     queryKey: notificationKeys.departements,
-    queryFn: fetchDepartements,
+    queryFn: () => fetchDepartements(),
     enabled: open && selection.audience === 'DEPARTEMENT',
     staleTime: 300_000,
   });

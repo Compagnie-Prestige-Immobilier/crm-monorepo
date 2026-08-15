@@ -38,7 +38,12 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { routeProblem } from './audience';
-import { createTemplate, fetchTemplates, notificationKeys, updateTemplate } from './api';
+import {
+  createTemplate,
+  fetchTemplates,
+  notificationKeys,
+  updateTemplate,
+} from '@/lib/data/notifications';
 import { AndroidPreview } from './android-preview';
 import { mergedVariables, renderNotification } from './template';
 import { CATEGORY_LABELS, type NotificationCategory, type NotificationTemplate } from './types';

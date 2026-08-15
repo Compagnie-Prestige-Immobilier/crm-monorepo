@@ -30,7 +30,7 @@ export function AndroidReleaseCard() {
 
   const release = useQuery({
     queryKey: queryKeys.androidUpdate,
-    queryFn: fetchAndroidUpdate,
+    queryFn: () => fetchAndroidUpdate(),
   });
   const upload = useMutation({
     mutationFn: () => {
