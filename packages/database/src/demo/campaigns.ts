@@ -4,13 +4,13 @@
  * et une campagne ACTIVE en cours (les commerciaux ont encore des tâches
  * ouvertes à l'écran).
  *
- *   « Campagne janvier — toutes bases »  CLOSED, scope ALL,  24 tâches, 4 commerciaux
+ *   « Campagne janvier : toutes bases »  CLOSED, scope ALL,  24 tâches, 4 commerciaux
  *   « Relance CHUES / CBAO »             ACTIVE, scope BDD1, 18 tâches, 3 commerciaux
  *
  * Six prospects restés injoignables en janvier reviennent dans la campagne
  * active : c'est exactement ce que fait l'outil en vrai, et c'est le genre de
  * détail qui rend une démonstration crédible. Deux tâches sur le même prospect
- * ne se marchent pas dessus tant qu'une seule est ACTIVE — c'est l'invariant que
+ * ne se marchent pas dessus tant qu'une seule est ACTIVE : c'est l'invariant que
  * porte l'index partiel `call_tasks_one_active_per_prospect`.
  *
  * Les six `CallOutcome` sont représentés. Les tentatives `OTHER` portent toutes
@@ -106,7 +106,7 @@ function distribute(
   });
 }
 
-// ── Campagne close — toutes bases ────────────────────────────────────────────
+// ── Campagne close : toutes bases ────────────────────────────────────────────
 // 24 tâches, toutes terminées : 10 méthodes obtenues, 5 refus, 3 mauvais
 // numéros, 6 injoignables. Un taux de succès de 42 %, plausible, et six
 // injoignables qui donnent sa raison d'être à la campagne suivante.
@@ -145,7 +145,7 @@ const CLOSED_TASKS: TaskSpec[] = [
   done('p069', [attempt('UNREACHABLE', 18)]),
 ];
 
-// ── Campagne active — segment BDD1 ───────────────────────────────────────────
+// ── Campagne active : segment BDD1 ───────────────────────────────────────────
 // 18 tâches : 6 déjà traitées, 12 encore ouvertes dont 5 avec une première
 // tentative. Le programme d'appel de chaque commercial reste donc visible et
 // non vide à l'écran pendant la démonstration.
@@ -180,7 +180,7 @@ const ACTIVE_COMMERCIAUX = ['awa', 'moussa', 'fatou'];
 export const DEMO_CAMPAIGNS: DemoCampaign[] = [
   {
     key: CLOSED_CAMPAIGN_KEY,
-    name: 'Campagne janvier — toutes bases',
+    name: 'Campagne janvier : toutes bases',
     scope: 'ALL',
     // La graine est PERSISTÉE : consulter la campagne ou rééditer un PDF ne
     // doit jamais retirer au sort.

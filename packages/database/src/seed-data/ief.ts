@@ -1,5 +1,5 @@
 /**
- * Les IEF — Inspections de l'Éducation et de la Formation.
+ * Les IEF : Inspections de l'Éducation et de la Formation.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * POURQUOI CE RÉFÉRENTIEL EXISTE, À CÔTÉ DES DÉPARTEMENTS
@@ -9,7 +9,7 @@
  * SCOLAIRE, et c'est celui sur lequel les feuilles de route CHUES sont bâties :
  * un téléconseiller reçoit « IEF Almadies », jamais « Dakar ».
  *
- * Les deux ne coïncident pas. 59 IEF pour 46 départements — dix départements en
+ * Les deux ne coïncident pas. 59 IEF pour 46 départements : dix départements en
  * portent plusieurs, et Dakar en porte quatre à lui seul :
  *
  *     Dakar     → Almadies, Dakar Plateau, Grand Dakar, Parcelles Assainies
