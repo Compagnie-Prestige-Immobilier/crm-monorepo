@@ -14,6 +14,7 @@ import {
   PRESENCE_LABELS,
   fetchSupervision,
   formatElapsed,
+  knownPresence,
   minutesSince,
   type PresenceState,
   type SupervisedUser,
@@ -38,6 +39,28 @@ const PRESENCE_VARIANT: Record<PresenceState, 'success' | 'info' | 'secondary'> 
   RECENT: 'info',
   AWAY: 'secondary',
 };
+
+/**
+ * L'état de présence, REPLIÉ avant d'être indexé.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Le typage engendré décrit ce que l'API promet, pas ce qu'elle envoie.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Les deux tables ci-dessus sont des `Record<PresenceState, …>` : elles ne
+ * répondent qu'aux trois états connus à la compilation. Un état livré côté API
+ * avant que le panel ne soit redéployé rendrait `undefined` des deux côtés, donc
+ * une pastille sans variante ni libellé, sur l'écran qui sert précisément à
+ * savoir qui est là.
+ *
+ * `knownPresence` replie sur `AWAY`, l'état le moins affirmatif : dire
+ * « inactif » de quelqu'un qui est peut-être connecté induit moins en erreur que
+ * l'inverse. La ligne reste nommée et datée, ce qui est l'essentiel.
+ */
+function PresenceBadge({ presence }: { presence: string }) {
+  const state = knownPresence(presence);
+  return <Badge variant={PRESENCE_VARIANT[state]}>{PRESENCE_LABELS[state]}</Badge>;
+}
 
 export function SupervisionView() {
   const live = useLive();
@@ -99,12 +122,17 @@ export function SupervisionView() {
         empty="Aucun compte téléconseiller."
       />
 
+      {/* « Banque & Finance », comme partout ailleurs dans le panel : c'est le
+          libellé de `ROLE_LABELS`, celui du formulaire de compte et celui de la
+          barre latérale. Cet écran disait « Finances générales », un nom qui
+          n'existe nulle part ailleurs et qui laissait croire à un troisième
+          pôle. */}
       <PresenceTable
         icon={LandmarkIcon}
-        title="Finances générales"
+        title="Banque & Finance"
         users={data.finances}
         observedAt={data.observedAt}
-        empty="Aucun compte au pôle Finances générales."
+        empty="Aucun compte au pôle Banque & Finance."
       />
     </div>
   );
@@ -201,9 +229,7 @@ function PresenceTable({
                 </th>
                 <td className="px-5 py-2">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant={PRESENCE_VARIANT[user.presence]}>
-                      {PRESENCE_LABELS[user.presence]}
-                    </Badge>
+                    <PresenceBadge presence={user.presence} />
                     {!user.isActive ? <Badge variant="outline">Désactivé</Badge> : null}
                   </div>
                 </td>

@@ -188,28 +188,25 @@ describe('description du public dans l’historique', () => {
 
 describe('phrase de confirmation', () => {
   it('annonce le NOMBRE : sans lui, la confirmation ne protège de rien', () => {
-    expect(confirmationSentence(400, 400)).toBe('Cet envoi s’adresse à 400 personnes.');
+    expect(confirmationSentence(400)).toBe('Cet envoi s’adresse à 400 personnes.');
   });
 
   it('accorde le singulier', () => {
-    expect(confirmationSentence(1, 1)).toBe('Cet envoi s’adresse à 1 personne.');
+    expect(confirmationSentence(1)).toBe('Cet envoi s’adresse à 1 personne.');
   });
 
-  it('DISTINGUE les destinataires injoignables', () => {
-    // Sans cette phrase, l'admin croit avoir touché 400 personnes alors que 120
-    // n'ont aucun appareil enregistré.
-    const sentence = confirmationSentence(400, 280);
-    expect(sentence).toContain('400 personnes');
-    expect(sentence).toContain('120');
-    expect(sentence).toContain('n’ont aucun appareil enregistré');
-  });
-
-  it('accorde le singulier sur les injoignables', () => {
-    expect(confirmationSentence(2, 1)).toContain('1 d’entre elles n’a aucun appareil');
+  /**
+   * La nuance « joignables / visés » a disparu du contrat : `AudiencePreviewDto`
+   * ne rend qu'un `recipientCount`, et tout compte visé lit la notification dans
+   * l'application. La phrase ne doit donc plus parler d'appareils enregistrés,
+   * sous peine d'annoncer un manque qui n'existe pas.
+   */
+  it('ne parle plus d’appareils enregistrés', () => {
+    expect(confirmationSentence(400)).not.toContain('appareil');
   });
 
   it('dit franchement qu’un public vide n’enverra rien', () => {
-    expect(confirmationSentence(0, 0)).toBe(
+    expect(confirmationSentence(0)).toBe(
       'Ce public ne correspond à aucun compte actif. Rien ne sera envoyé.',
     );
   });
