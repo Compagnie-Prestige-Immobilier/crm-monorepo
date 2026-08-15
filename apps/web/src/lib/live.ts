@@ -27,6 +27,33 @@
 /** Rythme nominal. Assez court pour être vivant, assez long pour être discret. */
 export const LIVE_INTERVAL_MS = 10_000;
 
+/**
+ * Rythme LENT, pour un état qui change quelques fois par JOUR.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Une minute, et le chiffre est un arbitrage, pas un défaut.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Le bandeau du mode démonstration est le premier usage. Il ne décrit pas un
+ * flux de saisies mais un interrupteur qu'un administrateur bascule au plus
+ * quelques fois par jour, et dont chaque bascule doit atteindre TOUS les écrans
+ * déjà ouverts. Deux bornes encadrent le choix :
+ *
+ *  - Trop lent, l'avertissement arrive après le geste qu'il devait prévenir.
+ *    Une minute est le temps qu'il faut pour ouvrir un formulaire et le remplir ;
+ *    au-delà, l'utilisateur perd sa saisie et découvre la cause par le 409, ce
+ *    qui est très exactement le défaut corrigé ici.
+ *  - Trop rapide, on paie pour rien. Le rythme nominal (dix secondes) coûterait
+ *    six requêtes par minute sur CHAQUE écran du panel et pour CHAQUE
+ *    utilisateur, alors qu'il n'y a rien à voir 99 % du temps. Le panel est
+ *    consulté depuis des connexions facturées au volume : une requête par
+ *    minute et par onglet est le plus petit prix qui tienne la promesse.
+ *
+ * La borne haute est donc dictée par l'usage (une minute de saisie), la borne
+ * basse par la facture. Elles se rejoignent à 60 000 ms.
+ */
+export const LIVE_SLOW_INTERVAL_MS = 60_000;
+
 /** Après un échec. Laisse le temps à un incident passager de se résoudre. */
 export const LIVE_ERROR_INTERVAL_MS = 60_000;
 
@@ -44,11 +71,16 @@ export interface LiveState {
  *
  * `false` et non `0` : TanStack Query traite `0` comme « aussi vite que
  * possible », ce qui est exactement l'inverse de l'intention.
+ *
+ * `nominalMs` permet à un appelant de sonder plus LENTEMENT que le tableau de
+ * bord sans réécrire les trois précautions ci-dessus, qui sont les mêmes pour
+ * tout le monde. Le ralentissement après échec ne peut jamais ACCÉLÉRER un
+ * sondage déjà lent : c'est un plancher, pas une valeur fixe.
  */
-export function liveInterval(state: LiveState): number | false {
+export function liveInterval(state: LiveState, nominalMs = LIVE_INTERVAL_MS): number | false {
   if (state.paused) return false;
   if (state.hidden) return false;
-  return state.failing ? LIVE_ERROR_INTERVAL_MS : LIVE_INTERVAL_MS;
+  return state.failing ? Math.max(nominalMs, LIVE_ERROR_INTERVAL_MS) : nominalMs;
 }
 
 /**

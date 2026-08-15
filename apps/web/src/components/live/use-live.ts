@@ -54,8 +54,15 @@ export interface Live {
  * La pause manuelle existe pour une raison précise : un écran qui se réordonne
  * pendant qu'on lit une ligne est inutilisable. Elle est offerte, jamais
  * imposée.
+ *
+ * `intervalMs` sert aux consommateurs qui ne regardent pas un flux de saisies :
+ * le bandeau du mode démonstration suit un interrupteur basculé quelques fois
+ * par jour et sonde donc à `LIVE_SLOW_INTERVAL_MS`. Le rythme change ; l'arrêt
+ * en arrière-plan et le ralentissement après échec, non : ce sont eux qui
+ * rendent le sondage supportable, et les redéfinir ailleurs les ferait diverger.
  */
-export function useLive(): Live {
+export function useLive(options?: { intervalMs?: number }): Live {
+  const intervalMs = options?.intervalMs;
   const hidden = useDocumentHidden();
   const [paused, setPaused] = useState(false);
 
@@ -66,8 +73,8 @@ export function useLive(): Live {
 
   const refetchInterval = useCallback(
     (query: { state: { status: string } }): number | false =>
-      liveInterval(stateOf(query.state.status === 'error')),
-    [stateOf],
+      liveInterval(stateOf(query.state.status === 'error'), intervalMs),
+    [stateOf, intervalMs],
   );
 
   const togglePause = useCallback(() => {

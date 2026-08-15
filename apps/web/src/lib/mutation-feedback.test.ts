@@ -1,8 +1,16 @@
 import { ApiError } from '@crm/api-client/query';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiConfigurationError } from '@/lib/api/config';
-import { apiErrorText } from '@/lib/mutation-feedback';
+import { apiErrorText, demoReadOnlyMessage, toastApiError } from '@/lib/mutation-feedback';
+
+/**
+ * Sonner est remplacé pour pouvoir LIRE les options du toast : la durée et
+ * l'identifiant du refus de démonstration ne se voient pas dans le texte, et
+ * c'est pourtant là que se joue leur utilité.
+ */
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
+vi.mock('sonner', () => ({ toast: { error: toastError, success: vi.fn() } }));
 
 /**
  * Le message d'erreur d'une mutation.
@@ -101,5 +109,91 @@ describe('les phrases de repli, quand le serveur ne dit rien', () => {
 
   it('parle de connexion quand ce n’est pas une réponse de l’API', () => {
     expect(apiErrorText(new TypeError('fetch failed'), 'Échec.')).toMatch(/injoignable/u);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Le refus de démonstration : reconnu au CODE, jamais au statut.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Tant que le mode démonstration est actif, l'API rend 409
+ * `DEMO_MODE_READ_ONLY` sur TOUTE écriture. Le message du serveur est déjà
+ * rédigé pour l'écran, et la branche 409 générique le laissait d'ailleurs
+ * passer : la prose atteignait donc déjà l'utilisateur, par accident.
+ *
+ * Ce qui manquait est ce que ces tests éprouvent, et chacun échoue sans la
+ * branche dédiée :
+ *
+ *  1. un corps qui porte le CODE mais pas de prose retombait sur « Un
+ *     enregistrement existe déjà avec ces valeurs », c'est-à-dire sur une cause
+ *     fausse, qui envoie chercher un doublon inexistant ;
+ *  2. rien ne distinguait ce refus d'un conflit d'unicité, donc rien ne pouvait
+ *     le traiter à part ;
+ *  3. le toast durait quatre secondes pour trois phrases, et s'empilait autant
+ *     de fois qu'il y avait de mutations parties.
+ */
+const DEMO_MESSAGE =
+  'La plateforme est en mode démonstration : les écritures sont suspendues. ' +
+  'Vos saisies mobiles hors ligne continuent d’être acceptées. Demandez à un ' +
+  'administrateur de désactiver le mode démonstration pour reprendre la saisie.';
+
+const demoRefusal = (body: unknown = { code: 'DEMO_MODE_READ_ONLY', message: DEMO_MESSAGE }) =>
+  fail(409, body);
+
+describe('le refus d’écriture du mode démonstration', () => {
+  beforeEach(() => {
+    toastError.mockClear();
+  });
+
+  it('rend la phrase du serveur telle quelle : elle est écrite pour l’écran', () => {
+    expect(apiErrorText(demoRefusal(), 'Enregistrement impossible.')).toBe(DEMO_MESSAGE);
+  });
+
+  it('n’accuse PAS un doublon quand le corps porte le code sans prose', () => {
+    // C'est le cas qui échouait : la branche 409 générique répondait « Un
+    // enregistrement existe déjà avec ces valeurs », et l'utilisateur partait
+    // chercher un doublon pendant qu'un interrupteur était allumé au bureau.
+    const text = apiErrorText(demoRefusal({ code: 'DEMO_MODE_READ_ONLY' }), 'Échec.');
+
+    expect(text).not.toMatch(/existe déjà/u);
+    expect(text).toMatch(/mode démonstration/u);
+  });
+
+  it('branche sur le code et non sur le statut : un 409 ordinaire reste un conflit', () => {
+    expect(demoReadOnlyMessage(fail(409, { message: 'Numéro déjà enregistré.' }))).toBeNull();
+    expect(demoReadOnlyMessage(fail(409, { code: 'PROSPECT_DUPLICATE' }))).toBeNull();
+    expect(demoReadOnlyMessage(new TypeError('fetch failed'))).toBeNull();
+    expect(demoReadOnlyMessage(demoRefusal())).toBe(DEMO_MESSAGE);
+  });
+
+  it('laisse au message trois phrases le temps d’être lu', () => {
+    toastApiError(demoRefusal(), 'Échec.');
+
+    const [text, options] = toastError.mock.calls[0] as [string, { duration?: number }];
+    expect(text).toBe(DEMO_MESSAGE);
+    // Quatre secondes, le défaut de Sonner, ne suffisent pas à lire la cause ET
+    // le remède : l'utilisateur ne retiendrait que « ça a échoué ».
+    expect(options.duration).toBeGreaterThan(8000);
+  });
+
+  it('n’empile pas un pavé identique par mutation partie', () => {
+    // Une vue à mise à jour optimiste ou une action en lot lance plusieurs
+    // écritures : elles sont TOUTES refusées, pour la même raison unique.
+    toastApiError(demoRefusal(), 'Échec.');
+    toastApiError(demoRefusal(), 'Échec.');
+    toastApiError(demoRefusal(), 'Échec.');
+
+    const ids = toastError.mock.calls.map((call) => (call[1] as { id?: string } | undefined)?.id);
+    expect(new Set(ids).size).toBe(1);
+    expect(ids[0]).toBe('DEMO_MODE_READ_ONLY');
+  });
+
+  it('ne colle ni identifiant ni durée sur les autres erreurs', () => {
+    // Sans quoi deux échecs de validation distincts se remplaceraient l'un
+    // l'autre, et le second effacerait le premier avant sa lecture.
+    toastApiError(fail(400, { message: 'Le nom est obligatoire.' }), 'Échec.');
+
+    expect(toastError.mock.calls[0]).toEqual(['Le nom est obligatoire.']);
   });
 });

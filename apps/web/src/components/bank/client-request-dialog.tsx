@@ -168,8 +168,7 @@ export function ClientRequestDialog({
                 {prenom.trim()} {nom.trim()} est en attente d’approbation.
               </p>
               <p className="mt-1 text-muted-foreground">
-                Vous recevrez une notification dès que le siège aura tranché. Inutile de renvoyer la
-                demande : elle est déjà enregistrée.
+                Vous recevrez une notification dès que le siège aura tranché.
               </p>
             </div>
           </div>

@@ -17,7 +17,26 @@ import type { Role } from '@/lib/types';
  *
  * Il est posé par le layout SERVEUR, à partir de l'état lu au rendu : un
  * bandeau chargé côté client apparaîtrait après coup, c'est-à-dire après que
- * l'utilisateur a commencé à lire les chiffres.
+ * l'utilisateur a commencé à lire les chiffres. Ce composant-ci ne fait donc
+ * que rendre un état qu'on lui donne ; c'est `DemoBannerLive` qui le monte, et
+ * qui resonde l'état pour que la bascule d'un administrateur atteigne aussi les
+ * écrans déjà ouverts, dans les deux sens.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Il annonce AUSSI la lecture seule, et c'est le même bandeau.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Tant que le mode est actif, l'API refuse toute écriture par un 409
+ * `DEMO_MODE_READ_ONLY`. Le toast qui en découle explique la cause, mais APRÈS
+ * la saisie perdue : l'utilisateur a rempli son formulaire avant d'apprendre
+ * qu'il ne pouvait pas l'enregistrer. La cause est donc écrite ici, en
+ * permanence, là où elle se lit AVANT le geste.
+ *
+ * Un SEUL bandeau, et non un second empilé dessous : la hauteur utile du panel
+ * est déjà courte, et deux bandes horizontales mangeraient la première ligne de
+ * chaque tableau. La phrase du terrain (« la synchronisation mobile reste
+ * acceptée ») tient dans la même ligne et évite qu'un responsable lise
+ * « écritures suspendues » comme « mes équipes sont arrêtées ».
  *
  * Couleurs : surface or `accent-surface` avec du texte `warning` (#856011,
  * 5,71:1). Jamais l'or décoratif #C8921A en texte : design.md §2.3.
@@ -31,11 +50,11 @@ export function DemoBanner({ seededAt, role }: { seededAt: string | null; role: 
       className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-accent-border/40 bg-accent-surface px-4 py-2 text-center text-[0.8125rem] text-warning"
     >
       <FlaskConicalIcon className="size-4 shrink-0" aria-hidden="true" />
-      <span className="font-[600]">Mode démonstration actif.</span>
+      <span className="font-[600]">Mode démonstration actif : écritures suspendues.</span>
       <span>
         Données fictives
         {seededAt !== null ? `, jeu créé le ${formatDate(seededAt)}` : ''}. Ne pas exporter comme
-        chiffres réels.
+        chiffres réels. La synchronisation mobile reste acceptée.
       </span>
       {role === 'ADMIN' ? (
         <Link

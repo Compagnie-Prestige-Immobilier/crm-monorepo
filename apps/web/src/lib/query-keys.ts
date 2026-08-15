@@ -136,6 +136,18 @@ export const queryKeys = {
 
   // ─── Mode démonstration ───────────────────────────────────────────────────
   demoStatus: ['demo-status'] as const,
+  /**
+   * Le BANDEAU global, sondé sur tous les écrans du panel.
+   *
+   * Une clé distincte de `demoStatus`, et préfixée par elle. Distincte parce
+   * que les deux lectures n'ont ni la même forme ni le même rythme : la carte
+   * de réglages lit l'état complet (compteurs, `canToggle`, `reason`) une fois
+   * à l'ouverture, le bandeau ne retient que `enabled` et `seededAt` et les
+   * resonde lentement, pour tous les rôles. Préfixée parce qu'une bascule
+   * invalide `demoStatus` : le préfixe fait tomber le bandeau dans le même
+   * appel, sans que l'opérateur attende le cycle suivant.
+   */
+  demoBanner: ['demo-status', 'banner'] as const,
 
   // ─── Administration ───────────────────────────────────────────────────────
   purgeCatalog: ['purge-catalog'] as const,
