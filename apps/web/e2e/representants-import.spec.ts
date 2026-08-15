@@ -178,9 +178,9 @@ test('la simulation chiffre le fichier et n’écrit rien, puis l’application 
   // ─── La fiche existe vraiment ─────────────────────────────────────────────
   await page.goto('/representants');
   await page.getByLabel('Recherche').fill(FULL_NAME);
-  await expect(
-    page.getByRole('button', { name: `Modifier la fiche de ${FULL_NAME}` }),
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: `Modifier la fiche de ${FULL_NAME}` })).toBeVisible(
+    { timeout: 30_000 },
+  );
 });
 
 test('redéposer le même classeur ne crée pas de second exemplaire', async ({ page }) => {
