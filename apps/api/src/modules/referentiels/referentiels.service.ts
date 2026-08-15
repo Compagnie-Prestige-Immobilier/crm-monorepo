@@ -70,7 +70,7 @@ const toRegion = (row: Region): RegionDto => ({ id: row.id, code: row.code, name
 /**
  * Référentiels : banques, syndicats, découpage administratif.
  *
- * Lecture ouverte à tout utilisateur authentifié — ce sont les listes
+ * Lecture ouverte à tout utilisateur authentifié, ce sont les listes
  * déroulantes du formulaire de saisie, elles ne contiennent aucune donnée
  * personnelle. Écriture réservée à l'ADMIN.
  *
