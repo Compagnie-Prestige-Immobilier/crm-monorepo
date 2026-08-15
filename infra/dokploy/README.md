@@ -1,4 +1,4 @@
-# Déploiement Dokploy — CPI GO
+# Déploiement Dokploy, CPI GO
 
 Trois scripts à lancer dans l'ordre. Chacun est **idempotent** : relancé, il
 retrouve l'existant au lieu de le doubler.
@@ -40,8 +40,8 @@ de Dokploy, et l'un des deux ne monterait pas.
 
 Le compose de production lance Caddy sur les ports 80 et 443. Sur un hôte
 Dokploy ces ports appartiennent à Traefik : les deux entreraient en collision et
-l'un ne démarrerait pas. La forme retenue est native — un service Postgres, deux
-applications construites depuis leurs Dockerfile — et laisse à Traefik le
+l'un ne démarrerait pas. La forme retenue est native, un service Postgres, deux
+applications construites depuis leurs Dockerfile, et laisse à Traefik le
 domaine et le TLS, qui lui reviennent.
 
 `docker-compose.prod.yml` reste valable pour un VPS nu, sans Dokploy.
@@ -62,7 +62,7 @@ go-admin.cpi-chues.com
 ```
 
 Installez le certificat et sa clé sur le VPS, puis passez le mode SSL en
-**Full (strict)** — et pas avant, sinon le site répond 526 entre les deux
+**Full (strict)**, et pas avant, sinon le site répond 526 entre les deux
 opérations.
 
 > Le mode **Flexible** est à proscrire ici : le tronçon Cloudflare → VPS
@@ -104,7 +104,7 @@ départements sont des clés étrangères obligatoires.
 Les données de démonstration s'activent depuis le panel web
 (**Paramètres → Mode démonstration**), jamais en ligne de commande.
 
-## Fichiers engendrés — jamais commités
+## Fichiers engendrés, jamais commités
 
 | Fichier              | Contenu                                                |
 | -------------------- | ------------------------------------------------------ |
@@ -124,7 +124,7 @@ curl -s -o /dev/null -w '%{http_code}\n' https://go.cpi-chues.com/api/v1/referen
 
 **401 est le résultat attendu** : le service répond et le garde
 d'authentification fait son travail. Un `200` signifierait que les routes sont
-ouvertes — à corriger d'urgence. Un `502` ou `526` signale que le certificat
+ouvertes, à corriger d'urgence. Un `502` ou `526` signale que le certificat
 d'origine n'est pas en place.
 
 ## Après la mise en ligne
