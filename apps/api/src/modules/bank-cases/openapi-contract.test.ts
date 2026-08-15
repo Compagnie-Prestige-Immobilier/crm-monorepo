@@ -68,6 +68,25 @@ const BANK_SCHEMAS = Object.entries(document.components.schemas).filter(([name])
   /^Bank|^CreateBank|^UpdateBank|^ReorderBank|^SetBank|^ProspectSearch/.test(name),
 );
 
+/**
+ * Forme d'un `operationId` ÉCRIT À LA MAIN.
+ *
+ * Faute de `@ApiOperation({ operationId })`, Nest en fabrique un à partir du
+ * contrôleur et de la méthode : `BankCasesController_list`. Le document reste
+ * donc valide, les générateurs produisent du code, et rien ne se voit, jusqu'au
+ * jour où quelqu'un renomme la classe et où toutes les méthodes du client
+ * changent de nom d'un coup. C'est précisément cette forme engendrée que le
+ * motif ci-dessous refuse : minuscule initiale, aucun tiret bas.
+ */
+const EXPLICITE = /^[a-z][A-Za-z0-9]+$/;
+
+/** Toutes les opérations du document, aplaties. */
+const OPERATIONS: { method: string; path: string; operation: Operation }[] = Object.entries(
+  document.paths,
+).flatMap(([path, methods]) =>
+  Object.entries(methods).map(([method, operation]) => ({ method, path, operation })),
+);
+
 describe('routes publiées', () => {
   it.each(ROUTES)('%s %s → %s', (method, path, operationId) => {
     const operation = document.paths[path]?.[method];
@@ -76,8 +95,13 @@ describe('routes publiées', () => {
   });
 
   it('toute route du module porte un operationId explicite', () => {
-    for (const [, path, operationId] of ROUTES) {
-      expect(operationId).toMatch(/^[a-z][A-Za-z]+$/);
+    for (const [method, path] of ROUTES) {
+      const operation = document.paths[path]?.[method];
+      const identifiant = operation?.operationId;
+      expect(identifiant, `${method.toUpperCase()} ${path} sans operationId`).toBeDefined();
+      expect(identifiant, `${method.toUpperCase()} ${path} : operationId engendré`).toMatch(
+        EXPLICITE,
+      );
       expect(path.startsWith('/api/v1/')).toBe(true);
     }
   });
@@ -104,6 +128,137 @@ describe('routes publiées', () => {
 
     expect(Object.keys(response?.content ?? {})).toEqual([mime]);
     expect(response?.content?.[mime]?.schema).toEqual({ type: 'string', format: 'binary' });
+  });
+});
+
+/**
+ * Les modules ARRIVÉS APRÈS ce test, tenus au même contrat.
+ *
+ * Chaque entrée fige l'INVENTAIRE COMPLET des opérations d'une étiquette : une
+ * route supprimée, ajoutée sans être déclarée ici, ou dont l'`operationId`
+ * change, met la ligne au rouge. Un simple compte n'y suffirait pas, deux
+ * routes échangées le laisseraient intact.
+ */
+const MODULES: Record<string, string[]> = {
+  'client-requests': [
+    'createClientRequest',
+    'listClientRequests',
+    'getClientRequest',
+    'approveClientRequest',
+    'rejectClientRequest',
+  ],
+  'rep-campaigns': [
+    'previewRepCampaign',
+    'recordRepCallAttempt',
+    'listRepCampaigns',
+    'createRepCampaign',
+    'getRepCampaign',
+    'closeRepCampaign',
+    'downloadRepProgrammePdf',
+  ],
+  representants: [
+    'listRepresentants',
+    'createRepresentant',
+    'lookupRepresentantByPhone',
+    'importRepresentants',
+    'getRepresentant',
+    'updateRepresentant',
+    'deleteRepresentant',
+  ],
+  export: [
+    'exportBankCasesXlsx',
+    'exportProspectsXlsx',
+    'downloadRepresentantsTemplateXlsx',
+    'exportRepresentantsXlsx',
+  ],
+};
+
+/** Opérations du document portant l'étiquette donnée. */
+const taggedWith = (tag: string): { method: string; path: string; operation: Operation }[] =>
+  OPERATIONS.filter((entry) => (entry.operation.tags ?? []).includes(tag));
+
+describe('operationId sur tout le document publié', () => {
+  /**
+   * Le contrôle porte sur le DOCUMENT, pas sur une liste locale. Une version
+   * antérieure de ce test bouclait sur la table `ROUTES` déclarée juste
+   * au-dessus et vérifiait que ses propres chaînes ressemblaient à des
+   * identifiants : elle ne pouvait pas échouer, quoi qu'il arrive au serveur.
+   */
+  it('aucune opération publiée ne porte un operationId engendré par Nest', () => {
+    const engendres = OPERATIONS.filter(
+      ({ operation }) =>
+        operation.operationId === undefined || !EXPLICITE.test(operation.operationId),
+    ).map(
+      ({ method, path, operation }) =>
+        `${method.toUpperCase()} ${path} → ${String(operation.operationId)}`,
+    );
+
+    expect(
+      engendres,
+      'Ajoutez @ApiOperation({ operationId }) sur ces routes : sans lui, le nom ' +
+        'de méthode du client engendré suit le nom de la CLASSE et change au ' +
+        'premier renommage.',
+    ).toEqual([]);
+
+    // Sans ce garde, un document vide ou un changement de forme du JSON ferait
+    // passer la boucle à vide, donc au vert.
+    expect(OPERATIONS.length).toBeGreaterThanOrEqual(100);
+  });
+
+  it('les operationId sont uniques dans tout le document', () => {
+    const vus = new Map<string, string[]>();
+    for (const { method, path, operation } of OPERATIONS) {
+      const id = operation.operationId ?? '(absent)';
+      vus.set(id, [...(vus.get(id) ?? []), `${method.toUpperCase()} ${path}`]);
+    }
+    const doublons = [...vus.entries()].filter(([, routes]) => routes.length > 1);
+    // Deux opérations de même identifiant font engendrer deux méthodes de même
+    // nom : le client Dart ne compile plus, ou pire, l'une écrase l'autre.
+    expect(doublons).toEqual([]);
+  });
+
+  it('toute route publiée est versionnée sous /api/v1/', () => {
+    const hors = OPERATIONS.map(({ path }) => path).filter((path) => !path.startsWith('/api/v1/'));
+    expect(hors).toEqual([]);
+  });
+
+  it.each(Object.entries(MODULES))('le module %s publie exactement ses routes', (tag, attendus) => {
+    const trouves = taggedWith(tag).map(({ operation }) => operation.operationId ?? '(absent)');
+    expect(trouves.sort()).toEqual([...attendus].sort());
+  });
+
+  /**
+   * `analytics` est le seul module dont l'inventaire bouge encore à chaque lot ;
+   * on y fige ce qui ne doit PAS disparaître plutôt que la liste entière.
+   */
+  it('le module analytics conserve ses agrégats de pilotage', () => {
+    const trouves = taggedWith('analytics').map(({ operation }) => operation.operationId);
+    for (const attendu of [
+      'getAnalyticsFunnel',
+      'getAnalyticsTotals',
+      'getCampaignPilotage',
+      'getAnalyticsDelays',
+      'getBankAging',
+      'getWeeklyCohorts',
+      'getDepartementYield',
+      'getRepresentantProductivity',
+      'getDataQuality',
+      'getOriginBreakdown',
+    ]) {
+      expect(trouves, `${attendu} a disparu du contrat`).toContain(attendu);
+    }
+  });
+
+  /**
+   * L'import de représentants est un `multipart/form-data`. Déclaré en JSON, le
+   * client engendré poste un corps que Fastify rejette avec un 406 illisible.
+   */
+  it('l’import de représentants est déclaré en multipart', () => {
+    const corps = (
+      document.paths['/api/v1/representants/import']?.post as unknown as
+        { requestBody?: { content?: Record<string, unknown> } } | undefined
+    )?.requestBody;
+    expect(Object.keys(corps?.content ?? {})).toEqual(['multipart/form-data']);
   });
 });
 
@@ -175,7 +330,9 @@ describe('discipline des schémas', () => {
   });
 
   it('les énumérations sont nommées, donc engendrées en types Dart et non en chaînes libres', () => {
-    for (const nom of ['BankStageType', 'BankCaseSortField', 'BankTimeGranularity']) {
+    // `TimeGranularity` est le pas de temps COMMUN : le module ne publie plus
+    // de doublon `BankTimeGranularity` de mêmes valeurs.
+    for (const nom of ['BankStageType', 'BankCaseSortField', 'TimeGranularity']) {
       expect(Object.keys(document.components.schemas)).toContain(nom);
     }
   });

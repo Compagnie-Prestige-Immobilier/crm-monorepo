@@ -8,8 +8,8 @@ import { ZERO_XOF, isStrictlyPositive } from './money.js';
  * Règles du workflow, en fonctions PURES.
  *
  * Elles ne connaissent ni Prisma ni HTTP : c'est ce qui permet de les
- * éprouver exhaustivement — chaque combinaison d'étape, de montant et de motif
- * — sans base de données, et c'est là que vivent les invariants financiers.
+ * éprouver exhaustivement, chaque combinaison d'étape, de montant et de motif
+ *, sans base de données, et c'est là que vivent les invariants financiers.
  *
  * La règle centrale : un montant n'existe QUE sur un encaissement, un motif
  * QUE sur un rejet, et un dossier ouvert ne porte ni l'un ni l'autre.
@@ -53,7 +53,7 @@ export const activeOpenStages = (stages: readonly WorkflowStage[]): WorkflowStag
  *
  * Fondée sur la POSITION et non sur un chaînage stocké : réordonner le workflow
  * ne doit toucher que les transitions futures, jamais réécrire l'historique.
- * Une étape désactivée est simplement sautée — les dossiers qui y stationnent
+ * Une étape désactivée est simplement sautée, les dossiers qui y stationnent
  * restent lisibles et repartent vers la suivante encore active.
  */
 export function nextOpenStage(
@@ -134,7 +134,7 @@ export function assertReachable(
  *
  * Le montant d'un REJET n'est jamais lu depuis le client : il est forcé à zéro.
  * Un agent qui poste « rejeté, 1 200 000 » décrirait un encaissement rejeté,
- * ce qui n'existe pas — et cette valeur entrerait ensuite dans la somme
+ * ce qui n'existe pas, et cette valeur entrerait ensuite dans la somme
  * encaissée du tableau de bord.
  */
 export function planTransitionEffect(

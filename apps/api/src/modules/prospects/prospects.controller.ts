@@ -10,6 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 
 import {
   CurrentUser,
@@ -31,6 +32,12 @@ import {
 
 @ApiTags('prospects')
 @ApiBearerAuth()
+// Toute route de ce contrôleur peut refuser pour ces trois raisons :
+// jeton absent ou expiré, rôle insuffisant, et entrée refusée par la
+// validation globale (`forbidNonWhitelisted` transforme un paramètre mal
+// orthographié en 400). Les déclarer ici évite de les oublier route par
+// route, ce qui était le cas sur 116 opérations sur 119.
+@ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'prospects', version: '1' })
 export class ProspectsController {
   constructor(private readonly prospects: ProspectsService) {}

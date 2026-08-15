@@ -77,6 +77,8 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     enrollmentCapturedById: row.enrollmentCapturedById,
     enrollmentCapturedByName: row.enrollmentCapturedBy?.fullName ?? null,
     enrollmentCapturedAt: row.enrollmentCapturedAt?.toISOString() ?? null,
+    origin: row.origin,
+    originLabel: row.originLabel,
     lastOutcome: lastAttempt?.outcome ?? null,
     lastComment: lastAttempt?.comment ?? null,
     lastAttemptAt: lastAttempt?.at.toISOString() ?? null,
@@ -118,8 +120,8 @@ export class ProspectsService {
     ]);
 
     // UNE seule requête supplémentaire pour toute la page, quel que soit son
-    // nombre de lignes. La variante évidente — lire les tentatives dans le
-    // `include` ou par ligne — produirait un aller-retour par prospect affiché.
+    // nombre de lignes. La variante évidente, lire les tentatives dans le
+    // `include` ou par ligne, produirait un aller-retour par prospect affiché.
     const attempts = await lastAttemptsByProspect(
       this.prisma,
       rows.map((row) => row.id),
@@ -149,7 +151,7 @@ export class ProspectsService {
     const id = input.id ?? uuidv7();
 
     await this.assertIdAvailable(user, id);
-    await this.assertRepresentantUsable(user, input.representantId);
+    const representant = await this.assertRepresentantUsable(user, input.representantId);
     await this.assertPhoneFree(phoneE164);
 
     const created = await this.prisma.prospect.create({
@@ -162,6 +164,17 @@ export class ProspectsService {
         syndicatId: input.syndicatId,
         representantId: input.representantId,
         createdById: user.id,
+        // DEUX SOURCES, ET IL FAUT LES DEUX.
+        //
+        // Le mode allumé d'abord : une fiche saisie pendant une démonstration
+        // est une fiche de démonstration, sans quoi elle survit à l'extinction
+        // et ressort dans un export transmis au siège.
+        //
+        // Le représentant ensuite : la liste des prospects AFFICHE son
+        // représentant. Un prospect visible accroché à une fiche de
+        // rattachement filtrée montrerait un représentant que l'annuaire ne
+        // connaît pas, et la paire se désolidariserait à l'extinction.
+        isDemo: (await this.demo.enabled()) || representant.isDemo,
         ...(input.statut ? { statut: input.statut } : {}),
         clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
       },
@@ -348,10 +361,13 @@ export class ProspectsService {
   private async assertRepresentantUsable(
     user: AuthenticatedUser,
     representantId: string,
-  ): Promise<void> {
+  ): Promise<{ id: string; createdById: string; isDemo: boolean }> {
     const representant = await this.prisma.representant.findFirst({
       where: { id: representantId, deletedAt: null },
-      select: { id: true, createdById: true },
+      // `isDemo` est lu ICI et non relu ailleurs : c'est la fiche de
+      // rattachement qui décide de la nature du prospect, et elle est déjà
+      // chargée à cet endroit.
+      select: { id: true, createdById: true, isDemo: true },
     });
     if (!representant) {
       throw new NotFoundException({
@@ -360,6 +376,7 @@ export class ProspectsService {
       });
     }
     assertOwnership(user, representant, 'Ce représentant appartient à un autre commercial.');
+    return representant;
   }
 
   private async assertIdAvailable(user: AuthenticatedUser, id: string): Promise<void> {
@@ -387,6 +404,13 @@ export class ProspectsService {
    * C'est le contrat que l'app mobile exploite pour afficher « Déjà enregistré
    * par Fatou Ndiaye » : sans le nom, l'utilisateur ne peut rien faire de
    * l'erreur, et la même saisie sera retentée indéfiniment.
+   */
+  /*
+   * LECTURE GLOBALE délibérée : l'index unique partiel
+   * `prospects_phone_e164_active_key` est global, il ne connaît pas le mode
+   * démonstration. Filtré, ce contrôle déclarerait libre un numéro que la base
+   * refuse ensuite, et le mobile recevrait un 409 générique au lieu du message
+   * nominatif dont il a besoin pour arrêter de rejouer la même saisie.
    */
   private async assertPhoneFree(phoneE164: string, exceptId?: string): Promise<void> {
     const clash = await this.prisma.prospect.findFirst({

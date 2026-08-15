@@ -44,7 +44,7 @@ describe('shortCode', () => {
     }
   });
 
-  it('n’émet jamais I, L, O ni U — les caractères qui se confondent à la lecture', () => {
+  it('n’émet jamais I, L, O ni U, les caractères qui se confondent à la lecture', () => {
     const codes = fixtureUuids(2_000).map(shortCode).join('');
     expect(codes).not.toMatch(/[ILOU]/);
   });

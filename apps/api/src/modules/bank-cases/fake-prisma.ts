@@ -8,8 +8,8 @@ import type { PrismaService } from '../../prisma/prisma.service.js';
  *
  * POURQUOI UNE DOUBLURE QUI *INTERPRÈTE* PLUTÔT QUE DES `vi.fn()` FIGÉS.
  *
- * Les invariants de ce module — unicité de la référence, garde de révision,
- * verrou terminal, copie d'identité — ne sont pas des appels à Prisma : ce sont
+ * Les invariants de ce module, unicité de la référence, garde de révision,
+ * verrou terminal, copie d'identité, ne sont pas des appels à Prisma : ce sont
  * des CONSÉQUENCES d'un enchaînement lecture/écriture. Une doublure qui rendrait
  * toujours la même ligne les vérifierait tous « vrais » sans rien démontrer :
  * un `updateMany` qui répond `{count: 1}` quoi qu'on lui passe fait passer le
@@ -22,7 +22,7 @@ import type { PrismaService } from '../../prisma/prisma.service.js';
  *
  * Ce qu'elle ne peut PAS faire, et qu'on ne lui demande pas : exécuter le SQL
  * brut de la liste, des agrégats et de l'export. Ces chemins-là sont couverts
- * par `bank-cases.integration.test.ts`, contre un vrai PostgreSQL — c'est le
+ * par `bank-cases.integration.test.ts`, contre un vrai PostgreSQL, c'est le
  * seul moyen honnête de prouver que le tableau de bord et la liste comptent le
  * même ensemble.
  */
@@ -460,12 +460,41 @@ export class FakePrisma {
       return Promise.resolve(rows.map((row) => ({ ...row })));
     },
 
-    findFirst: ({ where }: { where: Where }): Promise<unknown> => {
-      const row = this.stages.find((item) =>
+    // `orderBy` est HONORÉ ici, et pas seulement accepté. Le service s'appuie
+    // dessus pour départager deux étapes initiales actives : un double qui
+    // rendrait toujours la première de son tableau ferait passer un test que
+    // PostgreSQL, libre de choisir son plan, n'aurait aucune raison de tenir.
+    findFirst: ({
+      where,
+      orderBy,
+    }: {
+      where: Where;
+      orderBy?: Record<string, 'asc' | 'desc'>[];
+    }): Promise<unknown> => {
+      const matching = this.stages.filter((item) =>
         Object.entries(where).every(
           ([key, value]) => (item as unknown as Record<string, unknown>)[key] === value,
         ),
       );
+
+      if (orderBy) {
+        matching.sort((left, right) => {
+          for (const clause of orderBy) {
+            for (const [key, direction] of Object.entries(clause)) {
+              const a = (left as unknown as Record<string, unknown>)[key];
+              const b = (right as unknown as Record<string, unknown>)[key];
+              const delta =
+                typeof a === 'number' && typeof b === 'number'
+                  ? a - b
+                  : String(a).localeCompare(String(b));
+              if (delta !== 0) return direction === 'desc' ? -delta : delta;
+            }
+          }
+          return 0;
+        });
+      }
+
+      const row = matching[0];
       return Promise.resolve(row ? { ...row } : null);
     },
 
@@ -546,7 +575,7 @@ export class FakePrisma {
   /**
    * `$transaction` séquentiel. Il ne rejoue PAS d'annulation : aucun test de ce
    * fichier n'en dépend, et une fausse atomicité donnerait l'illusion d'avoir
-   * prouvé quelque chose que seule la vraie base peut démontrer — c'est le rôle
+   * prouvé quelque chose que seule la vraie base peut démontrer, c'est le rôle
    * de la suite d'intégration.
    */
   $transaction<T>(work: ((tx: FakePrisma) => Promise<T>) | Promise<unknown>[]): Promise<T> {

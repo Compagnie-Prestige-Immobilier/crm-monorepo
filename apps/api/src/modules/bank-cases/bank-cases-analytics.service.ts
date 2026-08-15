@@ -3,9 +3,9 @@ import { Prisma } from '@crm/database';
 import type { BankStageType } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { BANK_CASE_FROM, bankCaseConditions } from './bank-cases.sql.js';
+import { BANK_CASE_FROM, bankCaseConditions, closedAtLateral } from './bank-cases.sql.js';
 import { sumToString } from './money.js';
-import { BankTimeGranularity } from './analytics.dto.js';
+import { TimeGranularity } from '../analytics/dto.js';
 import type {
   BankAgentActivityDto,
   BankAnalyticsQueryDto,
@@ -20,23 +20,13 @@ import type { BankCaseFilterDto } from './dto.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
 /**
- * Date d'ENTRÉE en étape terminale.
+ * Date d'ENTRÉE en étape terminale, pour l'alias `c` de `BANK_CASE_FROM`.
  *
- * Lue dans l'historique et non sur `updatedAt` du dossier : un dossier encaissé
- * dont un administrateur corrige ensuite le montant verrait sinon son délai de
- * traitement s'allonger rétroactivement. La transition, elle, ne bouge jamais.
- *
- * `MAX` et non `MIN` : après une réouverture puis un nouvel encaissement, c'est
- * la dernière issue qui fait foi.
+ * La définition vit dans `bank-cases.sql.ts` et non plus ici : l'entonnoir
+ * analytique en a besoin sur son propre alias, et deux copies finiraient par
+ * donner deux dates d'encaissement pour le même dossier.
  */
-const CLOSED_AT = Prisma.sql`
-  LEFT JOIN LATERAL (
-    SELECT MAX(bt."createdAt") AS "closedAt"
-    FROM "bank_case_transitions" bt
-    INNER JOIN "bank_case_stages" bs ON bs."id" = bt."toStageId"
-    WHERE bt."caseId" = c."id" AND bs."type" <> 'OPEN'
-  ) cl ON TRUE
-`;
+const CLOSED_AT = closedAtLateral(Prisma.sql`c`);
 
 const SECONDS_PER_HOUR = 3600;
 
@@ -58,7 +48,7 @@ export class BankCaseAnalyticsService {
    * Un seul appel pour tout le tableau de bord.
    *
    * Sept requêtes agrégées, zéro ligne de dossier rapatriée, et le MÊME filtre
-   * que la liste — c'est cette dernière propriété qui garantit qu'un compteur
+   * que la liste, c'est cette dernière propriété qui garantit qu'un compteur
    * affiché est toujours exactement le décompte du tableau en dessous.
    */
   async overview(query: BankAnalyticsQueryDto): Promise<BankCaseAnalyticsDto> {
@@ -194,7 +184,7 @@ export class BankCaseAnalyticsService {
     const where = bankCaseConditions(filter, await this.demo.enabled());
     const rows = await this.prisma.$queryRaw<
       {
-        bankId: string;
+        banqueId: string;
         label: string;
         cases: number;
         cashed: number;
@@ -203,7 +193,7 @@ export class BankCaseAnalyticsService {
         meanSeconds: number | null;
       }[]
     >`
-      SELECT b."id" AS "bankId", b."shortName" AS "label",
+      SELECT b."id" AS "banqueId", b."shortName" AS "label",
              COUNT(*)::int AS "cases",
              COUNT(*) FILTER (WHERE s."type" = 'CASHED')::int AS "cashed",
              COUNT(*) FILTER (WHERE s."type" = 'REJECTED')::int AS "rejected",
@@ -220,7 +210,7 @@ export class BankCaseAnalyticsService {
 
     const total = rows.reduce((sum, row) => sum + row.cases, 0);
     return rows.map((row) => ({
-      bankId: row.bankId,
+      banqueId: row.banqueId,
       label: row.label,
       cases: row.cases,
       cashed: row.cashed,
@@ -315,8 +305,8 @@ export class BankCaseAnalyticsService {
  * énumération fermée et non de la chaîne reçue, ce qui interdit toute injection
  * par ce chemin.
  */
-function unit(granularity: BankTimeGranularity | undefined): Prisma.Sql {
-  if (granularity === BankTimeGranularity.MONTH) return Prisma.sql`'month'`;
-  if (granularity === BankTimeGranularity.WEEK) return Prisma.sql`'week'`;
+function unit(granularity: TimeGranularity | undefined): Prisma.Sql {
+  if (granularity === TimeGranularity.MONTH) return Prisma.sql`'month'`;
+  if (granularity === TimeGranularity.WEEK) return Prisma.sql`'week'`;
   return Prisma.sql`'day'`;
 }

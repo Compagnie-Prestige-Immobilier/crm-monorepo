@@ -17,7 +17,7 @@ import { normalizeReferenceDisplay, normalizeReferenceKey } from './reference-ke
  *
  * Ce n'est pas une préférence de style : la colonne est un `Decimal(18,0)` et
  * un nombre JSON perd de la précision au-delà de 2^53. Le test le démontre sur
- * une valeur que `JSON.parse` corrompt réellement — sans cette démonstration,
+ * une valeur que `JSON.parse` corrompt réellement, sans cette démonstration,
  * la règle finirait par être « simplifiée » un jour de refactorisation.
  */
 

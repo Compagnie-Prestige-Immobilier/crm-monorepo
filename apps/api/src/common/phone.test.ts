@@ -5,7 +5,7 @@ import { normalizePhone, tryNormalizePhone } from './phone.js';
 
 const CANONICAL = '+221771234567';
 
-describe('normalizePhone — déterminisme', () => {
+describe('normalizePhone, déterminisme', () => {
   // C'est LE test qui protège la clé de déduplication : toutes ces saisies
   // désignent le même abonné et doivent produire la même chaîne, sinon
   // l'index unique partiel ne dédoublonne plus rien.
@@ -64,7 +64,7 @@ describe('normalizePhone — déterminisme', () => {
   });
 });
 
-describe('normalizePhone — rejets', () => {
+describe('normalizePhone, rejets', () => {
   const garbage = [
     '',
     '   ',

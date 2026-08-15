@@ -56,7 +56,7 @@ function canonicalizePrefix(raw: string, region: CountryCode): string {
 /**
  * Indicatifs des régions que le système peut rencontrer. Volontairement court :
  * l'app est déployée au Sénégal. `getCountryCallingCode` de libphonenumber
- * ferait le travail, mais elle lève sur une région inconnue — ici une région
+ * ferait le travail, mais elle lève sur une région inconnue, ici une région
  * absente signifie simplement « pas de dépréfixage », ce qui est sans risque.
  */
 const REGION_CALLING_CODES: Readonly<Record<string, string>> = {

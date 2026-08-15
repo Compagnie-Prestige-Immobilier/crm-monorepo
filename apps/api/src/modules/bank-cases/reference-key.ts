@@ -5,7 +5,7 @@
  * `referenceKey` est sa forme normalisée et c'est ELLE qui porte l'unicité
  * globale, adossée à l'index partiel `bank_cases_reference_key_active`.
  *
- * La règle est volontairement minimale — majuscules, espaces compactés — parce
+ * La règle est volontairement minimale, majuscules, espaces compactés, parce
  * qu'une normalisation agressive (retirer les tirets, les barres obliques)
  * fusionnerait des références que la banque considère distinctes. Deux agents
  * qui saisissent « bnk 2026-014 » et « BNK  2026-014 » désignent le même

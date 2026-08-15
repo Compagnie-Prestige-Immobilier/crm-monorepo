@@ -267,7 +267,7 @@ describe('conflit de téléphone', () => {
 });
 
 describe('garde anti-squat d’identifiant', () => {
-  it('refuse en 403 un identifiant déjà pris par un autre commercial — jamais d’écrasement', async () => {
+  it('refuse en 403 un identifiant déjà pris par un autre commercial, jamais d’écrasement', async () => {
     const prisma = makePrisma();
     prisma.prospect.findUnique.mockResolvedValue({ id: 'p-1', createdById: bob.id });
 
@@ -385,6 +385,28 @@ describe('surface de phase 2 dans la liste', () => {
     });
   });
 
+  /**
+   * La provenance est STOCKÉE et indexée depuis les demandes de création de
+   * client. Absente de la réponse, elle est invisible pour tout client : celui
+   * qui vient de faire approuver une demande relit une fiche indistinguable
+   * d'une fiche de tournée terrain.
+   */
+  it('rend la provenance stockée, clé et détail lisible', async () => {
+    const prisma = makePrisma();
+    prisma.prospect.count.mockResolvedValue(2);
+    prisma.prospect.findMany.mockResolvedValue([
+      prospectRow({ id: 'p-banque', origin: 'BANQUE', originLabel: 'CBAO Thiès' }),
+      prospectRow({ id: 'p-terrain' }),
+    ]);
+
+    const { items } = await service(prisma).list(admin, {});
+
+    expect(items[0]).toMatchObject({ origin: 'BANQUE', originLabel: 'CBAO Thiès' });
+    // Une fiche de tournée terrain porte la clé, à null : nullable n'est pas absent.
+    expect(items[1]).toMatchObject({ origin: null, originLabel: null });
+    expect(Object.keys(items[1] ?? {})).toContain('origin');
+  });
+
   it('laisse à null les champs de phase 2 d’une fiche jamais appelée', async () => {
     const prisma = makePrisma();
     prisma.prospect.count.mockResolvedValue(1);
@@ -469,6 +491,8 @@ function prospectRow(overrides: Record<string, unknown>): Record<string, unknown
     updatedAt: new Date('2026-08-01T09:00:00.000Z'),
     deletedAt: null,
     phase2Status: 'PENDING',
+    origin: null,
+    originLabel: null,
     enrollmentMethod: null,
     enrollmentCapturedAt: null,
     enrollmentCapturedById: null,
@@ -487,3 +511,87 @@ function prospectRow(overrides: Record<string, unknown>): Record<string, unknown
     ...overrides,
   };
 }
+
+/**
+ * La nature de la fiche, à la création.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LE DÉFAUT CORRIGÉ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `create` n'écrivait pas `isDemo`. La colonne prenait donc son défaut, FALSE,
+ * et toute fiche saisie pendant une démonstration devenait une VRAIE fiche :
+ * visible après l'extinction du mode, comptée dans les agrégats, sortie dans
+ * l'export transmis au siège. Rien ne la désigne alors comme fictive : ni le
+ * filtre d'affichage, ni un nettoyage ultérieur par `isDemo`.
+ *
+ * Le rattachement compte autant que l'interrupteur : la liste des prospects
+ * AFFICHE le représentant. Une fiche visible accrochée à un représentant filtré
+ * montrerait un nom que l'annuaire ne connaît pas.
+ */
+describe('nature de la fiche créée', () => {
+  const saisie = {
+    nom: 'Fall',
+    prenom: 'Moussa',
+    phone: '77 123 45 67',
+    banqueId: 'b-1',
+    syndicatId: 's-1',
+    representantId: 'r-1',
+  };
+
+  const prepare = (representantIsDemo: boolean): PrismaMock => {
+    const prisma = makePrisma();
+    prisma.representant.findFirst.mockResolvedValue({
+      id: 'r-1',
+      createdById: alice.id,
+      isDemo: representantIsDemo,
+    });
+    prisma.prospect.create.mockResolvedValue(prospectRow({}));
+    return prisma;
+  };
+
+  it('mode ÉTEINT et représentant réel : la fiche est réelle', async () => {
+    const prisma = prepare(false);
+    await new ProspectsService(
+      prisma as unknown as PrismaService,
+      fakeDemoVisibility(false),
+    ).create(alice, saisie);
+
+    expect(firstArg(prisma.prospect.create).data?.isDemo).toBe(false);
+  });
+
+  it('mode ALLUMÉ : la fiche est une fiche de démonstration', async () => {
+    const prisma = prepare(false);
+    await new ProspectsService(prisma as unknown as PrismaService, fakeDemoVisibility(true)).create(
+      alice,
+      saisie,
+    );
+
+    expect(firstArg(prisma.prospect.create).data?.isDemo).toBe(true);
+  });
+
+  it('représentant de démonstration : la fiche le suit, mode éteint compris', async () => {
+    const prisma = prepare(true);
+    await new ProspectsService(
+      prisma as unknown as PrismaService,
+      fakeDemoVisibility(false),
+    ).create(alice, saisie);
+
+    expect(firstArg(prisma.prospect.create).data?.isDemo).toBe(true);
+  });
+
+  it('lit la nature du représentant, elle ne peut pas être devinée après coup', async () => {
+    const prisma = prepare(true);
+    await new ProspectsService(
+      prisma as unknown as PrismaService,
+      fakeDemoVisibility(false),
+    ).create(alice, saisie);
+
+    // La projection doit demander la colonne : sans elle, `representant.isDemo`
+    // vaudrait `undefined` et l'héritage retomberait silencieusement sur FALSE.
+    const select = (
+      prisma.representant.findFirst.mock.calls[0]?.[0] as { select?: Record<string, unknown> }
+    ).select;
+    expect(select?.isDemo).toBe(true);
+  });
+});

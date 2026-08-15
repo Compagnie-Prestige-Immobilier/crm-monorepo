@@ -1,4 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+
+import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import {
   IsBoolean,
   IsEnum,
@@ -147,6 +149,28 @@ export class ProspectDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   lastAttemptAt!: string | null;
 
+  /**
+   * Provenance de la fiche, telle qu'elle est STOCKÉE et indexée.
+   *
+   * Sans ces deux champs, un client qui vient de faire approuver une demande de
+   * création ne peut pas relire d'où vient la fiche qu'il a obtenue : il la
+   * voit identique à une fiche de tournée terrain, alors que la base sait la
+   * distinguer et que le tableau de bord la compte à part.
+   */
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Clé de provenance. Nulle pour une fiche née d’une tournée terrain.',
+  })
+  origin!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Détail conservé à la création (nom de la banque demandeuse, par exemple).',
+  })
+  originLabel!: string | null;
+
   @ApiProperty({ type: String, format: 'date-time' }) clientCreatedAt!: string;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
@@ -176,11 +200,22 @@ export class ProspectConflictExistingDto {
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
 }
 
-export class ProspectConflictDto {
+/**
+ * Le conflit de numéro, qui est une erreur ENRICHIE.
+ *
+ * Il hérite d'`ApiErrorDto` plutôt que de redéclarer sa moitié : le filtre
+ * global complète toute erreur avec `statusCode` et `requestId`, si bien qu'un
+ * schéma qui ne déclarait que `code` et `message` promettait moins que ce que
+ * le serveur envoie réellement. Un client généré sur ce schéma ne pouvait pas
+ * lire `statusCode` sur cette réponse et sur aucune autre.
+ *
+ * Ce qu'il ajoute, `existing`, est la raison d'être du schéma : le corps porte
+ * la fiche déjà enregistrée pour que l'écran propose de l'ouvrir au lieu de
+ * dire seulement « ce numéro existe déjà ».
+ */
+export class ProspectConflictDto extends ApiErrorDto {
   @ApiProperty({ enum: ['PROSPECT_PHONE_CONFLICT'] })
-  code!: 'PROSPECT_PHONE_CONFLICT';
-
-  @ApiProperty() message!: string;
+  declare code: 'PROSPECT_PHONE_CONFLICT';
 
   @ApiProperty({ type: () => ProspectConflictExistingDto })
   existing!: ProspectConflictExistingDto;

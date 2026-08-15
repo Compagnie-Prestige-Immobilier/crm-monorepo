@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
+import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { Role } from '@crm/database';
 
 import { Roles } from '../../common/decorators/roles.decorator.js';
@@ -17,7 +19,7 @@ import {
 /**
  * Configuration du workflow bancaire.
  *
- * La LECTURE est ouverte à l'agent Banque & Finance — il lui faut la liste des
+ * La LECTURE est ouverte à l'agent Banque & Finance, il lui faut la liste des
  * étapes pour afficher un dossier et proposer la suivante. Toute ÉCRITURE est
  * réservée à l'ADMIN : le workflow est une décision d'organisation, pas un
  * réglage d'agent. Le décorateur de classe pose la règle stricte et seule la
@@ -27,6 +29,12 @@ import {
 @ApiTags('bank-case-stages')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
+// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
+// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
+// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
+// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
+// cas sur 116 opérations sur 119.
+@ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'bank-case-stages', version: '1' })
 export class BankCaseStagesController {
   constructor(private readonly stages: BankCaseStagesService) {}
@@ -50,7 +58,7 @@ export class BankCaseStagesController {
       'Le type n’est pas un paramètre : une seconde étape d’encaissement ou de rejet rendrait la règle financière ambiguë. Insérer au milieu décale les étapes suivantes.',
   })
   @ApiResponse({ status: 201, type: BankCaseStageDto })
-  @ApiResponse({ status: 409, description: 'BANK_STAGE_CODE_CONFLICT.' })
+  @ApiResponse({ status: 409, type: ApiErrorDto, description: 'BANK_STAGE_CODE_CONFLICT.' })
   create(@Body() body: CreateBankCaseStageDto): Promise<BankCaseStageDto> {
     return this.stages.create(body);
   }
@@ -66,6 +74,7 @@ export class BankCaseStagesController {
   @ApiResponse({ status: 201, type: BankCaseStageListDto })
   @ApiResponse({
     status: 400,
+    type: ApiErrorDto,
     description: 'BANK_STAGE_REORDER_INCOMPLETE ou BANK_STAGE_INITIAL_MUST_BE_FIRST.',
   })
   reorder(@Body() body: ReorderBankCaseStagesDto): Promise<BankCaseStageListDto> {
@@ -81,7 +90,7 @@ export class BankCaseStagesController {
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: BankCaseStageDto })
-  @ApiResponse({ status: 404, description: 'BANK_STAGE_NOT_FOUND.' })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'BANK_STAGE_NOT_FOUND.' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateBankCaseStageDto,
@@ -100,6 +109,7 @@ export class BankCaseStagesController {
   @ApiResponse({ status: 201, type: BankCaseStageDto })
   @ApiResponse({
     status: 409,
+    type: ApiErrorDto,
     description: 'BANK_STAGE_SYSTEM_IMMUTABLE ou BANK_STAGE_HAS_OPEN_CASES.',
   })
   setActive(

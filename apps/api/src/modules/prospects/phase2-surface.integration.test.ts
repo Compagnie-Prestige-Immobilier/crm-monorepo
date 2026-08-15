@@ -70,18 +70,18 @@ interface Attendu {
 }
 
 const PLAN: readonly Omit<Attendu, 'id' | 'segment'>[] = [
-  // BDD1 — CHUES × CBAO
+  // BDD1, CHUES × CBAO
   { nom: 'B1Obtenu', sigle: 'CHUES', shortName: 'CBAO', obtenu: true },
   { nom: 'B1Obtenu2', sigle: 'CHUES', shortName: 'CBAO', obtenu: true },
   { nom: 'B1Attente', sigle: 'CHUES', shortName: 'CBAO', obtenu: false },
-  // BDD2 — CHUES × autre banque
+  // BDD2, CHUES × autre banque
   { nom: 'B2Obtenu', sigle: 'CHUES', shortName: 'BHS', obtenu: true },
   { nom: 'B2Attente', sigle: 'CHUES', shortName: 'BHS', obtenu: false },
-  // BDD3 — autre syndicat × CBAO
+  // BDD3, autre syndicat × CBAO
   { nom: 'B3Obtenu', sigle: 'SAES', shortName: 'CBAO', obtenu: true },
   { nom: 'B3Attente', sigle: 'SAES', shortName: 'CBAO', obtenu: false },
   { nom: 'B3Attente2', sigle: 'UDEN', shortName: 'CBAO', obtenu: false },
-  // BDD4 — autre syndicat × autre banque
+  // BDD4, autre syndicat × autre banque
   { nom: 'B4Obtenu', sigle: 'SAES', shortName: 'BHS', obtenu: true },
   { nom: 'B4Attente', sigle: 'UDEN', shortName: 'Ecobank', obtenu: false },
 ];
@@ -289,7 +289,7 @@ afterAll(async () => {
 });
 
 /**
- * Produit le classeur et le relit — c'est le FICHIER qui est jugé.
+ * Produit le classeur et le relit, c'est le FICHIER qui est jugé.
  *
  * La lecture est branchée AVANT l'écriture : le service pousse le XML au fil de
  * l'eau et le tampon d'un `PassThrough` est borné. Tout accumuler d'abord
@@ -381,7 +381,7 @@ describe('la matrice BDD1–BDD4 sur données réelles', () => {
 });
 
 describe('la phase 2 remonte jusqu’à la liste', () => {
-  it('rend la méthode, son auteur, et la DERNIÈRE tentative — pas la première', async () => {
+  it('rend la méthode, son auteur, et la DERNIÈRE tentative, pas la première', async () => {
     const page = await prospects.list(commercial, {
       phase2Status: 'METHOD_OBTAINED',
       pageSize: 200,
