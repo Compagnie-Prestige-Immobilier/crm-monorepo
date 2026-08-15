@@ -112,7 +112,14 @@ export class DemoService {
       throw new ForbiddenException({ code: 'DEMO_MODE_NOT_ALLOWED', message: guard.reason });
     }
 
-    const alreadySeeded = await this.prisma.demoEntity.count();
+    // Le décompte ne porte QUE sur les types connus, et c'est le pendant de la
+    // purge : elle laisse derrière elle les lignes de type inconnu, faute de
+    // savoir les supprimer. Un décompte nu les prendrait pour un jeu de
+    // démonstration en place et se contenterait d'allumer l'interrupteur, sur
+    // une base où il n'y a plus rien à montrer.
+    const alreadySeeded = await this.prisma.demoEntity.count({
+      where: { entityType: { in: [...DEMO_ENTITY_TYPES] } },
+    });
     if (alreadySeeded > 0) {
       // Le jeu existe : on se contente d'allumer. Aucune écriture de données.
       await this.afterCommit(
@@ -226,15 +233,45 @@ export class DemoService {
     // ordre de suppression valide QUELLES QUE SOIENT les séquences. Celles-ci
     // ne servent plus qu'à départager deux lignes du même type, où aucune clé
     // étrangère ne les relie.
+    // ═══════════════════════════════════════════════════════════════════════
+    // UNE LIGNE INCONNUE NE BLOQUE PAS LA PURGE, ELLE SE FAIT SIGNALER
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // `DemoEntity.entityType` est un `String` NU au schéma : rien, côté base,
+    // n'oblige sa valeur à figurer dans `DEMO_ENTITY_TYPES`. Une valeur héritée
+    // d'une version antérieure, ou écrite à la main lors d'une réparation,
+    // suffit donc à en produire une inconnue.
+    //
+    // Ce cas LEVAIT, avant la transaction. La conséquence était l'inverse exact
+    // de ce que la purge existe pour garantir : la ligne fautive restait, mais
+    // les DEUX MILLE autres aussi, l'interrupteur restait allumé, et la seule
+    // action capable de retirer les données fictives de la base était morte
+    // pour toujours. Une ligne illisible faisait tenir en otage tout le jeu de
+    // démonstration.
+    //
+    // On supprime donc TOUT CE QU'ON SAIT SUPPRIMER, et on signale le reste.
+    // Une ligne dont on ignore le type, on ignore aussi quelle table la porte :
+    // il n'y a rien à faire d'autre que de la nommer, fort, à l'opérateur.
     const byType = new Map<DemoEntityType, string[]>();
+    const unknown: string[] = [];
     for (const entry of entries) {
       const type = entry.entityType as DemoEntityType;
       if (!DEMO_ENTITY_TYPES.includes(type)) {
-        throw new Error(`Type d’entité de démonstration inconnu : ${type}`);
+        unknown.push(entry.entityType);
+        continue;
       }
       const bucket = byType.get(type);
       if (bucket) bucket.push(entry.entityId);
       else byType.set(type, [entry.entityId]);
+    }
+
+    if (unknown.length) {
+      this.logger.error(
+        `Registre de démonstration : ${String(unknown.length)} ligne(s) de type inconnu, ` +
+          `laissées en place et NON supprimées (${[...new Set(unknown)].join(', ')}). ` +
+          'La purge a traité tout le reste. Ces lignes désignent des données ' +
+          'qu’aucun code ne sait effacer : elles demandent une intervention manuelle.',
+      );
     }
 
     const groups = [...DEMO_ENTITY_TYPES]
@@ -248,7 +285,12 @@ export class DemoService {
           for (const group of groups) {
             await DEMO_DELETERS[group.type](tx, group.ids);
           }
-          await tx.demoEntity.deleteMany({});
+          // Le registre n'est vidé que de ce qui a RÉELLEMENT été supprimé.
+          // Effacer aussi les lignes de type inconnu ferait disparaître la
+          // seule trace de données fictives que personne ne sait plus atteindre.
+          await tx.demoEntity.deleteMany({
+            where: { entityType: { in: [...DEMO_ENTITY_TYPES] } },
+          });
           await this.setSetting(tx, DEMO_MODE_SETTING, 'false', adminId);
           await this.setSetting(tx, DEMO_SEEDED_AT_SETTING, '', adminId);
         },

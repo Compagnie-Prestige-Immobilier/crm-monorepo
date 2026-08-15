@@ -1,4 +1,5 @@
 import { createWriteStream } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { Global, Module, VersioningType } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
@@ -162,6 +163,7 @@ export class FakeDumpRunner implements DumpRunner {
   /** Retenue jusqu'à ce qu'on la relâche, pour observer l'état « running ». */
   private gate: Promise<void> | null = null;
   private open: (() => void) | null = null;
+  private partial = false;
 
   hold(): void {
     this.gate = new Promise<void>((resolve) => {
@@ -169,15 +171,34 @@ export class FakeDumpRunner implements DumpRunner {
     });
   }
 
+  /**
+   * Retient l'export APRÈS avoir créé sa sortie, comme le fait `pg_dump`.
+   *
+   * `hold()` seul retient AVANT le premier octet : le répertoire reste vide,
+   * et un balayage déclenché pendant ce temps n'aurait rien à effacer. Il ne
+   * peut donc pas montrer qu'un export en cours est protégé de lui, ce qui est
+   * précisément la propriété à exercer. `pg_dump` crée sa sortie dès le début
+   * et l'alimente pendant toute la durée de l'export ; c'est ce fichier-là,
+   * incomplet et vivant, que la doublure doit poser.
+   */
+  holdWithOutput(): void {
+    this.partial = true;
+    this.hold();
+  }
+
   release(): void {
     this.open?.();
     this.gate = null;
     this.open = null;
+    this.partial = false;
   }
 
   async run(destination: string): Promise<void> {
     this.calls += 1;
-    if (this.gate !== null) await this.gate;
+    if (this.gate !== null) {
+      if (this.partial) await writeFile(destination, '-- export partiel, en cours d’écriture\n');
+      await this.gate;
+    }
     if (this.failWith !== null) throw new Error(this.failWith);
     await pipeline(
       Readable.from(['-- export CPI GO\nCREATE TABLE prospects (id uuid);\n']),

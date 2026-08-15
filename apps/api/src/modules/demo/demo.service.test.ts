@@ -39,6 +39,16 @@ const restrictViolation = (representantId: string): Error =>
       `"prospects_representantId_fkey" (${representantId})`,
   );
 
+/** Le seul filtre que la purge pose sur le registre. */
+interface EntityTypeFilter {
+  where?: { entityType?: { in?: readonly string[] } };
+}
+
+const keeps = (entry: { entityType: string }, args?: EntityTypeFilter): boolean => {
+  const wanted = args?.where?.entityType?.in;
+  return wanted === undefined || wanted.includes(entry.entityType);
+};
+
 /**
  * Base minimale : deux tables liées, le registre, et les réglages.
  *
@@ -54,13 +64,17 @@ class FakeDemoDb {
   readonly settings = new Map<string, string>();
 
   readonly demoEntity = {
-    count: () => Promise.resolve(this.entries.length),
+    count: (args?: EntityTypeFilter) =>
+      Promise.resolve(this.entries.filter((entry) => keeps(entry, args)).length),
     findMany: () =>
       Promise.resolve([...this.entries].sort((left, right) => right.sequence - left.sequence)),
-    deleteMany: () => {
-      const count = this.entries.length;
-      this.entries = [];
-      return Promise.resolve({ count });
+    // Le `where` est APPLIQUÉ, et il le faut : la purge n'efface du registre
+    // que les types qu'elle sait supprimer. Une doublure qui viderait tout
+    // ferait passer un code qui perd la trace des lignes intraitables.
+    deleteMany: (args?: EntityTypeFilter) => {
+      const before = this.entries.length;
+      this.entries = this.entries.filter((entry) => !keeps(entry, args));
+      return Promise.resolve({ count: before - this.entries.length });
     },
     groupBy: () => {
       const buckets = new Map<string, number>();
@@ -169,6 +183,63 @@ describe('purge : l’ordre de suppression', () => {
 
     expect(db.prospects.size).toBe(0);
     expect(db.representants.size).toBe(0);
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * UNE LIGNE DE TYPE INCONNU NE PREND PAS LE JEU ENTIER EN OTAGE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `DemoEntity.entityType` est un `String` NU au schéma : rien n'oblige sa
+   * valeur à figurer dans `DEMO_ENTITY_TYPES`. Une valeur héritée d'une version
+   * antérieure, ou écrite lors d'une réparation, suffit à en produire une.
+   *
+   * La purge LEVAIT alors, AVANT même d'ouvrir sa transaction. Résultat exactement
+   * inverse de ce qu'elle promet : la ligne fautive restait, mais tout le reste
+   * du jeu de démonstration aussi, l'interrupteur restait allumé, et la seule
+   * action capable de retirer les données fictives de la base était morte pour
+   * de bon. Une valeur illisible tenait la base entière.
+   */
+  it('purge tout ce qu’elle sait supprimer malgré une ligne de type inconnu', async () => {
+    const db = new FakeDemoDb();
+    db.representants.add('rep-1');
+    db.prospects.set('pro-1', 'rep-1');
+    db.entries = [
+      { entityType: 'representant', entityId: 'rep-1', sequence: 0 },
+      { entityType: 'prospect', entityId: 'pro-1', sequence: 1 },
+      // Type qu'aucun code ne connaît : ni suppression, ni table associée.
+      { entityType: 'anciensTruc', entityId: 'x-1', sequence: 2 },
+    ];
+    const service = new DemoService(db.asService(), fakeDemoVisibility(true));
+
+    const status = await service.purge('adm-1');
+
+    // Tout ce qui était traitable est parti, et l'interrupteur est bien éteint.
+    expect(db.prospects.size).toBe(0);
+    expect(db.representants.size).toBe(0);
+    expect(status.enabled).toBe(false);
+
+    // La ligne intraitable RESTE : elle désigne des données qu'aucun code ne
+    // sait atteindre, et l'effacer supprimerait la seule trace qui permette à
+    // un opérateur de s'en occuper.
+    expect(db.entries).toEqual([{ entityType: 'anciensTruc', entityId: 'x-1', sequence: 2 }]);
+  });
+
+  /**
+   * Le pendant de la précédente : ce reliquat ne doit pas faire croire à un jeu
+   * de démonstration en place. Sans ce décompte par type, rallumer le mode se
+   * contenterait de basculer le réglage sur une base où il n'y a plus rien à
+   * montrer, et l'écran afficherait « démonstration active » et zéro fiche.
+   */
+  it('ne prend pas un reliquat inconnu pour un jeu déjà semé', async () => {
+    const db = new FakeDemoDb();
+    db.entries = [{ entityType: 'anciensTruc', entityId: 'x-1', sequence: 0 }];
+    const service = new DemoService(db.asService(), fakeDemoVisibility(false));
+
+    const seme = await db.demoEntity.count({ where: { entityType: { in: ['representant'] } } });
+    expect(seme).toBe(0);
+    // La purge d'un registre qui n'a QUE de l'inconnu ne casse pas non plus.
+    await expect(service.purge('adm-1')).resolves.toBeDefined();
   });
 });
 

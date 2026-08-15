@@ -171,6 +171,38 @@ function parseJob(raw: string): DumpJob | null {
   }
 }
 
+/**
+ * Le fichier que la ligne durable PROTÈGE, ou `null` si elle n'en protège aucun.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DEUX ÉTATS ONT UN FICHIER VIVANT, PAS UN SEUL
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `ready`, évidemment : c'est l'archive téléchargeable.
+ *
+ * `running` AUSSI, et c'est ce qui manquait. `pg_dump` écrit à cet instant même
+ * dans le fichier que la ligne nomme. Le balayage ne regardait que `ready` :
+ * un export en cours voyait donc sa sortie effacée sous lui par la
+ * réconciliation horaire, qui finit forcément par tomber au milieu d'un export.
+ *
+ * Tous les autres états n'ont RIEN à protéger, et c'est délibéré :
+ *
+ *  · `failed` nomme encore un fichier PARTIEL, qu'il faut justement effacer.
+ *    Un `.sql.gz` tronqué est indiscernable d'un export valide pour qui le
+ *    trouve sur le volume ;
+ *  · `queued` n'a pas encore de fichier ;
+ *  · `expired` a déjà eu le sien détruit.
+ *
+ * Le statut lu est l'EFFECTIF, pas celui de la ligne : un `running` que la
+ * borne de trente minutes a enterré est un mort, et son fichier partiel doit
+ * partir avec lui.
+ */
+const liveFile = (job: DumpJob, now: Date): string | null => {
+  if (job.fileName === null) return null;
+  const status = effectiveStatus(job, now);
+  return status === 'ready' || status === 'running' ? basename(job.fileName) : null;
+};
+
 @Injectable()
 export class DbDumpService implements OnModuleInit {
   private readonly logger = new Logger(DbDumpService.name);
@@ -572,13 +604,35 @@ export class DbDumpService implements OnModuleInit {
 
   private async execute(job: DumpJob, actor: AuthenticatedUser): Promise<void> {
     const startedAt = new Date();
-    let running: DumpJob = { ...job, status: 'running', startedAt: startedAt.toISOString() };
+    const fileName = dumpFileName(job.id, startedAt);
+    const path = join(this.directory, fileName);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // LA LIGNE NOMME SON FICHIER DÈS QU'ELLE PASSE `running`
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // `fileName` n'était écrit qu'à l'arrivée, en même temps que `ready`.
+    // Pendant tout le `pg_dump`, la ligne durable ne désignait donc AUCUN
+    // fichier, et `sweep()` ne calcule sa liste de survivants que sur ce que la
+    // ligne nomme : le balayage horaire, qui tombe forcément un jour au milieu
+    // d'un export, effaçait le fichier EN COURS D'ÉCRITURE. `pg_dump`
+    // continuait d'écrire dans un inode détaché, le `stat` final échouait, et
+    // la ligne restait `running` jusqu'à ce que la borne de trente minutes
+    // l'enterre. Un export perdu, sans autre trace qu'une erreur dans le
+    // journal.
+    //
+    // Le nom est donc calculé AVANT et publié AVEC l'état `running`. Le
+    // balayage peut alors distinguer un fichier vivant d'un orphelin, ce qui
+    // est exactement ce qu'il prétend faire.
+    let running: DumpJob = {
+      ...job,
+      status: 'running',
+      startedAt: startedAt.toISOString(),
+      fileName,
+    };
     // `writeOwned` partout dans ce chemin : si la ligne a changé de main, ce
     // travail n'existe plus pour personne et n'a plus rien à y écrire.
     await this.writeOwned(running, actor.id);
-
-    const fileName = dumpFileName(job.id, startedAt);
-    const path = join(this.directory, fileName);
 
     try {
       await mkdir(this.directory, { recursive: true });
@@ -607,7 +661,6 @@ export class DbDumpService implements OnModuleInit {
       ...running,
       status: 'ready',
       finishedAt: finishedAt.toISOString(),
-      fileName,
       fileSize,
       sha256: await this.sha256(path),
       expiresAt: new Date(finishedAt.getTime() + DUMP_TTL_MS).toISOString(),
@@ -729,10 +782,32 @@ export class DbDumpService implements OnModuleInit {
     // Le second coût est payé par un administrateur qui recliquera. Le premier
     // ne se voit jamais. On détruit.
     //
-    // `deliveriesLost` est posé par la réconciliation d'AMORÇAGE, où le doute
-    // n'existe même pas : le processus qui tenait la réservation est
-    // nécessairement mort, quel que soit son âge. En marche, on laisse le bail
-    // s'écouler, pour ne pas détruire sous les pieds d'une réplique qui livre.
+    // `deliveriesLost` est posé par la réconciliation d'AMORÇAGE. En marche, on
+    // laisse le bail s'écouler, pour ne pas détruire sous les pieds d'une
+    // réplique qui livre.
+    //
+    // ═══════════════════════════════════════════════════════════════════════
+    // CE RACCOURCI REPOSE SUR UNE HYPOTHÈSE DE DÉPLOIEMENT. LA VOICI.
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // « Au démarrage, le détenteur est nécessairement mort » n'est vrai que si
+    // UNE SEULE instance d'API tourne à la fois. C'est le cas aujourd'hui :
+    // `infra/docker/docker-compose.prod.yml` fixe `container_name`, ce qui
+    // interdit deux conteneurs d'API simultanés et impose l'arrêt de l'ancien
+    // avant le démarrage du neuf.
+    //
+    // SI CELA CHANGE, cette ligne devient dangereuse, et dans le sens qui ne se
+    // voit pas : une instance qui démarre pendant qu'une SŒUR diffuse une
+    // archive réservée depuis dix secondes détruirait le fichier sous son flux,
+    // et écrirait « échu » sur une livraison en cours. Tout le reste du module
+    // est pourtant écrit pour plusieurs répliques (voir `claim`) : l'hypothèse
+    // est isolée ICI, et c'est la seule du fichier.
+    //
+    // La correction, le jour venu, tient en une ligne : retirer le raccourci et
+    // laisser `RESERVATION_LEASE_MS` valoir aussi à l'amorçage. Elle ne coûte
+    // aucune sûreté, une réservation en cours interdisant déjà tout second
+    // téléchargement ; elle coûte seulement de garder l'archive au plus une
+    // heure de plus après un arrêt brutal en pleine livraison.
     if (
       status === 'ready' &&
       job.reservedAt !== null &&
@@ -814,13 +889,7 @@ export class DbDumpService implements OnModuleInit {
    */
   async sweep(now = new Date(), deliveriesLost = false): Promise<void> {
     const current = await this.reconcile(now, deliveriesLost);
-    const keep =
-      current !== null &&
-      effectiveStatus(current.job, now) === 'ready' &&
-      current.job.fileName !== null
-        ? basename(current.job.fileName)
-        : null;
-    await this.sweepOrphans(keep);
+    await this.sweepOrphans(current === null ? null : liveFile(current.job, now));
   }
 
   /** Le fichier a été livré : il n'a plus de raison d'exister. */
