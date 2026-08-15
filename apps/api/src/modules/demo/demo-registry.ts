@@ -10,9 +10,9 @@ import type { Prisma } from '@crm/database';
  * Le semeur enregistre ici CHAQUE ligne qu'il crée. La désactivation supprime
  * exactement ces identifiants, et rien d'autre.
  *
- * L'alternative tentante — supprimer par heuristique : « tout ce dont le nom
+ * L'alternative tentante, supprimer par heuristique : « tout ce dont le nom
  * commence par Démo », « tout ce qui a été créé après telle heure », « tout ce
- * qui appartient aux comptes de démonstration » — est à proscrire. Le jour où
+ * qui appartient aux comptes de démonstration », est à proscrire. Le jour où
  * un vrai commercial saisit un prospect pendant une démonstration, l'heuristique
  * l'efface, et personne ne comprend pourquoi la fiche a disparu. Une donnée
  * réelle perdue ne se retrouve pas.
@@ -33,8 +33,13 @@ export const DEMO_ENTITY_TYPES = [
   'callCampaignCommercial',
   'callTask',
   'callAttempt',
+  'repCallCampaign',
+  'repCallCampaignCommercial',
+  'repCallTask',
+  'repCallAttempt',
   'bankCase',
   'bankCaseTransition',
+  'clientCreationRequest',
 ] as const;
 
 export type DemoEntityType = (typeof DEMO_ENTITY_TYPES)[number];
@@ -49,8 +54,19 @@ export type DemoEntityType = (typeof DEMO_ENTITY_TYPES)[number];
 export const DEMO_DELETERS: Readonly<
   Record<DemoEntityType, (tx: Prisma.TransactionClient, ids: string[]) => Promise<unknown>>
 > = {
+  // Une demande approuvée POINTE vers le prospect qu'elle a créé : elle doit
+  // donc disparaître avant lui, sinon la clé étrangère refuse la suppression.
+  // L'ordre inverse de `DEMO_ENTITY_TYPES` s'en charge, à condition que la
+  // demande y figure APRÈS le prospect, ce qui est le cas.
+  clientCreationRequest: (tx, ids) =>
+    tx.clientCreationRequest.deleteMany({ where: { id: { in: ids } } }),
   bankCaseTransition: (tx, ids) => tx.bankCaseTransition.deleteMany({ where: { id: { in: ids } } }),
   bankCase: (tx, ids) => tx.bankCase.deleteMany({ where: { id: { in: ids } } }),
+  repCallAttempt: (tx, ids) => tx.repCallAttempt.deleteMany({ where: { id: { in: ids } } }),
+  repCallTask: (tx, ids) => tx.repCallTask.deleteMany({ where: { id: { in: ids } } }),
+  repCallCampaignCommercial: (tx, ids) =>
+    tx.repCallCampaignCommercial.deleteMany({ where: { id: { in: ids } } }),
+  repCallCampaign: (tx, ids) => tx.repCallCampaign.deleteMany({ where: { id: { in: ids } } }),
   callAttempt: (tx, ids) => tx.callAttempt.deleteMany({ where: { id: { in: ids } } }),
   callTask: (tx, ids) => tx.callTask.deleteMany({ where: { id: { in: ids } } }),
   callCampaignCommercial: (tx, ids) =>
@@ -77,7 +93,7 @@ export const DEMO_SEEDED_AT_SETTING = 'demo_seeded_at';
  *
  * Il ne sert à rien de l'écrire ligne par ligne : tout est inséré en une fois à
  * la fin, DANS la même transaction que les données elles-mêmes. Si la
- * transaction échoue, ni les données ni le registre ne subsistent — jamais l'un
+ * transaction échoue, ni les données ni le registre ne subsistent, jamais l'un
  * sans l'autre, ce qui laisserait des lignes de démonstration intraçables.
  */
 export class DemoRegistry {

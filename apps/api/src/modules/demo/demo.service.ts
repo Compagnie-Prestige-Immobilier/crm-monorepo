@@ -18,7 +18,7 @@ import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 /**
  * L'ensemencement touche plusieurs milliers de lignes : le délai par défaut de
  * Prisma (5 s) ne suffit pas, et il n'est pas question de découper en plusieurs
- * transactions — une démonstration à moitié semée est pire qu'une démonstration
+ * transactions, une démonstration à moitié semée est pire qu'une démonstration
  * absente.
  */
 const DEMO_TRANSACTION_TIMEOUT_MS = 120_000;
@@ -128,8 +128,8 @@ export class DemoService {
         await seedDemoData(tx, registry);
 
         // Le registre est écrit DANS la même transaction que les données. Il ne
-        // sert plus à la bascule — c'est la colonne `isDemo` qui porte la
-        // visibilité — mais il reste l'inventaire exact de ce qui a été créé,
+        // sert plus à la bascule, c'est la colonne `isDemo` qui porte la
+        // visibilité, mais il reste l'inventaire exact de ce qui a été créé,
         // et donc la seule base sûre d'une suppression définitive.
         await tx.demoEntity.createMany({ data: registry.toRows() });
         await this.setSetting(tx, DEMO_MODE_SETTING, 'true', adminId);
@@ -161,7 +161,7 @@ export class DemoService {
     await this.prisma.$transaction(async (tx) => {
       await this.setSetting(tx, DEMO_MODE_SETTING, 'false', adminId);
     });
-    this.logger.log('Mode démonstration éteint — aucune donnée supprimée.');
+    this.logger.log('Mode démonstration éteint, aucune donnée supprimée.');
     return this.status();
   }
 
@@ -226,8 +226,8 @@ export class DemoService {
     adminId: string,
   ): Promise<void> {
     // `updatedById` est une information d'audit, pas une dépendance dure : si
-    // l'auteur a disparu entre-temps — typiquement l'administrateur de
-    // démonstration, supprimé par la purge en cours — le réglage doit tout de
+    // l'auteur a disparu entre-temps, typiquement l'administrateur de
+    // démonstration, supprimé par la purge en cours, le réglage doit tout de
     // même s'écrire. Sans ce garde-fou, purger emporte l'auteur puis échoue en
     // voulant enregistrer l'extinction, et le mode reste allumé sur une base
     // vide.
@@ -244,7 +244,7 @@ export class DemoService {
     // réglage, et non à la sortie de `enable` / `disable` / `purge` : ces trois
     // méthodes ont sept points de retour à elles trois, et il suffirait d'en
     // oublier un pour qu'un administrateur bascule l'interrupteur sans que
-    // l'écran change — le pire symptôme possible pour un interrupteur.
+    // l'écran change, le pire symptôme possible pour un interrupteur.
     this.visibility.invalidate();
   }
 }
