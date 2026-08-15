@@ -251,10 +251,51 @@ export class SyncService {
       .map((operations) => [...operations].sort((left, right) => left.seq - right.seq))
       .sort((left, right) => (left[0]?.seq ?? 0) - (right[0]?.seq ?? 0));
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // L'AUTORITÉ DU LOT EST LUE UNE FOIS, ET ELLE VAUT POUR TOUT LE LOT
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // ═══ CE QUI N'ALLAIT PAS : UN LOT À DEUX AUTORITÉS ═══
+    //
+    // Un lot traverse ses groupes sur une fenêtre longue, deux cents opérations
+    // et autant de transactions. Deux faits sur l'auteur y étaient traités
+    // différemment, et rien ne le justifiait :
+    //
+    //   · `isDemo` était relu à CHAQUE groupe, dans la transaction du groupe ;
+    //   · le RÔLE et l'état du compte venaient de `request.user`, figés par
+    //     `FreshSessionGuard` à l'entrée de la requête, et jamais revus.
+    //
+    // Un lot pouvait donc écrire ses cent premières lignes en réel et les cent
+    // suivantes en fictif (l'interrupteur ayant basculé), tout en appliquant du
+    // début à la fin le rôle d'avant une rétrogradation. Le lot n'était
+    // cohérent avec personne : ni avec l'autorité d'entrée, ni avec celle de
+    // sortie.
+    //
+    // ═══ POURQUOI FIGER PLUTÔT QUE RAFRAÎCHIR ═══
+    //
+    // Rafraîchir par groupe aurait rendu le lot cohérent avec la fin, au prix
+    // d'un lot PARTIELLEMENT APPLIQUÉ : les groupes déjà écrits restent écrits,
+    // les suivants repartent en échec. Or ce module a déjà tranché cette
+    // question exacte, et dans l'autre sens : la synchronisation est DISPENSÉE
+    // de `DemoReadOnlyGuard` (voir `BatchAuthority.isDemo`) parce que refuser la file
+    // d'un commercial revenu d'un village sans réseau, à cause d'un
+    // interrupteur basculé au bureau pendant sa remontée, ferait basculer des
+    // saisies valides dans « À corriger ». Une rétrogradation en cours de lot
+    // produirait le même écran, pour la même raison.
+    //
+    // Le lot est donc UNE unité d'autorité, celle que `FreshSessionGuard` a
+    // validée à la porte, et la fenêtre est bornée par le lot lui-même :
+    // `SYNC_MAX_BATCH_SIZE` opérations dans une requête HTTP. La remontée
+    // SUIVANTE, elle, est refusée en entier par la garde, quelques secondes
+    // plus tard.
+    //
+    // Effet de bord agréable : une lecture par lot au lieu d'une par groupe.
+    const author = await this.readAuthority(user);
+
     const results: SyncOperationResultDto[] = [];
     for (const operations of ordered) {
       try {
-        results.push(...(await this.runGroup(user, body.clientBatchId, operations)));
+        results.push(...(await this.runGroup(author, body.clientBatchId, operations)));
       } catch (error) {
         // La transaction du groupe a été annulée : AUCUNE de ses opérations
         // n'a été écrite. On le dit franchement et on passe au groupe suivant,
@@ -287,21 +328,51 @@ export class SyncService {
     );
   }
 
+  /**
+   * Lit l'autorité du lot, UNE FOIS, avant le premier groupe.
+   *
+   * ═══ LE RÔLE VIENT DE LA BASE, PAS DU JETON ═══
+   *
+   * `request.user.role` est celui que `FreshSessionGuard` a posé à l'entrée de
+   * la requête, et c'est déjà la bonne valeur. On la relit tout de même ici,
+   * dans la MÊME lecture que `isDemo`, pour que les deux faits que le lot
+   * consulte proviennent d'un seul instant : deux lectures à deux moments
+   * finissent par décrire deux personnes.
+   *
+   * ═══ POURQUOI UN AUTEUR INTROUVABLE NE FAIT PAS ÉCHOUER LE LOT ═══
+   *
+   * Le repli n'est pas une négligence, c'est la règle que ce fichier appliquait
+   * déjà : le jeton vient d'être validé sur une ligne existante, et la garde
+   * refuse la requête AVANT d'arriver ici si le compte a disparu. Une ligne
+   * absente à cet instant décrit une base qui répond de travers, pas un compte
+   * supprimé ; refuser le lot ferait alors basculer dans « À corriger » des
+   * saisies valides qu'aucune reprise ne repêcherait. On garde donc l'identité
+   * validée à la porte, et `isDemo: false`, qui est ce que la version
+   * précédente écrivait déjà dans ce cas.
+   */
+  private async readAuthority(user: AuthenticatedUser): Promise<BatchAuthority> {
+    const author = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { role: true, isDemo: true },
+    });
+    return {
+      user: author?.role ? { ...user, role: author.role } : user,
+      isDemo: author?.isDemo ?? false,
+    };
+  }
+
   private async runGroup(
-    user: AuthenticatedUser,
+    author: BatchAuthority,
     batchKey: string,
     operations: SyncOperationDto[],
   ): Promise<SyncOperationResultDto[]> {
+    const { user, isDemo: authorIsDemo } = author;
     return this.prisma.$transaction(
       async (tx) => {
         const results: SyncOperationResultDto[] = [];
         // Vrai dès que le représentant du groupe est indisponible : ses
         // prospects ne peuvent alors plus être rattachés à quoi que ce soit.
         let parentUnavailable = false;
-
-        // LU UNE FOIS PAR GROUPE, et non par opération : c'est le même auteur
-        // pour tout le lot, et un groupe peut porter deux cents créations.
-        const authorIsDemo = await isDemoAuthor(tx, user.id);
 
         for (const operation of operations) {
           // NIVEAU 2, l'opération. Première instruction, systématiquement.
@@ -444,7 +515,7 @@ export class SyncService {
           ...(data.iefId ? { iefId: data.iefId } : {}),
           createdById: user.id,
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
-          // LA FICHE SUIT SON AUTEUR. Voir `isDemoAuthor` : la remontée hors
+          // LA FICHE SUIT SON AUTEUR. Voir `BatchAuthority.isDemo` : la remontée hors
           // ligne est dispensée de la garde, et l'animateur d'une démonstration
           // saisit sur le téléphone avec un compte de démonstration. Sans cette
           // valeur, la colonne prenait son défaut `false` et la fiche fictive
@@ -472,16 +543,32 @@ export class SyncService {
       await assertRepresentantPhoneFree(tx, phoneE164, operation.entityId);
     }
 
+    // ═══ « ABSENT » VEUT DIRE INCHANGÉ, ET SEULE UNE DEMANDE EXPLICITE VIDE ═══
+    //
+    // Voir `SyncOperationDto.clearedFields`. Le silence d'une application
+    // ancienne, qui ne connaît pas le champ, ne doit pas effacer une IEF
+    // renseignée ; mais un utilisateur qui vide le champ doit pouvoir le dire,
+    // ce que le client engendré ne savait pas exprimer (`includeIfNull: false`
+    // supprimait le `null` avant l'envoi, et le vidage arrivait identique à
+    // l'absence).
+    const cleared = new Set(operation.clearedFields ?? []);
+
     const row = await tx.representant.update({
       where: { id: existing.id },
       data: {
         ...(data.fullName ? { fullName: data.fullName.trim() } : {}),
         phoneE164,
-        ...(data.notes !== undefined ? { notes: data.notes || null } : {}),
+        ...(cleared.has('notes')
+          ? { notes: null }
+          : data.notes !== undefined
+            ? { notes: data.notes || null }
+            : {}),
         ...(data.departementId ? { departementId: data.departementId } : {}),
-        // `undefined` et non `null` : une application ancienne n'envoie pas le
-        // champ, et son silence ne doit pas effacer une IEF deja renseignee.
-        ...(data.iefId === undefined ? {} : { iefId: data.iefId }),
+        ...(cleared.has('iefId')
+          ? { iefId: null }
+          : data.iefId === undefined
+            ? {}
+            : { iefId: data.iefId }),
         rev: { increment: 1 },
       },
     });
@@ -999,30 +1086,35 @@ const clientDate = (clientCreatedAt: string | undefined, fallback: string): Date
   new Date(clientCreatedAt ?? fallback);
 
 /**
- * Nature de l'AUTEUR d'une remontée hors ligne.
+ * L'auteur d'un lot, tel qu'il vaut du PREMIER au DERNIER groupe.
  *
- * ═══ POURQUOI CE CHEMIN A BESOIN DE LE SAVOIR ═══
- *
- * `DemoReadOnlyGuard` suspend les écritures pendant une démonstration, mais la
- * synchronisation en est DISPENSÉE, sans condition : refuser la file d'un
- * commercial revenu d'un village sans réseau parce qu'un administrateur a
- * basculé un interrupteur au bureau ferait remonter des saisies valides dans
- * « À corriger ». Cette dispense est une exigence dure.
- *
- * L'en-tête de la garde en tirait la conclusion que « tout ce qui arrive encore
- * par un chemin dispensé est du travail RÉEL, ces chemins écrivent donc
- * isDemo: false ». Cette conclusion était FAUSSE, et elle l'était déjà :
- * l'animateur d'une démonstration se connecte sur le téléphone avec un compte
- * de démonstration, précisément pour montrer la saisie terrain. Ce qu'il pousse
- * n'est pas du travail réel.
- *
- * On lit donc la nature de l'auteur plutôt que de la supposer.
+ * Un seul objet pour les deux faits que le lot consulte, et c'est le point :
+ * ils viennent de la MÊME lecture, au MÊME instant. Séparés, ils dérivaient,
+ * l'un relu par groupe et l'autre figé à l'entrée de la requête.
  */
-async function isDemoAuthor(tx: Prisma.TransactionClient, userId: string): Promise<boolean> {
-  const author = await tx.user.findUnique({ where: { id: userId }, select: { isDemo: true } });
-  // Un auteur introuvable ne peut pas être un compte de démonstration : le
-  // jeton vient d'être validé sur une ligne existante.
-  return author?.isDemo ?? false;
+interface BatchAuthority {
+  readonly user: AuthenticatedUser;
+  /**
+   * Nature de l'AUTEUR d'une remontée hors ligne.
+   *
+   * ═══ POURQUOI CE CHEMIN A BESOIN DE LE SAVOIR ═══
+   *
+   * `DemoReadOnlyGuard` suspend les écritures pendant une démonstration, mais
+   * la synchronisation en est DISPENSÉE, sans condition : refuser la file d'un
+   * commercial revenu d'un village sans réseau parce qu'un administrateur a
+   * basculé un interrupteur au bureau ferait remonter des saisies valides dans
+   * « À corriger ». Cette dispense est une exigence dure.
+   *
+   * L'en-tête de la garde en tirait la conclusion que « tout ce qui arrive
+   * encore par un chemin dispensé est du travail RÉEL, ces chemins écrivent
+   * donc isDemo: false ». Cette conclusion était FAUSSE, et elle l'était déjà :
+   * l'animateur d'une démonstration se connecte sur le téléphone avec un compte
+   * de démonstration, précisément pour montrer la saisie terrain. Ce qu'il
+   * pousse n'est pas du travail réel.
+   *
+   * On lit donc la nature de l'auteur plutôt que de la supposer.
+   */
+  readonly isDemo: boolean;
 }
 
 /**

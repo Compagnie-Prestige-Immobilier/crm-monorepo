@@ -626,3 +626,158 @@ describe('la remontée d’un COMPTE de démonstration écrit du fictif', () => 
     expect(db.demoEntities).toHaveLength(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// L'autorité d'un lot
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UN LOT NE PEUT PAS AVOIR DEUX AUTEURS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Un `sync/push` traverse ses groupes sur une fenêtre longue, jusqu'à deux
+ * cents opérations et autant de transactions. Deux faits sur l'auteur y étaient
+ * traités différemment sans que rien ne le justifie : `isDemo` était relu à
+ * chaque groupe, le RÔLE venait de `request.user` et n'était jamais revu.
+ *
+ * Un lot pouvait donc écrire ses premières lignes en réel et les suivantes en
+ * fictif, tout en appliquant du début à la fin le rôle d'avant une
+ * rétrogradation. Le résultat n'est cohérent avec rien : ni avec l'autorité
+ * d'entrée, ni avec celle de sortie, et le client reçoit un lot dont la moitié
+ * obéit à des règles que l'autre moitié ignore.
+ *
+ * L'autorité est donc lue UNE FOIS, avant le premier groupe, et vaut jusqu'au
+ * dernier. Voir `readAuthority` pour le pourquoi du figeage plutôt que du
+ * rafraîchissement.
+ */
+describe('autorité d’un lot', () => {
+  /** Bascule l'auteur entre le premier et le second groupe. */
+  const basculerApresLePremierGroupe = (mute: () => void): void => {
+    const original = db.$transaction;
+    let groupes = 0;
+    db.$transaction = async <T>(fn: (tx: FakePrisma) => Promise<T>): Promise<T> => {
+      const outcome = await original(fn);
+      groupes += 1;
+      if (groupes === 1) mute();
+      return outcome;
+    };
+  };
+
+  /** Deux représentants, donc DEUX groupes de dépendance, donc deux transactions. */
+  const deuxGroupes = (): SyncPushDto =>
+    batch([createRep(REP_A, '+221770000001', 0), createRep(REP_B, '+221770000002', 1)], opId());
+
+  it('LES DEUX GROUPES ÉCRIVENT LA MÊME NATURE, même si l’auteur bascule au milieu', async () => {
+    // L'auteur est réel quand le lot commence. Qu'il devienne fictif pendant la
+    // remontée ne peut pas couper le lot en deux moitiés de natures
+    // différentes : la moitié fictive disparaîtrait à la purge, l'autre non,
+    // et le représentant survivrait à ses prospects.
+    db.addUser('com-alice', { role: Role.COMMERCIAL, isDemo: false });
+    basculerApresLePremierGroupe(() => {
+      db.addUser('com-alice', { role: Role.COMMERCIAL, isDemo: true });
+    });
+
+    await sync.push(alice, deuxGroupes());
+
+    expect(db.transactionCount).toBeGreaterThanOrEqual(2);
+    const natures = [...db.representants.values()].map((row) => row.isDemo);
+    expect(natures).toHaveLength(2);
+    expect(new Set(natures).size).toBe(1);
+    expect(natures[0]).toBe(false);
+  });
+
+  it('l’autorité est lue EN BASE, une seule fois, et non reprise du jeton', async () => {
+    // Le rôle du jeton et celui de la base peuvent différer d'un cheveu : c'est
+    // tout l'objet de `FreshSessionGuard`. Les deux faits que le lot consulte
+    // doivent venir de la MÊME lecture, sinon ils décrivent deux personnes.
+    let lectures = 0;
+    const original = db.user.findUnique;
+    db.user.findUnique = (args: { where: { id: string } }) => {
+      lectures += 1;
+      return original(args);
+    };
+    db.addUser('com-alice', { role: Role.COMMERCIAL, isDemo: true });
+
+    await sync.push(alice, deuxGroupes());
+
+    // UNE lecture pour tout le lot, et non une par groupe.
+    expect(lectures).toBe(1);
+    // Et elle a bien servi : les deux lignes suivent la nature de l'auteur.
+    expect([...db.representants.values()].every((row) => row.isDemo)).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Vider un champ n'est pas la même chose que ne pas y toucher
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LE DÉFAUT VIVAIT DANS LA COUTURE, PAS DANS UNE COUCHE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Trois comportements, chacun raisonnable seul :
+ *
+ *   1. le formulaire mobile laisse RETIRER l'IEF d'un représentant ;
+ *   2. le client Dart est engendré avec `includeIfNull: false`, donc un champ
+ *      mis à `null` est SUPPRIMÉ de la charge utile avant l'envoi ;
+ *   3. le service n'écrit `iefId` que si la clé est présente, pour qu'une
+ *      application ancienne, qui ne connaît pas le champ, n'efface pas une IEF
+ *      renseignée par son seul silence.
+ *
+ * Ensemble, ils rendaient le vidage IMPOSSIBLE et l'écart PERMANENT : le
+ * téléphone affichait le champ vide, le serveur gardait l'ancienne valeur, et
+ * la réponse alignait la révision locale sur celle du serveur, si bien
+ * qu'aucune relecture ultérieure ne pouvait plus rattraper la différence. Rien,
+ * nulle part, ne la signalait.
+ *
+ * La réparation nomme l'intention plutôt que de la deviner : voir
+ * `SyncOperationDto.clearedFields`. Les deux tests ci-dessous tiennent les deux
+ * moitiés de la règle, parce qu'une seule des deux se réparerait en cassant
+ * l'autre.
+ */
+describe('champs vidés', () => {
+  const REP_ID = REP_A;
+  const IEF = '0198f000-0000-7000-8000-000000000001';
+
+  const creerAvecIef = async (): Promise<void> => {
+    const creation = createRep(REP_ID, '+221770000001', 0);
+    // `Object.assign` et non un étalement : `data` est une INSTANCE de DTO,
+    // et l'étaler perdrait son prototype, donc sa validation.
+    creation.data = Object.assign(creation.data ?? {}, { iefId: IEF });
+    await sync.push(alice, batch([creation]));
+    expect(db.representants.get(REP_ID)?.iefId).toBe(IEF);
+  };
+
+  const modifier = (extra: Partial<SyncOperationDto>): SyncOperationDto => ({
+    opId: opId(),
+    seq: 1,
+    entity: SyncEntity.REPRESENTANT,
+    op: SyncOp.UPDATE,
+    entityId: REP_ID,
+    clientUpdatedAt: '2026-08-10T11:00:00.000Z',
+    baseRev: 1,
+    data: { fullName: 'Rep A', phone: '+221770000001', departementId: '0198c000-0000-7000-8000-000000000001' },
+    ...extra,
+  });
+
+  it('un champ ABSENT reste inchangé, et c’est ce qui protège les vieux clients', async () => {
+    // Une application qui ne connaît pas `iefId` envoie une charge utile sans
+    // lui. Son silence ne doit rien effacer : c'est la moitié de la règle que
+    // la réparation ne devait surtout pas casser.
+    await creerAvecIef();
+
+    await sync.push(alice, batch([modifier({})], 'batch-2'));
+
+    expect(db.representants.get(REP_ID)?.iefId).toBe(IEF);
+  });
+
+  it('un champ NOMMÉ dans clearedFields est vidé pour de bon', async () => {
+    await creerAvecIef();
+
+    await sync.push(alice, batch([modifier({ clearedFields: ['iefId'] })], 'batch-3'));
+
+    expect(db.representants.get(REP_ID)?.iefId).toBeNull();
+  });
+});
