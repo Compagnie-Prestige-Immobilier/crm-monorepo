@@ -10,6 +10,7 @@ import 'package:cpi_go/core/sync/sync_engine.dart';
 import 'package:cpi_go/core/sync/sync_engine_factory.dart';
 import 'package:cpi_go/core/sync/token_store.dart';
 import 'package:cpi_go/data/local/database.dart';
+import 'package:cpi_go/data/repositories/draft_repository.dart';
 import 'package:crm_api_client/crm_api_client.dart';
 // `isNull`/`isNotNull` existent des deux côtés : ici on parle de matchers, pas
 // d'expressions SQL.
@@ -802,6 +803,47 @@ void main() {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
       await engine.remapEntityId('repA', 'repA');
       expect((await db.select(db.representants).get()).single.id, 'repA');
+    });
+
+    /// ═══ UN BROUILLON DE CORRECTION RESTAIT SUR UN IDENTIFIANT MORT ═══
+    ///
+    /// Le remappage réécrivait `payload` et `parentId` des brouillons, jamais
+    /// `entityId`. Or un brouillon de correction de représentant porte
+    /// `entityId = <id local>` et pas de `parentId` : rien ne le suivait.
+    ///
+    /// Deux dégâts enchaînés. `DraftRepository.forEntity` ne le retrouve plus
+    /// sous l'identifiant serveur, donc rouvrir la fiche perd la correction en
+    /// cours ; et `RepresentantFormScreen._isCreationDraft` conclut « création »
+    /// dès que la fiche visée est absente, donc le brouillon orphelin passe pour
+    /// neuf et se réapplique **sans rien demander** dans un formulaire de
+    /// création. C'est le doublon-plus-correction-détruite que ce garde devait
+    /// fermer.
+    test('le brouillon d\'une CORRECTION suit son représentant', () async {
+      await insertRepresentant(db, id: 'local-rep', phone: '+221770000001');
+      final DraftRepository drafts = DraftRepository(db, clock: FakeClock(t0));
+      await drafts.save(
+        draftId: 'd-correction',
+        formKey: 'representant.create',
+        entityId: 'local-rep',
+        values: <String, Object?>{'fullName': 'Awa Sy corrigée'},
+      );
+
+      await engine.remapEntityId('local-rep', 'server-rep');
+
+      expect(
+        (await db.select(db.formDrafts).get()).single.entityId,
+        'server-rep',
+        reason: 'sinon il désigne un identifiant que plus aucune ligne ne porte',
+      );
+      final DraftSnapshot? found = await drafts.forEntity(
+        'representant.create',
+        'server-rep',
+      );
+      expect(
+        found?.draftId,
+        'd-correction',
+        reason: 'rouvrir la fiche doit retrouver la correction en cours',
+      );
     });
   });
 

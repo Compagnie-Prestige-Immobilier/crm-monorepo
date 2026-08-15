@@ -1268,7 +1268,7 @@ class SyncEngine {
 
   /// Réécrit un identifiant local en identifiant serveur, **en une transaction**.
   ///
-  /// Cinq écritures qui doivent être atomiques ; interrompues au milieu, elles
+  /// Six écritures qui doivent être atomiques ; interrompues au milieu, elles
   /// laisseraient des prospects orphelins ou des opérations pointant vers un
   /// identifiant qui n'existe plus :
   ///
@@ -1280,7 +1280,30 @@ class SyncEngine {
   ///    une partition orpheline et ne partiraient jamais ;
   /// 4. le `representantId` **à l'intérieur de chaque payload en attente** : le
   ///    payload est du JSON figé, aucune cascade SQL ne l'atteint ;
-  /// 5. les brouillons de formulaire en cours qui pointent vers l'ancien parent.
+  /// 5. les brouillons de formulaire en cours qui pointent vers l'ancien parent
+  ///    (`form_drafts.payload` et `form_drafts.parentId`) ;
+  /// 6. `form_drafts.entityId`, l'identifiant de la fiche que le brouillon
+  ///    **corrige**.
+  ///
+  /// ═══ POURQUOI LA SIXIÈME EXISTE ═══
+  ///
+  /// Elle manquait, et son absence rouvrait le défaut que
+  /// `RepresentantFormScreen._isCreationDraft` a été écrit pour fermer. Un
+  /// brouillon de correction de représentant porte `entityId = <id local>` et
+  /// **pas** de `parentId` : rien ne le repointait. Après un remappage, il
+  /// désignait donc un identifiant que plus aucune ligne ne porte, avec deux
+  /// conséquences enchaînées :
+  ///
+  /// * `DraftRepository.forEntity(formKey, <id serveur>)` ne le retrouvait
+  ///   plus : rouvrir la fiche perdait silencieusement la correction en cours ;
+  /// * `_isCreationDraft` interroge `representantById(entityId)` et conclut
+  ///   « création » quand la fiche est absente. Le brouillon orphelin passait
+  ///   donc pour neuf, et « Nouveau représentant » dans la minute le
+  ///   réappliquait **sans rien demander** ([DraftAge.crash]) : le formulaire
+  ///   neuf se remplissait de la fiche corrigée, adoptait son `draftId`, et
+  ///   l'enregistrement détruisait la correction en produisant un doublon.
+  ///   C'est exactement le couple doublon-plus-correction-détruite que le garde
+  ///   devait empêcher.
   ///
   /// Cas particulier traité explicitement : la fiche serveur peut **déjà** être
   /// présente localement (un pull l'a ramenée entre-temps). Renommer
@@ -1335,13 +1358,15 @@ class SyncEngine {
           serverId,
         );
         final bool parentMoved = draft.parentId == localId;
-        if (rewritten == null && !parentMoved) continue;
+        final bool entityMoved = draft.entityId == localId;
+        if (rewritten == null && !parentMoved && !entityMoved) continue;
         await (_db.update(
           _db.formDrafts,
         )..where((FormDrafts t) => t.draftId.equals(draft.draftId))).write(
           FormDraftsCompanion(
             payload: rewritten == null ? const Value.absent() : Value<String>(rewritten),
             parentId: parentMoved ? Value<String?>(serverId) : const Value.absent(),
+            entityId: entityMoved ? Value<String?>(serverId) : const Value.absent(),
           ),
         );
       }
