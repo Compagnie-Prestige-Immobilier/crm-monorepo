@@ -37,7 +37,7 @@ export default async function ParametresPage() {
   return (
     <div className="flex max-w-4xl flex-col gap-6">
       <p className="text-[0.9375rem] text-muted-foreground">
-        Réglages de la plateforme. Ces actions portent sur les données de tous les utilisateurs.
+        Ces actions portent sur les données de tous les utilisateurs.
       </p>
 
       <HydrationBoundary state={dehydrate(queryClient)}>

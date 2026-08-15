@@ -221,8 +221,8 @@ export function ClientRequestsView({ role }: { role: Role }) {
             activeFilterCount > 0
               ? 'Changez de statut ou retirez un critère.'
               : canReview
-                ? 'Les banques déposent une demande depuis le formulaire d’ouverture de dossier, quand le client est absent de la base.'
-                : 'Vous déposez une demande depuis le formulaire d’ouverture de dossier, quand le client est absent de la base.'
+                ? 'Une demande arrivée ici attend votre approbation, ou un refus dont le motif est remonté à la banque.'
+                : 'Ouvrez un dossier depuis « Nouveau dossier » : si le client est absent de la base, vous pourrez y demander sa création.'
           }
         />
       ) : (

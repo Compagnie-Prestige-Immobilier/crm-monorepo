@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import type { ReactNode } from 'react';
 
-import { DemoBanner } from '@/components/layout/demo-banner';
+import { DemoBannerLive } from '@/components/layout/demo-banner-live';
 import { SIDEBAR_COOKIE } from '@/components/layout/sidebar-cookie';
 import { SidebarShell } from '@/components/layout/sidebar-shell';
 import { Topbar } from '@/components/layout/topbar';
@@ -115,7 +115,12 @@ export default async function PanelLayout({ children }: { children: ReactNode })
       <SidebarShell role={user.role} defaultCollapsed={sidebarCollapsed} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {demo.enabled ? <DemoBanner seededAt={demo.seededAt} role={user.role} /> : null}
+        {/* L'état lu ci-dessus est le PREMIER rendu, jamais le dernier mot : le
+            composant le resonde lentement pour que la bascule d'un
+            administrateur atteigne les écrans déjà ouverts, dans les deux sens.
+            Il est monté même quand le mode est éteint, sans quoi il n'y aurait
+            personne pour voir l'allumage. Voir `demo-banner-live.tsx`. */}
+        <DemoBannerLive initial={demo} role={user.role} />
         <Topbar user={user} />
         <main id="contenu-principal" className="flex-1 p-4 md:p-6">
           {children}
