@@ -288,7 +288,19 @@ const SITES: Record<string, Site> = {
   },
   'modules/sync/sync.service.ts → boolean': {
     verdict: 'LECTURE',
-    note: 'déclarations de type d’isDemoAuthor et du retour d’assertRepresentantUsable',
+    note: 'déclarations de type du retour d’assertRepresentantUsable et des passages d’authorIsDemo',
+  },
+  'modules/sync/sync.service.ts → boolean;': {
+    verdict: 'LECTURE',
+    note: 'déclaration de type de BatchAuthority.isDemo, la nature de l’auteur lue une fois par lot',
+  },
+  'modules/sync/sync.service.ts → author?.isDemo ?? false': {
+    verdict: 'LECTURE',
+    note:
+      'readAuthority : RECOPIE la nature de l’auteur telle qu’elle est en base, elle ne la décide ' +
+      'pas. Le repli `false` vaut pour un auteur introuvable, cas où l’ancien isDemoAuthor rendait ' +
+      'déjà false, et il va dans le sens du réel : une ligne écrite réelle reste exportable et ' +
+      'supprimable, l’inverse serait indestructible',
   },
   'modules/auth/auth.service.ts → boolean': {
     verdict: 'LECTURE',

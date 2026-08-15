@@ -254,11 +254,36 @@ export class DbDumpService implements OnModuleInit {
    * heures annoncées, et se retrouver dans les instantanés de sauvegarde du
    * fournisseur, qui passent la nuit.
    *
-   * Toutes les heures : l'échéance est de six heures, le dépassement maximal
-   * est donc d'une heure, et le balayage ne coûte qu'une lecture de ligne et un
-   * `readdir` sur un répertoire qui contient zéro ou un fichier.
+   * ═══════════════════════════════════════════════════════════════════════════
+   * TOUTES LES DIX MINUTES, ET LA CADENCE EST LA BORNE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Le rythme était HORAIRE, et la justification écrite ici disait « le
+   * dépassement maximal est donc d'une heure » comme si c'était acceptable. Ce
+   * ne l'est pas : une heure sur six, c'est SEIZE POUR CENT de vie en plus
+   * accordés à une copie complète et non chiffrée de la clientèle, hors de la
+   * base, sur un volume que traversent les instantanés de sauvegarde du
+   * fournisseur. `DUMP_TTL_MS` annonce six heures ; l'archive pouvait rester
+   * près de sept.
+   *
+   * Le cas n'est pas théorique, il est simplement invisible. `state()` et
+   * `download()` réconcilient immédiatement, donc l'écart ne se produit que
+   * quand PERSONNE ne regarde : l'export du vendredi soir que son demandeur ne
+   * vient jamais chercher, c'est-à-dire exactement la situation que ce
+   * balayage existe pour couvrir.
+   *
+   * LA NOUVELLE BORNE EST DIX MINUTES, soit un trente-sixième des six heures,
+   * moins de trois pour cent. Le dépassement cesse d'être une fraction
+   * significative de l'échéance et devient un arrondi.
+   *
+   * ET IL N'Y A RIEN À PAYER POUR CELA. Un balayage, c'est une lecture de la
+   * ligne `app_settings` par sa clé primaire, puis un `readdir` sur un
+   * répertoire qui contient ZÉRO OU UN fichier, et rien d'autre quand il n'y a
+   * rien à détruire, ce qui est le cas de la quasi-totalité des passages. Six
+   * fois presque rien reste presque rien. Descendre plus bas n'achèterait plus
+   * grand-chose : l'échéance elle-même se compte en heures.
    */
-  @Cron(CronExpression.EVERY_HOUR, { name: 'cpi.db-dump.sweep' })
+  @Cron(CronExpression.EVERY_10_MINUTES, { name: 'cpi.db-dump.sweep' })
   async sweepExpired(): Promise<void> {
     if (isOpenApiGeneration()) return;
     try {
@@ -630,9 +655,45 @@ export class DbDumpService implements OnModuleInit {
       startedAt: startedAt.toISOString(),
       fileName,
     };
+    // ═══════════════════════════════════════════════════════════════════════
+    // LA PRISE PERDUE ARRÊTE TOUT, ET ELLE L'ARRÊTE AVANT `pg_dump`
+    // ═══════════════════════════════════════════════════════════════════════
+    //
     // `writeOwned` partout dans ce chemin : si la ligne a changé de main, ce
-    // travail n'existe plus pour personne et n'a plus rien à y écrire.
-    await this.writeOwned(running, actor.id);
+    // travail n'existe plus pour personne et n'a plus rien à y écrire. La
+    // valeur rendue était pourtant IGNORÉE ici, et seulement ici : le
+    // passage à `ready` plus bas l'honore depuis toujours, en effaçant
+    // l'archive et en rendant la main. Cette transition-ci partait donc lancer
+    // `pg_dump` en sachant déjà que la ligne ne lui appartenait plus.
+    //
+    // Deux dégâts, et aucun ne se voit dans le journal :
+    //  · DEUX `pg_dump` sur la même base en même temps, celui-ci et celui du
+    //    travail qui a pris la clé, alors que tout le module est écrit pour
+    //    qu'il n'y en ait jamais qu'un ;
+    //  · `sweepOrphans()` ne garde que le fichier que la ligne DURABLE nomme.
+    //    Cette ligne nomme désormais le fichier de l'autre travail : la sortie
+    //    en cours d'écriture de celui-ci est donc un orphelin, et le premier
+    //    balayage qui passe l'efface sous le processus qui écrit dedans.
+    //
+    // ABANDONNER AVANT `pg_dump` EST LA SEULE BRANCHE SÛRE, et c'est ce qui la
+    // distingue du passage à `ready`. Là-bas, le fichier existe déjà et la
+    // seule chose à faire est de le détruire. Ici, rien n'a encore été écrit :
+    // ne pas démarrer ne laisse RIEN derrière soi, ni copie de la clientèle, ni
+    // processus concurrent, ni ligne à corriger. Toute autre issue en laisse
+    // au moins une. Démarrer puis renoncer plus tard reviendrait à produire
+    // sciemment un exemplaire complet de la base que plus aucune ligne ne
+    // nomme, donc que plus rien ne saurait ni servir ni détruire.
+    //
+    // Et l'on n'écrit RIEN de plus : pas même un `failed`, qui écraserait
+    // l'état du travail qui détient légitimement la clé. Le journal porte la
+    // trace, la ligne appartient à l'autre.
+    if (!(await this.writeOwned(running, actor.id))) {
+      this.logger.warn(
+        `Export de la base ${job.id} : la ligne d’état a changé de main avant le démarrage, ` +
+          'l’export est abandonné sans lancer pg_dump.',
+      );
+      return;
+    }
 
     try {
       await mkdir(this.directory, { recursive: true });
