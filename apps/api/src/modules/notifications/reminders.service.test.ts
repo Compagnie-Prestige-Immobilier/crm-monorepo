@@ -1,7 +1,12 @@
 import { BankStageType, NotificationDeliveryStatus, NotificationStatus, Role } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DELIVERY_RETRY_ERROR, NotificationsService } from './notifications.service.js';
+import {
+  DELIVERY_RETRY_ERROR,
+  EMAIL_PERSIST_GROUP_SIZE,
+  NotificationsService,
+} from './notifications.service.js';
+import type { BrevoDispatchResult, BrevoMessage, BrevoTransport } from './brevo.transport.js';
 import {
   RemindersService,
   ReminderKey,
@@ -599,6 +604,128 @@ describe('expédition des envois programmés', () => {
 
     expect(brevo.allAddresses).toEqual(['un@cpi.sn']);
     expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.SENT);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Expédition plus longue que son propre bail
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UN BAIL QUE PERSONNE NE RENOUVELLE FAIT PASSER LE VIVANT POUR UN MORT
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `dispatchDue` reprend une notification `SENDING` dont `updatedAt` a plus de
+ * `SENDING_LEASE_MS`, sur le motif que son détenteur est mort. Rien n'écrivait
+ * pourtant la notification PENDANT l'expédition : `persistVerdicts` touche les
+ * livraisons, et `settleNotification` n'écrit qu'à la toute fin. Une annonce
+ * générale plus lente que le bail voyait donc `updatedAt` rester figé sur
+ * l'instant de la prise, et un second passage la réclamait alors que le premier
+ * envoyait encore. Les deux lisaient les mêmes livraisons `PENDING` et les
+ * servaient toutes les deux.
+ *
+ * Le doc-bloc de `SENDING_LEASE_MS` traitait cette borne comme un PLANCHER
+ * suffisant (« quinze minutes couvrent l'expédition la plus lente qui soit
+ * légitime »). Ce n'est pas une propriété, c'est une estimation, et elle
+ * dépend d'un service tiers : Brevo en 429 sur chaque vague, ou une base lente,
+ * la dépassent sans que rien ne soit anormal. Un bail se RENOUVELLE, il ne
+ * s'estime pas.
+ */
+describe('expédition plus longue que le bail', () => {
+  /** Deux vagues : le renouvellement a lieu entre les deux. */
+  const TOTAL = EMAIL_PERSIST_GROUP_SIZE + 8;
+  const APRES_LE_BAIL = new Date(NOW.getTime() + SENDING_LEASE_MS + 60_000);
+
+  beforeEach(() => {
+    db.clock = () => NOW;
+    brevo.configured = true;
+    for (let index = 0; index < TOTAL; index += 1) {
+      const suffix = String(index);
+      db.addUser({ id: `usr-${suffix}`, role: Role.COMMERCIAL, email: `${suffix}@cpi.sn` });
+    }
+  });
+
+  it('N’EST PAS REPRISE PAR UN SECOND PASSAGE, et personne n’est servi deux fois', async () => {
+    await db.notification.create({
+      data: {
+        title: 'Annonce générale',
+        body: 'Corps',
+        status: NotificationStatus.SCHEDULED,
+        scheduledFor: new Date(NOW.getTime() - 60_000),
+        deliveries: {
+          createMany: {
+            data: Array.from({ length: TOTAL }, (_unused, index) => ({
+              userId: `usr-${String(index)}`,
+            })),
+          },
+        },
+      },
+    });
+
+    /** Ce que le SECOND passage a réussi à reprendre pendant que le premier envoyait. */
+    let repris: number | null = null;
+
+    const lent = new (class implements BrevoTransport {
+      calls = 0;
+      readonly servies: string[] = [];
+
+      isConfigured(): boolean {
+        return true;
+      }
+
+      unavailableReason(): string | null {
+        return null;
+      }
+
+      async send(messages: readonly BrevoMessage[]): Promise<BrevoDispatchResult> {
+        this.calls += 1;
+        const adresses = messages.flatMap((message) =>
+          message.recipients.map((recipient) => recipient.email),
+        );
+
+        if (this.calls === 1) {
+          // La première vague a duré plus que le bail. C'est le cas que la
+          // borne de quinze minutes suppose impossible, et qu'un service tiers
+          // en 429 produit sans rien casser par ailleurs.
+          db.clock = () => APRES_LE_BAIL;
+        }
+
+        if (this.calls === 2) {
+          // Un autre passage tique pendant que la seconde vague est EN VOL.
+          // Sans renouvellement du bail, il trouve `updatedAt` figé sur
+          // l'instant de la prise, réclame la notification, relit les
+          // livraisons encore `PENDING` et renvoie les mêmes e-mails.
+          //
+          // Il porte le MÊME transport, comme une seconde instance derrière le
+          // même répartiteur : c'est ce qui rend le doublon visible ici plutôt
+          // que dans une doublure que personne ne regarde.
+          repris = await new RemindersService(
+            db.asService(),
+            new NotificationsService(db.asService(), fakeDemoVisibility(), this),
+            fakeDemoVisibility(),
+          ).dispatchDue(APRES_LE_BAIL);
+        }
+
+        this.servies.push(...adresses);
+        return {
+          status: 'SENT',
+          outcomes: adresses.map((email) => ({ email, ok: true })),
+        };
+      }
+    })();
+
+    const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(), lent);
+    const service = new RemindersService(db.asService(), notifications, fakeDemoVisibility());
+
+    expect(await service.dispatchDue(NOW)).toBe(1);
+
+    // LE POINT DU TEST : le second passage repart les mains vides.
+    expect(repris).toBe(0);
+
+    // Et la propriété qui compte pour le destinataire : une adresse, un e-mail.
+    expect(lent.servies).toHaveLength(TOTAL);
+    expect(new Set(lent.servies).size).toBe(TOTAL);
   });
 });
 

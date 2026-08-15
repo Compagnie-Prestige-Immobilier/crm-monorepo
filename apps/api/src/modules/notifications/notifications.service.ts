@@ -62,8 +62,20 @@ export const DELIVERY_RETRY_ERROR = 'EMAIL_RETRY';
  * quand `isConfigured()` rendait `false`, c'est-à-dire sur des téléconseillers
  * parfaitement joignables dès qu'une clé serait branchée, et il écrasait au
  * passage le marqueur de réessai qu'un passage précédent avait posé sur la
- * même ligne. Une absence de clé n'apprend rien sur le destinataire : la ligne
- * reste en file SANS marqueur, ce que `dispatch()` garantit désormais.
+ * même ligne. Une absence de clé n'apprend rien sur le destinataire.
+ *
+ * C'est pourquoi la nature du destinataire est désormais LUE EN BASE avant
+ * qu'on ne regarde le transport (voir `EmailLegResult.emailable`) : le rôle et
+ * l'adresse ne dépendent pas de la présence d'une clé Brevo. Sans clé, un
+ * téléconseiller reste en file SANS marqueur, donc à servir ; un agent du pôle
+ * banque reçoit son `INBOX_ONLY`, parce que c'est vrai de lui en toutes
+ * circonstances.
+ *
+ * ═══ CE MARQUEUR EST TERMINAL, ET C'EST `settleNotification` QUI LE LIT ═══
+ *
+ * Une ligne `PENDING` qui le porte n'attend plus rien : la notification peut se
+ * refermer sur SENT sans lui mentir. Une ligne `PENDING` qui ne le porte PAS
+ * attend encore un envoi, et retient la notification en SENDING.
  */
 export const DELIVERY_INBOX_ONLY = 'INBOX_ONLY';
 
@@ -143,10 +155,27 @@ interface EmailLegResult {
   readonly status: BrevoTransportStatus;
   /**
    * Verdict par destinataire, pour les seuls comptes réellement servis. Un
-   * identifiant absent de cette table n'a pas d'e-mail à recevoir : sa ligne
-   * reste en file, sans que ce soit un échec.
+   * identifiant absent de cette table n'a pas reçu de verdict : soit il n'a pas
+   * d'e-mail à recevoir, soit le transport n'a pas pu être sollicité.
    */
   readonly verdicts: ReadonlyMap<string, DeliveryVerdict>;
+  /**
+   * Qui est SERVI PAR E-MAIL, indépendamment de l'état du transport.
+   *
+   * C'est ce qui distingue « cette personne ne recevra jamais d'e-mail »
+   * (téléconseiller, non, ou pas d'adresse) de « personne n'a pu être servi
+   * parce qu'aucune clé n'est branchée ». Les deux produisaient une ligne
+   * `PENDING` sans verdict, et étaient donc confondues : sans clé, TOUT le
+   * monde était estampillé « boîte de réception seule » puis la notification se
+   * refermait sur SENT, ce qui enterrait définitivement des e-mails jamais
+   * partis.
+   *
+   * `null` veut dire « on n'a pas pu savoir » : la lecture des comptes elle-
+   * même a échoué. Dans ce cas on n'estampille PERSONNE, parce qu'affirmer
+   * qu'un destinataire ne sera jamais servi par e-mail est une décision qu'on
+   * ne prend pas sur une panne de base.
+   */
+  readonly emailable: ReadonlySet<string> | null;
 }
 
 interface DeliveryRowSeed {
@@ -347,7 +376,7 @@ export class NotificationsService {
 
     if (!deliveries.length) {
       const idle = await this.sendByEmail(notification, []);
-      await this.settleNotification(notificationId, idle.status, 0);
+      await this.settleNotification(notificationId, idle.status);
       return { sent: 0, failed: 0, pending: 0, emailed: idle.emailed, emailStatus: idle.status };
     }
 
@@ -359,18 +388,18 @@ export class NotificationsService {
     let sent = 0;
     let failed = 0;
     let pending = 0;
-    /** Livraisons qu'un passage ULTÉRIEUR doit reprendre. Voir `settleNotification`. */
-    let retryable = 0;
     const inboxOnly: string[] = [];
 
     for (const delivery of deliveries) {
       const verdict = email.verdicts.get(delivery.userId);
 
       if (verdict === undefined) {
-        // Personne à servir par e-mail. `PENDING` et non `FAILED` : rien n'a
-        // échoué, il n'y avait simplement rien à envoyer au-dehors.
+        // Aucun verdict. `PENDING` et non `FAILED` : rien n'a échoué. Reste à
+        // dire POURQUOI, et c'est `emailable` qui tranche, pas le transport.
         pending += 1;
-        inboxOnly.push(delivery.id);
+        if (email.emailable !== null && !email.emailable.has(delivery.userId)) {
+          inboxOnly.push(delivery.id);
+        }
         continue;
       }
 
@@ -383,29 +412,23 @@ export class NotificationsService {
       }
       if (verdict.kind === 'retry') {
         pending += 1;
-        retryable += 1;
         continue;
       }
       failed += 1;
     }
 
-    // LE MARQUEUR NE S'ÉCRIT QUE SI LA BRANCHE E-MAIL A RÉELLEMENT JUGÉ.
-    //
-    // Sans transport configuré, elle n'a jugé personne : elle rend une table
-    // de verdicts vide, et TOUTES les livraisons tombent dans la branche
-    // ci-dessus. Les estampiller « boîte de réception seule » affirmerait d'un
-    // téléconseiller joignable qu'il ne sera jamais servi par e-mail, et
-    // écraserait le marqueur de réessai qu'un passage précédent avait posé sur
-    // la même ligne, seule trace qui distingue « à reprendre » de « rien à
-    // envoyer ». Sans clé, la ligne reste en file sans marqueur.
-    if (inboxOnly.length && email.status !== 'NOT_CONFIGURED') {
+    // LE MARQUEUR DÉCRIT LE DESTINATAIRE, il ne dépend donc plus de l'état du
+    // transport : `emailable` vient de la base, pas de la clé Brevo. Il est
+    // écrit AVANT `settleNotification`, qui le relit pour savoir quelles
+    // livraisons attendent encore quelque chose.
+    if (inboxOnly.length) {
       await this.prisma.notificationDelivery.updateMany({
         where: { id: { in: inboxOnly } },
         data: { error: DELIVERY_INBOX_ONLY },
       });
     }
 
-    await this.settleNotification(notificationId, email.status, retryable);
+    await this.settleNotification(notificationId, email.status);
     return { sent, failed, pending, emailed: email.emailed, emailStatus: email.status };
   }
 
@@ -444,9 +467,8 @@ export class NotificationsService {
     userIds: readonly string[],
   ): Promise<EmailLegResult> {
     const empty = new Map<string, DeliveryVerdict>();
-    if (!this.email.isConfigured())
-      return { emailed: 0, status: 'NOT_CONFIGURED', verdicts: empty };
-    if (!userIds.length) return { emailed: 0, status: 'SENT', verdicts: empty };
+    if (!userIds.length)
+      return { emailed: 0, status: 'SENT', verdicts: empty, emailable: new Set<string>() };
 
     // Hissé hors du `try` : le rattrapage doit savoir QUI était visé pour
     // marquer ces lignes-là à réessayer, et elles seules.
@@ -466,12 +488,32 @@ export class NotificationsService {
      */
     let candidates: readonly { userId: string }[] = userIds.map((userId) => ({ userId }));
 
+    /**
+     * Qui est servi par e-mail. `null` tant que la base n'a pas répondu.
+     *
+     * Voir `EmailLegResult.emailable` : tant qu'il vaut `null`, `dispatch()`
+     * n'estampille personne « boîte de réception seule ».
+     */
+    let emailable: Set<string> | null = null;
+
     /** Verdicts DÉJÀ ÉCRITS en base, groupe par groupe. */
     const verdicts = new Map<string, DeliveryVerdict>();
     let emailed = 0;
     let refused = false;
 
     try {
+      // ═══ LA NATURE DU DESTINATAIRE SE LIT AVANT L'ÉTAT DU TRANSPORT ═══
+      //
+      // Cette lecture précédait autrefois le contrôle `isConfigured()`, qui
+      // rendait la main sans elle. Sans clé, on ignorait donc QUI aurait dû
+      // recevoir un e-mail, et `dispatch()` estampillait tout le monde « boîte
+      // de réception seule », téléconseillers compris, avant de refermer
+      // l'envoi sur SENT. Le jour où une clé était branchée, ces e-mails-là
+      // n'existaient plus pour personne.
+      //
+      // Le rôle et l'adresse ne dépendent pas de la clé : on les lit d'abord,
+      // et une lecture par identifiants est de toute façon négligeable devant
+      // ce qu'elle évite.
       const users = await this.prisma.user.findMany({
         where: { id: { in: [...userIds] }, role: Role.COMMERCIAL },
         select: { id: true, email: true, fullName: true },
@@ -480,10 +522,19 @@ export class NotificationsService {
       targeted = users
         .filter((user) => user.email.trim().length > 0)
         .map((user) => ({ userId: user.id, email: user.email.trim(), fullName: user.fullName }));
-      // Les comptes sont connus : le rattrapage se resserre sur eux.
+      // Les comptes sont connus : le rattrapage se resserre sur eux, et la
+      // nature de chaque destinataire est désormais établie.
       candidates = targeted;
+      emailable = new Set(targeted.map((row) => row.userId));
 
-      if (!targeted.length) return { emailed: 0, status: 'SENT', verdicts: empty };
+      // SANS CLÉ, RIEN N'EST JUGÉ, ET RIEN N'EST ENTERRÉ. Les téléconseillers
+      // restent en file sans marqueur, donc `settleNotification` retient la
+      // notification en SENDING et le bail la fera reprendre. Les autres
+      // destinataires, eux, sont bel et bien tranchés : `emailable` le dit.
+      if (!this.email.isConfigured())
+        return { emailed: 0, status: 'NOT_CONFIGURED', verdicts: empty, emailable };
+
+      if (!targeted.length) return { emailed: 0, status: 'SENT', verdicts: empty, emailable };
 
       const content = buildEmailContent(notification.title, notification.body);
 
@@ -566,6 +617,11 @@ export class NotificationsService {
 
         await this.persistVerdicts(notification.id, groupVerdicts);
         for (const [userId, verdict] of groupVerdicts) verdicts.set(userId, verdict);
+
+        // LE BAIL EST RENOUVELÉ À CHAQUE VAGUE. Voir `renewLease` : sans cela,
+        // une expédition plus longue que le bail était reprise par un second
+        // passage pendant que le premier envoyait encore.
+        await this.renewLease(notification.id);
       }
 
       if (emailed) {
@@ -578,7 +634,12 @@ export class NotificationsService {
       // derrière un groupe accepté décrit une panne partielle : l'annoncer
       // comme une panne de transport ferait croire que la clé est en cause,
       // alors que des e-mails sont bel et bien partis.
-      return { emailed, status: refused && emailed === 0 ? 'TRANSPORT_ERROR' : 'SENT', verdicts };
+      return {
+        emailed,
+        status: refused && emailed === 0 ? 'TRANSPORT_ERROR' : 'SENT',
+        verdicts,
+        emailable,
+      };
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       this.logger.warn(
@@ -605,8 +666,47 @@ export class NotificationsService {
       // une panne de transport alors que des e-mails sont partis ferait
       // chercher du côté de la clé. L'interruption reste visible, dans le
       // journal et dans les lignes laissées en file.
-      return { emailed, status: emailed === 0 ? 'TRANSPORT_ERROR' : 'SENT', verdicts };
+      return { emailed, status: emailed === 0 ? 'TRANSPORT_ERROR' : 'SENT', verdicts, emailable };
     }
+  }
+
+  /**
+   * Renouvelle le BAIL posé sur la notification en cours d'expédition.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LE DÉFAUT : UNE EXPÉDITION VIVANTE ÉTAIT REPRISE COMME UNE MORTE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `dispatchDue` reprend une notification `SENDING` dont `updatedAt` a plus de
+   * `SENDING_LEASE_MS`, sur le motif que le processus qui la tenait est mort.
+   * Or RIEN n'écrivait la notification pendant l'expédition : `persistVerdicts`
+   * touche les LIVRAISONS, et `settleNotification` n'écrit qu'à la fin. Une
+   * annonce générale plus longue que le bail voyait donc son `updatedAt` rester
+   * figé sur l'instant de la prise, et un second passage la réclamait pendant
+   * que le premier envoyait encore.
+   *
+   * Les deux expéditions lisaient alors les MÊMES livraisons `PENDING` et les
+   * servaient toutes les deux : le destinataire recevait le message en double.
+   *
+   * Un bail n'a de sens que si son détenteur le renouvelle : c'est ce qui
+   * distingue « il travaille » de « il est mort ». Une écriture par VAGUE, donc
+   * au plus une toutes les quinze secondes environ, contre un bail de quinze
+   * minutes : la marge est de trois ordres de grandeur, et un processus tué
+   * cesse de renouveler à l'instant même où il tombe.
+   *
+   * Le `where` porte `SENDING` : une notification annulée ou déjà refermée par
+   * un autre chemin ne doit pas être ramenée en arrière par ce renouvellement.
+   * L'échec est ignoré, il coûte au pire une reprise inutile.
+   */
+  private async renewLease(notificationId: string): Promise<void> {
+    await this.prisma.notification
+      .updateMany({
+        where: { id: notificationId, status: NotificationStatus.SENDING },
+        // La valeur ne change pas, et ce n'est pas le sujet : c'est
+        // `@updatedAt` qu'on vient chercher, posé par Prisma sur toute écriture.
+        data: { status: NotificationStatus.SENDING },
+      })
+      .catch(() => undefined);
   }
 
   /**
@@ -716,13 +816,57 @@ export class NotificationsService {
    * demanderait un compteur sur la livraison, donc une colonne de plus ; entre
    * réessayer trop et abandonner un envoi en silence, c'est l'abandon qui est
    * le défaut grave.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LA DÉCISION SE LIT EN BASE, ET NON DANS UN COMPTEUR DE L'APPELANT
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Cette méthode recevait un `retryable` compté par l'expédition qui l'appelle.
+   * Ce chiffre ne décrit que CE passage-là, et deux passages peuvent se
+   * chevaucher : une expédition plus longue que le bail était reprise par une
+   * seconde (voir `renewLease`, qui ferme cette fenêtre-là), et l'ordre
+   * d'arrivée décidait de l'état final. La seconde persistait un `EMAIL_RETRY`,
+   * puis la PREMIÈRE, toujours en cours, appelait `settleNotification` avec
+   * `retryable = 0` et écrivait SENT par-dessus. La livraison restait `PENDING`
+   * avec son marqueur, la notification affichait « envoyée », et `dispatchDue`
+   * ne revient JAMAIS sur une SENT : le réessai était perdu pour de bon.
+   *
+   * Le même mensonge s'écrivait sans la moindre concurrence, par le simple fait
+   * qu'aucune clé Brevo n'était branchée : la branche e-mail ne rendait aucun
+   * verdict, `retryable` restait à zéro, et l'envoi se refermait sur SENT sans
+   * qu'un seul e-mail soit parti.
+   *
+   * La seule source honnête est donc l'ÉTAT DES LIVRAISONS, relu ici :
+   *
+   *   · `PENDING` sans `INBOX_ONLY` : cette personne attend encore un e-mail,
+   *     qu'il faille le réessayer ou qu'il n'ait jamais pu être tenté ;
+   *   · `PENDING` avec `INBOX_ONLY` : elle n'attend plus rien, elle lit dans
+   *     l'application. C'est un état TERMINAL malgré son statut ;
+   *   · `SENT`, `DELIVERED`, `READ`, `FAILED` : tranché.
+   *
+   * La branche `null` de l'`OR` n'est pas une précaution de style : une ligne
+   * jamais marquée porte `error: null`, et un prédicat SQL de la forme
+   * `error <> 'INBOX_ONLY'` ne sélectionne PAS les `NULL`. L'écrire ainsi
+   * aurait rendu « aucune livraison en attente » exactement dans le cas que
+   * cette méthode existe pour rattraper.
    */
-  private async settleNotification(
-    id: string,
-    transportStatus: string,
-    retryable: number,
-  ): Promise<void> {
-    if (retryable > 0) {
+  private async settleNotification(id: string, transportStatus: string): Promise<void> {
+    // LECTURE GLOBALE délibérée, et pour la MÊME raison que celle de
+    // `dispatch()` : ce décompte décide du sort de la notification qu'on vient
+    // d'expédier, dont les livraisons portent déjà sa nature. Une livraison
+    // masquée par la visibilité de démonstration attendrait toujours son
+    // e-mail ; l'écarter du décompte ferait refermer l'envoi sur SENT, et le
+    // simple fait de basculer l'interrupteur suffirait alors à enterrer des
+    // livraisons en attente.
+    const outstanding = await this.prisma.notificationDelivery.count({
+      where: {
+        notificationId: id,
+        status: NotificationDeliveryStatus.PENDING,
+        OR: [{ error: null }, { error: { not: DELIVERY_INBOX_ONLY } }],
+      },
+    });
+
+    if (outstanding > 0) {
       await this.prisma.notification.update({
         where: { id },
         data: { status: NotificationStatus.SENDING, transportStatus },
