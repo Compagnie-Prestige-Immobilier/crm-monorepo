@@ -93,7 +93,12 @@ class EssaiController {
     return { role: user.role };
   }
 
-  /** Route SANS rôle exigé : la garde ne doit rien y coûter, ni rien y refuser. */
+  /**
+   * Route SANS rôle exigé, et c'est TOUT SON INTÉRÊT : elle représente
+   * `sync/push`, `prospects/reassign`, l'export des représentants et les
+   * listes, qui décident toutes d'après `request.user.role` dans leur service
+   * sans porter le moindre décorateur.
+   */
   @Get('ouvert')
   ouvert(@CurrentUser() user: AuthenticatedUser): { role: string } {
     return { role: user.role };
@@ -192,26 +197,52 @@ describe('rôle rétrogradé pendant la vie du jeton', () => {
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════
-   * LA LIMITE, ÉPINGLÉE PLUTÔT QUE TUE
+   * LE TEST QUI FERME LA PORTE DE DERRIÈRE
    * ═══════════════════════════════════════════════════════════════════════════
    *
-   * Une route SANS `@Roles` n'est pas relue : elle garde le rôle du jeton,
-   * périmé jusqu'à quinze minutes. C'est le prix assumé de ne pas ajouter une
-   * requête en base à TOUT le trafic du produit, remontée mobile comprise, pour
-   * une valeur dont ces routes ne font dépendre aucune décision : ce qu'elles
-   * cloisonnent l'est par `id`, que le jeton ne peut pas périmer.
+   * Ce test affirmait l'INVERSE, et il encodait un trou d'autorisation comme
+   * une décision : une route sans `@Roles` gardait le rôle du JETON, au motif
+   * qu'aucune de ces routes ne déciderait d'après le rôle.
    *
-   * Ce test ne célèbre pas ce comportement, il le DOCUMENTE. Le jour où une
-   * route sans `@Roles` se mettra à décider d'après le rôle, l'hypothèse tombe,
-   * et c'est ici qu'on doit venir la relire.
+   * Elles le font, et pas qu'un peu. `isAdmin(request.user)` est lu à
+   * l'INTÉRIEUR des services, sur des routes sans décorateur : `sync/push`
+   * (où un ADMIN modifie et supprime des lignes dont il n'est pas l'auteur),
+   * `prospects/reassign`, l'export des représentants, les listes prospects et
+   * représentants, et tout `analytics`. Un ADMIN rétrogradé conservait donc son
+   * autorité sur ces chemins pendant toute la vie de son jeton.
+   *
+   * La route témoin ci-dessous ne porte AUCUN `@Roles` : elle représente
+   * exactement cette famille. Remettre une condition sur `@Roles` dans la garde
+   * fait repasser ce test au rouge, ce qui est tout son objet.
    */
-  it('ne relit rien sur une route qui n’exige aucun rôle, et le dit', async () => {
+  it('relit l’autorité sur une route qui n’exige AUCUN rôle', async () => {
     users.row = { role: Role.COMMERCIAL, isActive: true, isDemo: false, deletedAt: null };
 
     const response = await app.inject({ method: 'GET', url: OUVERT_URL });
 
+    // La session n'est pas coupée : la personne travaille, avec l'autorité qui
+    // est désormais la sienne. C'est cette valeur-là que lisent ensuite
+    // `isAdmin()` et `ownerScope()` dans la couche service.
     expect(response.statusCode).toBe(200);
-    expect(response.json<{ role: string }>().role).toBe(Role.ADMIN);
+    expect(response.json<{ role: string }>().role).toBe(Role.COMMERCIAL);
+  });
+
+  /**
+   * Les trois refus immédiats valent AUSSI sans `@Roles`, et c'est la moitié
+   * la plus importante : un compte supprimé, désactivé, ou de démonstration
+   * après extinction du mode, atteignait `sync/push` sans être inquiété.
+   */
+  it('refuse un compte désactivé sur une route sans rôle exigé', async () => {
+    users.row = { role: Role.COMMERCIAL, isActive: false, isDemo: false, deletedAt: null };
+
+    expect((await app.inject({ method: 'GET', url: OUVERT_URL })).statusCode).toBe(401);
+  });
+
+  it('refuse un jeton de démonstration sur une route sans rôle exigé', async () => {
+    users.row = { role: Role.COMMERCIAL, isActive: true, isDemo: true, deletedAt: null };
+    demo.current = 'off';
+
+    expect((await app.inject({ method: 'GET', url: OUVERT_URL })).statusCode).toBe(401);
   });
 
   /**
