@@ -1,12 +1,20 @@
 import { readFile, readdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import type { FastifyRequest } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { createAppUpdatesApp, FakeReleaseStore, multipartBody } from './fake-release-store.js';
+import { AppUpdatesService } from './app-updates.service.js';
+import {
+  createAppUpdatesApp,
+  FAKE_ADMIN,
+  FakeReleaseStore,
+  multipartBody,
+} from './fake-release-store.js';
 
 /**
  * Publication d'une release : champs du formulaire ET version lue dans l'APK.
@@ -84,6 +92,14 @@ const uploadFile = (fields: Record<string, string>, apk: Buffer, name = 'cpi-go.
 
 const upload = (fields: Record<string, string>) => uploadFile(fields, cpiGoV7);
 
+/** Le MÊME envoi, mais avec les champs placés après la partie fichier. */
+const uploadTrailing = (fields: Record<string, string>) =>
+  app.inject({
+    method: 'POST',
+    url: UPLOAD_URL,
+    ...multipartBody({}, { name: 'cpi-go.apk', content: cpiGoV7 }, fields),
+  });
+
 /** APK réellement présents dans le répertoire des releases, `.part` compris. */
 const releaseFiles = async (): Promise<string[]> => readdir(releaseDir);
 
@@ -127,6 +143,115 @@ describe('POST android (champs multipart)', () => {
     // Et surtout : la valeur tapée n'est PAS devenue la version publiée.
     const current = await app.inject({ method: 'GET', url: CURRENT_URL });
     expect(current.json<{ versionCode: number }>().versionCode).toBe(1);
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LE REFUS NE DOIT PAS DÉPENDRE DE L'ORDRE DES PARTIES
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Rien n'impose l'ordre des parties d'un envoi multipart. Le service lisait
+   * pourtant les champs au moment où la partie FICHIER lui parvenait : tout
+   * champ arrivant après elle était ignoré en silence. Un panel resté sur
+   * l'ancienne version, qui envoie son fichier en premier, publiait donc sans
+   * rien apprendre, alors que la description publiée dans `openapi.json` et
+   * recopiée dans les deux clients générés promet un 400.
+   *
+   * Le test précédent n'exerçait que l'ordre commode, le seul que fabriquait
+   * l'aide de test.
+   */
+  it('refuse ces mêmes champs quand ils arrivent APRÈS le fichier', async () => {
+    const response = await uploadTrailing({
+      forceUpdate: 'false',
+      versionName: '9.9.9',
+      versionCode: '99',
+    });
+
+    expect(response.statusCode).toBe(400);
+    const current = await app.inject({ method: 'GET', url: CURRENT_URL });
+    expect(current.json<{ versionCode: number }>().versionCode).toBe(1);
+  });
+
+  it('et accepte un formulaire conforme dont les champs suivent le fichier', async () => {
+    // Contre-épreuve : le refus ci-dessus doit venir des champs de trop, pas de
+    // l'ordre lui-même.
+    const response = await uploadTrailing({ forceUpdate: 'true', notes: 'Champs après fichier.' });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json<{ versionCode: number }>().versionCode).toBe(7);
+    const current = await app.inject({ method: 'GET', url: CURRENT_URL });
+    expect(current.json<{ notes: string | null }>().notes).toBe('Champs après fichier.');
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LE CORPS ARRIVE EN PLUSIEURS MORCEAUX, ET LES DEUX TESTS CI-DESSUS NE LE
+   * MONTRENT PAS
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `app.inject` écrit tout le corps d'un coup, et les APK de test pèsent moins
+   * d'un kilo-octet : busboy analyse donc le message ENTIER avant que le
+   * service n'ait vu la première partie, si bien que l'objet `fields` de la
+   * partie fichier est déjà complet, quel que soit l'ordre. Les deux tests
+   * précédents décrivent le contrat, ils ne peuvent pas faire apparaître le
+   * défaut.
+   *
+   * Sur un vrai téléversement de 70 Mo, c'est l'inverse : le flux du fichier se
+   * remplit, l'analyse se met en attente, et `fields` ne contient à cet instant
+   * QUE ce qui précédait le fichier. Le service lisait là. Cette doublure
+   * reproduit exactement cela : `fields` est un objet VIVANT, vide tant que le
+   * flux n'est pas consommé, rempli ensuite.
+   */
+  it('N’UTILISE PAS `fields` AVANT D’AVOIR CONSOMMÉ LE FLUX', async () => {
+    /** Partie fichier suivie de ses champs, comme busboy les délivre. */
+    class LateFieldsRequest {
+      /** Partagé par toutes les parties, et rempli au fil de l'analyse. */
+      readonly fields: Record<string, unknown> = {};
+
+      constructor(
+        private readonly apk: Buffer,
+        private readonly trailing: Record<string, string>,
+      ) {}
+
+      async *parts(): AsyncGenerator {
+        // Le `await` n'a rien d'ornemental : il place la reprise du générateur
+        // après le tour de boucle du consommateur, donc après la consommation
+        // du flux, exactement comme l'analyse d'un vrai corps multipart.
+        await Promise.resolve();
+        yield {
+          type: 'file',
+          fieldname: 'file',
+          filename: 'cpi-go.apk',
+          file: Readable.from([this.apk]),
+          fields: this.fields,
+        };
+        // Reprise APRÈS consommation du flux : c'est seulement ici que le
+        // reste du corps est analysé, et donc que les champs existent.
+        for (const [fieldname, value] of Object.entries(this.trailing)) {
+          this.fields[fieldname] = { type: 'field', fieldname, value };
+          yield { type: 'field', fieldname, value, fields: this.fields };
+        }
+      }
+
+      /** Ce que consommait l'ancienne implémentation. */
+      async file(): Promise<unknown> {
+        const iterator = this.parts();
+        return (await iterator.next()).value;
+      }
+    }
+
+    const isolated = new AppUpdatesService(store.asService());
+    const request = new LateFieldsRequest(cpiGoV7, {
+      forceUpdate: 'true',
+      notes: 'Champs analysés après le fichier.',
+    });
+
+    const published = await isolated.upload(request as unknown as FastifyRequest, FAKE_ADMIN);
+
+    // Les champs qui suivaient le fichier ont bel et bien été pris en compte.
+    expect(published.forceUpdate).toBe(true);
+    expect(published.notes).toBe('Champs analysés après le fichier.');
+    expect(published.versionCode).toBe(7);
   });
 
   /**

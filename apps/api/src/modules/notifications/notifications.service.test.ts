@@ -356,6 +356,163 @@ describe('éventail', () => {
     expect(db.deliveries[0]?.error).toBe(DELIVERY_RETRY_ERROR);
   });
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LA BASE LÂCHE AVANT MÊME QUE L'ON SACHE QUI SERVIR
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `ThrowingBrevoTransport` échoue APRÈS la lecture des comptes : la liste des
+   * destinataires visés est déjà remplie, et le rattrapage la retrouve. La
+   * fenêtre laissée ouverte est celle d'AVANT : un délai d'attente du pool ou
+   * une requête interrompue sur `user.findMany`. Le rattrapage remettait alors
+   * en file une liste vide, `retryable` restait à zéro, et l'envoi se refermait
+   * sur SENT.
+   *
+   * Le symptôme était le pire du produit, et exactement celui que la correction
+   * précédente prétendait avoir tué : aucun e-mail parti, toutes les livraisons
+   * en file estampillées « boîte de réception seule », et une plateforme qui
+   * affirme avoir envoyé.
+   */
+  /** Un envoi programmé, donc écrit sans être expédié : la panne vient après. */
+  const scheduleThree = async (): Promise<string> => {
+    brevo.configured = true;
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1', 'usr-2', 'usr-3'],
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+    });
+    db.breakOn('user.findMany', new Error('Timed out fetching a new connection from the pool'));
+    return created.id;
+  };
+
+  it('UNE PANNE DE BASE AVANT LE CIBLAGE LAISSE L’ENVOI PRENABLE', async () => {
+    const id = await scheduleThree();
+
+    await service.dispatch(id);
+    db.faults.clear();
+    const detail = await service.get(id);
+
+    // SENDING : c'est le seul état que le bail expiré rend reprenable.
+    expect(detail.notification.status).toBe(NotificationStatus.SENDING);
+    expect(detail.notification.sentAt).toBeNull();
+    expect(detail.notification.transportStatus).toBe('TRANSPORT_ERROR');
+
+    // Et les trois lignes portent le marqueur de RÉESSAI, pas celui du
+    // destinataire qu'on ne sert jamais par e-mail : la seconde valeur ferait
+    // croire à un envoi terminé et correct.
+    expect(db.deliveries).toHaveLength(3);
+    for (const delivery of db.deliveries) {
+      expect(delivery.status).toBe(NotificationDeliveryStatus.PENDING);
+      expect(delivery.error).toBe(DELIVERY_RETRY_ERROR);
+    }
+  });
+
+  it('la panne passée, la reprise sert bien les trois destinataires', async () => {
+    // Contre-épreuve du test précédent : laisser l'envoi prenable ne vaut que
+    // si la reprise aboutit réellement.
+    const id = await scheduleThree();
+    await service.dispatch(id);
+
+    db.faults.clear();
+    const retry = await service.dispatch(id);
+
+    expect(retry.sent).toBe(3);
+    expect(brevo.allAddresses).toHaveLength(3);
+  });
+
+  /**
+   * LE MARQUEUR DE RÉESSAI NE DOIT PAS ÊTRE EFFACÉ PAR UN PASSAGE AVEUGLE.
+   *
+   * Sans clé Brevo, la branche e-mail ne juge PERSONNE : elle rend une table de
+   * verdicts vide. Toutes les livraisons tombaient alors dans la branche « rien
+   * à envoyer au-dehors » et se faisaient estampiller `INBOX_ONLY`, ce qui
+   * affirme d'un téléconseiller parfaitement joignable qu'il ne sera jamais
+   * servi par e-mail, et efface la seule trace disant « celle-ci est à
+   * reprendre ».
+   */
+  it('un passage sans clé n’efface pas le marqueur de réessai d’un passage précédent', async () => {
+    brevo = new FakeBrevoTransport((email) => ({
+      email,
+      ok: false,
+      errorCode: 'HTTP_503',
+      kind: 'transient',
+    }));
+    brevo.configured = true;
+    service = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
+
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1'],
+    });
+    expect(db.deliveries[0]?.error).toBe(DELIVERY_RETRY_ERROR);
+
+    // La clé disparaît entre deux passages (rotation ratée, variable perdue).
+    brevo.configured = false;
+    await service.dispatch(created.id);
+
+    expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.PENDING);
+    expect(db.deliveries[0]?.error).toBe(DELIVERY_RETRY_ERROR);
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * UNE CLÉ INVALIDE NE SE RÉESSAIE PAS TOUTES LES QUINZE MINUTES
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Le transport annonce `TRANSPORT_ERROR` dès qu'aucun lot n'est passé, quelle
+   * que soit la nature des refus. Un public de moins de cent adresses tient
+   * dans un seul lot : c'est donc l'état rendu pour TOUT refus définitif de
+   * l'audience normale de ce produit. Le traduire en bloc par « tout le monde
+   * réessaie » épinglait la notification en SENDING pour toujours.
+   */
+  it('UN REFUS DÉFINITIF DE TOUT LE PUBLIC EST ENTERRÉ, PAS RÉESSAYÉ', async () => {
+    brevo = new FakeBrevoTransport((email) => ({
+      email,
+      ok: false,
+      errorCode: 'unauthorized',
+      kind: 'permanent',
+    }));
+    brevo.configured = true;
+    service = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
+
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1', 'usr-2', 'usr-3'],
+    });
+
+    expect(created.counts.failed).toBe(3);
+    expect(created.counts.pending).toBe(0);
+    expect(db.deliveries.every((row) => row.error === 'unauthorized')).toBe(true);
+
+    // ET SURTOUT : l'envoi est refermé. Il ne repartira pas au prochain tick.
+    expect(created.status).toBe(NotificationStatus.SENT);
+  });
+
+  it('mais un refus PASSAGER de tout le public reste, lui, en file', async () => {
+    // Contre-épreuve : la correction ci-dessus ne doit pas enterrer un 429.
+    brevo = new FakeBrevoTransport((email) => ({
+      email,
+      ok: false,
+      errorCode: 'HTTP_429',
+      kind: 'transient',
+    }));
+    brevo.configured = true;
+    service = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
+
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1'],
+    });
+
+    expect(created.status).toBe(NotificationStatus.SENDING);
+    expect(created.counts.failed).toBe(0);
+    expect(db.deliveries[0]?.error).toBe(DELIVERY_RETRY_ERROR);
+  });
+
   it('un destinataire non servi par e-mail reste en file, pas en échec', async () => {
     db.addUser({ id: 'usr-banque', role: Role.BANQUE_FINANCE, email: 'banque@cpi.sn' });
     brevo.configured = true;
@@ -530,6 +687,74 @@ describe('boîte de réception', () => {
     // réécrite par un second appel.
     expect(second).toBe(first);
     expect((await service.inbox(asUser('usr-1'), {})).unreadCount).toBe(0);
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * OUVRIR L'APPLICATION N'EFFACE PAS UN ÉCHEC D'ENVOI
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `markRead` écrivait `status: READ` sans prédicat de statut. Une livraison
+   * FAILED devenait donc READ à la première ouverture, et l'échec disparaissait
+   * des compteurs de l'écran d'administration : l'envoi s'affichait « lu » par
+   * quelqu'un qui n'a jamais reçu l'e-mail. La date de lecture, elle, est
+   * légitime : c'est le STATUT qui ne doit pas mentir.
+   */
+  it('LIRE UNE LIVRAISON EN ÉCHEC N’EFFACE PAS L’ÉCHEC', async () => {
+    const failing = new FakeBrevoTransport((email) => ({
+      email,
+      ok: false,
+      errorCode: 'invalid_parameter',
+      kind: 'permanent',
+    }));
+    failing.configured = true;
+    const isolated = new NotificationsService(db.asService(), fakeDemoVisibility(), failing);
+
+    const created = await isolated.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1'],
+    });
+    expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.FAILED);
+
+    await isolated.markRead(asUser('usr-1'), created.id);
+
+    expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.FAILED);
+    expect(db.deliveries[0]?.error).toBe('invalid_parameter');
+    // La lecture est tout de même horodatée : la pastille de non-lues se vide.
+    expect(db.deliveries[0]?.readAt).not.toBeNull();
+    expect((await isolated.inbox(asUser('usr-1'), {})).unreadCount).toBe(0);
+    expect((await isolated.get(created.id)).notification.counts.failed).toBe(1);
+  });
+
+  /**
+   * LE MÊME DÉFAUT, CÔTÉ RÉESSAI. Une livraison laissée en file attend le
+   * passage suivant ; la faire passer READ la sort de la population `PENDING`
+   * que la reprise interroge, et annule ce réessai sans que rien ne le dise.
+   */
+  it('LIRE UNE LIVRAISON EN ATTENTE DE RÉESSAI N’ANNULE PAS LE RÉESSAI', async () => {
+    let refuse = true;
+    const flaky = new FakeBrevoTransport((email) =>
+      refuse ? { email, ok: false, errorCode: 'HTTP_503', kind: 'transient' } : { email, ok: true },
+    );
+    flaky.configured = true;
+    const isolated = new NotificationsService(db.asService(), fakeDemoVisibility(), flaky);
+
+    const created = await isolated.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1'],
+    });
+    expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.PENDING);
+
+    // L'utilisateur ouvre l'application AVANT que la reprise n'ait lieu.
+    await isolated.markRead(asUser('usr-1'), created.id);
+    refuse = false;
+    const retry = await isolated.dispatch(created.id);
+
+    // La reprise a bien retrouvé la ligne, et l'e-mail est parti.
+    expect(retry.sent).toBe(1);
+    expect(flaky.allAddresses).toHaveLength(2);
   });
 
   it('refuse de marquer lue la notification d’un autre', async () => {

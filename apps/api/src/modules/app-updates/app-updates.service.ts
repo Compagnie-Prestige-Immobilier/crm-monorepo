@@ -79,14 +79,27 @@ export class AppUpdatesService {
    * définitif d'une version que la base n'annonce pas : `download()` sert le
    * fichier nommé par la base, mais un orphelin de 70 Mo par tentative
    * remplirait le volume en quelques semaines.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * POURQUOI `parts()` ET NON `file()`
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `request.file()` rend la partie fichier dès qu'elle arrive, et son
+   * `fields` ne contient alors que les champs reçus AVANT elle. C'est un objet
+   * vivant, que busboy continue de remplir, mais qui était lu tout de suite :
+   * un client envoyant `versionName` APRÈS le fichier voyait donc son champ
+   * ignoré en silence, là où le contrat publié promet un 400 nommant les
+   * champs de trop. L'ordre des parties d'un envoi multipart n'est imposé par
+   * rien, ni par la norme, ni par les navigateurs.
+   *
+   * L'itérateur, lui, rend TOUTES les parties : la boucle ne se termine qu'une
+   * fois le corps entièrement analysé, et les champs sont alors complets quel
+   * que soit leur rang. Conséquence assumée : le fichier est écrit sur le
+   * disque AVANT que les champs ne soient jugés, puisqu'il faut avoir consommé
+   * son flux pour lire ce qui le suit. Le `.part` est effacé sur tous les
+   * chemins de refus, y compris celui-là.
    */
   async upload(request: FastifyRequest, actor: AuthenticatedUser): Promise<AppUpdateDto> {
-    const file = await request.file();
-    if (!file || !file.filename.toLowerCase().endsWith('.apk')) {
-      throw new BadRequestException('Un fichier APK est requis.');
-    }
-    const input = await this.validateFields(this.readFields(file));
-
     await mkdir(this.directory, { recursive: true });
     // Le nom temporaire ne peut plus porter le versionCode, qui n'est pas
     // encore connu : un UUID suffit, et il garantit que deux publications
@@ -95,21 +108,35 @@ export class AppUpdatesService {
     const temporaryPath = join(this.directory, `.${draft}.apk.part`);
     const hash = createHash('sha256');
     let fileSize = 0;
-    try {
-      file.file.on('data', (chunk: Buffer) => {
-        fileSize += chunk.length;
-        hash.update(chunk);
-      });
-      await pipeline(file.file, createWriteStream(temporaryPath, { flags: 'wx' }));
-    } catch (error) {
-      await rm(temporaryPath, { force: true });
-      if (file.file.truncated) throw new BadRequestException('APK trop volumineux.');
-      throw error;
-    }
+    let file: MultipartFile | null = null;
+    const fields: Record<string, string> = {};
 
     let identity: ApkIdentity;
     let fileName: string;
+    let input: AppUpdateUploadDto;
     try {
+      for await (const part of request.parts()) {
+        if (part.type !== 'file') {
+          // Le multipart ne transporte que du texte ; une partie typée
+          // `application/json` par le client sort déjà désérialisée, et n'a
+          // rien à faire dans un formulaire de release.
+          if (typeof part.value === 'string') fields[part.fieldname] = part.value;
+          continue;
+        }
+        if (!part.filename.toLowerCase().endsWith('.apk')) {
+          throw new BadRequestException('Un fichier APK est requis.');
+        }
+        file = part;
+        part.file.on('data', (chunk: Buffer) => {
+          fileSize += chunk.length;
+          hash.update(chunk);
+        });
+        await pipeline(part.file, createWriteStream(temporaryPath, { flags: 'wx' }));
+      }
+
+      if (file === null) throw new BadRequestException('Un fichier APK est requis.');
+
+      input = await this.validateFields(fields);
       identity = await readApkIdentity(temporaryPath);
       const current = await this.readRelease();
       assertPublishable(identity, current?.versionCode ?? null);
@@ -117,10 +144,12 @@ export class AppUpdatesService {
       fileName = `cpi-go-${String(identity.versionCode)}-${draft}.apk`;
       await rename(temporaryPath, join(this.directory, fileName));
     } catch (error) {
-      // `rm` AVANT de relever : sans ce nettoyage, chaque APK refusé (mauvais
-      // paquet, version pas assez haute, manifeste illisible) laisserait ses
-      // dizaines de mégaoctets sur le volume monté, que rien ne balaie.
+      // `rm` AVANT de relever : sans ce nettoyage, chaque APK refusé (champ
+      // invalide, mauvais paquet, version pas assez haute, manifeste illisible)
+      // laisserait ses dizaines de mégaoctets sur le volume monté, que rien ne
+      // balaie.
       await rm(temporaryPath, { force: true });
+      if (file?.file.truncated === true) throw new BadRequestException('APK trop volumineux.');
       throw error;
     }
 
@@ -187,14 +216,6 @@ export class AppUpdatesService {
     } catch {
       return null;
     }
-  }
-
-  private readFields(file: MultipartFile): Record<string, string> {
-    const fields: Record<string, string> = {};
-    for (const [key, value] of Object.entries(file.fields)) {
-      if (value && 'value' in value && typeof value.value === 'string') fields[key] = value.value;
-    }
-    return fields;
   }
 
   /**
