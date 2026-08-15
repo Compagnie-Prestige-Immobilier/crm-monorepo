@@ -17,6 +17,16 @@ final DateTime t0 = DateTime.utc(2026, 8, 12, 9);
 /// passeraient pour de mauvaises raisons.
 Future<AppDatabase> openTestDatabase() async {
   final AppDatabase db = AppDatabase(NativeDatabase.memory());
+  await seedReferentials(db);
+  return db;
+}
+
+/// Les mêmes référentiels, posés sur une base déjà ouverte.
+///
+/// Extrait d'[openTestDatabase] pour les tests qui ont besoin d'une SOUS-CLASSE
+/// d'[AppDatabase] : observer un entrelacement suppose de pouvoir s'intercaler
+/// entre deux instructions, ce qu'aucun paramètre de fabrique ne permet.
+Future<void> seedReferentials(AppDatabase db) async {
   await db.customStatement('PRAGMA foreign_keys = ON;');
   await db
       .into(db.departements)
@@ -49,7 +59,6 @@ Future<AppDatabase> openTestDatabase() async {
           localUpdatedAt: t0,
         ),
       );
-  return db;
 }
 
 Future<void> insertRepresentant(

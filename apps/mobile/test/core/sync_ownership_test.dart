@@ -11,6 +11,7 @@ import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/write_repository.dart';
 import 'package:crm_api_client/crm_api_client.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/db_fixture.dart';
@@ -548,6 +549,86 @@ void main() {
       expect(payload['fullName'], 'Ma version');
     });
 
+    /// ═══ LA GARDE ÉTAIT LUE HORS DE LA TRANSACTION QU'ELLE PROTÈGE ═══
+    ///
+    /// Le test précédent décrit un régime STABLE : l'opération était déjà en
+    /// file quand la page est arrivée. Celui-ci décrit la fenêtre, et c'est la
+    /// seule chose que les deux autres ne pouvaient pas voir.
+    ///
+    /// `_applyPage` calculait ses deux ensembles gardés, PUIS ouvrait sa
+    /// transaction d'écriture. Rien ne suspend l'interface entre les deux : la
+    /// page vient d'arriver par un lien 2G, le commercial a le formulaire sous
+    /// les yeux, et « Enregistrer » écrit la fiche et met l'opération en file
+    /// pendant ce temps-là. Cette opération-là n'était dans aucun des deux
+    /// ensembles, donc la version serveur l'écrasait dans `representants` :
+    /// c'est-à-dire le symptôme exact que la garde existe pour empêcher, une
+    /// correction qui disparaît de l'écran et que son auteur ressaisit.
+    ///
+    /// L'entrelacement est réel : le crochet écrit VRAIMENT dans la base, par
+    /// `WriteRepository`, et il est commité avant que la transaction de la page
+    /// ne s'ouvre.
+    test('une correction enregistrée pendant le tirage n\'est pas écrasée', () async {
+      final _HookedDatabase hooked = _HookedDatabase(NativeDatabase.memory());
+      addTearDown(hooked.close);
+      await seedReferentials(hooked);
+      await insertRepresentant(
+        hooked,
+        id: 'repA',
+        phone: '+221770000001',
+        fullName: 'Avant',
+        rev: 1,
+        serverUpdatedAt: t0,
+      );
+
+      final FakeApi slowApi = FakeApi();
+      final SyncEngine pulling = SyncEngine(
+        database: hooked,
+        api: slowApi,
+        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        clock: clock,
+        random: Random(3),
+      );
+      final WriteRepository writes = WriteRepository(hooked, clock: clock);
+
+      slowApi.pullPages.add(
+        pullPageWithRepresentant(
+          representantDto(
+            id: 'repA',
+            phoneE164: '+221770000001',
+            fullName: 'Version serveur',
+            rev: 7,
+          ),
+        ),
+      );
+
+      // Le geste de l'utilisateur, placé exactement dans la fenêtre : juste
+      // avant que la page n'ouvre sa transaction.
+      hooked.onNextTransaction = () async {
+        await writes.updateRepresentant(
+          id: 'repA',
+          fullName: 'Ma correction',
+          phoneE164: '+221770000001',
+          departementId: 'dep-1',
+        );
+      };
+
+      await pulling.pullChanges();
+
+      final Representant row = (await hooked.select(hooked.representants).get()).single;
+      expect(
+        row.fullName,
+        'Ma correction',
+        reason:
+            'l\'opération était en file au moment d\'écrire : tant qu\'un envoi '
+            'peut trancher, le pull ne tranche pas à sa place',
+      );
+      expect(
+        (await allOutbox(hooked)).single.status,
+        OutboxStatus.pending,
+        reason: 'la correction est bien partie en file, elle n\'a pas été avalée',
+      );
+    });
+
     test('une ligne encore en file, elle, reste protégée', () async {
       await insertRepresentant(
         db,
@@ -584,6 +665,130 @@ void main() {
         'Ma version',
         reason: 'tant qu\'un envoi peut trancher, on le laisse trancher',
       );
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // B4bis : l'invariant dont deux gardes dépendent sans jamais le vérifier
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// ═══ « À CORRIGER » N'APPARTIENT À PERSONNE ═══
+  ///
+  /// Deux mécanismes fenêtrent sur le STATUT seul, sans jamais regarder le
+  /// jeton de possession, et ils ne sont sûrs que si cet invariant tient :
+  ///
+  /// * `WriteRepository.retryOperation` ne filtre que sur
+  ///   [OutboxStatus.needsAttention], puis efface bail et jeton. Si une ligne
+  ///   `conflict` ou `failed` pouvait porter un jeton, « Réessayer » volerait
+  ///   une ligne en vol et le lot repartirait sous une clé d'idempotence neuve
+  ///   pendant que le premier envoi est encore en cours ;
+  /// * `Phase2DirectorySync.purge`, à la déconnexion, SUPPRIME des lignes
+  ///   d'outbox en ne filtrant que sur « hors [OutboxStatus.open] ». C'est la
+  ///   seule suppression de la file qui ne repose pas la possession dans son
+  ///   `WHERE` : elle n'est fenêtrée que parce qu'une ligne `done` a, elle
+  ///   aussi, rendu son jeton.
+  ///
+  /// L'invariant se vérifie donc ici, sur TOUS les chemins qui produisent l'un
+  /// de ces états, plutôt que de se relire dans les commentaires de ceux qui en
+  /// dépendent.
+  group('invariant : une ligne qui attend une décision humaine n\'a plus de jeton', () {
+    test('aucun chemin de verdict ne laisse un jeton derrière lui', () async {
+      // Un plafond de blocage à 1 : le premier rejeu bloqué suffit alors à
+      // pousser la ligne en `failed`, sans douze tours de vidange.
+      final SyncEngine strict = SyncEngine(
+        database: db,
+        api: api,
+        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        clock: clock,
+        maxBlockedAttempts: 1,
+        random: Random(4),
+      );
+
+      for (final String key in <String>['k1', 'k2', 'k4']) {
+        await insertRepresentant(db, id: 'rep-$key', phone: '+22177000000${key[1]}');
+      }
+      await queueOp(
+        db,
+        id: 'C1',
+        entityType: 'representant',
+        entityId: 'rep-k1',
+        dependencyKey: 'k1',
+      );
+      await queueOp(
+        db,
+        id: 'C2',
+        entityType: 'representant',
+        entityId: 'rep-k2',
+        dependencyKey: 'k2',
+      );
+      // Type d'entité que ce build ne sait pas traduire : la ligne meurt dans
+      // `_prepare`, avant tout réseau. C'est le seul chemin vers `failed` qui ne
+      // passe pas par un verdict.
+      await queueOp(
+        db,
+        id: 'C3',
+        entityType: 'chose_inconnue',
+        entityId: 'x-k3',
+        dependencyKey: 'k3',
+      );
+      await queueOp(
+        db,
+        id: 'C4',
+        entityType: 'representant',
+        entityId: 'rep-k4',
+        dependencyKey: 'k4',
+      );
+
+      api.verdicts['C1'] = conflictOn('C1', errorCode: ServerErrorCodes.revConflict);
+      api.verdicts['C2'] = invalidOn('C2');
+      api.verdicts['C4'] = SyncOperationResultDto(
+        opId: 'C4',
+        status: SyncOpStatus.skippedDependencyFailed,
+        entityId: null,
+        rev: null,
+        serverUpdatedAt: null,
+        errorCode: ServerErrorCodes.parentRepresentantFailed,
+        error: 'Le parent n\'est pas passé.',
+      );
+
+      await strict.drain();
+
+      final List<OutboxData> stuck = (await allOutbox(db))
+          .where((OutboxData o) => OutboxStatus.needsAttention.contains(o.status))
+          .toList(growable: false);
+      expect(
+        stuck.map((OutboxData o) => o.id).toSet(),
+        <String>{'C1', 'C2', 'C3', 'C4'},
+        reason: 'les quatre chemins doivent avoir abouti, sinon le test ne prouve rien',
+      );
+      for (final OutboxData row in stuck) {
+        expect(
+          row.claimToken,
+          isNull,
+          reason:
+              '${row.id} (${row.status}) porte encore un jeton : « Réessayer » '
+              'volerait une ligne que quelqu\'un croit posséder',
+        );
+        expect(row.leaseUntil, isNull, reason: '${row.id} garde un bail');
+      }
+    });
+
+    test('un acquittement rend le jeton, et c\'est ce qui borne la purge', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+
+      await engine.drain();
+
+      final OutboxData done = await outboxById(db, 'A1');
+      expect(done.status, OutboxStatus.done);
+      expect(
+        done.claimToken,
+        isNull,
+        reason:
+            'la purge de déconnexion supprime les lignes hors `open` sans reposer '
+            'la possession : elle n\'est fenêtrée que par cette remise à null',
+      );
+      expect(done.leaseUntil, isNull);
     });
   });
 
@@ -1207,6 +1412,38 @@ PullPage pullPageWithRepresentant(RepresentantDto dto) => PullPage(
   hasMore: false,
   serverTime: t0,
 );
+
+/// Une base qui laisse s'intercaler une écriture juste avant une transaction.
+///
+/// C'est le pendant de [_GatedApi] côté stockage : le faux serveur tient un
+/// isolat DANS son envoi, celui-ci tient un appelant JUSTE AVANT sa
+/// transaction. Sans ce point d'arrêt, la fenêtre entre une lecture et la
+/// transaction qui s'en sert ne dure pas assez pour être observée, et un test
+/// qui compterait sur l'ordonnancement des micro-tâches passerait ou échouerait
+/// au gré des versions.
+///
+/// Le crochet est à un seul coup et s'efface avant de s'exécuter : sans quoi
+/// l'écriture qu'il déclenche, qui ouvre elle-même une transaction, se
+/// rappellerait indéfiniment.
+class _HookedDatabase extends AppDatabase {
+  _HookedDatabase(super.executor);
+
+  /// Ce que l'utilisateur fait pendant que le moteur travaille.
+  Future<void> Function()? onNextTransaction;
+
+  @override
+  Future<T> transaction<T>(
+    Future<T> Function() action, {
+    bool requireNew = false,
+  }) async {
+    final Future<void> Function()? hook = onNextTransaction;
+    if (hook != null) {
+      onNextTransaction = null;
+      await hook();
+    }
+    return super.transaction(action, requireNew: requireNew);
+  }
+}
 
 /// Un serveur qui ne répond qu'au coup de sifflet.
 ///
