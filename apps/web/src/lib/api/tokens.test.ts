@@ -129,6 +129,50 @@ describe('rotateRefreshToken', () => {
     });
   });
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * Un serveur qui répond MAL ne doit pas être traité plus durement qu'un
+   * serveur MUET.
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `unavailable` fait garder les cookies (`proxy.ts`), `invalid` les efface et
+   * renvoie à l'écran de connexion. Tout statut non 2xx valait `invalid`, donc
+   * une réponse qui ne dit RIEN du jeton détruisait quand même la session.
+   *
+   * Le 429 n'est pas théorique : `ThrottlerGuard` est une garde GLOBALE de
+   * l'API, `/auth/refresh` est donc plafonné, et le contrat ne déclare pour
+   * cette route que 200 et 401. Le statut que le client ne prévoyait pas est
+   * exactement celui qui déconnectait.
+   */
+  it('ne tue PAS la session sur un 429 : le plafond ne juge pas le jeton', async () => {
+    const fetchImpl = vi.fn(() => Promise.resolve(new Response('{}', { status: 429 })));
+    await expect(rotateRefreshTokenDetailed('http://api.test', 'old', fetchImpl)).resolves.toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
+  });
+
+  it('ne tue PAS la session sur une passerelle en panne', async () => {
+    // 502, 503, 504 : l'API redémarre ou un intermédiaire répond à sa place.
+    // Le refresh token sera toujours valable dans dix secondes.
+    for (const status of [500, 502, 503, 504]) {
+      const fetchImpl = vi.fn(() => Promise.resolve(new Response('', { status })));
+      await expect(
+        rotateRefreshTokenDetailed('http://api.test', `old-${String(status)}`, fetchImpl),
+      ).resolves.toEqual({ ok: false, reason: 'unavailable' });
+    }
+  });
+
+  it('tue la session sur un 401 : là, l’API s’est prononcée sur le jeton', async () => {
+    // Le pendant indispensable des deux tests ci-dessus : élargir `unavailable`
+    // à tout ne ferait plus jamais effacer un jeton révoqué, et l'utilisateur
+    // resterait coincé sur une session morte.
+    const fetchImpl = vi.fn(() => Promise.resolve(new Response('{}', { status: 401 })));
+    await expect(
+      rotateRefreshTokenDetailed('http://api.test', 'revoked', fetchImpl),
+    ).resolves.toEqual({ ok: false, reason: 'invalid' });
+  });
+
   it('single-flight le même refresh token pendant les requêtes concurrentes', async () => {
     let calls = 0;
     const fetchImpl = vi.fn(async () => {
