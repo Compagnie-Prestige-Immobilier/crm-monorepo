@@ -2534,6 +2534,8 @@ export interface components {
       /** @description Révision serveur sur laquelle le client s’est basé. Fournie sur update/delete, elle transforme une écriture aveugle en écriture conditionnelle. */
       baseRev?: number;
       data?: components['schemas']['SyncEntityDataDto'];
+      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes. */
+      clearedFields?: string[];
     };
     SyncPushDto: {
       /**
