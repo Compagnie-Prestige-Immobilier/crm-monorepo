@@ -1,4 +1,4 @@
-// CRM Prospection CPI — schéma de données.
+// CRM Prospection CPI : schéma de données.
 //
 // Deux invariants gouvernent ce schéma :
 //
@@ -22,7 +22,7 @@
 //
 // L'identifiant client ne supprime PAS toute réconciliation : il supprime la
 // réconciliation d'IDENTIFIANT. Deux commerciaux qui rencontrent le même
-// représentant produisent deux UUID pour une seule personne réelle — le
+// représentant produisent deux UUID pour une seule personne réelle : le
 // téléphone les réunit, et c'est le seul remappage d'identifiant du système
 // (voir le service de synchronisation).
 
@@ -55,7 +55,7 @@ enum ProspectStatut {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Phase 2 — collecte des méthodes d'enrôlement
+// Phase 2 : collecte des méthodes d'enrôlement
 // ─────────────────────────────────────────────────────────────────────────────
 
 enum Phase2Status {
@@ -82,7 +82,7 @@ enum EnrollmentMethod {
 // Le segment n'est volontairement pas stocké sur Prospect : il dépend de deux
 // clés étrangères, donc une colonne dénormalisée se désynchroniserait dès qu'un
 // admin corrige la banque d'un prospect. Il est calculé par le helper partagé
-// `segment.ts`, seule définition autorisée — listes, campagnes, statistiques et
+// `segment.ts`, seule définition autorisée : listes, campagnes, statistiques et
 // exports en dépendent tous.
 enum BddSegment {
   BDD1
@@ -117,6 +117,34 @@ enum CallOutcome {
   REFUSED
   WRONG_NUMBER
   OTHER
+}
+
+// Issue d'un appel passé à un REPRÉSENTANT, distincte de CallOutcome.
+//
+// Les deux familles d'appel ne poursuivent pas le même but : appeler un
+// prospect sert à obtenir une méthode d'enrôlement, appeler un représentant
+// sert à obtenir des fiches. Réutiliser CallOutcome forcerait à y ajouter des
+// issues sans objet pour un prospect (« a promis une liste »), et les
+// statistiques de phase 2 compteraient alors des appels qui ne la concernent
+// pas.
+enum RepCallOutcome {
+  REACHED
+  PROSPECTS_PROMISED
+  UNREACHABLE
+  CALLBACK
+  REFUSED
+  WRONG_NUMBER
+  OTHER
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Demande de création de client (banque vers administrateur)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ClientRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -164,16 +192,25 @@ model User {
   callTasksAssigned   CallTask[]               @relation("CallTaskAssignedTo")
   callAttempts        CallAttempt[]            @relation("CallAttemptPerformedBy")
 
+  // Campagnes d'appels aux représentants : module séparé, voir plus bas
+  repCampaignsCreated    RepCallCampaign[]           @relation("RepCallCampaignCreatedBy")
+  repCampaignMemberships RepCallCampaignCommercial[] @relation("RepCallCampaignCommercial")
+  repCallTasksAssigned   RepCallTask[]               @relation("RepCallTaskAssignedTo")
+  repCallAttempts        RepCallAttempt[]            @relation("RepCallAttemptPerformedBy")
+
   // Banque & Finance
   bankCasesCreated    BankCase[]           @relation("BankCaseCreatedBy")
   bankCasesUpdated    BankCase[]           @relation("BankCaseUpdatedBy")
   bankCaseTransitions BankCaseTransition[] @relation("BankCaseTransitionBy")
 
+  // Demandes de création de client, ouvertes par une banque et arbitrées par un admin
+  clientRequestsMade     ClientCreationRequest[] @relation("ClientCreationRequestRequestedBy")
+  clientRequestsReviewed ClientCreationRequest[] @relation("ClientCreationRequestReviewedBy")
+
   // Démonstration
   appSettingsUpdated AppSetting[] @relation("AppSettingUpdatedBy")
 
-  // Notifications push
-  deviceTokens           DeviceToken[]          @relation("DeviceTokenUser")
+  // Notifications
   notificationsCreated   Notification[]         @relation("NotificationCreatedBy")
   notificationDeliveries NotificationDelivery[] @relation("NotificationDeliveryUser")
   notificationTemplates  NotificationTemplate[] @relation("NotificationTemplateCreatedBy")
@@ -184,7 +221,7 @@ model User {
   /// suppression : les lignes de démo coexistent en permanence avec les vraies,
   /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
   /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
-  /// export réel — elle est invisible dès que le mode est éteint.
+  /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
   @@index([role, isActive])
@@ -198,7 +235,7 @@ model User {
 //
 // `familyId` implémente la détection de rejeu : chaque rotation crée un nouveau
 // token dans la même famille. Si un token déjà consommé (`revokedAt` non nul)
-// est représenté, c'est qu'il a été volé — toute la famille est révoquée d'un
+// est représenté, c'est qu'il a été volé : toute la famille est révoquée d'un
 // coup et l'utilisateur doit se reconnecter.
 model RefreshToken {
   id        String    @id @default(uuid(7))
@@ -218,7 +255,7 @@ model RefreshToken {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Référentiels — synchronisés en lecture seule vers le mobile
+// Référentiels : synchronisés en lecture seule vers le mobile
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Region {
@@ -243,10 +280,11 @@ model Departement {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users         User[]
-  representants Representant[]
-  iefs          Ief[]
-  notifications Notification[] @relation("NotificationAudienceDepartement")
+  users            User[]
+  representants    Representant[]
+  iefs             Ief[]
+  notifications    Notification[]    @relation("NotificationAudienceDepartement")
+  repCallCampaigns RepCallCampaign[] @relation("RepCallCampaignDepartement")
 
   @@unique([regionId, name])
   @@index([updatedAt])
@@ -257,11 +295,11 @@ model Departement {
 ///
 /// Découpage SCOLAIRE, distinct du découpage administratif. Les feuilles de
 /// route CHUES sont bâties dessus : un téléconseiller reçoit « IEF Almadies »,
-/// jamais « Dakar ». 59 IEF pour 46 départements — Dakar en porte quatre.
+/// jamais « Dakar ». 59 IEF pour 46 départements : Dakar en porte quatre.
 ///
 /// Le rattachement au représentant est FACULTATIF, et le restera : les fiches
 /// déjà saisies n'en portent pas, et une colonne obligatoire les rendrait
-/// invalides rétroactivement. Le département reste, lui, obligatoire — il est
+/// invalides rétroactivement. Le département reste, lui, obligatoire : il est
 /// déductible de l'IEF, jamais l'inverse.
 model Ief {
   id            String      @id @default(uuid(7))
@@ -274,7 +312,8 @@ model Ief {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  representants Representant[]
+  representants    Representant[]
+  repCallCampaigns RepCallCampaign[] @relation("RepCallCampaignIef")
 
   @@unique([departementId, name])
   @@index([updatedAt])
@@ -290,8 +329,9 @@ model Banque {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  prospects Prospect[]
-  bankCases BankCase[]
+  prospects      Prospect[]
+  bankCases      BankCase[]
+  clientRequests ClientCreationRequest[]
 
   @@index([updatedAt])
   @@map("banques")
@@ -336,14 +376,14 @@ model Representant {
   ief   Ief?    @relation(fields: [iefId], references: [id], onDelete: Restrict)
 
   // Le commercial qui l'a saisi le premier. Ne change pas si un autre commercial
-  // rattache ensuite des prospects au même représentant — la paternité de la
+  // rattache ensuite des prospects au même représentant : la paternité de la
   // ligne prospect suffit à tracer qui a apporté quoi.
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
   // Horodatage de la saisie sur le terrain, distinct de `createdAt` qui est
   // l'arrivée en base. Les deux peuvent être séparés de plusieurs jours si le
-  // commercial est resté hors ligne — les statistiques d'activité s'appuient
+  // commercial est resté hors ligne : les statistiques d'activité s'appuient
   // sur `clientCreatedAt`.
   clientCreatedAt DateTime
 
@@ -351,7 +391,9 @@ model Representant {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  prospects Prospect[]
+  prospects       Prospect[]
+  repCallTasks    RepCallTask[]
+  repCallAttempts RepCallAttempt[]
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -359,12 +401,15 @@ model Representant {
   /// suppression : les lignes de démo coexistent en permanence avec les vraies,
   /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
   /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
-  /// export réel — elle est invisible dès que le mode est éteint.
+  /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
   @@index([phoneE164])
   @@index([createdById])
   @@index([departementId])
+  // Le périmètre d'une campagne de représentants se borne par IEF : sans cet
+  // index, le tirage parcourt séquentiellement toute la table à chaque aperçu.
+  @@index([iefId])
   // Index de pagination du pull delta : keyset sur (updatedAt, id).
   @@index([updatedAt, id])
   @@index([deletedAt])
@@ -399,12 +444,26 @@ model Prospect {
 
   statut ProspectStatut @default(NOUVEAU)
 
+  /// Provenance de la fiche quand elle N'EST PAS née d'une tournée terrain.
+  ///
+  /// Vide pour l'écrasante majorité des lignes : le chemin normal reste la
+  /// saisie mobile par un commercial, et `createdById` suffit alors à dire d'où
+  /// vient la fiche. La colonne ne se remplit que sur les entrées exceptionnelles
+  /// (aujourd'hui `BANQUE`, via une demande de création approuvée), pour qu'un
+  /// administrateur puisse mesurer ce qui entre hors base au lieu de le deviner.
+  ///
+  /// `originLabel` porte le détail lisible (nom de la banque demandeuse) et non
+  /// une clé étrangère : le libellé doit survivre au renommage du référentiel,
+  /// exactement comme l'identité recopiée sur un dossier bancaire.
+  origin      String?
+  originLabel String?
+
   // ── Phase 2 : méthode d'enrôlement ──────────────────────────────────────
   // Dimension indépendante de `statut`. Invariant applicatif, testé :
   // `enrollmentMethod` est OBLIGATOIRE si et seulement si
   // `phase2Status = METHOD_OBTAINED`, et NULL pour tous les autres statuts.
   // Il est aussi posé en contrainte CHECK dans la migration, pour qu'aucun
-  // chemin d'écriture — y compris un correctif SQL manuel — ne puisse le violer.
+  // chemin d'écriture : y compris un correctif SQL manuel : ne puisse le violer.
   phase2Status           Phase2Status      @default(PENDING)
   enrollmentMethod       EnrollmentMethod?
   enrollmentCapturedAt   DateTime?
@@ -423,15 +482,20 @@ model Prospect {
   /// suppression : les lignes de démo coexistent en permanence avec les vraies,
   /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
   /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
-  /// export réel — elle est invisible dès que le mode est éteint.
+  /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
-  callTasks    CallTask[]
-  callAttempts CallAttempt[]
-  bankCases    BankCase[]
+  callTasks      CallTask[]
+  callAttempts   CallAttempt[]
+  bankCases      BankCase[]
+  clientRequests ClientCreationRequest[]
 
   @@index([phoneE164])
   @@index([representantId])
+  // `origin` est indexée en index PARTIEL (`WHERE "origin" IS NOT NULL`) dans
+  // la migration, pas ici : Prisma ne sait pas exprimer la clause `WHERE`, et
+  // un index complet porterait les centaines de milliers de lignes sans
+  // provenance pour ne jamais servir. Voir `prospects_origin_idx`.
   @@index([createdById])
   @@index([banqueId])
   @@index([syndicatId])
@@ -455,11 +519,11 @@ model Prospect {
 
 // L'idempotence tient sur DEUX niveaux. Aucun des deux ne suffit seul.
 //
-// Niveau 1 — le lot. Le mobile envoie `Idempotency-Key: <batchId>`. Si le
+// Niveau 1 : le lot. Le mobile envoie `Idempotency-Key: <batchId>`. Si le
 // réseau coupe après que le serveur a écrit mais avant que la réponse n'arrive,
 // le client rejoue le lot identique et retrouve ici la réponse mémorisée.
 //
-// Niveau 2 — l'opération (modèle SyncOperation). Indispensable parce que le
+// Niveau 2 : l'opération (modèle SyncOperation). Indispensable parce que le
 // niveau 1 ne couvre PAS le cas réel suivant : 3 opérations sur 5 passent, le
 // client reconstitue un lot DIFFÉRENT sous un NOUVEAU batchId. La clé de lot ne
 // reconnaît rien ; seules les clés par opération rendent ce rejeu sûr.
@@ -473,7 +537,7 @@ model Prospect {
 //
 // L'insertion du marqueur `IN_PROGRESS` se fait dans sa PROPRE transaction,
 // AVANT la transaction de travail. Placée dedans, un rollback l'effacerait et
-// le rejeu réécrirait — c'est l'erreur classique sur ce motif.
+// le rejeu réécrirait : c'est l'erreur classique sur ce motif.
 model SyncBatch {
   key          String      @map("idempotency_key")
   userId       String
@@ -540,7 +604,7 @@ model AuditLog {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Phase 2 — campagnes d'appels et collecte des méthodes
+// Phase 2 : campagnes d'appels et collecte des méthodes
 // ═════════════════════════════════════════════════════════════════════════════
 
 // Une campagne fige une répartition. La graine de mélange est PERSISTÉE parce
@@ -554,6 +618,15 @@ model CallCampaign {
   scope  CampaignScope
   seed   String
   status CampaignStatus @default(ACTIVE)
+
+  /// Nombre de journées sur lesquelles la file de chaque commercial est étalée.
+  ///
+  /// Vaut 1 par défaut, ce qui reproduit exactement le comportement antérieur.
+  /// Au-delà, la file de chaque commercial est découpée en tranches contiguës :
+  /// sur 120 000 fiches et 7 jours, un commercial reçoit sept programmes tenables
+  /// au lieu d'un seul illisible. La répartition reste reproductible à graine
+  /// égale, puisqu'elle se fait APRÈS le tirage et non pendant.
+  spreadDays Int @default(1)
 
   createdById String
   createdBy   User   @relation("CallCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
@@ -572,7 +645,7 @@ model CallCampaign {
   /// suppression : les lignes de démo coexistent en permanence avec les vraies,
   /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
   /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
-  /// export réel — elle est invisible dès que le mode est éteint.
+  /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
   @@index([status, createdAt])
@@ -615,6 +688,13 @@ model CallTask {
   // exactement celui-ci : c'est ce qui rend le papier et l'écran cohérents.
   position Int
 
+  /// Journée d'étalement, à partir de 0 (donc « jour 1 » à l'affichage).
+  ///
+  /// Écrit à la création, jamais recalculé : le programme du jour 3 doit rendre
+  /// le même document une semaine plus tard. Vaut 0 partout quand la campagne
+  /// n'est pas étalée, ce qui laisse les campagnes existantes intactes.
+  dayIndex Int @default(0)
+
   status   CallTaskStatus @default(OPEN)
   isActive Boolean        @default(true)
 
@@ -630,13 +710,15 @@ model CallTask {
   /// suppression : les lignes de démo coexistent en permanence avec les vraies,
   /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
   /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
-  /// export réel — elle est invisible dès que le mode est éteint.
+  /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
   @@unique([campaignId, prospectId])
   @@unique([campaignId, assignedToId, position])
   @@index([assignedToId, status])
   @@index([prospectId])
+  // Le PDF « jour N » d'un commercial lit exactement cette clé.
+  @@index([campaignId, assignedToId, dayIndex])
   @@index([isDemo])
   @@map("call_tasks")
 }
@@ -648,7 +730,7 @@ model CallTask {
 // un numéro trouvé dans l'annuaire, y compris un numéro attribué à un collègue :
 // il faut donc conserver les deux pour que l'attribution reste juste.
 model CallAttempt {
-  // UUID v7 généré par le mobile — sert aussi de clé d'idempotence.
+  // UUID v7 généré par le mobile : sert aussi de clé d'idempotence.
   id         String        @id
   prospectId String
   prospect   Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
@@ -674,7 +756,7 @@ model CallAttempt {
   /// suppression : les lignes de démo coexistent en permanence avec les vraies,
   /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
   /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
-  /// export réel — elle est invisible dès que le mode est éteint.
+  /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
   @@index([prospectId, createdAt])
@@ -685,10 +767,222 @@ model CallAttempt {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// Campagnes d'appels aux REPRÉSENTANTS
+//
+// Module SÉPARÉ, et non un `kind` ajouté sur CallCampaign. Les deux familles
+// partagent la mécanique (graine persistée, tourniquet, tâche par cible,
+// journal d'appels en ajout seul) mais rien de leur métier : la cible n'est pas
+// la même table, les issues d'appel ne sont pas les mêmes, et surtout la
+// campagne prospects porte l'invariant « une seule tâche active par prospect »
+// qui décide de l'éligibilité de la phase 2. Greffer les représentants dessus
+// mettrait cet invariant en jeu à chaque évolution du nouveau besoin, sur la
+// fonctionnalité qui porte aujourd'hui toute la collecte des méthodes.
+// ═════════════════════════════════════════════════════════════════════════════
+
+model RepCallCampaign {
+  id     String         @id @default(uuid(7))
+  name   String
+  seed   String
+  status CampaignStatus @default(ACTIVE)
+
+  /// Voir `CallCampaign.spreadDays` : même sémantique, même valeur par défaut.
+  spreadDays Int @default(1)
+
+  /// Périmètre du tirage. Les deux bornes sont FACULTATIVES et se cumulent ;
+  /// aucune des deux ne vaut « tous les représentants du pays ».
+  departementId String?
+  departement   Departement? @relation("RepCallCampaignDepartement", fields: [departementId], references: [id], onDelete: SetNull)
+  iefId         String?
+  ief           Ief?         @relation("RepCallCampaignIef", fields: [iefId], references: [id], onDelete: SetNull)
+
+  /// Ne retenir que les représentants n'ayant apporté AUCUN prospect vivant.
+  /// C'est la campagne de relance des dormants, celle qui a motivé le module.
+  onlyWithoutProspects Boolean @default(false)
+
+  createdById String
+  createdBy   User   @relation("RepCallCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  closedAt  DateTime?
+
+  commerciaux RepCallCampaignCommercial[]
+  tasks       RepCallTask[]
+  attempts    RepCallAttempt[]
+
+  /// Ligne appartenant au jeu de démonstration. Voir `User.isDemo`.
+  isDemo Boolean @default(false)
+
+  @@index([status, createdAt])
+  @@index([isDemo])
+  @@map("rep_call_campaigns")
+}
+
+model RepCallCampaignCommercial {
+  id         String          @id @default(uuid(7))
+  campaignId String
+  campaign   RepCallCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User            @relation("RepCallCampaignCommercial", fields: [userId], references: [id], onDelete: Restrict)
+  // Rang dans le tourniquet. Fige la distribution, donc le contenu de chaque PDF.
+  position   Int
+
+  @@unique([campaignId, userId])
+  @@unique([campaignId, position])
+  @@map("rep_call_campaign_commerciaux")
+}
+
+// Une tâche est une ligne du programme papier d'un commercial.
+//
+// `isActive` porte l'index unique partiel qui interdit deux tâches actives sur
+// le même représentant : sans lui, deux campagnes simultanées distribueraient le
+// même numéro à deux commerciaux, qui appelleraient la même personne le même
+// matin.
+model RepCallTask {
+  id             String          @id @default(uuid(7))
+  campaignId     String
+  campaign       RepCallCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  representantId String
+  representant   Representant    @relation(fields: [representantId], references: [id], onDelete: Cascade)
+
+  assignedToId String
+  assignedTo   User   @relation("RepCallTaskAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+
+  position Int
+  /// Voir `CallTask.dayIndex`.
+  dayIndex Int @default(0)
+
+  status   CallTaskStatus @default(OPEN)
+  isActive Boolean        @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  attempts RepCallAttempt[]
+
+  /// Ligne appartenant au jeu de démonstration. Voir `User.isDemo`.
+  isDemo Boolean @default(false)
+
+  @@unique([campaignId, representantId])
+  @@unique([campaignId, assignedToId, position])
+  @@index([assignedToId, status])
+  @@index([representantId])
+  @@index([campaignId, assignedToId, dayIndex])
+  @@index([isDemo])
+  @@map("rep_call_tasks")
+}
+
+/// Historique en AJOUT SEUL des appels passés aux représentants. Une tentative
+/// n'est jamais modifiée : elle décrit un fait daté.
+model RepCallAttempt {
+  // UUID v7 engendré par le client : sert aussi de clé d'idempotence.
+  id             String           @id
+  representantId String
+  representant   Representant     @relation(fields: [representantId], references: [id], onDelete: Cascade)
+  taskId         String?
+  task           RepCallTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  campaignId     String?
+  campaign       RepCallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  performedById String
+  performedBy   User   @relation("RepCallAttemptPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+
+  outcome           RepCallOutcome
+  /// Nombre de fiches promises par le représentant, quand l'issue le prévoit.
+  promisedProspects Int?
+  comment           String?
+
+  clientCreatedAt DateTime
+  createdAt       DateTime @default(now())
+
+  /// Ligne appartenant au jeu de démonstration. Voir `User.isDemo`.
+  isDemo Boolean @default(false)
+
+  @@index([representantId, createdAt])
+  @@index([performedById, createdAt])
+  @@index([campaignId])
+  @@index([isDemo])
+  @@map("rep_call_attempts")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Demande de création de client
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Une banque saisit un dossier pour un client absent de la base.
+///
+/// Sans cette table, l'agent était dans une impasse : « Aucun client ne
+/// correspond », et rien ne remontait à l'administrateur. Le rôle
+/// BANQUE_FINANCE n'a pas : et ne doit pas avoir : le droit de créer un
+/// prospect : il ne voit ni le représentant, ni le syndicat, ni le commercial
+/// propriétaire, donc la fiche qu'il produirait serait incomplète et sans
+/// paternité. La demande passe donc par un arbitrage explicite.
+///
+/// L'identité saisie est CONSERVÉE telle quelle même après approbation : c'est
+/// elle qui permet de comprendre, des mois plus tard, ce que la banque avait
+/// réellement demandé quand le prospect créé a été corrigé depuis.
+model ClientCreationRequest {
+  id String @id @default(uuid(7))
+
+  nom       String
+  prenom    String
+  /// Normalisé en E.164 par le serveur, avec la MÊME fonction que partout
+  /// ailleurs : c'est ce qui permet de refuser une demande portant sur un
+  /// prospect déjà en base.
+  phoneE164 String
+  note      String?
+
+  /// Banque demandeuse. Sert de `originLabel` au prospect créé.
+  banqueId String
+  banque   Banque @relation(fields: [banqueId], references: [id], onDelete: Restrict)
+
+  requestedById String
+  requestedBy   User   @relation("ClientCreationRequestRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  status ClientRequestStatus @default(PENDING)
+
+  reviewedById  String?
+  reviewedBy    User?     @relation("ClientCreationRequestReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt    DateTime?
+  rejectionNote String?
+
+  /// Prospect issu de l'approbation. Nul tant que la demande n'a pas abouti.
+  ///
+  /// `Restrict` et non `SetNull`. La contrainte CHECK
+  /// `client_creation_requests_approved_has_prospect` exige qu'une demande
+  /// APPROUVÉE porte son prospect : remettre la colonne à NULL à la suppression
+  /// du prospect ferait échouer cette suppression sur une violation de CHECK,
+  /// message illisible pour l'administrateur qui efface une fiche. Le refus
+  /// franc est plus honnête, et la purge administrative efface les demandes
+  /// AVANT les prospects (`purge-plan.ts`).
+  createdProspectId String?
+  createdProspect   Prospect? @relation(fields: [createdProspectId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Ligne appartenant au jeu de démonstration. Voir `User.isDemo`.
+  isDemo Boolean @default(false)
+
+  // Unicité de la FILE D'ATTENTE (un seul PENDING par numéro) posée en index
+  // partiel dans la migration : Prisma ne sait pas exprimer la clause `WHERE`.
+  // Voir `client_creation_requests_pending_phone_key`.
+  @@index([status, createdAt])
+  @@index([requestedById])
+  @@index([phoneE164])
+  // L'écran d'arbitrage filtre par banque demandeuse, et la purge des banques
+  // doit pouvoir vérifier la clé étrangère sans parcourir toute la table.
+  @@index([banqueId])
+  @@index([isDemo])
+  @@map("client_creation_requests")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Banque & Finance
 // ═════════════════════════════════════════════════════════════════════════════
 
-// Étapes du workflow, configurables par l'ADMIN — mais seulement les étapes
+// Étapes du workflow, configurables par l'ADMIN : mais seulement les étapes
 // OPEN intermédiaires. Les trois étapes système (initiale, encaissé, rejeté)
 // portent des règles financières fixes et ne peuvent être ni supprimées ni
 // désactivées.
@@ -793,7 +1087,7 @@ model BankCase {
   /// suppression : les lignes de démo coexistent en permanence avec les vraies,
   /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
   /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
-  /// export réel — elle est invisible dès que le mode est éteint.
+  /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
   @@index([currentStageId])
@@ -841,7 +1135,7 @@ model BankCaseTransition {
   /// suppression : les lignes de démo coexistent en permanence avec les vraies,
   /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
   /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
-  /// export réel — elle est invisible dès que le mode est éteint.
+  /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
   @@index([caseId, createdAt])
@@ -873,8 +1167,8 @@ model AppSetting {
 /// C'est la pièce qui rend l'interrupteur sûr. Désactiver le mode démo supprime
 /// précisément les identifiants listés ici, et rien d'autre.
 ///
-/// L'alternative — supprimer par heuristique, « tout ce dont le nom commence
-/// par Démo » ou « tout ce qui a été créé après telle date » — est à proscrire :
+/// L'alternative : supprimer par heuristique, « tout ce dont le nom commence
+/// par Démo » ou « tout ce qui a été créé après telle date » : est à proscrire :
 /// le jour où un vrai commercial saisit un prospect pendant une démonstration,
 /// l'heuristique l'efface, et personne ne comprend pourquoi la fiche a disparu.
 ///
@@ -893,11 +1187,11 @@ model DemoEntity {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Notifications push
+// Notifications
 // ═════════════════════════════════════════════════════════════════════════════
 
-/// Nature du message. Sert au filtrage de la boîte de réception et au choix du
-/// canal Android (un rappel n'a pas à réveiller l'écran comme une annonce).
+/// Nature du message. Sert au filtrage de la boîte de réception et à la mise en
+/// avant côté client (un rappel ne se présente pas comme une annonce).
 enum NotificationCategory {
   ANNONCE
   RAPPEL
@@ -925,9 +1219,11 @@ enum NotificationStatus {
 
 /// Cycle de vie d'un envoi vers UN destinataire.
 ///
-/// `SENT` signifie « accepté par FCM », pas « affiché ». `DELIVERED` n'est
-/// atteignable que si l'appareil le confirme. La distinction compte : un taux
-/// de SENT à 100 % avec zéro READ décrit un problème, pas un succès.
+/// `SENT` signifie « e-mail accepté par Brevo », pas « lu ». `PENDING` n'est
+/// PAS un échec : le destinataire non servi par e-mail lit dans l'application,
+/// et une ligne en file peut aussi attendre un réessai après un incident
+/// passager. La distinction compte : un taux de SENT à 100 % avec zéro READ
+/// décrit un problème, pas un succès.
 enum NotificationDeliveryStatus {
   PENDING
   SENT
@@ -936,63 +1232,12 @@ enum NotificationDeliveryStatus {
   READ
 }
 
-enum DevicePlatform {
-  ANDROID
-  IOS
-  WEB
-}
-
-/// Jeton FCM d'un appareil.
-///
-/// `token` est unique SANS être rattaché durablement à un utilisateur : les
-/// téléphones se prêtent. À l'enregistrement, le jeton est DÉTACHÉ de son
-/// propriétaire précédent au lieu d'être dupliqué — sans quoi l'ancien
-/// utilisateur continuerait de recevoir sur un appareil qui n'est plus le sien,
-/// ce qui est une fuite de données, pas une imperfection.
-model DeviceToken {
-  id     String @id @default(uuid(7))
-  userId String
-  user   User   @relation("DeviceTokenUser", fields: [userId], references: [id], onDelete: Cascade)
-
-  token      String         @unique
-  platform   DevicePlatform @default(ANDROID)
-  appVersion String?
-
-  lastSeenAt DateTime  @default(now())
-  // Non nul dès la déconnexion, ou dès que FCM répond UNREGISTERED. Un jeton
-  // mort le reste : le réessayer indéfiniment pollue les métriques d'échec.
-  revokedAt  DateTime?
-
-  /// Nombre d'écritures encore dans la file d'attente locale, RAPPORTÉ par
-  /// l'appareil à chaque enregistrement.
-  ///
-  /// Le serveur ne peut pas deviner ce que contient une file locale. La
-  /// solution paresseuse — « ce commercial n'a rien poussé depuis N jours » —
-  /// confond un téléphone en panne avec un commercial en congé, et réveille le
-  /// second toutes les nuits. Ici l'appareil déclare son propre retard : le
-  /// rappel ne part que s'il y a réellement quelque chose à synchroniser.
-  pendingOps   Int       @default(0)
-  /// Depuis quand la file est non vide. Remis à NULL dès qu'elle se vide.
-  pendingSince DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  /// Ligne appartenant au jeu de démonstration.
-  isDemo Boolean @default(false)
-
-  @@index([userId, revokedAt])
-  @@index([revokedAt])
-  @@index([isDemo])
-  @@map("device_tokens")
-}
-
 /// Gabarit réutilisable, éditable par l'ADMIN.
 ///
 /// Les variables sont écrites `{{nom}}` dans le titre comme dans le corps.
 /// `variables` documente celles que le gabarit attend : c'est ce que le
 /// compositeur web affiche à l'auteur. Une variable manquante à la substitution
-/// n'est pas une erreur fatale — le texte est rendu sans elle et le nom manquant
+/// n'est pas une erreur fatale : le texte est rendu sans elle et le nom manquant
 /// est remonté à l'appelant, parce qu'un rappel amputé vaut mieux qu'un rappel
 /// non envoyé.
 model NotificationTemplate {
@@ -1028,7 +1273,7 @@ model NotificationTemplate {
 /// `reminderKey` + `period` portent l'idempotence des rappels récurrents : le
 /// couple est unique, donc deux instances de l'API qui déclenchent le même
 /// rappel à la même minute produisent une insertion et un conflit, pas deux
-/// notifications. Les envois manuels laissent les deux à NULL — en PostgreSQL
+/// notifications. Les envois manuels laissent les deux à NULL : en PostgreSQL
 /// les NULL ne se heurtent jamais dans un index unique, ce qui laisse le
 /// compositeur libre de renvoyer deux fois le même texte.
 model Notification {
@@ -1040,8 +1285,7 @@ model Notification {
   /// Route applicative ouverte au tap, ex. `/phase2?phone=+221771234567`.
   /// Volontairement une route interne et non une URL : le mobile la donne
   /// telle quelle à go_router, sans jamais ouvrir de navigateur.
-  route   String?
-  payload Json?
+  route String?
 
   audience              NotificationAudience @default(ALL)
   audienceRole          Role?
@@ -1101,11 +1345,10 @@ model NotificationDelivery {
 
   status NotificationDeliveryStatus @default(PENDING)
 
-  /// Jeton effectivement visé. Conservé en texte et non en clé étrangère : le
-  /// jeton peut être élagué ensuite, l'historique de l'envoi ne doit pas
-  /// disparaître avec lui.
-  deviceToken String?
-  error       String?
+  /// Marqueur d'issue, jamais un statut : `INBOX_ONLY` quand le destinataire
+  /// n'est pas servi par e-mail, `EMAIL_RETRY` quand un échec passager laisse
+  /// la ligne en file, sinon le code d'erreur rendu par Brevo.
+  error String?
 
   sentAt      DateTime?
   deliveredAt DateTime?
