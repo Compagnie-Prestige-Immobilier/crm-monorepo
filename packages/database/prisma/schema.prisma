@@ -1311,6 +1311,20 @@ model Notification {
   reminderKey String?
   period      String?
 
+  /// IDENTITÉ DU DÉTENTEUR DU BAIL D'EXPÉDITION. `null` quand personne ne tient
+  /// l'envoi.
+  ///
+  /// `status = SENDING` + `updatedAt` disaient QU'UN processus travaillait, sans
+  /// jamais dire LEQUEL. Un bail sans identité de propriétaire n'en est pas un :
+  /// un expéditeur dont le bail avait expiré, repris entre-temps par un second,
+  /// se réveillait, renouvelait le bail DU SECOND en écrivant `SENDING`, et
+  /// continuait d'envoyer sur les mêmes livraisons. Les deux se croyaient seuls.
+  ///
+  /// Chaque prise écrit ici un jeton neuf, et toute écriture d'expédition porte
+  /// ce jeton dans son `where` : celui qui ne l'a plus n'écrit plus rien. C'est
+  /// la même forme que `outbox.claimToken` côté mobile, pour la même raison.
+  dispatchClaim String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
