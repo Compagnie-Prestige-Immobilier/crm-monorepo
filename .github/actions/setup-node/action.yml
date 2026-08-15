@@ -10,6 +10,12 @@ inputs:
     description: Lancer `pnpm install --frozen-lockfile`
     required: false
     default: 'true'
+  turbo-cache:
+    description: >-
+      Restaurer et enregistrer le cache turbo. À mettre à 'false' dans un job
+      dont la raison d'être est justement de tout re-dériver depuis les sources.
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -23,14 +29,57 @@ runs:
         node-version: 24.18.0
         cache: pnpm
 
-    # Cache Turbo local : une entrée doit correspondre exactement au commit.
-    # Les sorties incluent le build Prisma généré, qui peut changer sans que
-    # TypeScript voie un fichier source différent ; restaurer une ancienne
-    # entrée via `restore-keys` injecterait alors des types périmés.
-    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+    # ------------------------------------------------------------------------
+    # Cache Turbo local.
+    #
+    # La clé se terminait par `${{ github.sha }}` et n'avait AUCUN
+    # `restore-keys`. Or `actions/cache` ne restaure que sur correspondance
+    # exacte de la clé, et chaque poussée porte un SHA neuf : l'entrée était
+    # donc écrite à chaque exécution et relue à aucune. On payait l'envoi pour
+    # zéro réutilisation, alors que la réutilisation entre commits est
+    # exactement, et seulement, ce que turbo apporte.
+    #
+    # La justification retirée invoquait le client Prisma généré : une entrée
+    # restaurée par préfixe aurait pu injecter des types périmés. Vérifié sur
+    # turbo 2.10.5, ce n'est pas le cas, pour deux raisons indépendantes.
+    #
+    # 1. Turbo adresse ses entrées par empreinte de contenu. Le nom de fichier
+    #    dans `.turbo/cache` EST l'empreinte de la tâche : `<empreinte>.tar.zst`
+    #    accompagné d'un `<empreinte>-meta.json` dont le champ `hash` répète ce
+    #    nom. Une entrée qui ne correspond pas aux entrées de la tâche porte une
+    #    autre empreinte : elle n'est jamais consultée, donc jamais utilisée.
+    #    Restaurer un surensemble d'entrées ne peut pas faire choisir la
+    #    mauvaise, seulement en proposer davantage.
+    # 2. L'artefact incriminé n'est de toute façon pas dans ce cache.
+    #    `turbo run build --dry=json` donne `outputs: []` pour
+    #    `@crm/database#build`, et `cache: false` pour `@crm/database#db:generate` :
+    #    le `dist` dérivé de Prisma n'est jamais mis en cache par turbo.
+    #    Et l'empreinte d'une tâche intègre celle de ses dépendances : modifier
+    #    `packages/database/prisma/schema.prisma` change l'empreinte de
+    #    `db:generate`, et par propagation celle de `@crm/api#build`,
+    #    `@crm/web#build` et des deux tâches `generate` (constaté en comparant
+    #    deux `--dry=json` avant et après modification du schéma).
+    #
+    # Le motif de restauration partagé `turbo-<os>-` traverse aussi les jobs, à
+    # dessein : `node` et `sonar` lancent tous deux `test:coverage`, `node` et
+    # `contract` compilent tous deux @crm/database. Mêmes empreintes de tâche,
+    # donc une seule entrée doit les servir au lieu de cinq. Le segment
+    # `github.job` ne subsiste que dans la clé d'ÉCRITURE, pour que deux jobs de
+    # la même exécution n'écrivent pas la même clé, et comme premier motif de
+    # restauration parce que l'exécution précédente du même job est le voisin le
+    # plus proche.
+    #
+    # Chemin restreint à `.turbo/cache` : le reste de `.turbo` n'est que
+    # journaux et sockets du démon.
+    # ------------------------------------------------------------------------
+    - if: inputs.turbo-cache == 'true'
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
-        path: .turbo
+        path: .turbo/cache
         key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
+        restore-keys: |
+          turbo-${{ runner.os }}-${{ github.job }}-
+          turbo-${{ runner.os }}-
 
     - if: inputs.install == 'true'
       shell: bash

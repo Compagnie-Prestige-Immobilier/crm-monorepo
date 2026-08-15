@@ -104,7 +104,15 @@ jobs:
       SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
       SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
     steps:
+      # fetch-depth: 0 : le scanner lit le `git blame` pour décider ce qui est
+      # du « code nouveau », et c'est sur le code nouveau que porte la porte de
+      # qualité par défaut. Avec le clone superficiel de profondeur 1 il n'y a
+      # aucun blame : le scanner émet un WARN par fichier et l'attribution du
+      # code nouveau est dégradée. Seul ce job en a besoin ; un clone complet
+      # est plus lent et aucun autre job ne lit l'historique.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-node
       - run: pnpm db:generate
       - run: pnpm test:coverage
@@ -137,9 +145,29 @@ jobs:
         with:
           fetch-depth: 0
 
+      # ---------------------------------------------------------------------
+      # `turbo-cache: 'false'`, et c'est le seul job où on le désactive.
+      #
+      # Ce job ne demande à turbo qu'UNE chose : régénérer le contrat et les
+      # deux clients. Or la tâche `generate` de turbo.json déclare ses `inputs`
+      # nommément (openapi.json, openapi-config.yaml, openapitools.json,
+      # scripts/**, .openapi-generator-ignore), et `pubspec.lock` n'y figure
+      # pas. Un relèvement de version de json_serializable ou de build_runner
+      # côté Dart ne changerait donc PAS l'empreinte de `generate` : turbo
+      # restaurerait les `*.g.dart` de l'ancien générateur et le portillon
+      # anti-dérive passerait au vert sur du code que le générateur courant
+      # n'écrit plus. C'est exactement le vert-sur-artefact-périmé que ce job
+      # existe pour attraper.
+      #
+      # Le coût est nul : les seules tâches turbo lancées ici sont
+      # `@crm/database#build` (qui ne déclare aucun `outputs`, donc n'est pas
+      # mis en cache de toute façon) et cette génération, qui doit réellement
+      # s'exécuter pour que le portillon veuille dire quelque chose.
+      # ---------------------------------------------------------------------
       - uses: ./.github/actions/setup-node
         with:
           install: 'false'
+          turbo-cache: 'false'
 
       # openapi-generator 7.24.0 tourne sur la JVM.
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
@@ -148,11 +176,46 @@ jobs:
           java-version: '21'
 
       # build_runner produit les *.g.dart du client Dart.
+      # `cache: true` couvre DEUX caches dans cette version épinglée de
+      # l'action : le SDK Flutter, et `~/.pub-cache` (clé
+      # `flutter-pub-<os>-<canal>-<version>-<arch>` suffixée par
+      # `hashFiles('**/pubspec.lock')`). Inutile d'en ajouter un troisième
+      # à la main, il ferait doublon avec celui-là.
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        id: flutter
         with:
           flutter-version: 3.41.7
           channel: stable
           cache: true
+
+      # ---------------------------------------------------------------------
+      # État incrémental de build_runner pour le client Dart, ~28 Mo.
+      # `.dart_tool/build` contient `asset_graph.json` (l'empreinte de chaque
+      # entrée), `generated`, et surtout `entrypoint` : le script de build
+      # compilé, qui est la partie coûteuse d'une exécution à froid.
+      #
+      # `restore-keys` est sûr ici pour une raison DIFFÉRENTE de celle de
+      # turbo, et c'est ce qui permet de garder ce cache dans un job où le
+      # cache turbo est coupé : build_runner valide lui-même ce qu'il relit. Au
+      # chargement du graphe (build_runner_core, asset_graph/graph_loader.dart)
+      # il compare l'empreinte des phases de build, les versions de langage des
+      # paquets, les expériences activées et la version du SDK Dart ; au
+      # moindre écart il supprime le graphe ET les sorties, puis reconstruit
+      # tout. Un graphe illisible déclenche la même reconstruction complète.
+      # Une entrée périmée coûte donc au pire ce qu'aurait coûté l'absence de
+      # cache, jamais un artefact faux, y compris pour le relèvement de
+      # version Dart qui justifie la coupure du cache turbo juste au-dessus.
+      #
+      # Le préfixe de restauration s'arrête à l'empreinte de pubspec.lock et de
+      # build.yaml : un jeu de générateurs différent n'est jamais restauré,
+      # même si build_runner saurait le rejeter.
+      # ---------------------------------------------------------------------
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: packages/api-client-dart/.dart_tool/build
+          key: build-runner-dart-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('packages/api-client-dart/pubspec.lock', 'packages/api-client-dart/build.yaml') }}-${{ github.job }}-${{ github.sha }}
+          restore-keys: |
+            build-runner-dart-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('packages/api-client-dart/pubspec.lock', 'packages/api-client-dart/build.yaml') }}-
 
       # Le jar du générateur pèse 30 Mo. `generator-cli.storageDir` le place
       # dans l'arbre de travail (openapitools.json) précisément pour qu'il soit
@@ -286,11 +349,27 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
+      # `cache: true` couvre le SDK Flutter ET `~/.pub-cache` (voir le job
+      # `contract`), ce qui sert les deux `pub get` de ce job.
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        id: flutter
         with:
           flutter-version: 3.41.7
           channel: stable
           cache: true
+
+      # État incrémental de build_runner pour apps/mobile, ~21 Mo, dont ~17 Mo
+      # de script de build compilé (`entrypoint`). Même raisonnement de sûreté
+      # que pour le client Dart dans le job `contract` : build_runner rejette
+      # lui-même un graphe dont les phases, les versions de langage, les
+      # expériences ou le SDK Dart ne correspondent plus, et reconstruit tout.
+      # Le préfixe de restauration s'arrête donc à pubspec.lock + build.yaml.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: apps/mobile/.dart_tool/build
+          key: build-runner-mobile-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('apps/mobile/pubspec.lock', 'apps/mobile/build.yaml') }}-${{ github.job }}-${{ github.sha }}
+          restore-keys: |
+            build-runner-mobile-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('apps/mobile/pubspec.lock', 'apps/mobile/build.yaml') }}-
 
       - name: Client Dart généré — analyse
         working-directory: packages/api-client-dart
