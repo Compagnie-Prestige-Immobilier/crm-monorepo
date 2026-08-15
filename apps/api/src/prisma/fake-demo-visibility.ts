@@ -1,4 +1,6 @@
-import type { DemoVisibilityService } from './demo-visibility.service.js';
+import { ConflictException } from '@nestjs/common';
+
+import { DEMO_MODE_STATE_UNKNOWN, type DemoVisibilityService } from './demo-visibility.service.js';
 
 /**
  * Double d'essai de `DemoVisibilityService`.
@@ -16,7 +18,15 @@ export const fakeDemoVisibility = (enabled: boolean | 'unknown' = false): DemoVi
     // « pas éteint » pour la garde d'écriture, qui refuse dans le doute. Les
     // deux repliements sont opposés, et c'est précisément pourquoi le service
     // rend trois états et non un booléen.
+    //
+    // `enabledForWrite` LÈVE sur `unknown`, comme le vrai service : un double
+    // qui rendrait `false` laisserait passer verts les tests censés démontrer
+    // qu'une valeur écrite ne se devine pas.
     enabled: () => Promise.resolve(enabled === true),
+    enabledForWrite: () =>
+      enabled === 'unknown'
+        ? Promise.reject(new ConflictException({ code: DEMO_MODE_STATE_UNKNOWN }))
+        : Promise.resolve(enabled),
     state: () => Promise.resolve(enabled === 'unknown' ? 'unknown' : enabled ? 'on' : 'off'),
     invalidate: () => undefined,
   }) as unknown as DemoVisibilityService;
