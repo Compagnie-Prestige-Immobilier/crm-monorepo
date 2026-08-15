@@ -106,19 +106,58 @@ jobs:
       # quelques minutes à un job que personne n'attend. À reconsidérer une
       # fois ce job vu vert et sa marge disque réelle connue.
       #
-      # /usr/local/lib/android est volontairement ÉPARGNÉ : c'est le SDK
-      # Android dont dépendent à la fois `flutter build apk` et l'émulateur.
-      # Les `df -h` encadrants servent à lire, au prochain passage, ce que
-      # l'étape a réellement libéré.
+      # DEUX répertoires sont volontairement ÉPARGNÉS, et les toucher casserait
+      # le job plus sûrement que le manque de place :
+      #   /usr/local/lib/android     SDK Android, requis par `flutter build apk`
+      #                              ET par l'émulateur.
+      #   /opt/hostedtoolcache/Java* JDK, requis par Gradle. `flutter build apk`
+      #                              échoue sans lui, et rien dans ce job ne le
+      #                              réinstalle.
+      #
+      # Le reste de la liste est du contenu qu'aucune étape de ce job n'ouvre.
+      # Ordre de grandeur libéré sur l'image ubuntu-latest actuelle, mesuré par
+      # les `df -h` encadrants au prochain passage : dotnet ~1,6 Go, ghcup+ghc
+      # ~2,7 Go, swift ~1,9 Go, powershell ~1,2 Go, CodeQL ~5,4 Go, boost ~1 Go,
+      # miniconda ~0,7 Go, Azure CLI ~1 Go. Soit une quinzaine de gigas, sur un
+      # disque qui en offre une vingtaine de libres au départ.
+      #
+      # La quantité est le point faible du dispositif : elle n'est PAS vérifiée.
+      # Le seuil ci-dessous ne fait donc pas échouer l'étape, l'émulateur restant
+      # seul juge de ce qui lui suffit, mais il inscrit le chiffre en clair
+      # dans le journal. Si ce job échoue encore sur l'espace disque, la ligne
+      # d'annotation dit immédiatement s'il faut élargir cette liste ou chercher
+      # ailleurs, au lieu de relire « does not have enough disk space » une
+      # troisième fois sans la moindre mesure.
       # -----------------------------------------------------------------------
       - name: Récupérer de l'espace disque
         run: |
           set -uo pipefail
-          df -h /
-          sudo rm -rf /usr/share/dotnet /usr/share/swift /usr/local/.ghcup /opt/ghc \
-            /usr/local/share/powershell /opt/hostedtoolcache/CodeQL || true
+          echo "Avant :"; df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/share/swift \
+            /usr/local/.ghcup \
+            /opt/ghc \
+            /usr/local/share/powershell \
+            /usr/local/share/boost \
+            /usr/share/miniconda \
+            /opt/az \
+            /opt/hostedtoolcache/CodeQL \
+            /opt/hostedtoolcache/PyPy \
+            /opt/hostedtoolcache/Ruby \
+            /opt/hostedtoolcache/go || true
           docker image prune --all --force || true
-          df -h /
+          echo "Après :"; df -h /
+          # Le repli à 999 vaut « mesure indisponible » : mieux vaut ne rien
+          # annoncer qu'avertir à tort sur une valeur vide, qui ferait en plus
+          # râler `test` sur un opérande non entier.
+          libre=$(df --output=avail --block-size=1G / | tail -1 | tr -d ' ')
+          libre=${libre:-999}
+          echo "Espace libre sur / : ${libre} Go"
+          if [ "${libre}" -lt 12 ]; then
+            echo "::warning::Seulement ${libre} Go libres avant la création de l'AVD."
+            echo "::warning::En dessous de ~12 Go ce job retombe sur « not enough disk space »."
+          fi
 
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         id: flutter
