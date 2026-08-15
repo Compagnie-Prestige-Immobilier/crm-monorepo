@@ -33,7 +33,7 @@ export default async function TableauDeBordPage({
   // Le client SERVEUR est passé explicitement : il porte le jeton lu dans le
   // cookie `httpOnly`, que le client navigateur ne peut pas voir. Sans cet
   // argument, `src/lib/data/*` retomberait sur le client navigateur, dont
-  // l'URL de base est relative — donc invalide côté serveur.
+  // l'URL de base est relative : donc invalide côté serveur.
   const client = getServerApiClient();
 
   // QueryClient dédié à CETTE requête (voir lib/query-client.ts). Le préchargement

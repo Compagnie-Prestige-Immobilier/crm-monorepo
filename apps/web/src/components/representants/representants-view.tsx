@@ -1,14 +1,25 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeftIcon, ChevronRightIcon, SearchIcon, UsersRoundIcon } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  FileSpreadsheetIcon,
+  LoaderIcon,
+  PencilIcon,
+  PlusIcon,
+  UploadIcon,
+  UsersRoundIcon,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
 
-import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { useFileDownload } from '@/components/exports/download-button';
 import { QueryErrorState } from '@/components/query-error-state';
+import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
+import { RepresentantsFiltersBar } from '@/components/representants/representants-filters-bar';
+import { useRepresentantFilters } from '@/components/representants/use-representant-filters';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -18,49 +29,45 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { fetchReferenceData } from '@/lib/data/reference';
+import { fetchRepresentants } from '@/lib/data/representants';
 import {
-  DEFAULT_REPRESENTANT_FILTERS,
-  fetchRepresentants,
-  type RepresentantFilters,
-} from '@/lib/data/representants';
+  buildRepresentantsExportUrl,
+  representantsExportFileName,
+} from '@/lib/data/representants-import';
 import { formatDate, formatNumber, formatPhone } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
+import { countActiveRepresentantFilters } from '@/lib/representant-filters';
+import type { RepresentantRow } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 /**
- * Représentants — les personnes rencontrées sur le terrain qui remettent les
+ * Représentants : les personnes rencontrées sur le terrain qui remettent les
  * listes de prospects.
  *
- * L'écran est en LECTURE. Une fiche de représentant naît sur le mobile, pendant
- * une tournée, et le numéro de téléphone y sert de clé de déduplication : le
- * laisser modifier depuis le siège, sans le terrain au bout du fil, casserait
- * le rattachement des prospects déjà saisis. La colonne « Prospects » est donc
- * l'information centrale — c'est elle qui dit si une fiche compte.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * L'écran n'est plus en lecture seule, et la nuance compte.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Une fiche naît normalement sur le mobile, en tournée, face à la personne : le
+ * numéro de téléphone sert de clé de déduplication, et il se vérifie de vive
+ * voix. Cela reste le parcours principal. Mais il n'existait AUCUNE issue pour
+ * l'exception : corriger une faute depuis le siège, saisir une fiche remontée
+ * par téléphone, ou reprendre les milliers de lignes d'un partenaire. Le
+ * dialogue de saisie et l'import de masse couvrent ces cas-là, avec le même
+ * contrôle d'unicité qu'au mobile.
+ *
+ * La colonne « Prospects » reste l'information centrale : c'est elle qui dit si
+ * une fiche compte.
+ *
+ * Les critères vivent dans l'URL (`useRepresentantFilters`), comme sur les
+ * prospects et les dossiers : « les représentants de Ziguinchor sans aucun
+ * prospect » est un lien, pas un état perdu au rechargement. L'export part
+ * exactement de ces critères.
  */
 export function RepresentantsView() {
-  const searchId = useId();
-
-  const [searchDraft, setSearchDraft] = useState('');
-  const [filters, setFilters] = useState<RepresentantFilters>(DEFAULT_REPRESENTANT_FILTERS);
-
-  // Recherche appliquée après une pause de frappe : une requête par caractère
-  // saturerait l'API sans rien apporter.
-  useEffect(() => {
-    if (searchDraft === filters.search) return;
-    const timer = setTimeout(() => {
-      setFilters((current) => ({ ...current, search: searchDraft, page: 1 }));
-    }, 350);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [searchDraft, filters.search]);
-
-  const { data: reference } = useQuery({
-    queryKey: queryKeys.reference,
-    queryFn: () => fetchReferenceData(),
-    staleTime: 5 * 60_000,
-  });
+  const { filters, setFilters } = useRepresentantFilters();
+  const exporter = useFileDownload();
+  const [editing, setEditing] = useState<{ representant: RepresentantRow | null } | null>(null);
 
   const { data, isPending, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.representants(filters),
@@ -73,92 +80,60 @@ export function RepresentantsView() {
   const pageCount = data?.pageCount ?? 1;
   const first = total === 0 ? 0 : (page - 1) * filters.pageSize + 1;
   const last = Math.min(page * filters.pageSize, total);
+  const activeFilterCount = countActiveRepresentantFilters(filters);
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-        Personnes qui remettent les listes de prospects. Fiches créées depuis l’application mobile,
-        en consultation seule ici.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
+          Personnes qui remettent les listes de prospects. Les fiches naissent en tournée, sur
+          l’application mobile ; la saisie et l’import ci-contre couvrent les exceptions.
+        </p>
 
-      <section
-        aria-label="Filtres"
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm"
-      >
-        <div className="flex min-w-[16rem] flex-1 flex-col gap-1.5">
-          <Label htmlFor={searchId}>Recherche</Label>
-          <div className="relative">
-            <SearchIcon
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <Input
-              id={searchId}
-              type="search"
-              value={searchDraft}
-              onChange={(event) => {
-                setSearchDraft(event.target.value);
-              }}
-              placeholder="Nom ou téléphone…"
-              className="pl-9"
-            />
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            onClick={() => {
+              setEditing({ representant: null });
+            }}
+          >
+            <PlusIcon aria-hidden="true" />
+            Nouveau représentant
+          </Button>
+
+          <Button asChild variant="outline">
+            <Link href="/representants/import">
+              <UploadIcon aria-hidden="true" />
+              Import Excel
+            </Link>
+          </Button>
+
+          {/* L'export part des filtres de l'URL, pas de la page affichée :
+              celui qui envoie le fichier doit pouvoir jurer qu'il contient ce
+              qu'il avait sous les yeux. */}
+          <Button
+            type="button"
+            variant="outline"
+            disabled={exporter.pending || total === 0}
+            onClick={() => {
+              void exporter.download({
+                url: buildRepresentantsExportUrl(filters),
+                fileName: representantsExportFileName(),
+                failureMessage: 'L’export n’a pas pu être généré.',
+              });
+            }}
+          >
+            {exporter.pending ? (
+              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <FileSpreadsheetIcon aria-hidden="true" />
+            )}
+            Exporter
+          </Button>
         </div>
+      </div>
 
-        <FilterCombobox
-          label="Département"
-          placeholder="Tous les départements"
-          value={filters.departementId}
-          options={(reference?.departements ?? []).map((departement) => ({
-            value: departement.id,
-            label: departement.name,
-          }))}
-          onChange={(value) => {
-            setFilters((current) => ({
-              ...current,
-              departementId: value,
-              // L'IEF choisie n'appartient qu'à un département : la garder après
-              // un changement de département donnerait une liste vide sans que
-              // rien à l'écran n'explique pourquoi.
-              iefId: null,
-              page: 1,
-            }));
-          }}
-        />
-
-        <FilterCombobox
-          label="IEF"
-          placeholder="Toutes les IEF"
-          value={filters.iefId}
-          options={(reference?.iefs ?? [])
-            // Restreintes au département choisi. Proposer les 59 IEF du pays
-            // alors que le département est déjà filtré ferait chercher dans
-            // cinquante-huit entrées hors sujet.
-            .filter((ief) =>
-              filters.departementId === null ? true : ief.departementId === filters.departementId,
-            )
-            .map((ief) => ({
-              value: ief.id,
-              label: ief.name,
-              // Le département en indice : « Bignona 1 » et « Bignona 2 » ne se
-              // distinguent que par lui, et quatre IEF partagent Dakar.
-              hint: ief.departementName,
-            }))}
-          onChange={(value) => {
-            setFilters((current) => ({ ...current, iefId: value, page: 1 }));
-          }}
-        />
-
-        <FilterCombobox
-          label="Téléconseiller"
-          placeholder="Tous les téléconseillers"
-          value={filters.commercialId}
-          options={reference?.commerciaux ?? []}
-          onChange={(value) => {
-            setFilters((current) => ({ ...current, commercialId: value, page: 1 }));
-          }}
-        />
-      </section>
+      <RepresentantsFiltersBar />
 
       {isPending ? (
         <TableSkeleton />
@@ -187,17 +162,40 @@ export function RepresentantsView() {
                 <TableHead>Saisi par</TableHead>
                 <TableHead className="text-right">Prospects</TableHead>
                 <TableHead>Première saisie</TableHead>
+                <TableHead className="w-24">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.items.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={7} className="py-16">
+                  <TableCell colSpan={8} className="py-16">
+                    {/*
+                      Deux vides, deux messages : et la distinction n'est pas
+                      cosmétique.
+
+                      Ce bloc disait toujours « Aucun représentant ne correspond
+                      à ces critères. Élargissez la recherche ou retirez un
+                      filtre. », y compris sans le moindre critère posé. Une
+                      installation neuve, ou un compte qui ouvre l'écran pour la
+                      première fois, se voyait donc renvoyé retirer des filtres
+                      qu'il n'avait jamais mis : il cherchait, ne trouvait rien à
+                      retirer, et concluait à une panne. Les campagnes, les
+                      dossiers et les demandes clients branchent déjà sur leur
+                      compteur de filtres actifs.
+                    */}
                     <div className="flex flex-col items-center gap-2 text-center">
                       <UsersRoundIcon className="size-8 text-muted-foreground" aria-hidden="true" />
-                      <p className="font-[600]">Aucun représentant ne correspond à ces critères.</p>
+                      <p className="font-[600]">
+                        {activeFilterCount === 0
+                          ? 'Aucun représentant enregistré.'
+                          : 'Aucun représentant ne correspond à ces critères.'}
+                      </p>
                       <p className="text-[0.8125rem] text-muted-foreground">
-                        Élargissez la recherche ou retirez un filtre.
+                        {activeFilterCount === 0
+                          ? 'Les fiches sont saisies en tournée depuis le mobile, ou créées ici, une par une ou par import d’un classeur.'
+                          : 'Élargissez la recherche ou retirez un filtre.'}
                       </p>
                     </div>
                   </TableCell>
@@ -211,10 +209,10 @@ export function RepresentantsView() {
                     </TableCell>
                     <TableCell>{representant.departementName}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {/* Un tiret cadratin, et non « — aucune » : les fiches
+                      {/* Un tiret cadratin, et non « : aucune » : les fiches
                           saisies avant l'arrivée du référentiel n'en portent
                           pas, et ce n'est pas une anomalie à commenter. */}
-                      {representant.iefName ?? '—'}
+                      {representant.iefName ?? '\u2014'}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {representant.createdByName}
@@ -224,6 +222,23 @@ export function RepresentantsView() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(representant.clientCreatedAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        // Le nom est DANS l'intitulé : « Modifier » répété sur
+                        // vingt-cinq lignes ne distingue rien pour qui parcourt
+                        // la page au lecteur d'écran.
+                        aria-label={`Modifier la fiche de ${representant.fullName}`}
+                        onClick={() => {
+                          setEditing({ representant });
+                        }}
+                      >
+                        <PencilIcon className="size-4" aria-hidden="true" />
+                        <span aria-hidden="true">Modifier</span>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -238,7 +253,7 @@ export function RepresentantsView() {
 
         Auparavant il vivait hors du ternaire d'état : pendant la première
         requête `total` vaut 0, et la région live annonçait donc « Aucun
-        résultat » par-dessus le squelette — puis de nouveau par-dessus la carte
+        résultat » par-dessus le squelette : puis de nouveau par-dessus la carte
         d'erreur, qu'elle contredisait. La pagination affichait « 1 / 1 » dans
         les deux cas.
       */}
@@ -248,7 +263,7 @@ export function RepresentantsView() {
           L'intitulé est DONNÉ EN TEXTE (`sr-only`), pas en `aria-label` :
           `aria-label` est interdit sur un `<p>` (rôle `paragraph`, liste « name
           prohibited » d'ARIA 1.2), et là où un lecteur d'écran l'honore quand
-          même, le nom REMPLACE le contenu annoncé — l'utilisateur entendrait
+          même, le nom REMPLACE le contenu annoncé : l'utilisateur entendrait
           l'intitulé au lieu du décompte. Le préfixe suffit à distinguer cette
           région de celle du Toaster. `role="status"` implique déjà
           `aria-live="polite"`.
@@ -267,7 +282,7 @@ export function RepresentantsView() {
               aria-label="Page précédente"
               disabled={page <= 1}
               onClick={() => {
-                setFilters((current) => ({ ...current, page: current.page - 1 }));
+                setFilters({ page: page - 1 });
               }}
             >
               <ChevronLeftIcon className="size-4" aria-hidden="true" />
@@ -281,7 +296,7 @@ export function RepresentantsView() {
               aria-label="Page suivante"
               disabled={page >= pageCount}
               onClick={() => {
-                setFilters((current) => ({ ...current, page: current.page + 1 }));
+                setFilters({ page: page + 1 });
               }}
             >
               <ChevronRightIcon className="size-4" aria-hidden="true" />
@@ -289,6 +304,14 @@ export function RepresentantsView() {
           </div>
         </div>
       )}
+
+      <RepresentantFormDialog
+        open={editing !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+        representant={editing?.representant ?? null}
+      />
     </div>
   );
 }

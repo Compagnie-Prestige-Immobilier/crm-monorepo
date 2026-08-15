@@ -13,7 +13,7 @@ import {
 /**
  * Source unique de l'état de filtre de Banque & Finance : l'URL.
  *
- * Trois consommateurs lisent ce même objet — la liste, le tableau de bord et
+ * Trois consommateurs lisent ce même objet : la liste, le tableau de bord et
  * l'export. Les tenir dans un état React local obligerait à les synchroniser à
  * trois, et il suffirait d'un oubli pour qu'un classeur ne corresponde plus à
  * l'écran depuis lequel il a été demandé.

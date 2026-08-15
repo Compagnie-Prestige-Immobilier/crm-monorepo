@@ -16,12 +16,12 @@ import type {
 } from '@/lib/types';
 
 /**
- * Banque & Finance — dossiers, étapes, motifs de rejet, agrégats.
+ * Banque & Finance : dossiers, étapes, motifs de rejet, agrégats.
  *
  * Deux invariants du contrat sont respectés ici sans exception :
  *
  *  1. TOUT montant reste une chaîne. Aucune fonction de ce module ne fait
- *     `Number(amountXof)` — voir `lib/money.ts` pour ce que coûterait l'inverse.
+ *     `Number(amountXof)` : voir `lib/money.ts` pour ce que coûterait l'inverse.
  *  2. Toute écriture porte `expectedRev`. L'API répond 409 si le dossier a
  *     bougé entre-temps, et c'est ce qui empêche deux agents de faire avancer
  *     le même dossier de deux étapes en croyant chacun l'avoir avancé d'une.
@@ -86,7 +86,7 @@ export async function searchBankProspects(
   if (term.length < 2) return [];
   return unwrap(
     await client.GET('/api/v1/bank-cases/prospect-search', {
-      params: { query: { q: term, pageSize: 20 } },
+      params: { query: { search: term, pageSize: 20 } },
     }),
   ).items;
 }
@@ -220,8 +220,8 @@ export async function updateBankStage(
 }
 
 /**
- * Réordonnancement. L'API attend la liste COMPLÈTE des étapes ouvertes —
- * actives comme inactives — l'initiale en tête. Envoyer une liste partielle
+ * Réordonnancement. L'API attend la liste COMPLÈTE des étapes ouvertes -
+ * actives comme inactives : l'initiale en tête. Envoyer une liste partielle
  * renvoie `BANK_STAGE_REORDER_INCOMPLETE`.
  */
 export async function reorderBankStages(
@@ -255,7 +255,7 @@ export function activeOpenStages(stages: readonly BankCaseStage[]): BankCaseStag
   return stages.filter((stage) => stage.isActive && stage.type === 'OPEN').sort(byPosition);
 }
 
-/** Toutes les étapes ouvertes, actives ou non — l'ordre que `reorder` attend. */
+/** Toutes les étapes ouvertes, actives ou non : l'ordre que `reorder` attend. */
 export function allOpenStages(stages: readonly BankCaseStage[]): BankCaseStage[] {
   return stages.filter((stage) => stage.type === 'OPEN').sort(byPosition);
 }
@@ -272,7 +272,7 @@ export function stageOfType(
 }
 
 /**
- * Étape ouverte suivante — reproduction EXACTE de `nextOpenStage` côté API.
+ * Étape ouverte suivante : reproduction EXACTE de `nextOpenStage` côté API.
  *
  * Fondée sur la position, pas sur un chaînage stocké : une étape désactivée est
  * sautée, et les dossiers qui y stationnent repartent vers la suivante encore

@@ -22,7 +22,7 @@ const NB = '\u202f';
  * Le franc CFA voyage en CHAÎNE, du serveur à l'écran.
  *
  * La colonne est un `Decimal(18,0)`. `Number.MAX_SAFE_INTEGER` s'arrête à
- * 9 007 199 254 740 991 — seize chiffres. Un `Number(montant)` sur un
+ * 9 007 199 254 740 991 : seize chiffres. Un `Number(montant)` sur un
  * portefeuille consolidé perd donc des unités SANS lever la moindre erreur, et
  * le total affiché diverge de celui du classeur Excel. Ces tests fixent le
  * fait qu'aucune conversion flottante n'a lieu sur le chemin d'affichage.
@@ -35,7 +35,7 @@ describe('formatXof', () => {
 
   it('formate un montant qui dépasse la précision d’un nombre JSON', () => {
     // 18 chiffres : la borne exacte de la colonne. `Number('999999999999999999')`
-    // vaut 1e18 — soit une unité de plus que la réalité, silencieusement.
+    // vaut 1e18 : soit une unité de plus que la réalité, silencieusement.
     const huge = '999999999999999999';
     expect(formatXof(huge)).toBe(`999${NB}999${NB}999${NB}999${NB}999${NB}999 FCFA`);
     // La preuve du danger, écrite noir sur blanc : la voie flottante ment.

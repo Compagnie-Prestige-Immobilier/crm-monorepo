@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
-import { PROSPECT_STATUTS, type ProspectStatut } from '@/lib/types';
+import { PROSPECT_STATUTS } from '@/lib/types';
 
 /**
  * Schémas partagés entre le formulaire client et le Route Handler.
  *
  * Une seule définition : le message d'erreur affiché sous le champ est
  * littéralement celui que le serveur appliquerait. Les bornes (longueurs
- * minimales, tailles maximales) reprennent celles de `apps/api/openapi.json` —
+ * minimales, tailles maximales) reprennent celles de `apps/api/openapi.json` -
  * un formulaire plus permissif que l'API produit un 400 illisible au lieu d'un
  * message sous le champ fautif.
  */
@@ -57,8 +57,8 @@ const userBaseSchema = z.object({
 /**
  * Un seul schéma pour la création ET la modification, paramétré par le mode.
  *
- * La forme de sortie est identique dans les deux cas — `password` reste une
- * chaîne, vide en modification — pour que `react-hook-form` n'ait qu'un seul
+ * La forme de sortie est identique dans les deux cas : `password` reste une
+ * chaîne, vide en modification : pour que `react-hook-form` n'ait qu'un seul
  * type de valeurs. Deux schémas de formes différentes obligeraient à typer le
  * formulaire en union, et `handleSubmit` ne saurait plus quoi passer.
  */
@@ -122,7 +122,10 @@ export const prospectSchema = z.object({
   banqueId: z.string().trim().min(1, 'La banque est obligatoire.'),
   syndicatId: z.string().trim().min(1, 'Le syndicat est obligatoire.'),
   representantId: z.string().trim().min(1, 'Le représentant est obligatoire.'),
-  statut: z.enum(PROSPECT_STATUTS as [ProspectStatut, ...ProspectStatut[]]),
+  // `PROSPECT_STATUTS` est maintenant un tuple littéral figé (`as const
+  // satisfies`) : `z.enum` le consomme directement, sans la conversion vers un
+  // tuple mutable qu'exigeait l'ancienne annotation `readonly ProspectStatut[]`.
+  statut: z.enum(PROSPECT_STATUTS),
 });
 export type ProspectFormInput = z.infer<typeof prospectSchema>;
 

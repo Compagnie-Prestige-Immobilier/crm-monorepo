@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canSubmitDisable,
+  DEMO_SEEDED_KINDS,
   canSubmitEnable,
   demoBreakdown,
+  demoBannerState,
   demoControl,
   seededAtOrNull,
   totalDemoRows,
@@ -31,6 +33,11 @@ const COUNTS: DemoCounts = {
   bankCaseTransitions: 96,
 };
 
+/** Tous les compteurs à un : la seule façon de comparer les DEUX listes. */
+const COUNTS_ALL: DemoCounts = Object.fromEntries(
+  Object.keys(COUNTS).map((key) => [key, 1]),
+) as unknown as DemoCounts;
+
 function status(overrides: Partial<DemoStatus> = {}): DemoStatus {
   return {
     enabled: true,
@@ -50,7 +57,7 @@ describe('la désactivation ne part JAMAIS par accident', () => {
 
   it('bloque le second clic pendant que le premier court', () => {
     // Sans ce verrou, un double-clic envoie deux suppressions : la seconde ne
-    // détruit rien de plus — l'API ne supprime que ce qu'elle a enregistré —
+    // détruit rien de plus : l'API ne supprime que ce qu'elle a enregistré -
     // mais affiche une erreur au moment où la première vient de réussir.
     expect(canSubmitDisable({ status: status(), confirmed: true, pending: true })).toBe(false);
   });
@@ -131,8 +138,8 @@ describe('ce que la confirmation annonce', () => {
 
 describe('seededAtOrNull', () => {
   it('traite la chaîne vide comme une absence de date', () => {
-    // Constaté sur la pile de développement : l'API renvoie `seededAt: ""` —
-    // et non `null` — quand le mode n'a jamais été activé. Passée à `parseISO`,
+    // Constaté sur la pile de développement : l'API renvoie `seededAt: ""` -
+    // et non `null` : quand le mode n'a jamais été activé. Passée à `parseISO`,
     // cette chaîne produit `Invalid Date`, puis un plantage de rendu dans
     // `date-fns/format`.
     expect(seededAtOrNull({ seededAt: '' })).toBeNull();
@@ -144,5 +151,55 @@ describe('seededAtOrNull', () => {
     expect(seededAtOrNull({ seededAt: '2026-08-12T09:00:00.000Z' })).toBe(
       '2026-08-12T09:00:00.000Z',
     );
+  });
+});
+
+describe('demoBannerState', () => {
+  /**
+   * Le bandeau ne dépend PAS du rôle.
+   *
+   * Le layout du panel n'interrogeait l'état que pour un ADMIN : un agent
+   * BANQUE_FINANCE, qui a pourtant `/dossiers/export` dans sa barre latérale,
+   * ne voyait jamais l'avertissement et pouvait envoyer des chiffres fictifs à
+   * sa direction. L'état affiché ne se lit donc que dans la réponse, et la
+   * fonction n'a plus de paramètre de rôle à oublier.
+   */
+  it('n’affiche le bandeau que si le mode est ACTIF', () => {
+    expect(demoBannerState(status({ enabled: true })).enabled).toBe(true);
+    expect(demoBannerState(status({ enabled: false })).enabled).toBe(false);
+  });
+
+  it('normalise la date d’ensemencement, chaîne vide comprise', () => {
+    // L'API renvoie `seededAt: ""` quand le mode n'a jamais été activé : passée
+    // telle quelle à `formatDate`, elle plante le rendu du bandeau.
+    expect(demoBannerState(status({ seededAt: '' })).seededAt).toBeNull();
+    expect(demoBannerState(status({ seededAt: '2026-08-12T09:00:00.000Z' })).seededAt).toBe(
+      '2026-08-12T09:00:00.000Z',
+    );
+  });
+});
+
+describe('les deux confirmations décrivent le MÊME jeu de données', () => {
+  /**
+   * L'activation annonce ce qui va être créé ; la désactivation rechiffre ce
+   * qui va être supprimé. Deux listes divergentes feraient croire qu'on
+   * installe une chose et qu'on en retire une autre : l'administrateur
+   * n'oserait plus retirer, et le jeu de démonstration resterait en place, mêlé
+   * aux vraies données. C'est exactement l'accident que tout ce module vise.
+   */
+  it('n’annonce à l’activation que des natures que la suppression sait rendre', () => {
+    const removable = new Set(demoBreakdown(COUNTS_ALL).map((row) => row.label));
+    for (const kind of DEMO_SEEDED_KINDS) {
+      expect(removable, `« ${kind} » est annoncé mais jamais rechiffré`).toContain(kind);
+    }
+  });
+
+  it('ne rechiffre à la suppression aucune nature non annoncée', () => {
+    const announced = new Set<string>(DEMO_SEEDED_KINDS);
+    for (const row of demoBreakdown(COUNTS_ALL)) {
+      expect(announced, `« ${row.label} » est supprimé sans avoir été annoncé`).toContain(
+        row.label,
+      );
+    }
   });
 });

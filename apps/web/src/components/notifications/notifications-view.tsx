@@ -1,11 +1,22 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BellIcon, BellOffIcon, LoaderIcon, PlusIcon, XIcon } from 'lucide-react';
+import {
+  BellIcon,
+  BellOffIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  LoaderIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  XIcon,
+} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/empty-state';
+import { InboxView } from '@/components/notifications/inbox-view';
+import { useNotificationFilters } from '@/components/notifications/use-notification-filters';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,9 +24,18 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -27,15 +47,16 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toastApiError } from '@/lib/mutation-feedback';
+import {
+  countActiveNotificationFilters,
+  NOTIFICATION_CATEGORIES,
+  NOTIFICATION_PAGE_SIZE,
+  NOTIFICATION_STATUSES,
+  type NotificationTab,
+} from '@/lib/notification-filters';
 import { cn } from '@/lib/utils';
 import { describeAudience } from './audience';
-import {
-  DEFAULT_NOTIFICATION_FILTERS,
-  cancelNotification,
-  fetchNotification,
-  fetchNotifications,
-  notificationKeys,
-} from './api';
+import { cancelNotification, fetchNotification, fetchNotifications, notificationKeys } from './api';
 import { NotificationComposer } from './notification-composer';
 import { TemplateManager } from './template-manager';
 import {
@@ -43,6 +64,7 @@ import {
   DELIVERY_LABELS,
   ROLE_LABELS,
   STATUS_LABELS,
+  type NotificationCategory,
   type NotificationDeliveryStatus,
   type NotificationRow,
   type NotificationStatus,
@@ -69,172 +91,376 @@ const DELIVERY_VARIANT: Record<
   READ: 'success',
 };
 
+/** « Tous » porte une valeur explicite : un `Select` n'accepte pas `''`. */
+const ALL = 'tous';
+
 const dateTime = (value: string | null): string =>
   value === null ? '–' : new Date(value).toLocaleString('fr-SN');
 
-export function NotificationsView() {
+/**
+ * Écran Notifications : RECEVOIR et ÉMETTRE, dans le même endroit.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Trois défauts sont corrigés ici, et tous les trois cachaient de la donnée.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 1. **L'onglet vit dans l'URL.** Il vivait dans un `useState` : recharger la
+ *    page ramenait sur l'historique, et « regarde l'onglet Gabarits » n'était
+ *    pas un lien qu'on colle. Les campagnes utilisent une route par onglet, les
+ *    statistiques un paramètre ; ici le paramètre suffit.
+ * 2. **L'historique se pagine et se filtre.** Il était figé sur
+ *    `{ page: 1, pageSize: 20 }`, sans aucun contrôle à l'écran, alors que
+ *    l'API expose `page`, `status` et `category`. La vingt-et-unième
+ *    notification envoyée devenait inatteignable.
+ * 3. **La boîte de réception existe.** Elle est le premier onglet, ouverte à
+ *    tous les rôles : c'est l'écran complet vers lequel la cloche prétendait
+ *    renvoyer.
+ */
+export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
   const queryClient = useQueryClient();
+  const { filters, setFilters } = useNotificationFilters(isAdmin);
   const [composerOpen, setComposerOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  /**
+   * L'envoi programmé qu'on est sur le point d'ANNULER.
+   *
+   * L'annulation partait auparavant d'un clic unique, sur un bouton nommé
+   * « Annuler » : le même mot que le bouton de fermeture de chaque boîte de
+   * dialogue du produit. Un envoi préparé pour quatre cents personnes
+   * disparaissait donc sur un geste qui, partout ailleurs, ne fait que refermer
+   * une fenêtre.
+   */
+  const [cancelling, setCancelling] = useState<NotificationRow | null>(null);
+
+  const listQuery = {
+    page: filters.page,
+    pageSize: NOTIFICATION_PAGE_SIZE,
+    ...(filters.status === null ? {} : { status: filters.status }),
+    ...(filters.category === null ? {} : { category: filters.category }),
+  };
 
   const list = useQuery({
-    queryKey: notificationKeys.list(DEFAULT_NOTIFICATION_FILTERS),
-    queryFn: () => fetchNotifications(DEFAULT_NOTIFICATION_FILTERS),
+    queryKey: notificationKeys.list(listQuery),
+    queryFn: () => fetchNotifications(listQuery),
     placeholderData: (previous) => previous,
+    enabled: isAdmin && filters.tab === 'historique',
   });
 
   const cancel = useMutation({
     mutationFn: (id: string) => cancelNotification(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.root });
-      toast.success('Notification annulée.');
+      setCancelling(null);
+      toast.success('Envoi annulé.');
     },
     onError: (error) => {
       toastApiError(error, 'L’annulation a échoué.');
     },
   });
 
+  const activeFilterCount = countActiveNotificationFilters(filters);
+  const meta = list.data?.meta;
+
   return (
     <div className="flex flex-col gap-6">
-      <Tabs defaultValue="historique">
+      <Tabs
+        value={filters.tab}
+        onValueChange={(value) => {
+          setFilters({ tab: value as NotificationTab });
+        }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <TabsList>
-            <TabsTrigger value="historique">Historique</TabsTrigger>
-            <TabsTrigger value="gabarits">Gabarits</TabsTrigger>
+            <TabsTrigger value="reception">Boîte de réception</TabsTrigger>
+            {isAdmin ? <TabsTrigger value="historique">Historique</TabsTrigger> : null}
+            {isAdmin ? <TabsTrigger value="gabarits">Gabarits</TabsTrigger> : null}
           </TabsList>
-          <Button
-            type="button"
-            onClick={() => {
-              setComposerOpen(true);
-            }}
-          >
-            <PlusIcon aria-hidden="true" />
-            Nouvelle notification
-          </Button>
+          {isAdmin ? (
+            <Button
+              type="button"
+              onClick={() => {
+                setComposerOpen(true);
+              }}
+            >
+              <PlusIcon aria-hidden="true" />
+              Nouvelle notification
+            </Button>
+          ) : null}
         </div>
 
-        <TabsContent value="historique" className="mt-4">
-          {list.isPending ? (
-            <TableSkeleton />
-          ) : list.isError ? (
-            <QueryErrorState
-              error={list.error}
-              onRetry={() => {
-                void list.refetch();
-              }}
-              fallback="L’historique des notifications n’a pas pu être chargé."
-            />
-          ) : list.data.items.length === 0 ? (
-            <EmptyState
-              icon={BellOffIcon}
-              title="Aucune notification envoyée"
-              description="Les envois apparaissent ici."
-              action={
-                <Button
-                  type="button"
-                  className="mt-1"
-                  onClick={() => {
-                    setComposerOpen(true);
+        <TabsContent value="reception" className="mt-4">
+          <InboxView
+            page={filters.inboxPage}
+            unreadOnly={filters.unreadOnly}
+            onPageChange={(page) => {
+              setFilters({ inboxPage: page });
+            }}
+            onUnreadOnlyChange={(unreadOnly) => {
+              setFilters({ unreadOnly });
+            }}
+          />
+        </TabsContent>
+
+        {isAdmin ? (
+          <TabsContent value="historique" className="mt-4 flex flex-col gap-4">
+            {/* Les critères que l'API expose depuis le début, et que l'écran
+                n'offrait pas : sans eux, retrouver « le rappel de campagne de
+                mardi » se faisait à l'œil sur une seule page de vingt. */}
+            <section
+              aria-label="Filtres des envois"
+              className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm"
+            >
+              <div className="flex w-48 flex-col gap-1.5">
+                <Label htmlFor="statut-envoi">État</Label>
+                <Select
+                  value={filters.status ?? ALL}
+                  onValueChange={(value) => {
+                    setFilters({ status: value === ALL ? null : (value as NotificationStatus) });
                   }}
                 >
-                  <PlusIcon aria-hidden="true" />
-                  Composer la première
-                </Button>
-              }
-            />
-          ) : (
-            <div
-              className={cn(
-                'overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity',
-                list.isFetching && 'opacity-80',
-              )}
-            >
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Notification</TableHead>
-                    <TableHead>Destinataires</TableHead>
-                    <TableHead>État</TableHead>
-                    <TableHead>Livraison</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.data.items.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="max-w-xs">
-                        <button
-                          type="button"
-                          className="min-h-11 text-left"
-                          onClick={() => {
-                            setDetailId(row.id);
-                          }}
-                        >
-                          <span className="block font-[600]">{row.title}</span>
-                          <span className="block truncate text-[0.8125rem] text-muted-foreground">
-                            {row.body}
-                          </span>
-                        </button>
-                      </TableCell>
-                      <TableCell>
-                        <span className="block">{describeAudience(row)}</span>
-                        <span className="block text-[0.75rem] text-muted-foreground">
-                          {CATEGORY_LABELS[row.category]}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={STATUS_VARIANT[row.status]}>
-                          {STATUS_LABELS[row.status]}
-                        </Badge>
-                        {row.transportStatus === 'NOT_CONFIGURED' ? (
-                          <Badge variant="warning" className="mt-1 block w-fit">
-                            Aucun push remis
-                          </Badge>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>
-                        <DeliverySummary row={row} />
-                      </TableCell>
-                      <TableCell className="text-[0.8125rem] text-muted-foreground">
-                        {dateTime(row.sentAt ?? row.scheduledFor ?? row.createdAt)}
-                      </TableCell>
-                      <TableCell>
-                        {row.status === 'SCHEDULED' ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={cancel.isPending}
-                            onClick={() => {
-                              cancel.mutate(row.id);
-                            }}
-                          >
-                            {cancel.isPending ? (
-                              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                            ) : (
-                              <XIcon aria-hidden="true" />
-                            )}
-                            Annuler
-                          </Button>
-                        ) : null}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </TabsContent>
+                  <SelectTrigger id="statut-envoi">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Tous les états</SelectItem>
+                    {NOTIFICATION_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {STATUS_LABELS[status]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-        <TabsContent value="gabarits" className="mt-4">
-          <TemplateManager />
-        </TabsContent>
+              <div className="flex w-48 flex-col gap-1.5">
+                <Label htmlFor="categorie-envoi">Catégorie</Label>
+                <Select
+                  value={filters.category ?? ALL}
+                  onValueChange={(value) => {
+                    setFilters({
+                      category: value === ALL ? null : (value as NotificationCategory),
+                    });
+                  }}
+                >
+                  <SelectTrigger id="categorie-envoi">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Toutes les catégories</SelectItem>
+                    {NOTIFICATION_CATEGORIES.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {CATEGORY_LABELS[category]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {activeFilterCount > 0 ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setFilters({ status: null, category: null });
+                  }}
+                >
+                  <RotateCcwIcon aria-hidden="true" />
+                  Tout effacer
+                </Button>
+              ) : null}
+            </section>
+
+            {list.isPending ? (
+              <TableSkeleton />
+            ) : list.isError ? (
+              <QueryErrorState
+                error={list.error}
+                onRetry={() => {
+                  void list.refetch();
+                }}
+                fallback="L’historique des notifications n’a pas pu être chargé."
+              />
+            ) : list.data.items.length === 0 ? (
+              <EmptyState
+                icon={BellOffIcon}
+                title={
+                  activeFilterCount === 0
+                    ? 'Aucune notification envoyée'
+                    : 'Aucun envoi ne correspond à ces critères'
+                }
+                description={
+                  activeFilterCount === 0
+                    ? 'Les envois apparaissent ici.'
+                    : 'Changez d’état ou de catégorie.'
+                }
+                action={
+                  activeFilterCount === 0 ? (
+                    <Button
+                      type="button"
+                      className="mt-1"
+                      onClick={() => {
+                        setComposerOpen(true);
+                      }}
+                    >
+                      <PlusIcon aria-hidden="true" />
+                      Composer la première
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <>
+                <div
+                  className={cn(
+                    'overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity',
+                    list.isFetching && 'opacity-80',
+                  )}
+                >
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Notification</TableHead>
+                        <TableHead>Destinataires</TableHead>
+                        <TableHead>État</TableHead>
+                        <TableHead>Livraison</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>
+                          <span className="sr-only">Actions</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {list.data.items.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="max-w-xs">
+                            <button
+                              type="button"
+                              className="min-h-11 text-left"
+                              onClick={() => {
+                                setDetailId(row.id);
+                              }}
+                            >
+                              <span className="block font-[600]">{row.title}</span>
+                              <span className="block truncate text-[0.8125rem] text-muted-foreground">
+                                {row.body}
+                              </span>
+                            </button>
+                          </TableCell>
+                          <TableCell>
+                            <span className="block">{describeAudience(row)}</span>
+                            <span className="block text-[0.75rem] text-muted-foreground">
+                              {CATEGORY_LABELS[row.category]}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={STATUS_VARIANT[row.status]}>
+                              {STATUS_LABELS[row.status]}
+                            </Badge>
+                            {row.transportStatus === 'NOT_CONFIGURED' ? (
+                              <Badge variant="warning" className="mt-1 block w-fit">
+                                Aucun push remis
+                              </Badge>
+                            ) : null}
+                          </TableCell>
+                          <TableCell>
+                            <DeliverySummary row={row} />
+                          </TableCell>
+                          <TableCell className="text-[0.8125rem] text-muted-foreground">
+                            {dateTime(row.sentAt ?? row.scheduledFor ?? row.createdAt)}
+                          </TableCell>
+                          <TableCell>
+                            {row.status === 'SCHEDULED' ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                /* L'attente ne concerne QUE la ligne visée. Un
+                                   `cancel.isPending` nu grisait et faisait
+                                   tourner le bouton de toutes les lignes
+                                   programmées : l'écran donnait à croire que
+                                   plusieurs envois partaient à l'annulation. */
+                                disabled={cancel.isPending && cancel.variables === row.id}
+                                onClick={() => {
+                                  setCancelling(row);
+                                }}
+                              >
+                                {cancel.isPending && cancel.variables === row.id ? (
+                                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+                                ) : (
+                                  <XIcon aria-hidden="true" />
+                                )}
+                                Annuler l’envoi
+                              </Button>
+                            ) : null}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {meta === undefined ? null : (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-[0.8125rem] text-muted-foreground" role="status">
+                      <span className="sr-only">Envois affichés&nbsp;: </span>
+                      {meta.total} envoi{meta.total > 1 ? 's' : ''}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Page précédente"
+                        disabled={meta.page <= 1}
+                        onClick={() => {
+                          setFilters({ page: meta.page - 1 });
+                        }}
+                      >
+                        <ChevronLeftIcon className="size-4" aria-hidden="true" />
+                      </Button>
+                      <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
+                        {meta.page} / {Math.max(1, meta.pageCount)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Page suivante"
+                        disabled={meta.page >= meta.pageCount}
+                        onClick={() => {
+                          setFilters({ page: meta.page + 1 });
+                        }}
+                      >
+                        <ChevronRightIcon className="size-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+        ) : null}
+
+        {isAdmin ? (
+          <TabsContent value="gabarits" className="mt-4">
+            <TemplateManager />
+          </TabsContent>
+        ) : null}
       </Tabs>
 
-      <NotificationComposer open={composerOpen} onOpenChange={setComposerOpen} />
+      {isAdmin ? (
+        <>
+          <NotificationComposer open={composerOpen} onOpenChange={setComposerOpen} />
+          <CancelSendDialog
+            row={cancelling}
+            pending={cancel.isPending}
+            onOpenChange={(open) => {
+              if (!open) setCancelling(null);
+            }}
+            onConfirm={() => {
+              if (cancelling !== null) cancel.mutate(cancelling.id);
+            }}
+          />
+        </>
+      ) : null}
+
       <NotificationDetailDialog
         id={detailId}
         onClose={() => {
@@ -246,11 +472,77 @@ export function NotificationsView() {
 }
 
 /**
+ * Confirmation de l'annulation d'un envoi programmé.
+ *
+ * Un envoi programmé est un travail déjà fait : le texte a été rédigé, le public
+ * choisi, l'heure arrêtée. L'annuler ne se défait pas, et l'action portait le
+ * mot « Annuler », c'est-à-dire exactement le mot que porte le bouton de
+ * fermeture de chaque dialogue du produit. Le libellé est donc devenu
+ * « Annuler l'envoi », et un dialogue nomme la notification visée.
+ */
+function CancelSendDialog({
+  row,
+  pending,
+  onOpenChange,
+  onConfirm,
+}: {
+  row: NotificationRow | null;
+  pending: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog
+      open={row !== null}
+      onOpenChange={(open) => {
+        if (!open && pending) return;
+        onOpenChange(open);
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
+        {row === null ? null : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Annuler l’envoi «&nbsp;{row.title}&nbsp;» ?</DialogTitle>
+              <DialogDescription>
+                Programmé pour le {dateTime(row.scheduledFor)}. Il ne partira pas, et cela ne se
+                défait pas&nbsp;: il faudra le recomposer.
+              </DialogDescription>
+            </DialogHeader>
+
+            <p className="rounded-md border border-border bg-secondary px-3 py-2.5 text-[0.875rem]">
+              Destinataires prévus&nbsp;: <strong>{describeAudience(row)}</strong>.
+            </p>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => {
+                  onOpenChange(false);
+                }}
+              >
+                Revenir
+              </Button>
+              <Button type="button" variant="destructive" disabled={pending} onClick={onConfirm}>
+                {pending ? <LoaderIcon className="size-4 animate-spin" aria-hidden="true" /> : null}
+                Annuler l’envoi
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
  * Résumé de livraison.
  *
- * Les échecs et les non-remis sont montrés MÊME À ZÉRO... non : seulement quand
- * ils existent, mais toujours de façon distincte du total. Un « 340 envoyées »
- * sans mention des 60 échecs laisse croire à un envoi complet.
+ * Les échecs et les non-remis ne sont montrés que lorsqu'ils existent, mais
+ * toujours de façon distincte du total. Un « 340 envoyées » sans mention des 60
+ * échecs laisse croire à un envoi complet.
  */
 function DeliverySummary({ row }: { row: NotificationRow }) {
   const { counts } = row;

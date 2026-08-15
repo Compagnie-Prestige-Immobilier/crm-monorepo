@@ -10,7 +10,7 @@ import { getQueryClient } from '@/lib/query-client';
 
 /**
  * `getQueryClient()` renvoie ici l'instance NAVIGATEUR (singleton de module).
- * Le rendu serveur de ce composant appelle la variante mémorisée par requête —
+ * Le rendu serveur de ce composant appelle la variante mémorisée par requête -
  * voir `lib/query-client.ts` pour pourquoi la distinction n'est pas cosmétique.
  */
 export function Providers({ children }: { children: ReactNode }) {

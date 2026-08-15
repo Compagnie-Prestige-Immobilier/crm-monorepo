@@ -13,8 +13,8 @@ export function usePrefersReducedMotion(): boolean {
    *
    * Avec `useState(false)`, la préférence n'était connue qu'au premier effet.
    * Or React vide les effets passifs des ENFANTS D'ABORD : celui de
-   * `react-chartjs-2`, qui CONSTRUIT le graphique — et lance donc l'animation
-   * d'entrée de 220 ms —, s'exécutait avant celui qui passe `reduced` à `true`.
+   * `react-chartjs-2`, qui CONSTRUIT le graphique : et lance donc l'animation
+   * d'entrée de 220 ms , s'exécutait avant celui qui passe `reduced` à `true`.
    * Un utilisateur ayant demandé moins d'animation voyait malgré tout les six
    * graphiques du tableau de bord s'animer à chaque chargement ; seules les
    * mises à jour suivantes étaient immobiles.

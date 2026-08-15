@@ -29,7 +29,7 @@ export default async function globalSetup(): Promise<void> {
   }
 
   /**
-   * Un 429 prouve que l'API est VIVANTE — c'est son limiteur de débit qui
+   * Un 429 prouve que l'API est VIVANTE, c'est son limiteur de débit qui
    * répond, pas un serveur absent. Le traiter comme une panne faisait échouer
    * la suite entière alors que la seule chose à faire est d'attendre la
    * fenêtre suivante.

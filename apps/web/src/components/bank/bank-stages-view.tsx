@@ -7,8 +7,11 @@ import {
   ChevronUpIcon,
   LoaderIcon,
   LockIcon,
+  MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  PowerIcon,
+  PowerOffIcon,
 } from 'lucide-react';
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
@@ -26,6 +29,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -63,14 +73,14 @@ const COLOR_ROLES: readonly { value: string; label: string }[] = [
 ];
 
 /**
- * Configuration du flux bancaire — ADMIN.
+ * Configuration du flux bancaire : ADMIN.
  *
  * Le réordonnancement se fait à DEUX BOUTONS, « Monter » et « Descendre », et
  * non par glisser-déposer. Ce n'est pas une économie de bibliothèque : un
  * glisser-déposer est inutilisable au clavier sans une implémentation ARIA
  * complète, illisible pour un lecteur d'écran, et casse-tête au doigt sur une
  * tablette. Deux boutons sont atteignables à la tabulation, annoncés
- * correctement, et fonctionnent partout — pour une opération qu'un
+ * correctement, et fonctionnent partout : pour une opération qu'un
  * administrateur fait trois fois par an.
  *
  * Chaque déplacement envoie la liste COMPLÈTE des étapes ouvertes, l'initiale
@@ -202,29 +212,57 @@ export function BankStagesView() {
               const canMoveUp = index > 0 && !(initialLocked && (index === 1 || index === 0));
               const canMoveDown = index < open.length - 1 && !(initialLocked && index === 0);
 
+              const lockedLabel =
+                stage.isSystem || stage.isInitial
+                  ? 'Étape système ou initiale : désactivation impossible.'
+                  : undefined;
+              const toggleLabel = stage.isActive ? 'Désactiver' : 'Réactiver';
+              const toggle = (): void => {
+                if (stage.isActive) {
+                  setDeactivating(stage);
+                } else {
+                  toggleActive.mutate({ id: stage.id, isActive: true });
+                }
+              };
+
               return (
                 <li key={stage.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                  <span className="w-6 shrink-0 text-[0.8125rem] text-muted-foreground tabular-nums">
-                    {index + 1}
-                  </span>
+                  {/*
+                    `basis-full lg:basis-auto` sur la colonne libellé, et c'est
+                    le cœur du correctif.
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StageBadge stage={stage} />
-                      {stage.isInitial ? <Badge variant="outline">Étape initiale</Badge> : null}
-                      {stage.isSystem ? (
-                        <Badge variant="secondary" className="gap-1">
-                          <LockIcon aria-hidden="true" />
-                          Système
-                        </Badge>
-                      ) : null}
+                    Elle était en `min-w-0 flex-1`, donc `flex-basis: 0` : elle
+                    ne déclenchait JAMAIS le retour à la ligne de la ligne
+                    flexible, et se faisait écraser par le groupe d'actions
+                    (`shrink-0`, quatre contrôles, environ 200 px). Sous 360 px,
+                    le libellé passait sous les boutons. En base 100 %, la
+                    colonne prend sa ligne et les actions descendent sur la
+                    leur ; au-delà de `lg`, tout revient sur une seule ligne.
+                  */}
+                  <div className="flex min-w-0 basis-full items-center gap-3 lg:basis-auto lg:flex-1">
+                    <span className="w-6 shrink-0 text-[0.8125rem] text-muted-foreground tabular-nums">
+                      {index + 1}
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StageBadge stage={stage} />
+                        {stage.isInitial ? <Badge variant="outline">Étape initiale</Badge> : null}
+                        {stage.isSystem ? (
+                          <Badge variant="secondary" className="gap-1">
+                            <LockIcon aria-hidden="true" />
+                            Système
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 truncate text-[0.75rem] text-muted-foreground">
+                        Code {stage.code}
+                      </p>
                     </div>
-                    <p className="mt-0.5 truncate text-[0.75rem] text-muted-foreground">
-                      Code {stage.code}
-                    </p>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-1">
+                  {/* ─── Actions, à partir de 1024 px ─────────────────────── */}
+                  <div className="ml-auto hidden shrink-0 items-center gap-1 lg:flex">
                     <Button
                       type="button"
                       variant="outline"
@@ -268,21 +306,72 @@ export function BankStagesView() {
                       size="sm"
                       className="tap-target"
                       disabled={stage.isSystem || stage.isInitial || toggleActive.isPending}
-                      title={
-                        stage.isSystem || stage.isInitial
-                          ? 'Étape système ou initiale : désactivation impossible.'
-                          : undefined
-                      }
-                      onClick={() => {
-                        if (stage.isActive) {
-                          setDeactivating(stage);
-                        } else {
-                          toggleActive.mutate({ id: stage.id, isActive: true });
-                        }
-                      }}
+                      title={lockedLabel}
+                      onClick={toggle}
                     >
-                      {stage.isActive ? 'Désactiver' : 'Réactiver'}
+                      {toggleLabel}
                     </Button>
+                  </div>
+
+                  {/* ─── Actions, sous 1024 px ────────────────────────────────
+                      Les quatre contrôles tiennent dans un menu : quatre cibles
+                      de 44 px alignées demandent 200 px, largeur que l'écran
+                      n'a pas. Les libellés y sont ÉCRITS EN TOUTES LETTRES, ce
+                      que quatre pictogrammes ne disaient pas. */}
+                  <div className="ml-auto shrink-0 lg:hidden">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          aria-label={`Actions pour « ${stage.label} »`}
+                        >
+                          <MoreHorizontalIcon className="size-4" aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem
+                          disabled={!canMoveUp || reorder.isPending}
+                          onSelect={() => {
+                            move(index, -1);
+                          }}
+                        >
+                          <ChevronUpIcon aria-hidden="true" />
+                          Monter
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={!canMoveDown || reorder.isPending}
+                          onSelect={() => {
+                            move(index, 1);
+                          }}
+                        >
+                          <ChevronDownIcon aria-hidden="true" />
+                          Descendre
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            setEditing(stage);
+                          }}
+                        >
+                          <PencilIcon aria-hidden="true" />
+                          Renommer
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          disabled={stage.isSystem || stage.isInitial || toggleActive.isPending}
+                          variant={stage.isActive ? 'destructive' : 'default'}
+                          onSelect={toggle}
+                        >
+                          {stage.isActive ? (
+                            <PowerOffIcon aria-hidden="true" />
+                          ) : (
+                            <PowerIcon aria-hidden="true" />
+                          )}
+                          {toggleLabel}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </li>
               );
@@ -302,12 +391,19 @@ export function BankStagesView() {
         <CardContent className="p-0">
           <ul className="divide-y divide-border">
             {systemStages.map((stage) => (
+              /*
+                `min-w-0` + `truncate` sur le libellé, et surtout PAS de
+                `ml-auto` sur la pastille : poussée à droite, elle sautait à la
+                ligne au premier repli et laissait un blanc au milieu de la
+                rangée. Sans `min-w-0`, « Encaissé · code CASHED » refusait de
+                se couper et débordait de la carte sous 360 px.
+              */
               <li key={stage.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <StageBadge stage={stage} />
-                <span className="text-[0.8125rem] text-muted-foreground">
+                <span className="min-w-0 truncate text-[0.8125rem] text-muted-foreground">
                   {BANK_STAGE_TYPE_LABELS[stage.type]} · code {stage.code}
                 </span>
-                <Badge variant="secondary" className="ml-auto gap-1">
+                <Badge variant="secondary" className="gap-1">
                   <LockIcon aria-hidden="true" />
                   Non modifiable
                 </Badge>

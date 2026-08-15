@@ -5,7 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
  * Parcours partant d'un navigateur VIERGE : connexion, déconnexion, refus.
  *
  * Ils tournent dans le projet `chromium-anonyme`, sans l'état de session
- * partagé — c'est précisément la pose et l'effacement des cookies qu'ils
+ * partagé, c'est précisément la pose et l'effacement des cookies qu'ils
  * vérifient.
  */
 

@@ -1,7 +1,7 @@
 import { API_PREFIX, REFRESH_SKEW_SECONDS } from '@/lib/api/config';
 
 /**
- * Rotation des jetons — mécanique pure, sans dépendance à `next/headers`.
+ * Rotation des jetons : mécanique pure, sans dépendance à `next/headers`.
  *
  * Ce module est partagé par le middleware (rafraîchissement anticipé), le
  * relais `/api/v1/*` (rafraîchissement réactif sur 401) et le client serveur.
@@ -34,7 +34,7 @@ export type RefreshRotationResult =
  * C'est volontaire et c'est sans risque ici : la valeur ne sert qu'à décider
  * s'il faut rafraîchir avant d'envoyer la requête. L'autorité reste l'API, qui
  * vérifie la signature à chaque appel. Un jeton falsifié avec un `exp` lointain
- * ne gagne rien — il se fera rejeter en 401 et la voie réactive prendra le
+ * ne gagne rien : il se fera rejeter en 401 et la voie réactive prendra le
  * relais.
  */
 export function readJwtExpiry(token: string): number | null {
@@ -72,7 +72,7 @@ export function isAccessTokenStale(token: string | null | undefined, now = Date.
  *
  * `null` signifie « cette famille de jetons est morte » : jeton révoqué,
  * expiré, ou rejoué. L'appelant doit alors effacer les cookies et renvoyer
- * vers `/connexion` — surtout pas réessayer, le serveur invalide toute la
+ * vers `/connexion` : surtout pas réessayer, le serveur invalide toute la
  * famille au premier rejeu détecté.
  */
 export async function rotateRefreshToken(

@@ -17,7 +17,7 @@ import { bankExportFileName, buildBankExportUrl } from '@/lib/data/export';
  * Il ne double PAS le menu d'export de la liste : il porte la même barre de
  * filtre, écrit dans la même URL, et produit le même fichier. Sa raison d'être
  * est qu'un agent qui vient chercher « le classeur du mois » n'a pas à savoir
- * qu'il se cache derrière un menu de la page « Dossiers » — et qu'il puisse
+ * qu'il se cache derrière un menu de la page « Dossiers » : et qu'il puisse
  * régler ses critères en voyant, écrit noir sur blanc, ce que chaque feuille
  * contiendra.
  */

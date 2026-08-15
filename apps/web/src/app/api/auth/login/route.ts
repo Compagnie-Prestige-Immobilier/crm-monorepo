@@ -10,7 +10,7 @@ import { loginSchema } from '@/lib/schemas';
  * `POST /api/auth/login`
  *
  * Le navigateur ne parle jamais au backend NestJS directement. Il poste ici,
- * ce handler relaie, et les jetons repartent en cookies `httpOnly` — jamais
+ * ce handler relaie, et les jetons repartent en cookies `httpOnly` : jamais
  * dans le corps de la réponse. C'est la seule façon d'empêcher qu'un JWT
  * atterrisse dans du JavaScript, donc à portée d'une XSS.
  *
@@ -42,7 +42,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   } catch (error) {
     // `API_URL` absent : le panel n'a aucun backend à joindre. C'est la
-    // PREMIÈRE branche, avant le repli « injoignable » — sans elle, un panel
+    // PREMIÈRE branche, avant le repli « injoignable » : sans elle, un panel
     // mal déployé envoyait l'administrateur vérifier sa connexion.
     if (error instanceof ApiConfigurationError) {
       return NextResponse.json(configErrorBody(error), { status: 500 });

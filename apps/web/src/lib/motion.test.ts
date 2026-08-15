@@ -6,7 +6,7 @@ import { cubicBezier, easeOut, easeSpring, interpolateCount } from '@/lib/motion
  * Les courbes de `docs/design.md` §7 pilotent le seul mouvement que le CSS ne
  * sait pas produire : celui d'un compteur qui change de valeur. Une erreur ici
  * ne casse rien, elle fabrique un mouvement qui ne ressemble à aucun autre de
- * l'interface — ce qui se voit immédiatement et ne s'explique jamais.
+ * l'interface : ce qui se voit immédiatement et ne s'explique jamais.
  */
 
 describe('cubic-bezier', () => {

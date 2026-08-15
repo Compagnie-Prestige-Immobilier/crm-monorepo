@@ -9,7 +9,7 @@ import type { ProspectFilters } from '@/lib/types';
 /**
  * Source unique de l'état de filtre : l'URL.
  *
- * Trois consommateurs lisent ce même objet — le tableau, les graphiques et le
+ * Trois consommateurs lisent ce même objet : le tableau, les graphiques et le
  * bouton d'export. Les tenir dans un état React local obligerait à les
  * synchroniser à trois, et il suffirait d'un oubli pour qu'un fichier Excel ne
  * corresponde plus à l'écran depuis lequel il a été demandé.

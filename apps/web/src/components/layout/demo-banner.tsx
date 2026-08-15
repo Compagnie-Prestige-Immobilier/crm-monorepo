@@ -20,7 +20,7 @@ import type { Role } from '@/lib/types';
  * l'utilisateur a commencé à lire les chiffres.
  *
  * Couleurs : surface or `accent-surface` avec du texte `warning` (#856011,
- * 5,71:1). Jamais l'or décoratif #C8921A en texte — design.md §2.3.
+ * 5,71:1). Jamais l'or décoratif #C8921A en texte : design.md §2.3.
  */
 export function DemoBanner({ seededAt, role }: { seededAt: string | null; role: Role }) {
   return (

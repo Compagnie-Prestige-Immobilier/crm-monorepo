@@ -34,12 +34,12 @@ import { queryKeys } from '@/lib/query-keys';
  *
  * 1. `keepPreviousData` : les chiffres RESTENT à l'écran pendant le cycle
  *    suivant. Sans cela, le tableau de bord repasserait par son squelette
- *    toutes les dix secondes — l'écran clignoterait en permanence.
+ *    toutes les dix secondes : l'écran clignoterait en permanence.
  * 2. Les valeurs GLISSENT (voir `AnimatedNumber`), elles ne sautent pas. Un
  *    nombre qui change d'un coup se lit comme un scintillement ; un nombre qui
  *    monte se lit comme une hausse.
  * 3. Un cycle en échec n'efface RIEN. L'indicateur passe à « Interrompu », le
- *    rythme ralentit, et les derniers chiffres connus restent affichés — mieux
+ *    rythme ralentit, et les derniers chiffres connus restent affichés : mieux
  *    vaut une donnée datée et signalée qu'un écran vide.
  *
  * `prefers-reduced-motion` coupe l'interpolation des compteurs comme celle des
@@ -59,13 +59,13 @@ export function DashboardView() {
   });
 
   /**
-   * L'entonnoir et les montants — requête SÉPARÉE, volontairement.
+   * L'entonnoir et les montants : requête SÉPARÉE, volontairement.
    *
    * Elle vise `GET /analytics/funnel`, absente du client engendré, et elle
    * porte le seul chiffre que la direction vient chercher. La tenir à part
    * garantit qu'un échec des six agrégats de prospection n'efface pas le
    * montant encaissé, et réciproquement : deux pannes distinctes, deux zones
-   * d'écran distinctes. Le filtre, lui, reste le même — les montants décrivent
+   * d'écran distinctes. Le filtre, lui, reste le même : les montants décrivent
    * la population des compteurs affichés dessous.
    */
   const funnelQuery = useQuery({

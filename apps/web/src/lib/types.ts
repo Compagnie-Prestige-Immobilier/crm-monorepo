@@ -35,12 +35,29 @@ export type UpdateUserInput = Schemas['UpdateUserDto'];
 export type UpdateProspectInput = Schemas['UpdateProspectDto'];
 export type UpdateRepresentantInput = Schemas['UpdateRepresentantDto'];
 
-export const PROSPECT_STATUTS: readonly ProspectStatut[] = [
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * `as const satisfies`, et jamais `readonly X[]`, sur TOUTES ces listes.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Ces tableaux alimentent les listes déroulantes de filtre. Annotés
+ * `readonly ProspectStatut[]`, ils acceptent un SOUS-ENSEMBLE sans broncher :
+ * un statut ajouté au contrat disparaît silencieusement des filtres, et
+ * personne ne peut plus retrouver les fiches qui le portent. Les tables de
+ * libellés voisines (`Record<ProspectStatut, string>`), elles, cassent le
+ * build : deux façons d'écrire la même chose, dont une seule protège.
+ *
+ * `as const satisfies readonly ProspectStatut[]` garde la vérification (aucune
+ * valeur inventée) ET conserve le type littéral, ce qui permet à
+ * `EXHAUSTIVE_*` ci-dessous d'exiger la couverture complète. C'est déjà ce que
+ * fait `PROSPECT_SORT_FIELDS` : la règle est simplement appliquée partout.
+ */
+export const PROSPECT_STATUTS = [
   'NOUVEAU',
   'CONTACTE',
   'CONVERTI',
   'PERDU',
-];
+] as const satisfies readonly ProspectStatut[];
 
 /** Libellés métier français. Les enums Prisma ne s'affichent jamais bruts. */
 export const PROSPECT_STATUT_LABELS: Record<ProspectStatut, string> = {
@@ -60,7 +77,7 @@ export const ROLE_LABELS: Record<Role, string> = {
  * Valeur affichée pour un référentiel désactivé.
  *
  * Désactiver une banque ne supprime AUCUN prospect : les fiches gardent la
- * référence, et c'est voulu — un export d'octobre doit rester lisible en
+ * référence, et c'est voulu : un export d'octobre doit rester lisible en
  * janvier. L'écran doit donc distinguer « la banque X » de « la banque X,
  * retirée du référentiel », sinon l'administrateur croit à une donnée perdue.
  */
@@ -103,8 +120,8 @@ export type ProspectSortField = (typeof PROSPECT_SORT_FIELDS)[number];
 export type SortDirection = Schemas['SortOrder'];
 
 /**
- * Objet de filtre unique. Il pilote LES TROIS consommateurs — le tableau, les
- * graphiques et l'export — pour qu'un lien collé dans un chat rende exactement
+ * Objet de filtre unique. Il pilote LES TROIS consommateurs : le tableau, les
+ * graphiques et l'export : pour qu'un lien collé dans un chat rende exactement
  * le même écran, et que le fichier Excel corresponde à ce qui est à l'écran.
  * Sérialisé tel quel dans les search params de l'URL (voir `lib/filters.ts`).
  */
@@ -149,7 +166,12 @@ export type CampaignAttempt = Schemas['CampaignAttemptDto'];
 export type CampaignProgress = Schemas['CampaignProgressDto'];
 export type CreateCampaignInput = Schemas['CreateCampaignDto'];
 
-export const BDD_SEGMENTS: readonly BddSegment[] = ['BDD1', 'BDD2', 'BDD3', 'BDD4'];
+export const BDD_SEGMENTS = [
+  'BDD1',
+  'BDD2',
+  'BDD3',
+  'BDD4',
+] as const satisfies readonly BddSegment[];
 
 /**
  * Libellés de segment, repris MOT POUR MOT de `packages/database/src/segment.ts`
@@ -172,18 +194,24 @@ export const SEGMENT_SHORT_LABELS: Record<BddSegment, string> = {
   BDD4: 'BDD4',
 };
 
-export const CAMPAIGN_SCOPES: readonly CampaignScope[] = ['ALL', 'BDD1', 'BDD2', 'BDD3', 'BDD4'];
+export const CAMPAIGN_SCOPES = [
+  'ALL',
+  'BDD1',
+  'BDD2',
+  'BDD3',
+  'BDD4',
+] as const satisfies readonly CampaignScope[];
 
 export function campaignScopeLabel(scope: CampaignScope): string {
   return scope === 'ALL' ? 'Toutes bases : BDD1 à BDD4' : SEGMENT_LABELS[scope];
 }
 
-export const PHASE2_STATUSES: readonly Phase2Status[] = [
+export const PHASE2_STATUSES = [
   'PENDING',
   'METHOD_OBTAINED',
   'REFUSED',
   'WRONG_NUMBER',
-];
+] as const satisfies readonly Phase2Status[];
 
 export const PHASE2_STATUS_LABELS: Record<Phase2Status, string> = {
   PENDING: 'En attente',
@@ -192,11 +220,11 @@ export const PHASE2_STATUS_LABELS: Record<Phase2Status, string> = {
   WRONG_NUMBER: 'Mauvais numéro',
 };
 
-export const ENROLLMENT_METHODS: readonly EnrollmentMethod[] = [
+export const ENROLLMENT_METHODS = [
   'PLATFORM',
   'PHYSICAL',
   'VOICE_OR_ELECTRONIC_MESSAGING',
-];
+] as const satisfies readonly EnrollmentMethod[];
 
 export const ENROLLMENT_METHOD_LABELS: Record<EnrollmentMethod, string> = {
   PLATFORM: 'Plateforme',
@@ -213,10 +241,89 @@ export const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {
   OTHER: 'Autre',
 };
 
+// ─── Campagnes REPRÉSENTANTS ────────────────────────────────────────────────
+
+export type RepCallOutcome = Schemas['RepCallOutcome'];
+
+/**
+ * Libellés des issues d'appel aux représentants.
+ *
+ * Le détail d'une campagne représentants affichait l'énumération BRUTE :
+ * l'écran montrait littéralement « PROSPECTS_PROMISED » à un administrateur.
+ * Son jumeau, le détail des campagnes prospects, traduit depuis toujours par
+ * `CALL_OUTCOME_LABELS` : les deux écrans se lisent côte à côte, et l'un
+ * parlait français quand l'autre parlait Prisma.
+ *
+ * L'issue est propre à ce module et ne recoupe PAS `CallOutcome` : appeler un
+ * représentant, c'est obtenir la promesse d'une liste de prospects, pas une
+ * méthode d'enrôlement. Deux énumérations, deux tables de libellés.
+ */
+export const REP_CALL_OUTCOME_LABELS: Record<RepCallOutcome, string> = {
+  REACHED: 'Joint',
+  PROSPECTS_PROMISED: 'Prospects promis',
+  UNREACHABLE: 'Injoignable',
+  CALLBACK: 'À rappeler',
+  REFUSED: 'Refus',
+  WRONG_NUMBER: 'Mauvais numéro',
+  OTHER: 'Autre',
+};
+
+/** Même code couleur que les campagnes prospects : deux écrans, une grammaire. */
+export const REP_CALL_OUTCOME_VARIANTS: Record<RepCallOutcome, BadgeVariant> = {
+  REACHED: 'info',
+  PROSPECTS_PROMISED: 'success',
+  UNREACHABLE: 'secondary',
+  CALLBACK: 'info',
+  REFUSED: 'destructive',
+  WRONG_NUMBER: 'warning',
+  OTHER: 'outline',
+};
+
 export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
   ACTIVE: 'En cours',
   CLOSED: 'Clôturée',
 };
+
+// ─── Exhaustivité des listes de filtre ──────────────────────────────────────
+
+/**
+ * Ce qui MANQUE à une liste pour couvrir toute son énumération.
+ *
+ * `as const satisfies readonly X[]` interdit d'INVENTER une valeur, mais pas
+ * d'en OUBLIER une : `['NOUVEAU'] satisfies readonly ProspectStatut[]` compile
+ * parfaitement. Or c'est l'oubli qui fait mal : un membre ajouté au contrat
+ * disparaît de la liste déroulante, et les fiches qui le portent deviennent
+ * introuvables sans qu'aucun écran ne l'explique.
+ */
+type MissingFrom<Enum extends string, Listed extends string> = Exclude<Enum, Listed>;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Le garde-fou : toutes les entrées doivent valoir `never`.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Un membre oublié transforme son entrée en chaîne littérale, et cette
+ * affectation cesse de compiler EN LE NOMMANT. C'est ce que font déjà, par
+ * construction, les tables `Record<Enum, string>` voisines ; les listes
+ * n'avaient, elles, aucune protection équivalente.
+ *
+ * Aucun coût à l'exécution qui vaille d'être mentionné : un objet vide.
+ */
+type FilterListCoverage = {
+  PROSPECT_STATUTS: MissingFrom<ProspectStatut, (typeof PROSPECT_STATUTS)[number]>;
+  BDD_SEGMENTS: MissingFrom<BddSegment, (typeof BDD_SEGMENTS)[number]>;
+  CAMPAIGN_SCOPES: MissingFrom<CampaignScope, (typeof CAMPAIGN_SCOPES)[number]>;
+  PHASE2_STATUSES: MissingFrom<Phase2Status, (typeof PHASE2_STATUSES)[number]>;
+  ENROLLMENT_METHODS: MissingFrom<EnrollmentMethod, (typeof ENROLLMENT_METHODS)[number]>;
+  PROSPECT_SORT_FIELDS: MissingFrom<
+    Schemas['ProspectSortField'],
+    (typeof PROSPECT_SORT_FIELDS)[number]
+  >;
+  BANK_CASE_SORT_FIELDS: MissingFrom<BankCaseSortField, (typeof BANK_CASE_SORT_FIELDS)[number]>;
+};
+
+export const FILTER_LISTS_ARE_EXHAUSTIVE: Record<keyof FilterListCoverage, never> =
+  {} as FilterListCoverage;
 
 // ─── Banque & Finance ───────────────────────────────────────────────────────
 
@@ -243,7 +350,7 @@ export const BANK_CASE_SORT_FIELDS = [
  * Le `color` d'une étape est un RÔLE du design system (`info`, `warning`,
  * `success`, `destructive`…), jamais un hex : c'est écrit dans le contrat
  * (`BankCaseStageDto.color`). On le traduit ici en variante de `Badge`, avec un
- * repli neutre — une étape créée demain avec un rôle inconnu doit s'afficher,
+ * repli neutre : une étape créée demain avec un rôle inconnu doit s'afficher,
  * pas casser l'écran.
  */
 export type BadgeVariant =
@@ -321,7 +428,7 @@ export interface FilterOption {
 
 export interface ReferenceData {
   departements: Departement[];
-  /** Les IEF — découpage scolaire. 59 pour 46 départements. */
+  /** Les IEF : découpage scolaire. 59 pour 46 départements. */
   iefs: Ief[];
   banques: Banque[];
   syndicats: Syndicat[];

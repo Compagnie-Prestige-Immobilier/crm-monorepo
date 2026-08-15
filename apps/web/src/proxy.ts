@@ -13,19 +13,19 @@ import { isAccessTokenStale, rotateRefreshTokenDetailed } from '@/lib/api/tokens
  * Rotation ANTICIPÉE des jetons (`proxy.ts`, ex-`middleware.ts`).
  *
  * Pourquoi ici et pas seulement dans le client serveur : un composant serveur
- * ne peut PAS écrire de cookie — au moment où il s'exécute, les en-têtes de
+ * ne peut PAS écrire de cookie : au moment où il s'exécute, les en-têtes de
  * réponse sont déjà partis. Or l'API fait tourner le refresh token à chaque
  * usage. Un rafraîchissement déclenché pendant un rendu obtiendrait donc un
  * jeton neuf sans pouvoir le ranger : le cookie garderait l'ancien, que le
  * backend vient d'invalider, et la session mourrait au chargement suivant.
  *
  * Ce fichier tourne AVANT le rendu, sur le runtime Node.js (garanti par la
- * convention `proxy.ts` de Next 16 — donc `process.env.API_URL` est lu à
+ * convention `proxy.ts` de Next 16 : donc `process.env.API_URL` est lu à
  * l'exécution, pas figé au build). Il réécrit les cookies de la requête ET de
  * la réponse : le rendu qui suit voit déjà le jeton neuf.
  *
  * Le rejeu réactif sur 401 reste en place dans `src/lib/api/server.ts` et dans
- * le relais `/api/v1/*` — il couvre la révocation d'un compte en cours de
+ * le relais `/api/v1/*` : il couvre la révocation d'un compte en cours de
  * session, que l'anticipation ne peut pas prévoir.
  */
 
@@ -42,7 +42,7 @@ const proxy: NextProxy = async (request) => {
    * `API_URL` absent : on ne tourne rien et on laisse passer.
    *
    * Lever ici ferait répondre 500 à CHAQUE requête du panel, y compris à
-   * l'écran de connexion — le seul endroit où le défaut de configuration peut
+   * l'écran de connexion : le seul endroit où le défaut de configuration peut
    * encore être nommé. Le message utile serait remplacé par une page d'erreur
    * muette. Les Route Handlers, eux, répondent avec la variable manquante.
    */

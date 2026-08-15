@@ -7,13 +7,17 @@ import { useState } from 'react';
 
 import { CampaignCreateDialog } from '@/components/phase2/campaign-create-dialog';
 import { CampaignProgressBar } from '@/components/phase2/campaign-progress-bar';
+import { CampaignsTabs } from '@/components/phase2/campaigns-tabs';
+import { CampaignsFiltersBar } from '@/components/phase2/campaigns-filters-bar';
+import { useCampaignFilters } from '@/components/phase2/use-campaign-filters';
 import { EmptyState } from '@/components/empty-state';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DEFAULT_CAMPAIGN_FILTERS, fetchCampaigns, type CampaignFilters } from '@/lib/data/phase2';
+import { countActiveCampaignFilters } from '@/lib/campaign-filters';
+import { fetchCampaigns } from '@/lib/data/phase2';
 import { formatDate, formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import { CAMPAIGN_STATUS_LABELS, campaignScopeLabel } from '@/lib/types';
@@ -28,8 +32,9 @@ import { CAMPAIGN_STATUS_LABELS, campaignScopeLabel } from '@/lib/types';
  * fait souvent depuis une tablette en réunion.
  */
 export function CampaignsView() {
-  const [filters, setFilters] = useState<CampaignFilters>(DEFAULT_CAMPAIGN_FILTERS);
+  const { filters, setFilters } = useCampaignFilters();
   const [creating, setCreating] = useState(false);
+  const activeFilterCount = countActiveCampaignFilters(filters);
 
   const { data, isPending, isError, error, refetch, isFetching } = useQuery({
     queryKey: queryKeys.campaigns(filters),
@@ -39,6 +44,8 @@ export function CampaignsView() {
 
   return (
     <div className="flex flex-col gap-6">
+      <CampaignsTabs />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
           Répartition des prospects en attente entre les commerciaux choisis. Tirage définitif.
@@ -54,41 +61,7 @@ export function CampaignsView() {
         </Button>
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Filtrer par statut"
-        className="inline-flex h-11 w-fit items-center justify-center rounded-md bg-secondary p-1 text-muted-foreground"
-      >
-        {(
-          [
-            ['TOUTES', 'Toutes'],
-            ['ACTIVE', 'En cours'],
-            ['CLOSED', 'Clôturées'],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={(filters.status ?? 'TOUTES') === value}
-            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-sm px-3 text-[0.875rem] font-[600] whitespace-nowrap transition-colors aria-selected:bg-card aria-selected:text-foreground aria-selected:shadow-elev-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            onClick={() => {
-              // `value` sort déjà typé du tuple `as const` : le réassertir
-              // masquerait un renommage de statut au lieu de le signaler.
-              const next = value;
-              setFilters((current) => ({
-                ...current,
-                status: next === 'TOUTES' ? null : next,
-                // Changer de filtre remet la pagination à 1 : rester en page 3 d'un
-                // résultat qui n'en compte plus qu'une affiche une liste vide.
-                page: 1,
-              }));
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <CampaignsFiltersBar />
 
       {isPending ? (
         <CampaignsSkeleton />
@@ -104,15 +77,17 @@ export function CampaignsView() {
         <EmptyState
           icon={MegaphoneIcon}
           title={
-            filters.status === null ? 'Aucune campagne d’appels' : 'Aucune campagne dans cet état'
+            activeFilterCount === 0
+              ? 'Aucune campagne d’appels'
+              : 'Aucune campagne ne correspond à ces filtres'
           }
           description={
-            filters.status === null
+            activeFilterCount === 0
               ? 'Créez une campagne pour répartir les prospects en attente.'
-              : 'Changez d’onglet pour voir les autres campagnes.'
+              : 'Élargissez la période ou retirez un critère.'
           }
           action={
-            filters.status === null ? (
+            activeFilterCount === 0 ? (
               <Button
                 type="button"
                 onClick={() => {
@@ -188,7 +163,7 @@ export function CampaignsView() {
                 aria-label="Page précédente"
                 disabled={data.page <= 1}
                 onClick={() => {
-                  setFilters((current) => ({ ...current, page: current.page - 1 }));
+                  setFilters({ page: data.page - 1 });
                 }}
               >
                 <ChevronLeftIcon className="size-4" aria-hidden="true" />
@@ -202,7 +177,7 @@ export function CampaignsView() {
                 aria-label="Page suivante"
                 disabled={data.page >= data.pageCount}
                 onClick={() => {
-                  setFilters((current) => ({ ...current, page: current.page + 1 }));
+                  setFilters({ page: data.page + 1 });
                 }}
               >
                 <ChevronRightIcon className="size-4" aria-hidden="true" />

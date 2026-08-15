@@ -2,18 +2,17 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeftIcon,
   ArrowRightIcon,
   BanknoteIcon,
   CircleSlashIcon,
   LoaderIcon,
   ShieldAlertIcon,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
 import { StageBadge } from '@/components/bank/stage-badge';
+import { DetailBackLink } from '@/components/detail-back-link';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -72,27 +71,42 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
 
   if (detail.isPending || stages.isPending) return <BankCaseDetailSkeleton />;
 
+  /**
+   * Le retour à la liste est rendu AVANT l'état d'erreur, pas après.
+   *
+   * Une référence périmée (un signet, un lien collé dans un message) produit un
+   * 404, que `QueryErrorState` ne propose pas de rejouer : recliquer ne fera pas
+   * réapparaître un dossier supprimé. Sans ce lien, l'écran n'avait donc plus
+   * aucune issue, et le bouton « Précédent » du navigateur n'est pas une
+   * réponse de conception.
+   */
   if (detail.isError) {
     return (
-      <QueryErrorState
-        error={detail.error}
-        onRetry={() => {
-          void detail.refetch();
-        }}
-        fallback="Ce dossier n’a pas pu être chargé."
-      />
+      <div className="flex flex-col gap-6">
+        <DetailBackLink href="/dossiers">Tous les dossiers</DetailBackLink>
+        <QueryErrorState
+          error={detail.error}
+          onRetry={() => {
+            void detail.refetch();
+          }}
+          fallback="Ce dossier n’a pas pu être chargé."
+        />
+      </div>
     );
   }
 
   if (stages.isError) {
     return (
-      <QueryErrorState
-        error={stages.error}
-        onRetry={() => {
-          void stages.refetch();
-        }}
-        fallback="Le flux de traitement n’a pas pu être chargé."
-      />
+      <div className="flex flex-col gap-6">
+        <DetailBackLink href="/dossiers">Tous les dossiers</DetailBackLink>
+        <QueryErrorState
+          error={stages.error}
+          onRetry={() => {
+            void stages.refetch();
+          }}
+          fallback="Le flux de traitement n’a pas pu être chargé."
+        />
+      </div>
     );
   }
 
@@ -109,12 +123,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
 
   return (
     <div className="flex flex-col gap-6">
-      <Button asChild variant="ghost" className="w-fit -ml-2">
-        <Link href="/dossiers">
-          <ArrowLeftIcon aria-hidden="true" />
-          Tous les dossiers
-        </Link>
-      </Button>
+      <DetailBackLink href="/dossiers">Tous les dossiers</DetailBackLink>
 
       {/* ─── En-tête ─────────────────────────────────────────────────── */}
       <Card className="animate-rise">
@@ -172,7 +181,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
               {/* L'action principale est ÉPINGLÉE en tête, en pleine variante :
                   faire avancer un dossier est le geste que l'agent répète
                   vingt fois par jour. Le rejet est à côté, en `destructive`
-                  et sans place privilégiée — il ne doit jamais être le bouton
+                  et sans place privilégiée : il ne doit jamais être le bouton
                   qu'on atteint par réflexe. */}
               {action.kind === 'advance' ? (
                 <Button
@@ -260,7 +269,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
 // ─── Chronologie ────────────────────────────────────────────────────────────
 
 /**
- * Chronologie verticale, du plus ancien au plus récent — l'ordre dans lequel
+ * Chronologie verticale, du plus ancien au plus récent : l'ordre dans lequel
  * l'API renvoie l'historique, et l'ordre dans lequel les faits se sont produits.
  *
  * Une `<ol>` et non une pile de `<div>` : c'est une séquence ordonnée, et un
@@ -439,7 +448,7 @@ function AdvanceDialog({
                 id={amountId}
                 // `inputMode` et non `type="number"` : un champ numérique HTML
                 // convertit la valeur en `number` côté DOM, ce qui perdrait de
-                // la précision au-delà de 2^53 — exactement ce que le contrat
+                // la précision au-delà de 2^53 : exactement ce que le contrat
                 // évite en exposant les montants en chaîne.
                 inputMode="numeric"
                 autoComplete="off"
@@ -498,7 +507,7 @@ function AdvanceDialog({
           <Button
             type="button"
             // Verrouillé pendant l'envoi : deux clics enverraient deux
-            // transitions, et la seconde échouerait en conflit de révision — ce
+            // transitions, et la seconde échouerait en conflit de révision : ce
             // que l'agent lirait comme un échec alors que la première a réussi.
             disabled={advance.isPending || !amountValid}
             onClick={() => {
@@ -609,7 +618,7 @@ function RejectDialog({
           <DialogTitle>Rejeter ce dossier ?</DialogTitle>
           <DialogDescription>
             {/* On ÉCRIT le montant en toutes lettres. Le serveur force 0 sur un
-                rejet, quoi qu'on lui envoie — mais un agent qui vient de voir
+                rejet, quoi qu'on lui envoie : mais un agent qui vient de voir
                 un montant à l'écran croirait sinon que le rejet le conserve, et
                 s'étonnerait de le voir disparaître de la synthèse. */}
             Le rejet clôt le dossier. <strong className="font-[600]">Montant : 0 FCFA</strong>.

@@ -13,11 +13,11 @@ import type {
 } from '@/lib/types';
 
 /**
- * Référentiels — tout ce qui alimente les listes déroulantes de filtre.
+ * Référentiels : tout ce qui alimente les listes déroulantes de filtre.
  *
  * `activeOnly: false` partout, et c'est délibéré : un prospect saisi en mars
  * référence peut-être une banque retirée depuis. Si le combobox ne proposait
- * que les référentiels actifs, ce prospect deviendrait infiltrable — on ne
+ * que les référentiels actifs, ce prospect deviendrait infiltrable : on ne
  * pourrait plus retrouver ses lignes pour les corriger. Les écrans marquent la
  * valeur « (retiré) » plutôt que de la cacher.
  */
@@ -30,7 +30,7 @@ export async function fetchReferenceData(
     /**
      * Les IEF ne sont pas dans le lot `/referentiels` : elles y ajouteraient
      * 59 lignes à une réponse déjà tirée par tous les écrans, alors qu'un seul
-     * s'en sert. Requête séparée, mais dans le MÊME `Promise.all` — la barre de
+     * s'en sert. Requête séparée, mais dans le MÊME `Promise.all` : la barre de
      * filtre ne doit pas afficher six listes prêtes et une septième en attente.
      */
     client.GET('/api/v1/referentiels/iefs', { params: { query: { activeOnly: false } } }),
@@ -41,7 +41,7 @@ export async function fetchReferenceData(
     /**
      * Campagnes d'appels : elles alimentent le filtre « Campagne » du tableau
      * des prospects. Rangées dans le MÊME lot que les autres référentiels
-     * plutôt que dans une requête à part — la barre de filtre serait sinon
+     * plutôt que dans une requête à part : la barre de filtre serait sinon
      * capable d'afficher ses six listes déroulantes pendant que la septième
      * charge encore, et un utilisateur filtrerait sur un écran à moitié prêt.
      */

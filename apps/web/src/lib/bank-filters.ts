@@ -2,6 +2,12 @@ import type { operations } from '@crm/api-client';
 
 import { isMoneyString } from '@/lib/money';
 import {
+  readIsoDate,
+  readPositiveInt,
+  readString,
+  type RawSearchParams,
+} from '@/lib/search-params';
+import {
   BANK_CASE_SORT_FIELDS,
   type BankCaseSortField,
   type BankStageType,
@@ -9,7 +15,7 @@ import {
 } from '@/lib/types';
 
 /**
- * Filtre unique de Banque & Finance — même dispositif que `ProspectFilters`, et
+ * Filtre unique de Banque & Finance : même dispositif que `ProspectFilters`, et
  * pour la même raison.
  *
  * UN objet pilote la liste, le tableau de bord et l'export. Un agent qui envoie
@@ -36,7 +42,7 @@ export interface BankCaseFilters {
   search: string;
   stageId: string | null;
   stageType: BankStageType | null;
-  bankId: string | null;
+  banqueId: string | null;
   agentId: string | null;
   rejectionReasonId: string | null;
   /** Bornes incluses, `YYYY-MM-DD`, sur la création du dossier. */
@@ -55,7 +61,7 @@ export const EMPTY_BANK_FILTERS: BankCaseFilters = {
   search: '',
   stageId: null,
   stageType: null,
-  bankId: null,
+  banqueId: null,
   agentId: null,
   rejectionReasonId: null,
   dateFrom: null,
@@ -68,38 +74,7 @@ export const EMPTY_BANK_FILTERS: BankCaseFilters = {
   sortDir: 'desc',
 };
 
-export type RawSearchParams = Record<string, string | string[] | undefined>;
-
-function readOne(params: RawSearchParams | URLSearchParams, key: string): string | null {
-  if (params instanceof URLSearchParams) return params.get(key);
-  const raw = params[key];
-  if (Array.isArray(raw)) return raw[0] ?? null;
-  return raw ?? null;
-}
-
-function readString(params: RawSearchParams | URLSearchParams, key: string): string | null {
-  const value = readOne(params, key);
-  if (value === null) return null;
-  const trimmed = value.trim();
-  return trimmed === '' ? null : trimmed;
-}
-
-function readPositiveInt(
-  params: RawSearchParams | URLSearchParams,
-  key: string,
-  fallback: number,
-): number {
-  const value = readString(params, key);
-  if (value === null) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function readIsoDate(params: RawSearchParams | URLSearchParams, key: string): string | null {
-  const value = readString(params, key);
-  if (value === null) return null;
-  return /^\d{4}-\d{2}-\d{2}$/u.test(value) ? value : null;
-}
+export type { RawSearchParams };
 
 /** Une borne de montant qui n'est pas un entier de chiffres est ÉCARTÉE. */
 function readMoney(params: RawSearchParams | URLSearchParams, key: string): string | null {
@@ -121,7 +96,7 @@ export function parseBankFilters(params: RawSearchParams | URLSearchParams): Ban
       stageType !== null && (STAGE_TYPES as readonly string[]).includes(stageType)
         ? (stageType as BankStageType)
         : null,
-    bankId: readString(params, 'bankId'),
+    banqueId: readString(params, 'banqueId'),
     agentId: readString(params, 'agentId'),
     rejectionReasonId: readString(params, 'rejectionReasonId'),
     dateFrom: readIsoDate(params, 'dateFrom'),
@@ -150,7 +125,7 @@ export function serializeBankFilters(filters: BankCaseFilters): URLSearchParams 
   put('search', filters.search.trim());
   put('stageId', filters.stageId);
   put('stageType', filters.stageType);
-  put('bankId', filters.bankId);
+  put('banqueId', filters.banqueId);
   put('agentId', filters.agentId);
   put('rejectionReasonId', filters.rejectionReasonId);
   put('dateFrom', filters.dateFrom);
@@ -174,7 +149,7 @@ export function countActiveBankFilters(filters: BankCaseFilters): number {
   if (filters.search.trim() !== '') count += 1;
   if (filters.stageId !== null) count += 1;
   if (filters.stageType !== null) count += 1;
-  if (filters.bankId !== null) count += 1;
+  if (filters.banqueId !== null) count += 1;
   if (filters.agentId !== null) count += 1;
   if (filters.rejectionReasonId !== null) count += 1;
   if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
@@ -182,16 +157,74 @@ export function countActiveBankFilters(filters: BankCaseFilters): number {
   return count;
 }
 
+// ─── Filtrage simple / filtrage avancé ───────────────────────────────────────
+
+/**
+ * Les critères rangés derrière « Filtres avancés » : miroir exact de
+ * `ADVANCED_FILTER_KEYS` (`lib/filters.ts`), pour les dossiers.
+ *
+ * Les huit champs étaient dépliés en permanence : sur la liste comme sur le
+ * tableau de bord, la première chose visible était un formulaire de huit
+ * cases, et les chiffres commençaient dessous. Restent à l'air libre la
+ * recherche, l'étape et la période : les trois critères qu'un agent touche à
+ * chaque session. La banque de traitement, l'agent, le motif de rejet et les
+ * bornes de montant servent à une question précise, quelques fois par mois.
+ *
+ * La liste est ORDONNÉE comme les champs à l'écran : les puces de rappel
+ * suivent l'ordre du panneau, si bien qu'une puce se retrouve à l'œil.
+ */
+export const BANK_ADVANCED_FILTER_KEYS = [
+  'banqueId',
+  'agentId',
+  'rejectionReasonId',
+  'amountMin',
+  'amountMax',
+] as const;
+
+export type BankAdvancedFilterKey = (typeof BANK_ADVANCED_FILTER_KEYS)[number];
+
+/** Les critères avancés RÉELLEMENT renseignés, dans l'ordre des champs. */
+export function activeBankAdvancedKeys(filters: BankCaseFilters): BankAdvancedFilterKey[] {
+  return BANK_ADVANCED_FILTER_KEYS.filter((key) => filters[key] !== null);
+}
+
+export function countBankAdvancedFilters(filters: BankCaseFilters): number {
+  return activeBankAdvancedKeys(filters).length;
+}
+
+export function hasBankAdvancedFilters(filters: BankCaseFilters): boolean {
+  return BANK_ADVANCED_FILTER_KEYS.some((key) => filters[key] !== null);
+}
+
+/**
+ * Remise à zéro des SEULS critères avancés. La recherche, l'étape et la période
+ * restent : ce sont ceux que l'agent voit, et effacer un champ visible depuis
+ * un bouton rangé ailleurs se lit comme un défaut.
+ *
+ * Écrit champ par champ plutôt qu'en `Object.fromEntries` : la forme littérale
+ * est vérifiée par le compilateur, si bien qu'un critère renommé dans
+ * `BankCaseFilters` casse ici au lieu d'être silencieusement oublié.
+ */
+export function clearBankAdvancedFilters(): Partial<BankCaseFilters> {
+  return {
+    banqueId: null,
+    agentId: null,
+    rejectionReasonId: null,
+    amountMin: null,
+    amountMax: null,
+  } satisfies Record<BankAdvancedFilterKey, null>;
+}
+
 /**
  * Bornes de journée explicitées, exactement comme pour les prospects : sans
  * heure, `dateTo=2026-08-12` serait interprété comme minuit pile et exclurait
  * toute la journée du 12. L'heure métier est `Africa/Dakar`, soit UTC+0 toute
- * l'année — `Z` est donc exact, sans conversion.
+ * l'année : `Z` est donc exact, sans conversion.
  */
 const startOfDay = (isoDate: string): string => `${isoDate}T00:00:00.000Z`;
 const endOfDay = (isoDate: string): string => `${isoDate}T23:59:59.999Z`;
 
-/** Critères de sélection seuls — communs à la liste, aux agrégats et à l'export. */
+/** Critères de sélection seuls : communs à la liste, aux agrégats et à l'export. */
 export function toBankFilterQuery(filters: BankCaseFilters): BankAnalyticsQuery {
   const query: BankAnalyticsQuery = {};
 
@@ -199,7 +232,7 @@ export function toBankFilterQuery(filters: BankCaseFilters): BankAnalyticsQuery 
   if (search !== '') query.search = search;
   if (filters.stageId !== null) query.stageId = filters.stageId;
   if (filters.stageType !== null) query.stageType = filters.stageType;
-  if (filters.bankId !== null) query.bankId = filters.bankId;
+  if (filters.banqueId !== null) query.banqueId = filters.banqueId;
   if (filters.agentId !== null) query.agentId = filters.agentId;
   if (filters.rejectionReasonId !== null) query.rejectionReasonId = filters.rejectionReasonId;
   if (filters.dateFrom !== null) query.dateFrom = startOfDay(filters.dateFrom);

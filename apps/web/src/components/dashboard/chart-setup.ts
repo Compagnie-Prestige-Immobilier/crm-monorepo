@@ -12,7 +12,7 @@ import {
 } from 'chart.js';
 
 /**
- * Enregistrement Chart.js — une seule fois, ici.
+ * Enregistrement Chart.js : une seule fois, ici.
  *
  * Chart.js 4 est modulaire : rien n'est enregistré par défaut. On déclare
  * exactement les éléments utilisés (ligne, barre, arc) plutôt que d'importer

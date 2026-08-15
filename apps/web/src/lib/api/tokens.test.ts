@@ -91,7 +91,7 @@ describe('rotateRefreshToken', () => {
     });
   });
 
-  it('renvoie null — famille morte — sur un refus de l’API', async () => {
+  it('renvoie null : famille morte : sur un refus de l’API', async () => {
     const fetchImpl = vi.fn(() => Promise.resolve(new Response('{}', { status: 401 })));
     expect(await rotateRefreshToken('http://api.test', 'revoked', fetchImpl)).toBeNull();
   });

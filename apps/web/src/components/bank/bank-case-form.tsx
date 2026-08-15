@@ -7,14 +7,16 @@ import {
   CheckIcon,
   LoaderIcon,
   SearchIcon,
+  UserPlusIcon,
   UserRoundIcon,
   XIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { ClientRequestDialog } from '@/components/bank/client-request-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,6 +35,7 @@ import { formatPhone, withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import type { BankProspectSearchItem } from '@/lib/types';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
 /**
@@ -47,7 +50,7 @@ import { cn } from '@/lib/utils';
  * Le premier champ est dominant parce qu'il porte tout le risque : ouvrir un
  * dossier sur le mauvais homonyme se découvre à l'encaissement, quand l'argent
  * est parti. Le résumé qui suit la sélection existe pour cette vérification-là,
- * et il montre le téléphone — le seul champ réellement discriminant.
+ * et il montre le téléphone : le seul champ réellement discriminant.
  */
 export function BankCaseForm() {
   const router = useRouter();
@@ -60,23 +63,17 @@ export function BankCaseForm() {
   const referenceRef = useRef<HTMLInputElement>(null);
 
   const [term, setTerm] = useState('');
-  const [debounced, setDebounced] = useState('');
   const [selected, setSelected] = useState<BankProspectSearchItem | null>(null);
   const [reference, setReference] = useState('');
   const [processingBankId, setProcessingBankId] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<{ id: string; reference: string } | null>(null);
+  const [requesting, setRequesting] = useState(false);
 
   // Débounce : l'API n'accepte la recherche qu'à partir de deux caractères et
   // plafonne à 300 requêtes par minute. Une requête par frappe épuiserait le
-  // quota au premier nom un peu long.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebounced(term.trim());
-    }, 300);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [term]);
+  // quota au premier nom un peu long. Le délai est celui de tout le panel :
+  // cet écran en avait pris un autre (300 ms) sans raison énoncée.
+  const debounced = useDebouncedValue(term.trim());
 
   const results = useQuery({
     queryKey: ['bank-prospect-search', debounced] as const,
@@ -99,7 +96,7 @@ export function BankCaseForm() {
    * de saisir et l'information arrive au moment où elle sert : avant qu'il
    * n'atteigne le bouton d'envoi.
    *
-   * Ce contrôle ne REMPLACE pas celui du serveur — l'unicité est une contrainte
+   * Ce contrôle ne REMPLACE pas celui du serveur : l'unicité est une contrainte
    * PostgreSQL, et deux agents peuvent saisir la même référence à la seconde
    * près. Il évite seulement de découvrir le conflit après avoir tout rempli.
    */
@@ -110,7 +107,7 @@ export function BankCaseForm() {
           search: value,
           stageId: null,
           stageType: null,
-          bankId: null,
+          banqueId: null,
           agentId: null,
           rejectionReasonId: null,
           dateFrom: null,
@@ -148,7 +145,7 @@ export function BankCaseForm() {
     onSuccess: (bankCase) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.bankCasesRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.bankAnalyticsRoot });
-      // Le succès n'est annoncé qu'ICI, après la réponse du serveur — jamais au
+      // Le succès n'est annoncé qu'ICI, après la réponse du serveur : jamais au
       // clic. Un message optimiste sur un POST qui échoue ensuite laisse l'agent
       // convaincu d'avoir ouvert un dossier qui n'existe pas.
       toast.success(`Dossier ${bankCase.reference} ouvert.`);
@@ -257,9 +254,31 @@ export function BankCaseForm() {
                 La recherche a échoué. Réessayez.
               </p>
             ) : results.data.length === 0 ? (
-              <p className="p-4 text-[0.875rem] text-muted-foreground">
-                Aucun client ne correspond.
-              </p>
+              /* ─── L'IMPASSE, ET SA SORTIE ────────────────────────────────
+                 Cet état n'affichait que « Aucun client ne correspond. » et
+                 s'arrêtait là. Le rôle BANQUE_FINANCE n'a aucune route de
+                 création de prospect, et rien ne remontait au siège : le
+                 dossier ne se faisait pas, ou se faisait sur un homonyme, ce
+                 qui se découvre à l'encaissement, quand l'argent est parti. */
+              <div className="flex flex-col items-start gap-3 p-4">
+                <div>
+                  <p className="text-[0.875rem] font-[600]">Aucun client ne correspond.</p>
+                  <p className="mt-1 text-[0.8125rem] text-muted-foreground">
+                    Si le client existe mais n’est pas encore en base, demandez sa création au
+                    siège. Elle vous reviendra approuvée, prête à recevoir ce dossier.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setRequesting(true);
+                  }}
+                >
+                  <UserPlusIcon aria-hidden="true" />
+                  Demander la création du client
+                </Button>
+              </div>
             ) : (
               <ul className="max-h-72 overflow-y-auto p-1 scrollbar-thin">
                 {results.data.map((prospect) => (
@@ -412,7 +431,7 @@ export function BankCaseForm() {
             type="submit"
             size="lg"
             // Désactivé PENDANT l'envoi : un double-clic créerait deux dossiers,
-            // dont le second échouerait en conflit de référence — et l'agent
+            // dont le second échouerait en conflit de référence : et l'agent
             // verrait une erreur alors que son dossier vient d'être créé.
             disabled={!canSubmit}
             className="flex-1 sm:flex-none"
@@ -428,6 +447,12 @@ export function BankCaseForm() {
           </Button>
         </div>
       </div>
+
+      {/* Le dialogue est PRÉ-REMPLI avec la recherche saisie : l'agent vient de
+          taper ce nom ou ce numéro, le lui redemander serait une double saisie
+          et une occasion de divergence entre ce qu'il cherchait et ce qu'il
+          demande. */}
+      <ClientRequestDialog open={requesting} onOpenChange={setRequesting} initialTerm={debounced} />
     </form>
   );
 }

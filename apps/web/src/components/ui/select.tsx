@@ -109,7 +109,7 @@ function SelectItem({
       className={cn(
         'relative flex w-full cursor-default select-none items-center gap-2 rounded-sm py-2 pr-8 pl-2',
         'text-[0.875rem] outline-none',
-        // `focus:` et non `focus-visible:` — Radix déplace le focus par
+        // `focus:` et non `focus-visible:` : Radix déplace le focus par
         // programme au clavier, ce qui n'arme pas `:focus-visible`.
         // Le seul fond `secondary` ne fait que 1,16:1 contre `popover` : très
         // en dessous des 3:1 exigés d'un indicateur de focus (WCAG 1.4.11).

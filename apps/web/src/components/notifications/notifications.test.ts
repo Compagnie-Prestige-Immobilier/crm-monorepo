@@ -18,16 +18,16 @@ import {
 import type { NotificationRow } from '@/components/notifications/types';
 
 /**
- * Compositeur de notifications — logique pure.
+ * Compositeur de notifications : logique pure.
  *
  * Ces tests portent sur ce qui décide d'un ENVOI NON ANNULABLE : la description
  * du public, le nombre annoncé, et la substitution du texte. Le rendu React
- * n'est pas testé ici — le projet n'embarque ni jsdom ni testing-library, et
+ * n'est pas testé ici : le projet n'embarque ni jsdom ni testing-library, et
  * l'essentiel de ce qui peut mal tourner est de toute façon dans ces fonctions.
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Substitution — doit avoir la MÊME sémantique que le serveur
+// Substitution : doit avoir la MÊME sémantique que le serveur
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('substitution de gabarit (miroir du serveur)', () => {
@@ -52,7 +52,7 @@ describe('substitution de gabarit (miroir du serveur)', () => {
   });
 
   it('fusionne les variables du titre puis du corps, sans doublon', () => {
-    expect(mergedVariables('{{nom}} — rappel', '{{nombre}} fiches pour {{nom}}')).toEqual([
+    expect(mergedVariables('{{nom}} : rappel', '{{nombre}} fiches pour {{nom}}')).toEqual([
       'nom',
       'nombre',
     ]);
@@ -187,7 +187,7 @@ describe('description du public dans l’historique', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('phrase de confirmation', () => {
-  it('annonce le NOMBRE — sans lui, la confirmation ne protège de rien', () => {
+  it('annonce le NOMBRE : sans lui, la confirmation ne protège de rien', () => {
     expect(confirmationSentence(400, 400)).toBe('Cet envoi s’adresse à 400 personnes.');
   });
 
@@ -226,7 +226,7 @@ describe('validation du lien profond', () => {
     expect(routeProblem('/a-corriger')).toBeNull();
   });
 
-  it('accepte le champ vide — le lien est facultatif', () => {
+  it('accepte le champ vide : le lien est facultatif', () => {
     expect(routeProblem('')).toBeNull();
     expect(routeProblem('   ')).toBeNull();
   });

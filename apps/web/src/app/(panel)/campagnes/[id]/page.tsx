@@ -23,8 +23,8 @@ export default async function CampagnePage({ params }: { params: Promise<{ id: s
 
   const queryClient = getQueryClient();
   // Le préchargement n'est PAS `await`é en dehors d'un try : une campagne
-  // introuvable doit se présenter comme une erreur dans la vue — qui sait la
-  // rendre avec un message et un retour — et non comme une exception de rendu
+  // introuvable doit se présenter comme une erreur dans la vue : qui sait la
+  // rendre avec un message et un retour : et non comme une exception de rendu
   // serveur qui ferait tomber l'écran entier.
   try {
     await queryClient.prefetchQuery({

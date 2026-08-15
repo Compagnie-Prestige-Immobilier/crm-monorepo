@@ -8,7 +8,7 @@ import type { Role, SessionUser } from '@/lib/types';
 export const PANEL_ROLES: readonly Role[] = ['ADMIN', 'BANQUE_FINANCE'];
 
 /**
- * Couche d'authentification — `POST /auth/login`, `GET /auth/me`,
+ * Couche d'authentification : `POST /auth/login`, `GET /auth/me`,
  * `POST /auth/logout` du client généré.
  *
  * Ce qui n'est PAS un détail d'implémentation : les jetons ne traversent jamais
@@ -91,7 +91,7 @@ export async function fetchSessionUser(client: ApiClient = getApiClient()): Prom
   return unwrap(await client.GET('/api/v1/auth/me'));
 }
 
-/** `POST /auth/logout` — révoque toute la famille de refresh tokens. */
+/** `POST /auth/logout` : révoque toute la famille de refresh tokens. */
 export async function revokeSession(refreshToken: string, client: ApiClient): Promise<void> {
   await client.POST('/api/v1/auth/logout', { body: { refreshToken } });
 }

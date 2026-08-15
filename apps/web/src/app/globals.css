@@ -2,7 +2,7 @@
 @import 'tw-animate-css';
 
 /* ══════════════════════════════════════════════════════════════════════════
-   CPI GO — panneau d'administration
+   CPI GO : panneau d'administration
    Tokens portés depuis docs/design.md. Ce fichier est la seule source de
    couleur du panel : aucune valeur en dur dans un composant.
    Règle §2.3 : l'or #C8921A ne sert JAMAIS de couleur de texte (2,77:1).
@@ -22,7 +22,7 @@
   /* Blanc franc. Le #FAF7F7 d'origine était un blanc TEINTÉ de rose : sur un
      grand écran de travail, la teinte se voit et donne un plan de travail
      coloré. Le bordeaux CPI vit dans la barre latérale, les actions et les
-     accents — pas sous les chiffres qu'on lit toute la journée. */
+     accents : pas sous les chiffres qu'on lit toute la journée. */
   --background: #ffffff;
   --foreground: #1c0810;
   --card: #fbfbfc;
@@ -33,7 +33,7 @@
   --input: transparent;
   --input-background: #f5ecee;
   /* WCAG 1.4.11 : le CONTOUR d'un champ doit atteindre 3:1, car son
-     remplissage ne suffit pas à le délimiter — #F5ECEE sur #FAF7F7 ne fait que
+     remplissage ne suffit pas à le délimiter : #F5ECEE sur #FAF7F7 ne fait que
      1,09:1. L'ancienne bordure `--border` tombait à 1,27:1 : les champs
      n'existaient visuellement pas. Ici 3,24:1 sur le fond, 3,45:1 sur `card`. */
   --input-border: #af7d84;
@@ -57,7 +57,7 @@
   --muted-foreground: #6b4a52;
   --ring: #630210;
 
-  /* §2.3 Or CPI — surface décorative, jamais du texte */
+  /* §2.3 Or CPI : surface décorative, jamais du texte */
   --accent: #c8921a;
   /* Texte posé SUR une surface or : #1C0810 sur #C8921A = 6,95:1 */
   --accent-foreground: #1c0810;
@@ -84,7 +84,7 @@
   --info-foreground: #ffffff;
   --info-surface: #f7eef1;
 
-  /* Statuts posés SUR UNE SURFACE SOMBRE — sidebar #3A010A, bordeaux #630210.
+  /* Statuts posés SUR UNE SURFACE SOMBRE : sidebar #3A010A, bordeaux #630210.
      design.md mesure ses paires sur fond clair ; les quatre tokens ci-dessus
      sont des teintes foncées et n'y survivent pas : `--destructive` #B91C1C
      tombe à 2,10:1 sur bordeaux. On reprend les déclinaisons de §3, pour la
@@ -110,7 +110,7 @@
      7,07:1 sur `#3A010A`, 7,22:1 sur le `#300710` du thème sombre. */
   --sidebar-muted-foreground: #c09aa4;
 
-  /* §2.6 Graphiques — au-delà de 5 séries on regroupe en « Autres » */
+  /* §2.6 Graphiques : au-delà de 5 séries on regroupe en « Autres » */
   --chart-1: #630210;
   --chart-2: #c8921a;
   --chart-3: #1a6b44;
@@ -119,7 +119,7 @@
   --chart-grid: rgba(99, 2, 16, 0.1);
   --chart-tick: #6b4a52;
 
-  /* §5 Rayons — base 0.25rem, échelle 6/8/12/16/20/24 */
+  /* §5 Rayons : base 0.25rem, échelle 6/8/12/16/20/24 */
   --radius: 0.25rem;
   --radius-xs: 6px;
   --radius-sm: 8px;
@@ -128,7 +128,7 @@
   --radius-xl: 20px;
   --radius-2xl: 24px;
 
-  /* §5 Élévation — ombres teintées prune, jamais du noir pur */
+  /* §5 Élévation : ombres teintées prune, jamais du noir pur */
   --elev-xs: 0 1px 2px rgba(28, 8, 16, 0.04);
   --elev-sm: 0 1px 3px rgba(28, 8, 16, 0.05), 0 1px 2px rgba(28, 8, 16, 0.04);
   --elev-md: 0 4px 12px rgba(28, 8, 16, 0.06), 0 2px 6px rgba(28, 8, 16, 0.04);
@@ -136,7 +136,7 @@
   --elev-xl: 0 16px 48px rgba(28, 8, 16, 0.1), 0 8px 24px rgba(28, 8, 16, 0.06);
   --elev-hover: 0 6px 22px rgba(99, 2, 16, 0.1);
 
-  /* §6 États Material 3 — opacités du premier plan sur la surface */
+  /* §6 États Material 3 : opacités du premier plan sur la surface */
   --state-hover: 0.08;
   --state-focus: 0.1;
   --state-pressed: 0.12;
@@ -167,7 +167,7 @@
      Le fond était un prune #140206 : lisible sur une barre latérale, oppressant
      sur 90 % de l'écran, où tout le plan de travail virait au rouge sombre.
      La couleur de marque appartient à la navigation, aux actions et aux
-     accents — pas à la surface sur laquelle on lit des chiffres pendant huit
+     accents : pas à la surface sur laquelle on lit des chiffres pendant huit
      heures. Un gris très légèrement chaud garde la parenté avec le bordeaux
      sans le teinter. */
   --background: #141315;
@@ -390,6 +390,71 @@
       transform: none;
     }
   }
+
+  /* §7 : appel de la cloche de notification.
+     Deux mouvements distincts, et la distinction est le point :
+     l'oscillation se joue UNE fois, à l'arrivée d'une notification (un
+     événement) ; la pulsation de la pastille tourne tant qu'il reste du non-lu
+     (un état). Les fondre en une seule animation ferait soit rater l'arrivée,
+     soit agiter la barre en permanence, ce qui devient un décor qu'on ne voit
+     plus. Les deux ne sont posées qu'en `motion-safe:` par le composant, et le
+     bloc `prefers-reduced-motion` en bas de ce fichier les neutralise de toute
+     façon. Amplitude volontairement faible : 8 degrés se remarquent du coin de
+     l'œil sans attirer le regard hors de la tâche en cours. */
+  --animate-bell-swing: bell-swing 620ms var(--ease-out) 1;
+  /* BORNÉE à 4 cycles, jamais `infinite`.
+
+     WCAG 2.2.2 (Pause, Stop, Hide) : tout mouvement qui démarre seul et dure
+     plus de cinq secondes doit pouvoir être arrêté. Cette pastille tournait
+     `infinite` dans la barre supérieure, c'est-à-dire sur CHAQUE écran du
+     panel, sans aucune commande de pause : le contraire exact de la règle que
+     `live-indicator.tsx` énonce à voix haute (« La pastille ne clignote pas. Un
+     point qui pulse en permanence dans un coin de l'écran capte l'attention
+     toutes les secondes, pour une information qui ne change pas. »).
+
+     Quatre cycles suffisent : la pulsation sert à ATTIRER l'œil sur une
+     arrivée, et une fois l'œil attiré elle n'ajoute rien. Le CHIFFRE de la
+     pastille, lui, reste affiché tant qu'il reste du non-lu : c'est lui qui
+     porte l'information, pas le mouvement.
+
+     Le CALCUL, et pourquoi la durée d'un cycle change aussi : la règle fixe le
+     seuil à CINQ SECONDES au total, pas à un nombre de cycles. 3 × 2,4 s
+     ferait encore 7,2 s. On resserre donc le cycle à 1,6 s, ce qui donne
+     3 × 1,6 s = 4,8 s : sous le seuil, sans commande de pause à inventer pour
+     une pastille de seize pixels. L'animation redémarre au remontage du
+     composant, donc à chaque nouvelle arrivée. */
+  --animate-badge-pulse: badge-pulse 1.6s var(--ease-out) 3;
+
+  @keyframes bell-swing {
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+    15% {
+      transform: rotate(8deg);
+    }
+    35% {
+      transform: rotate(-7deg);
+    }
+    55% {
+      transform: rotate(5deg);
+    }
+    75% {
+      transform: rotate(-3deg);
+    }
+  }
+
+  @keyframes badge-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(1.14);
+    }
+  }
 }
 
 @layer base {
@@ -421,7 +486,7 @@
     line-height: 1.15;
   }
 
-  /* §10 Accessibilité — anneau de focus visible partout, jamais supprimé. */
+  /* §10 Accessibilité : anneau de focus visible partout, jamais supprimé. */
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
@@ -435,7 +500,7 @@
 }
 
 @layer utilities {
-  /* Cible tactile minimale §6 — 44 px. */
+  /* Cible tactile minimale §6 : 44 px. */
   .tap-target {
     min-block-size: 44px;
     min-inline-size: 44px;
@@ -444,13 +509,13 @@
   /* ── Identité « registre » ────────────────────────────────────────────────
      Le panel tient un registre : des dossiers qui partent en banque, des
      fiches qui font foi. Son vocabulaire visuel est celui d'un registre bien
-     composé — des filets nets, une colonne d'appui à gauche, des chiffres
+     composé : des filets nets, une colonne d'appui à gauche, des chiffres
      alignés. L'or n'y remplit jamais une forme : il MARQUE. Un seul geste,
      répété partout, plutôt que dix ornements.
      ───────────────────────────────────────────────────────────────────────── */
 
   /* Le marqueur. 3 px d'or à gauche : ouverture de section, élément de
-     navigation actif, ligne mise en avant. C'est un repère, pas un décor —
+     navigation actif, ligne mise en avant. C'est un repère, pas un décor -
      il répond toujours à « c'est ici que ça commence » ou « vous êtes ici ». */
   .rail {
     position: relative;
@@ -501,7 +566,7 @@
   }
 }
 
-/* §7 — les durées tombent à 0, la logique ne change pas. */
+/* §7 : les durées tombent à 0, la logique ne change pas. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

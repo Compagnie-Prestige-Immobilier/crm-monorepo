@@ -61,7 +61,7 @@ function isSortField(id: string): id is ProspectSortField {
  *
  * `manualPagination` / `manualSorting` / `manualFiltering` sont à `true` :
  * TanStack Table ne fait ici que le rendu. La pagination, le tri et le filtrage
- * sont exécutés par le serveur — la table dépasse déjà le millier de lignes et
+ * sont exécutés par le serveur : la table dépasse déjà le millier de lignes et
  * grossit à chaque tournée ; la rapatrier entière pour trier dans le navigateur
  * bloquerait l'onglet et ferait fuiter des données hors du périmètre filtré.
  */
@@ -198,7 +198,7 @@ export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
                           ) : (
                             /* `opacity-40` ramenait cette icône à 1,94:1 en
                                clair, très en dessous des 3:1 exigés d'un
-                               élément graphique porteur de sens — et c'est le
+                               élément graphique porteur de sens : et c'est le
                                SEUL indice qu'une colonne est triable.
                                `text-muted-foreground` plein tient 7,70:1 tout
                                en restant discret face à la flèche active. */
@@ -251,12 +251,12 @@ export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
           `aria-label`.
 
           Deux pièges évités ici :
-          — `aria-label` sur un `<p>` est INTERDIT : le rôle `paragraph` figure
+          : `aria-label` sur un `<p>` est INTERDIT : le rôle `paragraph` figure
             sur la liste « name prohibited » d'ARIA 1.2. Là où un lecteur
             d'écran l'honore quand même, le nom REMPLACE le contenu annoncé :
             l'utilisateur entend l'intitulé et jamais le décompte, soit
             exactement l'inverse du but recherché.
-          — le `Toaster` de Sonner monte lui aussi une région `aria-live="polite"`,
+          : le `Toaster` de Sonner monte lui aussi une région `aria-live="polite"`,
             plus haut dans le DOM. Un préfixe en `sr-only` distingue les deux
             sans recourir à un attribut interdit.
 

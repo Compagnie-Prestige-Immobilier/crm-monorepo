@@ -5,15 +5,15 @@
  * Pourquoi ce module existe.
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * `docs/design.md` porte des ratios dans son texte — « 5,71:1 sur card »,
+ * `docs/design.md` porte des ratios dans son texte : « 5,71:1 sur card »,
  * « 8,71:1 sur primary ». Ce sont des COMMENTAIRES : ils ne protègent de rien.
  * Le jour où un token change de valeur, la phrase reste vraie dans le document
  * et fausse à l'écran, et personne ne s'en aperçoit avant qu'un utilisateur ne
  * signale un texte illisible.
  *
  * Le piège précis que ce module ferme : le document mesure ses paires sur fond
- * CLAIR. Dès qu'un composant est posé sur une surface sombre — bordeaux
- * `#630210`, sidebar `#3A010A` — toutes ces mesures deviennent caduques, et les
+ * CLAIR. Dès qu'un composant est posé sur une surface sombre : bordeaux
+ * `#630210`, sidebar `#3A010A` : toutes ces mesures deviennent caduques, et les
  * quatre tokens de statut sont justement des teintes foncées. `destructive`
  * `#B91C1C` sur bordeaux ne fait que 2,10:1.
  *
@@ -71,7 +71,7 @@ export function relativeLuminance(color: Rgb): number {
  * Ratio entre deux couleurs OPAQUES, de 1 à 21.
  *
  * L'ordre des arguments est indifférent : la formule prend la plus claire au
- * numérateur. Les couleurs à canal alpha ne sont pas acceptées — leur contraste
+ * numérateur. Les couleurs à canal alpha ne sont pas acceptées : leur contraste
  * dépend de ce qu'il y a dessous, donc d'un contexte que cette fonction n'a pas.
  */
 export function contrastRatio(a: string, b: string): number {
@@ -92,7 +92,7 @@ export function ratio(a: string, b: string): number {
  *
  * La recopie est assumée : un test qui lirait le CSS testerait un analyseur de
  * CSS. Ce qu'on veut vérifier, ce sont les VALEURS, et un écart entre cette
- * table et la feuille de style se voit au premier coup d'œil sur le diff — les
+ * table et la feuille de style se voit au premier coup d'œil sur le diff : les
  * deux fichiers changent dans le même commit ou pas du tout.
  */
 export const TOKENS = {

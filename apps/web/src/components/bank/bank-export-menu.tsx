@@ -20,7 +20,7 @@ import { bankExportFileName, buildBankExportUrl } from '@/lib/data/export';
  *
  * Le menu les nomme au lieu de dire « Exporter » tout court. Un agent qui
  * cherche l'historique des transitions doit savoir, avant de télécharger, que
- * la deuxième feuille l'attend — sinon il exporte, n'y trouve pas son compte,
+ * la deuxième feuille l'attend : sinon il exporte, n'y trouve pas son compte,
  * et redemande le fichier à quelqu'un d'autre.
  *
  * Le classeur suit EXACTEMENT les filtres de l'écran : c'est la même promesse

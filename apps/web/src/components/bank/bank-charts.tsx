@@ -12,7 +12,7 @@ import { Chart } from '@/components/dashboard/chart-setup';
  * react-chartjs-2 (`Bar`, `Doughnut`) enregistrent LEUR contrôleur à
  * l'importation ; le composant générique `Chart`, lui, n'en enregistre aucun.
  * Sans ces deux lignes, le graphe des encaissements lève « bar is not a
- * registered controller » à l'exécution — et seulement à l'exécution.
+ * registered controller » à l'exécution : et seulement à l'exécution.
  */
 Chart.register(BarController, LineController);
 
@@ -27,11 +27,11 @@ import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
  * Deux choses les distinguent de ceux du tableau de bord des prospects :
  *
  * 1. Ils sont CLIQUABLES. Un segment renvoie vers la liste filtrée sur ce même
- *    segment — « 42 rejets pour document manquant » mène aux 42 dossiers. Sans
+ *    segment : « 42 rejets pour document manquant » mène aux 42 dossiers. Sans
  *    cela, l'agent lit un chiffre puis refait le filtre à la main, ce qui
  *    produit régulièrement une sélection différente de celle du graphique.
  * 2. Les montants passent par `xofToChartNumber`. C'est le SEUL endroit du
- *    panel où un montant devient un `number` — Chart.js ne trace rien d'autre —
+ *    panel où un montant devient un `number` : Chart.js ne trace rien d'autre -
  *    et la conversion est nommée pour ça. Tout ce qui est ÉCRIT (info-bulles,
  *    axes, totaux) repart de la chaîne d'origine via `formatXof`.
  *
@@ -105,7 +105,7 @@ export interface ClickableSlice {
   onSelect?: (() => void) | undefined;
 }
 
-/** Barres horizontales cliquables — répartition par étape, par motif, par agent. */
+/** Barres horizontales cliquables : répartition par étape, par motif, par agent. */
 export function BankRankChart({
   items,
   label,
@@ -149,7 +149,7 @@ export function BankRankChart({
   );
 }
 
-/** Anneau cliquable — part d'étape ou de banque. */
+/** Anneau cliquable : part d'étape ou de banque. */
 export function BankShareChart({ items }: { items: readonly ClickableSlice[] }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
@@ -229,7 +229,7 @@ export function CashingsOverTimeChart({
 
   // `'bar' | 'line'` : le type UNION est ce qui autorise un jeu de données
   // `line` dans un graphe `bar`. Typé `'bar'` seul, TypeScript refuse le
-  // second jeu — à raison, puisqu'il n'appartient pas au même contrôleur.
+  // second jeu : à raison, puisqu'il n'appartient pas au même contrôleur.
   const options: ChartOptions<'bar' | 'line'> = {
     ...baseOptions(theme, reducedMotion),
     scales: {

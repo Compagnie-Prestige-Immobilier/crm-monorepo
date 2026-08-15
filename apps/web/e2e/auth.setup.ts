@@ -4,7 +4,7 @@ import { expect, test as setup } from '@playwright/test';
  * Se connecte UNE fois et range les cookies de session sur disque.
  *
  * Ce n'est pas seulement une optimisation. L'API applique deux limiteurs de
- * débit — 10 connexions par minute et par IP, 300 requêtes par minute — et le
+ * débit : 10 connexions par minute et par IP, 300 requêtes par minute, et le
  * panel émet une dizaine d'appels par écran. Une suite qui se reconnecte à
  * chaque test épuise le quota, l'API répond 429, et les tests échouent pour une
  * raison qui n'a rien à voir avec ce qu'ils vérifient.

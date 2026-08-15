@@ -16,7 +16,7 @@ import type { ProspectFilters } from '@/lib/types';
  * Deux modes, deux significations.
  *
  * `filtered` décrit la population affichée. `consolidated` ignore
- * délibérément le critère de segment — c'est le CLASSEUR qui porte la
+ * délibérément le critère de segment : c'est le CLASSEUR qui porte la
  * segmentation, en cinq feuilles fixes (Consolidé, BDD1…BDD4). Envoyer
  * `segment=BDD2` avec `mode=consolidated` produirait quatre feuilles vides sur
  * cinq ; on le retire donc plutôt que de laisser l'utilisateur découvrir le
