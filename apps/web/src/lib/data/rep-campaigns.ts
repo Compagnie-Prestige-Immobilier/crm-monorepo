@@ -18,7 +18,7 @@ import type { Paginated } from '@/lib/types';
  * dans les campagnes prospects, qui tournent en production.
  *
  * Le seul emprunt est cosmétique : `slugForFileName`, pour que les deux liasses
- * qu'un commercial reçoit le même matin portent des noms de la même famille.
+ * qu'un téléconseiller reçoit le même matin portent des noms de la même famille.
  */
 
 type Schemas = components['schemas'];
@@ -119,7 +119,7 @@ export async function fetchRepCampaignPreview(
 // ─── Programme imprimable ───────────────────────────────────────────────────
 
 /**
- * URL du programme PDF d'un commercial.
+ * URL du programme PDF d'un téléconseiller.
  *
  * Elle vise le relais `/api/v1/*` de Next et non l'API directement : le jeton
  * vit dans un cookie `httpOnly`, hors de portée de `fetch` côté client, et un

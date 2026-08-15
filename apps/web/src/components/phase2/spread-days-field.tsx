@@ -22,7 +22,7 @@ import { formatNumber } from '@/lib/format';
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Sans étalement, une campagne sur toute la base produit UN programme par
- * commercial, de plusieurs centaines de pages, qu'aucun téléconseiller ne peut
+ * téléconseiller, de plusieurs centaines de pages, qu'aucun d'entre eux ne peut
  * ni imprimer ni tenir. Découpé en sept journées, le même tirage donne sept
  * liasses tenables, et la charge du jour devient une décision prise avant le
  * tirage plutôt qu'un constat après impression.
@@ -72,8 +72,8 @@ export function SpreadDaysField({
       </Select>
       <p className="text-[0.75rem] text-muted-foreground">
         {value === 1
-          ? 'Un programme unique par commercial.'
-          : `Un programme par jour et par commercial, soit ${formatNumber(value)} liasses chacun.`}
+          ? 'Un programme unique par téléconseiller.'
+          : `Un programme par jour et par téléconseiller, soit ${formatNumber(value)} liasses chacun.`}
       </p>
     </div>
   );
@@ -104,7 +104,7 @@ export function SpreadPreview({
     <div>
       <h3 className="flex items-center gap-2 pb-2 text-[0.8125rem] font-[600]">
         <CalendarRangeIcon className="size-4" aria-hidden="true" />
-        Charge par journée, pour un commercial
+        Charge par journée, pour un téléconseiller
       </h3>
       <ul className="grid gap-1.5 sm:grid-cols-2">
         {perDay.map((count, index) => (

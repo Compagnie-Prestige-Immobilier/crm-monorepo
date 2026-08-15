@@ -52,7 +52,8 @@ export function RepCampaignsView() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Répartition des représentants à rappeler entre les commerciaux choisis. Tirage définitif.
+          Répartition des représentants à rappeler entre les téléconseillers choisis. Tirage
+          définitif.
         </p>
         <Button
           type="button"

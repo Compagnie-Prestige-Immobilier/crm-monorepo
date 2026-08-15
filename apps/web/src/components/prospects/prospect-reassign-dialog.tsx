@@ -28,7 +28,7 @@ import type { ProspectRow } from '@/lib/types';
  * Deux rattachements distincts, et c'est la raison d'être de cet écran séparé :
  * le REPRÉSENTANT (qui a présenté le prospect, donc le département) et le
  * COMMERCIAL propriétaire (qui le voit dans son application). Les confondre
- * ferait disparaître un prospect de la tournée d'un commercial sans qu'il
+ * ferait disparaître un prospect de la tournée d'un téléconseiller sans qu'il
  * comprenne pourquoi.
  */
 export function ProspectReassignDialog({
@@ -120,8 +120,8 @@ export function ProspectReassignDialog({
             onChange={setCommercialId}
           />
           <p className="text-[0.75rem] text-muted-foreground">
-            Le représentant détermine le département. Le commercial propriétaire voit le prospect
-            dans l’application mobile.
+            Le représentant détermine le département. Le téléconseiller propriétaire voit le
+            prospect dans l’application mobile.
           </p>
         </div>
 
