@@ -9,7 +9,7 @@
 # Sans `output: 'standalone'`, .next/standalone n'est pas produit et l'étape
 # finale échoue sur un COPY introuvable. Le mode standalone n'embarque que les
 # modules réellement importés, ce qui fait passer l'image de ~1,2 Go à ~200 Mo
-# — la différence entre un déploiement de trente secondes et de cinq minutes
+#, la différence entre un déploiement de trente secondes et de cinq minutes
 # sur la liaison d'un VPS.
 
 ARG NODE_VERSION=24.18.0
@@ -42,7 +42,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile
 COPY --from=pruner /repo/out/full/ ./
 
-# Figé dans le bundle client au moment du build — d'où un ARG et non une
+# Figé dans le bundle client au moment du build, d'où un ARG et non une
 # variable d'environnement de runtime.
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}

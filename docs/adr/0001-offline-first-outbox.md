@@ -1,4 +1,4 @@
-# ADR 0001 — Synchronisation hors ligne : outbox partitionnée, LWW, pas de CRDT
+# ADR 0001 : Synchronisation hors ligne : outbox partitionnée, LWW, pas de CRDT
 
 **Statut** : accepté · **Date** : 2026-08-12
 
@@ -29,7 +29,7 @@ inter-appareils dénué de sens. Localement on trie par `seq`, côté serveur pa
 ### 2. Outbox partitionnée par représentant, pas FIFO global
 
 `dependencyKey` = l'identifiant du représentant. Ordre strict **à l'intérieur** d'une clé,
-indépendance totale **entre** clés — le modèle des partitions Kafka.
+indépendance totale **entre** clés : le modèle des partitions Kafka.
 
 Le FIFO global donnerait la garantie d'ordre gratuitement, mais au prix d'un blocage de tête
 total : **un seul numéro en doublon fige la synchronisation de tout l'appareil**. Avec le
@@ -46,7 +46,7 @@ parent _et_ partage sa `dependencyKey`, et un lot n'emporte qu'un préfixe conti
 - **Par lot** : un 409 sur l'opération 3 sur 200 annule 197 écritures valides. Le client rejoue,
   reproduit le même 409, et l'appareil se coince définitivement sur un mauvais numéro. Sur un
   lien 2G, réémettre 200 opérations pour échouer à l'identique est inacceptable.
-- **Par opération** : un prospect atterrit alors que le `create` de son représentant a échoué —
+- **Par opération** : un prospect atterrit alors que le `create` de son représentant a échoué :
   violation de clé étrangère, ou état incohérent visible par l'utilisateur.
 - **Par groupe** : atomicité de l'unité que l'utilisateur a réellement en tête (« ce
   représentant et ses prospects »), domaines de panne indépendants, durée de verrou bornée.
@@ -55,7 +55,7 @@ parent _et_ partage sa `dependencyKey`, et un lot n'emporte qu'un préfixe conti
 
 Le niveau lot couvre le cas courant : le serveur a écrit, la réponse s'est perdue, le client
 rejoue le lot identique. Il **ne couvre pas** le cas où 3 opérations sur 5 sont passées et où le
-client reconstitue un lot _différent_ sous un _nouveau_ `batchId` — seules les clés par opération
+client reconstitue un lot _différent_ sous un _nouveau_ `batchId` : seules les clés par opération
 rendent ce rejeu sûr.
 
 Le marqueur `IN_PROGRESS` s'insère dans sa **propre transaction, avant** la transaction de
@@ -88,7 +88,7 @@ ligne naît déjà derrière le curseur.
 
 Retenu : curseur opaque `{t, id}`, pagination keyset sur `(updatedAt, id)`, lecture avec un
 filigrane de 2 secondes. L'hypothèse « aucune transaction d'écriture ne dépasse 2 s » est
-**transformée en invariant** par un `statement_timeout = 2s` sur le rôle de synchronisation —
+**transformée en invariant** par un `statement_timeout = 2s` sur le rôle de synchronisation :
 c'est ce qui la rend sûre plutôt qu'optimiste.
 
 Une table `change_log(seq bigserial)` aurait le même défaut : la valeur de séquence est allouée
@@ -98,12 +98,12 @@ se fait sauter.
 ## Conséquences
 
 - Le moteur de synchronisation est du Dart pur sous `lib/core/sync/`, sans aucun import de
-  `package:flutter` ni de Riverpod — l'isolat WorkManager n'a ni arbre de widgets, ni conteneur
+  `package:flutter` ni de Riverpod : l'isolat WorkManager n'a ni arbre de widgets, ni conteneur
   Riverpod, ni plugins enregistrés. Une règle de lint interdit ces imports dans ce dossier.
 - L'état de synchronisation par ligne est **dérivé** d'une vue SQL joignant l'opération de tête
-  de l'outbox, jamais dénormalisé sur la ligne métier — une colonne dénormalisée se
+  de l'outbox, jamais dénormalisé sur la ligne métier : une colonne dénormalisée se
   désynchronise au premier chemin de code qui oublie de la mettre à jour.
 - La synchronisation en arrière-plan est un **complément**. Android 15 plafonne les services
   `dataSync` à 6 h par 24 h, Android 16 durcit les quotas JobScheduler, et les ROM Transsion et
-  Xiaomi — majoritaires au Sénégal — tuent les tâches de fond quoi qu'en dise AOSP. Le chemin
+  Xiaomi : majoritaires au Sénégal : tuent les tâches de fond quoi qu'en dise AOSP. Le chemin
   premier plan est le chemin principal, avec un compteur d'attente visible en permanence.
