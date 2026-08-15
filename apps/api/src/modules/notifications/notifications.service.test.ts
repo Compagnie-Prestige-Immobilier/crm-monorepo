@@ -10,6 +10,7 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import {
   DELIVERY_INBOX_ONLY,
   DELIVERY_RETRY_ERROR,
+  EMAIL_PERSIST_GROUP_SIZE,
   NotificationsService,
   buildEmailContent,
 } from './notifications.service.js';
@@ -27,6 +28,9 @@ import {
   classifyBrevoFailure,
   mapWithConcurrency,
   readBrevoErrorCode,
+  type BrevoDispatchResult,
+  type BrevoMessage,
+  type BrevoTransport,
 } from './brevo.transport.js';
 import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
@@ -240,6 +244,54 @@ describe('éventail', () => {
     expect(stalled?.error).toBe(DELIVERY_RETRY_ERROR);
   });
 
+  it('UNE LIVRAISON À RÉESSAYER LAISSE L’ENVOI PRENABLE, jamais SENT', async () => {
+    // LE DÉFAUT QUE CE TEST INTERDIT DE REVENIR. La notification était marquée
+    // SENT sans condition. Une seule adresse refusée passagèrement laissait donc
+    // sa livraison PENDING sous un envoi SENT, et `dispatchDue` ne reprend que
+    // les SCHEDULED échues et les SENDING dont le bail a expiré : plus rien ne
+    // revenait dessus. Le téléconseiller ne recevait pas son e-mail, et la
+    // plateforme affirmait le lui avoir envoyé.
+    brevo = new FakeBrevoTransport((email) =>
+      email === 'deux@cpi.sn'
+        ? { email, ok: false, errorCode: 'HTTP_429', kind: 'transient' }
+        : { email, ok: true },
+    );
+    brevo.configured = true;
+    service = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
+
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1', 'usr-2', 'usr-3'],
+    });
+
+    // SENDING et non SENT : c'est l'état qu'un bail expiré rend prenable.
+    expect(created.status).toBe(NotificationStatus.SENDING);
+    expect(created.sentAt).toBeNull();
+  });
+
+  it('et une fois TOUT tranché, l’envoi se referme sur SENT', async () => {
+    // Le pendant du test précédent : rester SENDING quand plus rien n'est à
+    // reprendre ferait repartir l'envoi toutes les quinze minutes pour rien.
+    // Un refus DÉFINITIF ne se réessaie pas, il ne doit donc pas retenir l'envoi.
+    brevo = new FakeBrevoTransport((email) =>
+      email === 'deux@cpi.sn'
+        ? { email, ok: false, errorCode: 'invalid_parameter', kind: 'permanent' }
+        : { email, ok: true },
+    );
+    brevo.configured = true;
+    service = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
+
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1', 'usr-2', 'usr-3'],
+    });
+
+    expect(created.status).toBe(NotificationStatus.SENT);
+    expect(created.sentAt).not.toBeNull();
+  });
+
   it('un échec passager repart au passage suivant, et finit par passer', async () => {
     let refuse = true;
     brevo = new FakeBrevoTransport((email) =>
@@ -320,6 +372,88 @@ describe('éventail', () => {
     expect(created.counts.failed).toBe(0);
     const detail = await service.get(created.id);
     expect(detail.recipients[0]?.error).toBe(DELIVERY_INBOX_ONLY);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Durabilité de l'acceptation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * CE QUE BREVO A ACCEPTÉ EST ACQUIS, MÊME SI LA SUITE MEURT.
+ *
+ * Confier un lot à Brevo est irréversible. Tant que la livraison n'est pas
+ * écrite `SENT`, la base ignore cet envoi : la notification garde son bail,
+ * expire, se fait reprendre, et le message repart vers des gens qui l'ont déjà
+ * reçu. En n'écrivant qu'à la fin, la fenêtre couvrait TOUTE l'expédition.
+ */
+describe('écriture des acceptations au fil de l’eau', () => {
+  /** Transport qui sert la première vague, puis meurt sur la seconde. */
+  class DyingBrevoTransport implements BrevoTransport {
+    readonly served: string[][] = [];
+    calls = 0;
+
+    isConfigured(): boolean {
+      return true;
+    }
+
+    unavailableReason(): string | null {
+      return null;
+    }
+
+    send(messages: readonly BrevoMessage[]): Promise<BrevoDispatchResult> {
+      this.calls += 1;
+      const recipients = messages.flatMap((message) =>
+        message.recipients.map((recipient) => recipient.email),
+      );
+      this.served.push(recipients);
+      // La seconde vague meurt APRÈS que la première a été acceptée : c'est
+      // exactement le processus tué en cours d'expédition.
+      if (this.calls === 2) return Promise.reject(new Error('processus interrompu'));
+      return Promise.resolve({
+        status: 'SENT',
+        outcomes: recipients.map((email) => ({ email, ok: true })),
+      });
+    }
+  }
+
+  const TOTAL = EMAIL_PERSIST_GROUP_SIZE + 8;
+  let dying: DyingBrevoTransport;
+
+  beforeEach(() => {
+    for (let index = 0; index < TOTAL; index += 1) {
+      const suffix = String(index);
+      db.addUser({ id: `usr-${suffix}`, role: Role.COMMERCIAL, email: `${suffix}@cpi.sn` });
+    }
+    dying = new DyingBrevoTransport();
+    service = new NotificationsService(db.asService(), fakeDemoVisibility(), dying);
+  });
+
+  it('LA REPRISE NE RENVOIE QUE CE QUI N’A PAS ÉTÉ ACCEPTÉ', async () => {
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.ROLE,
+      audienceRole: Role.COMMERCIAL,
+    });
+
+    // Deux vagues : la première acceptée, la seconde interrompue.
+    expect(dying.calls).toBe(2);
+    expect(dying.served[0]).toHaveLength(EMAIL_PERSIST_GROUP_SIZE);
+
+    // L'acceptation de la première vague est en base MALGRÉ l'interruption.
+    const acquises = db.deliveries.filter(
+      (row) => row.status === NotificationDeliveryStatus.SENT,
+    ).length;
+    expect(acquises).toBe(EMAIL_PERSIST_GROUP_SIZE);
+
+    // Et l'envoi reste prenable, puisqu'il reste des livraisons à reprendre.
+    expect(created.status).toBe(NotificationStatus.SENDING);
+
+    // LA PROPRIÉTÉ QUI COMPTE : la reprise ne réexpédie que les 8 restantes.
+    // Sans écriture au fil de l'eau, les 800 repartaient, et 792 personnes
+    // recevaient le message une seconde fois.
+    await service.dispatch(created.id);
+    expect(dying.served[2]).toHaveLength(8);
   });
 });
 
