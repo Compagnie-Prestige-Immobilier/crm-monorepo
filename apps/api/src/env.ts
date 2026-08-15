@@ -99,6 +99,24 @@ export const envSchema = z
     // détruit à l'échéance ou au premier téléchargement.
     DB_DUMP_DIR: z.string().min(1).default('./storage/db-dumps'),
 
+    // Interrupteur de la fonctionnalité elle-même, ÉTEINT PAR DÉFAUT, dans le
+    // même esprit que DEMO_MODE_ALLOWED plus bas : une clé d'environnement,
+    // hors de portée de l'interface, sans laquelle les routes n'existent pas.
+    //
+    // Ce n'est pas un réglage de confort. La fonctionnalité produit un second
+    // exemplaire complet de la clientèle sur un volume ; tant que la chaîne
+    // entière (unicité du travail, unicité de la livraison, borne de vie du
+    // fichier à travers les redémarrages) n'est pas jugée sûre pour un parc
+    // donné, la bonne posture est qu'elle soit INACCESSIBLE, et non simplement
+    // réservée aux ADMIN. Un déploiement qui ne pose pas cette variable rend
+    // 404 sur les trois routes, ce qui est l'état par défaut voulu.
+    //
+    // La garde `DbDumpEnabledGuard` l'applique à l'exécution. Le contrat
+    // OpenAPI, lui, décrit les routes en permanence : le désenregistrement du
+    // module les ferait disparaître du contrat généré (le générateur tourne
+    // sans cette variable), et le client web ne compilerait plus.
+    DB_DUMP_ENABLED: booleanFlag(false),
+
     // Garde-fou du mode démonstration. L'interrupteur lui-même vit en base
     // (table app_settings) et se manœuvre depuis le panel admin ; cette
     // variable est distincte et volontairement hors de portée de l'interface :

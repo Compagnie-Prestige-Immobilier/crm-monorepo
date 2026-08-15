@@ -48,15 +48,79 @@ export interface AuditRow {
   after: unknown;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LA DOUBLURE APPLIQUE LES PRÉDICATS. C'EST TOUT L'INTÉRÊT.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `create` refuse une clé déjà présente, et `updateMany` n'écrit QUE si son
+ * `where` correspond, en rendant le nombre de lignes touchées. Sans cela, les
+ * écritures conditionnelles du service (la prise du travail, la réservation du
+ * téléchargement, l'écriture réservée au propriétaire de la ligne) réussiraient
+ * toujours dans les tests, et les courses qu'elles existent pour arbitrer
+ * seraient exactement les seules choses qu'aucun test ne verrait.
+ *
+ * Une doublure permissive fait passer les tests d'un verrou qui n'en est pas un.
+ */
 export class FakeDumpStore {
   private value: string | null = null;
   readonly audits: AuditRow[] = [];
+
+  /**
+   * Posé pendant l'écriture conditionnelle, pour entrelacer deux appelants.
+   *
+   * C'est ce qui permet d'éprouver une VRAIE course : deux `request()` lancés
+   * ensemble, dont le second lit l'état pendant que le premier est suspendu
+   * juste avant d'écrire. Sans ce crochet, deux appels séquentiels ne
+   * prouveraient rien, la première écriture étant déjà commise.
+   */
+  onBeforeConditionalWrite: (() => Promise<void>) | null = null;
 
   readonly appSetting = {
     findUnique: ({ where }: { where: { key: string } }): Promise<{ value: string } | null> =>
       Promise.resolve(
         where.key === SETTING_KEY && this.value !== null ? { value: this.value } : null,
       ),
+
+    /** La clé est la clé primaire : un second insérant échoue, comme en base. */
+    create: ({ data }: { data: { key: string; value: string } }): Promise<{ value: string }> => {
+      if (this.value !== null) {
+        return Promise.reject(new Error('Unique constraint failed on the fields: (`key`)'));
+      }
+      this.value = data.value;
+      return Promise.resolve({ value: data.value });
+    },
+
+    updateMany: async ({
+      where,
+      data,
+    }: {
+      where: { key: string; value?: string | { contains: string } };
+      data: { value: string };
+    }): Promise<{ count: number }> => {
+      const hook = this.onBeforeConditionalWrite;
+      if (hook !== null) {
+        // Une seule fois : le crochet sert à ouvrir la fenêtre, pas à suspendre
+        // toutes les écritures qui suivent.
+        this.onBeforeConditionalWrite = null;
+        await hook();
+      }
+      if (where.key !== SETTING_KEY || this.value === null) return { count: 0 };
+
+      const expected = where.value;
+      if (typeof expected === 'string' && this.value !== expected) return { count: 0 };
+      if (
+        expected !== undefined &&
+        typeof expected === 'object' &&
+        !this.value.includes(expected.contains)
+      ) {
+        return { count: 0 };
+      }
+
+      this.value = data.value;
+      return { count: 1 };
+    },
+
     upsert: ({ create }: { create: { value: string } }): Promise<{ value: string }> => {
       this.value = create.value;
       return Promise.resolve({ value: create.value });

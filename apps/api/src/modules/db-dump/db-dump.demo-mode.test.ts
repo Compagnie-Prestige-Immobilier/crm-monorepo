@@ -74,6 +74,9 @@ beforeAll(() => {
 
 beforeEach(async () => {
   process.env.DB_DUMP_DIR = await mkdtemp(join(tmpdir(), 'cpi-dumps-demo-'));
+  // Ce fichier éprouve la politique de démonstration, pas l'interrupteur de la
+  // fonctionnalité : celui-ci est allumé pour que les routes existent.
+  process.env.DB_DUMP_ENABLED = 'true';
   store = new FakeDumpStore();
   runner = new FakeDumpRunner();
   demo = new FakeDemoVisibility();
