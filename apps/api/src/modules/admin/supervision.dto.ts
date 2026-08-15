@@ -4,7 +4,7 @@ import { Role } from '@crm/database';
 import { PRESENCE_ONLINE_WINDOW_MINUTES, type PresenceState } from './presence.js';
 
 /**
- * Supervision des comptes — téléconseillers et pôle Finances générales.
+ * Supervision des comptes, téléconseillers et pôle Finances générales.
  *
  * Les dates sont renvoyées BRUTES, en ISO 8601, jamais mises en forme ni
  * transformées en « il y a 4 minutes ». Un libellé relatif calculé côté serveur

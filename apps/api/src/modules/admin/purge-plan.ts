@@ -1,5 +1,5 @@
 /**
- * Plan de purge — la partie DÉCISIONNELLE, sans Prisma.
+ * Plan de purge, la partie DÉCISIONNELLE, sans Prisma.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * Deux notions distinctes vivent ici, et les confondre est le piège du sujet.
@@ -21,7 +21,7 @@
  * les arêtes `onDelete: Restrict`, les seules qui font échouer une suppression.
  * Les arêtes `Cascade` sont assurées par PostgreSQL et les arêtes `SetNull` ne
  * bloquent rien. Élargir `requires` au-delà de ces arêtes reviendrait à
- * supprimer des données que l'administrateur n'a pas demandées — ce qui est le
+ * supprimer des données que l'administrateur n'a pas demandées, ce qui est le
  * seul défaut irrattrapable d'un écran comme celui-ci.
  */
 
@@ -39,12 +39,24 @@ export const PURGE_STEP_ORDER = [
   'callTasks',
   'campaignMembers',
   'campaigns',
+  // Campagnes de représentants, dans le même ordre que leurs homologues
+  // prospects. Elles pointent vers `users` en `Restrict` (créateur, membre du
+  // tourniquet, affectataire, auteur de la tentative) : sans ces quatre étapes,
+  // la suppression des comptes téléconseillers échoue et emporte toute la
+  // transaction avec elle.
+  'repCallAttempts',
+  'repCallTasks',
+  'repCampaignMembers',
+  'repCampaigns',
+  // Les demandes de création pointent en `Restrict` vers `prospects` (le
+  // prospect issu de l'approbation), `banques` et `users`. Elles doivent donc
+  // partir avant ces trois-là, et non après.
+  'clientRequests',
   'prospects',
   'representants',
   'notificationDeliveries',
   'notifications',
   'notificationTemplates',
-  'deviceTokens',
   'syncOperations',
   'syncBatches',
   'auditLogs',
@@ -54,6 +66,9 @@ export const PURGE_STEP_ORDER = [
   'bankRejectionReasons',
   'banques',
   'syndicats',
+  // Les IEF pointent en `Restrict` vers les départements, et les représentants
+  // pointent en `Restrict` vers les IEF : elles se placent donc entre les deux.
+  'iefs',
   'departements',
   'regions',
 ] as const;
@@ -66,6 +81,8 @@ export const PURGE_DOMAIN_KEYS = [
   'representants',
   'prospects',
   'campagnes',
+  'campagnesRepresentants',
+  'demandesClients',
   'fileAppels',
   'tentatives',
   'dossiers',
@@ -122,24 +139,48 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     requires: ['fileAppels'],
   },
   {
+    key: 'campagnesRepresentants',
+    label: 'Campagnes d’appels aux représentants',
+    hint: 'Campagnes de relance, leur file d’appels et les tentatives enregistrées.',
+    steps: ['repCallAttempts', 'repCallTasks', 'repCampaignMembers', 'repCampaigns'],
+    requires: [],
+  },
+  {
+    key: 'demandesClients',
+    label: 'Demandes de création de client',
+    hint: 'Demandes déposées par les banques, arbitrées ou non.',
+    steps: ['clientRequests'],
+    requires: [],
+  },
+  {
     key: 'prospects',
     label: 'Prospects',
     hint: 'Fiches prospects, y compris l’annuaire répliqué sur mobile.',
     steps: ['prospects'],
-    requires: ['dossiers', 'tentatives', 'fileAppels'],
+    // `demandesClients` : une demande approuvée pointe en `Restrict` vers le
+    // prospect qu'elle a produit. La laisser derrière ferait échouer toute la
+    // transaction sur la première fiche née d'une demande bancaire.
+    requires: ['dossiers', 'tentatives', 'fileAppels', 'demandesClients'],
   },
   {
     key: 'representants',
     label: 'Représentants',
     hint: 'Fiches représentants.',
     steps: ['representants'],
-    requires: ['prospects'],
+    // `campagnesRepresentants` en plus de `prospects` : les tâches et les
+    // tentatives d'appel pendent du représentant en CASCADE. Sans cette
+    // dépendance, purger les seuls représentants les emportait silencieusement,
+    // sans qu'ils soient comptés dans le rapport rendu à l'administrateur, et
+    // en laissant des campagnes représentants aux files vidées. Le domaine
+    // `prospects` déclare déjà ses propres enfants en cascade pour la même
+    // raison : c'est la symétrie qui manquait.
+    requires: ['prospects', 'campagnesRepresentants'],
   },
   {
     key: 'notifications',
     label: 'Notifications',
-    hint: 'Envois, accusés, gabarits et appareils enregistrés.',
-    steps: ['notificationDeliveries', 'notifications', 'notificationTemplates', 'deviceTokens'],
+    hint: 'Envois, accusés de lecture et gabarits.',
+    steps: ['notificationDeliveries', 'notifications', 'notificationTemplates'],
     requires: [],
   },
   {
@@ -161,28 +202,44 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     label: 'Comptes téléconseillers',
     hint: 'Comptes et tout ce qu’ils ont saisi.',
     steps: ['commercialAccounts'],
-    requires: ['dossiers', 'tentatives', 'fileAppels', 'campagnes', 'prospects', 'representants'],
+    // `campagnesRepresentants` : le membre du tourniquet, l'affectataire d'une
+    // tâche et l'auteur d'une tentative pointent tous vers `users` en
+    // `Restrict`, exactement comme du côté prospects.
+    requires: [
+      'dossiers',
+      'tentatives',
+      'fileAppels',
+      'campagnes',
+      'campagnesRepresentants',
+      'prospects',
+      'representants',
+    ],
   },
   {
     key: 'finances',
     label: 'Comptes Finances générales',
-    hint: 'Comptes du pôle et dossiers qu’ils ont ouverts.',
+    hint: 'Comptes du pôle, dossiers qu’ils ont ouverts et demandes qu’ils ont déposées.',
     steps: ['financeAccounts'],
-    requires: ['dossiers'],
+    // `demandesClients` : `requestedById` pointe en `Restrict` vers le compte
+    // bancaire qui a déposé la demande.
+    requires: ['dossiers', 'demandesClients'],
   },
   {
     key: 'referentiels',
     label: 'Référentiels',
-    hint: 'Régions, départements, banques, syndicats, étapes et motifs de rejet.',
+    hint: 'Régions, départements, IEF, banques, syndicats, étapes et motifs de rejet.',
     steps: [
       'bankCaseStages',
       'bankRejectionReasons',
       'banques',
       'syndicats',
+      'iefs',
       'departements',
       'regions',
     ],
-    requires: ['dossiers', 'prospects', 'representants'],
+    // `demandesClients` : `banqueId` pointe en `Restrict` vers la banque
+    // demandeuse, qui ne peut donc pas partir avant elle.
+    requires: ['dossiers', 'prospects', 'representants', 'demandesClients'],
   },
 ];
 
@@ -211,7 +268,7 @@ export function isPurgeDomainKey(value: string): value is PurgeDomainKey {
  * dérive, et à raison.
  *
  * Le résultat est trié dans l'ordre de `PURGE_DOMAIN_KEYS` pour que deux
- * sélections équivalentes produisent la même réponse — sans quoi le récapitulatif
+ * sélections équivalentes produisent la même réponse, sans quoi le récapitulatif
  * changerait d'ordre selon celui des cases cochées.
  */
 export function expandPurgeSelection(
