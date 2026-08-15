@@ -368,13 +368,23 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
    * seule la session bancaire est ouverte ici, ce qui coûte UNE connexion sur
    * les dix par minute que l'API accorde.
    */
-  const stamp = String(Date.now());
+  const stamp = Date.now();
   const prenom = 'Coumba';
-  const nom = `Ndoye${stamp}`;
+  /**
+   * Le suffixe est écrit en base 36, et ce n'est pas de la coquetterie.
+   *
+   * Le dialogue répartit la recherche entre « nom » et « téléphone » selon la
+   * proportion de CHIFFRES du terme saisi. Un horodatage décimal en compte
+   * treize : « Coumba Ndoye1760000000000 » serait pris pour un numéro, la
+   * recherche partirait dans le champ téléphone, et l'assertion de
+   * pré-remplissage échouerait pour une raison qui n'a rien à voir avec ce
+   * qu'on éprouve. En base 36 le suffixe est surtout fait de lettres.
+   */
+  const nom = `Ndoye${stamp.toString(36)}`;
   // Préfixe `77` : une plage mobile que `libphonenumber` reconnaît pour le
   // Sénégal. Saisi avec ses espaces : c'est le SERVEUR qui normalise en E.164,
   // et c'est cette normalisation qui décide du doublon.
-  const suffix = stamp.slice(-7);
+  const suffix = String(stamp).slice(-7);
   const phone = `77 ${suffix.slice(0, 3)} ${suffix.slice(3, 5)} ${suffix.slice(5, 7)}`;
 
   const bankContext = await browser.newContext({ baseURL: WEB_URL });
@@ -427,9 +437,9 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
     await expect(bankPage.getByRole('heading', { name: 'Mes demandes', level: 1 })).toBeVisible();
     const suivi = bankPage.getByRole('listitem').filter({ hasText: nom });
     await expect(suivi).toContainText('En attente d’arbitrage par l’administration.');
-    await expect(
-      suivi.getByRole('button', { name: 'Approuver et créer le prospect' }),
-    ).toHaveCount(0);
+    await expect(suivi.getByRole('button', { name: 'Approuver et créer le prospect' })).toHaveCount(
+      0,
+    );
 
     // ─── L'administration arbitre ───────────────────────────────────────────
     await page.goto('/demandes-clients');
