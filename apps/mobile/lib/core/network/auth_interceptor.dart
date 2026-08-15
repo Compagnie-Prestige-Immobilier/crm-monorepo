@@ -18,7 +18,7 @@ class RefreshedTokens {
 ///
 /// Trois pièges de ce motif, tous évités ici volontairement.
 ///
-/// **1. Le renouvellement doit être en vol unique — et le vol unique ne suffit
+/// **1. Le renouvellement doit être en vol unique : et le vol unique ne suffit
 /// pas.** Cinq requêtes parties ensemble reviennent en 401 ensemble. Sans
 /// garde, cinq renouvellements concurrents partent ; le serveur révoque la
 /// famille de jetons au premier rejeu détecté (`/auth/refresh` révoque le jeton
@@ -177,7 +177,7 @@ class AuthInterceptor extends Interceptor {
     } on DioException catch (e) {
       // Un 401/403 sur le renouvellement veut dire « ce jeton ne vaut plus
       // rien » : la session est finie. Un timeout ou une coupure, en revanche,
-      // ne dit rien sur la validité du jeton — le détruire déconnecterait un
+      // ne dit rien sur la validité du jeton : le détruire déconnecterait un
       // commercial hors ligne qui n'a rien fait de mal.
       final int? status = e.response?.statusCode;
       if (status == 401 || status == 403) {

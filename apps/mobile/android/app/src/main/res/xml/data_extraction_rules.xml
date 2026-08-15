@@ -6,8 +6,8 @@
   l'autre au comportement par défaut, qui est « tout emporter ».
 
   Ici les deux sont vides de toute inclusion, donc rien ne sort. La base
-  `cpi_go.sqlite` contient l'annuaire de phase 2 — jusqu'à 500 000 numéros de
-  téléphone répliqués sur un appareil personnel — et l'outbox, c'est-à-dire des
+  `cpi_go.sqlite` contient l'annuaire de phase 2 : jusqu'à 500 000 numéros de
+  téléphone répliqués sur un appareil personnel : et l'outbox, c'est-à-dire des
   saisies terrain non encore transmises. Aucun des deux n'a de raison d'exister
   ailleurs que sur cet appareil et sur le serveur.
 

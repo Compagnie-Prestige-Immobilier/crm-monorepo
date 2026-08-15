@@ -20,7 +20,7 @@ import '../../auth/auth_state.dart';
 /// C'est ici, et nulle part ailleurs, que vivent les valeurs techniques :
 /// numéro de build, adresse du serveur, identifiant de compte. Sur un écran
 /// courant, un identifiant de base de données n'informe personne ; ici il a un
-/// usage précis — le dire au support — et un seul geste pour le transmettre.
+/// usage précis : le dire au support : et un seul geste pour le transmettre.
 class AboutScreen extends ConsumerWidget {
   const AboutScreen({super.key});
 

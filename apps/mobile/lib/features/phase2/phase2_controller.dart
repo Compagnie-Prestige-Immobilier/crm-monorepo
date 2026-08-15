@@ -21,7 +21,7 @@ enum Phase2Stage {
   /// Numéro absent de l'annuaire répliqué.
   notFound,
 
-  /// Dossier déjà clos côté serveur — lecture seule.
+  /// Dossier déjà clos côté serveur : lecture seule.
   alreadyClosed,
 
   /// Dossier ouvert : les trois cartes de méthode et l'issue négative.
@@ -48,7 +48,7 @@ class Phase2State {
 
   final Phase2Stage stage;
 
-  /// L'entrée d'annuaire trouvée. Six champs — pas de nom, pas de banque.
+  /// L'entrée d'annuaire trouvée. Six champs : pas de nom, pas de banque.
   final Phase2DirectoryData? entry;
 
   /// Le numéro normalisé qui a servi à chercher, tel qu'on veut le réafficher.
@@ -102,9 +102,12 @@ class Phase2State {
       identical(this, other) ||
       other is Phase2State &&
           other.stage == stage &&
-          other.entry?.prospectId == entry?.prospectId &&
-          other.entry?.phase2Status == entry?.phase2Status &&
-          other.entry?.enrollmentMethod == entry?.enrollmentMethod &&
+          // L'entrée ENTIÈRE, et non trois de ses champs : `rev` en fait
+          // partie, et c'est elle qui change quand un pull d'annuaire
+          // réconcilie un miroir optimiste. Comparée par morceaux, la
+          // réconciliation ne provoquait aucun rebuild et l'écran gardait à
+          // l'affichage un état que le serveur venait de contredire.
+          other.entry == entry &&
           other.searchedPhone == searchedPhone &&
           other.errorMessage == errorMessage &&
           other.confirmation == confirmation &&
@@ -117,9 +120,7 @@ class Phase2State {
   @override
   int get hashCode => Object.hash(
     stage,
-    entry?.prospectId,
-    entry?.phase2Status,
-    entry?.enrollmentMethod,
+    entry,
     searchedPhone,
     errorMessage,
     confirmation,
@@ -225,7 +226,7 @@ class Phase2Controller extends Notifier<Phase2State> {
     );
     // Coup de pouce au moteur, sans pull : on vient d'écrire, tirer maintenant
     // ne rapporterait rien et coûterait un aller-retour. Hors ligne, l'échec est
-    // silencieux et la ligne reste en file — c'est le comportement voulu.
+    // silencieux et la ligne reste en file : c'est le comportement voulu.
     ref.read(syncCoordinatorProvider.notifier).nudge();
     return true;
   }

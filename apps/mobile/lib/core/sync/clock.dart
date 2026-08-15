@@ -1,6 +1,6 @@
 /// Horloge injectable.
 ///
-/// Dart pur — voir `lib/core/sync/README` en tête de [SyncEngine] : rien dans ce
+/// Dart pur : voir `lib/core/sync/README` en tête de [SyncEngine] : rien dans ce
 /// dossier n'importe `package:flutter`.
 ///
 /// Le moteur de synchronisation calcule des back-offs, des baux et des fenêtres

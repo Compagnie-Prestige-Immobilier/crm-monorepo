@@ -5,7 +5,7 @@
 
   Depuis Android 9 (API 28), le trafic en clair est refusé par défaut, et la
   cible est `targetSdk = 36`. Le serveur de développement, lui, écoute en HTTP
-  sur `10.0.2.2:3001` — l'alias de la machine hôte vu depuis l'émulateur. Sans
+  sur `10.0.2.2:3001` : l'alias de la machine hôte vu depuis l'émulateur. Sans
   cette exception, toutes les requêtes échouent en `CLEARTEXT_NOT_PERMITTED`,
   qui remonte comme une simple erreur de connexion et se confond avec « pas de
   réseau ».

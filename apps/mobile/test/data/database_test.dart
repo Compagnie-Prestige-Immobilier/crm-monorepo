@@ -101,6 +101,7 @@ Future<void> _queueOp(
   required String entityId,
   String op = 'create',
   String status = 'pending',
+  String? dependencyKey,
   DateTime? nextAttemptAt,
 }) {
   return db
@@ -112,6 +113,7 @@ Future<void> _queueOp(
           entityId: entityId,
           op: op,
           payload: '{}',
+          dependencyKey: Value<String?>(dependencyKey),
           status: Value<String>(status),
           nextAttemptAt: nextAttemptAt ?? t0,
           createdAt: t0,
@@ -374,37 +376,88 @@ void main() {
       );
     });
 
-    test('claimableOutbox respecte nextAttemptAt et le bail', () async {
+    test('claimableOutbox écarte la suite d\'une chaîne empoisonnée', () async {
       await _queueOp(
         db,
-        id: 'ready',
+        id: 'tete-morte',
         entityType: 'representant',
         entityId: 'r1',
-        nextAttemptAt: t0.subtract(const Duration(minutes: 1)),
+        dependencyKey: 'r1',
+        status: 'failed',
       );
       await _queueOp(
         db,
-        id: 'later',
+        id: 'derriere',
+        entityType: 'prospect',
+        entityId: 'p1',
+        dependencyKey: 'r1',
+      );
+      await _queueOp(
+        db,
+        id: 'autre-cle',
         entityType: 'representant',
         entityId: 'r2',
-        nextAttemptAt: t0.add(const Duration(hours: 1)),
+        dependencyKey: 'r2',
+      );
+      // Sans `dependency_key` : sa propre partition, rien ne l'empoisonne.
+      await _queueOp(db, id: 'solo', entityType: 'representant', entityId: 'r3');
+
+      final List<OutboxData> claimable = await db.claimableOutbox(maxRows: 50).get();
+      expect(claimable.map((OutboxData o) => o.id), <String>['autre-cle', 'solo']);
+    });
+
+    test('une masse de lignes mortes ne masque pas le travail restant', () async {
+      // Le sélecteur lisait « les N premières lignes ouvertes ». Un échec de lot
+      // terminal en marque 200 d'un coup : la fenêtre de lecture se remplissait
+      // de travail mort et le travail réel, plus loin, devenait invisible.
+      for (int i = 0; i < 50; i++) {
+        await _queueOp(
+          db,
+          id: 'mort-$i',
+          entityType: 'representant',
+          entityId: 'rm$i',
+          dependencyKey: 'rm$i',
+          status: 'failed',
+        );
+      }
+      await _queueOp(
+        db,
+        id: 'vivant',
+        entityType: 'representant',
+        entityId: 'rv',
+        dependencyKey: 'rv',
+      );
+
+      final List<OutboxData> claimable = await db.claimableOutbox(maxRows: 10).get();
+      expect(claimable.map((OutboxData o) => o.id), <String>['vivant']);
+    });
+
+    test('countSchedulableOutbox ignore ce qu\'aucun worker ne débloquera', () async {
+      await _queueOp(db, id: 'a', entityType: 'representant', entityId: 'r1');
+      await _queueOp(
+        db,
+        id: 'b',
+        entityType: 'representant',
+        entityId: 'r2',
+        status: 'syncing',
       );
       await _queueOp(
         db,
-        id: 'leased',
+        id: 'c',
         entityType: 'representant',
         entityId: 'r3',
-        nextAttemptAt: t0.subtract(const Duration(minutes: 1)),
+        status: 'failed',
       );
-      await db.customStatement(
-        'UPDATE outbox SET lease_until = ? WHERE id = ?',
-        <Object?>[t0.add(const Duration(minutes: 5)).toIso8601String(), 'leased'],
+      await _queueOp(
+        db,
+        id: 'd',
+        entityType: 'representant',
+        entityId: 'r4',
+        status: 'conflict',
       );
 
-      final List<OutboxData> claimable = await db
-          .claimableOutbox(now: t0.toIso8601String(), maxRows: 50)
-          .get();
-      expect(claimable.map((OutboxData o) => o.id), <String>['ready']);
+      expect(await db.countPendingOutbox().getSingle(), 4);
+      expect(await db.countSchedulableOutbox().getSingle(), 2);
     });
   });
 
@@ -474,7 +527,7 @@ void main() {
         .customSelect('SELECT typeof(client_created_at) AS t FROM representants')
         .getSingle();
     // Stockés en secondes UNIX, deux écritures faites dans la même seconde
-    // deviendraient indiscernables — or c'est ce que le curseur keyset doit
+    // deviendraient indiscernables : or c'est ce que le curseur keyset doit
     // départager.
     expect(row.read<String>('t'), 'text');
   });

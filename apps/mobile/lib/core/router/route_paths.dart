@@ -16,7 +16,7 @@ abstract final class Routes {
   /// Historique : mes représentants dépliables vers leurs prospects.
   static const String historique = '/historique';
 
-  /// Phase 2 — saisie des méthodes d'enrôlement.
+  /// Phase 2 : saisie des méthodes d'enrôlement.
   ///
   /// Route de premier niveau, hors coque de navigation et **hors du parcours de
   /// phase 1** : c'est un autre travail, mené depuis un autre support (un
@@ -62,6 +62,28 @@ abstract final class Routes {
     path: newRepresentant,
     queryParameters: <String, String>{draftParam: draftId},
   ).toString();
+
+  /// Pré-remplissage venu d'une recherche restée sans résultat.
+  static const String prefillNameParam = 'nom';
+  static const String prefillPhoneParam = 'tel';
+
+  /// « J'ai cherché Ousmane, je ne l'ai pas trouvé, je le crée. »
+  ///
+  /// La requête tapée était **jetée** au passage : l'utilisateur retapait le
+  /// même nom ou le même numéro dans l'écran suivant. C'est un geste de plus au
+  /// moment précis où il en a déjà fait un pour rien.
+  static String newRepresentantPrefilled(String query) {
+    final String trimmed = query.trim();
+    if (trimmed.isEmpty) return newRepresentant;
+    // Chiffres et séparateurs de présentation seulement : c'est un numéro.
+    final bool looksLikePhone = RegExp(r'^[0-9+\s().-]+$').hasMatch(trimmed);
+    return Uri(
+      path: newRepresentant,
+      queryParameters: <String, String>{
+        looksLikePhone ? prefillPhoneParam : prefillNameParam: trimmed,
+      },
+    ).toString();
+  }
 
   /// `/login?next=<uri encodée>`.
   ///

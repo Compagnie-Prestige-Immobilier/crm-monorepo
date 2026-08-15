@@ -9,6 +9,7 @@ import '../../../core/sync/api_port.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../data/local/database.dart';
+import '../../../data/repositories/write_repository.dart';
 
 /// Feuille d'arbitrage : « ce numéro appartient à quelqu'un d'autre ».
 ///
@@ -26,10 +27,10 @@ import '../../../data/local/database.dart';
 /// tard jusqu'à une fusion automatique. On nomme donc explicitement le
 /// propriétaire et son département, et on laisse trois issues :
 ///
-/// * **Rattacher mes prospects** — c'est bien la même personne, mes prospects
+/// * **Rattacher mes prospects** : c'est bien la même personne, mes prospects
 ///   rejoignent sa fiche ; ma création de représentant est abandonnée ;
-/// * **Corriger le numéro** — c'est une faute de frappe, j'ouvre la fiche ;
-/// * **Supprimer** — j'abandonne cette saisie et ce qui en dépend.
+/// * **Corriger le numéro** : c'est une faute de frappe, j'ouvre la fiche ;
+/// * **Supprimer** : j'abandonne cette saisie et ce qui en dépend.
 Future<void> showOwnershipSheet({
   required BuildContext context,
   required OutboxData row,
@@ -106,8 +107,24 @@ class _OwnershipSheet extends ConsumerWidget {
             const SizedBox(height: CpiSpacing.xs),
             TextButton.icon(
               onPressed: () async {
-                await ref.read(writeRepositoryProvider).discardOperation(row.seq);
-                if (context.mounted) Navigator.of(context).pop();
+                final DiscardResult result = await ref
+                    .read(writeRepositoryProvider)
+                    .discardOperation(row.seq);
+                if (!context.mounted) return;
+                // On ne referme pas la feuille sur un refus : la saisie est
+                // toujours là, et la fermer laisserait croire qu'elle est
+                // partie.
+                if (result.outcome == DiscardOutcome.claimed) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Envoi en cours : réessayez dans quelques instants.',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop();
               },
               icon: Icon(PhosphorIconsRegular.trash, size: 20, color: cpi.syncFailed),
               label: Text(
@@ -131,7 +148,7 @@ class _OwnershipSheet extends ConsumerWidget {
     if (serverId == null) return;
     await ref.read(syncEngineProvider).remapEntityId(row.entityId, serverId);
     // La création du représentant n'a plus lieu d'être : la fiche existe déjà
-    // côté serveur. On l'abandonne SANS cascade — les prospects, eux, viennent
+    // côté serveur. On l'abandonne SANS cascade : les prospects, eux, viennent
     // d'être repointés et doivent partir.
     await ref.read(writeRepositoryProvider).discardOwnCreateOnly(row.id);
     await ref.read(syncCoordinatorProvider.notifier).run(pull: false);

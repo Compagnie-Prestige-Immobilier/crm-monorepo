@@ -27,7 +27,7 @@ void popOrHome(BuildContext context, {String fallback = Routes.home}) {
   final GoRouter? router = GoRouter.maybeOf(context);
   if (router == null) {
     // Aucun routeur : écran monté seul (test de widget, aperçu). On retombe sur
-    // le `Navigator` local plutôt que de lever — un écran ne doit jamais
+    // le `Navigator` local plutôt que de lever : un écran ne doit jamais
     // dépendre du routeur pour se construire.
     Navigator.of(context).maybePop();
     return;

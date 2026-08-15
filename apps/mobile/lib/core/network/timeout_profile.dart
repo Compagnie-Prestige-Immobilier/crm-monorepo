@@ -8,10 +8,10 @@ import 'package:dio/dio.dart';
 /// trois secondes rien qu'à monter : avec 3 s de `receiveTimeout`, aucun envoi
 /// n'aboutit jamais, et l'app se comporte comme si le serveur était mort.
 enum TimeoutProfile {
-  /// Lecture ordinaire (référentiels, lookup, pull) — 30 s.
+  /// Lecture ordinaire (référentiels, lookup, pull) : 30 s.
   read(Duration(seconds: 30)),
 
-  /// Envoi d'un lot d'outbox — 60 s. Un lot peut peser 512 ko et partir sur un
+  /// Envoi d'un lot d'outbox : 60 s. Un lot peut peser 512 ko et partir sur un
   /// lien montant saturé ; il vaut mieux attendre que réémettre.
   push(Duration(seconds: 60));
 

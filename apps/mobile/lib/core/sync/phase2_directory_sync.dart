@@ -1,10 +1,11 @@
+import 'package:crm_api_client/crm_api_client.dart';
 import 'package:drift/drift.dart';
 
 import '../../data/local/database.dart';
 import 'api_port.dart';
 import 'clock.dart';
 
-/// Réplication de l'annuaire de phase 2 — **Dart pur**.
+/// Réplication de l'annuaire de phase 2 : **Dart pur**.
 ///
 /// Volontairement séparée de `SyncEngine` et de son cycle de 60 secondes. Trois
 /// raisons :
@@ -18,7 +19,7 @@ import 'clock.dart';
 ///    progression affichée est indistinguable d'une app plantée. On rend donc la
 ///    progression, page par page.
 /// 3. **Le curseur est distinct.** Un curseur unique partagé avec le pull métier
-///    divergerait au premier téléchargement interrompu — et une reprise avec le
+///    divergerait au premier téléchargement interrompu : et une reprise avec le
 ///    mauvais curseur, ici, veut dire retélécharger 500 000 lignes.
 ///
 /// Aucun `import 'package:flutter/...'` : comme tout `lib/core/sync/`, ce
@@ -46,14 +47,6 @@ class Phase2DirectorySync {
   /// Clé de curseur dans `sync_state`. Distincte de celle de `SyncEngine`.
   static const String cursorKey = 'phase2_directory';
 
-  /// Les trois issues qui closent un dossier côté serveur. Les autres
-  /// (`UNREACHABLE`, `CALLBACK`, `OTHER`) laissent la tâche ouverte.
-  static const Set<String> terminalOutcomes = <String>{
-    'METHOD_OBTAINED',
-    'REFUSED',
-    'WRONG_NUMBER',
-  };
-
   bool _pulling = false;
 
   /// Vrai tant qu'un téléchargement est en cours. Lu par l'écran pour ne pas
@@ -71,7 +64,7 @@ class Phase2DirectorySync {
   /// [maxPages] borne le transfert. 300 pages × 2000 = 600 000 lignes, soit
   /// au-delà du plus gros portefeuille attendu ; la borne n'est pas une limite
   /// fonctionnelle, c'est le garde-fou qui empêche une boucle qui n'avancerait
-  /// pas — curseur non honoré, `hasMore` toujours vrai — de tourner
+  /// pas : curseur non honoré, `hasMore` toujours vrai : de tourner
   /// indéfiniment dans un isolat, batterie comprise.
   Future<int> pull({
     int maxPages = 300,
@@ -106,15 +99,15 @@ class Phase2DirectorySync {
 
   /// Écriture LWW par `rev`.
   ///
-  /// Le `WHERE` porte tout : sans lui, une page rejouée — curseur non avancé
-  /// après une coupure — réécrirait une ligne plus récente avec une version plus
+  /// Le `WHERE` porte tout : sans lui, une page rejouée : curseur non avancé
+  /// après une coupure : réécrirait une ligne plus récente avec une version plus
   /// ancienne. Ici, concrètement, cela ressusciterait un dossier déjà clos et le
   /// commercial rappellerait un numéro déjà traité.
   ///
   /// **`>=` et non `>`, contrairement au pull métier.** L'écart est délibéré et
   /// c'est lui qui rend la réconciliation possible : `markLocallyClosed` écrit
   /// un statut optimiste **sans incrémenter `rev`**. Si le serveur refuse cette
-  /// écriture (`PHASE2_ALREADY_COMPLETED`), sa propre `rev` n'a pas bougé — avec
+  /// écriture (`PHASE2_ALREADY_COMPLETED`), sa propre `rev` n'a pas bougé : avec
   /// un `>` strict, le pull suivant ne corrigerait donc jamais le miroir
   /// optimiste, et l'écran continuerait d'afficher une issue que le serveur n'a
   /// jamais acceptée. À `rev` égale, c'est le serveur qui a raison.
@@ -154,26 +147,32 @@ class Phase2DirectorySync {
   /// Miroir optimiste d'une issue terminale, écrit au moment de la saisie.
   ///
   /// Sans lui, le commercial qui vient d'enregistrer une méthode et qui
-  /// retaperait le même numéro — cela arrive, la pile de papier n'est pas
-  /// triée — retomberait sur le formulaire de saisie et enregistrerait une
+  /// retaperait le même numéro : cela arrive, la pile de papier n'est pas
+  /// triée : retomberait sur le formulaire de saisie et enregistrerait une
   /// seconde tentative que le serveur refuserait en `PHASE2_ALREADY_COMPLETED`.
   ///
   /// **`rev` n'est PAS incrémentée.** C'est délibéré : la ligne locale reste
   /// « en retard » d'une révision, donc le prochain pull, qui rapportera la
-  /// `rev` réellement attribuée par le serveur, l'emportera et réconciliera —
+  /// `rev` réellement attribuée par le serveur, l'emportera et réconciliera :
   /// y compris quand le serveur a tranché autrement que nous (conflit).
   Future<void> markLocallyClosed({
     required String prospectId,
     required String outcome,
     String? method,
   }) async {
-    if (!terminalOutcomes.contains(outcome)) return;
+    // CONVERSION EXPLICITE issue d'appel → statut de dossier. Écrire `outcome`
+    // directement fonctionnait par coïncidence de noms ; voir
+    // [Phase2Statuses.forOutcome].
+    final String? status = Phase2Statuses.forOutcome(outcome);
+    if (status == null) return;
     await (_db.update(
       _db.phase2Directory,
     )..where((Phase2Directory t) => t.prospectId.equals(prospectId))).write(
       Phase2DirectoryCompanion(
-        phase2Status: Value<String>(outcome),
-        enrollmentMethod: Value<String?>(outcome == 'METHOD_OBTAINED' ? method : null),
+        phase2Status: Value<String>(status),
+        enrollmentMethod: Value<String?>(
+          status == Phase2Statuses.methodObtained ? method : null,
+        ),
         updatedAt: Value<DateTime>(_clock.now()),
       ),
     );
@@ -183,6 +182,20 @@ class Phase2DirectorySync {
       _db.phase2ByPhone(phone: phoneE164).getSingleOrNull();
 
   Future<int> count() => _db.countPhase2Directory().getSingle();
+
+  /// Dossiers que mes appels ont clos.
+  ///
+  /// En Dart et non en requête nommée : la liste des issues terminales était
+  /// retapée dans le SQL, ce qui en faisait une quatrième copie d'une règle que
+  /// seul le serveur tranche. Ici, elle est LUE depuis [CallOutcomes.terminal].
+  Future<int> countClosed() {
+    final Expression<int> total = _db.callAttempts.id.count();
+    return (_db.selectOnly(_db.callAttempts)
+          ..addColumns(<Expression<Object>>[total])
+          ..where(_db.callAttempts.outcome.isIn(CallOutcomes.terminal)))
+        .map((TypedResult row) => row.read(total) ?? 0)
+        .getSingle();
+  }
 
   Stream<int> watchCount() => _db.countPhase2Directory().watchSingle();
 
@@ -211,7 +224,7 @@ class Phase2DirectorySync {
   }
 
   /// Efface l'annuaire, les tentatives locales, leurs opérations en file et le
-  /// curseur — **tout ce que la phase 2 a posé sur cet appareil**.
+  /// curseur : **tout ce que la phase 2 a posé sur cet appareil**.
   ///
   /// Appelée à la déconnexion. Un annuaire de 500 000 numéros qui survivrait au
   /// départ de son propriétaire sur un téléphone personnel n'est pas un détail
@@ -220,7 +233,7 @@ class Phase2DirectorySync {
   ///
   /// Le curseur part avec le reste. Le conserver ferait croire au prochain
   /// utilisateur que son annuaire est à jour alors qu'il est vide, et le pull
-  /// delta suivant ne ramènerait que les lignes modifiées depuis — c'est-à-dire
+  /// delta suivant ne ramènerait que les lignes modifiées depuis : c'est-à-dire
   /// presque rien.
   Future<void> purge() async {
     await _db.transaction(() async {
@@ -239,12 +252,17 @@ class Phase2DirectorySync {
 /// Nom d'entité de la phase 2 dans l'outbox et dans le contrat de push.
 ///
 /// Constante et non littéral : une faute de frappe produirait des opérations
-/// que le sélecteur classerait en `prospect` — le moteur ne fait pas de
-/// distinction par défaut — et le serveur les refuserait sans que rien n'indique
+/// que le sélecteur classerait en `prospect` : le moteur ne fait pas de
+/// distinction par défaut : et le serveur les refuserait sans que rien n'indique
 /// pourquoi.
 const String callAttemptEntity = 'call_attempt';
 
 /// Issues d'un appel, telles que le serveur les nomme.
+///
+/// Les valeurs viennent de l'énumération GÉNÉRÉE depuis `apps/api/openapi.json`
+/// et ne sont plus retapées : le membre `unknown_default_open_api` est écarté,
+/// il décrit une valeur que ce client ne connaît pas encore et qu'aucun écran ne
+/// doit jamais proposer à la saisie.
 abstract final class CallOutcomes {
   static const String methodObtained = 'METHOD_OBTAINED';
   static const String unreachable = 'UNREACHABLE';
@@ -253,39 +271,76 @@ abstract final class CallOutcomes {
   static const String wrongNumber = 'WRONG_NUMBER';
   static const String other = 'OTHER';
 
-  static const List<String> all = <String>[
-    methodObtained,
-    unreachable,
-    callback,
-    refused,
-    wrongNumber,
-    other,
-  ];
+  static final List<String> all = CallOutcome.values
+      .where((CallOutcome o) => o != CallOutcome.unknownDefaultOpenApi)
+      .map((CallOutcome o) => o.value)
+      .toList(growable: false);
 
-  /// Les issues qui closent le dossier. `METHOD_OBTAINED` exige une méthode ;
-  /// `REFUSED` et `WRONG_NUMBER` sont terminales sans méthode.
-  static const Set<String> terminal = <String>{methodObtained, refused, wrongNumber};
+  /// Les issues qui closent le dossier.
+  ///
+  /// ═══ UNE SEULE DÉFINITION, DÉRIVÉE ═══
+  ///
+  /// Cet ensemble était écrit QUATRE fois : ici, dans
+  /// `Phase2DirectorySync.terminalOutcomes`, dans la requête `countMyClosed` de
+  /// `schema.drift`, et côté serveur. Quatre copies d'une règle que le serveur
+  /// est seul à trancher : la première divergence se serait vue en production,
+  /// sous la forme d'un dossier compté clos localement et rouvert au pull
+  /// suivant.
+  ///
+  /// La dérivation est exacte : une issue est terminale si et seulement si elle
+  /// correspond à un [Phase2Status]. C'est la définition même du serveur, et
+  /// c'est ce qui rend `markLocallyClosed` typable.
+  static final Set<String> terminal = Phase2Statuses.all
+      .where((String s) => s != Phase2Statuses.pending)
+      .toSet();
 }
 
-/// Méthodes d'enrôlement.
+/// Méthodes d'enrôlement, dérivées de l'énumération générée.
+///
+/// Retapées à la main, elles rendaient inopérant le `enumUnknownDefaultCase:
+/// true` d'`openapi-config.yaml`, dont c'est précisément le rôle : accueillir un
+/// membre ajouté côté serveur sans rien casser.
 abstract final class EnrollmentMethods {
   static const String platform = 'PLATFORM';
   static const String physical = 'PHYSICAL';
   static const String voiceOrElectronicMessaging = 'VOICE_OR_ELECTRONIC_MESSAGING';
 
-  static const List<String> all = <String>[
-    platform,
-    physical,
-    voiceOrElectronicMessaging,
-  ];
+  static final List<String> all = EnrollmentMethod.values
+      .where((EnrollmentMethod m) => m != EnrollmentMethod.unknownDefaultOpenApi)
+      .map((EnrollmentMethod m) => m.value)
+      .toList(growable: false);
 }
 
-/// Statuts de phase 2 d'un dossier. **Quatre valeurs, distinctes des six issues
-/// d'appel** — les confondre ferait écrire `CALLBACK` dans une colonne que le
-/// serveur n'accepte pas.
+/// Statuts de phase 2 d'un dossier. **Distincts des issues d'appel** : les
+/// confondre ferait écrire `CALLBACK` dans une colonne que le serveur n'accepte
+/// pas.
 abstract final class Phase2Statuses {
   static const String pending = 'PENDING';
   static const String methodObtained = 'METHOD_OBTAINED';
   static const String refused = 'REFUSED';
   static const String wrongNumber = 'WRONG_NUMBER';
+
+  static final List<String> all = Phase2Status.values
+      .where((Phase2Status s) => s != Phase2Status.unknownDefaultOpenApi)
+      .map((Phase2Status s) => s.value)
+      .toList(growable: false);
+
+  /// Le statut de dossier correspondant à une issue d'appel, ou `null` si cette
+  /// issue ne clôt rien.
+  ///
+  /// ═══ CE QUE `markLocallyClosed` FAISAIT ═══
+  ///
+  /// Elle écrivait une valeur de `CallOutcome` dans une colonne de
+  /// `Phase2Status`. Ça marchait, mais **par coïncidence** : trois membres
+  /// portent le même nom dans les deux énumérations. Le jour où le serveur
+  /// renomme une issue, ou en ajoute une terminale qui ne porte pas le nom du
+  /// statut, la ligne locale reçoit une valeur que le serveur n'accepte pas et
+  /// l'écran affiche un état qui n'existe pas.
+  ///
+  /// La conversion est maintenant EXPLICITE et rend `null` pour les trois issues
+  /// non terminales (`UNREACHABLE`, `CALLBACK`, `OTHER`).
+  static String? forOutcome(String outcome) {
+    if (outcome == pending) return null;
+    return all.contains(outcome) ? outcome : null;
+  }
 }

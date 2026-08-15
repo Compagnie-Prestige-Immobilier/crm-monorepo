@@ -4,7 +4,7 @@ import 'package:cpi_go/core/sync/backoff.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('Backoff — plafond exponentiel', () {
+  group('Backoff : plafond exponentiel', () {
     test('min(2 s × 2^(n-1), 15 min)', () {
       final Backoff b = Backoff(random: Random(1));
       expect(b.ceilingFor(1), const Duration(seconds: 2));
@@ -16,7 +16,7 @@ void main() {
       expect(b.ceilingFor(10), const Duration(minutes: 15));
       expect(b.ceilingFor(30), const Duration(minutes: 15));
       // Décalage borné : sans le `clamp(0, 30)`, `1 << 200` déborderait et
-      // rendrait un délai négatif — un réessai immédiat en boucle.
+      // rendrait un délai négatif : un réessai immédiat en boucle.
       expect(b.ceilingFor(200), const Duration(minutes: 15));
       expect(b.ceilingFor(0), Duration.zero);
       expect(b.ceilingFor(-3), Duration.zero);
@@ -31,7 +31,7 @@ void main() {
     });
   });
 
-  group('Backoff — gigue COMPLÈTE, pas égale', () {
+  group('Backoff : gigue COMPLÈTE, pas égale', () {
     test('un tirage nul donne un délai nul', () {
       // C'est LA propriété qui distingue les deux. Avec une gigue égale
       // (`delai/2 + random(0, delai/2)`), ce délai vaudrait 128 s : jamais zéro,
@@ -51,7 +51,7 @@ void main() {
     test('trente appareils qui se reconnectent ensemble ne se resynchronisent pas', () {
       // Le scénario réel : une antenne revient, trente téléphones qui ont
       // accumulé une file repartent dans la même seconde. Avec une gigue
-      // égale, ils réessaient TOUS après au moins `delai/2` — c'est-à-dire à
+      // égale, ils réessaient TOUS après au moins `delai/2` : c'est-à-dire à
       // nouveau ensemble, sur un backhaul qui vient à peine de se rétablir.
       final Backoff b = Backoff(random: Random(20260812));
       const int attempts = 8; // plafond : 256 000 ms

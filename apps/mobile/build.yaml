@@ -5,7 +5,7 @@ targets:
         options:
           # Les horodatages voyagent en ISO-8601 avec les millisecondes. Stockés
           # en secondes UNIX (défaut de drift), deux écritures faites dans la
-          # même seconde deviendraient indiscernables — or c'est exactement ce
+          # même seconde deviendraient indiscernables : or c'est exactement ce
           # que le curseur keyset (updated_at, id) doit départager.
           #
           # Conséquence assumée : drift sérialise un DateTime local avec son

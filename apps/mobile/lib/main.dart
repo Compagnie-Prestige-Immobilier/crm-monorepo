@@ -5,17 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
 import 'core/background/background_sync.dart';
 import 'core/providers/app_providers.dart';
-import 'core/push/firebase_push_transport.dart';
-import 'core/push/push_background.dart';
-import 'core/push/push_transport.dart';
-import 'features/notifications/notifications_controller.dart';
 import 'data/local/connection.dart';
 import 'data/local/database.dart';
 import 'data/repositories/draft_repository.dart';
@@ -23,8 +18,8 @@ import 'data/repositories/draft_repository.dart';
 /// Point d'entrée.
 ///
 /// La base, les préférences et le numéro de build sont résolus **avant** le
-/// premier cadre, et injectés par surcharge de providers. L'alternative — un
-/// `FutureProvider` que l'arbre attend — ferait démarrer l'app sur un écran de
+/// premier cadre, et injectés par surcharge de providers. L'alternative : un
+/// `FutureProvider` que l'arbre attend : ferait démarrer l'app sur un écran de
 /// chargement à chaque lancement, et empêcherait de restaurer la dernière route
 /// dès le premier cadre.
 Future<void> main() async {
@@ -33,7 +28,7 @@ Future<void> main() async {
   // En debug seulement : matérialise l'arbre de sémantique. Sans lui, l'app est
   // un rectangle opaque pour `uiautomator` et aucun test d'interface piloté
   // depuis l'extérieur n'est possible. En release, c'est le lecteur d'écran qui
-  // décide — on ne paie pas l'arbre si personne ne le lit.
+  // décide : on ne paie pas l'arbre si personne ne le lit.
   if (kDebugMode) {
     SemanticsBinding.instance.ensureSemantics();
   }
@@ -65,50 +60,21 @@ Future<void> main() async {
   // appareil lent pour un bénéfice nul.
   unawaited(_initBackground());
 
-  // Le transport push est résolu AVANT le premier cadre, mais son
-  // initialisation ne peut pas échouer bruyamment : sans projet Firebase,
-  // `initialize()` renvoie `false` et l'application démarre normalement avec un
-  // transport inerte. Cf. `core/push/firebase_push_transport.dart`.
-  final PushTransport push = await _initPush();
-
+  // Aucun transport push à initialiser : Firebase est abandonné (il exige un
+  // compte Google) et `pushTransportProvider` rend déjà le transport inerte par
+  // défaut. Les annonces arrivent par l'inbox applicative, rapatriée par
+  // `NotificationsCoordinator` (ouverture de session, retour au premier plan,
+  // fin de cycle de synchronisation).
   runApp(
     ProviderScope(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
         sharedPreferencesProvider.overrideWithValue(preferences),
         buildNumberProvider.overrideWithValue(packageInfo.buildNumber),
-        pushTransportProvider.overrideWithValue(push),
       ],
       child: const CpiGoApp(),
     ),
   );
-}
-
-/// Prépare Firebase Messaging et enregistre le gestionnaire d'arrière-plan.
-///
-/// `onBackgroundMessage` exige une fonction de PREMIER NIVEAU annotée
-/// `@pragma('vm:entry-point')` : elle est appelée depuis le moteur, dans un
-/// isolat neuf, sans jamais passer par du code Dart appelant. Une fermeture ou
-/// une méthode d'instance y serait introuvable.
-///
-/// L'enregistrement est fait même quand le transport est indisponible : il ne
-/// coûte rien, et il évite un chemin conditionnel de plus le jour où Firebase
-/// sera provisionné.
-Future<PushTransport> _initPush() async {
-  final FirebasePushTransport transport = FirebasePushTransport();
-  try {
-    final bool ready = await transport.initialize();
-    if (ready) {
-      FirebaseMessaging.onBackgroundMessage(cpiPushBackgroundHandler);
-    }
-    return ready ? transport : const NullPushTransport();
-  } on Object catch (e) {
-    // Une plateforme qui refuse Firebase ne doit pas empêcher l'application de
-    // démarrer : la prospection hors ligne est le métier, les notifications
-    // sont un confort.
-    debugPrint('Notifications push indisponibles : $e');
-    return const NullPushTransport();
-  }
 }
 
 Future<void> _initBackground() async {

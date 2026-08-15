@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 
 import 'request_id_interceptor.dart';
 
-/// Journalisation — **dernier** de la chaîne.
+/// Journalisation : **dernier** de la chaîne.
 ///
 /// Dernier, et pas premier : posé en tête il journaliserait la requête *avant*
 /// que l'authentification et le rejeu ne l'aient touchée, c'est-à-dire une
@@ -14,7 +14,7 @@ import 'request_id_interceptor.dart';
 /// **Ce qui n'est jamais journalisé** : `Authorization`, le corps de
 /// `/auth/login` et `/auth/refresh`. Un jeton dans `logcat` est un jeton
 /// exfiltrable par n'importe quelle application capable de lire les journaux sur
-/// un appareil rooté — et une bonne part du parc visé l'est.
+/// un appareil rooté : et une bonne part du parc visé l'est.
 class LoggingInterceptor extends Interceptor {
   const LoggingInterceptor({this.enabled = true});
 

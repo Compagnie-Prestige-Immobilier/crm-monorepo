@@ -2,13 +2,13 @@ import 'package:drift/drift.dart';
 
 import '../local/database.dart';
 
-/// Lectures des référentiels et des listes — **Dart pur**.
+/// Lectures des référentiels et des listes : **Dart pur**.
 ///
 /// Toutes les recherches de l'app (département, banque, syndicat) tapent
 /// **uniquement la base locale**. C'est le point de conception : la saisie doit
 /// être instantanée et fonctionner sans réseau. Une autocomplétion qui
 /// interrogerait le serveur mettrait 4 s à répondre sur un lien EDGE et
-/// afficherait une liste vide dans un village — c'est-à-dire exactement là où
+/// afficherait une liste vide dans un village : c'est-à-dire exactement là où
 /// l'app sert.
 class ReferenceRepository {
   ReferenceRepository(this._db);
@@ -97,15 +97,34 @@ class ReferenceRepository {
   ///
   /// Le filtre est en SQL et pas en Dart : à 400 représentants, filtrer en Dart
   /// signifie relire et désérialiser 400 lignes à chaque frappe de la recherche.
-  Stream<List<RepresentantSyncViewData>> watchRepresentants({String? search}) {
+  ///
+  /// ## Pourquoi une LIMITE, comme pour les prospects
+  ///
+  /// Cette requête est un FLUX drift adossé à `representants` **et à `outbox`**.
+  /// L'outbox change à chaque écriture, à chaque prise de bail, à chaque
+  /// acquittement : c'est-à-dire des centaines de fois pendant une vidange. À
+  /// chacun de ces changements, la vue entière était rematérialisée : jointure
+  /// sur l'outbox comprise, sans borne. L'équivalent prospect était plafonné à
+  /// 500 depuis le début ; l'omission ici était une omission, pas une décision.
+  ///
+  /// Au-delà de la limite, c'est le champ de recherche qui prend le relais : il
+  /// filtre en SQL, donc il atteint toujours la fiche voulue.
+  Stream<List<RepresentantSyncViewData>> watchRepresentants({
+    String? search,
+    int limit = 500,
+  }) {
     final String pattern = '%${(search ?? '').trim().toLowerCase()}%';
     return _db
         .customSelect(
           'SELECT * FROM representant_sync_view '
           'WHERE deleted_at IS NULL '
           '  AND (?1 = \'%%\' OR lower(full_name) LIKE ?1 OR phone_e164 LIKE ?1) '
-          'ORDER BY client_created_at DESC',
-          variables: <Variable<Object>>[Variable<String>(pattern)],
+          'ORDER BY client_created_at DESC '
+          'LIMIT ?2',
+          variables: <Variable<Object>>[
+            Variable<String>(pattern),
+            Variable<int>(limit),
+          ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.representants,
             _db.outbox,

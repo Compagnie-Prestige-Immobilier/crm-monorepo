@@ -1,4 +1,4 @@
--- Schéma local de CPI GO — miroir hors ligne de packages/database/prisma/schema.prisma.
+-- Schéma local de CPI GO : miroir hors ligne de packages/database/prisma/schema.prisma.
 --
 -- Écrit en SQL et non en tables Dart, pour trois raisons qui sont toutes des
 -- contraintes du serveur qu'on doit reproduire au caractère près :
@@ -6,7 +6,7 @@
 --      exprimable dans le DSL Dart de drift ;
 --   2. `ON UPDATE CASCADE` sur prospects.representant_id est porteur (voir plus
 --      bas) et doit apparaître tel quel dans le DDL ;
---   3. les vues dérivent `sync_status` par jointure sur l'outbox — c'est du SQL,
+--   3. les vues dérivent `sync_status` par jointure sur l'outbox : c'est du SQL,
 --      pas un modèle objet.
 --
 -- Les identifiants sont des UUID v7 générés PAR LE CLIENT. C'est ce qui rend la
@@ -14,7 +14,7 @@
 -- avant que l'un ou l'autre n'ait jamais vu le serveur.
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Référentiels — tirés du serveur, jamais écrits localement
+-- Référentiels : tirés du serveur, jamais écrits localement
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE TABLE departements (
@@ -31,7 +31,7 @@ CREATE TABLE departements (
 
 CREATE INDEX departements_active_idx ON departements (is_active, name);
 
--- Les IEF — Inspections de l'Éducation et de la Formation.
+-- Les IEF : Inspections de l'Éducation et de la Formation.
 --
 -- Découpage SCOLAIRE, distinct du découpage administratif : 59 IEF pour
 -- 46 départements, et quatre IEF dans le seul département de Dakar. Les
@@ -138,8 +138,13 @@ CREATE TABLE prospects (
     representant_id TEXT NOT NULL
         REFERENCES representants (id) ON UPDATE CASCADE ON DELETE RESTRICT,
     created_by_id TEXT NOT NULL,
-    statut TEXT NOT NULL DEFAULT 'NOUVEAU'
-        CHECK (statut IN ('NOUVEAU', 'CONTACTE', 'CONVERTI', 'PERDU')),
+    -- Pas de CHECK d'énumération : la valeur vient du SERVEUR, par le pull.
+    -- Un `ProspectStatut` ajouté côté serveur arrive en `unknown_default_open_api`
+    -- (c'est le rôle d'`enumUnknownDefaultCase: true` dans openapi-config.yaml)
+    -- et un CHECK figé ABORTAIT la transaction de pull entière : la page était
+    -- perdue, le curseur n'avançait pas, et la synchronisation s'arrêtait sur
+    -- une valeur que ce client n'avait pas à comprendre pour la stocker.
+    statut TEXT NOT NULL DEFAULT 'NOUVEAU',
     client_created_at DATETIME NOT NULL,
     rev INTEGER NOT NULL DEFAULT 1,
     local_updated_at DATETIME NOT NULL,
@@ -185,11 +190,41 @@ CREATE TABLE outbox (
     base_rev INTEGER NULL,
     status TEXT NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'syncing', 'done', 'conflict', 'failed')),
+    -- Tentatives dont le SERVEUR est responsable : refus, 5xx, absence de
+    -- verdict. Ce sont elles, et elles seules, qui mènent à `failed` par
+    -- épuisement.
     attempts INTEGER NOT NULL DEFAULT 0,
+    -- Tentatives BLOQUÉES : le serveur a répondu, mais l'opération n'a pas été
+    -- jugée (dépendance non résolue, statut inconnu). Compteur séparé pour deux
+    -- raisons qui sont deux bugs distincts :
+    --   1. brûler `attempts` pour la faute d'une AUTRE opération tuerait une
+    --      saisie parfaitement valide ;
+    --   2. ne rien compter du tout laissait `attempts` à zéro, donc un délai de
+    --      back-off nul, donc cinquante réémissions par vidange, toutes les
+    --      soixante secondes, indéfiniment, sans jamais devenir visible dans
+    --      « À corriger ».
+    -- Il porte donc son propre plancher (30 s) et son propre plafond, au terme
+    -- duquel la ligne passe en `failed` et devient actionnable.
+    blocked_attempts INTEGER NOT NULL DEFAULT 0,
     next_attempt_at DATETIME NOT NULL,
     -- Bail pris par l'isolat qui traite la ligne. Sans bail, l'isolat WorkManager
     -- et l'isolat UI peuvent envoyer la même opération deux fois.
     lease_until DATETIME NULL,
+    -- Jeton de possession, écrit dans la MÊME instruction que le bail.
+    --
+    -- Le bail seul dit « quelqu'un travaille sur cette ligne » ; il ne dit pas
+    -- QUI. Toutes les écritures d'après-envoi (verdict, remise en file, échec,
+    -- réparation d'horloge, récupération de bail) désignaient la ligne par son
+    -- seul `seq`. Un isolat dont le bail a expiré pendant qu'il attendait le
+    -- réseau revenait donc écrire son verdict sur une ligne qu'un AUTRE isolat
+    -- avait déjà reprise et renvoyée : le verdict du premier envoi écrasait
+    -- l'état du second, et une opération réellement en attente passait `done`.
+    --
+    -- Le jeton rend chaque écriture conditionnelle : `WHERE seq = ? AND
+    -- claim_token = ?`. Un écrivain qui n'est plus le propriétaire ne met à jour
+    -- aucune ligne, ce qui est exactement le comportement voulu : ne rien faire,
+    -- pas écraser. Il est remis à NULL dès que la ligne est relâchée.
+    claim_token TEXT NULL,
     batch_id TEXT NULL,
     last_error_code TEXT NULL,
     last_error_msg TEXT NULL,
@@ -227,18 +262,18 @@ CREATE TABLE sync_state (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Phase 2 — annuaire d'enrôlement
+-- Phase 2 : annuaire d'enrôlement
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- SIX COLONNES, JAMAIS UNE DE PLUS. C'est une frontière de confidentialité, pas
 -- une préférence de modélisation.
 --
 -- Cette table est répliquée sur le téléphone PERSONNEL de chaque commercial,
--- hors ligne, et couvre l'intégralité du portefeuille — 50 000 à 500 000 lignes.
+-- hors ligne, et couvre l'intégralité du portefeuille : 50 000 à 500 000 lignes.
 -- Y ajouter le nom, la banque ou le syndicat reviendrait à distribuer la base
 -- nominative complète à chaque terminal : une seule perte d'appareil suffirait
 -- à la faire fuiter. Le commercial n'a besoin que de savoir quel numéro il
--- vient de composer et si le dossier est déjà réglé — le programme papier, lui,
+-- vient de composer et si le dossier est déjà réglé : le programme papier, lui,
 -- ne porte que des numéros, délibérément.
 --
 -- Un test compare l'ensemble des colonnes à cette liste exacte : ajouter un
@@ -253,23 +288,29 @@ CREATE TABLE phase2_directory (
     -- la seule clé de recherche de l'écran : la saisie est comparée en égalité
     -- stricte après normalisation, jamais en `LIKE`. Un `LIKE '%…%'` sur
     -- 500 000 lignes n'utilise aucun index et prend des secondes sur un
-    -- téléphone d'entrée de gamme — soit, à l'échelle d'une pile d'appels, une
+    -- téléphone d'entrée de gamme : soit, à l'échelle d'une pile d'appels, une
     -- minute perdue toutes les vingt recherches.
     phone_e164 TEXT NOT NULL,
-    phase2_status TEXT NOT NULL DEFAULT 'PENDING'
-        CHECK (phase2_status IN ('PENDING', 'METHOD_OBTAINED', 'REFUSED', 'WRONG_NUMBER')),
+    -- Aucun CHECK d'énumération sur ces deux colonnes : elles sont ÉCRITES PAR
+    -- LE SERVEUR, page par page, par `Phase2DirectorySync`. Une quatrième
+    -- méthode d'enrôlement ajoutée côté serveur faisait échouer l'écriture de la
+    -- page entière : 2000 lignes perdues, curseur figé, annuaire jamais complet
+    -- : exactement ce que `enumUnknownDefaultCase: true` existe pour éviter.
+    --
+    -- Le vocabulaire vit maintenant dans `Phase2Statuses` et
+    -- `EnrollmentMethods`, dérivés de l'énumération générée : une seule
+    -- définition, qui suit le contrat au lieu de le figer.
+    phase2_status TEXT NOT NULL DEFAULT 'PENDING',
     -- Renseignée si et seulement si `phase2_status` vaut METHOD_OBTAINED, comme
     -- côté serveur.
-    enrollment_method TEXT NULL
-        CHECK (enrollment_method IS NULL
-               OR enrollment_method IN ('PLATFORM', 'PHYSICAL', 'VOICE_OR_ELECTRONIC_MESSAGING')),
+    enrollment_method TEXT NULL,
     rev INTEGER NOT NULL DEFAULT 1,
     updated_at DATETIME NOT NULL
 );
 
 -- UNIQUE et non un simple index : le serveur garantit un numéro par prospect,
 -- et un doublon local ferait rendre à la recherche exacte deux lignes
--- contradictoires — l'écran devrait alors choisir, ce qu'il ne peut pas faire.
+-- contradictoires : l'écran devrait alors choisir, ce qu'il ne peut pas faire.
 -- Pas d'index partiel ici : l'annuaire n'a pas de suppression logique, une
 -- ligne retirée du périmètre disparaît au pull suivant.
 CREATE UNIQUE INDEX phase2_directory_phone_unique ON phase2_directory (phone_e164);
@@ -283,22 +324,30 @@ CREATE INDEX phase2_directory_status_idx ON phase2_directory (phase2_status);
 -- saisi. C'est elle qui alimente sa progression personnelle, y compris pour des
 -- lignes déjà acquittées par le serveur.
 --
--- Les trois CHECK reproduisent au caractère près les contraintes de
--- `call_attempts` côté PostgreSQL. Les répliquer ici n'est pas de la ceinture et
--- des bretelles : sans elles, une saisie invalide s'enregistre sur le terrain,
--- part dans la file, et n'est refusée qu'à la synchronisation — c'est-à-dire
--- potentiellement trois semaines plus tard, à un moment où le commercial ne se
--- souvient plus de l'appel et ne peut plus rien corriger.
+-- Les trois CHECK restants reproduisent les contraintes de FORME de
+-- `call_attempts` côté PostgreSQL : « méthode si et seulement si
+-- METHOD_OBTAINED », « OTHER exige un commentaire », « commentaire borné ». Ce
+-- sont des règles structurelles, pas des listes de vocabulaire : elles restent
+-- vraies quelle que soit l'issue que le serveur ajoutera demain.
+--
+-- Les répliquer ici n'est pas de la ceinture et des bretelles : sans elles, une
+-- saisie invalide s'enregistre sur le terrain, part dans la file, et n'est
+-- refusée qu'à la synchronisation : c'est-à-dire potentiellement trois semaines
+-- plus tard, à un moment où le commercial ne se souvient plus de l'appel et ne
+-- peut plus rien corriger.
 CREATE TABLE call_attempts (
     -- UUID v7 engendré par le client. C'est la clé d'idempotence du serveur.
     id TEXT NOT NULL PRIMARY KEY,
     prospect_id TEXT NOT NULL,
-    outcome TEXT NOT NULL CHECK (outcome IN (
-        'METHOD_OBTAINED', 'UNREACHABLE', 'CALLBACK', 'REFUSED', 'WRONG_NUMBER', 'OTHER'
-    )),
-    method TEXT NULL
-        CHECK (method IS NULL
-               OR method IN ('PLATFORM', 'PHYSICAL', 'VOICE_OR_ELECTRONIC_MESSAGING')),
+    -- Pas de liste d'énumération ici non plus. `CallOutcomes.all` et
+    -- `EnrollmentMethods.all` sont dérivés du client généré et vérifiés par
+    -- `WriteRepository.validateCallAttempt` AVANT l'écriture, avec un message en
+    -- français que le commercial peut corriger dans la seconde. Une liste figée
+    -- dans le DDL n'ajoutait pas de sécurité : elle garantissait qu'une issue
+    -- ajoutée côté serveur, dûment régénérée dans le client, serait refusée par
+    -- SQLite au moment d'enregistrer un appel.
+    outcome TEXT NOT NULL,
+    method TEXT NULL,
     comment TEXT NULL,
     client_created_at DATETIME NOT NULL,
     created_by_id TEXT NOT NULL,
@@ -360,12 +409,12 @@ CREATE INDEX notifications_created_idx ON notifications (created_at);
 CREATE INDEX notifications_unread_idx ON notifications (read_at);
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Vues — le statut de synchronisation est DÉRIVÉ, jamais stocké
+-- Vues : le statut de synchronisation est DÉRIVÉ, jamais stocké
 -- ─────────────────────────────────────────────────────────────────────────────
 --
 -- Il serait tentant d'ajouter une colonne `sync_status` sur representants et
 -- prospects. Elle se désynchroniserait de l'outbox la première fois qu'un chemin
--- de code oublierait de la mettre à jour — et ce chemin existe toujours (retry,
+-- de code oublierait de la mettre à jour : et ce chemin existe toujours (retry,
 -- expiration de bail, purge). Ici la vue lit l'outbox : il n'y a rien à tenir
 -- à jour, donc rien à oublier.
 --
@@ -444,21 +493,51 @@ countPendingOutbox:
     SELECT COUNT(*) AS c FROM outbox
     WHERE status IN ('pending', 'syncing', 'conflict', 'failed');
 
+-- Ce qu'une exécution de fond pourrait encore faire avancer.
+--
+-- Distinct de `countPendingOutbox`, et l'écart est le correctif : ce dernier
+-- compte aussi `conflict` et `failed`, qui n'avanceront JAMAIS sans une action
+-- humaine. Le coordinateur s'en servait pour décider d'enfiler un one-off
+-- WorkManager à chaque passage en arrière-plan : une seule opération
+-- définitivement en échec suffisait donc à programmer un worker à chaque mise en
+-- veille, indéfiniment, pour un travail qu'aucun worker ne peut faire. C'est
+-- exactement le quota JobScheduler qu'Android 16 compte et que le commentaire de
+-- `enqueueCatchUp` prétendait épargner.
+countSchedulableOutbox:
+    SELECT COUNT(*) AS c FROM outbox
+    WHERE status IN ('pending', 'syncing');
+
 countOutboxByStatus:
     SELECT status, COUNT(*) AS c FROM outbox GROUP BY status;
 
--- Prochain lot à émettre. Une seule opération par dependency_key : la suivante
--- de la même chaîne n'a de sens qu'une fois celle-ci acquittée.
--- `unixepoch()` et non une comparaison directe : les DATETIME sont stockés en
--- texte ISO-8601 (voir build.yaml), et comparer deux textes date à date est
--- correct par chance, pas par construction — un jour où l'un des deux porterait
--- un décalage horaire, l'ordre lexicographique mentirait sans rien signaler.
+-- Opérations candidates au prochain lot : ouvertes ET hors chaîne empoisonnée.
+--
+-- Le `NOT EXISTS` EST le correctif. Le sélecteur lisait auparavant « les
+-- 2000 premières lignes ouvertes par `seq` », puis écartait en Dart les chaînes
+-- dont la tête était `conflict` ou `failed`. Un échec de lot terminal marque
+-- 200 lignes d'un coup : dix lots refusés suffisaient donc à ce que les
+-- 2000 lignes lues soient TOUTES empoisonnées, et le travail réellement en
+-- attente, plus loin dans la file, devenait invisible. Le compteur se figeait,
+-- sans erreur, sans explication, et aucune action de l'utilisateur ne pouvait le
+-- débloquer puisque l'écran « À corriger » ne montrait que les 200 premières.
+--
+-- Exclure en SQL plutôt que tronquer : la limite ne borne plus que du travail
+-- réellement éligible.
+--
+-- `COALESCE(dependency_key, 'op:' || id)` reproduit la règle du sélecteur : une
+-- opération sans clé est sa propre partition, elle ne dépend de rien et rien ne
+-- dépend d'elle.
 claimableOutbox:
-    SELECT * FROM outbox
-    WHERE status = 'pending'
-      AND unixepoch(next_attempt_at) <= unixepoch(:now)
-      AND (lease_until IS NULL OR unixepoch(lease_until) < unixepoch(:now))
-    ORDER BY seq ASC
+    SELECT o.* FROM outbox AS o
+    WHERE o.status IN ('pending', 'syncing')
+      AND NOT EXISTS (
+          SELECT 1 FROM outbox AS p
+          WHERE p.status IN ('conflict', 'failed')
+            AND p.seq < o.seq
+            AND COALESCE(p.dependency_key, 'op:' || p.id)
+                = COALESCE(o.dependency_key, 'op:' || o.id)
+      )
+    ORDER BY o.seq ASC
     LIMIT :maxRows;
 
 representantsWithStatus:
@@ -494,17 +573,19 @@ countPhase2Pending:
 
 -- Progression PERSONNELLE : ce que ce commercial a saisi sur CET appareil.
 -- Ce n'est pas l'avancement de la campagne, et l'écran ne le présente pas comme
--- tel — le programme officiel est le PDF papier.
+-- tel : le programme officiel est le PDF papier.
 countMyAttempts:
     SELECT COUNT(*) AS c FROM call_attempts;
 
 countMyMethods:
     SELECT COUNT(*) AS c FROM call_attempts WHERE outcome = 'METHOD_OBTAINED';
 
--- Dossiers que mes appels ont clos : les trois issues terminales.
-countMyClosed:
-    SELECT COUNT(*) AS c FROM call_attempts
-    WHERE outcome IN ('METHOD_OBTAINED', 'REFUSED', 'WRONG_NUMBER');
+-- Dossiers que mes appels ont clos.
+--
+-- Les issues terminales ne sont PAS listées ici : c'était la quatrième copie
+-- d'une règle que le serveur est seul à trancher. Elle vit désormais dans
+-- `CallOutcomes.terminal`, dérivée de l'énumération générée, et le compte se
+-- fait côté Dart (`Phase2DirectorySync.countClosed`).
 
 attemptsForProspect:
     SELECT * FROM call_attempts

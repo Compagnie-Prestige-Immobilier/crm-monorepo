@@ -9,8 +9,8 @@ import '../../core/theme/cpi_tokens.dart';
 /// docs/design.md §5 rappelle qu'une ombre coûte une passe de rendu par
 /// élément dans une liste, et §7 qu'une animation qui n'informe de rien se
 /// supprime. Une pression, elle, informe : elle dit « le doigt a bien été
-/// enregistré ». On la rend donc par une seule transformation — `Transform.scale`
-/// — qui n'invalide pas la couche de peinture des enfants, ne compose aucune
+/// enregistré ». On la rend donc par une seule transformation : `Transform.scale`
+/// : qui n'invalide pas la couche de peinture des enfants, ne compose aucune
 /// opacité sur un grand sous-arbre et n'anime aucun flou.
 ///
 /// La durée vient de [CpiMotion.of], qui la ramène à zéro sous
@@ -76,7 +76,7 @@ class _CpiPressableState extends State<CpiPressable> {
 ///
 /// Le décalage est **plafonné** : au-delà de six éléments, tout arrive en même
 /// temps. Un escalier qui court sur quarante lignes n'est plus une entrée, c'est
-/// une attente — et sur un appareil lent, quarante animations simultanées
+/// une attente : et sur un appareil lent, quarante animations simultanées
 /// coûtent des images.
 class CpiListEntrance extends StatelessWidget {
   const CpiListEntrance({

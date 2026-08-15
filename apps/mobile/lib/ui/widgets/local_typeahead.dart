@@ -91,12 +91,27 @@ String foldSearch(String input) {
 /// C'est le point de conception, pas un raccourci : la liste vient de la base
 /// SQLite, donc elle répond en moins d'une frame et fonctionne sans réseau. Une
 /// complétion adossée au serveur mettrait plusieurs secondes à répondre sur un
-/// lien EDGE, et rendrait une liste vide dans un village — c'est-à-dire
+/// lien EDGE, et rendrait une liste vide dans un village : c'est-à-dire
 /// exactement là où l'app sert.
 ///
 /// `RawAutocomplete` plutôt que `Autocomplete` : ce dernier impose son propre
 /// `TextEditingController`, ce qui empêche le formulaire de piloter la valeur
 /// (pré-remplissage entre deux prospects, restauration d'un brouillon).
+///
+/// ## Pourquoi [emptyHint] s'affiche SOUS le champ et non dans le panneau
+///
+/// Il était rendu dans `optionsViewBuilder`, et **ne s'est jamais affiché une
+/// seule fois**. Flutter conditionne l'ouverture du panneau à
+/// `_canShowOptionsView => hasFocus && _options.isNotEmpty`
+/// (`autocomplete.dart`) : quand la liste est vide : c'est-à-dire exactement
+/// quand ce message a quelque chose à dire : le panneau n'est jamais construit,
+/// donc le message non plus.
+///
+/// Conséquence sur une installation neuve, avant la première synchronisation :
+/// les listes déroulantes ne réagissaient pas, « Enregistrer » restait grisé
+/// pour toujours, et **rien à l'écran n'expliquait pourquoi**. Le message vit
+/// donc maintenant dans l'arbre du champ, où rien ne peut l'empêcher de
+/// paraître.
 class LocalTypeahead extends StatefulWidget {
   const LocalTypeahead({
     super.key,
@@ -151,11 +166,13 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
 
   /// Revenir sur un champ déjà rempli SÉLECTIONNE tout.
   ///
-  /// Sans ça, le curseur atterrit là où le doigt a touché — au milieu du mot —
+  /// Sans ça, le curseur atterrit là où le doigt a touché : au milieu du mot :
   /// et corriger « Dakar » en « Diourbel » demande d'effacer caractère par
   /// caractère. Tout sélectionner rend les deux gestes naturels : une frappe
   /// remplace, une suppression vide.
   void _onFocusChange() {
+    // Le message sous le champ dépend du focus : on redessine.
+    if (mounted) setState(() {});
     if (!widget.focusNode.hasFocus) return;
     final String text = widget.controller.text;
     if (text.isEmpty) return;
@@ -177,10 +194,73 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
     widget.focusNode.requestFocus();
   }
 
+  /// Ce qu'il y a à dire sous le champ, ou `null` s'il n'y a rien à dire.
+  ///
+  /// Deux situations, deux messages, et il faut les distinguer : « le
+  /// référentiel n'est pas là » se répare par une synchronisation, « ta
+  /// recherche ne donne rien » se répare en tapant autre chose.
+  String? _inlineMessage(String text) {
+    // Référentiel absent : le message est PERMANENT, focus ou pas. C'est le cas
+    // d'une installation neuve, et c'est celui où l'écran ne disait rien.
+    if (widget.options.isEmpty) return widget.emptyHint;
+    if (!widget.focusNode.hasFocus) return null;
+    if (widget.selectedId != null) return null;
+    final String query = text.trim();
+    if (query.isEmpty) return null;
+    final bool anyMatch = widget.options.any((TypeaheadOption o) => o.matches(query));
+    return anyMatch ? null : 'Aucun résultat pour « $query »';
+  }
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        _field(context, theme),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: widget.controller,
+          builder: (BuildContext context, TextEditingValue value, Widget? _) {
+            final String? message = _inlineMessage(value.text);
+            if (message == null) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(
+                top: CpiSpacing.xxs,
+                left: CpiSpacing.sm,
+                right: CpiSpacing.sm,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Icon(
+                    PhosphorIconsRegular.info,
+                    size: 16,
+                    // `accentText` (#856011) et jamais `accent` (#C8921A) :
+                    // l'or de surface fait 2,77:1 et échoue AA
+                    // (docs/design.md §2.3).
+                    color: context.cpi.accentText,
+                  ),
+                  const SizedBox(width: CpiSpacing.xxs),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: context.cpi.accentText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _field(BuildContext context, ThemeData theme) {
     return RawAutocomplete<TypeaheadOption>(
       textEditingController: widget.controller,
       focusNode: widget.focusNode,
@@ -276,48 +356,45 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                 clipBehavior: Clip.antiAlias,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 280, maxWidth: 480),
-                  child: results.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.all(CpiSpacing.md),
-                          child: Text(
-                            widget.emptyHint,
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                        )
-                      // `shrinkWrap` avec une hauteur bornée : le panneau prend
-                      // la place de son contenu tant qu'il tient, et **défile**
-                      // au-delà. C'est ce défilement qui rend la liste entière
-                      // parcourable maintenant qu'elle n'est plus tronquée.
-                      : Scrollbar(
-                          child: ListView.builder(
-                            padding: EdgeInsets.zero,
-                            shrinkWrap: true,
-                            itemCount: results.length,
-                            itemBuilder: (BuildContext context, int index) {
-                              final TypeaheadOption option = results.elementAt(index);
-                              final bool current = option.id == widget.selectedId;
-                              return ListTile(
-                                // 44 px minimum de cible tactile
-                                // (docs/design.md §1).
-                                minVerticalPadding: CpiSpacing.sm,
-                                selected: current,
-                                selectedTileColor: theme.colorScheme.secondaryContainer,
-                                title: Text(option.label),
-                                subtitle: option.secondary == null
-                                    ? null
-                                    : Text(option.secondary!),
-                                trailing: current
-                                    ? Icon(
-                                        PhosphorIconsRegular.check,
-                                        size: 18,
-                                        color: theme.colorScheme.primary,
-                                      )
-                                    : null,
-                                onTap: () => onSelect(option),
-                              );
-                            },
-                          ),
-                        ),
+                  // Pas de branche « liste vide » ici : Flutter n'ouvre le
+                  // panneau que si `_options.isNotEmpty`, donc ce cas est
+                  // inatteignable. Le message vit sous le champ (voir
+                  // `_inlineMessage`).
+                  //
+                  // `shrinkWrap` avec une hauteur bornée : le panneau prend la
+                  // place de son contenu tant qu'il tient, et **défile**
+                  // au-delà. C'est ce défilement qui rend la liste entière
+                  // parcourable maintenant qu'elle n'est plus tronquée.
+                  child: Scrollbar(
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: results.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        final TypeaheadOption option = results.elementAt(index);
+                        final bool current = option.id == widget.selectedId;
+                        return ListTile(
+                          // 44 px minimum de cible tactile
+                          // (docs/design.md §1).
+                          minVerticalPadding: CpiSpacing.sm,
+                          selected: current,
+                          selectedTileColor: theme.colorScheme.secondaryContainer,
+                          title: Text(option.label),
+                          subtitle: option.secondary == null
+                              ? null
+                              : Text(option.secondary!),
+                          trailing: current
+                              ? Icon(
+                                  PhosphorIconsRegular.check,
+                                  size: 18,
+                                  color: theme.colorScheme.primary,
+                                )
+                              : null,
+                          onTap: () => onSelect(option),
+                        );
+                      },
+                    ),
+                  ),
                 ),
               ),
             );

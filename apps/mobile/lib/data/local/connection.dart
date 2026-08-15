@@ -20,7 +20,7 @@ QueryExecutor openAppDatabaseConnection() {
       setup: AppDatabase.applyPragmas,
       // Une seconde connexion sera ouverte par l'isolat WorkManager. Sans
       // partage, drift ouvre deux connexions indépendantes sur le même fichier
-      // et les requêtes en flux de l'UI ne voient pas les écritures du worker —
+      // et les requêtes en flux de l'UI ne voient pas les écritures du worker :
       // l'écran resterait figé sur un compteur périmé.
       shareAcrossIsolates: true,
     ),

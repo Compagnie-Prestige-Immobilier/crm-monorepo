@@ -5,7 +5,7 @@ import 'push_message.dart';
 
 /// Boîte de réception LOCALE.
 ///
-/// **Dart pur** — pas de Flutter, pas de Riverpod. Utilisable depuis l'isolat
+/// **Dart pur** : pas de Flutter, pas de Riverpod. Utilisable depuis l'isolat
 /// d'arrière-plan comme depuis l'interface, exactement au même titre que
 /// `WriteRepository`.
 ///
@@ -21,13 +21,13 @@ class PushInboxStore {
 
   /// Enregistre un message reçu.
   ///
-  /// `insertOnConflictUpdate` sur la clé primaire : FCM peut remettre le même
-  /// message (reprise de connexion, reprise après veille), et deux lignes pour
-  /// une notification produiraient un compteur de non-lues faux.
+  /// `insertOnConflictUpdate` sur la clé primaire : le même message revient à
+  /// chaque rapatriement de la boîte de réception, et deux lignes pour une
+  /// notification produiraient un compteur de non-lues faux.
   ///
   /// **`readAt` n'est jamais écrasé** : une notification déjà lue puis remise
-  /// par FCM ne doit pas redevenir non lue, sinon la pastille remonte toute
-  /// seule et l'utilisateur cesse de lui faire confiance.
+  /// ne doit pas redevenir non lue, sinon la pastille remonte toute seule et
+  /// l'utilisateur cesse de lui faire confiance.
   Future<void> upsert(PushMessage message) async {
     await _db.transaction(() async {
       final StoredNotification? existing = await (_db.select(
@@ -67,8 +67,8 @@ class PushInboxStore {
           _db.notifications,
         )..where((Notifications t) => t.id.equals(message.id))).getSingleOrNull();
 
-        // Le serveur fait autorité sur l'état lu — il agrège les lectures faites
-        // depuis d'autres appareils — mais une lecture LOCALE non encore
+        // Le serveur fait autorité sur l'état lu : il agrège les lectures faites
+        // depuis d'autres appareils : mais une lecture LOCALE non encore
         // remontée ne doit pas être perdue. On garde donc la plus ancienne des
         // deux, c'est-à-dire la première lecture réelle.
         final DateTime? serverRead = readStates?[message.id];
@@ -142,8 +142,8 @@ class PushInboxStore {
   /// Purge complète.
   ///
   /// Appelée à la DÉCONNEXION, au même titre que l'annuaire de phase 2 : le
-  /// téléphone est personnel, et les notifications d'un commercial — qui
-  /// peuvent nommer des prospects — ne doivent pas survivre à son départ.
+  /// téléphone est personnel, et les notifications d'un commercial : qui
+  /// peuvent nommer des prospects : ne doivent pas survivre à son départ.
   Future<void> purge() async {
     await _db.delete(_db.notifications).go();
   }

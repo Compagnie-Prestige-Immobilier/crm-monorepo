@@ -1,4 +1,4 @@
-/// Vocabulaire de statut de l'outbox — **Dart pur**.
+/// Vocabulaire de statut de l'outbox : **Dart pur**.
 ///
 /// Les cinq valeurs sont contraintes par un `CHECK` dans `schema.drift` et lues
 /// par les deux vues SQL qui dérivent `sync_status`. Elles ne sont donc pas
@@ -32,7 +32,7 @@ abstract final class OutboxStatus {
   /// Les états qui comptent encore comme « en attente » pour l'utilisateur.
   static const List<String> open = <String>[pending, syncing, conflict, failed];
 
-  /// Les états qui demandent une action humaine — l'écran « À corriger ».
+  /// Les états qui demandent une action humaine : l'écran « À corriger ».
   static const List<String> needsAttention = <String>[conflict, failed];
 }
 
@@ -63,4 +63,12 @@ abstract final class ServerErrorCodes {
   static const String parentRepresentantFailed = 'PARENT_REPRESENTANT_FAILED';
   static const String groupTransactionFailed = 'GROUP_TRANSACTION_FAILED';
   static const String idempotencyInProgress = 'IDEMPOTENCY_IN_PROGRESS';
+
+  /// Le dossier a déjà été clos côté serveur (`phase2-sync.service.ts`).
+  ///
+  /// C'est un ARBITRAGE, pas un refus de saisie : deux commerciaux ont appelé le
+  /// même numéro, ou le miroir optimiste local a devancé une décision serveur
+  /// contraire. Classé en `failed`, il aurait envoyé le commercial corriger une
+  /// saisie parfaitement valide.
+  static const String phase2AlreadyCompleted = 'PHASE2_ALREADY_COMPLETED';
 }

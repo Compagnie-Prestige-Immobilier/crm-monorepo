@@ -9,6 +9,7 @@ import 'package:cpi_go/core/sync/token_store.dart';
 import 'package:cpi_go/core/utils/phone.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/write_repository.dart';
+import 'package:crm_api_client/crm_api_client.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:sqlite3/common.dart' show SqliteException;
 import 'package:flutter_test/flutter_test.dart';
@@ -20,7 +21,7 @@ import '../support/fake_api.dart';
 ///
 /// Le fil directeur : le commercial travaille depuis un **programme papier** qui
 /// ne porte que des numéros. Tout ce qui suit protège les deux propriétés dont
-/// dépend ce dispositif — une recherche qui trouve toujours la bonne ligne quelle
+/// dépend ce dispositif : une recherche qui trouve toujours la bonne ligne quelle
 /// que soit la façon dont le numéro a été recopié, et une saisie qui ne se perd
 /// jamais entre le trottoir et le serveur.
 void main() {
@@ -135,7 +136,7 @@ void main() {
 
       // De la phase 1 dans la même base : elle ne doit PAS partir. La purge vise
       // la phase 2, pas les saisies de prospection qui n'ont pas encore été
-      // envoyées — les emporter détruirait le travail de la journée.
+      // envoyées : les emporter détruirait le travail de la journée.
       await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
       await queueOp(db, id: 'op-p1', entityType: 'representant', entityId: 'rep-1');
 
@@ -205,7 +206,7 @@ void main() {
     test('deux prospects ne peuvent pas partager un numéro', () async {
       await seedDirectory(prospectId: 'pros-1', phone: '+221771234567');
       // Sans cette contrainte, la recherche exacte rendrait deux lignes
-      // contradictoires et l'écran devrait arbitrer — ce qu'il ne peut pas.
+      // contradictoires et l'écran devrait arbitrer : ce qu'il ne peut pas.
       await expectLater(
         seedDirectory(prospectId: 'pros-2', phone: '+221771234567'),
         throwsA(isA<SqliteException>()),
@@ -373,7 +374,7 @@ void main() {
           await directory.lookupByPhone('+221771234567') as Phase2DirectoryData;
       expect(row.phase2Status, Phase2Statuses.methodObtained);
       expect(row.enrollmentMethod, EnrollmentMethods.platform);
-      // `rev` INCHANGÉE — c'est ce qui laisse le prochain pull réconcilier.
+      // `rev` INCHANGÉE : c'est ce qui laisse le prochain pull réconcilier.
       expect(row.rev, 1);
     });
 
@@ -566,10 +567,9 @@ void main() {
       expect(await db.countMyAttempts().getSingle(), 3);
       expect(await db.countPhase2Pending().getSingle(), 3);
       expect(api.calls, isEmpty);
-      expect(api.rawCalls, isEmpty);
     });
 
-    test('le retour du réseau vide la file par le chemin brut', () async {
+    test('le retour du réseau vide la file par le chemin TYPÉ', () async {
       await seedDirectory(prospectId: 'a', phone: '+221770000001');
       await writes.recordCallAttempt(
         prospectId: 'a',
@@ -580,22 +580,57 @@ void main() {
 
       await engine.drain();
 
-      // Chemin BRUT et non le chemin typé : le client généré ne connaît pas
-      // encore `call_attempt`, et un passage par le chemin typé perdrait
-      // silencieusement `prospectId`, `outcome`, `method` et `comment`.
-      expect(api.calls, isEmpty);
-      expect(api.rawCalls, hasLength(1));
+      // ═══ IL N'Y A PLUS QU'UN TRANSPORT ═══
+      //
+      // Une variante brute de `push` existait, au motif que `SyncEntity`
+      // ignorait `call_attempt` et que `SyncEntityDataDto` n'avait ni
+      // `prospectId`, ni `outcome`, ni `method`, ni `comment`. Le client généré
+      // porte les quatre : le contournement était devenu du code mort qui
+      // dupliquait la sérialisation d'un lot.
+      expect(api.calls, hasLength(1));
 
-      final RawPushCall call = api.rawCalls.single;
+      final PushCall call = api.calls.single;
       expect(call.payloadVersion, SyncEngine.payloadVersion);
-      expect(call.operations.single['entity'], 'call_attempt');
-      expect(call.operations.single['op'], 'create');
+      final SyncOperationDto sent = call.operations.single;
+      expect(sent.entity, SyncEntity.callAttempt);
+      expect(sent.op, SyncOp.create);
+      // L'identifiant de la TENTATIVE, pas celui du prospect : c'est lui que le
+      // serveur retient comme clé d'idempotence.
+      expect(sent.entityId, isNot('a'));
+      // Sans garde de révision, comme le chemin brut qui n'en envoyait aucune.
+      // En envoyer une ferait revenir la tentative en REV_CONFLICT, et le
+      // conflit deviendrait la tête de `phase2:<prospect>` : plus aucune
+      // tentative sur ce numéro ne partirait ensuite.
+      expect(sent.baseRev, isNull);
 
-      final Map<String, Object?> data = call.dataAt(0);
-      expect(data['prospectId'], 'a');
-      expect(data['outcome'], CallOutcomes.methodObtained);
-      expect(data['method'], EnrollmentMethods.voiceOrElectronicMessaging);
-      expect(data['clientCreatedAt'], isA<String>());
+      // Le point de vigilance de toute la bascule : ces quatre champs sont
+      // exactement ceux que le modèle généré laissait tomber en silence quand il
+      // ne les déclarait pas. Un `data` amputé part en
+      // `CALL_ATTEMPT_INCOMPLETE`, et l'appel est perdu.
+      final SyncEntityDataDto data = sent.data!;
+      expect(data.prospectId, 'a');
+      expect(data.outcome, CallOutcome.METHOD_OBTAINED);
+      expect(data.method, EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING);
+      expect(data.clientCreatedAt, isNotNull);
+
+      // Et le JSON réellement émis, parce que c'est lui qui voyage : un enum
+      // rendu `unknown_default_open_api` passerait toutes les assertions
+      // ci-dessus sur les objets et ne se verrait qu'ici.
+      final Map<String, dynamic> wire = sent.toJson();
+      final Map<String, dynamic> wireData = wire['data'] as Map<String, dynamic>;
+      expect(wire['entity'], 'call_attempt');
+      expect(wireData['prospectId'], 'a');
+      expect(wireData['outcome'], CallOutcomes.methodObtained);
+      expect(wireData['method'], EnrollmentMethods.voiceOrElectronicMessaging);
+      // En UTC sur le fil, et pas en heure locale : le chemin brut recopiait la
+      // chaîne stockée, le chemin typé la reconstruit depuis un `DateTime`. Une
+      // reconstruction en heure locale décalerait l'appel de l'écart horaire, et
+      // le serveur compte les tentatives par journée.
+      expect(wireData['clientCreatedAt'], endsWith('Z'));
+      expect(
+        DateTime.parse(wireData['clientCreatedAt'] as String).toUtc(),
+        data.clientCreatedAt!.toUtc(),
+      );
 
       expect(await db.countPhase2Pending().getSingle(), 0);
     });
@@ -614,12 +649,12 @@ void main() {
       expect(await db.countPhase2Pending().getSingle(), 1);
 
       // Rejeu. L'`opId` est le même, donc le serveur rend `duplicate` sans créer
-      // de seconde tentative — c'est ce qui empêche qu'un appel soit compté deux
+      // de seconde tentative : c'est ce qui empêche qu'un appel soit compté deux
       // fois dans la commission de fin de mois.
       clock.advance(const Duration(minutes: 5));
       await engine.drain();
 
-      expect(api.rawRows, hasLength(1));
+      expect(api.rows, hasLength(1));
       expect(await db.countPhase2Pending().getSingle(), 0);
     });
 
@@ -657,7 +692,7 @@ void main() {
 
     test('un lot ne dépasse jamais 25 clés de dépendance', () async {
       // Le serveur refuse EN BLOC, en 400, un lot couvrant plus de 25 groupes
-      // (`SYNC_MAX_DEPENDENCY_GROUPS`) — donc terminal, donc toutes les
+      // (`SYNC_MAX_DEPENDENCY_GROUPS`) : donc terminal, donc toutes les
       // opérations partiraient en `failed`. Une matinée hors ligne en produit
       // soixante : sans ce plafond, la première synchronisation au retour du
       // réseau condamnerait la matinée entière.
@@ -681,21 +716,21 @@ void main() {
       // La vidange complète les emporte quand même, en plusieurs lots.
       await engine.drain();
       expect(await db.countPhase2Pending().getSingle(), 0);
-      expect(api.rawCalls.length, greaterThan(1));
-      for (final RawPushCall call in api.rawCalls) {
-        final Set<Object?> callKeys = call.operations
-            .map(
-              (Map<String, Object?> o) =>
-                  (o['data']! as Map<String, Object?>)['prospectId'],
-            )
-            .toSet();
+      expect(api.calls.length, greaterThan(1));
+      for (final PushCall call in api.calls) {
+        final Set<String?> callKeys = call.operations
+            .map((SyncOperationDto o) => o.data?.prospectId)
+            .toSet()
+            .cast<String?>();
         expect(callKeys.length, lessThanOrEqualTo(25));
       }
     });
 
-    test('un lot est homogène : phase 1 et phase 2 ne se mélangent jamais', () async {
-      // Les deux familles empruntent deux transports différents tant que le
-      // client généré ignore `call_attempt`. Un lot mixte n'aurait aucun chemin.
+    test('phase 1 et phase 2 partent MÉLANGÉES, dans un seul lot', () async {
+      // Elles étaient séparées de force : deux transports, donc un lot mixte
+      // sans chemin. Il n'y a plus qu'un transport, et les séparer coûtait un
+      // aller-retour réseau de plus à chaque fois qu'un commercial saisit un
+      // prospect puis rappelle quelqu'un : c'est-à-dire tous les jours.
       await insertRepresentant(db, id: 'rep-1', phone: '+221770000009');
       await queueOp(
         db,
@@ -712,12 +747,18 @@ void main() {
       );
 
       final List<OutboxData> batch = await engine.selectBatch();
-      final Set<String> families = batch.map((OutboxData o) => o.entityType).toSet();
-      expect(families, hasLength(1));
+      expect(
+        batch.map((OutboxData o) => o.entityType).toSet(),
+        <String>{'representant', callAttemptEntity},
+        reason: 'les deux familles tiennent maintenant dans le même lot',
+      );
 
       await engine.drain();
-      expect(api.calls, hasLength(1));
-      expect(api.rawCalls, hasLength(1));
+      expect(api.calls, hasLength(1), reason: 'un seul aller-retour, pas deux');
+      expect(
+        api.calls.single.operations.map((SyncOperationDto o) => o.entity).toSet(),
+        <SyncEntity>{SyncEntity.representant, SyncEntity.callAttempt},
+      );
       expect(await db.countPendingOutbox().getSingle(), 0);
     });
 
@@ -739,7 +780,45 @@ void main() {
       final OutboxData row = await outboxById(db, 'op-vieux');
       expect(row.status, OutboxStatus.failed);
       expect(row.lastErrorCode, ClientErrorCodes.payloadSchemaMismatch);
-      expect(api.rawCalls, isEmpty);
+      expect(api.calls, isEmpty);
     });
+
+    test(
+      'une issue d\'appel inconnue part en failed, pas en `unknown` sur le fil',
+      () async {
+        // ═══ LE PIÈGE PROPRE AU CHEMIN TYPÉ ═══
+        //
+        // Le client est généré avec `enumUnknownDefaultCase: true` : une valeur
+        // qu'il ignore devient `unknownDefaultOpenApi` et repart sur le fil en
+        // `unknown_default_open_api`. Le chemin brut recopiait la chaîne telle
+        // quelle ; sans garde, la bascule transformerait l'issue d'un appel réel
+        // en issue bidon, en silence, et la tentative serait comptée pour ce
+        // qu'elle n'est pas.
+        await seedDirectory(prospectId: 'a', phone: '+221770000001');
+        await queueOp(
+          db,
+          id: 'op-issue-neuve',
+          entityType: callAttemptEntity,
+          entityId: 'att-9',
+          dependencyKey: 'phase2:a',
+          payload: <String, Object?>{
+            'prospectId': 'a',
+            'outcome': 'RAPPEL_PROGRAMME',
+            'clientCreatedAt': '2026-08-12T09:00:00.000Z',
+          },
+        );
+
+        await engine.drain();
+
+        final OutboxData row = await outboxById(db, 'op-issue-neuve');
+        expect(row.status, OutboxStatus.failed);
+        expect(row.lastErrorCode, ClientErrorCodes.payloadSchemaMismatch);
+        expect(
+          api.calls,
+          isEmpty,
+          reason: 'rien ne doit partir avec une issue que le serveur ne connaît pas',
+        );
+      },
+    );
   });
 }

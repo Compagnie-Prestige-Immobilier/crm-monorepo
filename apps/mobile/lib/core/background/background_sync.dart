@@ -21,7 +21,7 @@ import '../sync/sync_engine_factory.dart';
 ///
 /// `WidgetsFlutterBinding.ensureInitialized()` crée le binding : sans lui, tout
 /// appel de canal de plateforme lève. `DartPluginRegistrant.ensureInitialized()`
-/// enregistre les plugins **dans cet isolat** — un isolat de fond démarre sans
+/// enregistre les plugins **dans cet isolat** : un isolat de fond démarre sans
 /// aucun plugin enregistré, donc sans `flutter_secure_storage` (pas de jeton,
 /// donc pas d'authentification), sans `path_provider` (pas de chemin de base,
 /// donc pas de base de données) et sans `shared_preferences`. Les oublier ne
@@ -42,7 +42,7 @@ void callbackDispatcher() {
     try {
       final SecureTokenStore tokens = SecureTokenStore();
       if (await tokens.readRefreshToken() == null) {
-        // Pas de session : rien à faire, et surtout pas de réessai — le worker
+        // Pas de session : rien à faire, et surtout pas de réessai : le worker
         // reviendrait toutes les 15 minutes pour ne rien faire.
         return true;
       }
@@ -59,7 +59,7 @@ void callbackDispatcher() {
             tokens: tokens,
             // Le MÊME verrou que l'isolat UI, adossé au même fichier de base.
             // C'est ce qui empêche ce worker et l'app ouverte de présenter le
-            // même jeton de renouvellement en même temps — ce que le serveur
+            // même jeton de renouvellement en même temps : ce que le serveur
             // lit comme un rejeu, et qui coûte la session au commercial.
             mutex: DatabaseRefreshMutex(database),
           ).client,

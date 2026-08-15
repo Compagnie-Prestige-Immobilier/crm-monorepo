@@ -129,7 +129,7 @@ void main() {
     tearDown(() => db.close());
 
     /// Deux représentants, deux prospects chacun. `dependencyKey` = l'id du
-    /// représentant, y compris pour les prospects — c'est la convention de
+    /// représentant, y compris pour les prospects : c'est la convention de
     /// `WriteRepository`.
     Future<void> seedTwoChains() async {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
@@ -236,7 +236,19 @@ void main() {
           .map((OutboxData o) => o.id)
           .toList();
       expect(chainA, <String>['A1', 'A2']);
-      expect(batch.map((OutboxData o) => o.seq).toList(), isA<List<int>>());
+      // `isA<List<int>>()` était garanti par le type de retour : l'assertion ne
+      // pouvait pas échouer. Ce qui doit tenir, c'est que le lot est trié par
+      // `seq` STRICTEMENT croissant, dans la chaîne comme entre les chaînes :
+      // c'est cet ordre, et lui seul, qui garantit qu'un prospect ne précède
+      // jamais le `create` de son représentant.
+      final List<int> seqs = batch.map((OutboxData o) => o.seq).toList();
+      expect(seqs, hasLength(4));
+      for (int i = 1; i < seqs.length; i++) {
+        expect(seqs[i], greaterThan(seqs[i - 1]));
+      }
+      final int repASeq = batch.firstWhere((OutboxData o) => o.id == 'A1').seq;
+      final int prospectSeq = batch.firstWhere((OutboxData o) => o.id == 'A2').seq;
+      expect(prospectSeq, greaterThan(repASeq));
     });
 
     test('une opération sans dependencyKey est sa propre partition', () async {
@@ -264,13 +276,17 @@ void main() {
     });
 
     test('le lot s\'arrête au plafond d\'opérations', () async {
-      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      // Cinq entités DISTINCTES, une par clé : c'est le plafond d'opérations
+      // qu'on mesure ici. Cinq écritures sur la MÊME fiche seraient bornées
+      // bien avant par une autre règle, celle qui n'en laisse passer qu'une par
+      // lot (voir [SyncEngine.selectBatch]), et le test ne mesurerait plus rien.
       for (int i = 0; i < 5; i++) {
+        await insertRepresentant(db, id: 'rep$i', phone: '+22177000000$i');
         await queueOp(
           db,
           id: 'op$i',
           entityType: 'representant',
-          entityId: 'repA',
+          entityId: 'rep$i',
           dependencyKey: 'k$i',
         );
       }
@@ -341,7 +357,7 @@ void main() {
         engine.drain(),
       ]);
       // Sans le garde de vol unique, le même lot partirait deux fois sous deux
-      // clés d'idempotence différentes — que le serveur ne peut pas rapprocher.
+      // clés d'idempotence différentes : que le serveur ne peut pas rapprocher.
       expect(api.calls, hasLength(1));
       expect(counts.reduce((int a, int b) => a + b), 1);
     });
@@ -427,16 +443,43 @@ void main() {
       expect(rep.serverUpdatedAt, t0);
     });
 
-    test('le batchId change à chaque tentative, l\'opId jamais', () async {
+    test('le batchId est STABLE tant que le lot ne change pas', () async {
+      // C'est toute la raison d'être de `Idempotency-Key` : la réponse s'est
+      // perdue au retour, le lot est déjà appliqué côté serveur, et le rejeu
+      // doit tomber sur le cache de `sync_batches` au lieu de refaire le
+      // travail. Un identifiant neuf à chaque tentative rendait ce cache
+      // systématiquement froid : il n'avait jamais pu servir.
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
       await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
       api.loseNextResponse = true;
       await engine.drain();
       clock.advance(const Duration(minutes: 30));
       await engine.drain();
-      expect(api.calls[0].batchId, isNot(api.calls[1].batchId));
+      expect(api.calls, hasLength(2));
+      expect(api.calls[0].batchId, api.calls[1].batchId);
       expect(api.calls[0].opIds, api.calls[1].opIds);
       expect(api.calls[0].payloadVersion, SyncEngine.payloadVersion);
+    });
+
+    test('un lot recomposé prend un batchId neuf', () async {
+      // Rejouer une clé d'idempotence sous un CONTENU différent serait pire que
+      // de ne pas la rejouer : le serveur rendrait le verdict mémorisé d'un
+      // autre ensemble d'opérations.
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+      api.loseNextResponse = true;
+      await engine.drain();
+
+      // Une deuxième opération rejoint la file entre les deux tentatives.
+      await insertRepresentant(db, id: 'repB', phone: '+221770000002');
+      await queueOp(db, id: 'B1', entityType: 'representant', entityId: 'repB');
+
+      clock.advance(const Duration(minutes: 30));
+      await engine.drain();
+
+      expect(api.calls, hasLength(2));
+      expect(api.calls[1].opIds, containsAll(<String>['A1', 'B1']));
+      expect(api.calls[0].batchId, isNot(api.calls[1].batchId));
     });
   });
 
@@ -561,13 +604,13 @@ void main() {
       // 3. outbox.entityId
       expect((await outboxById(db, 'R1')).entityId, 'server-rep');
 
-      // 4. outbox.dependencyKey — sans ça les prospects tombent dans une
+      // 4. outbox.dependencyKey : sans ça les prospects tombent dans une
       //    partition orpheline et ne partent jamais.
       for (final String id in <String>['R1', 'P1', 'P2']) {
         expect((await outboxById(db, id)).dependencyKey, 'server-rep');
       }
 
-      // 5. le representantId À L'INTÉRIEUR de chaque payload en attente — aucune
+      // 5. le representantId À L'INTÉRIEUR de chaque payload en attente : aucune
       //    cascade SQL n'atteint du JSON figé.
       for (final String id in <String>['P1', 'P2']) {
         final Map<String, Object?> payload =
@@ -868,20 +911,143 @@ void main() {
     });
 
     test('parent en échec : remise en file SANS consommer de tentative', () async {
-      api.verdicts['A1'] = SyncOperationResultDto(
-        opId: 'A1',
-        status: SyncOpStatus.skippedDependencyFailed,
-        entityId: null,
-        rev: null,
-        serverUpdatedAt: null,
-        errorCode: ServerErrorCodes.parentRepresentantFailed,
-        error: 'Le représentant n\'est pas passé.',
-      );
+      api.verdicts['A1'] = _blockedOn('A1');
       await build().drain();
       final OutboxData row = await outboxById(db, 'A1');
       expect(row.status, OutboxStatus.pending);
       expect(row.attempts, 0);
       expect(row.lastErrorCode, ServerErrorCodes.parentRepresentantFailed);
+    });
+
+    // ── Rejeu bloqué : plancher et plafond ────────────────────────────────────
+    //
+    // Sans compteur séparé, `attempts` restait à zéro, `nextDelay(0)` rendait
+    // ZÉRO, et l'opération repartait cinquante fois par vidange, toutes les
+    // soixante secondes, indéfiniment : jamais `failed`, donc jamais visible
+    // dans « À corriger », donc rien à faire pour l'utilisateur.
+
+    test('un rejeu bloqué attend au moins 30 s, jamais zéro', () async {
+      api.verdicts['A1'] = _blockedOn('A1');
+      // Tirage nul : sans plancher, le délai serait exactement zéro.
+      await build(random: _ZeroRandom()).drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.blockedAttempts, 1);
+      expect(row.attempts, 0, reason: 'la faute n\'est pas la sienne');
+      expect(
+        row.nextAttemptAt,
+        t0.add(const Duration(seconds: 30)),
+        reason: 'nextDelay(1) tiré à zéro doit être relevé au plancher',
+      );
+    });
+
+    test('un blocage permanent finit par devenir visible dans « À corriger »', () async {
+      api.verdicts['A1'] = _blockedOn('A1');
+      final SyncEngine engine = build();
+      // Onze rejeux : la ligne tourne, mais elle est de plus en plus espacée.
+      for (int i = 0; i < 11; i++) {
+        clock.advance(const Duration(minutes: 20));
+        await engine.drain();
+        expect((await outboxById(db, 'A1')).status, OutboxStatus.pending);
+      }
+      expect((await outboxById(db, 'A1')).blockedAttempts, 11);
+
+      clock.advance(const Duration(minutes: 20));
+      await engine.drain();
+
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.failed);
+      expect(row.blockedAttempts, 12);
+      expect(row.attempts, 0, reason: 'aucun refus serveur n\'a été comptabilisé');
+    });
+
+    // ── Lien mort : les tentatives comptent des REFUS, pas du temps ───────────
+
+    test('lien injoignable : rien ne se consomme, comme une session morte', () async {
+      api.failNextPush = const ApiException(
+        'NETWORK',
+        kind: FailureKind.unreachable,
+        message: 'Réseau indisponible.',
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.pending);
+      expect(row.attempts, 0);
+      expect(row.nextAttemptAt, t0, reason: 'reprise dès le retour du réseau');
+      expect(row.lastErrorCode, 'NETWORK');
+    });
+
+    test('huit coupures réseau ne tuent pas une saisie valide', () async {
+      final SyncEngine engine = build();
+      for (int i = 0; i < 8; i++) {
+        api.failNextPush = const ApiException(
+          'TIMEOUT',
+          kind: FailureKind.unreachable,
+        );
+        await engine.drain();
+      }
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(
+        row.status,
+        OutboxStatus.pending,
+        reason: 'ATTEMPTS_EXHAUSTED doit rester réservé aux refus du serveur',
+      );
+      expect(row.attempts, 0);
+
+      // Le réseau revient : la saisie part, intacte.
+      await engine.drain();
+      expect((await outboxById(db, 'A1')).status, OutboxStatus.done);
+    });
+
+    test('runOnce ne compte pas comme envoyé un lot qui a échoué', () async {
+      api.failNextPush = const ApiException('timeout', statusCode: 504);
+      final SyncOutcome outcome = await build().runOnce(pull: false);
+      expect(
+        outcome.pushed,
+        0,
+        reason:
+            'annoncer un envoi qui n\'a pas eu lieu fait rendre `ok` au worker, '
+            'qui ne se reprogramme alors jamais',
+      );
+      expect((await outboxById(db, 'A1')).status, OutboxStatus.pending);
+    });
+
+    // ── Rejeu d'un verdict mémorisé ───────────────────────────────────────────
+    //
+    // `duplicate` ne veut pas dire « c'est écrit », il veut dire « j'ai déjà vu
+    // cet opId, voici ce que j'avais répondu ». Si ce verdict mémorisé était un
+    // REFUS, le marquer `done` efface l'écriture en silence : le commercial tape
+    // « Réessayer » dans « À corriger » et sa fiche disparaît.
+
+    test('`duplicate` porteur d\'un conflit ne marque PAS l\'opération faite', () async {
+      api.verdicts['A1'] = SyncOperationResultDto(
+        opId: 'A1',
+        status: SyncOpStatus.duplicate,
+        entityId: null,
+        rev: null,
+        serverUpdatedAt: null,
+        errorCode: ServerErrorCodes.revConflict,
+        error: 'La fiche a changé côté serveur.',
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.conflict);
+      expect(row.lastErrorCode, ServerErrorCodes.revConflict);
+    });
+
+    test('`duplicate` porteur d\'un refus part en `failed`, pas en `done`', () async {
+      api.verdicts['A1'] = SyncOperationResultDto(
+        opId: 'A1',
+        status: SyncOpStatus.duplicate,
+        entityId: null,
+        rev: null,
+        serverUpdatedAt: null,
+        errorCode: 'VALIDATION_FAILED',
+        error: 'Département inconnu.',
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.failed);
+      expect(row.lastErrorMsg, 'Département inconnu.');
     });
 
     test('une opération sans verdict revient en file, visiblement', () async {
@@ -945,6 +1111,30 @@ void main() {
       expect(await engine.readCursor(), 'cur-1');
       final SyncStateData row = (await db.select(db.syncState).get()).single;
       expect(row.collection, SyncEngine.cursorKey);
+    });
+
+    test('deux pulls concurrents ne font pas reculer le curseur', () async {
+      // Quatre déclencheurs peuvent tomber ensemble : minuteur de 60 s, retour
+      // au premier plan, bouton « Synchroniser », changement de connectivité.
+      // Sans vol unique, ils lisent le MÊME curseur de départ, et le dernier à
+      // écrire le fait reculer : les pages déjà tirées repartent, payées deux
+      // fois sur un forfait mobile.
+      api.pullPages.addAll(<PullPage>[
+        emptyPullPage(cursor: 'cur-1'),
+        emptyPullPage(cursor: 'cur-2'),
+      ]);
+
+      await Future.wait<int>(<Future<int>>[
+        engine.pullChanges(),
+        engine.pullChanges(),
+      ]);
+
+      expect(
+        api.pullPages,
+        hasLength(1),
+        reason: 'le second appel doit sortir sans toucher au réseau',
+      );
+      expect(await engine.readCursor(), 'cur-1');
     });
 
     test('une page rejouée n\'écrase pas une révision plus récente', () async {
@@ -1131,9 +1321,21 @@ void main() {
         const ApiException('x', kind: FailureKind.idempotencyInProgress).retryable,
         isTrue,
       );
+      expect(const ApiException('x', kind: FailureKind.unreachable).retryable, isTrue);
       expect(const ApiException('x', kind: FailureKind.terminal).retryable, isFalse);
       expect(
         const ApiException('x', kind: FailureKind.sessionExpired).retryable,
+        isFalse,
+      );
+    });
+
+    test('seul le lien mort se déclare injoignable', () {
+      expect(
+        const ApiException('x', kind: FailureKind.unreachable).isUnreachable,
+        isTrue,
+      );
+      expect(
+        const ApiException('x', kind: FailureKind.retryable).isUnreachable,
         isFalse,
       );
     });
@@ -1167,6 +1369,18 @@ void main() {
 class _Interrupted implements Exception {
   const _Interrupted();
 }
+
+/// Verdict « ton parent n'est pas passé » : le serveur a répondu, mais il n'a
+/// pas jugé l'opération.
+SyncOperationResultDto _blockedOn(String opId) => SyncOperationResultDto(
+  opId: opId,
+  status: SyncOpStatus.skippedDependencyFailed,
+  entityId: null,
+  rev: null,
+  serverUpdatedAt: null,
+  errorCode: ServerErrorCodes.parentRepresentantFailed,
+  error: 'Le représentant n\'est pas passé.',
+);
 
 /// Tirage nul : le délai de back-off vaut alors exactement zéro, ce qu'une gigue
 /// égale ne peut pas produire.

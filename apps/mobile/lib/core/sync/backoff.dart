@@ -1,6 +1,6 @@
 import 'dart:math';
 
-/// Back-off exponentiel à **gigue complète** — Dart pur.
+/// Back-off exponentiel à **gigue complète** : Dart pur.
 ///
 /// `min(2 s × 2^(n-1), 15 min)`, puis un tirage uniforme dans `[0, delai]`.
 ///
@@ -10,7 +10,7 @@ import 'dart:math';
 /// ils réessaient tous après *au moins* `delai/2`, c'est-à-dire tous ensemble,
 /// sur un backhaul qui vient à peine de se rétablir. La gigue complète étale les
 /// trente tentatives sur tout l'intervalle. Sur un lien dégradé, une
-/// tournée syndicale, une salle de formation — c'est exactement la situation où
+/// tournée syndicale, une salle de formation : c'est exactement la situation où
 /// tous les téléphones ont accumulé une file et retrouvent le réseau au même
 /// instant.
 ///

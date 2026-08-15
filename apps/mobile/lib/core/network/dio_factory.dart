@@ -14,8 +14,8 @@ import 'timeout_profile.dart';
 /// s'appuie dessus.
 ///
 /// Le point capital est la dernière ligne : `CrmApiClient(dio: dio)`. Si on
-/// laissait le client généré fabriquer son propre Dio — ce qu'il fait très bien
-/// tout seul quand on ne lui en passe pas — il obtiendrait un transport sans
+/// laissait le client généré fabriquer son propre Dio : ce qu'il fait très bien
+/// tout seul quand on ne lui en passe pas : il obtiendrait un transport sans
 /// aucun de nos intercepteurs : pas d'`Authorization`, pas de renouvellement,
 /// pas d'identifiant de requête, et des délais d'attente de 5 s/3 s. Toutes les
 /// requêtes partiraient en 401 et la panne serait incompréhensible, parce que le
@@ -24,15 +24,15 @@ import 'timeout_profile.dart';
 /// **Ordre des intercepteurs.** Dio les exécute dans l'ordre d'ajout à l'aller
 /// et dans l'ordre inverse au retour.
 ///
-/// 1. [TimeoutProfileInterceptor] — ajuste le délai avant que quoi que ce soit
+/// 1. [TimeoutProfileInterceptor] : ajuste le délai avant que quoi que ce soit
 ///    d'autre ne parte ; le client généré n'expose pas de paramètre de délai.
-/// 2. [RequestIdInterceptor] — l'identifiant doit exister avant la première
+/// 2. [RequestIdInterceptor] : l'identifiant doit exister avant la première
 ///    erreur possible, sinon il manque précisément aux requêtes à déboguer.
-/// 3. [AuthInterceptor] — pose le porteur, renouvelle en vol unique, rejoue sur
+/// 3. [AuthInterceptor] : pose le porteur, renouvelle en vol unique, rejoue sur
 ///    un Dio nu.
-/// 4. [RetryInterceptor] — **GET seulement** ; après l'authentification, pour
+/// 4. [RetryInterceptor] : **GET seulement** ; après l'authentification, pour
 ///    qu'un rejeu de 401 ne soit pas compté comme un réessai réseau.
-/// 5. [LoggingInterceptor] — dernier, pour journaliser ce qui part réellement.
+/// 5. [LoggingInterceptor] : dernier, pour journaliser ce qui part réellement.
 class ApiClientFactory {
   const ApiClientFactory._();
 
@@ -88,7 +88,11 @@ class ApiClientFactory {
           );
         },
       ),
-      RetryInterceptor(),
+      // Le MÊME `dio`, avec sa chaîne complète : un rejeu qui repartirait sur un
+      // transport neuf n'aurait pas d'`AuthInterceptor`, et un 401 dû à un
+      // simple jeton expiré déconnecterait le commercial (voir
+      // `retry_interceptor.dart`).
+      RetryInterceptor(dio: dio),
       LoggingInterceptor(enabled: verboseLogs),
     ]);
 
