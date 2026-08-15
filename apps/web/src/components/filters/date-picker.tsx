@@ -52,6 +52,20 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
     start: startOfWeek(startOfMonth(month), { weekStartsOn: 1 }),
     end: endOfWeek(endOfMonth(month), { weekStartsOn: 1 }),
   });
+  /**
+   * Les jours sont regroupés en SEMAINES, et ce découpage est ce qui rend la
+   * grille lisible par un lecteur d'écran.
+   *
+   * `role="grid"` n'admet pas de `gridcell` en enfant direct : la spécification
+   * ARIA impose un `row` entre les deux. La grille rendait ses quarante-deux
+   * boutons à plat, si bien qu'aucune position de ligne ou de colonne n'était
+   * calculable : le lecteur annonçait quarante-deux boutons de suite, sans
+   * jamais dire « lundi » ni « semaine 3 ». L'intervalle va d'un début à une fin
+   * de semaine, la longueur est donc toujours un multiple de sept.
+   */
+  const weeks = Array.from({ length: days.length / 7 }, (_, index) =>
+    days.slice(index * 7, index * 7 + 7),
+  );
   const minDate = min ? parseISO(min) : null;
   const maxDate = max ? parseISO(max) : null;
   const selectedYear = selected?.getFullYear() ?? new Date().getFullYear();
@@ -157,46 +171,53 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
               </Button>
             </div>
           </div>
-          <div
-            className="mt-2 grid grid-cols-7 text-center text-xs font-medium text-muted-foreground"
-            role="row"
-          >
-            {WEEKDAYS.map((weekday) => (
-              <span key={weekday} role="columnheader" aria-label={weekday} className="py-2">
-                {weekday.slice(0, 1).toUpperCase()}
-              </span>
+          {/* La ligne d'en-têtes vit DANS la grille : posée à côté, son
+              `role="row"` n'avait aucun `grid` propriétaire, et les sept
+              `columnheader` ne se rattachaient à aucune colonne. */}
+          <div className="mt-2 grid gap-1" role="grid" aria-label={label}>
+            <div
+              className="grid grid-cols-7 text-center text-xs font-medium text-muted-foreground"
+              role="row"
+            >
+              {WEEKDAYS.map((weekday) => (
+                <span key={weekday} role="columnheader" aria-label={weekday} className="py-2">
+                  {weekday.slice(0, 1).toUpperCase()}
+                </span>
+              ))}
+            </div>
+            {weeks.map((week) => (
+              <div key={week[0]?.toISOString()} className="grid grid-cols-7 gap-1" role="row">
+                {week.map((day) => {
+                  const disabled = (minDate && day < minDate) || (maxDate && day > maxDate);
+                  const currentMonth = isSameMonth(day, month);
+                  return (
+                    <button
+                      key={day.toISOString()}
+                      type="button"
+                      role="gridcell"
+                      aria-label={format(day, 'dd MMMM yyyy', { locale: fr })}
+                      aria-selected={selected ? isSameDay(day, selected) : false}
+                      disabled={Boolean(disabled)}
+                      onClick={() => {
+                        onChange(format(day, 'yyyy-MM-dd'));
+                        setOpen(false);
+                      }}
+                      className={cn(
+                        'flex h-9 items-center justify-center rounded-md text-sm transition-colors',
+                        'hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring',
+                        !currentMonth && 'text-muted-foreground/50',
+                        selected &&
+                          isSameDay(day, selected) &&
+                          'bg-primary text-primary-foreground hover:bg-primary/90',
+                        disabled && 'pointer-events-none opacity-30',
+                      )}
+                    >
+                      {format(day, 'd')}
+                    </button>
+                  );
+                })}
+              </div>
             ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1" role="grid" aria-label={label}>
-            {days.map((day) => {
-              const disabled = (minDate && day < minDate) || (maxDate && day > maxDate);
-              const currentMonth = isSameMonth(day, month);
-              return (
-                <button
-                  key={day.toISOString()}
-                  type="button"
-                  role="gridcell"
-                  aria-label={format(day, 'dd MMMM yyyy', { locale: fr })}
-                  aria-selected={selected ? isSameDay(day, selected) : false}
-                  disabled={Boolean(disabled)}
-                  onClick={() => {
-                    onChange(format(day, 'yyyy-MM-dd'));
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    'flex h-9 items-center justify-center rounded-md text-sm transition-colors',
-                    'hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring',
-                    !currentMonth && 'text-muted-foreground/50',
-                    selected &&
-                      isSameDay(day, selected) &&
-                      'bg-primary text-primary-foreground hover:bg-primary/90',
-                    disabled && 'pointer-events-none opacity-30',
-                  )}
-                >
-                  {format(day, 'd')}
-                </button>
-              );
-            })}
           </div>
           <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
             <Button
