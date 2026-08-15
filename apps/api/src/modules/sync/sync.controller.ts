@@ -22,6 +22,7 @@ import {
 import { DemoWritable } from '../../common/decorators/demo-writable.decorator.js';
 import { SyncService } from './sync.service.js';
 import { SyncPullQueryDto, SyncPullResponseDto, SyncPushDto, SyncPushResponseDto } from './dto.js';
+import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
 
 @ApiTags('sync')
 @ApiBearerAuth()
@@ -64,7 +65,13 @@ export class SyncController {
   // tentative d'appel de phase 2 n'a PAS de route propre, elle n'arrive que
   // par ce lot : la dispenser ici la couvre entièrement.
   @DemoWritable('la remontée hors ligne ne doit JAMAIS être refusée')
+  // OUVERT AUX TROIS RÔLES, ET ÉCRIT COMME TEL. La remontée hors ligne se
+  // cloisonne par AUTEUR (`ownerScope`), pas par rôle : chacun renvoie ce
+  // qu'il a saisi, et l'ADMIN en voit davantage par la même règle. Poser un
+  // rôle ici retirerait la remontée au premier rôle qui se mettrait à saisir
+  // sur le terrain, sans que personne l'ait décidé pour lui.
   @Post('push')
+  @Roles(...ANY_AUTHENTICATED)
   @HttpCode(HttpStatus.OK)
   @ApiHeader({
     name: 'Idempotency-Key',
@@ -157,7 +164,10 @@ export class SyncController {
     }
   }
 
+  // Même règle que `push`, et pour la même raison : c'est l'auteur qui borne
+  // la descente, pas le rôle.
   @Get('pull')
+  @Roles(...ANY_AUTHENTICATED)
   @ApiOperation({
     operationId: 'pullSyncChanges',
     summary: 'Récupère les changements depuis un curseur opaque.',

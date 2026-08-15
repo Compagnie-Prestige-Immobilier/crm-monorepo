@@ -11,6 +11,7 @@ import {
 } from '../../common/decorators/current-user.decorator.js';
 import { AuthService } from './auth.service.js';
 import { AuthTokensDto, AuthUserDto, LoginDto, LogoutResponseDto, RefreshDto } from './dto.js';
+import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
 
 @ApiTags('auth')
 // AUCUNE route de ce contrôleur n'écrit de donnée métier : elles ouvrent et
@@ -79,7 +80,12 @@ export class AuthController {
     return { revoked: await this.auth.logout(body.refreshToken) };
   }
 
+  // OUVERT AUX TROIS RÔLES, ET ÉCRIT COMME TEL : cette route rend l'identité
+  // de l'APPELANT, et rien d'autre. Elle est authentifiée, contrairement aux
+  // trois précédentes, et tout porteur de session a besoin d'elle pour savoir
+  // qui il est, à commencer par l'écran qui décide de son menu.
   @Get('me')
+  @Roles(...ANY_AUTHENTICATED)
   @ApiBearerAuth()
   @ApiOperation({ operationId: 'getCurrentUser', summary: 'Profil de l’utilisateur authentifié.' })
   @ApiResponse({ status: 200, type: AuthUserDto })
