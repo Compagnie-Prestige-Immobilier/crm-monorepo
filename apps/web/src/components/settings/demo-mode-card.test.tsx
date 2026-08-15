@@ -21,7 +21,27 @@ import { renderWithQuery } from '@/test/render-query';
  * exactement la même allure) et coûteuse en production.
  */
 
-const enableDemoMode = vi.fn(() => Promise.resolve({ enabled: true, seededAt: null, counts: {} }));
+/**
+ * Les compteurs sont donnés AU COMPLET, même si aucun test ne les lit :
+ * `totalDemoRows` les additionne pour le message de succès, et un champ absent
+ * produirait un « NaN lignes créées » qu'un objet vide laisserait passer en
+ * silence.
+ */
+const COUNTS = {
+  users: 0,
+  representants: 0,
+  prospects: 0,
+  campaigns: 0,
+  campaignCommerciaux: 0,
+  callTasks: 0,
+  callAttempts: 0,
+  bankCases: 0,
+  bankCaseTransitions: 0,
+};
+
+const enableDemoMode = vi.fn(() =>
+  Promise.resolve({ enabled: true, seededAt: null, counts: { ...COUNTS, prospects: 1200 } }),
+);
 const fetchDemoStatus = vi.fn();
 
 vi.mock('@/lib/data/demo', async () => {
@@ -41,14 +61,7 @@ const IDLE_STATUS = {
   canToggle: true,
   reason: null,
   seededAt: null,
-  counts: {
-    users: 0,
-    representants: 0,
-    prospects: 0,
-    campaigns: 0,
-    bankCases: 0,
-    callAttempts: 0,
-  },
+  counts: COUNTS,
 };
 
 describe('DemoModeCard, activation', () => {
