@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 
+import { isTransientPatch } from '@/components/filters/use-url-filters';
 import { EMPTY_FILTERS, parseProspectFilters, serializeProspectFilters } from '@/lib/filters';
 import type { ProspectFilters } from '@/lib/types';
 
@@ -17,7 +18,14 @@ import type { ProspectFilters } from '@/lib/types';
  * Bénéfice secondaire, mais celui que l'utilisateur voit : l'écran filtré est
  * une URL. Elle se colle dans un message, se met en favori, et le bouton
  * « Précédent » défait le dernier filtre.
+ *
+ * Cette dernière promesse était FAUSSE : tout passait par `router.replace`, qui
+ * n'empile rien, si bien que « Précédent » quittait l'écran. Voir
+ * `TRANSIENT_KEYS` ci-dessous, et le même raisonnement dans
+ * `use-url-filters.ts` : un critère choisi empile une entrée, une frappe la
+ * remplace.
  */
+
 export function useProspectFilters(): {
   filters: ProspectFilters;
   setFilters: (patch: Partial<ProspectFilters>) => void;
@@ -45,7 +53,12 @@ export function useProspectFilters(): {
       if (!onlyPagination) next.page = 1;
 
       const query = serializeProspectFilters(next).toString();
-      router.replace(query === '' ? pathname : `${pathname}?${query}`, { scroll: false });
+      const url = query === '' ? pathname : `${pathname}?${query}`;
+      if (isTransientPatch(patch)) {
+        router.replace(url, { scroll: false });
+      } else {
+        router.push(url, { scroll: false });
+      }
     },
     [filters, pathname, router],
   );
@@ -57,7 +70,8 @@ export function useProspectFilters(): {
       ...EMPTY_FILTERS,
       pageSize: filters.pageSize,
     }).toString();
-    router.replace(query === '' ? pathname : `${pathname}?${query}`, { scroll: false });
+    // Geste délibéré, et l'un des plus regrettés : il doit pouvoir se défaire.
+    router.push(query === '' ? pathname : `${pathname}?${query}`, { scroll: false });
   }, [filters.pageSize, pathname, router]);
 
   return { filters, setFilters, resetFilters };

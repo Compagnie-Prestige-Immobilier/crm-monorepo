@@ -234,9 +234,9 @@ export function RepresentantsFiltersBar() {
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={orderId}>Sens</Label>
             <Select
-              value={filters.sortOrder}
+              value={filters.sortDir}
               onValueChange={(value) => {
-                setFilters({ sortOrder: value as SortDirection });
+                setFilters({ sortDir: value as SortDirection });
               }}
             >
               <SelectTrigger id={orderId} className="w-full">

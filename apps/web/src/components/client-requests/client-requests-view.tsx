@@ -385,9 +385,30 @@ function RequestCard({
             </p>
           ) : null}
 
-          {/* `/prospects` est réservé à l'ADMIN : proposer ce lien à un agent
-              bancaire l'enverrait droit sur un refus de droits. Il retrouve son
-              client par la recherche du formulaire d'ouverture de dossier. */}
+          {/*
+            `/prospects` est réservé à l'ADMIN : proposer ce lien à un agent
+            bancaire l'enverrait droit sur un refus de droits. Il retrouve son
+            client par la recherche du formulaire d'ouverture de dossier.
+
+            ═════════════════════════════════════════════════════════════════
+            Pourquoi le lien passe par la RECHERCHE et non par l'identifiant.
+            ═════════════════════════════════════════════════════════════════
+
+            `request.createdProspectId` est connu, et l'ignorer paraît être un
+            raccourci paresseux. Ce n'en est pas un : le panel n'a pas d'écran de
+            détail de prospect. Il n'existe ni route `/prospects/[id]`, ni critère
+            par identifiant dans `ProspectFilters` : la fiche s'ouvre dans un
+            dialogue, depuis la ligne du tableau. Un lien par identifiant n'aurait
+            donc aucune destination.
+
+            La recherche par téléphone, elle, aboutit bien : l'API normalise le
+            terme avant de comparer (`tryNormalizePhone` dans
+            `common/prospect-where.ts`), si bien qu'une forme E.164 retrouve la
+            fiche stockée à l'identique. Le `+` survit à l'aller-retour d'URL
+            grâce à `encodeURIComponent` : sans lui, `URLSearchParams` le lirait
+            comme une espace et la recherche partirait sur un numéro amputé.
+            C'est ce dernier point qu'éprouve `lib/filters.test.ts`.
+          */}
           {request.createdProspectId !== null && canReview ? (
             <Button asChild variant="outline">
               <Link href={`/prospects?search=${encodeURIComponent(request.phoneE164)}`}>
