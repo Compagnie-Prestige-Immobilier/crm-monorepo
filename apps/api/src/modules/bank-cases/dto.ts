@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type, type TransformFnParams } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -20,6 +20,7 @@ import {
 import { BankStageType } from '@crm/database';
 
 import { PageMetaDto, SortOrder } from '../../common/dto/prospect-filter.dto.js';
+import { queryBoolean } from '../../common/dto/query-boolean.js';
 import { MONEY_PATTERN } from './money.js';
 
 /**
@@ -331,10 +332,16 @@ export class BankCaseFilterDto {
   @IsEnum(BankStageType)
   stageType?: BankStageType;
 
+  /**
+   * `banqueId` et non `bankId` : c'est le nom porté par la clé étrangère Banque
+   * partout ailleurs dans le contrat (prospects, demandes clients, recherche
+   * d'autocomplétion). Deux noms pour la même entité obligent chaque client à
+   * se souvenir duquel dépend l'écran qu'il construit.
+   */
   @ApiPropertyOptional({ format: 'uuid', description: 'Banque de traitement du dossier.' })
   @IsOptional()
   @IsUUID()
-  bankId?: string;
+  banqueId?: string;
 
   @ApiPropertyOptional({
     format: 'uuid',
@@ -410,6 +417,12 @@ export class BankCaseQueryDto extends BankCaseFilterDto {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class ProspectSearchQueryDto {
+  /**
+   * `search` et non `q` : c'est le nom de TOUS les autres paramètres de
+   * recherche libre du contrat. Il reste OBLIGATOIRE ici, contrairement aux
+   * autres, parce que cet endpoint est une autocomplétion : sans terme il
+   * remonterait la base entière des prospects enrôlés.
+   */
   @ApiProperty({
     maxLength: 120,
     description:
@@ -419,7 +432,7 @@ export class ProspectSearchQueryDto {
   @IsString()
   @MinLength(2)
   @MaxLength(120)
-  q!: string;
+  search!: string;
 
   @ApiPropertyOptional({ minimum: 1, default: 1 })
   @IsOptional()
@@ -544,14 +557,6 @@ export class SetBankCaseStageActiveDto {
   @IsBoolean()
   isActive!: boolean;
 }
-
-/**
- * `Type(() => Boolean)` transformerait la chaîne « false » en `true` — toute
- * chaîne non vide est vraie. Sur un paramètre de requête, où tout arrive en
- * texte, c'est exactement le cas qui compte.
- */
-const queryBoolean = (params: TransformFnParams): boolean =>
-  params.value === true || params.value === 'true' || params.value === '1';
 
 export class IncludeInactiveQueryDto {
   @ApiPropertyOptional({
