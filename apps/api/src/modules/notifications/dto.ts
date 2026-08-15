@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -19,7 +19,6 @@ import {
   MinLength,
 } from 'class-validator';
 import {
-  DevicePlatform,
   NotificationAudience,
   NotificationCategory,
   NotificationDeliveryStatus,
@@ -28,22 +27,30 @@ import {
 } from '@crm/database';
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
+import { queryBoolean } from '../../common/dto/query-boolean.js';
 
 /**
  * Un lien profond est une ROUTE INTERNE. `^/` et pas d'URL absolue.
  *
  * Le mobile passe cette chaîne telle quelle à `go_router`. Autoriser
  * `https://…` transformerait chaque notification en vecteur d'hameçonnage
- * portant le logo de l'application — et l'utilisateur n'a aucun moyen de
+ * portant le logo de l'application, et l'utilisateur n'a aucun moyen de
  * vérifier la destination avant d'appuyer.
  */
 export const ROUTE_PATTERN = /^\/[A-Za-z0-9\-._~/%?&=+:@!$'(),;[\]*]*$/;
 
 export class NotificationDeliveryCountsDto {
   @ApiProperty({ type: Number }) total!: number;
-  @ApiProperty({ type: Number, description: 'En file : aucun push tenté (ou aucun appareil).' })
+  @ApiProperty({
+    type: Number,
+    description:
+      'En file. Soit le destinataire n’est pas servi par e-mail et lira dans l’application, soit l’envoi a échoué de façon passagère et sera réessayé. Ce n’est pas un échec.',
+  })
   pending!: number;
-  @ApiProperty({ type: Number, description: 'Accepté par FCM. N’implique pas « affiché ».' })
+  @ApiProperty({
+    type: Number,
+    description: 'E-mail accepté par Brevo. N’implique pas « lu », ni même « remis ».',
+  })
   sent!: number;
   @ApiProperty({ type: Number }) delivered!: number;
   @ApiProperty({ type: Number }) failed!: number;
@@ -84,7 +91,7 @@ export class NotificationDto {
     type: String,
     nullable: true,
     description:
-      'NOT_CONFIGURED quand aucun compte de service FCM n’est fourni : les lignes de livraison existent, la remise n’a pas eu lieu. TRANSPORT_ERROR quand Google a refusé l’authentification.',
+      'Issue de la branche E-MAIL, seul canal sortant. NOT_CONFIGURED quand aucune clé Brevo n’est fournie : les lignes de livraison existent et la boîte de réception les montre, aucun e-mail n’est parti. TRANSPORT_ERROR quand Brevo a tout refusé ; les livraisons restent en file et seront réessayées.',
   })
   transportStatus!: string | null;
 
@@ -114,7 +121,7 @@ export class NotificationDetailDto {
   @ApiProperty({ type: () => NotificationDto }) notification!: NotificationDto;
   @ApiProperty({
     type: () => [NotificationRecipientDto],
-    description: 'Une ligne par destinataire — c’est ce qui rend « qui a reçu ? » répondable.',
+    description: 'Une ligne par destinataire, c’est ce qui rend « qui a reçu ? » répondable.',
   })
   recipients!: NotificationRecipientDto[];
 }
@@ -179,11 +186,6 @@ export class CreateNotificationDto {
   @MaxLength(300)
   @Matches(ROUTE_PATTERN, { message: 'route doit être une route interne commençant par /' })
   route?: string;
-
-  @ApiPropertyOptional({ type: Object, description: 'Données libres transmises au client.' })
-  @IsOptional()
-  @IsObject()
-  payload?: Record<string, unknown>;
 
   @ApiProperty({ enum: NotificationAudience, enumName: 'NotificationAudience' })
   @IsEnum(NotificationAudience)
@@ -250,7 +252,7 @@ export class NotificationQueryDto {
 export class InboxQueryDto {
   @ApiPropertyOptional({ description: 'Ne rendre que les non lues.' })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(queryBoolean)
   @IsBoolean()
   unreadOnly?: boolean;
 
@@ -297,80 +299,12 @@ export class AudiencePreviewQueryDto {
 }
 
 export class AudiencePreviewDto {
-  @ApiProperty({ type: Number, description: 'Comptes actifs visés.' })
-  recipientCount!: number;
   @ApiProperty({
     type: Number,
     description:
-      'Destinataires possédant au moins un appareil enregistré. L’écart avec `recipientCount` est le nombre de personnes qui ne verront le message qu’en ouvrant l’application.',
+      'Comptes actifs visés. Tous liront la notification dans l’application : il n’y a plus de « joignable » distinct de « visé ».',
   })
-  reachableCount!: number;
-  @ApiProperty({
-    type: Boolean,
-    description: 'Faux quand aucun compte de service FCM n’est configuré.',
-  })
-  transportConfigured!: boolean;
-  @ApiProperty({ type: String, nullable: true }) transportReason!: string | null;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Appareils
-// ─────────────────────────────────────────────────────────────────────────────
-
-export class RegisterDeviceDto {
-  @ApiProperty({
-    minLength: 8,
-    maxLength: 4096,
-    description: 'Jeton d’enregistrement FCM. Réattribué si un autre compte le détenait.',
-  })
-  @IsString()
-  @MinLength(8)
-  @MaxLength(4096)
-  token!: string;
-
-  @ApiPropertyOptional({ enum: DevicePlatform, enumName: 'DevicePlatform' })
-  @IsOptional()
-  @IsEnum(DevicePlatform)
-  platform?: DevicePlatform;
-
-  @ApiPropertyOptional({ maxLength: 40 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  appVersion?: string;
-
-  @ApiPropertyOptional({
-    minimum: 0,
-    description:
-      'Écritures encore dans la file locale. Alimente le rappel « saisies non synchronisées » ; le serveur ne peut pas le deviner.',
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1_000_000)
-  pendingOps?: number;
-}
-
-export class UnregisterDeviceDto {
-  @ApiProperty({ minLength: 8, maxLength: 4096 })
-  @IsString()
-  @MinLength(8)
-  @MaxLength(4096)
-  token!: string;
-}
-
-export class DeviceTokenDto {
-  @ApiProperty({ format: 'uuid' }) id!: string;
-  @ApiProperty({ enum: DevicePlatform, enumName: 'DevicePlatform' }) platform!: DevicePlatform;
-  @ApiProperty({ type: String, nullable: true }) appVersion!: string | null;
-  @ApiProperty({ type: String, format: 'date-time' }) lastSeenAt!: string;
-  @ApiProperty({
-    type: Boolean,
-    description:
-      'Faux quand aucun transport n’est configuré : le jeton est stocké, rien n’est remis.',
-  })
-  pushEnabled!: boolean;
+  recipientCount!: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -472,7 +406,21 @@ export class UpdateNotificationTemplateDto {
 
 /** Rendu d'un gabarit avec un jeu de variables, pour l'aperçu du compositeur. */
 export class RenderTemplateDto {
-  @ApiProperty({ type: Object, description: 'Couples `{ variable: valeur }`.' })
+  /**
+   * `additionalProperties` est OBLIGATOIRE ici, pas décoratif.
+   *
+   * `type: Object` seul produit un schéma `{ "type": "object" }` sans la
+   * moindre propriété. Les générateurs le lisent littéralement (« un objet, et
+   * aucune clé n'est permise ») et rendent `Record<string, never>` côté
+   * TypeScript, `Object?` côté Dart : dans les deux cas un type qui interdit
+   * d'écrire ce que la route attend, et que l'appelant doit contourner par une
+   * assertion. Déclarer le dictionnaire rend le contrat exploitable.
+   */
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description: 'Couples `{ variable: valeur }`.',
+  })
   @IsObject()
   variables!: Record<string, string>;
 }
@@ -499,7 +447,7 @@ export class ReminderRunDto {
 export class IncludeInactiveQueryDto {
   @ApiPropertyOptional({ default: false })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(queryBoolean)
   @IsBoolean()
   includeInactive?: boolean;
 }

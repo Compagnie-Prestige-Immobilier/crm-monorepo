@@ -4,14 +4,30 @@ import {
   NotificationStatus,
   Role,
 } from '@crm/database';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { NotificationsService } from './notifications.service.js';
-import { DevicesService } from './devices.service.js';
+import {
+  DELIVERY_INBOX_ONLY,
+  DELIVERY_RETRY_ERROR,
+  NotificationsService,
+  buildEmailContent,
+} from './notifications.service.js';
 import { NotificationError } from './errors.js';
-import { BrokenTransport, FakePrisma, FakeTransport } from './fake-prisma.js';
-import { chunkTokens, classifyFcmError, readFcmErrorCode } from './fcm.transport.js';
+import {
+  BrokenBrevoTransport,
+  FakeBrevoTransport,
+  FakePrisma,
+  ThrowingBrevoTransport,
+} from './fake-prisma.js';
+import {
+  BREVO_MAX_CONCURRENT_CALLS,
+  BrevoHttpTransport,
+  chunkRecipients,
+  classifyBrevoFailure,
+  mapWithConcurrency,
+  readBrevoErrorCode,
+} from './brevo.transport.js';
 import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const admin: AuthenticatedUser = {
@@ -44,7 +60,7 @@ const codeOf = (error: unknown): string | undefined =>
   ((error as { response?: { code?: string } }).response ?? {}).code;
 
 let db: FakePrisma;
-let transport: FakeTransport;
+let brevo: FakeBrevoTransport;
 let service: NotificationsService;
 
 const baseBody = {
@@ -55,8 +71,10 @@ const baseBody = {
 
 beforeEach(() => {
   db = new FakePrisma();
-  transport = new FakeTransport();
-  service = new NotificationsService(db.asService(), transport, fakeDemoVisibility());
+  // Éteint par défaut : c'est l'état du dépôt sans clé Brevo, et celui que la
+  // très grande majorité de ces tests doit exercer.
+  brevo = new FakeBrevoTransport();
+  service = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,7 +92,7 @@ describe('résolution du public', () => {
 
   it('« tout le monde » exclut les comptes désactivés et supprimés', async () => {
     // Un commercial dont l'accès a été fermé ne doit plus recevoir de consignes
-    // de travail sur son téléphone personnel.
+    // de travail.
     const preview = await service.previewAudience({ audience: NotificationAudience.ALL });
     expect(preview.recipientCount).toBe(4); // admin + usr-1 + usr-2 + usr-3
   });
@@ -97,7 +115,7 @@ describe('résolution du public', () => {
 
   it('« comptes choisis » déduplique avant de compter', async () => {
     // Choisir deux fois la même personne afficherait « 2 destinataires » pour
-    // une seule — au moment précis où l'admin décide de confirmer.
+    // une seule, au moment précis où l'admin décide de confirmer.
     const preview = await service.previewAudience({
       audience: NotificationAudience.USERS,
       audienceUserIds: ['usr-1', 'usr-1', 'usr-2'],
@@ -120,27 +138,13 @@ describe('résolution du public', () => {
     expect(created.counts.total).toBe(preview.recipientCount);
   });
 
-  it('distingue « visé » de « joignable »', async () => {
-    db.addDevice({ userId: 'usr-1', token: 'tok-1' });
-    db.addDevice({ userId: 'usr-1', token: 'tok-1-bis' });
-
-    const preview = await service.previewAudience({
-      audience: NotificationAudience.ROLE,
-      audienceRole: Role.COMMERCIAL,
-    });
-
-    expect(preview.recipientCount).toBe(2);
-    // Deux téléphones, UNE personne joignable.
-    expect(preview.reachableCount).toBe(1);
-  });
-
   it('refuse un public vide plutôt que d’enregistrer un envoi sans destinataire', async () => {
     const empty = new FakePrisma();
     empty.users.length = 0;
     const isolated = new NotificationsService(
       empty.asService(),
-      new FakeTransport(),
       fakeDemoVisibility(),
+      new FakeBrevoTransport(),
     );
 
     const error = await refusal(() => isolated.create(admin, baseBody));
@@ -180,21 +184,19 @@ describe('résolution du public', () => {
 
 describe('éventail', () => {
   beforeEach(() => {
-    db.addUser({ id: 'usr-1' });
-    db.addUser({ id: 'usr-2' });
-    db.addUser({ id: 'usr-3' });
-    db.addDevice({ userId: 'usr-1', token: 'tok-1' });
-    db.addDevice({ userId: 'usr-2', token: 'tok-mort' });
-    db.addDevice({ userId: 'usr-3', token: 'tok-3' });
+    db.addUser({ id: 'usr-1', role: Role.COMMERCIAL, email: 'un@cpi.sn' });
+    db.addUser({ id: 'usr-2', role: Role.COMMERCIAL, email: 'deux@cpi.sn' });
+    db.addUser({ id: 'usr-3', role: Role.COMMERCIAL, email: 'trois@cpi.sn' });
   });
 
-  it('UN JETON DÉFAILLANT N’EMPORTE PAS LE LOT', async () => {
-    transport = new FakeTransport((message) =>
-      message.token === 'tok-mort'
-        ? { token: message.token, ok: false, errorCode: 'INVALID_ARGUMENT', kind: 'invalid' }
-        : { token: message.token, ok: true },
+  it('UNE ADRESSE REFUSÉE N’EMPORTE PAS LE LOT', async () => {
+    brevo = new FakeBrevoTransport((email) =>
+      email === 'deux@cpi.sn'
+        ? { email, ok: false, errorCode: 'invalid_parameter', kind: 'permanent' }
+        : { email, ok: true },
     );
-    service = new NotificationsService(db.asService(), transport, fakeDemoVisibility());
+    brevo.configured = true;
+    service = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -208,113 +210,116 @@ describe('éventail', () => {
     const detail = await service.get(created.id);
     const broken = detail.recipients.find((recipient) => recipient.userId === 'usr-2');
     expect(broken?.status).toBe(NotificationDeliveryStatus.FAILED);
-    expect(broken?.error).toBe('INVALID_ARGUMENT');
+    expect(broken?.error).toBe('invalid_parameter');
   });
 
-  it('UNREGISTERED ÉLAGUE LE JETON, définitivement', async () => {
-    // Un jeton mort le reste. Le réessayer à chaque envoi ferait croire à un
-    // taux d'échec permanent alors que l'application a été désinstallée.
-    transport = new FakeTransport((message) =>
-      message.token === 'tok-mort'
-        ? { token: message.token, ok: false, errorCode: 'UNREGISTERED', kind: 'unregistered' }
-        : { token: message.token, ok: true },
+  it('UN ÉCHEC PASSAGER RESTE EN FILE, il n’est PAS enterré', async () => {
+    // C'est la propriété qui rend le réessai possible. Écrire FAILED sur un 429
+    // condamnerait définitivement un envoi que la seule attente aurait fait
+    // passer, et personne ne le remarquerait.
+    brevo = new FakeBrevoTransport((email) =>
+      email === 'deux@cpi.sn'
+        ? { email, ok: false, errorCode: 'HTTP_429', kind: 'transient' }
+        : { email, ok: true },
     );
-    service = new NotificationsService(db.asService(), transport, fakeDemoVisibility());
-
-    await service.create(admin, { ...baseBody, audience: NotificationAudience.ALL });
-
-    const pruned = db.deviceTokens.find((row) => row.token === 'tok-mort');
-    expect(pruned?.revokedAt).not.toBeNull();
-
-    // Et il ne repart pas au tour suivant.
-    transport.batches.length = 0;
-    await service.create(admin, { ...baseBody, audience: NotificationAudience.ALL });
-    expect(transport.allMessages.map((message) => message.token)).not.toContain('tok-mort');
-  });
-
-  it('n’élague QUE UNREGISTERED — un argument invalide ne détruit rien', async () => {
-    // INVALID_ARGUMENT couvre aussi bien un jeton malformé qu'un corps de
-    // message fautif. Élaguer dessus détruirait les jetons d'une campagne
-    // entière à cause d'une charge utile mal formée, sans retour possible.
-    transport = new FakeTransport((message) => ({
-      token: message.token,
-      ok: false,
-      errorCode: 'INVALID_ARGUMENT',
-      kind: 'invalid',
-    }));
-    service = new NotificationsService(db.asService(), transport, fakeDemoVisibility());
-
-    await service.create(admin, baseBody);
-
-    expect(db.deviceTokens.every((row) => row.revokedAt === null)).toBe(true);
-  });
-
-  it('un destinataire à trois téléphones ne fait qu’UNE livraison', async () => {
-    db.addDevice({ userId: 'usr-1', token: 'tok-1-b' });
-    db.addDevice({ userId: 'usr-1', token: 'tok-1-c' });
+    brevo.configured = true;
+    service = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
 
     const created = await service.create(admin, {
       ...baseBody,
       audience: NotificationAudience.USERS,
-      audienceUserIds: ['usr-1'],
+      audienceUserIds: ['usr-1', 'usr-2', 'usr-3'],
     });
 
-    expect(created.counts.total).toBe(1);
-    expect(created.counts.sent).toBe(1);
-    expect(transport.allMessages).toHaveLength(3);
-  });
-
-  it('passe à SENT dès qu’UN appareil accepte, même si les autres échouent', async () => {
-    db.addDevice({ userId: 'usr-1', token: 'tok-1-casse' });
-    transport = new FakeTransport((message) =>
-      message.token === 'tok-1-casse'
-        ? { token: message.token, ok: false, errorCode: 'UNAVAILABLE', kind: 'transient' }
-        : { token: message.token, ok: true },
-    );
-    service = new NotificationsService(db.asService(), transport, fakeDemoVisibility());
-
-    const created = await service.create(admin, {
-      ...baseBody,
-      audience: NotificationAudience.USERS,
-      audienceUserIds: ['usr-1'],
-    });
-
-    expect(created.counts.sent).toBe(1);
     expect(created.counts.failed).toBe(0);
+    expect(created.counts.pending).toBe(1);
+
+    const detail = await service.get(created.id);
+    const stalled = detail.recipients.find((recipient) => recipient.userId === 'usr-2');
+    expect(stalled?.status).toBe(NotificationDeliveryStatus.PENDING);
+    expect(stalled?.error).toBe(DELIVERY_RETRY_ERROR);
   });
 
-  it('un destinataire sans appareil reste en file, pas en échec', async () => {
-    db.addUser({ id: 'usr-sans-tel' });
+  it('un échec passager repart au passage suivant, et finit par passer', async () => {
+    let refuse = true;
+    brevo = new FakeBrevoTransport((email) =>
+      refuse ? { email, ok: false, errorCode: 'HTTP_503', kind: 'transient' } : { email, ok: true },
+    );
+    brevo.configured = true;
+    service = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
 
     const created = await service.create(admin, {
       ...baseBody,
       audience: NotificationAudience.USERS,
-      audienceUserIds: ['usr-sans-tel'],
+      audienceUserIds: ['usr-1'],
+    });
+    expect(created.counts.pending).toBe(1);
+
+    refuse = false;
+    const retry = await service.dispatch(created.id);
+
+    expect(retry.sent).toBe(1);
+    expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.SENT);
+  });
+
+  it('UNE PANNE DE TRANSPORT LAISSE TOUT EN FILE', async () => {
+    // Aucun lot n'est passé : ce ne sont pas les adresses qui sont en cause,
+    // c'est le service ou la clé. Enterrer les livraisons ici perdrait un envoi
+    // pour une panne de trente secondes.
+    const broken = new NotificationsService(
+      db.asService(),
+      fakeDemoVisibility(),
+      new BrokenBrevoTransport(),
+    );
+
+    const created = await broken.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1'],
     });
 
-    // Rien n'a échoué : il n'y avait rien à joindre. La personne verra le
-    // message en ouvrant l'application.
+    expect(created.transportStatus).toBe('TRANSPORT_ERROR');
+    expect(created.counts.failed).toBe(0);
+    expect(created.counts.pending).toBe(1);
+    expect(db.deliveries[0]?.error).toBe(DELIVERY_RETRY_ERROR);
+  });
+
+  it('un transport e-mail qui LÈVE laisse la livraison en file, sans propager', async () => {
+    // Une exception ici ferait échouer la composition entière : le pire rapport
+    // entre le prix payé et le service rendu.
+    const throwing = new NotificationsService(
+      db.asService(),
+      fakeDemoVisibility(),
+      new ThrowingBrevoTransport(),
+    );
+
+    const created = await throwing.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1'],
+    });
+
+    expect(created.transportStatus).toBe('TRANSPORT_ERROR');
+    expect(created.counts.pending).toBe(1);
+    expect(db.deliveries[0]?.error).toBe(DELIVERY_RETRY_ERROR);
+  });
+
+  it('un destinataire non servi par e-mail reste en file, pas en échec', async () => {
+    db.addUser({ id: 'usr-banque', role: Role.BANQUE_FINANCE, email: 'banque@cpi.sn' });
+    brevo.configured = true;
+
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-banque'],
+    });
+
+    // Rien n'a échoué : il n'y avait rien à envoyer au-dehors. La personne
+    // verra le message en ouvrant l'application.
     expect(created.counts.pending).toBe(1);
     expect(created.counts.failed).toBe(0);
     const detail = await service.get(created.id);
-    expect(detail.recipients[0]?.error).toBe('NO_DEVICE');
-  });
-
-  it('transmet la route dans la charge utile — c’est l’objet de la fonctionnalité', async () => {
-    await service.create(admin, {
-      ...baseBody,
-      route: '/phase2?phone=%2B221771234567',
-      audience: NotificationAudience.USERS,
-      audienceUserIds: ['usr-1'],
-    });
-
-    const message = transport.allMessages[0];
-    expect(message?.data.route).toBe('/phase2?phone=%2B221771234567');
-    expect(message?.data.notificationId).toBeTruthy();
-    // FCM refuse le message entier si une valeur de `data` n'est pas une chaîne.
-    expect(Object.values(message?.data ?? {}).every((value) => typeof value === 'string')).toBe(
-      true,
-    );
+    expect(detail.recipients[0]?.error).toBe(DELIVERY_INBOX_ONLY);
   });
 });
 
@@ -322,11 +327,9 @@ describe('éventail', () => {
 // Mode dégradé
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('absence de transport', () => {
+describe('absence de clé Brevo', () => {
   beforeEach(() => {
-    db.addUser({ id: 'usr-1' });
-    db.addDevice({ userId: 'usr-1', token: 'tok-1' });
-    transport.configured = false;
+    db.addUser({ id: 'usr-1', role: Role.COMMERCIAL, email: 'un@cpi.sn' });
   });
 
   it('stocke et met en file au lieu de planter', async () => {
@@ -342,7 +345,7 @@ describe('absence de transport', () => {
     expect(created.counts.sent).toBe(0);
   });
 
-  it('la boîte de réception fonctionne quand même — c’est le point du mode dégradé', async () => {
+  it('la boîte de réception fonctionne quand même, c’est le point du mode dégradé', async () => {
     await service.create(admin, {
       ...baseBody,
       audience: NotificationAudience.USERS,
@@ -352,31 +355,6 @@ describe('absence de transport', () => {
     const inbox = await service.inbox(asUser('usr-1'), {});
     expect(inbox.items).toHaveLength(1);
     expect(inbox.unreadCount).toBe(1);
-  });
-
-  it('l’aperçu le dit à l’administrateur au lieu de le laisser croire à un envoi', async () => {
-    const preview = await service.previewAudience({ audience: NotificationAudience.ALL });
-    expect(preview.transportConfigured).toBe(false);
-    expect(preview.transportReason).not.toBeNull();
-  });
-
-  it('un échec d’authentification Google n’élague AUCUN jeton', async () => {
-    // Aucun jeton n'est en cause quand c'est l'échange OAuth qui a échoué.
-    // Élaguer ici détruirait toute la base d'appareils sur une panne passagère.
-    const broken = new NotificationsService(
-      db.asService(),
-      new BrokenTransport(),
-      fakeDemoVisibility(),
-    );
-    const created = await broken.create(admin, {
-      ...baseBody,
-      audience: NotificationAudience.USERS,
-      audienceUserIds: ['usr-1'],
-    });
-
-    expect(created.transportStatus).toBe('TRANSPORT_ERROR');
-    expect(db.deviceTokens.every((row) => row.revokedAt === null)).toBe(true);
-    expect(created.counts.pending).toBe(1);
   });
 });
 
@@ -388,7 +366,6 @@ describe('boîte de réception', () => {
   beforeEach(() => {
     db.addUser({ id: 'usr-1' });
     db.addUser({ id: 'usr-2' });
-    db.addDevice({ userId: 'usr-1', token: 'tok-1' });
   });
 
   it('ne montre que ses propres notifications', async () => {
@@ -471,8 +448,8 @@ describe('boîte de réception', () => {
 
 describe('programmation', () => {
   beforeEach(() => {
-    db.addUser({ id: 'usr-1' });
-    db.addDevice({ userId: 'usr-1', token: 'tok-1' });
+    db.addUser({ id: 'usr-1', role: Role.COMMERCIAL, email: 'un@cpi.sn' });
+    brevo.configured = true;
   });
 
   it('n’envoie rien tant que l’heure n’est pas venue', async () => {
@@ -482,7 +459,7 @@ describe('programmation', () => {
     });
 
     expect(created.status).toBe(NotificationStatus.SCHEDULED);
-    expect(transport.allMessages).toHaveLength(0);
+    expect(brevo.sent).toHaveLength(0);
   });
 
   it('annule un envoi programmé', async () => {
@@ -497,8 +474,8 @@ describe('programmation', () => {
   });
 
   it('REFUSE d’annuler un envoi déjà parti', async () => {
-    // Un téléphone qui a sonné ne se rappelle pas. Marquer « annulée » une
-    // notification déjà lue serait un mensonge dans l'historique.
+    // Un e-mail parti ne se rappelle pas. Marquer « annulée » une notification
+    // déjà lue serait un mensonge dans l'historique.
     const created = await service.create(admin, baseBody);
 
     const error = await refusal(() => service.cancel(created.id));
@@ -512,118 +489,484 @@ describe('programmation', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Réattribution d'appareil
+// Canal e-mail
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('réattribution d’un appareil entre utilisateurs', () => {
-  let devices: DevicesService;
-
+describe('canal e-mail', () => {
   beforeEach(() => {
-    db.addUser({ id: 'usr-1' });
-    db.addUser({ id: 'usr-2' });
-    devices = new DevicesService(db.asService(), transport);
+    db.addUser({ id: 'usr-tc1', role: Role.COMMERCIAL, email: 'tc1@cpi.sn', fullName: 'Awa Diop' });
+    // Un compte sans adresse : le schéma exige la colonne, l'usage réel la
+    // laisse parfois vide sur les comptes de terrain.
+    db.addUser({ id: 'usr-tc2', role: Role.COMMERCIAL, email: '' });
+    db.addUser({ id: 'usr-banque', role: Role.BANQUE_FINANCE, email: 'banque@cpi.sn' });
   });
 
-  it('DÉPLACE le jeton au lieu de le dupliquer', async () => {
-    // Les téléphones se prêtent. Deux lignes pour un seul appareil feraient
-    // sonner l'ancien propriétaire sur un téléphone qui n'est plus le sien :
-    // ce n'est pas un doublon, c'est une fuite.
-    await devices.register(asUser('usr-1'), { token: 'tok-partage' });
-    await devices.register(asUser('usr-2'), { token: 'tok-partage' });
-
-    const rows = db.deviceTokens.filter((row) => row.token === 'tok-partage');
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.userId).toBe('usr-2');
-  });
-
-  it('l’ancien propriétaire ne reçoit plus rien sur cet appareil', async () => {
-    await devices.register(asUser('usr-1'), { token: 'tok-partage' });
-    await devices.register(asUser('usr-2'), { token: 'tok-partage' });
-
-    await service.create(admin, {
-      ...baseBody,
-      audience: NotificationAudience.USERS,
-      audienceUserIds: ['usr-1'],
+  const dispatchTo = async (userIds: readonly string[]) => {
+    const row = await db.notification.create({
+      data: {
+        title: 'Réunion demain',
+        body: 'Point commercial à 9 h au siège.',
+        deliveries: { createMany: { data: userIds.map((userId) => ({ userId })) } },
+      },
     });
+    return service.dispatch(row.id);
+  };
 
-    expect(transport.allMessages).toHaveLength(0);
+  it('SANS CLÉ, rien ne part et rien ne casse', async () => {
+    // L'absence de clé est l'état nominal du dépôt : elle doit se voir dans le
+    // résumé, et nulle part ailleurs.
+    const summary = await dispatchTo(['usr-tc1']);
+
+    expect(summary.emailStatus).toBe('NOT_CONFIGURED');
+    expect(summary.emailed).toBe(0);
+    expect(brevo.sent).toHaveLength(0);
+    expect(summary.failed).toBe(0);
+    expect(summary.pending).toBe(1);
   });
 
-  it('la déconnexion révoque, et la reconnexion ressuscite', async () => {
-    await devices.register(asUser('usr-1'), { token: 'tok-1' });
-    await devices.unregister(asUser('usr-1'), { token: 'tok-1' });
-    expect(db.deviceTokens[0]?.revokedAt).not.toBeNull();
+  it('ne sert QUE les commerciaux disposant d’une adresse', async () => {
+    brevo.configured = true;
 
-    await devices.register(asUser('usr-1'), { token: 'tok-1' });
-    // Sans cette réanimation, l'utilisateur ne recevrait plus jamais rien et
-    // rien ne le signalerait.
-    expect(db.deviceTokens[0]?.revokedAt).toBeNull();
+    const summary = await dispatchTo(['usr-tc1', 'usr-tc2', 'usr-banque', 'usr-admin']);
+
+    // Le rôle banque et l'administrateur ont une adresse valide : ils sont
+    // écartés par le RÔLE, pas par l'adresse. `usr-tc2` est commercial mais
+    // sans adresse.
+    expect(brevo.allAddresses).toEqual(['tc1@cpi.sn']);
+    expect(summary.emailed).toBe(1);
+    expect(summary.sent).toBe(1);
+    expect(summary.pending).toBe(3);
+    expect(summary.emailStatus).toBe('SENT');
   });
 
-  it('ne laisse pas révoquer le jeton d’un autre', async () => {
-    await devices.register(asUser('usr-1'), { token: 'tok-1' });
-    await devices.unregister(asUser('usr-2'), { token: 'tok-1' });
-    expect(db.deviceTokens[0]?.revokedAt).toBeNull();
+  it('adresse l’e-mail avec le titre et le corps de la notification', async () => {
+    brevo.configured = true;
+
+    await dispatchTo(['usr-tc1']);
+
+    const message = brevo.sent[0];
+    expect(message?.subject).toBe('Réunion demain');
+    expect(message?.textContent).toContain('Point commercial à 9 h au siège.');
+    expect(message?.htmlContent).toContain('Point commercial à 9 h au siège.');
+    expect(message?.recipients[0]?.name).toBe('Awa Diop');
   });
 
-  it('conserve le DÉBUT du retard à travers les battements de cœur', async () => {
-    const start = new Date('2026-08-10T08:00:00Z');
-    db.addDevice({ userId: 'usr-1', token: 'tok-1', pendingOps: 5, pendingSince: start });
-
-    await devices.register(asUser('usr-1'), { token: 'tok-1', pendingOps: 7 });
-
-    // Écraser `pendingSince` à chaque enregistrement remettrait le compteur à
-    // zéro toutes les quinze minutes, et le rappel ne partirait jamais.
-    expect(db.deviceTokens[0]?.pendingSince?.getTime()).toBe(start.getTime());
-    expect(db.deviceTokens[0]?.pendingOps).toBe(7);
-  });
-
-  it('efface le retard quand la file se vide', async () => {
-    db.addDevice({ userId: 'usr-1', token: 'tok-1', pendingOps: 5, pendingSince: new Date() });
-    await devices.register(asUser('usr-1'), { token: 'tok-1', pendingOps: 0 });
-    expect(db.deviceTokens[0]?.pendingSince).toBeNull();
+  it('échappe le texte saisi avant de le poser dans le HTML', () => {
+    // Titre et corps sont saisis par un administrateur. Une balise recopiée
+    // telle quelle ferait de l'e-mail portant notre nom un support
+    // d'hameçonnage que le lecteur ne peut pas inspecter.
+    const content = buildEmailContent('<script>alert(1)</script>', 'a & b');
+    expect(content.html).not.toContain('<script>');
+    expect(content.html).toContain('&lt;script&gt;');
+    expect(content.html).toContain('a &amp; b');
+    // Le texte brut, lui, n'est pas du balisage : il reste tel quel.
+    expect(content.text).toContain('a & b');
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Détails du transport
+// Détails du transport e-mail
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('découpage et classement FCM', () => {
-  it('respecte le plafond de 500 jetons par lot', () => {
-    const chunks = chunkTokens(Array.from({ length: 1201 }, (_, index) => index));
+describe('découpage et classement Brevo', () => {
+  it('respecte le plafond de 99 destinataires par appel', () => {
+    // Une adresse de trop et Brevo refuse l'appel EN BLOC : les 99 autres ne
+    // partent pas non plus.
+    const chunks = chunkRecipients(Array.from({ length: 200 }, (_, index) => index));
     expect(chunks).toHaveLength(3);
-    expect(chunks[0]).toHaveLength(500);
-    expect(chunks[2]).toHaveLength(201);
+    expect(chunks[0]).toHaveLength(99);
+    expect(chunks[2]).toHaveLength(2);
   });
 
-  it('reconnaît UNREGISTERED dans les détails d’erreur', () => {
-    const payload = {
-      error: {
-        status: 'NOT_FOUND',
-        details: [
-          {
-            '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError',
-            errorCode: 'UNREGISTERED',
-          },
-        ],
-      },
-    };
-    expect(readFcmErrorCode(payload)).toBe('UNREGISTERED');
-    expect(classifyFcmError('UNREGISTERED', 404)).toBe('unregistered');
+  it('lit le code d’erreur Brevo quand il y en a un', () => {
+    expect(readBrevoErrorCode({ code: 'invalid_parameter' })).toBe('invalid_parameter');
+    expect(readBrevoErrorCode({})).toBeUndefined();
+    expect(readBrevoErrorCode(null)).toBeUndefined();
   });
 
-  it('classe INVALID_ARGUMENT comme invalide, pas comme mort', () => {
-    expect(classifyFcmError('INVALID_ARGUMENT', 400)).toBe('invalid');
+  it('classe 429 et 5xx comme passagers, le reste comme définitif', () => {
+    expect(classifyBrevoFailure(429)).toBe('transient');
+    expect(classifyBrevoFailure(503)).toBe('transient');
+    expect(classifyBrevoFailure(400)).toBe('permanent');
+    expect(classifyBrevoFailure(401)).toBe('permanent');
   });
 
-  it('classe un 503 comme passager', () => {
-    expect(classifyFcmError(undefined, 503)).toBe('transient');
+  it('le pool de travail respecte l’ordre d’entrée et n’avale pas les rejets', async () => {
+    const settled = await mapWithConcurrency([1, 2, 3, 4], 2, (value) =>
+      value === 3 ? Promise.reject(new Error('trois')) : Promise.resolve(value * 10),
+    );
+
+    expect(settled.map((result) => result.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+      'rejected',
+      'fulfilled',
+    ]);
+    expect(settled[3]).toEqual({ status: 'fulfilled', value: 40 });
+  });
+});
+
+describe('appels HTTP Brevo', () => {
+  const configured = { BREVO_API_KEY: 'cle', BREVO_SENDER_EMAIL: 'no-reply@cpi.sn' };
+
+  const message = (count: number) => ({
+    recipients: Array.from({ length: count }, (_, index) => ({
+      email: `u${String(index)}@cpi.sn`,
+    })),
+    subject: 'Sujet',
+    htmlContent: '<p>x</p>',
+    textContent: 'x',
   });
 
-  it('retombe sur `error.status` quand les détails manquent', () => {
-    expect(readFcmErrorCode({ error: { status: 'UNAVAILABLE' } })).toBe('UNAVAILABLE');
-    expect(readFcmErrorCode({})).toBeUndefined();
-    expect(readFcmErrorCode(null)).toBeUndefined();
+  it('PLAFONNE LES APPELS SIMULTANÉS', async () => {
+    // Sans plafond, une campagne générale ouvre autant de requêtes que de lots
+    // d'un coup, et Brevo écrête la queue de la vague en 429 : ce sont les
+    // derniers destinataires qui disparaissent, ceux dont personne ne remarque
+    // l'absence.
+    let inFlight = 0;
+    let peak = 0;
+    let calls = 0;
+
+    vi.stubGlobal('fetch', async () => {
+      calls += 1;
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight -= 1;
+      return new Response('{}', { status: 201 });
+    });
+
+    try {
+      const transport = new BrevoHttpTransport(configured);
+      // 2 000 adresses : 21 lots de 99, donc 21 appels si rien ne bride.
+      await transport.send([message(2000)]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(calls).toBe(21);
+    expect(peak).toBeLessThanOrEqual(BREVO_MAX_CONCURRENT_CALLS);
+  });
+
+  it('POSE UN DÉLAI D’ABANDON SUR CHAQUE APPEL', async () => {
+    // Sans signal explicite, `fetch` hérite du défaut d'undici, cinq minutes,
+    // pendant lesquelles le tick de rappels reste bloqué sur une socket muette.
+    const seen: (AbortSignal | null | undefined)[] = [];
+
+    vi.stubGlobal('fetch', (_url: string, init?: RequestInit) => {
+      seen.push(init?.signal);
+      return Promise.resolve(new Response('{}', { status: 201 }));
+    });
+
+    try {
+      const transport = new BrevoHttpTransport(configured);
+      await transport.send([message(1)]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toBeInstanceOf(AbortSignal);
+  });
+
+  it('classe un 429 en passager jusque dans l’issue rendue', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve(new Response('{"code":"too_many_requests"}', { status: 429 })),
+    );
+
+    let result;
+    try {
+      const transport = new BrevoHttpTransport(configured);
+      result = await transport.send([message(1)]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(result.outcomes[0]?.ok).toBe(false);
+    expect(result.outcomes[0]?.kind).toBe('transient');
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Ce que `dispatch` fait de chaque réponse possible
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Envoie `count` adresses à travers une doublure de `fetch`, et rend à la
+   * fois l'issue et les corps postés. Les corps comptent : c'est le seul moyen
+   * de prouver que le découpage en lots de 99 se retrouve VRAIMENT dans les
+   * requêtes, et pas seulement dans la fonction `chunkRecipients` prise à part.
+   */
+  const withFetch = async (
+    count: number,
+    handler: (call: number) => Promise<Response>,
+  ): Promise<{
+    result: Awaited<ReturnType<BrevoHttpTransport['send']>>;
+    bodies: Record<string, unknown>[];
+  }> => {
+    const bodies: Record<string, unknown>[] = [];
+    let call = 0;
+
+    vi.stubGlobal('fetch', (_url: string, init?: RequestInit) => {
+      const brut = typeof init?.body === 'string' ? init.body : '{}';
+      bodies.push(JSON.parse(brut) as Record<string, unknown>);
+      call += 1;
+      return handler(call);
+    });
+
+    try {
+      return { result: await new BrevoHttpTransport(configured).send([message(count)]), bodies };
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  };
+
+  it('un 201 rend SENT, chaque destinataire du lot marqué passé', async () => {
+    const { result, bodies } = await withFetch(3, () =>
+      Promise.resolve(new Response('{"messageId":"<x>"}', { status: 201 })),
+    );
+
+    expect(result.status).toBe('SENT');
+    expect(result.outcomes).toHaveLength(3);
+    expect(result.outcomes.every((outcome) => outcome.ok)).toBe(true);
+    // Un succès ne porte NI code d'erreur NI nature d'échec : ces deux champs
+    // pilotent le sort de la ligne de livraison chez l'appelant.
+    expect(result.outcomes[0]?.errorCode).toBeUndefined();
+    expect(result.outcomes[0]?.kind).toBeUndefined();
+
+    // L'appel est bien UN message pour N destinataires, et non N appels.
+    expect(bodies).toHaveLength(1);
+    expect((bodies[0]?.to as unknown[]).length).toBe(3);
+    expect(bodies[0]?.sender).toEqual({ email: 'no-reply@cpi.sn', name: 'CPI GO' });
+  });
+
+  /**
+   * Un 400 décrit un état qui ne bougera pas tout seul : adresse refusée, corps
+   * invalide. Le classer en `transient` ferait réessayer indéfiniment à chaque
+   * passage du tick, sur une ligne qui ne passera jamais.
+   */
+  it('un 400 est DÉFINITIF et remonte le code de Brevo, pas le statut HTTP', async () => {
+    const { result } = await withFetch(2, () =>
+      Promise.resolve(new Response('{"code":"invalid_parameter"}', { status: 400 })),
+    );
+
+    // Un seul lot, entièrement en échec : le service n'a rien délivré.
+    expect(result.status).toBe('TRANSPORT_ERROR');
+    expect(result.outcomes).toHaveLength(2);
+    for (const outcome of result.outcomes) {
+      expect(outcome.ok).toBe(false);
+      expect(outcome.kind).toBe('permanent');
+      // `invalid_parameter` et non `HTTP_400` : c'est ce que l'exploitant lit
+      // dans le journal, et les deux ne s'y valent pas.
+      expect(outcome.errorCode).toBe('invalid_parameter');
+    }
+  });
+
+  it('sans code dans le corps, l’issue retombe sur le statut HTTP', async () => {
+    const { result } = await withFetch(1, () => Promise.resolve(new Response('', { status: 403 })));
+
+    expect(result.outcomes[0]?.errorCode).toBe('HTTP_403');
+    expect(result.outcomes[0]?.kind).toBe('permanent');
+  });
+
+  /**
+   * Une socket coupée ne dit RIEN de l'adresse visée. L'enterrer en `permanent`
+   * est la faute coûteuse : elle condamne un envoi que la simple attente aurait
+   * fait passer.
+   */
+  it('une coupure réseau est PASSAGÈRE et ne fait pas lever `send`', async () => {
+    const { result } = await withFetch(2, () => Promise.reject(new Error('ECONNRESET')));
+
+    expect(result.status).toBe('TRANSPORT_ERROR');
+    expect(result.detail).toContain('ECONNRESET');
+    for (const outcome of result.outcomes) {
+      expect(outcome.ok).toBe(false);
+      expect(outcome.errorCode).toBe('NETWORK_ERROR');
+      expect(outcome.kind).toBe('transient');
+    }
+  });
+
+  /** Le délai dépassé emprunte le même chemin que la coupure : il repassera. */
+  it('un abandon sur délai est traité comme une coupure, donc PASSAGER', async () => {
+    const { result } = await withFetch(1, () =>
+      Promise.reject(new DOMException('The operation was aborted.', 'TimeoutError')),
+    );
+
+    expect(result.outcomes[0]?.kind).toBe('transient');
+    expect(result.outcomes[0]?.errorCode).toBe('NETWORK_ERROR');
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LE CAS QUI DÉCIDE DU RESTE : DES LOTS QUI NE FINISSENT PAS PAREIL
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Le grain de l'échec est le LOT de 99, pas l'adresse. Quand un lot sur trois
+   * est refusé, deux propriétés doivent tenir ensemble :
+   *
+   *  - les 198 adresses des lots passés sont marquées passées, sans quoi elles
+   *    repartiraient au passage suivant et les gens recevraient deux fois le
+   *    même rappel ;
+   *  - le statut d'ensemble reste `SENT`, parce que quelque chose EST parti :
+   *    `TRANSPORT_ERROR` est réservé au cas où RIEN ne passe, et il fait
+   *    conclure à l'appelant que la clé ou le service est en cause.
+   */
+  it('des lots aux issues DIFFÉRENTES : chacun garde la sienne, l’envoi reste SENT', async () => {
+    const { result, bodies } = await withFetch(250, (call) =>
+      Promise.resolve(
+        call === 2
+          ? new Response('{"code":"invalid_parameter"}', { status: 400 })
+          : new Response('{}', { status: 201 }),
+      ),
+    );
+
+    // 250 adresses : 99 + 99 + 52.
+    expect(bodies.map((body) => (body.to as unknown[]).length)).toEqual([99, 99, 52]);
+
+    expect(result.status).toBe('SENT');
+    expect(result.outcomes).toHaveLength(250);
+    expect(result.outcomes.filter((outcome) => outcome.ok)).toHaveLength(151);
+
+    const refusees = result.outcomes.filter((outcome) => !outcome.ok);
+    expect(refusees).toHaveLength(99);
+    expect(refusees.every((outcome) => outcome.kind === 'permanent')).toBe(true);
+    // Ce sont bien les adresses du DEUXIÈME lot, pas d'autres : l'appariement
+    // entre lots et issues suit l'ordre d'entrée.
+    expect(refusees[0]?.email).toBe('u99@cpi.sn');
+    expect(refusees.at(-1)?.email).toBe('u197@cpi.sn');
+  });
+
+  it('sans clé, aucun appel réseau et un état NOT_CONFIGURED', async () => {
+    const fetchStub = vi.fn();
+    vi.stubGlobal('fetch', fetchStub);
+
+    let result;
+    try {
+      result = await new BrevoHttpTransport({ BREVO_SENDER_EMAIL: 'no-reply@cpi.sn' }).send([
+        message(5),
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(result.status).toBe('NOT_CONFIGURED');
+    expect(result.outcomes).toEqual([]);
+    expect(result.detail).toContain('BREVO_API_KEY');
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  it('une liste vide ne touche pas au réseau', async () => {
+    const fetchStub = vi.fn();
+    vi.stubGlobal('fetch', fetchStub);
+
+    let result;
+    try {
+      result = await new BrevoHttpTransport(configured).send([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(result).toEqual({ status: 'SENT', outcomes: [] });
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Visibilité de démonstration
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LE DÉFAUT CORRIGÉ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Le schéma porte `isDemo` sur `Notification` et sur `NotificationDelivery`
+ * depuis toujours ; le service l'ignorait dans les deux sens.
+ *
+ * En ÉCRITURE, la colonne prenait son défaut, FALSE : une annonce composée
+ * pendant une démonstration devenait une VRAIE annonce, arrivait dans la boîte
+ * de réception de vrais commerciaux avec un texte d'exemple, survivait à
+ * l'extinction du mode.
+ *
+ * En LECTURE, ni la liste d'administration ni la boîte de réception ne
+ * cloisonnaient : le mode éteint ne cachait rien de ce que le mode allumé avait
+ * produit.
+ *
+ * Le balayage `demo-visibility.sweep.test.ts` ne voyait rien de tout cela : sa
+ * liste de modèles s'était arrêtée à douze entrées quand le schéma en portait
+ * quinze. C'est ce trou-là qu'un test de dérive contre `schema.prisma` ferme
+ * désormais.
+ */
+describe('visibilité de démonstration', () => {
+  const enDemonstration = (): NotificationsService =>
+    new NotificationsService(db.asService(), fakeDemoVisibility(true), brevo);
+
+  beforeEach(() => {
+    db.addUser({ id: 'usr-1' });
+  });
+
+  const ciblee = {
+    ...baseBody,
+    audience: NotificationAudience.USERS,
+    audienceUserIds: ['usr-1'],
+  };
+
+  it('mode ÉTEINT : l’envoi et ses livraisons sont réels', async () => {
+    await service.create(admin, ciblee);
+
+    expect(db.notifications.map((row) => row.isDemo)).toEqual([false]);
+    expect(db.deliveries.map((row) => row.isDemo)).toEqual([false]);
+  });
+
+  it('mode ALLUMÉ : l’envoi ET ses livraisons sont de démonstration', async () => {
+    await enDemonstration().create(admin, ciblee);
+
+    expect(db.notifications.map((row) => row.isDemo)).toEqual([true]);
+    // Les livraisons portent la MÊME valeur : une livraison visible accrochée
+    // à une notification masquée afficherait une ligne vide dans la boîte.
+    expect(db.deliveries.map((row) => row.isDemo)).toEqual([true]);
+  });
+
+  it('la liste d’administration cache les envois de démonstration', async () => {
+    await enDemonstration().create(admin, ciblee);
+    await service.create(admin, { ...ciblee, title: 'Vraie annonce' });
+
+    const page = await service.list({});
+
+    expect(page.items.map((item) => item.title)).toEqual(['Vraie annonce']);
+    // Le TOTAL doit suivre la liste : sinon la pagination annonce deux envois
+    // et n'en montre qu'un.
+    expect(page.meta.total).toBe(1);
+  });
+
+  it('l’écran de détail refuse un envoi masqué, il ne l’ouvre pas par son identifiant', async () => {
+    const cachee = await enDemonstration().create(admin, ciblee);
+
+    const error = await refusal(() => service.get(cachee.id));
+    expect(codeOf(error)).toBe('NOTIFICATION_NOT_FOUND');
+
+    // Mode allumé, le même identifiant s'ouvre : la ligne est masquée, pas
+    // supprimée.
+    await expect(enDemonstration().get(cachee.id)).resolves.toBeDefined();
+  });
+
+  it('la boîte de réception et sa pastille cachent l’un et l’autre', async () => {
+    await enDemonstration().create(admin, ciblee);
+
+    const boite = await service.inbox(asUser('usr-1'), {});
+    expect(boite.items).toHaveLength(0);
+    expect(boite.unreadCount).toBe(0);
+    expect(boite.meta.total).toBe(0);
+
+    // Mode allumé, la même boîte montre le message.
+    const visible = await enDemonstration().inbox(asUser('usr-1'), {});
+    expect(visible.items).toHaveLength(1);
+    expect(visible.unreadCount).toBe(1);
+  });
+
+  it('refuse de marquer lue une notification masquée', async () => {
+    const cachee = await enDemonstration().create(admin, ciblee);
+
+    const error = await refusal(() => service.markRead(asUser('usr-1'), cachee.id));
+    expect(codeOf(error)).toBe('NOTIFICATION_NOT_FOUND');
   });
 });

@@ -4,6 +4,7 @@ import {
   NotificationCategory,
   NotificationDeliveryStatus,
   NotificationStatus,
+  Role,
   type Prisma,
 } from '@crm/database';
 
@@ -11,11 +12,12 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { buildAudienceWhere, dedupe, type AudienceSelector } from './audience.js';
 import {
-  FCM_TRANSPORT,
-  type FcmMessage,
-  type FcmTransport,
-  type FcmTransportStatus,
-} from './fcm.transport.js';
+  BREVO_TRANSPORT,
+  type BrevoRecipient,
+  type BrevoTransport,
+  type BrevoTransportStatus,
+} from './brevo.transport.js';
+import { renderTemplate } from './template.js';
 import {
   audienceEmpty,
   notScheduled,
@@ -37,14 +39,66 @@ import {
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { demoScope } from '../../prisma/demo-visibility.js';
 
-/** Ce que l'éventail a réellement produit. Sert aux tests et au journal. */
+/**
+ * Marqueur d'une livraison LAISSÉE EN FILE après un échec passager.
+ *
+ * La ligne reste `PENDING`, ce qui la rend éligible au passage suivant de
+ * `dispatch()` : c'est tout le mécanisme de réessai, il n'y a pas de file
+ * séparée. Le marqueur sert à distinguer « en attente parce qu'il faut
+ * réessayer » de « en attente parce qu'il n'y avait rien à envoyer », deux
+ * états que le seul statut `PENDING` confondrait.
+ */
+export const DELIVERY_RETRY_ERROR = 'EMAIL_RETRY';
+
+/**
+ * Marqueur d'une livraison qui ne sera JAMAIS servie par e-mail : le
+ * destinataire n'est pas téléconseiller, ou n'a pas d'adresse. Ce n'est pas un
+ * échec, la personne verra le message dans sa boîte de réception.
+ */
+export const DELIVERY_INBOX_ONLY = 'INBOX_ONLY';
+
+/**
+ * Ce que l'éventail a réellement produit. Sert aux tests et au journal.
+ *
+ * LES TROIS COMPTEURS PARLENT DE LA SEULE BRANCHE QUI RESTE, l'e-mail. Depuis
+ * le retrait de Firebase du mobile, aucun push ne part, et la boîte de
+ * réception sert TOUT LE MONDE sans distinction : elle n'a donc rien à compter,
+ * elle n'échoue pas.
+ *
+ *   · `sent`    : livraisons passées à SENT, l'e-mail a été accepté par Brevo ;
+ *   · `failed`  : livraisons passées à FAILED sur un refus définitif ;
+ *   · `pending` : livraisons LAISSÉES EN FILE, soit parce que le destinataire
+ *     n'est pas servi par e-mail (il lira dans l'application), soit parce que
+ *     l'échec est passager et qu'un prochain passage doit réessayer.
+ *
+ * `pending` n'est donc pas un synonyme d'échec, et c'est délibéré : sur une
+ * annonce générale, la majorité des destinataires y tombe légitimement.
+ */
 export interface DispatchSummary {
-  readonly transportStatus: FcmTransportStatus;
   readonly sent: number;
   readonly failed: number;
   readonly pending: number;
-  /** Jetons élagués parce que FCM les a déclarés UNREGISTERED. */
-  readonly prunedTokens: number;
+  /** Adresses acceptées par Brevo. Redondant avec `sent`, conservé pour le journal. */
+  readonly emailed: number;
+  readonly emailStatus: BrevoTransportStatus;
+}
+
+/** Sort réservé à UNE ligne de livraison par la branche e-mail. */
+type DeliveryVerdict =
+  | { readonly kind: 'sent' }
+  | { readonly kind: 'retry'; readonly error: string }
+  | { readonly kind: 'failed'; readonly error: string };
+
+/** Ce que la branche e-mail a produit. Interne à `dispatch()`. */
+interface EmailLegResult {
+  readonly emailed: number;
+  readonly status: BrevoTransportStatus;
+  /**
+   * Verdict par destinataire, pour les seuls comptes réellement servis. Un
+   * identifiant absent de cette table n'a pas d'e-mail à recevoir : sa ligne
+   * reste en file, sans que ce soit un échec.
+   */
+  readonly verdicts: ReadonlyMap<string, DeliveryVerdict>;
 }
 
 interface DeliveryRowSeed {
@@ -58,7 +112,6 @@ const NOTIFICATION_SELECT = {
   body: true,
   category: true,
   route: true,
-  payload: true,
   audience: true,
   audienceRole: true,
   audienceDepartementId: true,
@@ -80,8 +133,8 @@ export class NotificationsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(FCM_TRANSPORT) private readonly transport: FcmTransport,
     private readonly demo: DemoVisibilityService,
+    @Inject(BREVO_TRANSPORT) private readonly email: BrevoTransport,
   ) {}
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -93,9 +146,9 @@ export class NotificationsService {
    *
    * L'ORDRE COMPTE. Le public est résolu et les lignes de livraison écrites
    * AVANT toute tentative de remise, et dans la même transaction que l'envoi.
-   * Le contraire — pousser d'abord, tracer ensuite — laisse un trou : un
-   * redémarrage entre les deux produit des téléphones qui ont sonné et une base
-   * qui l'ignore, donc une question « qui a reçu ? » sans réponse.
+   * Le contraire, envoyer d'abord, tracer ensuite, laisse un trou : un
+   * redémarrage entre les deux produit des e-mails partis et une base qui les
+   * ignore, donc une question « qui a reçu ? » sans réponse.
    */
   async create(user: AuthenticatedUser, body: CreateNotificationDto): Promise<NotificationDto> {
     if (body.route !== undefined && !ROUTE_PATTERN.test(body.route)) throw routeInvalid();
@@ -112,13 +165,26 @@ export class NotificationsService {
     });
     if (!recipients.length) throw audienceEmpty();
 
+    // ═══ LA NOTIFICATION SUIT L'INTERRUPTEUR ═══
+    //
+    // Composée mode ALLUMÉ, elle est une ligne de démonstration, au même titre
+    // qu'un prospect ou qu'une campagne saisis pendant la même séance : c'est
+    // ce qui la fait disparaître à l'extinction. Sans cela, une annonce
+    // d'exemple resterait dans la boîte de réception de vrais commerciaux,
+    // avec un texte écrit pour une démo.
+    //
+    // Les LIVRAISONS portent la même valeur : elles n'existent que par leur
+    // notification, et une livraison visible accrochée à une notification
+    // masquée afficherait une ligne vide dans la boîte de réception.
+    const isDemo = await this.demo.enabled();
+
     const created = await this.prisma.notification.create({
       data: {
+        isDemo,
         title: body.title,
         body: body.body,
         category: body.category ?? NotificationCategory.ANNONCE,
         route: body.route ?? null,
-        payload: (body.payload ?? null) as Prisma.InputJsonValue,
         audience: body.audience,
         audienceRole: body.audienceRole ?? null,
         audienceDepartementId: body.audienceDepartementId ?? null,
@@ -134,6 +200,7 @@ export class NotificationsService {
               (recipient): Prisma.NotificationDeliveryCreateManyNotificationInput => ({
                 userId: recipient.userId,
                 status: NotificationDeliveryStatus.PENDING,
+                isDemo,
               }),
             ),
           },
@@ -166,27 +233,16 @@ export class NotificationsService {
     return rows.map((row) => ({ userId: row.id }));
   }
 
-  /** Compteur annoncé au compositeur AVANT confirmation. */
+  /**
+   * Compteur annoncé au compositeur AVANT confirmation.
+   *
+   * Il n'y a plus de « joignable » distinct de « visé » : la boîte de réception
+   * sert tout le monde, sans appareil à enregistrer et sans transport à
+   * configurer. Le seul chiffre honnête est donc le nombre de comptes visés.
+   */
   async previewAudience(selector: AudienceSelector): Promise<AudiencePreviewDto> {
     const recipients = await this.resolveRecipients(selector);
-    const userIds = recipients.map((recipient) => recipient.userId);
-
-    // `distinct` plutôt qu'un comptage de jetons : un commercial avec trois
-    // téléphones est UNE personne joignable, pas trois.
-    const reachable = userIds.length
-      ? await this.prisma.deviceToken.findMany({
-          where: { userId: { in: userIds }, revokedAt: null },
-          select: { userId: true },
-          distinct: ['userId'],
-        })
-      : [];
-
-    return {
-      recipientCount: recipients.length,
-      reachableCount: reachable.length,
-      transportConfigured: this.transport.isConfigured(),
-      transportReason: this.transport.unavailableReason(),
-    };
+    return { recipientCount: recipients.length };
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -194,19 +250,28 @@ export class NotificationsService {
   // ───────────────────────────────────────────────────────────────────────────
 
   /**
-   * Pousse une notification vers tous les appareils de ses destinataires.
+   * Sert une notification à ses destinataires, puis écrit ce qui s'est passé.
+   *
+   * DEUX CANAUX, UN SEUL SORTANT. Tout destinataire lit la notification dans sa
+   * boîte de réception dès qu'il ouvre l'application : c'est la ligne de
+   * livraison elle-même qui la lui rend visible, il n'y a rien à « remettre ».
+   * Le seul canal qui part vers l'extérieur est l'e-mail des téléconseillers.
    *
    * TROIS PROPRIÉTÉS, toutes testées.
    *
-   * 1. UN JETON MORT N'EMPORTE PAS LE LOT. Chaque message est indépendant ;
-   *    l'échec de l'un marque SA ligne de livraison en échec et laisse les
-   *    autres passer. Un `Promise.all` ferait exactement le contraire.
-   * 2. UN DESTINATAIRE, UNE LIGNE. Trois téléphones ne font pas trois
-   *    livraisons : la ligne passe à SENT dès qu'un appareil a accepté, et
-   *    n'échoue que si tous ont échoué.
-   * 3. UNREGISTERED ÉLAGUE. Le jeton est révoqué, définitivement. Le réessayer
-   *    à chaque envoi ferait croire à un taux d'échec permanent alors que le
-   *    téléphone a simplement désinstallé l'application.
+   * 1. UN REFUS N'EMPORTE PAS LE LOT. Les issues sont traitées adresse par
+   *    adresse ; une adresse refusée marque SA ligne et laisse les autres
+   *    passer.
+   * 2. UN ÉCHEC PASSAGER RESTE EN FILE. 429, 5xx, socket coupée, délai dépassé :
+   *    la ligne reste `PENDING` avec le marqueur de réessai, et le passage
+   *    suivant la reprendra. L'écrire `FAILED` enterrerait définitivement un
+   *    envoi que la seule attente aurait fait passer.
+   * 3. LE NON-DESTINATAIRE D'E-MAIL N'EST PAS UN ÉCHEC. Un agent du pôle banque
+   *    n'est pas servi par e-mail, par choix ; sa ligne reste en file et il lit
+   *    dans l'application.
+   *
+   * RIEN ICI NE LÈVE À CAUSE DE L'E-MAIL : une panne Brevo laisse les lignes en
+   * file, elle ne fait pas échouer l'appel.
    */
   async dispatch(notificationId: string): Promise<DispatchSummary> {
     const notification = await this.prisma.notification.findUnique({
@@ -215,78 +280,28 @@ export class NotificationsService {
     });
     if (!notification) throw notificationNotFound();
 
+    // LECTURE GLOBALE délibérée : l'expédition doit servir TOUTES les
+    // livraisons de la notification qu'on lui a désignée. Une livraison écartée
+    // ici resterait `PENDING` pour toujours, sans qu'aucun passage ne la
+    // reprenne jamais, et le compteur annoncé au compositeur mentirait. La
+    // nature de la ligne est déjà tranchée en amont : les livraisons portent
+    // celle de leur notification, posée dans la même transaction que sa
+    // création.
     const deliveries = await this.prisma.notificationDelivery.findMany({
       where: { notificationId, status: NotificationDeliveryStatus.PENDING },
       select: { id: true, userId: true },
     });
 
     if (!deliveries.length) {
-      await this.markNotificationSent(notificationId, 'SENT');
-      return { transportStatus: 'SENT', sent: 0, failed: 0, pending: 0, prunedTokens: 0 };
+      const idle = await this.sendByEmail(notification, []);
+      await this.markNotificationSent(notificationId, idle.status);
+      return { sent: 0, failed: 0, pending: 0, emailed: idle.emailed, emailStatus: idle.status };
     }
 
-    const userIds = deliveries.map((delivery) => delivery.userId);
-    const tokens = await this.prisma.deviceToken.findMany({
-      where: { userId: { in: userIds }, revokedAt: null },
-      select: { token: true, userId: true },
-    });
-
-    // ── Mode dégradé ────────────────────────────────────────────────────────
-    // Pas de compte de service : les lignes restent PENDING, la notification
-    // est marquée envoyée avec un statut de transport explicite, et la boîte de
-    // réception mobile la montrera à la prochaine ouverture. Rien n'est perdu ;
-    // c'est simplement le push qui n'a pas lieu.
-    if (!this.transport.isConfigured()) {
-      const reason = this.transport.unavailableReason() ?? 'Transport indisponible.';
-      this.logger.warn(
-        `Notification ${notificationId} : ${String(deliveries.length)} destinataire(s) en file, aucun push. ${reason}`,
-      );
-      await this.markNotificationSent(notificationId, 'NOT_CONFIGURED');
-      return {
-        transportStatus: 'NOT_CONFIGURED',
-        sent: 0,
-        failed: 0,
-        pending: deliveries.length,
-        prunedTokens: 0,
-      };
-    }
-
-    const messages: FcmMessage[] = tokens.map((row) => ({
-      token: row.token,
-      title: notification.title,
-      body: notification.body,
-      data: buildDataPayload(notification),
-    }));
-
-    const result = await this.transport.send(messages);
-
-    if (result.status === 'TRANSPORT_ERROR') {
-      // L'échange OAuth a échoué : aucun jeton n'est en cause, aucun n'est
-      // élagué, et les lignes restent PENDING pour être rejouées.
-      this.logger.error(
-        `Notification ${notificationId} : transport en erreur (${result.detail ?? 'sans détail'}). Aucune livraison marquée.`,
-      );
-      await this.markNotificationSent(notificationId, 'TRANSPORT_ERROR');
-      return {
-        transportStatus: 'TRANSPORT_ERROR',
-        sent: 0,
-        failed: 0,
-        pending: deliveries.length,
-        prunedTokens: 0,
-      };
-    }
-
-    const outcomeByToken = new Map(result.outcomes.map((outcome) => [outcome.token, outcome]));
-    const tokensByUser = new Map<string, string[]>();
-    for (const row of tokens) {
-      const list = tokensByUser.get(row.userId) ?? [];
-      list.push(row.token);
-      tokensByUser.set(row.userId, list);
-    }
-
-    const deadTokens = result.outcomes
-      .filter((outcome) => outcome.kind === 'unregistered')
-      .map((outcome) => outcome.token);
+    const email = await this.sendByEmail(
+      notification,
+      deliveries.map((delivery) => delivery.userId),
+    );
 
     let sent = 0;
     let failed = 0;
@@ -294,62 +309,157 @@ export class NotificationsService {
     const now = new Date();
 
     for (const delivery of deliveries) {
-      const userTokens = tokensByUser.get(delivery.userId) ?? [];
+      const verdict = email.verdicts.get(delivery.userId);
 
-      if (!userTokens.length) {
-        // Aucun appareil : la personne verra le message en ouvrant
-        // l'application. `PENDING` et non `FAILED` — rien n'a échoué, il n'y
-        // avait simplement rien à joindre.
+      if (verdict === undefined) {
+        // Personne à servir par e-mail. `PENDING` et non `FAILED` : rien n'a
+        // échoué, il n'y avait simplement rien à envoyer au-dehors.
         pending += 1;
         await this.prisma.notificationDelivery.update({
           where: { id: delivery.id },
-          data: { error: 'NO_DEVICE' },
+          data: { error: DELIVERY_INBOX_ONLY },
         });
         continue;
       }
 
-      const outcomes = userTokens.map((token) => outcomeByToken.get(token));
-      const success = outcomes.find((outcome) => outcome?.ok === true);
-
-      if (success) {
+      if (verdict.kind === 'sent') {
         sent += 1;
         await this.prisma.notificationDelivery.update({
           where: { id: delivery.id },
-          data: {
-            status: NotificationDeliveryStatus.SENT,
-            deviceToken: success.token,
-            error: null,
-            sentAt: now,
-          },
+          data: { status: NotificationDeliveryStatus.SENT, error: null, sentAt: now },
+        });
+        continue;
+      }
+
+      if (verdict.kind === 'retry') {
+        // Le statut RESTE `PENDING` : c'est ce qui rend la ligne éligible au
+        // prochain passage. Seul le marqueur d'erreur change, pour distinguer
+        // « à réessayer » de « rien à envoyer ».
+        pending += 1;
+        await this.prisma.notificationDelivery.update({
+          where: { id: delivery.id },
+          data: { error: verdict.error },
         });
         continue;
       }
 
       failed += 1;
-      const firstError = outcomes.find((outcome) => outcome !== undefined);
       await this.prisma.notificationDelivery.update({
         where: { id: delivery.id },
         data: {
           status: NotificationDeliveryStatus.FAILED,
-          deviceToken: userTokens[0] ?? null,
-          error: firstError?.errorCode ?? 'UNKNOWN',
+          error: verdict.error,
           failedAt: now,
         },
       });
     }
 
-    if (deadTokens.length) {
-      await this.prisma.deviceToken.updateMany({
-        where: { token: { in: deadTokens }, revokedAt: null },
-        data: { revokedAt: now },
-      });
-      this.logger.log(
-        `${String(deadTokens.length)} jeton(s) élagué(s) : FCM les a déclarés UNREGISTERED.`,
-      );
-    }
+    await this.markNotificationSent(notificationId, email.status);
+    return { sent, failed, pending, emailed: email.emailed, emailStatus: email.status };
+  }
 
-    await this.markNotificationSent(notificationId, 'SENT');
-    return { transportStatus: 'SENT', sent, failed, pending, prunedTokens: deadTokens.length };
+  /**
+   * Sert la notification par e-mail, aux téléconseillers seuls.
+   *
+   * POURQUOI LES COMMERCIAUX ET EUX SEULS : ce sont les seuls destinataires qui
+   * travaillent devant un poste, souvent loin de l'application. Les autres
+   * rôles ont le panel ouvert toute la journée, et leur envoyer un e-mail de
+   * plus par notification transformerait leur boîte en bruit qu'ils finiraient
+   * par filtrer, e-mails utiles compris.
+   *
+   * RIEN DE CE QUI SE PASSE ICI N'EST UNE ERREUR REMONTÉE. Le `try` couvre
+   * l'appel réseau ET la lecture des comptes : une panne Brevo ou une base
+   * momentanément indisponible laissent les lignes EN FILE, avec le marqueur de
+   * réessai, plutôt que de faire échouer l'appel ou d'enterrer les livraisons.
+   *
+   * Les identifiants viennent des lignes de livraison, donc d'un public déjà
+   * résolu avec la visibilité de démonstration : le filtre n'a pas à être
+   * réappliqué sur une liste qui en sort.
+   */
+  private async sendByEmail(
+    notification: NotificationRow,
+    userIds: readonly string[],
+  ): Promise<EmailLegResult> {
+    const empty = new Map<string, DeliveryVerdict>();
+    if (!this.email.isConfigured())
+      return { emailed: 0, status: 'NOT_CONFIGURED', verdicts: empty };
+    if (!userIds.length) return { emailed: 0, status: 'SENT', verdicts: empty };
+
+    // Hissé hors du `try` : le rattrapage doit savoir QUI était visé pour
+    // marquer ces lignes-là à réessayer, et elles seules.
+    let targeted: { userId: string; email: string; fullName: string }[] = [];
+
+    try {
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: [...userIds] }, role: Role.COMMERCIAL },
+        select: { id: true, email: true, fullName: true },
+      });
+
+      targeted = users
+        .filter((user) => user.email.trim().length > 0)
+        .map((user) => ({ userId: user.id, email: user.email.trim(), fullName: user.fullName }));
+
+      if (!targeted.length) return { emailed: 0, status: 'SENT', verdicts: empty };
+
+      const recipients: BrevoRecipient[] = targeted.map((row) => ({
+        email: row.email,
+        name: row.fullName,
+      }));
+
+      const content = buildEmailContent(notification.title, notification.body);
+      const result = await this.email.send([
+        {
+          recipients,
+          subject: notification.title,
+          htmlContent: content.html,
+          textContent: content.text,
+        },
+      ]);
+
+      const emailed = result.outcomes.filter((outcome) => outcome.ok).length;
+
+      if (result.status === 'TRANSPORT_ERROR') {
+        // Aucun lot n'est passé : ce ne sont pas les adresses qui sont en
+        // cause, c'est le service ou la clé. Tout reste à réessayer.
+        this.logger.warn(
+          `Notification ${notification.id} : e-mail non parti (${result.detail ?? 'sans détail'}). Les livraisons restent en file.`,
+        );
+        return { emailed, status: result.status, verdicts: retryAll(targeted) };
+      }
+
+      if (emailed) {
+        this.logger.log(
+          `Notification ${notification.id} : ${String(emailed)} e-mail(s) remis à Brevo.`,
+        );
+      }
+
+      const byEmail = new Map(result.outcomes.map((outcome) => [outcome.email, outcome]));
+      const verdicts = new Map<string, DeliveryVerdict>();
+      for (const row of targeted) {
+        const outcome = byEmail.get(row.email);
+        if (outcome === undefined || outcome.ok) {
+          // Adresse acceptée, ou issue muette : un transport qui ne dit rien
+          // d'une adresse qu'il a reçue l'a prise en charge, et le doute ne
+          // justifie ni un échec ni un réessai.
+          verdicts.set(row.userId, { kind: 'sent' });
+          continue;
+        }
+        const error = outcome.errorCode ?? 'UNKNOWN';
+        verdicts.set(
+          row.userId,
+          outcome.kind === 'transient'
+            ? { kind: 'retry', error: DELIVERY_RETRY_ERROR }
+            : { kind: 'failed', error },
+        );
+      }
+      return { emailed, status: result.status, verdicts };
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Notification ${notification.id} : branche e-mail interrompue (${detail}). Les livraisons restent en file.`,
+      );
+      return { emailed: 0, status: 'TRANSPORT_ERROR', verdicts: retryAll(targeted) };
+    }
   }
 
   private async markNotificationSent(id: string, transportStatus: string): Promise<void> {
@@ -370,6 +480,9 @@ export class NotificationsService {
     const where: Prisma.NotificationWhereInput = {
       ...(query.status ? { status: query.status } : {}),
       ...(query.category ? { category: query.category } : {}),
+      // Le total et la page partagent la MÊME clause : sans cela, la
+      // pagination annoncerait un nombre d'envois que la liste ne montre pas.
+      ...demoScope(await this.demo.enabled()),
     };
 
     const [total, rows] = await Promise.all([
@@ -392,12 +505,19 @@ export class NotificationsService {
   }
 
   async get(id: string): Promise<NotificationDetailDto> {
-    const row = await this.prisma.notification.findUnique({
-      where: { id },
+    // `findFirst` et non `findUnique` : `findUnique` n'accepte qu'une clé
+    // unique, la visibilité ne s'y compose pas. Une notification masquée
+    // répond « introuvable », sans quoi le masquage ne couvrirait que la liste
+    // et l'écran de détail resterait ouvert à qui connaît l'identifiant.
+    const row = await this.prisma.notification.findFirst({
+      where: { id, ...demoScope(await this.demo.enabled()) },
       select: NOTIFICATION_SELECT,
     });
     if (!row) throw notificationNotFound();
 
+    // LECTURE GLOBALE délibérée : la notification vient d'être reconnue
+    // visible, ses destinataires en font partie. Filtrer une seconde fois
+    // afficherait un envoi « 40 destinataires » avec une liste plus courte.
     const deliveries = await this.prisma.notificationDelivery.findMany({
       where: { notificationId: id },
       select: {
@@ -433,7 +553,7 @@ export class NotificationsService {
    * Le `where` porte le statut attendu : c'est ce qui rend l'annulation sûre
    * face à l'ordonnanceur. Si le tick a démarré l'envoi entre la lecture et
    * l'écriture, la mise à jour ne touche aucune ligne et l'appelant reçoit un
-   * refus — au lieu de marquer « annulée » une notification déjà partie.
+   * refus, au lieu de marquer « annulée » une notification déjà partie.
    */
   async cancel(id: string): Promise<NotificationDto> {
     const now = new Date();
@@ -465,19 +585,25 @@ export class NotificationsService {
 
     // Une notification encore programmée n'appartient PAS à la boîte de
     // réception : elle n'a pas encore eu lieu.
+    const demoEnabled = await this.demo.enabled();
     const where: Prisma.NotificationDeliveryWhereInput = {
       userId: user.id,
       notification: { status: { in: [NotificationStatus.SENDING, NotificationStatus.SENT] } },
       ...(query.unreadOnly === true ? { readAt: null } : {}),
+      ...demoScope(demoEnabled),
     };
 
     const [total, unreadCount, rows] = await Promise.all([
       this.prisma.notificationDelivery.count({ where }),
+      // Le compteur de non-lues porte la MÊME visibilité que la liste :
+      // autrement la pastille annoncerait un message que la boîte ne montre
+      // pas, et l'utilisateur chercherait indéfiniment ce qu'il a « à lire ».
       this.prisma.notificationDelivery.count({
         where: {
           userId: user.id,
           readAt: null,
           notification: { status: { in: [NotificationStatus.SENDING, NotificationStatus.SENT] } },
+          ...demoScope(demoEnabled),
         },
       }),
       this.prisma.notificationDelivery.findMany({
@@ -519,18 +645,24 @@ export class NotificationsService {
    *
    * `updateMany` avec `userId` dans le `where` : un utilisateur ne peut pas
    * marquer lue la notification d'un autre, même en devinant l'identifiant.
-   * L'opération est idempotente — `readAt: null` empêche d'écraser la première
+   * L'opération est idempotente, `readAt: null` empêche d'écraser la première
    * lecture, qui est la seule intéressante.
    */
   async markRead(user: AuthenticatedUser, notificationId: string): Promise<{ ok: boolean }> {
+    // MÊME PORTÉE QUE LA BOÎTE qui a servi cet identifiant, sur l'écriture
+    // comme sur le repli : marquer lue une notification masquée répondrait
+    // « c'est fait » sur une ligne que l'utilisateur ne voit nulle part, et
+    // écrirait une date de lecture sur une ligne que le mode éteint nie.
+    const demoEnabled = await this.demo.enabled();
+
     const result = await this.prisma.notificationDelivery.updateMany({
-      where: { notificationId, userId: user.id, readAt: null },
+      where: { notificationId, userId: user.id, readAt: null, ...demoScope(demoEnabled) },
       data: { status: NotificationDeliveryStatus.READ, readAt: new Date() },
     });
 
     if (result.count === 0) {
       const existing = await this.prisma.notificationDelivery.findFirst({
-        where: { notificationId, userId: user.id },
+        where: { notificationId, userId: user.id, ...demoScope(demoEnabled) },
         select: { id: true },
       });
       if (!existing) throw notificationNotFound();
@@ -545,6 +677,10 @@ export class NotificationsService {
     const result = new Map<string, ReturnType<typeof tally>>();
     if (!ids.length) return result;
 
+    // LECTURE GLOBALE délibérée : les identifiants viennent d'une liste DÉJÀ
+    // cloisonnée, et ce sont les compteurs affichés en face de chaque ligne.
+    // Une seconde portée ici ferait afficher « 12 destinataires » sur un envoi
+    // qui en a quarante, le seul chiffre que l'écran ne peut pas se permettre.
     const grouped = await this.prisma.notificationDelivery.groupBy({
       by: ['notificationId', 'status'],
       where: { notificationId: { in: [...ids] } },
@@ -580,30 +716,59 @@ export class NotificationsService {
 }
 
 /**
- * Charge utile `data` du message FCM.
+ * Verdict « à réessayer » pour tout un lot de destinataires visés.
  *
- * TOUTES les valeurs sont des chaînes — FCM refuse le message entier si une
- * seule ne l'est pas, et l'erreur ne nomme pas le champ fautif.
- *
- * `route` est ce qui rend la notification actionnable : c'est elle que le
- * mobile donne à `go_router` au tap, y compris depuis un démarrage à froid.
+ * Servi quand l'échec porte sur le TRANSPORT et non sur une adresse : aucune
+ * des lignes concernées ne doit être enterrée.
  */
-export const buildDataPayload = (notification: {
-  id: string;
-  route: string | null;
-  category: string;
-  payload: unknown;
-}): Record<string, string> => {
-  const data: Record<string, string> = {
-    notificationId: notification.id,
-    category: notification.category,
-  };
-  if (notification.route) data.route = notification.route;
-  if (notification.payload !== null && notification.payload !== undefined) {
-    data.payload = JSON.stringify(notification.payload);
+const retryAll = (
+  targeted: readonly { userId: string }[],
+): ReadonlyMap<string, DeliveryVerdict> => {
+  const verdicts = new Map<string, DeliveryVerdict>();
+  for (const row of targeted) {
+    verdicts.set(row.userId, { kind: 'retry', error: DELIVERY_RETRY_ERROR });
   }
-  return data;
+  return verdicts;
 };
+
+/**
+ * Enveloppe HTML de l'e-mail. Un gabarit `{{}}` et non une concaténation :
+ * c'est `template.ts` qui substitue, la même fonction que le compositeur web
+ * utilise pour son aperçu. Deux implémentations de la substitution finiraient
+ * par diverger.
+ */
+const EMAIL_HTML_TEMPLATE = [
+  '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#111">',
+  '<h2 style="font-size:17px;margin:0 0 12px">{{titre}}</h2>',
+  '<p style="margin:0 0 16px">{{corps}}</p>',
+  '<p style="font-size:12px;color:#666;margin:0">Message automatique de CPI GO. Ne pas répondre.</p>',
+  '</div>',
+].join('');
+
+/**
+ * Échappe le texte avant de l'insérer dans le gabarit.
+ *
+ * Le titre et le corps sont SAISIS par un administrateur. Sans cet échappement,
+ * un `<` collé depuis un traitement de texte casserait la mise en page, et une
+ * balise volontaire ferait de l'e-mail portant notre nom un support d'hameçon-
+ * nage que le lecteur ne peut pas inspecter.
+ */
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+/** Corps de l'e-mail, en HTML et en texte brut (certains clients n'affichent que celui-ci). */
+export const buildEmailContent = (title: string, body: string): { html: string; text: string } => ({
+  html: renderTemplate(EMAIL_HTML_TEMPLATE, {
+    titre: escapeHtml(title),
+    corps: escapeHtml(body).replace(/\n/g, '<br />'),
+  }).text,
+  text: `${title}\n\n${body}`,
+});
 
 interface Counts {
   total: number;

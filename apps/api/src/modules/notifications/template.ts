@@ -32,20 +32,20 @@ export const extractVariables = (template: string): string[] => {
 /**
  * Rend un gabarit.
  *
- * UNE VARIABLE MANQUANTE N'EST PAS REMPLACÉE — le `{{nom}}` reste visible tel
+ * UNE VARIABLE MANQUANTE N'EST PAS REMPLACÉE, le `{{nom}}` reste visible tel
  * quel, et son nom est remonté dans `missing`.
  *
  * Les deux autres options ont été écartées :
  *
  *  - Lever : un rappel nocturne qui échoue en silence parce qu'un commercial
  *    n'a pas de département renseigné est pire que le même rappel imparfait.
- *  - Remplacer par du vide : produit « Bonjour , vous avez 3 tâches », une
+ *  - Remplacer par du vide : produit « Bonjour, vous avez 3 tâches », une
  *    phrase trouée que le lecteur attribue à un bug de l'application sans
  *    pouvoir dire lequel.
  *
  * Le marqueur laissé en clair est laid, mais il DIT ce qui manque. Et comme
  * `missing` remonte jusqu'au compositeur, l'admin voit le problème avant
- * d'expédier — c'est là que la faute se corrige.
+ * d'expédier, c'est là que la faute se corrige.
  */
 export const renderTemplate = (
   template: string,

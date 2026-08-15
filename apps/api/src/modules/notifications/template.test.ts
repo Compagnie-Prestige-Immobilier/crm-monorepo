@@ -25,7 +25,7 @@ describe('extraction des variables', () => {
   });
 
   it('fusionne titre et corps sans doublon, titre d’abord', () => {
-    expect(mergedVariables('{{nom}} — rappel', 'Vous avez {{nombre}} tâches, {{nom}}.')).toEqual([
+    expect(mergedVariables('{{nom}}, rappel', 'Vous avez {{nombre}} tâches, {{nom}}.')).toEqual([
       'nom',
       'nombre',
     ]);
@@ -45,7 +45,7 @@ describe('substitution', () => {
 
   it('LAISSE le marqueur visible quand la variable manque, et la signale', () => {
     // Décision assumée : ni exception (le rappel nocturne ne partirait plus),
-    // ni chaîne vide (« Bonjour , vous avez… » ressemble à un bug sans dire
+    // ni chaîne vide (« Bonjour, vous avez… » ressemble à un bug sans dire
     // lequel). Le marqueur intact NOMME ce qui manque.
     const result = renderTemplate('Bonjour {{nom}}, {{nombre}} fiches', { nombre: 3 });
     expect(result.text).toBe('Bonjour {{nom}}, 3 fiches');
