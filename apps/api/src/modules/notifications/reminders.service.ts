@@ -15,6 +15,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { isOpenApiGeneration } from '../../env.js';
 import { DELIVERY_RETRY_ERROR, NotificationsService } from './notifications.service.js';
+import { SENDING_LEASE_MS } from './dispatch-claim.js';
 import { readNotificationsEnv } from './notifications.env.js';
 import { renderNotification } from './template.js';
 import type { ReminderRunDto } from './dto.js';
@@ -150,45 +151,12 @@ export const remindersCron = (at: string): string => {
 export const REMINDERS_CRON = remindersCron(env.NOTIFICATIONS_REMINDERS_AT);
 
 /**
- * Durée du BAIL posé sur une notification prise en charge par `dispatchDue`.
- *
- * ═══ POURQUOI UN BAIL ET NON UN SIMPLE STATUT ═══
- *
- * `SCHEDULED -> SENDING` est une prise en charge, pas une garantie d'envoi. Un
- * processus tué entre les deux, un conteneur évincé, un déploiement au mauvais
- * moment, et la ligne reste `SENDING` pour toujours : les passages suivants ne
- * regardaient que `SCHEDULED` et ne la revoyaient jamais. La notification
- * n'était ni envoyée, ni en échec, ni visible comme telle.
- *
- * `SENDING` est donc lu comme un bail daté par `updatedAt`, sur le motif que
- * `SyncBatchStore` applique déjà à ses lots : on pose le marqueur AVANT le
- * travail, et un marqueur trop vieux redevient prenable.
- *
- * ═══ POURQUOI QUINZE MINUTES ═══
- *
- * PLANCHER, sous peine de DOUBLE ENVOI. Reprendre une notification dont
- * l'expédition tourne encore fait relire ses livraisons restées `PENDING` et
- * repartir les e-mails que le premier passage venait de confier à Brevo. Le
- * bail doit donc couvrir l'expédition la plus lente qui soit LÉGITIME : un
- * appel Brevo est coupé à `BREVO_REQUEST_TIMEOUT_MS` (15 s), les destinataires
- * sont découpés par lots de `BREVO_MAX_RECIPIENTS_PER_CALL` (99) servis
- * `BREVO_MAX_CONCURRENT_CALLS` (8) à la fois, puis chaque livraison est écrite
- * une par une. Une annonce générale à quelques milliers de comptes se compte
- * ainsi en minutes, pas en heures. C'est aussi pourquoi les 60 secondes de
- * `IN_PROGRESS_TIMEOUT_MS` ne conviennent pas ici : le lot de synchronisation
- * n'est qu'une transaction locale, l'expédition sort sur le réseau.
- *
- * PLAFOND, sous peine de rappel PÉRIMÉ. Un rappel dit « il vous reste 12 fiches
- * à appeler » : il n'a de sens que dans la journée qu'il décrit. Le balayage ne
- * tique qu'une fois par jour, à `NOTIFICATIONS_REMINDERS_AT`, mais `dispatchDue`
- * tique chaque minute : un rappel abandonné à 8 h repart donc à 8 h 15, très
- * loin de la fin de sa journée. Une heure passerait encore, un jour non.
- *
- * Quinze minutes laissent un ordre de grandeur au-dessus de l'expédition la
- * plus lente et un ordre de grandeur en dessous de la péremption. C'est le
- * milieu de la seule fourchette défendable.
+ * Réexporté pour les tests et pour les lecteurs de ce fichier : la durée du
+ * bail est définie avec le bail lui-même, dans `dispatch-claim.ts`, parce que
+ * c'est la prise en charge qui l'applique et non l'ordonnanceur qui la
+ * déclenche.
  */
-export const SENDING_LEASE_MS = 15 * 60_000;
+export { SENDING_LEASE_MS };
 
 /** Familles de rappel. Ces chaînes sont persistées : les renommer casse l'idempotence. */
 export const ReminderKey = {
@@ -262,10 +230,12 @@ export class RemindersService {
    * processus mort a laissées en chemin.
    *
    * LE VERROU EST UN `updateMany` CONDITIONNEL, pas une lecture suivie d'une
-   * écriture. Le `where` transforme la prise en charge en comparaison-et-échange
-   * atomique : de deux instances qui voient la même notification, une seule voit
-   * `count === 1` et travaille ; l'autre voit 0 et passe son chemin. Sans ce
-   * `where`, les deux enverraient.
+   * écriture, et IL N'EST PLUS POSÉ ICI : c'est `dispatch()` qui réclame, pour
+   * tous ses appelants à la fois (voir `DispatchClaim`). Ce balayage ne fait
+   * plus que DÉSIGNER des candidates ; celles qu'un autre processus tient déjà
+   * rendent `claimed: false` et ne sont pas comptées. Poser une seconde prise
+   * ici aurait rendu la première inutile tout en laissant croire qu'elle
+   * protège, ce qui est exactement l'histoire que ce module vient de vivre.
    *
    * ═══ DEUX POPULATIONS, UNE SEULE PRISE EN CHARGE ═══
    *
@@ -334,15 +304,12 @@ export class RemindersService {
 
     let dispatched = 0;
     for (const row of due) {
-      const claimed = await this.prisma.notification.updateMany({
-        where: { id: row.id, OR: claimable },
-        data: { status: NotificationStatus.SENDING },
-      });
-      if (claimed.count === 0) continue;
-
       try {
-        await this.notifications.dispatch(row.id);
-        dispatched += 1;
+        // L'instant du tick est passé jusqu'à la prise : l'échéance d'un envoi
+        // programmé et l'expiration d'un bail se jugent sur la MÊME horloge que
+        // celle qui a sélectionné la ligne, sinon les deux bouts de la
+        // comparaison appartiennent à deux instants différents.
+        if ((await this.notifications.dispatch(row.id, now)).claimed) dispatched += 1;
       } catch (error) {
         this.logger.error(
           `Expédition programmée ${row.id} en échec : ${error instanceof Error ? error.message : String(error)}`,
@@ -675,14 +642,14 @@ export class RemindersService {
           select: { id: true },
         });
 
-        await this.notifications.dispatch(notification.id);
+        await this.notifications.dispatch(notification.id, input.now);
         created += 1;
       } catch (error) {
         if (isUniqueViolation(error)) {
           // Déjà émis pour cette personne et cette période. C'est le chemin
           // NORMAL après un redémarrage : ce n'est pas une anomalie.
           skipped += 1;
-          await this.retryStalled(input.key, candidate.userId, period);
+          await this.retryStalled(input.key, candidate.userId, period, input.now);
           continue;
         }
         throw error;
@@ -718,8 +685,36 @@ export class RemindersService {
    * Le filtre sur le marqueur est essentiel : sans lui, on rejouerait aussi les
    * lignes en file pour la raison ordinaire (destinataire non servi par
    * e-mail), c'est-à-dire à chaque passage et pour rien.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * CE CHEMIN ENVOYAIT SANS RIEN RÉCLAMER, ET C'ÉTAIT LA PORTE RESTÉE OUVERTE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Il appelait `dispatch()` directement, sans prise en charge d'aucune sorte,
+   * pendant que cinq rondes de corrections renforçaient le bail de
+   * `dispatchDue`. Deux ticks de rappel simultanés, ou un réessai croisant le
+   * balayage d'échéances, servaient donc les mêmes livraisons en même temps.
+   *
+   * Il n'y a rien à réclamer ICI pour autant : `dispatch()` réclame désormais
+   * pour tous ses appelants (voir `DispatchClaim`), et une prise supplémentaire
+   * à cet endroit serait précisément la liste d'appelants que personne ne tient
+   * à jour.
+   *
+   * CE QUE CELA CHANGE POUR CE CHEMIN-CI, ET IL FAUT LE DIRE : le réessai
+   * n'est plus IMMÉDIAT. Si l'envoi d'origine a eu lieu il y a moins d'un bail,
+   * son détenteur est réputé vivant et `dispatch()` rend `claimed: false`. Le
+   * rappel n'est pas perdu pour autant, et c'est ce qui rend le compromis
+   * acceptable : la notification reste `SENDING`, donc `dispatchDue` la reprend
+   * dès le bail expiré, soit quinze minutes plus tard, très loin de la fin de
+   * la journée que le rappel décrit. On échange un réessai à la seconde contre
+   * la certitude de ne jamais servir la même livraison deux fois.
    */
-  private async retryStalled(key: ReminderKeyValue, userId: string, period: string): Promise<void> {
+  private async retryStalled(
+    key: ReminderKeyValue,
+    userId: string,
+    period: string,
+    now: Date,
+  ): Promise<void> {
     // LA MÊME PORTÉE QUE L'ÉCRITURE, et elle est fixe des deux côtés. C'est
     // précisément ce que l'interrupteur cassait : une ligne écrite mode allumé,
     // relue mode éteint, était introuvable, et le rappel restait bloqué
@@ -738,8 +733,14 @@ export class RemindersService {
     if (!stalled) return;
 
     try {
-      await this.notifications.dispatch(stalled.notificationId);
-      this.logger.log(`Rappel ${key} (${period}) : nouvelle tentative d'envoi pour ${userId}.`);
+      const retried = await this.notifications.dispatch(stalled.notificationId, now);
+      if (retried.claimed) {
+        this.logger.log(`Rappel ${key} (${period}) : nouvelle tentative d'envoi pour ${userId}.`);
+      } else {
+        this.logger.debug(
+          `Rappel ${key} (${period}) : envoi tenu par un autre passage, reprise laissée au bail.`,
+        );
+      }
     } catch (error) {
       // Un réessai qui échoue ne doit pas emporter le reste du passage : les
       // autres destinataires n'ont rien à voir avec cet incident.
