@@ -9,7 +9,7 @@ import { argon2id, hash, verify } from 'argon2';
  * inaccessible sur une base fraîchement semée.
  *
  * 19 456 Kio / 2 passes / 1 voie est le profil « second recommended option »
- * de la RFC 9106, celui qui vise les environnements à mémoire contrainte —
+ * de la RFC 9106, celui qui vise les environnements à mémoire contrainte,
  * un conteneur d'API partagé, précisément.
  */
 export const ARGON2_OPTIONS = {
