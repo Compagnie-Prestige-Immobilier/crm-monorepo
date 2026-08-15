@@ -1,18 +1,24 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { createReadStream, createWriteStream } from 'node:fs';
+import { createWriteStream } from 'node:fs';
 import { mkdir, rename, rm, stat } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { FastifyRequest } from 'fastify';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { MultipartFile } from '@fastify/multipart';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readEnv } from '../../env.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import type { AppUpdateDto, AppUpdateUploadDto } from './dto.js';
+import type { AppUpdateDto } from './dto.js';
+import { AppUpdateUploadDto } from './dto.js';
 
 const SETTING_KEY = 'mobile.android.release';
+
+/** Type MIME attendu par Android pour déclencher l'installateur système. */
+const APK_CONTENT_TYPE = 'application/vnd.android.package-archive';
 
 type ReleaseRecord = {
   versionName: string;
@@ -56,19 +62,7 @@ export class AppUpdatesService {
     if (!file || !file.filename.toLowerCase().endsWith('.apk')) {
       throw new BadRequestException('Un fichier APK est requis.');
     }
-    const fields = this.readFields(file);
-    const input: AppUpdateUploadDto = {
-      versionName: fields.versionName ?? '',
-      versionCode: Number(fields.versionCode),
-      forceUpdate: fields.forceUpdate === 'true',
-      ...(fields.notes === undefined ? {} : { notes: fields.notes }),
-    };
-    if (!input.versionName || !Number.isInteger(input.versionCode) || input.versionCode < 1) {
-      throw new BadRequestException('versionName et versionCode sont invalides.');
-    }
-    if (fields.forceUpdate !== 'true' && fields.forceUpdate !== 'false') {
-      throw new BadRequestException('forceUpdate doit valoir true ou false.');
-    }
+    const input = await this.validateFields(this.readFields(file));
     const current = await this.readRelease();
     if (current !== null && input.versionCode <= current.versionCode) {
       throw new BadRequestException(
@@ -113,39 +107,36 @@ export class AppUpdatesService {
     return this.toDto(release);
   }
 
-  async download(
-    reply: {
-      code(statusCode: number): {
-        header(name: string, value: string): unknown;
-        send(body: unknown): unknown;
-      };
-      header(name: string, value: string): unknown;
-      send(body: unknown): unknown;
-    },
-    rangeHeader?: string,
-  ): Promise<void> {
+  /**
+   * Sert l'APK publié, reprises de téléchargement comprises.
+   *
+   * L'analyse de l'en-tête `Range` est DÉLÉGUÉE à `@fastify/static` (voir le
+   * commentaire d'inscription du greffon dans `app-updates.module.ts`) :
+   * `bytes=-500` désigne les 500 derniers octets et non les 500 premiers, et
+   * se tromper là-dessus produit un APK corrompu que le contrôle sha256 rejette
+   * indéfiniment, tentative après tentative.
+   *
+   * Le fichier est vérifié AVANT d'être passé au greffon : une release
+   * référencée en base mais absente du disque doit rester une 404 en français,
+   * telle que l'attend le mobile, et non la 404 générique de Fastify.
+   */
+  async download(reply: FastifyReply): Promise<void> {
     const release = await this.readRelease();
     if (release === null) throw new NotFoundException('Aucune release disponible.');
-    const path = join(this.directory, basename(release.fileName));
+    // `basename` : le nom vient de la base, il ne doit jamais pouvoir remonter
+    // hors du répertoire des releases.
+    const fileName = basename(release.fileName);
     try {
-      const details = await stat(path);
-      const range = parseRange(rangeHeader, details.size);
-      reply.header('Accept-Ranges', 'bytes');
-      reply.header('Content-Type', 'application/vnd.android.package-archive');
-      reply.header('Content-Length', String(range ? range.end - range.start + 1 : details.size));
-      reply.header('Content-Disposition', `attachment; filename="${basename(release.fileName)}"`);
-      if (range) {
-        reply.header(
-          'Content-Range',
-          `bytes ${String(range.start)}-${String(range.end)}/${String(details.size)}`,
-        );
-        reply.code(206).send(createReadStream(path, { start: range.start, end: range.end }));
-      } else {
-        reply.send(createReadStream(path));
-      }
+      await stat(join(this.directory, fileName));
     } catch {
       throw new NotFoundException('Le fichier de release est indisponible.');
     }
+    // Android ne déclenche son installateur que sur ce type MIME ; celui déduit
+    // de l'extension par la bibliothèque écraserait notre en-tête, d'où
+    // `contentType: false`.
+    reply.header('Content-Type', APK_CONTENT_TYPE);
+    reply.header('Content-Disposition', `attachment; filename="${fileName}"`);
+    reply.sendFile(fileName, this.directory, { contentType: false });
   }
 
   private async readRelease(): Promise<ReleaseRecord | null> {
@@ -171,6 +162,46 @@ export class AppUpdatesService {
     return fields;
   }
 
+  /**
+   * Applique RÉELLEMENT `AppUpdateUploadDto` aux champs du formulaire.
+   *
+   * Le `ValidationPipe` global ne voit jamais ces champs : le corps est un flux
+   * multipart, le contrôleur reçoit la requête brute, et Nest ne construit
+   * aucun DTO. Les `@MaxLength` du DTO étaient donc purement décoratifs, et
+   * l'un d'eux protège `notes`, une valeur renvoyée telle quelle par la route
+   * PUBLIQUE `GET android/current` que chaque installation interroge au
+   * démarrage : une note de 10 Mo se serait retrouvée dans toutes les réponses.
+   */
+  private async validateFields(fields: Record<string, string>): Promise<AppUpdateUploadDto> {
+    // Le multipart ne transporte que du texte. La conversion est explicite ici
+    // plutôt que confiée à `enableImplicitConversion`, qui transformerait
+    // n'importe quelle chaîne en nombre et ferait passer `@IsInt` pour un
+    // contrôle alors qu'il ne verrait plus jamais de valeur invalide.
+    if (fields.forceUpdate !== 'true' && fields.forceUpdate !== 'false') {
+      throw new BadRequestException('forceUpdate doit valoir true ou false.');
+    }
+    const rawVersionCode = fields.versionCode?.trim() ?? '';
+    const input = plainToInstance(AppUpdateUploadDto, {
+      ...fields,
+      versionName: fields.versionName ?? '',
+      // Une chaîne non numérique donne NaN, que `@IsInt` refuse : c'est bien
+      // une erreur de saisie, pas un zéro implicite.
+      versionCode: /^-?\d+$/.test(rawVersionCode) ? Number(rawVersionCode) : Number.NaN,
+      forceUpdate: fields.forceUpdate === 'true',
+    });
+    const failures = await validate(input, { whitelist: true, forbidNonWhitelisted: true });
+    if (failures.length > 0) {
+      // Même forme d'erreur que le reste du module : `HttpException` à message
+      // simple. Les contraintes violées sont nommées, sans quoi l'administrateur
+      // n'a aucun moyen de savoir lequel des quatre champs il doit corriger.
+      const details = failures
+        .flatMap((failure) => Object.values(failure.constraints ?? {}))
+        .join(' ; ');
+      throw new BadRequestException(`Champs de release invalides : ${details}`);
+    }
+    return input;
+  }
+
   private toDto(release: ReleaseRecord): AppUpdateDto {
     return {
       available: true,
@@ -185,23 +216,4 @@ export class AppUpdatesService {
       notes: release.notes,
     };
   }
-}
-
-function parseRange(
-  value: string | undefined,
-  size: number,
-): { start: number; end: number } | null {
-  if (!value?.startsWith('bytes=')) return null;
-  const [rawStart, rawEnd] = value.slice('bytes='.length).split('-', 2);
-  const start = Number(rawStart);
-  const requestedEnd = rawEnd === undefined || rawEnd === '' ? size - 1 : Number(rawEnd);
-  if (
-    !Number.isInteger(start) ||
-    !Number.isInteger(requestedEnd) ||
-    start < 0 ||
-    start >= size ||
-    requestedEnd < start
-  )
-    return null;
-  return { start, end: Math.min(requestedEnd, size - 1) };
 }
