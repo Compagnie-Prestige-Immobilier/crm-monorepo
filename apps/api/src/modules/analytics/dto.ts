@@ -104,7 +104,7 @@ export class TopRepresentantListDto {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Phase 2 — avancement
+// Phase 2, avancement
 //
 // Chaque série porte la clé d'énumération EN PLUS du libellé : le tableau de
 // bord colore et ordonne à partir de la clé, jamais du libellé, qui est du
