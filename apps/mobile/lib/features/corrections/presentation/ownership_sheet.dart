@@ -10,6 +10,7 @@ import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../data/local/database.dart';
 import '../../../data/repositories/write_repository.dart';
+import 'discard_confirmation.dart';
 
 /// Feuille d'arbitrage : « ce numéro appartient à quelqu'un d'autre ».
 ///
@@ -31,6 +32,14 @@ import '../../../data/repositories/write_repository.dart';
 ///   rejoignent sa fiche ; ma création de représentant est abandonnée ;
 /// * **Corriger le numéro** : c'est une faute de frappe, j'ouvre la fiche ;
 /// * **Supprimer** : j'abandonne cette saisie et ce qui en dépend.
+///
+/// **Cette troisième issue passe par une confirmation, et c'est la même que
+/// celle de la carte de « À corriger ».** Un utilisateur ne lit pas ce
+/// commentaire ; il lit le libellé du bouton, qui est au singulier, et cette
+/// feuille ne s'ouvre que sur la ligne dont l'abandon emporte le plus de
+/// travail : la création du représentant, tête de sa clé de dépendance. La
+/// question et son compte exact vivent donc dans [confirmDiscard], appelée par
+/// les deux boutons.
 Future<void> showOwnershipSheet({
   required BuildContext context,
   required OutboxData row,
@@ -107,6 +116,17 @@ class _OwnershipSheet extends ConsumerWidget {
             const SizedBox(height: CpiSpacing.xs),
             TextButton.icon(
               onPressed: () async {
+                // La question AVANT la suppression, et avec le compte réel.
+                // Cette feuille ne s'ouvre que sur une création de représentant
+                // en `conflict` : c'est exactement la ligne dont l'abandon
+                // emporte tous les prospects saisis dessous. Voir
+                // [confirmDiscard].
+                final bool ok = await confirmDiscard(
+                  context: context,
+                  ref: ref,
+                  seq: row.seq,
+                );
+                if (!ok || !context.mounted) return;
                 final DiscardResult result = await ref
                     .read(writeRepositoryProvider)
                     .discardOperation(row.seq);

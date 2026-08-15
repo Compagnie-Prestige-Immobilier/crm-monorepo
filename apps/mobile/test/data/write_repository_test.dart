@@ -376,6 +376,77 @@ void main() {
       );
       expect(await allOutbox(db), hasLength(5));
     });
+
+    /// ═══ LA BOÎTE DE CONFIRMATION SOUS-COMPTAIT CE QU'ELLE DÉTRUISAIT ═══
+    ///
+    /// L'écran comptait sa cascade en filtrant « À corriger », qui ne montre que
+    /// `conflict` et `failed`. La suppression, elle, prend `OutboxStatus.open`,
+    /// donc `pending` et `syncing` en plus. C'est exactement l'état dans lequel
+    /// le moteur laisse les prospects d'un représentant refusé : verdict
+    /// `skippedDependencyFailed`, puis `_requeueBlocked` qui les remet en
+    /// `pending`. Ils étaient donc invisibles du compte, et un représentant
+    /// portant deux prospects annonçait « cette saisie » avant d'en détruire
+    /// trois.
+    test('previewDiscard voit les prospects `pending`, invisibles de « À corriger »', () async {
+      final Map<String, int> seqs = await seedChains();
+      final DiscardPreview preview = await repo.previewDiscard(seqs['A1']!);
+
+      expect(
+        preview.prospects,
+        2,
+        reason:
+            'pA1 et pA2 sont en `pending` : c\'est là que _requeueBlocked les '
+            'laisse, et c\'est là que l\'ancien compte ne regardait pas',
+      );
+      expect(preview.operations, 3);
+
+      // Le compte annoncé et le compte détruit doivent être le même nombre.
+      expect((await repo.discardOperation(seqs['A1']!)).removed, preview.operations);
+    });
+
+    test('previewDiscard ne compte que la ligne visée pour un prospect', () async {
+      final Map<String, int> seqs = await seedChains();
+      final DiscardPreview preview = await repo.previewDiscard(seqs['A2']!);
+      // L'ancien compte filtrait sur la seule `dependencyKey`, sans vérifier que
+      // la tête est bien un représentant : il annonçait la chaîne entière alors
+      // qu'un prospect ne retire que lui-même.
+      expect(preview.operations, 1);
+      expect(preview.prospects, 1);
+    });
+
+    test('previewDiscard ne détruit rien', () async {
+      final Map<String, int> seqs = await seedChains();
+      await repo.previewDiscard(seqs['A1']!);
+      expect(await allOutbox(db), hasLength(5));
+      expect(await db.select(db.prospects).get(), hasLength(3));
+    });
+
+    test('previewDiscard rend un compte nul sur un `seq` inconnu', () async {
+      await seedChains();
+      final DiscardPreview preview = await repo.previewDiscard(99999);
+      expect(preview.operations, 0);
+      expect(preview.prospects, 0);
+    });
+
+    /// « La fiche existe déjà côté serveur » n'est vrai que du seul appelant,
+    /// qui vient de la retrouver par lookup. Ce n'est vrai d'aucun prospect :
+    /// retirer sa ligne d'outbox et garder sa ligne `prospects` afficherait une
+    /// fiche RÉGLÉE qui n'a jamais quitté le téléphone, que plus rien ne peut
+    /// faire partir.
+    test('discardOwnCreateOnly refuse une création de prospect', () async {
+      await seedChains();
+
+      final DiscardResult result = await repo.discardOwnCreateOnly('A2');
+
+      expect(result.outcome, DiscardOutcome.notFound);
+      expect(result.removed, 0);
+      expect(await allOutbox(db), hasLength(5));
+      expect(
+        (await db.select(db.prospects).get()).map((Prospect p) => p.id),
+        containsAll(<String>['pA1']),
+        reason: 'la fiche serait restée sans opération, donc affichée réglée',
+      );
+    });
   });
 
   group('reprise manuelle', () {

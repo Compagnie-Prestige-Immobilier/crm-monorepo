@@ -16,6 +16,7 @@ import '../../../data/local/database.dart';
 import '../../../data/repositories/write_repository.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/offline_indicator.dart';
+import 'discard_confirmation.dart';
 import 'ownership_sheet.dart';
 
 /// « À corriger » : la file des opérations en `conflict` ou `failed`.
@@ -226,8 +227,13 @@ class _CorrectionCard extends ConsumerWidget {
                 ),
               TextButton.icon(
                 onPressed: () => _edit(context),
-                icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 18),
-                label: const Text('Modifier'),
+                icon: Icon(
+                  row.entityType == 'representant'
+                      ? PhosphorIconsRegular.pencilSimple
+                      : PhosphorIconsRegular.listMagnifyingGlass,
+                  size: 18,
+                ),
+                label: Text(_editLabel),
               ),
               TextButton.icon(
                 onPressed: () => _discard(context, ref),
@@ -297,6 +303,23 @@ class _CorrectionCard extends ConsumerWidget {
     await showOwnershipSheet(context: context, row: row, lookup: lookup);
   }
 
+  /// ═══ UN BOUTON NE PROMET PAS CE QU'IL NE FAIT PAS ═══
+  ///
+  /// Les deux types d'entité partageaient le libellé « Modifier ». Il est juste
+  /// pour un représentant : le bouton ouvre bien sa fiche en modification. Pour
+  /// un prospect, **il n'existe aucun écran de modification** : la route
+  /// `/prospects/nouveau` ne prend qu'un représentant et un brouillon, jamais un
+  /// identifiant de prospect. Le bouton faisait donc un saut d'onglet vers
+  /// l'historique, et l'utilisateur qui venait d'accepter de corriger sa saisie
+  /// se retrouvait devant une liste où rien ne désignait la ligne fautive, sans
+  /// comprendre ce qu'il avait déclenché ni comment revenir.
+  ///
+  /// On ne fabrique pas l'écran manquant ici. On dit ce que le bouton fait :
+  /// l'historique déplie les prospects sous leur représentant, c'est bien là que
+  /// la saisie se retrouve, et le libellé cesse de promettre autre chose.
+  String get _editLabel =>
+      row.entityType == 'representant' ? 'Modifier' : 'Voir dans l\'historique';
+
   void _edit(BuildContext context) {
     if (row.entityType == 'representant') {
       context.push(
@@ -308,34 +331,17 @@ class _CorrectionCard extends ConsumerWidget {
   }
 
   Future<void> _discard(BuildContext context, WidgetRef ref) async {
-    // On annonce le nombre exact d'opérations emportées. Abandonner la création
-    // d'un représentant emporte tous ses prospects : sans cette cascade, ils
-    // partiraient vers un parent qui n'existera jamais côté serveur, qui
-    // répondrait `REPRESENTANT_NOT_FOUND` indéfiniment.
-    final int cascade = await _countCascade(ref);
-    if (!context.mounted) return;
-    final bool? ok = await showDialog<bool>(
+    // On annonce le nombre exact de fiches emportées, compté par le même code
+    // que la suppression ([WriteRepository.previewDiscard]). Abandonner la
+    // création d'un représentant emporte tous ses prospects : sans cette
+    // cascade, ils partiraient vers un parent qui n'existera jamais côté
+    // serveur, qui répondrait `REPRESENTANT_NOT_FOUND` indéfiniment.
+    final bool ok = await confirmDiscard(
       context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Abandonner cet envoi ?'),
-        content: Text(
-          cascade > 1
-              ? '$cascade opérations liées seront supprimées définitivement.'
-              : 'Cette saisie sera supprimée définitivement.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
+      ref: ref,
+      seq: row.seq,
     );
-    if (ok != true) return;
+    if (!ok || !context.mounted) return;
     final DiscardResult result = await ref
         .read(writeRepositoryProvider)
         .discardOperation(row.seq);
@@ -352,19 +358,6 @@ class _CorrectionCard extends ConsumerWidget {
         ),
       );
     }
-  }
-
-  Future<int> _countCascade(WidgetRef ref) async {
-    if (row.op != 'create' || row.dependencyKey == null) return 1;
-    final List<OutboxData> all = await ref
-        .read(needsAttentionProvider.future)
-        .catchError((Object _) => const <OutboxData>[]);
-    // Approximation volontaire à l'affichage : le compte exact est fait dans la
-    // transaction de suppression, seule source de vérité.
-    return all
-        .where((OutboxData o) => o.dependencyKey == row.dependencyKey)
-        .length
-        .clamp(1, 999);
   }
 }
 
