@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangleIcon, CheckIcon, LoaderIcon, SendIcon, WifiOffIcon } from 'lucide-react';
+import { AlertTriangleIcon, CheckIcon, LoaderIcon, SendIcon } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -187,10 +187,19 @@ export function NotificationComposer({
       if (created.status === 'SCHEDULED') {
         toast.success('Notification programmée. Annulable jusqu’au départ.');
       } else if (created.transportStatus === 'NOT_CONFIGURED') {
-        // Le pire message possible serait « Envoyée » alors que rien n'est
-        // parti. On le dit, et on dit pourquoi.
+        /*
+          Le pire message possible serait « Envoyée » alors que rien n'est parti
+          par le canal sortant. On le dit, et on dit quoi.
+
+          Le canal est le COURRIEL, plus le push mobile : `transportStatus` vaut
+          NOT_CONFIGURED quand aucune clé Brevo n'est fournie. La notification
+          est bien enregistrée et chaque destinataire la lira dans
+          l'application ; c'est seulement l'e-mail qui ne part pas. Le message
+          citait Firebase, qui n'existe plus, et laissait croire que rien
+          n'avait été remis.
+        */
         toast.warning(
-          `Enregistrée pour ${String(created.counts.total)} destinataire(s). Aucun push remis : Firebase n’est pas configuré.`,
+          `Enregistrée pour ${String(created.counts.total)} destinataire(s), et lisible dans l’application. Aucun e-mail remis : le service d’envoi n’est pas configuré.`,
           { duration: 12_000 },
         );
       } else if (created.counts.failed > 0) {
@@ -632,14 +641,7 @@ function ConfirmationStep({
   route: string;
   when: When;
   scheduledFor: string;
-  preview:
-    | {
-        recipientCount: number;
-        reachableCount: number;
-        transportConfigured: boolean;
-        transportReason: string | null;
-      }
-    | undefined;
+  preview: { recipientCount: number } | undefined;
   isPending: boolean;
   isError: boolean;
 }) {
@@ -672,24 +674,17 @@ function ConfirmationStep({
                   : `${String(preview.recipientCount)} destinataires`}
               </p>
               <p className="mt-1 text-[0.9375rem] text-muted-foreground">
-                {confirmationSentence(preview.recipientCount, preview.reachableCount)}
+                {confirmationSentence(preview.recipientCount)}
               </p>
             </>
           ) : null}
         </div>
 
-        {preview && !preview.transportConfigured ? (
-          <div className="flex gap-3 rounded-[var(--radius-md)] border border-accent-border/30 bg-warning-surface p-3">
-            <WifiOffIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
-            <div className="text-[0.8125rem]">
-              <p className="font-[600] text-warning">Aucun push ne sera remis</p>
-              <p className="mt-0.5 text-muted-foreground">
-                {preview.transportReason ?? 'Firebase n’est pas configuré.'} Notification
-                enregistrée, visible dans l’application.
-              </p>
-            </div>
-          </div>
-        ) : null}
+        {/* L'avertissement « Aucun push ne sera remis » a disparu avec le push
+            lui-même : `AudiencePreviewDto` ne porte plus ni `transportConfigured`
+            ni `transportReason`, et tout compte visé lit la notification dans
+            l'application. Le bloc ne testait donc plus que des `undefined`, et
+            s'affichait à chaque envoi. */}
 
         <dl className="grid gap-2 text-[0.875rem]">
           <div className="flex gap-2">

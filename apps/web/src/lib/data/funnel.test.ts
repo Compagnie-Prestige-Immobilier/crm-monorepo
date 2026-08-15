@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { breakingStageIndex, parseFunnel, type FunnelStage } from '@/lib/data/funnel';
+import { breakingStageIndex, type FunnelStage } from '@/lib/data/funnel';
 import { formatXof } from '@/lib/money';
 
 /**
@@ -10,100 +10,50 @@ import { formatXof } from '@/lib/money';
  *  1. le montant ne devient jamais un `number`, à aucun moment du trajet ;
  *  2. la marche où la chaîne se casse est désignée par un fait, pas par un
  *     seuil inventé.
+ *
+ * La première n'est plus vérifiée par un validateur écrit à la main : le contrat
+ * engendré déclare `string`, et le compilateur refuse désormais un `number` à
+ * chaque point de passage. Il reste à prouver que le CHEMIN D'AFFICHAGE tient la
+ * promesse sur un montant que `Number` ne saurait pas porter, ce que fait le
+ * premier test ci-dessous.
  */
 
-const SAMPLE = {
-  etapes: [
-    { label: 'Prospects saisis', count: 37, tauxEtapePrecedente: 100, tauxGlobal: 100 },
-    { label: 'Méthode obtenue', count: 16, tauxEtapePrecedente: 43.2, tauxGlobal: 43.2 },
-    { label: 'Dossier ouvert', count: 1, tauxEtapePrecedente: 6.3, tauxGlobal: 2.7 },
-    { label: 'Dossier encaissé', count: 1, tauxEtapePrecedente: 100, tauxGlobal: 2.7 },
-  ],
-  finance: {
-    montantEncaisse: '7600000',
-    montantEncaisse30Jours: '7600000',
-    encaissementMoyen: '7600000',
-    montantEnCours: '0',
-    dossiers: 1,
-    dossiersOuverts: 0,
-    dossiersEncaisses: 1,
-    dossiersRejetes: 0,
-    tauxRejet: 0,
-    delaiMoyenJours: 0,
-  },
-};
-
 /** Espace insécable étroit : le séparateur de milliers du français. */
-const NB = ' ';
+const NB = '\u202f';
 
-describe('parseFunnel', () => {
-  it('lit la réponse de référence', () => {
-    const funnel = parseFunnel(SAMPLE);
-    expect(funnel.etapes).toHaveLength(4);
-    expect(funnel.etapes[2]?.tauxEtapePrecedente).toBe(6.3);
-    expect(funnel.finance.montantEncaisse).toBe('7600000');
-    expect(funnel.finance.delaiMoyenJours).toBe(0);
-  });
+const stage = (
+  label: string,
+  count: number,
+  precedente: number | null,
+  global: number | null = precedente,
+): FunnelStage => ({
+  label,
+  count,
+  tauxEtapePrecedente: precedente,
+  tauxGlobal: global,
+});
 
-  it('garde les montants en chaîne, sans conversion', () => {
-    const funnel = parseFunnel(SAMPLE);
-    for (const montant of [
-      funnel.finance.montantEncaisse,
-      funnel.finance.montantEncaisse30Jours,
-      funnel.finance.encaissementMoyen,
-      funnel.finance.montantEnCours,
-    ]) {
-      expect(typeof montant).toBe('string');
-    }
-  });
-
-  it('conserve un montant qui dépasse la précision d’un nombre JSON', () => {
+describe('montants de l’entonnoir', () => {
+  it('affiche sans perte un montant qui dépasse la précision d’un nombre JSON', () => {
     // 18 chiffres : la borne exacte de la colonne `Decimal(18,0)`.
     const huge = '999999999999999999';
-    const funnel = parseFunnel({
-      ...SAMPLE,
-      finance: { ...SAMPLE.finance, montantEncaisse: huge },
-    });
-    expect(funnel.finance.montantEncaisse).toBe(huge);
-    expect(formatXof(funnel.finance.montantEncaisse)).toBe(
-      `999${NB}999${NB}999${NB}999${NB}999${NB}999 FCFA`,
-    );
+
+    expect(formatXof(huge)).toBe(`999${NB}999${NB}999${NB}999${NB}999${NB}999 FCFA`);
     // La preuve de ce qu'on évite : la voie flottante ment d'une unité.
     expect(String(Number(huge))).not.toBe(huge);
-  });
-
-  it('REFUSE un montant émis en nombre JSON', () => {
-    expect(() =>
-      parseFunnel({ ...SAMPLE, finance: { ...SAMPLE.finance, montantEncaisse: 7600000 } }),
-    ).toThrow(/chaîne/u);
-  });
-
-  it('accepte un délai moyen absent', () => {
-    const funnel = parseFunnel({
-      ...SAMPLE,
-      finance: { ...SAMPLE.finance, delaiMoyenJours: null },
-    });
-    expect(funnel.finance.delaiMoyenJours).toBeNull();
-  });
-
-  it('échoue franchement sur une forme inattendue', () => {
-    expect(() => parseFunnel(null)).toThrow();
-    expect(() => parseFunnel({ etapes: {}, finance: SAMPLE.finance })).toThrow();
-    expect(() => parseFunnel({ etapes: [], finance: {} })).toThrow();
   });
 });
 
 describe('breakingStageIndex', () => {
-  const stage = (label: string, count: number, precedente: number): FunnelStage => ({
-    label,
-    count,
-    tauxEtapePrecedente: precedente,
-    tauxGlobal: precedente,
-  });
-
   it('désigne l’ouverture de dossier sur le jeu de référence', () => {
     // 43,2 % tient, 6,3 % casse. Le taux global de 2,7 % masquerait la marche.
-    expect(breakingStageIndex(parseFunnel(SAMPLE).etapes)).toBe(2);
+    const stages = [
+      stage('Prospects saisis', 37, 100, 100),
+      stage('Méthode obtenue', 16, 43.2, 43.2),
+      stage('Dossier ouvert', 1, 6.3, 2.7),
+      stage('Dossier encaissé', 1, 100, 2.7),
+    ];
+    expect(breakingStageIndex(stages)).toBe(2);
   });
 
   it('ignore la première marche, qui vaut 100 % par construction', () => {
@@ -126,5 +76,23 @@ describe('breakingStageIndex', () => {
     expect(breakingStageIndex([stage('A', 0, 100)])).toBeNull();
     // Sommet à zéro : les taux en dessous ne décrivent aucune population.
     expect(breakingStageIndex([stage('A', 0, 100), stage('B', 0, 0)])).toBeNull();
+  });
+
+  /**
+   * Le cas que le repli `?? 0` traitait à l'envers.
+   *
+   * L'API rend `null` quand l'étape précédente est vide. Compté pour zéro, ce
+   * `null` devenait le minimum de la série et l'écran peignait « Rupture » en
+   * rouge sur une marche où il ne s'était RIEN passé, tout en masquant la vraie
+   * rupture juste à côté.
+   */
+  it('ignore une marche sans taux au lieu de la désigner comme rupture', () => {
+    const stages = [stage('A', 10, 100), stage('B', 4, 40), stage('C', 0, null)];
+    expect(breakingStageIndex(stages)).toBe(1);
+  });
+
+  it('ne désigne rien quand aucune marche ne porte de taux', () => {
+    const stages = [stage('A', 10, 100), stage('B', 0, null), stage('C', 0, null)];
+    expect(breakingStageIndex(stages)).toBeNull();
   });
 });

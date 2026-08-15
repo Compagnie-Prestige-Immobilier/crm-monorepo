@@ -8,7 +8,7 @@ import { StatTile } from '@/components/stats/stat-tile';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { breakingStageIndex, type Funnel, type FunnelStage } from '@/lib/data/funnel';
-import { formatNumber, formatRate } from '@/lib/format';
+import { formatNumber, formatRate, formatRateOrNone } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 /**
@@ -156,6 +156,10 @@ export function MoneyBand({ finance }: { finance: Funnel['finance'] }) {
  */
 function barWidth(stage: FunnelStage): string {
   if (stage.count === 0) return '0%';
+  // `tauxGlobal` est nul quand le sommet de l'entonnoir est vide. Il n'y a alors
+  // aucune proportion à dessiner : une barre pleine mentirait, une barre au
+  // plancher laisserait croire à une marche minuscule.
+  if (stage.tauxGlobal === null) return '0%';
   return `${String(Math.max(1.5, Math.min(100, stage.tauxGlobal)))}%`;
 }
 
@@ -248,7 +252,7 @@ export function FunnelCard({ stages }: { stages: readonly FunnelStage[] }) {
                             isBreaking && 'text-destructive',
                           )}
                         >
-                          {formatRate(stage.tauxEtapePrecedente)}
+                          {formatRateOrNone(stage.tauxEtapePrecedente)}
                         </span>
                       </span>
                     )}
@@ -260,7 +264,7 @@ export function FunnelCard({ stages }: { stages: readonly FunnelStage[] }) {
                       'text-right text-[0.8125rem] tabular-nums text-muted-foreground',
                     )}
                   >
-                    {formatRate(stage.tauxGlobal)}
+                    {formatRateOrNone(stage.tauxGlobal)}
                   </td>
                 </tr>
               );
