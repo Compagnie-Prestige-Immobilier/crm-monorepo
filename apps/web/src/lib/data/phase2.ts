@@ -181,7 +181,7 @@ export function spreadIntoDays(count: number, days: number): number[] {
  * Répartition en tourniquet, reproduite à l'identique de
  * `distributeRoundRobin` côté API : les `total % buckets` premiers reçoivent
  * une fiche de plus. Recalculée ici plutôt qu'approchée par une division, sinon
- * l'aperçu annoncerait « 266 chacun » là où le premier commercial en reçoit 267.
+ * l'aperçu annoncerait « 266 chacun » là où le premier téléconseiller en reçoit 267.
  */
 export function roundRobinSplit(total: number, buckets: number): number[] {
   if (buckets <= 0 || total <= 0) return [];
@@ -257,7 +257,7 @@ export async function fetchCampaignPreview(
 }
 
 /**
- * URL du programme PDF d'un commercial.
+ * URL du programme PDF d'un téléconseiller.
  *
  * Elle vise le relais `/api/v1/*` de Next et non l'API directement : le jeton
  * vit dans un cookie `httpOnly`, hors de portée de `fetch` côté client, et un

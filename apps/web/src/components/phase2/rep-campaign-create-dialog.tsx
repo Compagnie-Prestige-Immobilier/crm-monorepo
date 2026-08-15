@@ -37,7 +37,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * Création d'une campagne d'appels REPRÉSENTANTS : nom → périmètre →
- * étalement → commerciaux → APERÇU.
+ * étalement → téléconseillers → APERÇU.
  *
  * Même dispositif que pour les prospects, et pour la même raison : le tirage
  * est IRRÉVERSIBLE. Il matérialise une tâche par représentant, rend ces fiches
@@ -113,7 +113,7 @@ export function RepCampaignCreateDialog({
       void queryClient.invalidateQueries({ queryKey: queryKeys.repCampaignsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.representantsRoot });
       toast.success(
-        `Campagne « ${campaign.name} » créée : ${formatNumber(campaign.progress.total)} appels répartis entre ${formatNumber(campaign.commercialCount)} commerciaux.`,
+        `Campagne « ${campaign.name} » créée : ${formatNumber(campaign.progress.total)} appels répartis entre ${formatNumber(campaign.commercialCount)} téléconseillers.`,
       );
       reset();
       onOpenChange(false);
@@ -262,7 +262,7 @@ export function RepCampaignCreateDialog({
 
             <fieldset className="flex flex-col gap-2">
               <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
-                Commerciaux
+                Téléconseillers
                 <span className="text-destructive" aria-label="obligatoire">
                   *
                 </span>
@@ -279,7 +279,7 @@ export function RepCampaignCreateDialog({
                 </div>
               ) : commerciaux.length === 0 ? (
                 <p role="status" className="rounded-md bg-muted px-3 py-4 text-[0.8125rem]">
-                  Aucun compte commercial. Créez-en un depuis l’écran Téléconseillers.
+                  Aucun compte téléconseiller. Créez-en un depuis l’écran Téléconseillers.
                 </p>
               ) : (
                 <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-md border border-border p-1 scrollbar-thin">

@@ -175,7 +175,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
       <section className="flex flex-col gap-3">
         <h2 className="flex items-center gap-2 font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
           <UsersIcon className="size-4" aria-hidden="true" />
-          Répartition par commercial
+          Répartition par téléconseiller
         </h2>
         <ul className="grid gap-3 lg:grid-cols-2">
           {data.commerciaux.map((commercial) => (
@@ -244,7 +244,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                       {attempt.assignedToId !== null &&
                       attempt.assignedToId !== attempt.performedById ? (
                         // Cas réel et déroutant s'il n'est pas signalé : un
-                        // commercial peut appeler un numéro affecté à un autre.
+                        // téléconseiller peut appeler un numéro affecté à un autre.
                         <p className="mt-0.5">Tâche d’un autre téléconseiller</p>
                       ) : null}
                     </div>
@@ -270,7 +270,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
               {/* On NOMME la conséquence et on la chiffre. « Voulez-vous
                   clôturer ? » laisserait croire à un simple archivage, alors que
                   la clôture annule les tâches en cours : les appels
-                  disparaissent des téléphones des commerciaux, séance tenante. */}
+                  disparaissent des téléphones des téléconseillers, séance tenante. */}
               {data.progress.open > 0
                 ? `${formatNumber(data.progress.open)} tâche${data.progress.open > 1 ? 's' : ''} ouverte${data.progress.open > 1 ? 's' : ''} ${data.progress.open > 1 ? 'seront annulées et retirées' : 'sera annulée et retirée'} des téléphones. Les prospects concernés redeviennent éligibles à une prochaine campagne.`
                 : 'Aucune tâche ouverte. Les appels aboutis sont conservés.'}
@@ -314,7 +314,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
   );
 }
 
-/** Une carte par commercial : avancement, position au tourniquet, programme PDF. */
+/** Une carte par téléconseiller : avancement, position au tourniquet, programme PDF. */
 function CommercialCard({
   campaignId,
   campaignName,
@@ -335,7 +335,7 @@ function CommercialCard({
    * courant, et le remplacer par « Jour 1 » ferait poser une question là où il
    * n'y en a pas. Au-delà, un seul bouton rendrait la liasse entière : soit
    * plusieurs centaines de pages, ce que l'étalement existe précisément pour
-   * éviter. Le commercial ne doit pas avoir à trier son propre programme.
+   * éviter. Le téléconseiller ne doit pas avoir à trier son propre programme.
    */
   const days = spreadDays > 1 ? commercial.perDay : [];
 

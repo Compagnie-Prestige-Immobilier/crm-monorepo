@@ -37,7 +37,7 @@ import type { CreateUserInput, UpdateUserInput, UserRow } from '@/lib/types';
 const NO_DEPARTEMENT = '__aucun__';
 
 /**
- * Création et modification d'un compte commercial.
+ * Création et modification d'un compte de téléconseiller.
  *
  * Un seul composant pour les deux : les champs sont identiques à un près (le
  * mot de passe, exigé à la création et jamais modifiable ici : la
@@ -131,7 +131,7 @@ export function UserFormDialog({
       // Racine de la clé : toutes les pages et tous les filtres de la liste
       // sont invalidés, pas seulement la combinaison affichée.
       void queryClient.invalidateQueries({ queryKey: queryKeys.commerciauxRoot });
-      // Le nouveau commercial doit apparaître immédiatement dans le combobox de
+      // Le nouveau téléconseiller doit apparaître immédiatement dans le combobox de
       // filtre des prospects, sinon on ne peut pas voir ses saisies.
       void queryClient.invalidateQueries({ queryKey: queryKeys.reference });
       toast.success(

@@ -171,7 +171,7 @@ export function RepCampaignDetailView({ campaignId }: { campaignId: string }) {
       <section className="flex flex-col gap-3">
         <h2 className="flex items-center gap-2 font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
           <UsersIcon className="size-4" aria-hidden="true" />
-          Répartition par commercial
+          Répartition par téléconseiller
         </h2>
         <ul className="grid gap-3 lg:grid-cols-2">
           {data.commerciaux.map((commercial) => (
@@ -255,7 +255,7 @@ export function RepCampaignDetailView({ campaignId }: { campaignId: string }) {
             <DialogDescription>
               {/* On NOMME la conséquence et on la chiffre : la clôture annule
                   les tâches en cours, qui disparaissent des téléphones des
-                  commerciaux séance tenante. */}
+                  téléconseillers séance tenante. */}
               {data.progress.open > 0
                 ? `${formatNumber(data.progress.open)} tâche${data.progress.open > 1 ? 's' : ''} ouverte${data.progress.open > 1 ? 's' : ''} ${data.progress.open > 1 ? 'seront annulées et retirées' : 'sera annulée et retirée'} des téléphones. Les représentants concernés redeviennent éligibles à une prochaine campagne.`
                 : 'Aucune tâche ouverte. Les appels aboutis sont conservés.'}
@@ -296,7 +296,7 @@ export function RepCampaignDetailView({ campaignId }: { campaignId: string }) {
   );
 }
 
-/** Une carte par commercial : avancement, position, et UN programme PAR JOUR. */
+/** Une carte par téléconseiller : avancement, position, et UN programme PAR JOUR. */
 function RepCommercialCard({
   campaignId,
   campaignName,

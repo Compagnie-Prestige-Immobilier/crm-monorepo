@@ -66,7 +66,7 @@ const ACTIVE_FILTER: Record<ActiveFilterValue, boolean | null> = {
 const ALL_ROLES = 'tous';
 
 /**
- * Comptes commerciaux.
+ * Comptes des téléconseillers.
  *
  * Un compte désactivé n'est pas rendu par une case à cocher dans une colonne :
  * la LIGNE ENTIÈRE change d'aspect (fond atténué, liseré, nom en gris, badge
@@ -173,7 +173,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
           }}
         >
           <UserPlusIcon aria-hidden="true" />
-          Nouveau commercial
+          Nouveau téléconseiller
         </Button>
       </div>
 

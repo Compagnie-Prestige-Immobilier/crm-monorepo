@@ -139,7 +139,7 @@ export interface ProspectFilters {
   enrollmentMethod: EnrollmentMethod | null;
   /** Prospects tirés dans cette campagne d'appels. */
   campaignId: string | null;
-  /** Commercial qui a OBTENU la méthode, distinct du propriétaire de phase 1. */
+  /** Téléconseiller qui a OBTENU la méthode, distinct du propriétaire de phase 1. */
   enrollmentCapturedById: string | null;
   /** Bornes incluses, format ISO `YYYY-MM-DD`, sur `clientCreatedAt`. */
   dateFrom: string | null;

@@ -34,7 +34,7 @@ export async function fetchReferenceData(
      * filtre ne doit pas afficher six listes prêtes et une septième en attente.
      */
     client.GET('/api/v1/referentiels/iefs', { params: { query: { activeOnly: false } } }),
-    // 200 : au-delà, l'API plafonne. CPI compte une dizaine de commerciaux ;
+    // 200 : au-delà, l'API plafonne. CPI compte une dizaine de téléconseillers ;
     // une pagination de la liste de filtre serait de la complexité gratuite.
     client.GET('/api/v1/users', { params: { query: { role: 'COMMERCIAL', pageSize: 200 } } }),
     client.GET('/api/v1/representants', { params: { query: { pageSize: 200 } } }),
