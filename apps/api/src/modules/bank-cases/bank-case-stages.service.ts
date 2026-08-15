@@ -23,8 +23,8 @@ const MAX_OPEN_POSITION = 99;
  * Deux invariants gouvernent ce service :
  *
  *  - une étape SYSTÈME est intouchable dans sa nature. Les trois étapes
- *    système portent des règles financières — point d'entrée, encaissement,
- *    rejet — dont dépend tout le reste du module. Les désactiver reviendrait à
+ *    système portent des règles financières, point d'entrée, encaissement,
+ *    rejet, dont dépend tout le reste du module. Les désactiver reviendrait à
  *    rendre le workflow inexploitable sans le moindre message d'erreur ;
  *  - réordonner n'affecte QUE les transitions futures. Les positions ne sont
  *    lues qu'au moment de calculer l'étape suivante ; l'historique référence
@@ -127,7 +127,7 @@ export class BankCaseStagesService {
   /**
    * Réordonne les étapes OUVERTES.
    *
-   * La liste doit être exhaustive — toutes les étapes ouvertes, actives ou
+   * La liste doit être exhaustive, toutes les étapes ouvertes, actives ou
    * non. Un réordonnancement partiel laisserait des positions en doublon ou en
    * trou, et « l'étape suivante » deviendrait indéterminée pour les dossiers
    * qui stationnent dans la partie non transmise.

@@ -11,10 +11,17 @@ import { BANK_CASE_INCLUDE, BANK_TRANSITION_INCLUDE } from './mappers.js';
 import type { BankCaseRow, BankTransitionRow } from './mappers.js';
 import { moneyToNumber, moneyToString } from './money.js';
 import type { BankCaseFilterDto } from './dto.js';
+import { markWorkbook, writeDemoWarningRow } from '../export/demo-marking.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { CPI_BURGUNDY_ARGB } from '../../common/brand.js';
 
-/** Bordeaux CPI. ARGB sans dièse : exceljs n'accepte pas la notation CSS. */
-const CPI_BURGUNDY = 'FF630210';
+/**
+ * Bordeaux CPI, ARGB sans dièse : exceljs n'accepte pas la notation CSS.
+ * Dérivé de la constante partagée : la couleur était réécrite dans chaque
+ * module qui produit un document, et rien ne garantissait qu'elle y soit la
+ * même.
+ */
+const CPI_BURGUNDY = CPI_BURGUNDY_ARGB;
 
 /** Taille de page de lecture. Borne la mémoire quel que soit le volume exporté. */
 const PAGE_SIZE = 500;
@@ -23,7 +30,7 @@ const PAGE_SIZE = 500;
  * Horodatage.
  *
  * Le fuseau de référence est `Africa/Dakar`, qui est à UTC+00:00 toute
- * l'année — pas d'heure d'été, pas de décalage historique en vigueur. Une date
+ * l'année, pas d'heure d'été, pas de décalage historique en vigueur. Une date
  * UTC écrite telle quelle EST donc l'heure de Dakar ; aucune conversion n'est
  * appliquée, et c'est volontaire : convertir vers le fuseau du serveur
  * produirait un fichier différent selon la machine qui l'a généré.
@@ -61,9 +68,12 @@ export class BankCasesExportService {
    * ce qu'il voit à l'écran.
    */
   async write(filter: BankCaseFilterDto, stream: Writable): Promise<void> {
+    // Lu UNE fois pour tout le classeur : une bascule survenue en cours
+    // d'export laisserait sinon une feuille avertie et l'autre muette.
+    const demoEnabled = await this.demo.enabled();
+
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
-    workbook.creator = 'CPI GO';
-    workbook.created = new Date();
+    markWorkbook(workbook, demoEnabled);
 
     const cases = workbook.addWorksheet(SHEET_CASES, { views: [{ state: 'frozen', ySplit: 1 }] });
     cases.columns = [
@@ -85,6 +95,7 @@ export class BankCasesExportService {
       from: { row: 1, column: 1 },
       to: { row: 1, column: cases.columns.length },
     };
+    writeDemoWarningRow(cases, demoEnabled, cases.columns.length);
 
     const history = workbook.addWorksheet(SHEET_HISTORY, {
       views: [{ state: 'frozen', ySplit: 1 }],
@@ -106,6 +117,7 @@ export class BankCasesExportService {
       from: { row: 1, column: 1 },
       to: { row: 1, column: history.columns.length },
     };
+    writeDemoWarningRow(history, demoEnabled, history.columns.length);
 
     // Pagination keyset sur l'identifiant : stable même si des dossiers changent
     // pendant l'export, contrairement à un OFFSET qui saute ou répète des lignes
@@ -126,6 +138,10 @@ export class BankCasesExportService {
         exported += 1;
       }
 
+      // LECTURE GLOBALE délibérée : `ids` vient de la page de dossiers
+      // ci-dessus, déjà filtrée par `bankCaseConditions`. Une transition
+      // n'existe que rattachée à son dossier ; refiltrer ici ne retirerait
+      // rien et ferait seulement croire à un second garde-fou.
       const transitions = await this.prisma.bankCaseTransition.findMany({
         where: { caseId: { in: ids } },
         include: BANK_TRANSITION_INCLUDE,
@@ -144,7 +160,7 @@ export class BankCasesExportService {
     cases.commit();
     history.commit();
 
-    await this.writeSummary(workbook, filter, exported);
+    await this.writeSummary(workbook, filter, exported, demoEnabled);
     await workbook.commit();
   }
 
@@ -152,6 +168,7 @@ export class BankCasesExportService {
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
     filter: BankCaseFilterDto,
     exported: number,
+    demoEnabled: boolean,
   ): Promise<void> {
     const [totals, byStage, byBank, byReason] = await Promise.all([
       this.analytics.totals(filter),
@@ -167,6 +184,7 @@ export class BankCasesExportService {
       { header: 'Part (%)', key: 'share', width: 12 },
     ];
     styleHeader(summary);
+    writeDemoWarningRow(summary, demoEnabled, 3);
 
     const section = (title: string): void => {
       const row = summary.addRow({ label: title });
@@ -189,7 +207,7 @@ export class BankCasesExportService {
     cashed.commit();
     summary.addRow({ label: 'Taux de rejet (%)', value: totals.rejectionRate }).commit();
     summary
-      .addRow({ label: 'Délai moyen de traitement (h)', value: totals.meanDelayHours ?? '—' })
+      .addRow({ label: 'Délai moyen de traitement (h)', value: totals.meanDelayHours ?? 'n/d' })
       .commit();
 
     summary.addRow({}).commit();

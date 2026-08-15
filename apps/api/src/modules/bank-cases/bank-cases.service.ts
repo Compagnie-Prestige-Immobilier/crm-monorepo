@@ -102,6 +102,10 @@ export class BankCasesService {
 
   async get(id: string): Promise<BankCaseDetailDto> {
     const row = await this.loadCase(id);
+    // LECTURE GLOBALE : l'historique d'un dossier DÉJÀ résolu par sa clé
+    // primaire juste au-dessus. Le cloisonnement s'est joué sur le dossier ;
+    // le rejouer ici rendrait une fiche sans son historique, ce qui se lirait
+    // à l'écran comme un dossier jamais traité.
     const history = await this.prisma.bankCaseTransition.findMany({
       where: { caseId: id },
       include: BANK_TRANSITION_INCLUDE,
@@ -124,8 +128,8 @@ export class BankCasesService {
     const referenceKey = normalizeReferenceKey(input.reference);
 
     // Pré-contrôle : il donne un message exploitable et pointe le dossier
-    // existant. Il ne suffit PAS — deux créations simultanées le franchissent
-    // toutes les deux — d'où le rattrapage de P2002 plus bas. Le pré-contrôle
+    // existant. Il ne suffit PAS, deux créations simultanées le franchissent
+    // toutes les deux, d'où le rattrapage de P2002 plus bas. Le pré-contrôle
     // est pour l'ergonomie, la contrainte est pour la vérité.
     await this.assertReferenceFree(referenceKey);
 
@@ -138,6 +142,7 @@ export class BankCasesService {
         phoneE164: true,
         banqueId: true,
         phase2Status: true,
+        isDemo: true,
       },
     });
     if (!prospect) throw prospectNotFound();
@@ -152,11 +157,25 @@ export class BankCasesService {
     });
     if (!bank) throw bankNotFound(processingBankId);
 
-    const initial = await this.prisma.bankCaseStage.findFirst({ where: { isInitial: true } });
+    // `isActive: true` est indispensable, pas décoratif. Sans lui, une étape
+    // initiale DÉSACTIVÉE continuait de recevoir tous les nouveaux dossiers :
+    // l'administrateur qui la retire du workflow croit l'avoir sortie du
+    // circuit, et les dossiers s'y accumulent à une étape qui n'apparaît plus
+    // nulle part. Désactiver l'étape initiale sans en désigner une autre est
+    // une configuration incomplète, et doit se dire comme telle.
+    //
+    // `orderBy` sur la position : rien n'interdit en base deux étapes
+    // initiales actives. Sans ordre explicite, PostgreSQL est libre de rendre
+    // l'une ou l'autre selon le plan retenu, et deux dossiers créés à la suite
+    // pouvaient démarrer à des étapes différentes.
+    const initial = await this.prisma.bankCaseStage.findFirst({
+      where: { isInitial: true, isActive: true },
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+    });
     if (!initial) {
       throw new ConflictException({
         code: BankCaseError.NO_INITIAL_STAGE,
-        message: 'Le workflow bancaire n’a pas d’étape initiale : configuration incomplète.',
+        message: 'Le workflow bancaire n’a pas d’étape initiale ACTIVE : configuration incomplète.',
       });
     }
 
@@ -174,6 +193,12 @@ export class BankCasesService {
             processingBankId,
             currentStageId: initial.id,
             createdById: user.id,
+            // Le dossier hérite du PROSPECT sur lequel il porte, et non du mode
+            // en vigueur à la seconde de l'ouverture. Un dossier ouvert sur une
+            // fiche de démonstration atterrissait sinon dans le tableau de bord
+            // réel et dans l'export transmis au siège, avec un montant inventé
+            // qui s'ajoutait aux vrais encaissements.
+            isDemo: prospect.isDemo,
           },
           include: BANK_CASE_INCLUDE,
         });
@@ -181,7 +206,14 @@ export class BankCasesService {
         // commencerait au premier changement d'étape et personne ne saurait
         // qui a ouvert le dossier ni quand.
         await tx.bankCaseTransition.create({
-          data: { caseId: row.id, toStageId: initial.id, performedById: user.id },
+          // L'historique suit son dossier : une transition réelle sur un
+          // dossier de démonstration fausserait les délais de traitement.
+          data: {
+            caseId: row.id,
+            toStageId: initial.id,
+            performedById: user.id,
+            isDemo: prospect.isDemo,
+          },
         });
         return row;
       });
@@ -254,8 +286,8 @@ export class BankCasesService {
   /**
    * Correction administrateur.
    *
-   * Elle contourne l'atteignabilité et le verrou terminal — c'est sa raison
-   * d'être — mais rien d'autre : les règles financières de l'étape visée
+   * Elle contourne l'atteignabilité et le verrou terminal, c'est sa raison
+   * d'être, mais rien d'autre : les règles financières de l'étape visée
    * s'appliquent à l'identique, et la justification est obligatoire. Elle
    * s'inscrit dans le MÊME historique append-only, marquée par
    * `correctionReason` : une correction reste visible pour toujours, elle
@@ -332,6 +364,10 @@ export class BankCasesService {
           rejectionDetail: effect.rejectionDetail,
           comment: comment === undefined || comment === '' ? null : comment,
           correctionReason: correctionReason ?? null,
+          // L'historique suit SON DOSSIER, pas le mode en vigueur à la seconde
+          // du changement d'étape : une transition non marquée sur un dossier
+          // de démonstration ressortirait dans les délais de traitement réels.
+          isDemo: existing.isDemo,
         },
       });
       return null;
@@ -346,8 +382,8 @@ export class BankCasesService {
   /**
    * Autocomplétion pour l'ouverture d'un dossier.
    *
-   * Restreinte aux prospects enrôlés — les seuls sur lesquels un dossier peut
-   * être ouvert — et à quatre champs : identité, téléphone, banque. Un agent
+   * Restreinte aux prospects enrôlés, les seuls sur lesquels un dossier peut
+   * être ouvert, et à quatre champs : identité, téléphone, banque. Un agent
    * Banque & Finance n'a aucune raison de voir le commercial propriétaire, le
    * syndicat ou l'historique d'appels ; la projection est la mesure de
    * confidentialité, pas un filtre côté client.
@@ -355,7 +391,7 @@ export class BankCasesService {
   async prospectSearch(query: ProspectSearchQueryDto): Promise<ProspectSearchListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? DEFAULT_SEARCH_PAGE_SIZE;
-    const term = query.q.trim();
+    const term = query.search.trim();
     const like = `%${term.toLowerCase()}%`;
 
     // Le téléphone est cherché sous sa forme NORMALISÉE : « 77 123 45 67 »,
@@ -464,6 +500,13 @@ export class BankCasesService {
     return reason;
   }
 
+  /**
+   * LECTURE GLOBALE délibérée : l'index unique partiel
+   * `bank_cases_reference_key_active` est global, il ne connaît pas le mode
+   * démonstration. Filtré, ce pré-contrôle déclarerait libre une référence que
+   * la base refuse ensuite, et l'agent recevrait un 409 générique au lieu du
+   * message qui pointe le dossier existant.
+   */
   private async assertReferenceFree(referenceKey: string): Promise<void> {
     const clash = await this.prisma.bankCase.findFirst({
       where: { referenceKey, deletedAt: null },
@@ -484,7 +527,10 @@ export class BankCasesService {
    * Le pré-contrôle et la contrainte ne font pas double emploi : entre la
    * lecture et l'insertion, une autre requête peut prendre la référence. Sans
    * ce rattrapage, le second agent reçoit un 500 illisible là où le premier
-   * recevait un message clair — pour exactement la même erreur.
+   * recevait un message clair, pour exactement la même erreur.
+   *
+   * LECTURE GLOBALE délibérée, pour la même raison qu'`assertReferenceFree` :
+   * on relit la ligne que l'index GLOBAL vient de faire gagner.
    */
   private async referenceConflictError(referenceKey: string): Promise<ConflictException> {
     const existing = await this.prisma.bankCase.findFirst({

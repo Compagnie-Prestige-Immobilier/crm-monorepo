@@ -36,6 +36,7 @@ const admin = user(ADMIN);
 /** Corps typé d'une exception métier Nest. */
 interface ErrorBody {
   code?: string;
+  banqueId?: string;
   existing?: { id: string; reference: string; referenceKey: string };
   current?: { rev: number; currentStage: { code: string } };
   currentRev?: number;
@@ -88,6 +89,43 @@ describe('ouverture d’un dossier', () => {
     expect(created.isTerminal).toBe(false);
     expect(created.amountXof).toBeNull();
     expect(created.createdByName).toBe('Fatou Ndiaye');
+  });
+
+  // Régression : la recherche de l'étape initiale ne filtrait pas sur
+  // `isActive`. Une étape initiale DÉSACTIVÉE continuait donc de recevoir tous
+  // les nouveaux dossiers. L'administrateur qui la retire du workflow croit
+  // l'avoir sortie du circuit, et les dossiers s'accumulent en silence à une
+  // étape qui n'apparaît plus nulle part.
+  it('refuse d’ouvrir sur une étape initiale DÉSACTIVÉE', async () => {
+    const initial = db.stages.find((item) => item.id === STAGE_A_TRAITER.id);
+    if (!initial) throw new Error('étape initiale absente du double');
+    initial.isActive = false;
+
+    const error = await refusal(() =>
+      service.create(agent, { prospectId: 'psp-enrole', reference: 'REF-INACTIVE' }),
+    );
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(bodyOf(error).code).toBe(BankCaseError.NO_INITIAL_STAGE);
+  });
+
+  // Rien n'interdit en base deux étapes initiales actives. Sans `orderBy`,
+  // PostgreSQL est libre de rendre l'une ou l'autre selon le plan retenu, et
+  // deux dossiers créés à la suite pouvaient démarrer à des étapes différentes.
+  it('départage deux étapes initiales actives par la position, jamais au hasard', async () => {
+    db.stages.push({
+      ...STAGE_A_TRAITER,
+      id: 'stg-a-traiter-bis',
+      code: 'A_TRAITER_BIS',
+      label: 'À traiter (doublon)',
+      position: 0,
+    });
+
+    const premier = await service.create(agent, { prospectId: 'psp-enrole', reference: 'REF-X' });
+    const second = await service.create(agent, { prospectId: 'psp-enrole', reference: 'REF-Y' });
+
+    expect(premier.currentStage.code).toBe('A_TRAITER_BIS');
+    expect(second.currentStage.code).toBe(premier.currentStage.code);
   });
 
   it('l’ouverture est elle-même une transition : la timeline commence à la création', async () => {
@@ -146,7 +184,12 @@ describe('ouverture d’un dossier', () => {
     ).toBe(BankCaseError.PROSPECT_NOT_FOUND);
   });
 
-  it('refuse une banque de traitement inconnue', async () => {
+  // 422 et NON 400 : l'identifiant est un UUID valide, il ne désigne
+  // simplement aucune banque. Même classe de faute que
+  // `CLIENT_REQUEST_BANQUE_NOT_FOUND`, qui sortait déjà en 422. Le corps
+  // nomme la clé `banqueId`, comme partout ailleurs dans le contrat, et non
+  // `bankId`.
+  it('refuse une banque de traitement inconnue, en 422 et sous le nom banqueId', async () => {
     const error = await refusal(() =>
       service.create(agent, {
         prospectId: 'psp-enrole',
@@ -154,7 +197,11 @@ describe('ouverture d’un dossier', () => {
         processingBankId: 'bnq-fantome',
       }),
     );
+
+    expect(error).toBeInstanceOf(UnprocessableEntityException);
     expect(bodyOf(error).code).toBe(BankCaseError.BANK_NOT_FOUND);
+    expect(bodyOf(error).banqueId).toBe('bnq-fantome');
+    expect(bodyOf(error)).not.toHaveProperty('bankId');
   });
 });
 
@@ -212,7 +259,7 @@ describe('unicité de la référence', () => {
    *
    * Entre la lecture d'`assertReferenceFree` et l'INSERT, un autre agent prend
    * la référence. Sans rattrapage du P2002, le second reçoit un 500 illisible
-   * là où le premier recevait un message clair — pour exactement la même
+   * là où le premier recevait un message clair, pour exactement la même
    * erreur. On reproduit la fenêtre en insérant la ligne concurrente juste
    * avant l'écriture.
    */
@@ -513,7 +560,7 @@ describe('conflit de révision', () => {
     });
 
     // Ibrahima avait chargé l'écran avant : il travaille encore sur rev 1 et
-    // veut rejeter le dossier. La cible est atteignable — c'est bien la GARDE DE
+    // veut rejeter le dossier. La cible est atteignable, c'est bien la GARDE DE
     // RÉVISION qui l'arrête, et non un refus d'atteignabilité.
     const error = await refusal(() =>
       service.transition(agentBis, created.id, {
@@ -605,8 +652,8 @@ describe('verrou terminal et correction ADMIN', () => {
   });
 
   /**
-   * La correction contourne l'atteignabilité et le verrou terminal — c'est sa
-   * raison d'être — mais RIEN d'autre.
+   * La correction contourne l'atteignabilité et le verrou terminal, c'est sa
+   * raison d'être, mais RIEN d'autre.
    */
   it('la correction ADMIN franchit le verrou et écrit une transition auditée', async () => {
     const dossier = await encaisser('REF-COR');
@@ -727,5 +774,29 @@ describe('lectures', () => {
 
     const tous = await service.listRejectionReasons(true);
     expect(tous.items.map((item) => item.code)).toContain('RETIRE');
+  });
+});
+
+/**
+ * L'autocomplétion lit son terme dans `search`, comme toutes les autres
+ * recherches libres du contrat. Le SQL est vérifié en intégration ; ce qui se
+ * joue ici, c'est que le terme reçu arrive bien jusqu'à la requête, un
+ * paramètre lu sous un autre nom donnerait une liste vide sans erreur.
+ */
+describe('autocomplétion prospect', () => {
+  it('cherche sur le terme reçu dans « search »', async () => {
+    const requetes: unknown[][] = [];
+    const prisma = {
+      $queryRaw: (...args: unknown[]) => {
+        requetes.push(args);
+        return Promise.resolve([]);
+      },
+    } as unknown as ReturnType<FakePrisma['asService']>;
+
+    const isole = new BankCasesService(prisma, fakeDemoVisibility());
+    await isole.prospectSearch({ search: 'Ndiaye' });
+
+    const valeurs = requetes.flat().flatMap((sql) => (sql as { values?: unknown[] }).values ?? []);
+    expect(valeurs).toContain('%ndiaye%');
   });
 });

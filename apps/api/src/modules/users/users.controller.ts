@@ -11,6 +11,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
+import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { Role } from '@crm/database';
 
 import { Roles } from '../../common/decorators/roles.decorator.js';
@@ -34,6 +36,12 @@ import {
 @ApiTags('users')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
+// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
+// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
+// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
+// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
+// cas sur 116 opérations sur 119.
+@ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
   constructor(private readonly users: UsersService) {}
@@ -56,7 +64,11 @@ export class UsersController {
   @Post()
   @ApiOperation({ operationId: 'createUser', summary: 'Crée un commercial ou un administrateur.' })
   @ApiResponse({ status: 201, type: UserDto })
-  @ApiResponse({ status: 409, description: 'E-mail ou nom d’utilisateur déjà pris.' })
+  @ApiResponse({
+    status: 409,
+    type: ApiErrorDto,
+    description: 'E-mail ou nom d’utilisateur déjà pris.',
+  })
   create(@Body() body: CreateUserDto): Promise<UserDto> {
     return this.users.create(body);
   }

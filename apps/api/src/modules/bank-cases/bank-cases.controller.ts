@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
+import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { Role } from '@crm/database';
 
 import { Roles } from '../../common/decorators/roles.decorator.js';
@@ -33,18 +35,24 @@ import {
  * 1. L'ORDRE DE DÉCLARATION EST SIGNIFIANT. Nest apparie les routes dans
  *    l'ordre où elles sont déclarées : `analytics`, `prospect-search` et
  *    `rejection-reasons` DOIVENT précéder `:id`, sinon le paramètre les avale
- *    et `GET /bank-cases/analytics` répond « dossier introuvable » — ou pire,
+ *    et `GET /bank-cases/analytics` répond « dossier introuvable », ou pire,
  *    échoue sur le `ParseUUIDPipe` avec un message qui n'oriente personne.
  *
  * 2. Le rôle est posé sur la CLASSE, et surchargé sur la seule route de
  *    correction. `RolesGuard` lit `getAllAndOverride([handler, class])` : le
  *    décorateur de méthode remplace celui de classe, il ne s'y ajoute pas.
- *    Un COMMERCIAL n'a de place nulle part ici — il ne voit ni ne touche un
+ *    Un COMMERCIAL n'a de place nulle part ici, il ne voit ni ne touche un
  *    dossier bancaire.
  */
 @ApiTags('bank-cases')
 @ApiBearerAuth()
 @Roles(Role.BANQUE_FINANCE, Role.ADMIN)
+// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
+// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
+// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
+// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
+// cas sur 116 opérations sur 119.
+@ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'bank-cases', version: '1' })
 export class BankCasesController {
   constructor(
@@ -74,11 +82,13 @@ export class BankCasesController {
   @ApiResponse({ status: 201, type: BankCaseDto })
   @ApiResponse({
     status: 409,
-    description: 'BANK_CASE_REFERENCE_CONFLICT — la référence normalisée est déjà prise.',
+    type: ApiErrorDto,
+    description: 'BANK_CASE_REFERENCE_CONFLICT, la référence normalisée est déjà prise.',
   })
   @ApiResponse({
     status: 422,
-    description: 'BANK_CASE_PROSPECT_NOT_ENROLLED — le prospect n’est pas en METHOD_OBTAINED.',
+    type: ApiErrorDto,
+    description: 'BANK_CASE_PROSPECT_NOT_ENROLLED, le prospect n’est pas en METHOD_OBTAINED.',
   })
   create(
     @CurrentUser() user: AuthenticatedUser,
@@ -132,7 +142,7 @@ export class BankCasesController {
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: BankCaseDetailDto })
-  @ApiResponse({ status: 404, description: 'BANK_CASE_NOT_FOUND.' })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'BANK_CASE_NOT_FOUND.' })
   get(@Param('id', ParseUUIDPipe) id: string): Promise<BankCaseDetailDto> {
     return this.cases.get(id);
   }
@@ -148,6 +158,7 @@ export class BankCasesController {
   @ApiResponse({ status: 200, type: BankCaseDto })
   @ApiResponse({
     status: 409,
+    type: ApiErrorDto,
     description:
       'BANK_CASE_REV_CONFLICT (le corps porte l’état courant), BANK_CASE_TERMINAL ou BANK_CASE_REFERENCE_CONFLICT.',
   })
@@ -170,10 +181,12 @@ export class BankCasesController {
   @ApiResponse({ status: 201, type: BankCaseDetailDto })
   @ApiResponse({
     status: 409,
+    type: ApiErrorDto,
     description: 'BANK_CASE_REV_CONFLICT, BANK_CASE_TERMINAL ou BANK_STAGE_INACTIVE.',
   })
   @ApiResponse({
     status: 422,
+    type: ApiErrorDto,
     description:
       'BANK_STAGE_NOT_NEXT, BANK_STAGE_CASHED_NOT_LAST, BANK_CASE_AMOUNT_REQUIRED, BANK_CASE_REJECTION_REASON_REQUIRED, BANK_CASE_REJECTION_DETAIL_REQUIRED.',
   })
@@ -199,7 +212,7 @@ export class BankCasesController {
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 201, type: BankCaseDetailDto })
-  @ApiResponse({ status: 403, description: 'Réservé à l’ADMIN.' })
+  @ApiResponse({ status: 403, type: ApiErrorDto, description: 'Réservé à l’ADMIN.' })
   correct(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,

@@ -97,13 +97,13 @@ describe('filtres de phase 2', () => {
   });
 });
 
-describe('recherche — la clause téléphone ne doit jamais tout matcher', () => {
+describe('recherche, la clause téléphone ne doit jamais tout matcher', () => {
   const clauses = (search: string) =>
     (buildProspectWhere(admin, { search }, false).OR ?? []) as Record<string, unknown>[];
 
   it('un terme alphabétique ne pose PAS de clause téléphone', () => {
     // Régression : `"ZZZZ".replace(/[^\d+]/g, '')` donne '', et
-    // `contains: ''` vaut `LIKE '%%'` — qui renvoie la base entière. Le filtre
+    // `contains: ''` vaut `LIKE '%%'`, qui renvoie la base entière. Le filtre
     // paraissait fonctionner tant que personne ne cherchait un nom absent.
     const or = clauses('ZZZZZNOPE');
     expect(or).toHaveLength(2);

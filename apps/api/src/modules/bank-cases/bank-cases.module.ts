@@ -9,7 +9,7 @@ import { BankCaseAnalyticsService } from './bank-cases-analytics.service.js';
 import { BankCasesExportService } from './bank-cases-export.service.js';
 
 /**
- * Banque & Finance — dossiers bancaires, workflow d'étapes et analytique.
+ * Banque & Finance, dossiers bancaires, workflow d'étapes et analytique.
  *
  * `PrismaModule` est global : il n'a pas à figurer dans les imports. Les
  * services sont exportés parce que l'export Excel du module consomme

@@ -6,6 +6,7 @@ import { isAdmin, ownerScope } from './scope.js';
 import { tryNormalizePhone } from './phone.js';
 import type { ProspectFilterDto } from './dto/prospect-filter.dto.js';
 import { demoScope } from '../prisma/demo-visibility.js';
+import { inclusiveDateFrom, inclusiveDateTo } from './date-bounds.js';
 
 /**
  * Traduit le filtre commun en clause `where` Prisma, cloisonnement compris.
@@ -17,7 +18,7 @@ import { demoScope } from '../prisma/demo-visibility.js';
  * sur ce filtre ne puisse l'omettre.
  *
  * `demoEnabled` est un paramètre OBLIGATOIRE, sans valeur par défaut. Un défaut
- * — quel qu'il soit — laisserait un appelant l'oublier et hériter en silence
+ *, quel qu'il soit, laisserait un appelant l'oublier et hériter en silence
  * d'une visibilité qu'il n'a pas choisie ; ici l'oubli ne compile pas.
  */
 export function buildProspectWhere(
@@ -34,7 +35,7 @@ export function buildProspectWhere(
 
   // `commercialId` ne peut qu'AFFINER la portée. Un COMMERCIAL qui le
   // renseigne avec l'identifiant d'un collègue obtient un ensemble vide, pas
-  // les lignes du collègue — l'intersection avec `ownerScope` s'en charge.
+  // les lignes du collègue, l'intersection avec `ownerScope` s'en charge.
   if (filter.commercialId) {
     where.createdById = isAdmin(user)
       ? filter.commercialId
@@ -52,6 +53,7 @@ export function buildProspectWhere(
   if (filter.banqueId) where.banqueId = filter.banqueId;
   if (filter.syndicatId) where.syndicatId = filter.syndicatId;
   if (filter.statut) where.statut = filter.statut;
+  if (filter.origin) where.origin = filter.origin;
   if (filter.phase2Status) where.phase2Status = filter.phase2Status;
   if (filter.enrollmentMethod) where.enrollmentMethod = filter.enrollmentMethod;
   if (filter.enrollmentCapturedById) {
@@ -82,8 +84,8 @@ export function buildProspectWhere(
 
   if (filter.dateFrom ?? filter.dateTo) {
     where.clientCreatedAt = {
-      ...(filter.dateFrom ? { gte: new Date(filter.dateFrom) } : {}),
-      ...(filter.dateTo ? { lte: new Date(filter.dateTo) } : {}),
+      ...(filter.dateFrom ? { gte: inclusiveDateFrom(filter.dateFrom) } : {}),
+      ...(filter.dateTo ? { lte: inclusiveDateTo(filter.dateTo) } : {}),
     };
   }
 
@@ -100,7 +102,7 @@ export function buildProspectWhere(
       { prenom: { contains: search, mode: 'insensitive' } },
       // La clause téléphone n'est posée QUE si le terme contient réellement des
       // chiffres. Sans ce garde-fou, un terme purement alphabétique réduit à la
-      // chaîne vide devient `contains: ''`, soit `LIKE '%%'` en SQL — qui
+      // chaîne vide devient `contains: ''`, soit `LIKE '%%'` en SQL, qui
       // matche TOUTES les lignes. La recherche « Diallo » renverrait alors la
       // base entière, et le filtre paraîtrait fonctionner tant que personne ne
       // cherche un nom absent.

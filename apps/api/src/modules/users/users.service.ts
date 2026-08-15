@@ -112,6 +112,14 @@ export class UsersService {
         role: input.role ?? Role.COMMERCIAL,
         ...(input.departementId ? { departementId: input.departementId } : {}),
         ...(input.phone ? { phoneE164: normalizePhone(input.phone) } : {}),
+        // Un compte est une racine : rien dont hériter, l'interrupteur décide
+        // seul.
+        //
+        // L'asymétrie est ce qui rendait l'omission visible : `list()`
+        // cloisonne DÉJÀ par `demoScope`. Le compte ouvert pendant une
+        // démonstration disparaissait donc de l'écran qui aurait permis de le
+        // voir, tout en restant en base et connectable.
+        isDemo: await this.demo.enabled(),
       },
       include: INCLUDE,
     });
@@ -211,6 +219,12 @@ export class UsersService {
     });
   }
 
+  /**
+   * LECTURE GLOBALE délibérée : l'unicité de l'e-mail et de l'identifiant est
+   * globale en base. Filtrée, elle laisserait créer un compte réel portant
+   * l'identifiant d'un compte de démonstration, et la contrainte le refuserait
+   * ensuite sans que l'administrateur comprenne quel compte le lui prend.
+   */
   private async assertIdentifiersFree(email?: string, username?: string): Promise<void> {
     const or: Prisma.UserWhereInput[] = [];
     if (email) or.push({ email: email.trim().toLowerCase() });

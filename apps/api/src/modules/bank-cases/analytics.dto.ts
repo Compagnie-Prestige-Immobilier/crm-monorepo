@@ -3,6 +3,7 @@ import { IsEnum, IsOptional } from 'class-validator';
 import { BankStageType } from '@crm/database';
 
 import { BankCaseFilterDto } from './dto.js';
+import { TimeGranularity } from '../analytics/dto.js';
 
 /**
  * Agrégats Banque & Finance.
@@ -13,25 +14,26 @@ import { BankCaseFilterDto } from './dto.js';
  * s'effondrerait à la première vraie volumétrie.
  *
  * Le filtre est exactement celui de la liste, si bien qu'un compteur affiché
- * correspond toujours au contenu du tableau et du fichier exporté — c'est une
+ * correspond toujours au contenu du tableau et du fichier exporté, c'est une
  * propriété testée, pas une intention.
  */
 
-export enum BankTimeGranularity {
-  DAY = 'day',
-  WEEK = 'week',
-  MONTH = 'month',
-}
-
+/**
+ * Le pas de temps est `TimeGranularity` (module analytique), et non un
+ * `BankTimeGranularity` de mêmes valeurs. Un jour, une semaine et un mois ne
+ * changent pas de sens selon le tableau de bord qui les demande, et le doublon
+ * faisait engendrer dans chaque client deux énumérations interchangeables que
+ * le compilateur refusait pourtant de mélanger.
+ */
 export class BankAnalyticsQueryDto extends BankCaseFilterDto {
   @ApiPropertyOptional({
-    enum: BankTimeGranularity,
-    enumName: 'BankTimeGranularity',
-    default: BankTimeGranularity.DAY,
+    enum: TimeGranularity,
+    enumName: 'TimeGranularity',
+    default: TimeGranularity.DAY,
   })
   @IsOptional()
-  @IsEnum(BankTimeGranularity)
-  granularity?: BankTimeGranularity;
+  @IsEnum(TimeGranularity)
+  granularity?: TimeGranularity;
 }
 
 export class BankAnalyticsTotalsDto {
@@ -79,7 +81,8 @@ export class BankTimeBucketDto {
 }
 
 export class BankBankBreakdownDto {
-  @ApiProperty({ format: 'uuid' }) bankId!: string;
+  /** Même nom que partout ailleurs dans le contrat (voir `BankCaseFilterDto`). */
+  @ApiProperty({ format: 'uuid' }) banqueId!: string;
   @ApiProperty() label!: string;
   @ApiProperty({ type: Number }) cases!: number;
   @ApiProperty({ type: Number }) cashed!: number;

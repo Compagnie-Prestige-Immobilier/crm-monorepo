@@ -12,15 +12,15 @@ import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js'
  *
  * La liste et les deux exports passent par `buildProspectWhere` ; les agrégats
  * du tableau de bord passent par `prospectConditions`, parce qu'ils comptent en
- * SQL sans jamais remonter de lignes. Deux traductions donc — et c'est
+ * SQL sans jamais remonter de lignes. Deux traductions donc, et c'est
  * exactement là que le décalage s'installe : un champ ajouté au DTO, câblé dans
  * l'une et oublié dans l'autre, produit un tableau de bord qui annonce 1 200
  * prospects là où le fichier exporté en contient 300, sans qu'aucun test de
  * module ne s'en aperçoive.
  *
  * Ces contrôles vérifient que CHAQUE champ du filtre restreint réellement les
- * DEUX traductions. Ils ne comparent pas les clauses entre elles — l'une est un
- * objet Prisma, l'autre du SQL — mais ils constatent qu'aucune des deux ne
+ * DEUX traductions. Ils ne comparent pas les clauses entre elles, l'une est un
+ * objet Prisma, l'autre du SQL, mais ils constatent qu'aucune des deux ne
  * traverse un champ sans réagir.
  */
 
@@ -62,6 +62,7 @@ const CHAMPS: Readonly<Record<keyof ProspectFilterDto, ProspectFilterDto>> = {
   departementId: { departementId: 'd-1' },
   commercialId: { commercialId: 'com-bob' },
   statut: { statut: 'CONVERTI' },
+  origin: { origin: 'BANQUE' },
   segment: { segment: 'BDD2' },
   phase2Status: { phase2Status: 'METHOD_OBTAINED' },
   enrollmentMethod: { enrollmentMethod: 'PLATFORM' },
@@ -99,6 +100,7 @@ describe('un filtre, la même population sur les trois surfaces', () => {
       'enrollmentCapturedById',
       'enrollmentMethod',
       'includeDeleted',
+      'origin',
       'phase2Status',
       'representantId',
       'search',
