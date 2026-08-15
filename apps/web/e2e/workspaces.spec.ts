@@ -170,7 +170,7 @@ test('création d’une campagne : l’aperçu chiffre AVANT la confirmation', a
   // distingue franchement du total.
   await page.getByRole('radio', { name: /^BDD1/ }).check();
 
-  // Deux commerciaux : le tourniquet doit répartir, pas tout donner au premier.
+  // Deux téléconseillers : le tourniquet doit répartir, pas tout donner au premier.
   const commerciaux = page.getByRole('checkbox');
   await commerciaux.nth(0).check();
   await commerciaux.nth(1).check();
@@ -199,11 +199,13 @@ test('création d’une campagne : l’aperçu chiffre AVANT la confirmation', a
 
   // On atterrit sur le détail, et le total tiré correspond à l'aperçu.
   await page.waitForURL(/\/campagnes\/[0-9a-f-]{36}/, { timeout: 60_000 });
-  await expect(page.getByRole('heading', { name: 'Répartition par commercial' })).toBeVisible();
+  // « téléconseiller » : la copie du panel ne dit plus « commercial », qui est
+  // désormais réservé aux identifiants venus du contrat engendré.
+  await expect(page.getByRole('heading', { name: 'Répartition par téléconseiller' })).toBeVisible();
   await expectNoErrorState(page);
 });
 
-test('chaque commercial a son programme PDF téléchargeable', async ({ page }) => {
+test('chaque téléconseiller a son programme PDF téléchargeable', async ({ page }) => {
   await page.goto('/campagnes');
   await page.getByRole('link', { name: /^E2E / }).first().click();
   await page.waitForURL(/\/campagnes\/[0-9a-f-]{36}/);
