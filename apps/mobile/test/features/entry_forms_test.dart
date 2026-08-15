@@ -196,6 +196,97 @@ void main() {
       expect(find.text('Nom corrigé'), findsOneWidget);
     });
 
+    /// ═══ LE BROUILLON D'UNE CORRECTION DANS UN FORMULAIRE NEUF ═══
+    ///
+    /// `latestFor` ne filtre que sur `formKey`, et création comme modification
+    /// écrivent sous `representant.create`. Deux gestes ordinaires suffisaient :
+    /// sortir d'une correction de la fiche R, puis appuyer sur « Nouveau
+    /// représentant » dans la minute. À moins de 60 secondes, `DraftAge.crash`
+    /// appliquait le brouillon de R **sans rien demander** : le formulaire neuf
+    /// se remplissait de son nom et de son numéro, l'écran adoptait son
+    /// `draftId`, et l'enregistrement supprimait la correction de R tout en
+    /// tentant une fiche en doublon.
+    formTestWidgets('une correction inachevée ne remonte PAS dans une création', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(db, id: 'rep-9', phone: '+221770000009');
+      await seedDraft(
+        draftId: 'brouillon-edit',
+        formKey: 'representant.create',
+        entityId: 'rep-9',
+        // Dans la fenêtre de reprise silencieuse : c'est ce qui rendait le
+        // défaut invisible, l'utilisateur n'avait rien à confirmer.
+        age: const Duration(seconds: 5),
+        values: <String, Object?>{
+          'fullName': 'Nom corrigé',
+          'phone': '77 000 00 09',
+          'departementId': 'dep-1',
+          'departementLabel': 'Dakar',
+        },
+      );
+
+      await tester.pumpWidget(host(const RepresentantFormScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nom corrigé'), findsNothing);
+      expect(find.text('Dakar'), findsNothing);
+      expect(find.textContaining('Saisie non terminée'), findsNothing);
+
+      // Et la correction est toujours là, intacte, pour la fiche à qui elle
+      // appartient.
+      final List<FormDraft> rows = await drafts();
+      expect(rows, hasLength(1));
+      expect(rows.single.draftId, 'brouillon-edit');
+      expect(rows.single.entityId, 'rep-9');
+    });
+
+    /// Le pendant : un brouillon de CRÉATION abandonné doit, lui, toujours
+    /// remonter. Le garde sépare les deux, il n'éteint pas la reprise.
+    formTestWidgets('un brouillon de création abandonné remonte toujours', (
+      WidgetTester tester,
+    ) async {
+      await seedDraft(
+        draftId: 'brouillon-create',
+        formKey: 'representant.create',
+        // Un identifiant d'entité qu'aucune fiche ne réclame : la transaction
+        // d'enregistrement supprime le brouillon au moment où la fiche
+        // apparaît, donc les deux ne coexistent jamais.
+        entityId: 'rep-jamais-enregistre',
+        values: <String, Object?>{'fullName': 'Ousmane Fall', 'phone': '77 123 45 67'},
+      );
+
+      await tester.pumpWidget(host(const RepresentantFormScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Saisie non terminée'), findsOneWidget);
+      expect(find.textContaining('Ousmane Fall'), findsOneWidget);
+    });
+
+    /// ═══ « SUPPRIMER » NE SUPPRIMAIT RIEN ═══
+    ///
+    /// L'adoption de l'identifiant retrouvé n'a lieu que dans `_apply`. Sur le
+    /// chemin `latestFor`, `_draftId` est donc encore l'identifiant neuf tiré au
+    /// montage, et `delete(_draftId)` ne touchait aucune ligne : la bannière
+    /// disparaissait, le brouillon survivait, et la même saisie périmée revenait
+    /// à chaque ouverture pendant sept jours.
+    formTestWidgets('« Supprimer » efface le brouillon RETROUVÉ', (
+      WidgetTester tester,
+    ) async {
+      await seedDraft(
+        draftId: 'brouillon-1',
+        formKey: 'representant.create',
+        values: <String, Object?>{'fullName': 'Ousmane Fall', 'phone': '77 123 45 67'},
+      );
+
+      await tester.pumpWidget(host(const RepresentantFormScreen()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Supprimer'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Saisie non terminée'), findsNothing);
+      expect(await drafts(), isEmpty);
+    });
+
     formTestWidgets('un département choisi seul est un brouillon, pas du vide', (
       WidgetTester tester,
     ) async {
@@ -289,6 +380,33 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Saisie non terminée'), findsOneWidget);
+    });
+
+    /// Même défaut que sur le formulaire de représentant : l'adoption de
+    /// l'identifiant retrouvé n'a lieu que dans `_apply`, donc « Supprimer »
+    /// visait l'identifiant neuf du montage et ne touchait aucune ligne.
+    formTestWidgets('« Supprimer » efface le brouillon RETROUVÉ', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
+      await seedDraft(
+        draftId: 'brouillon-mien',
+        formKey: 'prospect.create',
+        parentId: 'rep-1',
+        values: <String, Object?>{
+          'nom': 'Sow',
+          'prenom': 'Awa',
+          'representantId': 'rep-1',
+        },
+      );
+
+      await tester.pumpWidget(host(const ProspectEntryScreen(representantId: 'rep-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Supprimer'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Saisie non terminée'), findsNothing);
+      expect(await drafts(), isEmpty);
     });
   });
 

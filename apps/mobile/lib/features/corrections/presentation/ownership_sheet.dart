@@ -143,6 +143,44 @@ class _OwnershipSheet extends ConsumerWidget {
   /// Le remappage est celui du moteur, pas une variante locale : une seconde
   /// implémentation du même remappage divergerait au premier correctif appliqué
   /// à une seule des deux.
+  ///
+  /// ═══ CE QU'ON FAIT QUAND LA CRÉATION EST EN VOL ═══
+  ///
+  /// [WriteRepository.discardOwnCreateOnly] refuse d'effacer une création
+  /// réservée par un envoi. Ce refus doit arriver quelque part, sinon on
+  /// enchaînait sur la vidange et sur la fermeture de la feuille en affirmant à
+  /// l'utilisateur que le rattachement était fait, alors que la création est
+  /// toujours là et qu'elle repartira.
+  ///
+  /// **On s'arrête, on le dit, et on laisse la feuille ouverte.** C'est
+  /// exactement ce que fait déjà « Supprimer cette saisie » quelques lignes plus
+  /// haut, et pour la même raison : fermer sur un refus laisse croire que
+  /// l'action a eu lieu. L'attente est bornée : `reclaimExpiredLeases` tourne en
+  /// tête de chaque vidange et rend la ligne abandonnable dès que son porteur
+  /// est présumé mort, donc le second appui aboutira.
+  ///
+  /// **L'ordre reste remappage puis abandon, et c'est ce qui rend le refus
+  /// rattrapable.** Les deux autres ordres sont pires :
+  ///
+  /// * abandonner d'abord expose une coupure entre les deux écritures où la
+  ///   création a disparu alors que les prospects pointent encore vers le
+  ///   parent local : ils partiraient vers une fiche qui n'existera jamais côté
+  ///   serveur, et rien dans l'app ne pourrait plus les réparer ;
+  /// * dans cet ordre-ci, un refus laisse un état que l'utilisateur peut
+  ///   reprendre : les prospects sont repointés, la création est toujours en
+  ///   tête de sa clé, donc rien ne part, et rappuyer sur le bouton reprend là
+  ///   où on s'est arrêté. Le remappage est idempotent.
+  ///
+  /// **Et le doublon de représentant que ce refus pourrait faire craindre
+  /// n'existe pas ici.** La feuille ne s'ouvre que sur une tête en `conflict`, et
+  /// une tête en `conflict` empoisonne sa clé : le sélecteur l'ignore
+  /// entièrement (ADR 0001 §2), donc la création ne peut pas repartir toute
+  /// seule. Le seul cas où elle est en vol est celui où elle vient d'être
+  /// relancée à la main, et elle repart alors sous son `opId` d'origine, que le
+  /// serveur reconnaît. Aucun chemin ne produit une seconde fiche.
+  ///
+  /// [DiscardOutcome.notFound] est en revanche un succès : la création a déjà
+  /// quitté la file, le but est atteint.
   Future<void> _attach(BuildContext context, WidgetRef ref) async {
     final String? serverId = lookup.representant?.id;
     if (serverId == null) return;
@@ -150,7 +188,21 @@ class _OwnershipSheet extends ConsumerWidget {
     // La création du représentant n'a plus lieu d'être : la fiche existe déjà
     // côté serveur. On l'abandonne SANS cascade : les prospects, eux, viennent
     // d'être repointés et doivent partir.
-    await ref.read(writeRepositoryProvider).discardOwnCreateOnly(row.id);
+    final DiscardResult result = await ref
+        .read(writeRepositoryProvider)
+        .discardOwnCreateOnly(row.id);
+    if (!context.mounted) return;
+    if (result.outcome == DiscardOutcome.claimed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Envoi en cours : impossible de rattacher tout de suite. '
+            'Réessayez dans quelques instants.',
+          ),
+        ),
+      );
+      return;
+    }
     await ref.read(syncCoordinatorProvider.notifier).run(pull: false);
     if (context.mounted) Navigator.of(context).pop();
   }

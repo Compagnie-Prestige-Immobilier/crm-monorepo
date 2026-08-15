@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import '../../data/local/database.dart';
 import 'api_port.dart';
 import 'clock.dart';
+import 'outbox_status.dart';
 
 /// Réplication de l'annuaire de phase 2 : **Dart pur**.
 ///
@@ -223,8 +224,7 @@ class Phase2DirectorySync {
         );
   }
 
-  /// Efface l'annuaire, les tentatives locales, leurs opérations en file et le
-  /// curseur : **tout ce que la phase 2 a posé sur cet appareil**.
+  /// Efface l'annuaire et le curseur, **et épargne le travail non envoyé**.
   ///
   /// Appelée à la déconnexion. Un annuaire de 500 000 numéros qui survivrait au
   /// départ de son propriétaire sur un téléphone personnel n'est pas un détail
@@ -235,13 +235,60 @@ class Phase2DirectorySync {
   /// utilisateur que son annuaire est à jour alors qu'il est vide, et le pull
   /// delta suivant ne ramènerait que les lignes modifiées depuis : c'est-à-dire
   /// presque rien.
+  ///
+  /// ═══ LA PURGE EMPORTAIT UNE MATINÉE D'APPELS QUE LE SERVEUR N'A JAMAIS VUE ═══
+  ///
+  /// Elle vidait `call_attempts` et **toutes** les opérations `call_attempt` de
+  /// la file, quel que soit leur statut. Or l'écran de déconnexion compte les
+  /// éléments en attente avec `countPendingOutbox`, qui ne filtre PAS sur le
+  /// type d'entité : les tentatives d'appel non envoyées étaient donc comptées
+  /// dans le chiffre annoncé, et la boîte de dialogue promettait mot pour mot
+  /// « ces saisies ne partiront qu'à la prochaine connexion avec ce compte ».
+  /// L'utilisateur lisait cette promesse, confirmait, et la purge détruisait
+  /// exactement ce qu'on venait de lui garantir. Le serveur n'en avait jamais eu
+  /// copie : la perte est définitive et rien dans l'app ne peut la signaler.
+  ///
+  /// **Ce qui part et ce qui reste, et pourquoi la ligne passe là.** Le secret à
+  /// protéger est le NUMÉRO, et il n'est que dans `phase2_directory` : le test
+  /// voisin de `phase2_test.dart` vérifie qu'aucune colonne nominative n'a été
+  /// glissée dans `call_attempts`, qui ne porte qu'un identifiant de dossier,
+  /// une issue, une méthode et un commentaire. Conserver une tentative non
+  /// envoyée ne conserve donc aucun numéro : l'argument de fuite ne la couvre
+  /// pas, et il ne peut pas servir à justifier de détruire le travail de son
+  /// auteur.
+  ///
+  /// Une tentative **déjà partie** n'a, elle, plus de raison de rester : c'est
+  /// un journal que le serveur détient, et le prochain utilisateur de l'appareil
+  /// n'a pas à le lire.
+  ///
+  /// C'est exactement le traitement que la phase 1 reçoit déjà : ses opérations
+  /// survivent à la déconnexion, avec la réserve que la boîte de dialogue
+  /// énonce. Les deux files se comportent enfin pareil.
   Future<void> purge() async {
     await _db.transaction(() async {
       await _db.delete(_db.phase2Directory).go();
-      await _db.delete(_db.callAttempts).go();
-      await (_db.delete(
-        _db.outbox,
-      )..where((Outbox o) => o.entityType.equals(callAttemptEntity))).go();
+
+      // Les opérations CLOSES seulement. `OutboxStatus.open` couvre `pending`,
+      // `syncing`, `conflict` et `failed` : les quatre états que l'écran compte
+      // comme « en attente », donc les quatre que la promesse engage.
+      await (_db.delete(_db.outbox)..where(
+            (Outbox o) =>
+                o.entityType.equals(callAttemptEntity) &
+                o.status.isIn(OutboxStatus.open).not(),
+          ))
+          .go();
+
+      // Une tentative dont l'opération est encore en file doit rester : c'est
+      // elle que l'opération décrit, et l'écran de phase 2 la relit. La
+      // sous-requête évite de construire un `IN` de plusieurs centaines de
+      // termes un lendemain de tournée sans réseau.
+      await _db.customStatement(
+        'DELETE FROM call_attempts WHERE id NOT IN ('
+        'SELECT entity_id FROM outbox WHERE entity_type = ? AND status IN '
+        '(${List<String>.filled(OutboxStatus.open.length, '?').join(', ')}))',
+        <Object?>[callAttemptEntity, ...OutboxStatus.open],
+      );
+
       await (_db.delete(
         _db.syncState,
       )..where((SyncState t) => t.collection.equals(cursorKey))).go();

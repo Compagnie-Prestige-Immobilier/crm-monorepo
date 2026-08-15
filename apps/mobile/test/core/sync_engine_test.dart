@@ -960,6 +960,101 @@ void main() {
       expect(row.attempts, 0, reason: 'aucun refus serveur n\'a été comptabilisé');
     });
 
+    /// ═══ LE BUDGET DE BLOCAGE NE SE RECHARGEAIT JAMAIS ═══
+    ///
+    /// `blockedAttempts` n'était remis à zéro que par deux gestes de
+    /// l'UTILISATEUR (« Réessayer » et la correction sur place). Deux épisodes
+    /// de blocage sans rapport, séparés de plusieurs jours, partageaient donc le
+    /// même budget de douze : un parent réparé depuis longtemps laissait
+    /// derrière lui des enfants à moitié condamnés, que quelques
+    /// `GROUP_TRANSACTION_FAILED` intermittents achevaient, avec un message qui
+    /// renvoyait l'utilisateur réparer une fiche parente parfaitement saine.
+    ///
+    /// L'acquittement de la tête est l'événement qui clôt l'épisode : ce sont
+    /// ses échecs à elle qui ont fait monter le compteur de ses suiveurs.
+    test('un parent enfin passé rend son budget de blocage à sa suite', () async {
+      await insertProspect(
+        db,
+        id: 'pA1',
+        representantId: 'repA',
+        phone: '+221780000001',
+      );
+      await queueOp(
+        db,
+        id: 'A2',
+        entityType: 'prospect',
+        entityId: 'pA1',
+        dependencyKey: 'repA',
+      );
+
+      // Le prospect a déjà encaissé des rejeux bloqués pour la faute de son
+      // parent : c'est l'état que laisse un premier épisode.
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A2'))).write(
+        const OutboxCompanion(blockedAttempts: Value<int>(9)),
+      );
+
+      final SyncEngine engine = build();
+      await engine.drain();
+
+      expect((await outboxById(db, 'A1')).status, OutboxStatus.done);
+      expect(
+        (await outboxById(db, 'A2')).blockedAttempts,
+        0,
+        reason: 'la cause du blocage vient de disparaître : le budget repart',
+      );
+      // `attempts` compte, lui, des fautes que l'opération porte vraiment : il
+      // n'a rien à voir avec cet effacement.
+      expect((await outboxById(db, 'A2')).attempts, 0);
+    });
+
+    /// La chaîne voisine ne doit rien recevoir : son propre blocage, s'il
+    /// existe, n'a pas été résolu par ce succès-ci.
+    test('le budget rendu ne déborde pas sur une autre clé', () async {
+      await insertRepresentant(db, id: 'repB', phone: '+221770000002');
+      await queueOp(
+        db,
+        id: 'B1',
+        entityType: 'representant',
+        entityId: 'repB',
+        status: OutboxStatus.conflict,
+      );
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('B1'))).write(
+        const OutboxCompanion(blockedAttempts: Value<int>(9)),
+      );
+
+      await build().drain();
+
+      expect((await outboxById(db, 'B1')).blockedAttempts, 9);
+    });
+
+    /// Le message d'abandon envoyait TOUJOURS corriger « la fiche parente ».
+    /// `GROUP_TRANSACTION_FAILED` n'accuse aucun parent : il dit que le serveur
+    /// n'a pas pu écrire le lot. L'utilisateur partait chercher un défaut sur
+    /// une fiche qui n'en avait pas.
+    test('un lot refusé ne renvoie pas corriger une fiche parente saine', () async {
+      api.verdicts['A1'] = SyncOperationResultDto(
+        opId: 'A1',
+        status: SyncOpStatus.skippedDependencyFailed,
+        entityId: null,
+        rev: null,
+        serverUpdatedAt: null,
+        errorCode: ServerErrorCodes.groupTransactionFailed,
+        // Le serveur ne dit rien de plus : c'est le message par défaut du
+        // client qui parle, et c'est lui qui mentait.
+        error: null,
+      );
+      final SyncEngine engine = build();
+      for (int i = 0; i < 12; i++) {
+        clock.advance(const Duration(minutes: 20));
+        await engine.drain();
+      }
+
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.failed);
+      expect(row.lastErrorCode, ServerErrorCodes.groupTransactionFailed);
+      expect(row.lastErrorMsg, isNot(contains('parente')));
+    });
+
     // ── Lien mort : les tentatives comptent des REFUS, pas du temps ───────────
 
     test('lien injoignable : rien ne se consomme, comme une session morte', () async {

@@ -54,7 +54,8 @@ enum DiscardOutcome {
   notFound,
 }
 
-/// Résultat d'un [WriteRepository.discardOperation].
+/// Résultat d'un [WriteRepository.discardOperation] ou d'un
+/// [WriteRepository.discardOwnCreateOnly].
 class DiscardResult {
   const DiscardResult(this.outcome, {this.removed = 0});
 
@@ -836,8 +837,84 @@ class WriteRepository {
   /// repointés vers la bonne fiche et doivent partir. Passer par
   /// [discardOperation] les emporterait avec elle, ce qui est exactement le
   /// contraire de ce que l'utilisateur vient de demander.
-  Future<void> discardOwnCreateOnly(String opId) async {
-    await (_db.delete(_db.outbox)..where((Outbox o) => o.id.equals(opId))).go();
+  ///
+  /// ═══ UN IDENTIFIANT D'OPÉRATION N'EST PAS UNE AUTORISATION DE SUPPRIMER ═══
+  ///
+  /// La suppression ne portait que sur `id`. Aucune des trois questions qui
+  /// décident d'un abandon n'était posée, alors que [discardOperation] les pose
+  /// toutes les trois à trois mètres d'ici :
+  ///
+  /// * **est-ce bien une création ?** Le contrat de la méthode le dit dans son
+  ///   nom, rien ne l'imposait. Un `id` périmé désignant un `update` ou un
+  ///   `delete` faisait disparaître une intention utilisateur que rien ne
+  ///   reconstruit : ni l'écran « À corriger », ni le prochain tirage, qui
+  ///   ramènerait la valeur d'avant sans que personne puisse dire pourquoi ;
+  /// * **la ligne est-elle libre ?** Non testée. Une création réservée est une
+  ///   création **en vol** : la supprimer pendant que le serveur l'applique
+  ///   laisse côté serveur un représentant que ce téléphone ne sait plus
+  ///   rattacher, et localement plus aucune trace de l'envoi. C'est exactement
+  ///   le défaut que [discardOperation] a fermé, resté ouvert sur cette
+  ///   porte-ci ;
+  /// * **la suppression a-t-elle touché ce qu'on avait lu ?** Non vérifié. Lire
+  ///   en Dart puis écrire sans reposer la condition dans le `WHERE` laisse
+  ///   précisément la fenêtre qu'on prétend fermer, et un `DELETE` qui ne touche
+  ///   rien est indiscernable d'un `DELETE` qui a réussi quand on ne compte pas.
+  ///
+  /// La possession est donc lue ([_isClaimed]) **et** reposée dans le `WHERE`
+  /// ([_unclaimed]), et le compte est relu : à la moindre divergence on annule
+  /// la transaction ([_ClaimRace]) au lieu de supposer que le `DELETE` a frappé
+  /// la ligne qu'on avait sous les yeux.
+  ///
+  /// **Le type d'entité, lui, n'est volontairement pas contraint.** Dans
+  /// [discardOperation] il décide de la cascade ; ici il n'y a pas de cascade,
+  /// donc il ne décide de rien. Ce qui protège l'utilisateur est que
+  /// l'opération soit une création : une création abandonnée ne perd aucune
+  /// donnée qu'il faudrait ressaisir, puisque la fiche existe déjà côté serveur.
+  ///
+  /// **Un refus est rendu, jamais silencieux**, et c'est ce qui distingue les
+  /// deux façons de ne rien supprimer :
+  ///
+  /// * [DiscardOutcome.claimed] : la création est en vol, l'appelant doit
+  ///   s'arrêter et réessayer plus tard ;
+  /// * [DiscardOutcome.notFound] : il n'y a plus rien à abandonner sous cet
+  ///   `id`, soit qu'un autre chemin l'ait déjà retiré, soit qu'une correction
+  ///   l'ait réécrit sous un `id` neuf ([_amendInPlace]), soit que la ligne ne
+  ///   soit pas une création. Pour l'appelant, c'est un succès : le but est que
+  ///   la création ne parte pas, et elle ne partira pas.
+  ///
+  /// **Ce que ce verrou ne couvre pas** est ce que [_isClaimed] documente :
+  /// après un `SyncEngine.reclaimExpiredLeases`, la ligne redevient
+  /// abandonnable alors qu'un envoi fantôme peut encore aboutir. L'idempotence
+  /// par `opId` rend ce résidu inoffensif pour un renvoi, pas pour une
+  /// suppression.
+  Future<DiscardResult> discardOwnCreateOnly(String opId) async {
+    try {
+      return await _db.transaction(() async {
+        final OutboxData? row = await (_db.select(
+          _db.outbox,
+        )..where((Outbox o) => o.id.equals(opId))).getSingleOrNull();
+        // Une ligne qui n'est pas une création n'est pas de notre ressort : on
+        // ne la supprime pas, et on ne prétend pas l'avoir fait.
+        if (row == null || row.op != 'create') {
+          return const DiscardResult(DiscardOutcome.notFound);
+        }
+        if (_isClaimed(row)) return const DiscardResult(DiscardOutcome.claimed);
+
+        final int removed =
+            await (_db.delete(_db.outbox)..where(
+                  (Outbox o) =>
+                      o.id.equals(opId) & o.op.equals('create') & _unclaimed(o),
+                ))
+                .go();
+        if (removed != 1) {
+          // Une réservation est apparue entre la lecture et la suppression.
+          throw const _ClaimRace();
+        }
+        return const DiscardResult(DiscardOutcome.discarded, removed: 1);
+      });
+    } on _ClaimRace {
+      return const DiscardResult(DiscardOutcome.claimed);
+    }
   }
 
   /// Abandonne une opération.
