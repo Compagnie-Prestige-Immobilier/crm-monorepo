@@ -68,12 +68,16 @@ export class ApiErrorDto {
       'chaque opération ; les codes génériques dérivent du statut HTTP ' +
       '(BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, ' +
       'UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR). ' +
-      'UN CODE TRANSVERSE mérite d’être traité une fois pour toutes côté client : ' +
-      '`DEMO_MODE_READ_ONLY`, rendu en 409 sur TOUTE requête POST, PATCH, PUT ou ' +
-      'DELETE tant que le mode démonstration est actif. Il ne dépend d’aucune ' +
-      'opération en particulier, il décrit l’état de la plateforme, et son ' +
-      '`message` est déjà rédigé pour être affiché tel quel. Ces routes-là, et ' +
-      `elles seules, n’émettent JAMAIS ce code : ${DEMO_EXEMPTIONS_SENTENCE}.`,
+      'DEUX CODES TRANSVERSES méritent d’être traités une fois pour toutes côté ' +
+      'client. Ils sortent tous deux en 409 sur TOUTE requête POST, PATCH, PUT ou ' +
+      'DELETE, ne dépendent d’aucune opération en particulier, et leur `message` ' +
+      'est déjà rédigé pour être affiché tel quel : ' +
+      '`DEMO_MODE_READ_ONLY` tant que le mode démonstration est actif ; ' +
+      '`DEMO_MODE_STATE_UNKNOWN` quand le serveur n’arrive pas à lire l’état de ce ' +
+      'mode et refuse d’écrire une ligne dont il ne saurait pas dire si elle est ' +
+      'réelle. Le second N’ANNONCE PAS une démonstration en cours : il invite à ' +
+      'réessayer, et non à faire éteindre un interrupteur. Ces routes-là, et ' +
+      `elles seules, n’émettent JAMAIS ces codes : ${DEMO_EXEMPTIONS_SENTENCE}.`,
   })
   code!: string;
 

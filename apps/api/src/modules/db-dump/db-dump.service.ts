@@ -206,7 +206,9 @@ export class DbDumpService implements OnModuleInit {
     try {
       await this.sweep(new Date(), true);
     } catch (error) {
-      this.logger.error(`Export de la base : réconciliation d’amorçage impossible. ${String(error)}`);
+      this.logger.error(
+        `Export de la base : réconciliation d’amorçage impossible. ${String(error)}`,
+      );
     }
   }
 
@@ -922,9 +924,11 @@ export class DbDumpService implements OnModuleInit {
    * Rend `true` au gagnant, `false` au perdant. Aucun appelant n'a le droit
    * d'ignorer cette valeur.
    */
-  private async claim(next: DumpJob, actorId: string | null, previous: string | null): Promise<
-    boolean
-  > {
+  private async claim(
+    next: DumpJob,
+    actorId: string | null,
+    previous: string | null,
+  ): Promise<boolean> {
     const value = JSON.stringify(next);
     if (previous === null) {
       try {

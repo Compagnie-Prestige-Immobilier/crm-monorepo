@@ -8,6 +8,7 @@ import {
   DemoReadOnlyGuard,
 } from './demo-read-only.guard.js';
 import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
+import { DEMO_MODE_STATE_UNKNOWN } from '../../prisma/demo-visibility.service.js';
 
 import { AuthController } from '../../modules/auth/auth.controller.js';
 import { DemoController } from '../../modules/demo/demo.controller.js';
@@ -132,6 +133,29 @@ describe('lecture seule pendant une démonstration', () => {
     await expect(
       guardWithDemo('unknown').canActivate(contextFor('POST', ProspectsController, 'create')),
     ).rejects.toThrow();
+  });
+
+  /**
+   * ET IL LE DIT AVEC LE BON CODE.
+   *
+   * Le refus était le même dans les deux cas : « une démonstration est en
+   * cours, demandez à un administrateur de la désactiver ». Sur une panne de
+   * lecture du réglage alors que le mode est ÉTEINT, cette phrase envoie tous
+   * les utilisateurs qui écrivent vers un administrateur qui ouvre l'écran et
+   * voit le mode éteint. Personne n'a de prise sur ce qui est annoncé.
+   *
+   * `DEMO_MODE_STATE_UNKNOWN` nomme la vraie cause, et son message invite à
+   * réessayer plutôt qu'à chercher un interrupteur.
+   */
+  it('et il NOMME LA VRAIE CAUSE au lieu d’annoncer une démonstration', async () => {
+    const refusal = await refusalOf(
+      guardWithDemo('unknown'),
+      contextFor('POST', ProspectsController, 'create'),
+    );
+
+    expect(refusal.status).toBe(409);
+    expect((refusal.body as { code: string }).code).toBe(DEMO_MODE_STATE_UNKNOWN);
+    expect((refusal.body as { message: string }).message).not.toContain('administrateur');
   });
 
   it('laisse néanmoins passer une route dispensée, même dans le doute', async () => {

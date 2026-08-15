@@ -311,10 +311,13 @@ export class RemindersService {
     ];
 
     // Une notification de démonstration n'est PAS expédiée mode éteint : elle
-    // partirait vers de vrais destinataires avec un texte écrit pour une
-    // séance de démonstration. Elle reste programmée et repartira si le mode
-    // se rallume, ce qui est le comportement d'une ligne masquée, pas
-    // supprimée.
+    // partirait vers de vrais destinataires (le public est résolu sans
+    // cloisonnement quand le mode est allumé) avec un texte écrit pour une
+    // séance de démonstration. Elle reste DANS L'ÉTAT OÙ elle est, programmée
+    // ou en cours d'envoi, et sera reprise si le mode se rallume : c'est le
+    // comportement d'une ligne masquée, pas supprimée. Une ligne en cours
+    // d'envoi ne « redevient » pas programmée pour autant, c'est son bail
+    // expiré qui la rendra prenable.
     const due = await this.prisma.notification.findMany({
       where: {
         OR: claimable,

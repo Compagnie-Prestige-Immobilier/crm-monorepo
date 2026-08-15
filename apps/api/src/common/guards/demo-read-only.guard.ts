@@ -2,7 +2,7 @@ import { CanActivate, ConflictException, ExecutionContext, Injectable } from '@n
 import { Reflector } from '@nestjs/core';
 
 import { DEMO_WRITABLE_KEY } from '../decorators/demo-writable.decorator.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { DemoVisibilityService, demoStateUnknown } from '../../prisma/demo-visibility.service.js';
 
 /**
  * Pendant une démonstration, la plateforme est en LECTURE SEULE.
@@ -122,7 +122,22 @@ export class DemoReadOnlyGuard implements CanActivate {
     // échoue quand la base est en difficulté, et l'écriture qu'on refuse ici
     // aurait de toute façon échoué une couche plus bas, avec un message bien
     // moins clair.
-    if ((await this.demo.state()) === 'off') return true;
+    const state = await this.demo.state();
+    if (state === 'off') return true;
+
+    // ═══ REFUSER DANS LE DOUTE NE VEUT PAS DIRE MENTIR SUR LA CAUSE ═══
+    //
+    // Les deux états refusés ne décrivent pas la même situation, et le même
+    // refus les confondait. `DEMO_MODE_READ_ONLY` affirme qu'une démonstration
+    // est en cours et invite à demander à un administrateur de l'éteindre ;
+    // servi sur une simple panne de lecture du réglage, mode ÉTEINT, il envoie
+    // TOUS les utilisateurs qui écrivent vers un administrateur qui regarde son
+    // écran et voit le mode éteint. Personne ne peut agir sur la phrase reçue.
+    //
+    // `demoStateUnknown()` existe pour cela, avec un message qui nomme la vraie
+    // cause et invite à réessayer, et un code distinct sur lequel un opérateur
+    // branche son journal.
+    if (state === 'unknown') throw demoStateUnknown();
 
     // 409 et non 403 : le rôle de l'appelant n'est pas en cause, c'est l'ÉTAT
     // de la plateforme qui l'est, et il changera. Un 403 ferait croire à un

@@ -17,13 +17,22 @@ import type { Prisma } from '@crm/database';
  * l'efface, et personne ne comprend pourquoi la fiche a disparu. Une donnée
  * réelle perdue ne se retrouve pas.
  *
- * `sequence` fixe l'ordre de création ; la suppression le parcourt à l'envers,
- * ce qui satisfait les clés étrangères sans coder de tri topologique.
+ * `sequence` fixe l'ordre de création. Ce qui satisfait les clés étrangères à
+ * la suppression, en revanche, n'est PAS elle mais l'ordre des TYPES ci-dessous,
+ * parcouru à l'envers : la séquence n'est fiable que pour les lignes semées
+ * d'un coup, alors que le registre est aussi alimenté par la remontée hors
+ * ligne, où un rattachement peut donner à un enfant un rang inférieur à son
+ * parent. Voir `DemoService.purge`.
  */
 
 /**
  * Types d'entités traçables. L'ordre de cette liste EST l'ordre de création :
  * un parent précède toujours ses enfants.
+ *
+ * C'EST LUI QUI ORDONNE LA SUPPRESSION, à l'envers. La propriété est
+ * vérifiable sur le schéma : aucune clé étrangère d'un type de cette liste ne
+ * pointe vers un type qui le suit. Insérer un type au mauvais rang casse la
+ * purge, pas la compilation : le placer juste après le type qu'il référence.
  */
 export const DEMO_ENTITY_TYPES = [
   'user',

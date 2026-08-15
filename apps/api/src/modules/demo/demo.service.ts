@@ -115,27 +115,31 @@ export class DemoService {
     const alreadySeeded = await this.prisma.demoEntity.count();
     if (alreadySeeded > 0) {
       // Le jeu existe : on se contente d'allumer. Aucune écriture de données.
-      await this.prisma.$transaction(async (tx) => {
-        await this.setSetting(tx, DEMO_MODE_SETTING, 'true', adminId);
-      });
+      await this.afterCommit(
+        this.prisma.$transaction(async (tx) => {
+          await this.setSetting(tx, DEMO_MODE_SETTING, 'true', adminId);
+        }),
+      );
       this.logger.log('Mode démonstration allumé (jeu déjà en place).');
       return this.status();
     }
 
     const registry = new DemoRegistry();
-    await this.prisma.$transaction(
-      async (tx) => {
-        await seedDemoData(tx, registry);
+    await this.afterCommit(
+      this.prisma.$transaction(
+        async (tx) => {
+          await seedDemoData(tx, registry);
 
-        // Le registre est écrit DANS la même transaction que les données. Il ne
-        // sert plus à la bascule, c'est la colonne `isDemo` qui porte la
-        // visibilité, mais il reste l'inventaire exact de ce qui a été créé,
-        // et donc la seule base sûre d'une suppression définitive.
-        await tx.demoEntity.createMany({ data: registry.toRows() });
-        await this.setSetting(tx, DEMO_MODE_SETTING, 'true', adminId);
-        await this.setSetting(tx, DEMO_SEEDED_AT_SETTING, new Date().toISOString(), adminId);
-      },
-      { timeout: DEMO_TRANSACTION_TIMEOUT_MS },
+          // Le registre est écrit DANS la même transaction que les données. Il
+          // ne sert plus à la bascule, c'est la colonne `isDemo` qui porte la
+          // visibilité, mais il reste l'inventaire exact de ce qui a été créé,
+          // et donc la seule base sûre d'une suppression définitive.
+          await tx.demoEntity.createMany({ data: registry.toRows() });
+          await this.setSetting(tx, DEMO_MODE_SETTING, 'true', adminId);
+          await this.setSetting(tx, DEMO_SEEDED_AT_SETTING, new Date().toISOString(), adminId);
+        },
+        { timeout: DEMO_TRANSACTION_TIMEOUT_MS },
+      ),
     );
 
     this.logger.log(`Mode démonstration semé et allumé : ${String(registry.size)} entités.`);
@@ -158,9 +162,11 @@ export class DemoService {
    * simplement masquer la démonstration efface les données.
    */
   async disable(adminId: string): Promise<DemoStatusDto> {
-    await this.prisma.$transaction(async (tx) => {
-      await this.setSetting(tx, DEMO_MODE_SETTING, 'false', adminId);
-    });
+    await this.afterCommit(
+      this.prisma.$transaction(async (tx) => {
+        await this.setSetting(tx, DEMO_MODE_SETTING, 'false', adminId);
+      }),
+    );
     this.logger.log('Mode démonstration éteint, aucune donnée supprimée.');
     return this.status();
   }
@@ -183,36 +189,71 @@ export class DemoService {
     });
 
     if (entries.length === 0) {
-      await this.prisma.$transaction(async (tx) => {
-        await this.setSetting(tx, DEMO_MODE_SETTING, 'false', adminId);
-      });
+      await this.afterCommit(
+        this.prisma.$transaction(async (tx) => {
+          await this.setSetting(tx, DEMO_MODE_SETTING, 'false', adminId);
+        }),
+      );
       return this.status();
     }
 
-    // Regroupé par type EN CONSERVANT l'ordre décroissant de séquence : les
-    // enfants partent avant leurs parents, ce qui satisfait les clés étrangères
-    // sans avoir à connaître le graphe des dépendances.
-    const groups: { type: DemoEntityType; ids: string[] }[] = [];
+    // ═══════════════════════════════════════════════════════════════════════
+    // L'ORDRE DE SUPPRESSION SUIT LES TYPES, PAS LES SÉQUENCES
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Le regroupement se faisait sur la séquence décroissante, en découpant la
+    // liste à chaque changement de type. Cela suppose que la séquence d'une
+    // ligne est TOUJOURS supérieure à celle de son parent, et cette invariante
+    // ne tient pas : le registre est aussi alimenté hors ensemenceur, par la
+    // remontée hors ligne, et une ligne DÉJÀ inscrite n'y est jamais
+    // re-numérotée (`recordDemoEntity` ne fait rien sur conflit). Il suffit
+    // donc qu'un animateur crée un prospect, puis un second représentant, puis
+    // rattache le prospect à ce représentant-là : le prospect porte un rang
+    // INFÉRIEUR à son nouveau parent, la purge tente de supprimer le
+    // représentant en premier, `Prospect.representantId` est en
+    // `onDelete: Restrict`, et la transaction entière échoue. Le jeu de
+    // démonstration devient indéboulonnable, ce que la purge existe précisément
+    // pour empêcher.
+    //
+    // Re-numéroter à chaque rattachement ne réparerait rien : hisser un
+    // prospect au sommet le ferait passer AVANT ses propres enfants (une tâche
+    // d'appel, un dossier bancaire semés) et casserait la purge dans l'autre
+    // sens. L'ordre correct n'est pas chronologique, il est structurel.
+    //
+    // `DEMO_ENTITY_TYPES` le porte déjà : sa doc dit qu'un parent y précède
+    // toujours ses enfants, et c'est vérifiable sur le schéma, aucune clé
+    // étrangère ne remonte cette liste. La parcourir à l'envers donne donc un
+    // ordre de suppression valide QUELLES QUE SOIENT les séquences. Celles-ci
+    // ne servent plus qu'à départager deux lignes du même type, où aucune clé
+    // étrangère ne les relie.
+    const byType = new Map<DemoEntityType, string[]>();
     for (const entry of entries) {
       const type = entry.entityType as DemoEntityType;
-      const last = groups.at(-1);
-      if (last && last.type === type) last.ids.push(entry.entityId);
-      else groups.push({ type, ids: [entry.entityId] });
+      if (!DEMO_ENTITY_TYPES.includes(type)) {
+        throw new Error(`Type d’entité de démonstration inconnu : ${type}`);
+      }
+      const bucket = byType.get(type);
+      if (bucket) bucket.push(entry.entityId);
+      else byType.set(type, [entry.entityId]);
     }
 
-    await this.prisma.$transaction(
-      async (tx) => {
-        for (const group of groups) {
-          if (!DEMO_ENTITY_TYPES.includes(group.type)) {
-            throw new Error(`Type d’entité de démonstration inconnu : ${group.type}`);
+    const groups = [...DEMO_ENTITY_TYPES]
+      .reverse()
+      .map((type) => ({ type, ids: byType.get(type) ?? [] }))
+      .filter((group) => group.ids.length > 0);
+
+    await this.afterCommit(
+      this.prisma.$transaction(
+        async (tx) => {
+          for (const group of groups) {
+            await DEMO_DELETERS[group.type](tx, group.ids);
           }
-          await DEMO_DELETERS[group.type](tx, group.ids);
-        }
-        await tx.demoEntity.deleteMany({});
-        await this.setSetting(tx, DEMO_MODE_SETTING, 'false', adminId);
-        await this.setSetting(tx, DEMO_SEEDED_AT_SETTING, '', adminId);
-      },
-      { timeout: DEMO_TRANSACTION_TIMEOUT_MS },
+          await tx.demoEntity.deleteMany({});
+          await this.setSetting(tx, DEMO_MODE_SETTING, 'false', adminId);
+          await this.setSetting(tx, DEMO_SEEDED_AT_SETTING, '', adminId);
+        },
+        { timeout: DEMO_TRANSACTION_TIMEOUT_MS },
+      ),
     );
 
     this.logger.log(`Jeu de démonstration supprimé : ${String(entries.length)} entités.`);
@@ -245,6 +286,43 @@ export class DemoService {
     // méthodes ont sept points de retour à elles trois, et il suffirait d'en
     // oublier un pour qu'un administrateur bascule l'interrupteur sans que
     // l'écran change, le pire symptôme possible pour un interrupteur.
+    //
+    // CE VIDAGE-CI NE SUFFIT PAS À LUI SEUL, et `afterCommit` le complète : il
+    // a lieu AVANT le commit, donc pendant que la base rend encore l'ancienne
+    // valeur. Voir le doc-bloc d'`afterCommit`.
     this.visibility.invalidate();
+  }
+
+  /**
+   * Vide le cache de visibilité UNE SECONDE FOIS, après le commit.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * POURQUOI UN SEUL VIDAGE NE SUFFIT PAS
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `setSetting` s'exécute DANS la transaction : quand il vide le cache, la
+   * nouvelle valeur n'est visible que de cette transaction-là. Toute lecture
+   * concurrente (`state()`, donc chaque écriture jugée par `DemoReadOnlyGuard`
+   * et chaque émission de jeton) part alors en base, y lit l'ANCIENNE valeur,
+   * et la met en cache pour la durée pleine du TTL. Plus rien ensuite ne
+   * l'invalide : la bascule est déjà passée.
+   *
+   * Le symptôme est borné à deux secondes, mais il porte sur la garde
+   * d'écriture et sur la connexion : après avoir éteint la démonstration, des
+   * comptes fictifs pouvaient encore obtenir un jeton, et le doc de
+   * `DemoVisibilityService` affirmait l'inverse (« `invalidate()` supprime même
+   * ce délai sur l'instance qui a traité la bascule »).
+   *
+   * `finally` et non `then` : une transaction annulée peut avoir laissé un
+   * appelant concurrent mettre en cache une valeur lue en cours de route, et
+   * repartir d'un cache vide est de toute façon correct, seulement un peu plus
+   * coûteux.
+   */
+  private async afterCommit<T>(work: Promise<T>): Promise<T> {
+    try {
+      return await work;
+    } finally {
+      this.visibility.invalidate();
+    }
   }
 }

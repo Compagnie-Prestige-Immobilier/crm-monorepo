@@ -263,6 +263,34 @@ export class FakePrisma {
    */
   clock: () => Date = () => new Date();
 
+  /**
+   * PANNES INJECTÉES, par délégué et par méthode.
+   *
+   * ═══ POURQUOI LA DOUBLURE DOIT SAVOIR TOMBER ═══
+   *
+   * Une doublure qui répond toujours n'exerce qu'une moitié du service : celle
+   * où la base tient. L'autre moitié, le `catch` qui rattrape une lecture
+   * interrompue, restait donc entièrement non couverte, et un défaut y a vécu
+   * jusqu'à la quatrième relecture (voir `sendByEmail`) : un délai d'attente
+   * du pool sur la lecture des comptes refermait l'envoi sur SENT sans qu'un
+   * seul e-mail soit parti. Un transport qui lève ne le reproduisait pas, il
+   * échoue APRÈS la lecture des comptes.
+   *
+   * La clé est `délégué.méthode`, la valeur l'erreur à rejeter.
+   */
+  readonly faults = new Map<string, Error>();
+
+  /** Arme une panne sur un appel précis. Elle vaut pour tous les suivants. */
+  breakOn(operation: 'user.findMany' | 'notificationDelivery.updateMany', error: Error): void {
+    this.faults.set(operation, error);
+  }
+
+  /** Rend la panne armée, ou `null`. Les délégués s'en servent en première ligne. */
+  private fault(operation: string): Promise<never> | null {
+    const armed = this.faults.get(operation);
+    return armed ? Promise.reject(armed) : null;
+  }
+
   readonly users: UserRow[] = [ADMIN];
   readonly notifications: NotificationRow[] = [];
   readonly deliveries: DeliveryRow[] = [];
@@ -332,6 +360,7 @@ export class FakePrisma {
   get user() {
     return {
       findMany: (args: { where?: Record<string, unknown> }) =>
+        this.fault('user.findMany') ??
         Promise.resolve(
           this.users.filter((row) =>
             matches(row as unknown as Record<string, unknown>, args.where, this),
@@ -527,6 +556,8 @@ export class FakePrisma {
       },
 
       updateMany: (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        const armed = this.fault('notificationDelivery.updateMany');
+        if (armed) return armed;
         const rows = this.deliveries.filter((row) =>
           matches(row as unknown as Record<string, unknown>, args.where, this),
         );
@@ -662,11 +693,25 @@ export class FakeBrevoTransport implements BrevoTransport {
       });
     }
     this.sent.push(...messages);
+    const outcomes = messages.flatMap((message) =>
+      message.recipients.map((recipient) => this.outcomeFor(recipient.email)),
+    );
+
+    // ═══ LA MÊME RÈGLE D'ÉTAT QUE LE VRAI TRANSPORT ═══
+    //
+    // `BrevoHttpTransport` annonce `TRANSPORT_ERROR` dès que rien n'est passé
+    // alors qu'un appel a été tenté (`attempted > 0 && delivered === 0`), quelle
+    // que soit la NATURE des refus. La doublure rendait `SENT` sans condition :
+    // le service ne voyait donc jamais l'état que produit le cas le plus
+    // banal du produit, un public de moins de cent adresses refusé en bloc sur
+    // une clé invalide. Le défaut correspondant a survécu à toute la suite.
+    const delivered = outcomes.filter((outcome) => outcome.ok).length;
+    const failed = outcomes.find((outcome) => !outcome.ok);
+
     return Promise.resolve({
-      status: 'SENT',
-      outcomes: messages.flatMap((message) =>
-        message.recipients.map((recipient) => this.outcomeFor(recipient.email)),
-      ),
+      status: outcomes.length > 0 && delivered === 0 ? 'TRANSPORT_ERROR' : 'SENT',
+      outcomes,
+      ...(delivered === 0 && failed?.errorCode !== undefined ? { detail: failed.errorCode } : {}),
     });
   }
 
