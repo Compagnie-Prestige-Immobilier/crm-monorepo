@@ -623,17 +623,120 @@ describe('absence de clé Brevo', () => {
     db.addUser({ id: 'usr-1', role: Role.COMMERCIAL, email: 'un@cpi.sn' });
   });
 
-  it('stocke et met en file au lieu de planter', async () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * CE TEST AFFIRMAIT `SENT`, ET IL ENCODAIT UN DÉFAUT COMME UN CONTRAT
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Sans clé, la branche e-mail ne rendait aucun verdict, `retryable` restait à
+   * zéro, et `settleNotification` écrivait SENT. La plateforme affirmait donc
+   * avoir envoyé un e-mail qu'elle n'avait même pas tenté, sur une ligne restée
+   * `PENDING` et sans marqueur. Et comme `dispatchDue` ne reprend JAMAIS une
+   * notification SENT, brancher une clé le lendemain ne rattrapait rien : ces
+   * e-mails-là n'existaient plus pour personne.
+   *
+   * LE CONTRAT VOULU : un téléconseiller joignable qu'on n'a pas pu servir
+   * RETIENT la notification en SENDING. C'est le bail, mécanisme déjà en place,
+   * qui la fera reprendre, et le jour où une clé est branchée l'e-mail part.
+   */
+  it('RETIENT l’envoi en SENDING : l’e-mail n’a pas été tenté, il est encore dû', async () => {
     const created = await service.create(admin, {
       ...baseBody,
       audience: NotificationAudience.USERS,
       audienceUserIds: ['usr-1'],
     });
 
-    expect(created.status).toBe(NotificationStatus.SENT);
+    expect(created.status).toBe(NotificationStatus.SENDING);
     expect(created.transportStatus).toBe('NOT_CONFIGURED');
     expect(created.counts.pending).toBe(1);
     expect(created.counts.sent).toBe(0);
+
+    // Et la ligne ne porte AUCUN marqueur : elle n'est ni « boîte de réception
+    // seule » (ce serait faux d'un téléconseiller joignable) ni en réessai
+    // après échec (rien n'a été tenté).
+    expect(db.deliveries[0]?.error).toBeNull();
+  });
+
+  /**
+   * LA CONTRE-ÉPREUVE, et elle est indispensable : retenir TOUT en SENDING
+   * ferait passer le test ci-dessus en cassant le cas le plus courant du
+   * produit. Un destinataire qui n'est pas servi par e-mail n'attend rien, clé
+   * ou pas : sa nature se lit en base, pas sur la présence d'une clé Brevo.
+   */
+  it('referme l’envoi sur SENT quand PERSONNE n’est servi par e-mail', async () => {
+    db.addUser({ id: 'usr-banque', role: Role.BANQUE_FINANCE, email: 'banque@cpi.sn' });
+
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-banque'],
+    });
+
+    expect(created.status).toBe(NotificationStatus.SENT);
+    expect(created.transportStatus).toBe('NOT_CONFIGURED');
+    expect(db.deliveries[0]?.error).toBe(DELIVERY_INBOX_ONLY);
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LE RÉESSAI D'UN AUTRE PASSAGE NE DOIT PAS ÊTRE ENTERRÉ PAR CELUI-CI
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `settleNotification` recevait un `retryable` compté par l'expédition qui
+   * l'appelle. Ce chiffre ne décrit QUE ce passage-là, et deux passages
+   * peuvent se chevaucher : l'un persiste `EMAIL_RETRY`, l'autre, qui n'a rien
+   * jugé, referme la notification sur SENT par-dessus. La livraison reste
+   * `PENDING` avec son marqueur, et `dispatchDue` ne revient JAMAIS sur une
+   * SENT : le réessai est perdu pour de bon.
+   *
+   * Ci-dessous, le premier passage laisse un vrai `EMAIL_RETRY` (transport en
+   * panne), et le second ne juge personne. C'est l'état des LIVRAISONS, et non
+   * le compteur du second passage, qui doit décider.
+   */
+  it('ne referme pas sur SENT tant qu’une livraison porte le marqueur de réessai', async () => {
+    service = new NotificationsService(
+      db.asService(),
+      fakeDemoVisibility(),
+      new BrokenBrevoTransport(),
+    );
+
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1'],
+    });
+    expect(db.deliveries[0]?.error).toBe(DELIVERY_RETRY_ERROR);
+    expect(created.status).toBe(NotificationStatus.SENDING);
+
+    // Second passage, qui ne juge personne : la clé a disparu entre-temps.
+    service = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
+    await service.dispatch(created.id);
+
+    const detail = await service.get(created.id);
+    expect(detail.notification.status).toBe(NotificationStatus.SENDING);
+    expect(db.deliveries[0]?.status).toBe(NotificationDeliveryStatus.PENDING);
+  });
+
+  /**
+   * LA PROPRIÉTÉ QUI DONNE SON SENS À LA PRÉCÉDENTE : la clé branchée plus
+   * tard, l'e-mail part. C'est exactement ce que l'ancien `SENT` rendait
+   * impossible, et aucun test ne le disait.
+   */
+  it('l’e-mail part dès qu’une clé est branchée, sur la MÊME notification', async () => {
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1'],
+    });
+    expect(brevo.sent).toHaveLength(0);
+
+    brevo.configured = true;
+    await service.dispatch(created.id);
+
+    expect(brevo.allAddresses).toEqual(['un@cpi.sn']);
+    const detail = await service.get(created.id);
+    expect(detail.notification.status).toBe(NotificationStatus.SENT);
+    expect(detail.notification.counts.sent).toBe(1);
   });
 
   it('la boîte de réception fonctionne quand même, c’est le point du mode dégradé', async () => {
