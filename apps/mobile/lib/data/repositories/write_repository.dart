@@ -65,6 +65,39 @@ class DiscardResult {
   final int removed;
 }
 
+/// Ce qu'un [WriteRepository.discardOperation] emporterait, compté sans rien
+/// supprimer.
+///
+/// ═══ POURQUOI CE COMPTE N'EST PAS REFAIT DANS L'ÉCRAN ═══
+///
+/// La boîte de confirmation comptait sa cascade en filtrant la liste
+/// « À corriger », qui ne contient que les statuts `conflict` et `failed`. Or
+/// [WriteRepository.discardOperation] prend ses victimes dans
+/// [OutboxStatus.open], qui contient en plus `pending` et `syncing` : et c'est
+/// précisément là que se trouvent les prospects d'un représentant refusé. Le
+/// serveur répond `invalid` sur la tête, qui part en `failed`, et
+/// `skippedDependencyFailed` sur chacun de ses prospects, que
+/// `SyncEngine._requeueBlocked` remet en `pending`. Aucun d'eux n'était donc
+/// visible du compte, et un représentant portant vingt prospects annonçait
+/// « cette saisie » avant d'en détruire vingt-et-une.
+///
+/// Deux prédicats qui doivent décrire le même ensemble et vivent dans deux
+/// fichiers divergent au premier correctif appliqué à un seul des deux. Le
+/// compte est donc fait **ici**, par le même code que la suppression
+/// ([WriteRepository._discardVictims]), et l'écran ne fait plus que rendre la
+/// phrase.
+class DiscardPreview {
+  const DiscardPreview({required this.operations, required this.prospects});
+
+  /// Nombre de lignes d'outbox qui seront retirées, tête comprise.
+  final int operations;
+
+  /// Nombre de fiches prospect qui disparaîtront de la base avec elles. Ce
+  /// sont des saisies à ressaisir : c'est le nombre que l'utilisateur doit
+  /// lire avant de confirmer, pas le nombre d'opérations, qui ne lui dit rien.
+  final int prospects;
+}
+
 /// Une réservation d'envoi est apparue entre la lecture et l'écriture.
 ///
 /// Levée pour **annuler la transaction** : c'est le seul moyen, en drift, de
@@ -865,11 +898,22 @@ class WriteRepository {
   /// la transaction ([_ClaimRace]) au lieu de supposer que le `DELETE` a frappé
   /// la ligne qu'on avait sous les yeux.
   ///
-  /// **Le type d'entité, lui, n'est volontairement pas contraint.** Dans
-  /// [discardOperation] il décide de la cascade ; ici il n'y a pas de cascade,
-  /// donc il ne décide de rien. Ce qui protège l'utilisateur est que
-  /// l'opération soit une création : une création abandonnée ne perd aucune
-  /// donnée qu'il faudrait ressaisir, puisque la fiche existe déjà côté serveur.
+  /// **Le type d'entité est contraint lui aussi, à `representant`.** Il ne
+  /// l'était pas, au motif qu'ici il n'y a pas de cascade dont il déciderait, et
+  /// que « la fiche existe déjà côté serveur » : mais cette dernière phrase
+  /// n'est vraie que du seul appelant, qui vient de retrouver la fiche par
+  /// `lookupRepresentantByPhone`. Elle n'est vraie d'aucun prospect. Passé le
+  /// `id` d'une création de prospect, cette méthode retirait la ligne d'outbox
+  /// et laissait la ligne `prospects` derrière elle : les deux vues de synchro
+  /// dérivent `sync_status` de la présence d'une opération, donc la fiche
+  /// s'affichait **réglée** alors qu'elle n'a jamais quitté le téléphone, et
+  /// plus rien dans l'app ne pouvait la faire partir. Le défaut était latent,
+  /// pas vivant : le seul appelant passe une création de représentant. On ferme
+  /// la porte plutôt que de compter sur le fait que personne ne la pousse.
+  ///
+  /// La contrainte est posée **et reposée dans le `WHERE`**, comme les deux
+  /// autres, pour la même raison : une condition lue en Dart puis absente de la
+  /// suppression ne contraint rien.
   ///
   /// **Un refus est rendu, jamais silencieux**, et c'est ce qui distingue les
   /// deux façons de ne rien supprimer :
@@ -879,7 +923,8 @@ class WriteRepository {
   /// * [DiscardOutcome.notFound] : il n'y a plus rien à abandonner sous cet
   ///   `id`, soit qu'un autre chemin l'ait déjà retiré, soit qu'une correction
   ///   l'ait réécrit sous un `id` neuf ([_amendInPlace]), soit que la ligne ne
-  ///   soit pas une création. Pour l'appelant, c'est un succès : le but est que
+  ///   soit pas une création de représentant. Pour l'appelant, c'est un succès :
+  ///   le but est que
   ///   la création ne parte pas, et elle ne partira pas.
   ///
   /// **Ce que ce verrou ne couvre pas** est ce que [_isClaimed] documente :
@@ -893,9 +938,12 @@ class WriteRepository {
         final OutboxData? row = await (_db.select(
           _db.outbox,
         )..where((Outbox o) => o.id.equals(opId))).getSingleOrNull();
-        // Une ligne qui n'est pas une création n'est pas de notre ressort : on
-        // ne la supprime pas, et on ne prétend pas l'avoir fait.
-        if (row == null || row.op != 'create') {
+        // Une ligne qui n'est pas une création de représentant n'est pas de
+        // notre ressort : on ne la supprime pas, et on ne prétend pas l'avoir
+        // fait.
+        if (row == null ||
+            row.op != 'create' ||
+            row.entityType != 'representant') {
           return const DiscardResult(DiscardOutcome.notFound);
         }
         if (_isClaimed(row)) return const DiscardResult(DiscardOutcome.claimed);
@@ -903,7 +951,10 @@ class WriteRepository {
         final int removed =
             await (_db.delete(_db.outbox)..where(
                   (Outbox o) =>
-                      o.id.equals(opId) & o.op.equals('create') & _unclaimed(o),
+                      o.id.equals(opId) &
+                      o.op.equals('create') &
+                      o.entityType.equals('representant') &
+                      _unclaimed(o),
                 ))
                 .go();
         if (removed != 1) {
@@ -965,28 +1016,7 @@ class WriteRepository {
         if (row == null) return const DiscardResult(DiscardOutcome.notFound);
         if (_isClaimed(row)) return const DiscardResult(DiscardOutcome.claimed);
 
-        // La cascade ne vaut QUE pour la création du représentant, tête de la
-        // clé de dépendance. Abandonner cette création-là condamne tout ce qui
-        // en dépend : sans la cascade, les prospects partiraient vers un parent
-        // qui n'existera jamais côté serveur.
-        //
-        // Un prospect abandonné, lui, ne retire que lui-même : ses frères ont
-        // leur propre existence et le même parent, encore valide.
-        final List<OutboxData> victims;
-        if (row.op == 'create' &&
-            row.entityType == 'representant' &&
-            row.dependencyKey != null) {
-          victims =
-              await (_db.select(_db.outbox)..where(
-                    (Outbox o) =>
-                        o.dependencyKey.equals(row.dependencyKey!) &
-                        o.seq.isBiggerOrEqualValue(row.seq) &
-                        o.status.isIn(OutboxStatus.open),
-                  ))
-                  .get();
-        } else {
-          victims = <OutboxData>[row];
-        }
+        final List<OutboxData> victims = await _discardVictims(row);
         if (victims.any(_isClaimed)) {
           return const DiscardResult(DiscardOutcome.claimed);
         }
@@ -1038,5 +1068,58 @@ class WriteRepository {
     } on _ClaimRace {
       return const DiscardResult(DiscardOutcome.claimed);
     }
+  }
+
+  /// Les lignes qu'un abandon de [row] emporterait.
+  ///
+  /// La cascade ne vaut QUE pour la création du représentant, tête de la clé de
+  /// dépendance. Abandonner cette création-là condamne tout ce qui en dépend :
+  /// sans la cascade, les prospects partiraient vers un parent qui n'existera
+  /// jamais côté serveur.
+  ///
+  /// Un prospect abandonné, lui, ne retire que lui-même : ses frères ont leur
+  /// propre existence et le même parent, encore valide.
+  ///
+  /// **Extrait pour que [previewDiscard] compte exactement ce que
+  /// [discardOperation] supprime.** Tant que les deux passent par ici, la
+  /// phrase annoncée à l'utilisateur ne peut plus décrire un autre ensemble
+  /// que celui qui disparaît.
+  Future<List<OutboxData>> _discardVictims(OutboxData row) async {
+    if (row.op != 'create' ||
+        row.entityType != 'representant' ||
+        row.dependencyKey == null) {
+      return <OutboxData>[row];
+    }
+    return (_db.select(_db.outbox)..where(
+          (Outbox o) =>
+              o.dependencyKey.equals(row.dependencyKey!) &
+              o.seq.isBiggerOrEqualValue(row.seq) &
+              o.status.isIn(OutboxStatus.open),
+        ))
+        .get();
+  }
+
+  /// Ce qu'un [discardOperation] sur `seq` détruirait, **sans rien détruire**.
+  ///
+  /// Sert la boîte de confirmation : voir [DiscardPreview] pour ce que le
+  /// compte fait depuis l'écran ratait. Un `seq` inconnu rend un compte nul :
+  /// il n'y a rien à annoncer, et l'abandon rendra `notFound`.
+  Future<DiscardPreview> previewDiscard(int seq) async {
+    final OutboxData? row = await (_db.select(
+      _db.outbox,
+    )..where((Outbox o) => o.seq.equals(seq))).getSingleOrNull();
+    if (row == null) {
+      return const DiscardPreview(operations: 0, prospects: 0);
+    }
+    final List<OutboxData> victims = await _discardVictims(row);
+    // Seules les créations de prospect emportent une fiche métier : c'est ce
+    // que `discardOperation` supprime dans `prospects`. Une modification ou une
+    // suppression en file ne fait perdre que l'intention, pas la saisie.
+    final int prospects = victims
+        .where(
+          (OutboxData v) => v.op == 'create' && v.entityType == 'prospect',
+        )
+        .length;
+    return DiscardPreview(operations: victims.length, prospects: prospects);
   }
 }

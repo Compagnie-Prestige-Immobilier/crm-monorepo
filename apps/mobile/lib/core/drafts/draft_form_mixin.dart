@@ -132,6 +132,26 @@ mixin DraftFormMixin<T extends StatefulWidget> on State<T> {
   /// supprimé le brouillon, le réécrire le ferait réapparaître.
   void discardDraft() => _debouncer?.discard();
 
+  /// ═══ CE QUI FAIT TENIR L'ÉCRITURE DÉCLENCHÉE PAR `dispose()` ═══
+  ///
+  /// `dispose()` vide le debouncer, qui appelle ceci, qui est asynchrone : le
+  /// `await` rend la main **après** que l'écran a été démonté. Ce qui sauve la
+  /// saisie tient à trois faits, et à aucune garantie explicite :
+  ///
+  /// * tout ce qui lit l'état du widget est évalué **avant** le premier
+  ///   `await` : le test `mounted`, `collectDraftValues()`, `draftEntityId`,
+  ///   `draftParentId`, et le `ref.read` du dépôt. Au moment de cette
+  ///   évaluation, `super.dispose()` n'a pas encore été appelé : c'est la
+  ///   dernière ligne de `dispose()`, et le vidage est la troisième ;
+  /// * lire la `value` d'un `TextEditingController` déjà disposé ne lève pas :
+  ///   `ValueNotifier` n'a pas d'assertion de disposition sur son accesseur ;
+  /// * l'écriture elle-même ne touche plus au widget : c'est du drift pur.
+  ///
+  /// **Ne jamais insérer de `await` avant la collecte.** Et si une version de
+  /// Flutter ajoute un jour cette assertion à `ValueNotifier.value`, ce chemin
+  /// devient une perte silencieuse de brouillon à chaque appui sur « retour » :
+  /// la parade serait de collecter les valeurs dans `dispose()` et de les
+  /// passer ici, pas de rattraper l'exception.
   Future<void> _persist() async {
     if (!mounted || draftIsEmpty) return;
     await draftRepository.save(
