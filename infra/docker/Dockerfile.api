@@ -14,6 +14,15 @@ ARG NODE_VERSION=24.18.0
 ARG PNPM_VERSION=11.15.1
 ARG TURBO_VERSION=2.10.5
 ARG PRISMA_VERSION=7.9.0
+# Version MAJEURE de pg_dump, dans l'image finale uniquement.
+#
+# Elle doit correspondre à celle du serveur (`postgres:18.4` dans
+# docker-compose.prod.yml comme dans infra/dokploy/deploy.py). Ce n'est pas une
+# précaution de style : pg_dump REFUSE de travailler contre un serveur plus
+# récent que lui (« aborting because of server version mismatch »), et Debian 12
+# ne fournit d'origine que la 15. Sans dépôt PGDG et sans cet épinglage,
+# l'export intégral échouerait à chaque tentative, en production seulement.
+ARG PG_MAJOR=18
 
 # -----------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-bookworm-slim AS base
@@ -93,9 +102,34 @@ CMD ["pnpm", "exec", "prisma", "migrate", "deploy"]
 # Image finale.
 # -----------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-bookworm-slim AS runner
+ARG PG_MAJOR
 ENV NODE_ENV=production \
     PORT=3001
 WORKDIR /repo
+
+# pg_dump, et RIEN d'autre du côté client PostgreSQL.
+#
+# `postgresql-client-${PG_MAJOR}` et non `postgresql-client` : le méta-paquet
+# tirerait la version par défaut de la distribution (15 sur Bookworm), qui
+# refuserait de dumper un serveur 18.
+#
+# Le dépôt PGDG est ajouté puis RETIRÉ, avec sa clé et les listes d'index : il
+# n'a servi qu'à cette installation, et le laisser ferait qu'un futur
+# `apt upgrade` dans cette image ramène silencieusement une autre majeure.
+# `--no-install-recommends` écarte au passage la documentation et les greffons
+# qui n'ont rien à faire ici. Le coût net est d'environ 30 Mo.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+       | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+       > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-${PG_MAJOR} \
+    && apt-get purge -y --auto-remove curl gnupg \
+    && rm -f /etc/apt/sources.list.d/pgdg.list /usr/share/keyrings/pgdg.gpg \
+    && rm -rf /var/lib/apt/lists/* \
+    && pg_dump --version
 
 # Utilisateur non root. L'image node fournit déjà `node` (uid 1000) : on ne
 # crée rien, on cesse simplement d'être root.
@@ -121,7 +155,13 @@ RUN chmod +x /usr/local/bin/api-entrypoint.sh
 # The APK volume is mounted over this directory in production. Creating it with
 # the runtime user's ownership lets Docker initialize a new named volume with
 # permissions that the non-root API can write to.
-RUN mkdir -p /repo/storage/releases && chown -R node:node /repo/storage
+#
+# storage/db-dumps suit exactement la même règle, et pour la même raison : les
+# exports intégraux vivent sur un volume, hors de l'image, sans quoi un
+# redéploiement laisserait un état qui annonce un fichier disparu. Le contenu,
+# lui, ne dure PAS : il est détruit dès le téléchargement, et de toute façon à
+# son échéance (voir modules/db-dump/db-dump.job.ts).
+RUN mkdir -p /repo/storage/releases /repo/storage/db-dumps && chown -R node:node /repo/storage
 
 USER node
 EXPOSE 3001

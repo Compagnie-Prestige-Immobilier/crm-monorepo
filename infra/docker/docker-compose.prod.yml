@@ -98,6 +98,10 @@ services:
       API_DOCS_ENABLED: 'false'
       # Les APK publiés depuis le panel doivent survivre à une nouvelle image.
       APK_RELEASE_DIR: /repo/storage/releases
+      # Exports intégraux de la base. Même motif que ci-dessus : le fichier vit
+      # hors de l'image, sinon un redéploiement laisserait un état qui annonce
+      # un fichier disparu. Il est détruit dès son téléchargement.
+      DB_DUMP_DIR: /repo/storage/db-dumps
       # Caddy est en amont et réécrit X-Forwarded-For, donc l'en-tête est
       # digne de confiance ici, et il le faut, sinon toutes les requêtes
       # paraissent venir de l'IP de Caddy et le throttler devient global.
@@ -126,6 +130,7 @@ services:
     networks: [cpi-go]
     volumes:
       - apk-releases:/repo/storage/releases
+      - db-dumps:/repo/storage/db-dumps
     logging: *logging
 
   web:
@@ -215,6 +220,7 @@ services:
 volumes:
   pgdata:
   apk-releases:
+  db-dumps:
   caddy-data:
   caddy-config:
 

@@ -93,6 +93,12 @@ export const envSchema = z
     APK_RELEASE_DIR: z.string().min(1).default('./storage/releases'),
     APK_MAX_SIZE_BYTES: z.coerce.number().int().positive().max(1_073_741_824).default(524_288_000),
 
+    // Export intégral de la base, servi depuis un volume persistant, EXACTEMENT
+    // comme les APK ci-dessus et pour la même raison : le fichier survit à
+    // l'image. Il ne survit pas longtemps pour autant, `db-dump.job.ts` le
+    // détruit à l'échéance ou au premier téléchargement.
+    DB_DUMP_DIR: z.string().min(1).default('./storage/db-dumps'),
+
     // Garde-fou du mode démonstration. L'interrupteur lui-même vit en base
     // (table app_settings) et se manœuvre depuis le panel admin ; cette
     // variable est distincte et volontairement hors de portée de l'interface :

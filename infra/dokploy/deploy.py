@@ -60,6 +60,16 @@ WEB_NAME = "cpi-go-web"
 SSH_KEY_NAME = "cpi-go-deploy"
 APK_RELEASE_MOUNT = "/repo/storage/releases"
 APK_RELEASE_VOLUME = "cpi-go-apk-releases"
+# Exports intégraux de la base, demandés depuis Paramètres. Même motif que les
+# APK, et il n'est pas facultatif : l'état du travail vit en base et nomme un
+# fichier. Sans volume, un redéploiement emporte le fichier et laisse l'écran
+# proposer le téléchargement d'un export qui n'existe plus.
+#
+# Le contenu, lui, ne dure PAS : il est détruit dès son téléchargement, et de
+# toute façon à son échéance. Ce volume est fait pour survivre à une image, pas
+# pour accumuler des copies de la clientèle.
+DB_DUMP_MOUNT = "/repo/storage/db-dumps"
+DB_DUMP_VOLUME = "cpi-go-db-dumps"
 
 HERE = Path(__file__).resolve().parent
 SECRETS_FILE = HERE / ".secrets.generated"
@@ -425,6 +435,7 @@ def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
             # Swagger fermé : le contrat est publié par la CI, pas par le serveur.
             "API_DOCS_ENABLED=false",
             f"APK_RELEASE_DIR={APK_RELEASE_MOUNT}",
+            f"DB_DUMP_DIR={DB_DUMP_MOUNT}",
             "BUSINESS_TIME_ZONE=Africa/Dakar",
             "PHONE_DEFAULT_REGION=SN",
             "SYNC_MAX_BATCH_SIZE=200",
@@ -441,34 +452,52 @@ def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
     )
 
 
-def ensure_apk_mount(application_id: str) -> None:
-    """Ensure releases are stored outside the replaceable application image."""
+def ensure_volume_mount(
+    application_id: str, volume_name: str, mount_path: str, label: str
+) -> None:
+    """Ensure a directory is stored outside the replaceable application image.
+
+    Idempotente : un montage déjà conforme est laissé tel quel, et un montage
+    présent mais DIFFÉRENT lève au lieu d'être écrasé. Écraser en silence
+    déplacerait le répertoire sous les pieds de l'application, qui continuerait
+    d'annoncer des fichiers désormais introuvables.
+    """
     mounts = call(
         "mounts.listByServiceId",
         {"serviceType": "application", "serviceId": application_id},
         method="GET",
     ) or []
     for mount in mounts:
-        if mount.get("mountPath") != APK_RELEASE_MOUNT:
+        if mount.get("mountPath") != mount_path:
             continue
-        if mount.get("type") != "volume" or mount.get("volumeName") != APK_RELEASE_VOLUME:
+        if mount.get("type") != "volume" or mount.get("volumeName") != volume_name:
             raise DokployError(
-                f"un montage existe déjà sur {APK_RELEASE_MOUNT} avec une autre configuration"
+                f"un montage existe déjà sur {mount_path} avec une autre configuration"
             )
-        ok(f"volume APK « {APK_RELEASE_VOLUME} » déjà monté")
+        ok(f"volume {label} « {volume_name} » déjà monté")
         return
 
     call(
         "mounts.create",
         {
             "type": "volume",
-            "volumeName": APK_RELEASE_VOLUME,
-            "mountPath": APK_RELEASE_MOUNT,
+            "volumeName": volume_name,
+            "mountPath": mount_path,
             "serviceType": "application",
             "serviceId": application_id,
         },
     )
-    ok(f"volume APK « {APK_RELEASE_VOLUME} » monté sur {APK_RELEASE_MOUNT}")
+    ok(f"volume {label} « {volume_name} » monté sur {mount_path}")
+
+
+def ensure_apk_mount(application_id: str) -> None:
+    """Ensure releases are stored outside the replaceable application image."""
+    ensure_volume_mount(application_id, APK_RELEASE_VOLUME, APK_RELEASE_MOUNT, "APK")
+
+
+def ensure_db_dump_mount(application_id: str) -> None:
+    """Ensure database exports are stored outside the replaceable image."""
+    ensure_volume_mount(application_id, DB_DUMP_VOLUME, DB_DUMP_MOUNT, "exports base")
 
 
 def _web_env(names: dict[str, str]) -> str:
@@ -562,6 +591,9 @@ def cmd_configure() -> None:
 
     step("Stockage persistant des releases Android")
     ensure_apk_mount(ids["API_ID"])
+
+    step("Stockage persistant des exports de la base")
+    ensure_db_dump_mount(ids["API_ID"])
 
     call(
         "application.saveBuildType",

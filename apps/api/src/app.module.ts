@@ -14,6 +14,7 @@ import { AdminModule } from './modules/admin/admin.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { BankCasesModule } from './modules/bank-cases/bank-cases.module.js';
 import { ClientRequestsModule } from './modules/client-requests/client-requests.module.js';
+import { DbDumpModule } from './modules/db-dump/db-dump.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { Phase2Module } from './modules/phase2/phase2.module.js';
@@ -90,6 +91,7 @@ const env = readEnv();
     AnalyticsModule,
     ExportModule,
     AppUpdatesModule,
+    DbDumpModule,
   ],
   providers: [
     // L'ordre compte. Le throttler s'applique avant toute lecture de base ;
