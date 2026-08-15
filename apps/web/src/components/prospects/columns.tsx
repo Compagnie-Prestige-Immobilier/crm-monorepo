@@ -70,7 +70,7 @@ function Empty() {
  * `id` reprend le nom du champ trié CÔTÉ SERVEUR (`ProspectSortField` du
  * contrat) : le clic sur l'en-tête envoie donc `sortBy` sans table de
  * correspondance. Les colonnes dérivées d'une jointure : représentant,
- * département, commercial : ne sont pas triables : l'API ne le propose pas, et
+ * département, téléconseiller : ne sont pas triables : l'API ne le propose pas, et
  * une flèche qui ne trie rien est pire que pas de flèche.
  *
  * Les colonnes de phase 2 répondent à une question qu'on posait jusqu'ici en
@@ -225,7 +225,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       accessorKey: 'clientCreatedAt',
       header: 'Saisi le',
       cell: ({ row }) => (
-        // `clientCreatedAt` = saisie terrain, pas arrivée en base. Un commercial
+        // `clientCreatedAt` = saisie terrain, pas arrivée en base. Un téléconseiller
         // resté hors ligne trois jours voit ici la date de sa tournée.
         <time dateTime={row.original.clientCreatedAt} className="whitespace-nowrap tabular-nums">
           {formatDate(row.original.clientCreatedAt)}

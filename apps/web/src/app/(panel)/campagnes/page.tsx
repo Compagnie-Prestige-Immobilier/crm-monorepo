@@ -18,7 +18,7 @@ export default async function CampagnesPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  // Les campagnes montrent la répartition du travail entre commerciaux :
+  // Les campagnes montrent la répartition du travail entre téléconseillers :
   // l'API les réserve à l'ADMIN, et l'écran coupe en amont plutôt que de se
   // construire puis d'échouer en 403 sur chaque requête.
   const guard = await guardRoles(['ADMIN']);

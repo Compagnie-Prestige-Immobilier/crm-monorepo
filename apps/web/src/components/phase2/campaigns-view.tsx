@@ -48,7 +48,7 @@ export function CampaignsView() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Répartition des prospects en attente entre les commerciaux choisis. Tirage définitif.
+          Répartition des prospects en attente entre les téléconseillers choisis. Tirage définitif.
         </p>
         <Button
           type="button"

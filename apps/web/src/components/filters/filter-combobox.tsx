@@ -31,8 +31,8 @@ import { cn } from '@/lib/utils';
  * propre contenu : un `<label for>` n'entre nulle part dans cette chaîne
  * (contrairement à `input`, `select` ou `textarea`). Le `<label>` rendait donc
  * le clic pratique, et rien de plus : un lecteur d'écran annonçait « Tous les
- * commerciaux, bouton » sans jamais prononcer « Commercial ». Avec
- * `aria-labelledby`, il annonce « Commercial, Tous les commerciaux ».
+ * téléconseillers, bouton » sans jamais prononcer « Téléconseiller ». Avec
+ * `aria-labelledby`, il annonce « Téléconseiller, Tous les téléconseillers ».
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * Trois gestes économisés, pour quelqu'un qui filtre vingt fois par jour.
@@ -118,7 +118,7 @@ export function FilterCombobox({
               variant="outline"
               /*
                 `aria-labelledby` liste le libellé PUIS le déclencheur : le nom
-                devient « Commercial Tous les commerciaux ». Sans le second id,
+                devient « Téléconseiller Tous les téléconseillers ». Sans le second id,
                 le nom se réduirait au libellé et la valeur choisie ne serait
                 plus annoncée.
               */

@@ -125,7 +125,7 @@ export async function fetchOriginBreakdown(
 /**
  * Tâches clôturées par JOUR, tous commerciaux confondus.
  *
- * L'API rend une ligne par (jour, commercial) : c'est la bonne granularité pour
+ * L'API rend une ligne par (jour, téléconseiller) : c'est la bonne granularité pour
  * répondre à « qui avance », mais le graphique de cadence répond à « est-ce que
  * ça avance ». Le repli est fait ici parce qu'il dépend du graphique affiché,
  * pas de la donnée : servir les deux formes obligerait l'API à connaître la

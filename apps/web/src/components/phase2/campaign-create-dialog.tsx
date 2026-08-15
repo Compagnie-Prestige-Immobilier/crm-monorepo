@@ -34,13 +34,14 @@ import {
 import { cn } from '@/lib/utils';
 
 /**
- * Création guidée d'une campagne : nom → périmètre → commerciaux → APERÇU.
+ * Création guidée d'une campagne d'appels prospects : nom → périmètre →
+ * téléconseillers → APERÇU.
  *
  * L'aperçu est la raison d'être de cet écran, pas un ornement final. Le tirage
  * est IRRÉVERSIBLE : il matérialise une tâche par prospect, exclut ces
  * prospects de toute campagne ultérieure, et la seule façon d'annuler est de
  * clôturer la campagne : ce qui annule aussi les tâches déjà en cours chez les
- * commerciaux. Un administrateur qui découvre après coup qu'il vient de
+ * téléconseillers. Un administrateur qui découvre après coup qu'il vient de
  * distribuer huit cents fiches à trois personnes au lieu de quatre-vingts à
  * dix n'a aucun moyen simple de revenir en arrière.
  *
@@ -80,7 +81,7 @@ export function CampaignCreateDialog({
 
   /**
    * L'aperçu n'est demandé QU'À l'étape 2. Le charger dès l'ouverture
-   * relancerait deux requêtes à chaque coche d'un commercial : or le décompte
+   * relancerait deux requêtes à chaque coche d'un téléconseiller : or le décompte
    * de prospects ne dépend pas de QUI reçoit, seulement du périmètre. Seule la
    * répartition change, et elle est calculée localement.
    */
@@ -103,7 +104,7 @@ export function CampaignCreateDialog({
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.reference });
       toast.success(
-        `Campagne « ${campaign.name} » créée : ${formatNumber(campaign.progress.total)} appels répartis entre ${formatNumber(campaign.commercialCount)} commerciaux.`,
+        `Campagne « ${campaign.name} » créée : ${formatNumber(campaign.progress.total)} appels répartis entre ${formatNumber(campaign.commercialCount)} téléconseillers.`,
       );
       reset();
       onOpenChange(false);
@@ -218,7 +219,7 @@ export function CampaignCreateDialog({
 
             <fieldset className="flex flex-col gap-2">
               <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
-                Commerciaux
+                Téléconseillers
                 <span className="text-destructive" aria-label="obligatoire">
                   *
                 </span>
@@ -235,7 +236,7 @@ export function CampaignCreateDialog({
                 </div>
               ) : commerciaux.length === 0 ? (
                 <p role="status" className="rounded-md bg-muted px-3 py-4 text-[0.8125rem]">
-                  Aucun compte commercial. Créez-en un depuis l’écran Commerciaux.
+                  Aucun compte téléconseiller. Créez-en un depuis l’écran Téléconseillers.
                 </p>
               ) : (
                 <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-md border border-border p-1 scrollbar-thin">
