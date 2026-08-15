@@ -1,5 +1,5 @@
 /**
- * Suppression logique — assistant partagé.
+ * Suppression logique, assistant partagé.
  *
  * Chaque entité métier porte un `deletedAt`. Une lecture qui l'oublie ressort
  * des fiches supprimées : au mieux un doublon apparent dans le panel admin, au

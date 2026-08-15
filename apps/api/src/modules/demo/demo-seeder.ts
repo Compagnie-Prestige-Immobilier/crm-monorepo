@@ -5,7 +5,7 @@ import type { DemoRegistry } from './demo-registry.js';
 
 /**
  * Mêmes paramètres que `packages/database/src/seed.ts` et que la vérification à
- * la connexion. Un écart rendrait les comptes de démonstration inutilisables —
+ * la connexion. Un écart rendrait les comptes de démonstration inutilisables,
  * et le défaut ne se verrait qu'en pleine démonstration.
  */
 const ARGON2_OPTIONS = {
