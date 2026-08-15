@@ -1,14 +1,7 @@
-import type { components } from '@crm/api-client';
+import type { ApiClient, components } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 
-import {
-  apiUpload,
-  asArray,
-  asBoolean,
-  asNullableString,
-  asNumber,
-  asRecord,
-  asString,
-} from '@/lib/api/raw';
+import { getApiClient } from '@/lib/api/browser';
 import { toRepresentantQuery } from '@/lib/data/representants';
 import type { RepresentantFilters } from '@/lib/representant-filters';
 
@@ -25,10 +18,10 @@ import type { RepresentantFilters } from '@/lib/representant-filters';
  * Le premier appel (`dryRun`) n'écrit rien et rend un rapport ligne à ligne ;
  * le second applique, en une seule transaction, tout ou rien.
  *
- * L'envoi passe par `apiUpload` et donc par le relais `/api/v1/*` de Next : le
- * jeton vit dans un cookie `httpOnly`, hors de portée du JavaScript de la page.
- * Le relais recopie `content-type` (frontière multipart comprise) et le corps
- * tel quel.
+ * L'envoi passe par le client engendré et donc par le relais `/api/v1/*` de
+ * Next : le jeton vit dans un cookie `httpOnly`, hors de portée du JavaScript de
+ * la page. Le relais recopie `content-type` (frontière multipart comprise) et le
+ * corps tel quel.
  */
 
 type Schemas = components['schemas'];
@@ -38,52 +31,28 @@ export type ImportRowError = Schemas['ImportRowErrorDto'];
 export type ImportRowPreview = Schemas['ImportRowPreviewDto'];
 
 /**
- * Le rapport est VALIDÉ à l'entrée, comme tout ce qui passe par `raw.ts`.
+ * Le seul appel du panel qui envoie du MULTIPART.
  *
- * C'est le seul écran du panel où un chiffre décide d'une écriture de masse :
- * un « 0 erreur » venu d'une réponse dont la forme a changé ferait appliquer
- * l'import les yeux fermés.
+ * `bodySerializer` rend le `FormData` tel quel, et c'est indispensable :
+ * `openapi-fetch` sérialise en JSON par défaut, ce qui transformerait le
+ * classeur en `{}`. Rendre le `FormData` sans le toucher laisse aussi le
+ * navigateur poser lui-même l'en-tête `content-type` AVEC sa frontière ; une
+ * frontière écrite à la main serait fausse une fois sur deux.
  */
-function parseImportReport(value: unknown): ImportReport {
-  const body = asRecord(value, 'Le rapport d’import');
-
-  return {
-    dryRun: asBoolean(body.dryRun, 'dryRun'),
-    totalRows: asNumber(body.totalRows, 'totalRows'),
-    valid: asNumber(body.valid, 'valid'),
-    rejected: asNumber(body.rejected, 'rejected'),
-    duplicates: asNumber(body.duplicates, 'duplicates'),
-    created: asNumber(body.created, 'created'),
-    errors: asArray(body.errors, 'errors').map((entry, index) => {
-      const row = asRecord(entry, `errors[${String(index)}]`);
-      return {
-        line: asNumber(row.line, 'line'),
-        code: asString(row.code, 'code'),
-        message: asString(row.message, 'message'),
-        value: asNullableString(row.value, 'value'),
-      };
-    }),
-    preview: asArray(body.preview, 'preview').map((entry, index) => {
-      const row = asRecord(entry, `preview[${String(index)}]`);
-      return {
-        line: asNumber(row.line, 'line'),
-        fullName: asString(row.fullName, 'fullName'),
-        phoneE164: asString(row.phoneE164, 'phoneE164'),
-        departementName: asString(row.departementName, 'departementName'),
-        iefName: asNullableString(row.iefName, 'iefName'),
-        notes: asNullableString(row.notes, 'notes'),
-      };
-    }),
-  };
-}
-
-export async function importRepresentants(file: File, dryRun: boolean): Promise<ImportReport> {
+export async function importRepresentants(
+  file: File,
+  dryRun: boolean,
+  client: ApiClient = getApiClient(),
+): Promise<ImportReport> {
   const form = new FormData();
   form.append('file', file);
-  return apiUpload(
-    `/representants/import?dryRun=${dryRun ? 'true' : 'false'}`,
-    form,
-    parseImportReport,
+
+  return unwrap(
+    await client.POST('/api/v1/representants/import', {
+      params: { query: { dryRun } },
+      body: { file: '' },
+      bodySerializer: () => form,
+    }),
   );
 }
 

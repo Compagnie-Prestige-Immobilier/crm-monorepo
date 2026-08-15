@@ -95,25 +95,25 @@ export function describeAudience(
  *
  * Elle nomme le NOMBRE, parce que c'est la seule information qui rend la
  * confirmation utile : « Confirmer l'envoi ? » sans chiffre ne protège de rien.
- * Et elle distingue joignables et non joignables, sans quoi l'admin croit avoir
- * atteint 400 personnes alors que 120 n'ont pas d'appareil enregistré.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Elle ne distingue plus « joignables » et « visés », parce que l'API non plus.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * La phrase annonçait « 120 d'entre elles n'ont aucun appareil enregistré »,
+ * héritage d'un envoi par push mobile qui n'existe plus. `AudiencePreviewDto` ne
+ * rend qu'un `recipientCount`, et le dit explicitement : tous les comptes visés
+ * liront la notification dans l'application. Garder la nuance revenait à
+ * calculer un manque sur un `undefined`, donc à annoncer que TOUS les
+ * destinataires étaient injoignables.
  */
-export function confirmationSentence(recipientCount: number, reachableCount: number): string {
+export function confirmationSentence(recipientCount: number): string {
   if (recipientCount === 0) {
     return 'Ce public ne correspond à aucun compte actif. Rien ne sera envoyé.';
   }
 
   const people = recipientCount === 1 ? '1 personne' : `${String(recipientCount)} personnes`;
-  const head = `Cet envoi s’adresse à ${people}.`;
-
-  if (reachableCount === recipientCount) return head;
-
-  const silent = recipientCount - reachableCount;
-  const tail =
-    silent === 1
-      ? '1 d’entre elles n’a aucun appareil enregistré.'
-      : `${String(silent)} d’entre elles n’ont aucun appareil enregistré.`;
-  return `${head} ${tail}`;
+  return `Cet envoi s’adresse à ${people}.`;
 }
 
 /**

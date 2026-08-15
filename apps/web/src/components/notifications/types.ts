@@ -1,129 +1,47 @@
+import type { components } from '@crm/api-client';
+
 /**
- * Types du contrat de notification, ÉCRITS À LA MAIN : et c'est une exception
- * assumée à la règle du dépôt.
+ * Types du contrat de notification, LUS DANS LE CLIENT ENGENDRÉ.
  *
- * Partout ailleurs, `apps/web` lit ses types dans
- * `packages/api-client/src/generated`, régénérés depuis `openapi.json`. C'est
- * ce qui fait casser le `typecheck` du panel à l'endroit exact où un écran ment
- * sur le contrat.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Ils étaient écrits à la main. Ce n'était plus une exception, c'était un écart.
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * Ici, le module API vient d'être écrit et la régénération du client appartient
- * à une autre étape. Ces types en sont la transcription fidèle ; ils vivent
- * volontairement DANS le dossier de la fonctionnalité, et non dans
- * `src/lib/types.ts`, pour qu'ils soient faciles à supprimer d'un bloc le jour
- * où `pnpm codegen` les rend inutiles.
+ * L'exception avait une justification datée : « le module API vient d'être écrit,
+ * la régénération appartient à une autre étape ». Les neuf routes figurent
+ * désormais dans `packages/api-client/src/generated`. Une transcription à la
+ * main d'un contrat déjà typé ne vaut alors plus rien : elle ne fait pas casser
+ * le `typecheck` quand l'API change, elle le fait PASSER, ce qui est exactement
+ * l'inverse de l'effet recherché.
  *
- * TODO(generated-client) : remplacer par `Schemas['NotificationDto']` etc. une
- * fois `packages/api-client` régénéré.
+ * Le cas s'est produit pendant cette même réécriture : `AudiencePreview`
+ * déclarait `reachableCount`, `transportConfigured` et `transportReason`, que
+ * l'API ne rend plus. Le composeur affichait donc un avertissement « transport
+ * non configuré » calculé sur trois `undefined`.
+ *
+ * Seuls les LIBELLÉS restent ici : ils sont du français d'interface, pas du
+ * contrat, et l'API n'a pas à les décider.
  */
+type Schemas = components['schemas'];
 
-export type Role = 'ADMIN' | 'COMMERCIAL' | 'BANQUE_FINANCE';
+export type Role = Schemas['Role'];
+export type NotificationCategory = Schemas['NotificationCategory'];
+export type NotificationAudience = Schemas['NotificationAudience'];
+export type NotificationStatus = Schemas['NotificationStatus'];
+export type NotificationDeliveryStatus = Schemas['NotificationDeliveryStatus'];
 
-export type NotificationCategory = 'ANNONCE' | 'RAPPEL' | 'CAMPAGNE' | 'DOSSIER' | 'SYSTEME';
+export type NotificationCounts = Schemas['NotificationDeliveryCountsDto'];
+export type NotificationRow = Schemas['NotificationDto'];
+export type PageMeta = Schemas['PageMetaDto'];
+export type NotificationList = Schemas['NotificationListDto'];
+export type NotificationRecipient = Schemas['NotificationRecipientDto'];
+export type NotificationDetail = Schemas['NotificationDetailDto'];
+export type AudiencePreview = Schemas['AudiencePreviewDto'];
+export type NotificationTemplate = Schemas['NotificationTemplateDto'];
 
-export type NotificationAudience = 'ALL' | 'ROLE' | 'DEPARTEMENT' | 'USERS';
-
-export type NotificationStatus = 'SCHEDULED' | 'SENDING' | 'SENT' | 'CANCELLED';
-
-export type NotificationDeliveryStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED' | 'READ';
-
-export interface NotificationCounts {
-  total: number;
-  pending: number;
-  sent: number;
-  delivered: number;
-  failed: number;
-  read: number;
-}
-
-export interface NotificationRow {
-  id: string;
-  title: string;
-  body: string;
-  category: NotificationCategory;
-  route: string | null;
-  audience: NotificationAudience;
-  audienceRole: Role | null;
-  audienceDepartementId: string | null;
-  audienceUserIds: string[];
-  status: NotificationStatus;
-  scheduledFor: string | null;
-  sentAt: string | null;
-  cancelledAt: string | null;
-  transportStatus: string | null;
-  createdByName: string | null;
-  createdAt: string;
-  counts: NotificationCounts;
-}
-
-export interface PageMeta {
-  total: number;
-  page: number;
-  pageSize: number;
-  pageCount: number;
-}
-
-export interface NotificationList {
-  items: NotificationRow[];
-  meta: PageMeta;
-}
-
-export interface NotificationRecipient {
-  userId: string;
-  fullName: string;
-  role: Role;
-  status: NotificationDeliveryStatus;
-  error: string | null;
-  sentAt: string | null;
-  readAt: string | null;
-}
-
-export interface NotificationDetail {
-  notification: NotificationRow;
-  recipients: NotificationRecipient[];
-}
-
-export interface AudiencePreview {
-  recipientCount: number;
-  reachableCount: number;
-  transportConfigured: boolean;
-  transportReason: string | null;
-}
-
-export interface NotificationTemplate {
-  id: string;
-  name: string;
-  category: NotificationCategory;
-  titleTemplate: string;
-  bodyTemplate: string;
-  route: string | null;
-  variables: string[];
-  isActive: boolean;
-  updatedAt: string;
-}
-
-export interface CreateNotificationInput {
-  title: string;
-  body: string;
-  category?: NotificationCategory;
-  route?: string;
-  audience: NotificationAudience;
-  audienceRole?: Role;
-  audienceDepartementId?: string;
-  audienceUserIds?: string[];
-  scheduledFor?: string;
-  templateId?: string;
-}
-
-export interface CreateTemplateInput {
-  name: string;
-  category?: NotificationCategory;
-  titleTemplate: string;
-  bodyTemplate: string;
-  route?: string;
-}
-
-export type UpdateTemplateInput = Partial<CreateTemplateInput> & { isActive?: boolean };
+export type CreateNotificationInput = Schemas['CreateNotificationDto'];
+export type CreateTemplateInput = Schemas['CreateNotificationTemplateDto'];
+export type UpdateTemplateInput = Schemas['UpdateNotificationTemplateDto'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Libellés : français, une seule source
