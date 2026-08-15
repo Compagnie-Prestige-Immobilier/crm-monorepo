@@ -62,6 +62,18 @@ export default defineConfig({
     {
       name: 'chromium-anonyme',
       testMatch: /\.anon\.spec\.ts/,
+      /**
+       * Le navigateur reste VIERGE : aucun `storageState` ici, c'est tout
+       * l'objet de ces parcours.
+       *
+       * La dépendance n'en pose pas moins : elle garantit seulement que le
+       * fichier `e2e/.auth/admin.json` EXISTE sur disque quand ce projet
+       * démarre. `roles.anon.spec.ts` s'en sert hors navigateur, pour poser sa
+       * précondition (le mode démonstration, d'où vient le compte
+       * BANQUE_FINANCE) via le relais `/api/v1/*` sans dépenser une connexion
+       * de plus sur un point d'entrée limité à dix par minute.
+       */
+      dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'] },
     },
   ],
