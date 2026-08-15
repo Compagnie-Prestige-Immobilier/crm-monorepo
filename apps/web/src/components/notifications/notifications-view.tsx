@@ -56,7 +56,12 @@ import {
 } from '@/lib/notification-filters';
 import { cn } from '@/lib/utils';
 import { describeAudience } from './audience';
-import { cancelNotification, fetchNotification, fetchNotifications, notificationKeys } from './api';
+import {
+  cancelNotification,
+  fetchNotification,
+  fetchNotifications,
+  notificationKeys,
+} from '@/lib/data/notifications';
 import { NotificationComposer } from './notification-composer';
 import { TemplateManager } from './template-manager';
 import {

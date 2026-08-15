@@ -72,28 +72,22 @@ export function demoBannerState(status: DemoStatus): DemoBannerState {
 export const NO_DEMO_BANNER: DemoBannerState = { enabled: false, seededAt: null };
 
 /**
- * `campaignCommerciaux` : rattachements commercial↔campagne.
+ * Somme des compteurs : ce que la désactivation supprimera, et rien d'autre.
  *
- * TODO(api-client) : le champ EXISTE côté API (`DemoCountsDto`, et la réponse
- * live le renvoie), mais `apps/api/openapi.json` n'a pas été régénéré depuis
- * son ajout, donc le type engendré l'ignore. On le lit sans le déclarer plutôt
- * que d'élargir le type à la main : le jour où le document est régénéré, cette
- * fonction disparaît au profit de `counts.campaignCommerciaux`, et rien
- * d'autre ne bouge.
+ * `campaignCommerciaux` (les rattachements téléconseiller↔campagne) était lu à
+ * travers un `counts as { campaignCommerciaux?: unknown }`, le temps que
+ * `openapi.json` soit régénéré. Le champ est engendré depuis : la conversion
+ * n'attendait plus rien, et elle DÉSACTIVAIT durablement le typage sur une
+ * ligne du récapitulatif de suppression. Un champ renommé côté API aurait fait
+ * afficher « 0 affectation de campagne » au lieu de casser la compilation.
  */
-export function campaignCommerciauxCount(counts: DemoCounts): number {
-  const value = (counts as { campaignCommerciaux?: unknown }).campaignCommerciaux;
-  return typeof value === 'number' ? value : 0;
-}
-
-/** Somme des compteurs : ce que la désactivation supprimera, et rien d'autre. */
 export function totalDemoRows(counts: DemoCounts): number {
   return (
     counts.users +
     counts.representants +
     counts.prospects +
     counts.campaigns +
-    campaignCommerciauxCount(counts) +
+    counts.campaignCommerciaux +
     counts.callTasks +
     counts.callAttempts +
     counts.bankCases +
@@ -140,7 +134,7 @@ export function demoBreakdown(counts: DemoCounts): { label: DemoSeededKind; valu
     { label: 'représentants', value: counts.representants },
     { label: 'prospects', value: counts.prospects },
     { label: 'campagnes d’appels', value: counts.campaigns },
-    { label: 'affectations de campagne', value: campaignCommerciauxCount(counts) },
+    { label: 'affectations de campagne', value: counts.campaignCommerciaux },
     { label: 'tâches d’appel', value: counts.callTasks },
     { label: 'tentatives d’appel', value: counts.callAttempts },
     { label: 'dossiers bancaires', value: counts.bankCases },
