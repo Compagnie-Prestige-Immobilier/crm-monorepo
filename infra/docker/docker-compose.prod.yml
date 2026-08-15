@@ -119,16 +119,24 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    # Sonde TCP et non HTTP : la route de santé de l'API n'est pas figée au
-    # moment où ce fichier est écrit, et une sonde qui interroge une route
-    # inexistante bloque le déploiement au lieu de le protéger. À remplacer
-    # par un GET /health dès que la route existe.
+    # Sonde HTTP sur la route de disponibilité réelle. Le commentaire qui
+    # occupait ces lignes disait que « la route de santé n'est pas figée » et
+    # promettait de remplacer la sonde TCP « dès que la route existe » : elle
+    # existe (apps/api/src/modules/health/health.controller.ts, /health/live et
+    # /health/ready) et la CI l'interroge déjà dans quality-extended.yml.
+    #
+    # La différence n'est pas théorique. Une sonde TCP réussit dès que le
+    # socket écoute, c'est-à-dire avant que Nest ait fini de monter ses modules
+    # et sans rien savoir de la base. `api` était donc déclaré `healthy` trop
+    # tôt, et `web`, qui l'attend par `depends_on: service_healthy`, démarrait
+    # contre une API qui répondait encore 503. `/health/ready` ne répond 200
+    # que quand l'application peut réellement servir.
     healthcheck:
       test:
         - CMD
         - node
         - -e
-        - "require('node:net').connect(3001,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"
+        - "require('node:http').get('http://127.0.0.1:3001/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
       interval: 30s
       timeout: 5s
       retries: 3
