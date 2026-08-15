@@ -1,5 +1,5 @@
 /**
- * Mode démonstration — épreuve d'intégration sur une vraie base.
+ * Mode démonstration, épreuve d'intégration sur une vraie base.
  *
  * Le test central est `la donnée réelle survit à la désactivation`. Tous les
  * autres décrivent du confort ; celui-là décrit la seule faute irréparable que
@@ -33,7 +33,7 @@ const leurres: { representantId: string; prospectId: string; commercialId: strin
 beforeAll(async () => {
   // Le schéma d'environnement est strict et lu paresseusement par `readEnv()`.
   // Le garde-fou de production l'interroge, il faut donc lui donner de quoi
-  // valider — les valeurs elles-mêmes n'importent pas ici.
+  // valider, les valeurs elles-mêmes n'importent pas ici.
   process.env.NODE_ENV = 'test';
   process.env.JWT_ACCESS_SECRET ??= 'a'.repeat(32);
   process.env.JWT_REFRESH_SECRET ??= 'b'.repeat(32);
@@ -50,7 +50,7 @@ beforeAll(async () => {
   await demo.purge(adminId);
 
   // Un jeu de LEURRES : des lignes réelles qui ressemblent trait pour trait à
-  // des données de démonstration — même préfixe de nom, créées dans la même
+  // des données de démonstration, même préfixe de nom, créées dans la même
   // minute, rattachées à un commercial créé au même moment. Une suppression
   // par heuristique les emporterait.
   const commercial = await prisma.user.create({
@@ -167,7 +167,7 @@ describe('mode démonstration', () => {
 
     await demo.disable(adminId);
 
-    // Le jeu de démonstration est toujours en base — c'est le principe de la
+    // Le jeu de démonstration est toujours en base, c'est le principe de la
     // bascule : rien n'est détruit, ni côté réel, ni côté démonstration.
     expect(await prisma.prospect.count()).toBe(avant);
     expect(await prisma.demoEntity.count()).toBeGreaterThan(0);
@@ -209,8 +209,8 @@ describe('mode démonstration', () => {
 
     await demo.purge(adminId);
 
-    // Les leurres — indiscernables de données de démonstration pour toute
-    // heuristique de nom, de date ou de propriétaire — sont toujours là.
+    // Les leurres, indiscernables de données de démonstration pour toute
+    // heuristique de nom, de date ou de propriétaire, sont toujours là.
     expect(await prisma.prospect.findUnique({ where: { id: leurres.prospectId } })).not.toBeNull();
     expect(
       await prisma.representant.findUnique({ where: { id: leurres.representantId } }),

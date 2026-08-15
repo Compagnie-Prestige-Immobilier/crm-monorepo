@@ -6,7 +6,7 @@ import { demoScope, demoScopeSql, withDemoScope } from './demo-visibility.js';
  * Le mode démonstration est une bascule d'AFFICHAGE.
  *
  * Le test qui compte est le premier : mode éteint, une ligne de démonstration
- * doit être invisible pour toute lecture — y compris celle qui alimente un
+ * doit être invisible pour toute lecture, y compris celle qui alimente un
  * export Excel transmis au siège. C'est la seule faute que cette mécanique
  * puisse commettre.
  */

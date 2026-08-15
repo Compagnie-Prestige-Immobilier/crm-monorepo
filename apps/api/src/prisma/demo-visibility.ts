@@ -1,5 +1,5 @@
 /**
- * Mode démonstration — visibilité, pas destruction.
+ * Mode démonstration, visibilité, pas destruction.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * LE PRINCIPE
@@ -11,7 +11,7 @@
  * moment de l'extinction.
  *
  * La conception précédente insérait à l'activation et supprimait à l'extinction.
- * Elle était sûre — un registre traçait chaque ligne créée — mais elle laissait
+ * Elle était sûre, un registre traçait chaque ligne créée, mais elle laissait
  * un défaut plus grave que celui qu'elle évitait : **tant que le mode était
  * actif, les fiches de démonstration étaient dans les mêmes tables que les
  * vraies, et sortaient donc dans un export Excel transmis au siège.**
