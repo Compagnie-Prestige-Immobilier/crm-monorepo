@@ -10,8 +10,18 @@
 --
 -- Trois secondes : au-delà, mieux vaut un déploiement en échec, rejouable, que
 -- des minutes d'indisponibilité totale.
+--
+-- `SET LOCAL` ET NON `SET`, ET LA DIFFÉRENCE EST GRAVE.
+--
+-- `SET` seul vaut pour la SESSION, pas pour la transaction. Prisma applique les
+-- migrations successives sur la MÊME connexion : le plafond fuyait donc sur
+-- toutes les migrations suivantes, dont celle qui supprime `device_tokens`.
+-- Une suppression de table qui ne décroche pas son verrou en trois secondes
+-- échoue, `api-entrypoint.sh` refuse alors de démarrer, et le déploiement se
+-- solde par une indisponibilité totale au lieu du garde-fou qu'on croyait
+-- poser. `SET LOCAL` meurt avec la transaction qui porte CE fichier.
 -- ─────────────────────────────────────────────────────────────────────────────
-SET lock_timeout = '3s';
+SET LOCAL lock_timeout = '3s';
 
 -- CreateEnum
 CREATE TYPE "RepCallOutcome" AS ENUM ('REACHED', 'PROSPECTS_PROMISED', 'UNREACHABLE', 'CALLBACK', 'REFUSED', 'WRONG_NUMBER', 'OTHER');
