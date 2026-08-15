@@ -22,7 +22,7 @@ class RenderTemplateDto {
 
   /// Couples `{ variable: valeur }`.
   @JsonKey(name: r'variables', required: true, includeIfNull: false)
-  final Object variables;
+  final Map<String, String> variables;
 
   bool operator ==(Object other) {
     return identical(this, other) ||

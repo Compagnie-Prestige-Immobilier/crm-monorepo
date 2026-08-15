@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
+import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/audience_preview_dto.dart';
 import 'package:crm_api_client/src/model/create_notification_dto.dart';
 import 'package:crm_api_client/src/model/inbox_dto.dart';
@@ -109,7 +110,7 @@ class NotificationsApi {
   }
 
   /// Compose et envoie, ou programme, une notification.
-  /// Le public est résolu et les lignes de livraison écrites AVANT toute remise. Sans compte de service FCM, la notification est stockée et mise en file : &#x60;transportStatus&#x60; vaut alors NOT_CONFIGURED et l’interface doit le dire.
+  /// Le public est résolu et les lignes de livraison écrites AVANT toute remise. Sans clé Brevo, la notification est stockée et reste visible dans la boîte de réception : &#x60;transportStatus&#x60; vaut alors NOT_CONFIGURED, aucun e-mail n’est parti, et l’interface doit le dire.
   ///
   /// Parameters:
   /// * [createNotificationDto]
@@ -283,7 +284,7 @@ class NotificationsApi {
   }
 
   /// Boîte de réception de l’utilisateur courant.
-  /// Fonctionne même sans transport push : une notification en file y figure dès sa composition, ce qui rend le centre de notifications utile avant tout provisionnement Firebase.
+  /// C’est le canal qui fait foi : une notification y figure dès sa composition, indépendamment de toute remise sortante. Le mobile s’en sert désormais comme unique source.
   ///
   /// Parameters:
   /// * [unreadOnly] - Ne rendre que les non lues.

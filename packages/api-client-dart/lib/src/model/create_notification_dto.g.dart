@@ -15,8 +15,6 @@ abstract class _$CreateNotificationDtoCWProxy {
 
   CreateNotificationDto route(String? route);
 
-  CreateNotificationDto payload(Object? payload);
-
   CreateNotificationDto audience(NotificationAudience audience);
 
   CreateNotificationDto audienceRole(Role? audienceRole);
@@ -40,7 +38,6 @@ abstract class _$CreateNotificationDtoCWProxy {
     String body,
     NotificationCategory? category,
     String? route,
-    Object? payload,
     NotificationAudience audience,
     Role? audienceRole,
     String? audienceDepartementId,
@@ -69,9 +66,6 @@ class _$CreateNotificationDtoCWProxyImpl
 
   @override
   CreateNotificationDto route(String? route) => this(route: route);
-
-  @override
-  CreateNotificationDto payload(Object? payload) => this(payload: payload);
 
   @override
   CreateNotificationDto audience(NotificationAudience audience) =>
@@ -109,7 +103,6 @@ class _$CreateNotificationDtoCWProxyImpl
     Object? body = const $CopyWithPlaceholder(),
     Object? category = const $CopyWithPlaceholder(),
     Object? route = const $CopyWithPlaceholder(),
-    Object? payload = const $CopyWithPlaceholder(),
     Object? audience = const $CopyWithPlaceholder(),
     Object? audienceRole = const $CopyWithPlaceholder(),
     Object? audienceDepartementId = const $CopyWithPlaceholder(),
@@ -134,10 +127,6 @@ class _$CreateNotificationDtoCWProxyImpl
           ? _value.route
           // ignore: cast_nullable_to_non_nullable
           : route as String?,
-      payload: payload == const $CopyWithPlaceholder()
-          ? _value.payload
-          // ignore: cast_nullable_to_non_nullable
-          : payload as Object?,
       audience: audience == const $CopyWithPlaceholder()
           ? _value.audience
           // ignore: cast_nullable_to_non_nullable
@@ -194,7 +183,6 @@ CreateNotificationDto _$CreateNotificationDtoFromJson(
       ),
     ),
     route: $checkedConvert('route', (v) => v as String?),
-    payload: $checkedConvert('payload', (v) => v),
     audience: $checkedConvert(
       'audience',
       (v) => $enumDecode(
@@ -236,7 +224,6 @@ Map<String, dynamic> _$CreateNotificationDtoToJson(
   if (_$NotificationCategoryEnumMap[instance.category] case final value?)
     'category': value,
   if (instance.route case final value?) 'route': value,
-  if (instance.payload case final value?) 'payload': value,
   'audience': _$NotificationAudienceEnumMap[instance.audience]!,
   if (_$RoleEnumMap[instance.audienceRole] case final value?)
     'audienceRole': value,

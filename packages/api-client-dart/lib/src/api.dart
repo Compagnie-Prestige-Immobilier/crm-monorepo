@@ -13,14 +13,15 @@ import 'package:crm_api_client/src/api/app_updates_api.dart';
 import 'package:crm_api_client/src/api/auth_api.dart';
 import 'package:crm_api_client/src/api/bank_case_stages_api.dart';
 import 'package:crm_api_client/src/api/bank_cases_api.dart';
+import 'package:crm_api_client/src/api/client_requests_api.dart';
 import 'package:crm_api_client/src/api/demo_api.dart';
-import 'package:crm_api_client/src/api/devices_api.dart';
 import 'package:crm_api_client/src/api/export_api.dart';
 import 'package:crm_api_client/src/api/notification_templates_api.dart';
 import 'package:crm_api_client/src/api/notifications_api.dart';
 import 'package:crm_api_client/src/api/phase2_api.dart';
 import 'package:crm_api_client/src/api/prospects_api.dart';
 import 'package:crm_api_client/src/api/referentiels_api.dart';
+import 'package:crm_api_client/src/api/rep_campaigns_api.dart';
 import 'package:crm_api_client/src/api/representants_api.dart';
 import 'package:crm_api_client/src/api/sync_api.dart';
 import 'package:crm_api_client/src/api/users_api.dart';
@@ -184,16 +185,16 @@ class CrmApiClient {
     return BankCasesApi(dio);
   }
 
+  /// Get ClientRequestsApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  ClientRequestsApi getClientRequestsApi() {
+    return ClientRequestsApi(dio);
+  }
+
   /// Get DemoApi instance, base route and serializer can be overridden by a given but be careful,
   /// by doing that all interceptors will not be executed
   DemoApi getDemoApi() {
     return DemoApi(dio);
-  }
-
-  /// Get DevicesApi instance, base route and serializer can be overridden by a given but be careful,
-  /// by doing that all interceptors will not be executed
-  DevicesApi getDevicesApi() {
-    return DevicesApi(dio);
   }
 
   /// Get ExportApi instance, base route and serializer can be overridden by a given but be careful,
@@ -230,6 +231,12 @@ class CrmApiClient {
   /// by doing that all interceptors will not be executed
   ReferentielsApi getReferentielsApi() {
     return ReferentielsApi(dio);
+  }
+
+  /// Get RepCampaignsApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  RepCampaignsApi getRepCampaignsApi() {
+    return RepCampaignsApi(dio);
   }
 
   /// Get RepresentantsApi instance, base route and serializer can be overridden by a given but be careful,

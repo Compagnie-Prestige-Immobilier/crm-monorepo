@@ -17,6 +17,8 @@ abstract class _$CampaignCommercialDtoCWProxy {
 
   CampaignCommercialDto progress(CampaignProgressDto progress);
 
+  CampaignCommercialDto perDay(List<num> perDay);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CampaignCommercialDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -29,6 +31,7 @@ abstract class _$CampaignCommercialDtoCWProxy {
     String username,
     num position,
     CampaignProgressDto progress,
+    List<num> perDay,
   });
 }
 
@@ -56,6 +59,9 @@ class _$CampaignCommercialDtoCWProxyImpl
       this(progress: progress);
 
   @override
+  CampaignCommercialDto perDay(List<num> perDay) => this(perDay: perDay);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CampaignCommercialDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -68,6 +74,7 @@ class _$CampaignCommercialDtoCWProxyImpl
     Object? username = const $CopyWithPlaceholder(),
     Object? position = const $CopyWithPlaceholder(),
     Object? progress = const $CopyWithPlaceholder(),
+    Object? perDay = const $CopyWithPlaceholder(),
   }) {
     return CampaignCommercialDto(
       userId: userId == const $CopyWithPlaceholder()
@@ -90,6 +97,10 @@ class _$CampaignCommercialDtoCWProxyImpl
           ? _value.progress
           // ignore: cast_nullable_to_non_nullable
           : progress as CampaignProgressDto,
+      perDay: perDay == const $CopyWithPlaceholder()
+          ? _value.perDay
+          // ignore: cast_nullable_to_non_nullable
+          : perDay as List<num>,
     );
   }
 }
@@ -116,6 +127,7 @@ CampaignCommercialDto _$CampaignCommercialDtoFromJson(
       'username',
       'position',
       'progress',
+      'perDay',
     ],
   );
   final val = CampaignCommercialDto(
@@ -126,6 +138,10 @@ CampaignCommercialDto _$CampaignCommercialDtoFromJson(
     progress: $checkedConvert(
       'progress',
       (v) => CampaignProgressDto.fromJson(v as Map<String, dynamic>),
+    ),
+    perDay: $checkedConvert(
+      'perDay',
+      (v) => (v as List<dynamic>).map((e) => e as num).toList(),
     ),
   );
   return val;
@@ -139,4 +155,5 @@ Map<String, dynamic> _$CampaignCommercialDtoToJson(
   'username': instance.username,
   'position': instance.position,
   'progress': instance.progress.toJson(),
+  'perDay': instance.perDay,
 };

@@ -37,7 +37,7 @@ class AppUpdateDto {
 
     required this.publishedAt,
 
-    this.notes,
+    required this.notes,
   });
 
   @JsonKey(name: r'available', required: true, includeIfNull: false)
@@ -67,8 +67,8 @@ class AppUpdateDto {
   @JsonKey(name: r'publishedAt', required: true, includeIfNull: false)
   final String publishedAt;
 
-  @JsonKey(name: r'notes', required: false, includeIfNull: false)
-  final Object? notes;
+  @JsonKey(name: r'notes', required: true, includeIfNull: true)
+  final String? notes;
 
   bool operator ==(Object other) {
     return identical(this, other) ||

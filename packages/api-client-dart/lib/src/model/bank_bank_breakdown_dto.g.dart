@@ -7,7 +7,7 @@ part of 'bank_bank_breakdown_dto.dart';
 // **************************************************************************
 
 abstract class _$BankBankBreakdownDtoCWProxy {
-  BankBankBreakdownDto bankId(String bankId);
+  BankBankBreakdownDto banqueId(String banqueId);
 
   BankBankBreakdownDto label(String label);
 
@@ -30,7 +30,7 @@ abstract class _$BankBankBreakdownDtoCWProxy {
   /// BankBankBreakdownDto(...).copyWith(id: 12, name: "My name")
   /// ````
   BankBankBreakdownDto call({
-    String bankId,
+    String banqueId,
     String label,
     num cases,
     num cashed,
@@ -49,7 +49,7 @@ class _$BankBankBreakdownDtoCWProxyImpl
   final BankBankBreakdownDto _value;
 
   @override
-  BankBankBreakdownDto bankId(String bankId) => this(bankId: bankId);
+  BankBankBreakdownDto banqueId(String banqueId) => this(banqueId: banqueId);
 
   @override
   BankBankBreakdownDto label(String label) => this(label: label);
@@ -82,7 +82,7 @@ class _$BankBankBreakdownDtoCWProxyImpl
   /// BankBankBreakdownDto(...).copyWith(id: 12, name: "My name")
   /// ````
   BankBankBreakdownDto call({
-    Object? bankId = const $CopyWithPlaceholder(),
+    Object? banqueId = const $CopyWithPlaceholder(),
     Object? label = const $CopyWithPlaceholder(),
     Object? cases = const $CopyWithPlaceholder(),
     Object? cashed = const $CopyWithPlaceholder(),
@@ -92,10 +92,10 @@ class _$BankBankBreakdownDtoCWProxyImpl
     Object? meanProcessingHours = const $CopyWithPlaceholder(),
   }) {
     return BankBankBreakdownDto(
-      bankId: bankId == const $CopyWithPlaceholder()
-          ? _value.bankId
+      banqueId: banqueId == const $CopyWithPlaceholder()
+          ? _value.banqueId
           // ignore: cast_nullable_to_non_nullable
-          : bankId as String,
+          : banqueId as String,
       label: label == const $CopyWithPlaceholder()
           ? _value.label
           // ignore: cast_nullable_to_non_nullable
@@ -145,7 +145,7 @@ BankBankBreakdownDto _$BankBankBreakdownDtoFromJson(
   $checkKeys(
     json,
     requiredKeys: const [
-      'bankId',
+      'banqueId',
       'label',
       'cases',
       'cashed',
@@ -156,7 +156,7 @@ BankBankBreakdownDto _$BankBankBreakdownDtoFromJson(
     ],
   );
   final val = BankBankBreakdownDto(
-    bankId: $checkedConvert('bankId', (v) => v as String),
+    banqueId: $checkedConvert('banqueId', (v) => v as String),
     label: $checkedConvert('label', (v) => v as String),
     cases: $checkedConvert('cases', (v) => v as num),
     cashed: $checkedConvert('cashed', (v) => v as num),
@@ -174,7 +174,7 @@ BankBankBreakdownDto _$BankBankBreakdownDtoFromJson(
 Map<String, dynamic> _$BankBankBreakdownDtoToJson(
   BankBankBreakdownDto instance,
 ) => <String, dynamic>{
-  'bankId': instance.bankId,
+  'banqueId': instance.banqueId,
   'label': instance.label,
   'cases': instance.cases,
   'cashed': instance.cashed,

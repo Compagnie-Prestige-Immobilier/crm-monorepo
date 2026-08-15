@@ -7,7 +7,7 @@ part of 'render_template_dto.dart';
 // **************************************************************************
 
 abstract class _$RenderTemplateDtoCWProxy {
-  RenderTemplateDto variables(Object variables);
+  RenderTemplateDto variables(Map<String, String> variables);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RenderTemplateDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
@@ -15,7 +15,7 @@ abstract class _$RenderTemplateDtoCWProxy {
   /// ```dart
   /// RenderTemplateDto(...).copyWith(id: 12, name: "My name")
   /// ````
-  RenderTemplateDto call({Object variables});
+  RenderTemplateDto call({Map<String, String> variables});
 }
 
 /// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfRenderTemplateDto.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfRenderTemplateDto.copyWith.fieldName(...)`
@@ -25,7 +25,8 @@ class _$RenderTemplateDtoCWProxyImpl implements _$RenderTemplateDtoCWProxy {
   final RenderTemplateDto _value;
 
   @override
-  RenderTemplateDto variables(Object variables) => this(variables: variables);
+  RenderTemplateDto variables(Map<String, String> variables) =>
+      this(variables: variables);
 
   @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RenderTemplateDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -39,7 +40,7 @@ class _$RenderTemplateDtoCWProxyImpl implements _$RenderTemplateDtoCWProxy {
       variables: variables == const $CopyWithPlaceholder()
           ? _value.variables
           // ignore: cast_nullable_to_non_nullable
-          : variables as Object,
+          : variables as Map<String, String>,
     );
   }
 }
@@ -59,7 +60,10 @@ RenderTemplateDto _$RenderTemplateDtoFromJson(Map<String, dynamic> json) =>
     $checkedCreate('RenderTemplateDto', json, ($checkedConvert) {
       $checkKeys(json, requiredKeys: const ['variables']);
       final val = RenderTemplateDto(
-        variables: $checkedConvert('variables', (v) => v as Object),
+        variables: $checkedConvert(
+          'variables',
+          (v) => Map<String, String>.from(v as Map),
+        ),
       );
       return val;
     });

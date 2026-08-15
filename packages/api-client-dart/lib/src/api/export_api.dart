@@ -10,6 +10,7 @@ import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
 import 'dart:typed_data';
+import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/bank_stage_type.dart';
 import 'package:crm_api_client/src/model/bdd_segment.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
@@ -22,6 +23,76 @@ class ExportApi {
 
   const ExportApi(this._dio);
 
+  /// Modèle vide pour l’import de représentants.
+  /// En-têtes figés, une ligne d’exemple grisée, un onglet Instructions, et des listes déroulantes alimentées depuis les référentiels VIVANTS : un département désactivé ce matin ne figure pas dans le modèle téléchargé cet après-midi.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Uint8List] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Uint8List>> downloadRepresentantsTemplateXlsx({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/export/representants-modele.xlsx';
+    final _options = Options(
+      method: r'GET',
+      responseType: ResponseType.bytes,
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Uint8List? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null ? null : rawData as Uint8List;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Uint8List>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Export Excel des dossiers bancaires, avec le filtre de la liste.
   /// Trois feuilles : Dossiers (une ligne par dossier filtré), Historique (toutes les transitions de ces dossiers) et Synthèse (les mêmes agrégats que le tableau de bord).
   ///
@@ -29,7 +100,7 @@ class ExportApi {
   /// * [search] - Recherche libre sur la référence, le nom du client ou son téléphone.
   /// * [stageId]
   /// * [stageType]
-  /// * [bankId] - Banque de traitement du dossier.
+  /// * [banqueId] - Banque de traitement du dossier.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
   /// * [rejectionReasonId]
   /// * [dateFrom] - Borne basse sur la création, incluse.
@@ -49,7 +120,7 @@ class ExportApi {
     String? search,
     String? stageId,
     BankStageType? stageType,
-    String? bankId,
+    String? banqueId,
     String? agentId,
     String? rejectionReasonId,
     DateTime? dateFrom,
@@ -81,7 +152,7 @@ class ExportApi {
       if (search != null) r'search': search,
       if (stageId != null) r'stageId': stageId,
       if (stageType != null) r'stageType': stageType,
-      if (bankId != null) r'bankId': bankId,
+      if (banqueId != null) r'banqueId': banqueId,
       if (agentId != null) r'agentId': agentId,
       if (rejectionReasonId != null) r'rejectionReasonId': rejectionReasonId,
       if (dateFrom != null) r'dateFrom': dateFrom,
@@ -127,7 +198,7 @@ class ExportApi {
   }
 
   /// Export Excel des prospects, avec le même filtre que la liste.
-  /// Deux modes. &#x60;filtered&#x60; (défaut) : une feuille Prospects correspondant exactement aux filtres, plus Représentants et Synthèse. &#x60;consolidated&#x60; : exactement cinq feuilles — Consolidé, BDD1, BDD2, BDD3, BDD4.
+  /// Deux modes. &#x60;filtered&#x60; (défaut) : une feuille Prospects correspondant exactement aux filtres, plus Représentants et Synthèse. &#x60;consolidated&#x60; : exactement cinq feuilles, Consolidé, BDD1, BDD2, BDD3, BDD4.
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
@@ -142,6 +213,7 @@ class ExportApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -168,6 +240,7 @@ class ExportApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -207,10 +280,106 @@ class ExportApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
       if (mode != null) r'mode': mode,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Uint8List? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null ? null : rawData as Uint8List;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Uint8List>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Export Excel des représentants, avec le même filtre que la liste.
+  /// Mêmes critères que &#x60;GET /representants&#x60; : ce qui est exporté est exactement ce qui est affiché, cloisonnement par commercial compris.
+  ///
+  /// Parameters:
+  /// * [search]
+  /// * [departementId]
+  /// * [iefId] - Filtre par IEF.
+  /// * [commercialId] - Réservé à l’ADMIN.
+  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [hasProspects] - true : au moins un prospect vivant. false : aucun (représentant dormant).
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Uint8List] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Uint8List>> exportRepresentantsXlsx({
+    String? search,
+    String? departementId,
+    String? iefId,
+    String? commercialId,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? hasProspects,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/export/representants.xlsx';
+    final _options = Options(
+      method: r'GET',
+      responseType: ResponseType.bytes,
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (search != null) r'search': search,
+      if (departementId != null) r'departementId': departementId,
+      if (iefId != null) r'iefId': iefId,
+      if (commercialId != null) r'commercialId': commercialId,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (hasProspects != null) r'hasProspects': hasProspects,
     };
 
     final _response = await _dio.request<Object>(

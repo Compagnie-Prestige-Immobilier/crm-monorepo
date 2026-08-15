@@ -76,6 +76,10 @@ class ProspectDto {
 
     required this.lastAttemptAt,
 
+    required this.origin,
+
+    required this.originLabel,
+
     required this.clientCreatedAt,
 
     required this.createdAt,
@@ -197,6 +201,14 @@ class ProspectDto {
   @JsonKey(name: r'lastAttemptAt', required: true, includeIfNull: true)
   final DateTime? lastAttemptAt;
 
+  /// Clé de provenance. Nulle pour une fiche née d’une tournée terrain.
+  @JsonKey(name: r'origin', required: true, includeIfNull: true)
+  final String? origin;
+
+  /// Détail conservé à la création (nom de la banque demandeuse, par exemple).
+  @JsonKey(name: r'originLabel', required: true, includeIfNull: true)
+  final String? originLabel;
+
   @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
   final DateTime clientCreatedAt;
 
@@ -241,6 +253,8 @@ class ProspectDto {
                 lastOutcome,
                 lastComment,
                 lastAttemptAt,
+                origin,
+                originLabel,
                 clientCreatedAt,
                 createdAt,
                 updatedAt,
@@ -273,6 +287,8 @@ class ProspectDto {
                 other.lastOutcome,
                 other.lastComment,
                 other.lastAttemptAt,
+                other.origin,
+                other.originLabel,
                 other.clientCreatedAt,
                 other.createdAt,
                 other.updatedAt,
@@ -311,6 +327,8 @@ class ProspectDto {
         lastOutcome,
         lastComment,
         lastAttemptAt,
+        origin,
+        originLabel,
         clientCreatedAt,
         createdAt,
         updatedAt,

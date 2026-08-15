@@ -9,11 +9,15 @@ import 'dart:convert';
 import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
+import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/create_representant_dto.dart';
+import 'package:crm_api_client/src/model/import_report_dto.dart';
 import 'package:crm_api_client/src/model/ok_dto.dart';
 import 'package:crm_api_client/src/model/representant_dto.dart';
 import 'package:crm_api_client/src/model/representant_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
+import 'package:crm_api_client/src/model/representant_sort_field.dart';
+import 'package:crm_api_client/src/model/sort_order.dart';
 import 'package:crm_api_client/src/model/update_representant_dto.dart';
 
 class RepresentantsApi {
@@ -280,6 +284,109 @@ class RepresentantsApi {
     );
   }
 
+  /// Import de masse depuis un classeur Excel, en deux temps.
+  /// &#x60;dryRun&#x3D;true&#x60; (défaut) SIMULE : rien n’est écrit, et le rapport liste les erreurs avec leur numéro de ligne dans le fichier, ainsi que les doublons de téléphone (dans le fichier et contre la base). &#x60;dryRun&#x3D;false&#x60; applique, en une seule transaction : tout ou rien. Le premier temps n’est pas une précaution décorative, c’est ce qui évite d’écrire quelques milliers de fiches dont personne ne sait lesquelles sont bonnes.
+  ///
+  /// Parameters:
+  /// * [file]
+  /// * [dryRun] - Simulation. Vaut VRAI par défaut : l’écriture doit être un acte explicite, pas ce qui arrive quand on oublie un paramètre.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ImportReportDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ImportReportDto>> importRepresentants({
+    required MultipartFile file,
+    bool? dryRun = true,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/representants/import';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      contentType: 'multipart/form-data',
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (dryRun != null) r'dryRun': dryRun,
+    };
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = FormData.fromMap(<String, dynamic>{r'file': file});
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(
+          _dio.options,
+          _path,
+          queryParameters: _queryParameters,
+        ),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ImportReportDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ImportReportDto, ImportReportDto>(
+              rawData,
+              'ImportReportDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ImportReportDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Liste paginée. Un COMMERCIAL ne voit que ses propres représentants.
   ///
   ///
@@ -288,6 +395,11 @@ class RepresentantsApi {
   /// * [departementId]
   /// * [iefId] - Filtre par IEF.
   /// * [commercialId] - Réservé à l’ADMIN.
+  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [hasProspects] - true : au moins un prospect vivant. false : aucun (représentant dormant).
+  /// * [sortBy]
+  /// * [sortOrder]
   /// * [page]
   /// * [pageSize]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -304,6 +416,11 @@ class RepresentantsApi {
     String? departementId,
     String? iefId,
     String? commercialId,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? hasProspects,
+    RepresentantSortField? sortBy,
+    SortOrder? sortOrder,
     num? page = 1,
     num? pageSize = 25,
     CancelToken? cancelToken,
@@ -331,6 +448,11 @@ class RepresentantsApi {
       if (departementId != null) r'departementId': departementId,
       if (iefId != null) r'iefId': iefId,
       if (commercialId != null) r'commercialId': commercialId,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (hasProspects != null) r'hasProspects': hasProspects,
+      if (sortBy != null) r'sortBy': sortBy,
+      if (sortOrder != null) r'sortOrder': sortOrder,
       if (page != null) r'page': page,
       if (pageSize != null) r'pageSize': pageSize,
     };

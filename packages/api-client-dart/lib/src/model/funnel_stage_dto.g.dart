@@ -11,9 +11,9 @@ abstract class _$FunnelStageDtoCWProxy {
 
   FunnelStageDto count(num count);
 
-  FunnelStageDto tauxEtapePrecedente(num tauxEtapePrecedente);
+  FunnelStageDto tauxEtapePrecedente(num? tauxEtapePrecedente);
 
-  FunnelStageDto tauxGlobal(num tauxGlobal);
+  FunnelStageDto tauxGlobal(num? tauxGlobal);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `FunnelStageDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
@@ -24,8 +24,8 @@ abstract class _$FunnelStageDtoCWProxy {
   FunnelStageDto call({
     String label,
     num count,
-    num tauxEtapePrecedente,
-    num tauxGlobal,
+    num? tauxEtapePrecedente,
+    num? tauxGlobal,
   });
 }
 
@@ -42,11 +42,11 @@ class _$FunnelStageDtoCWProxyImpl implements _$FunnelStageDtoCWProxy {
   FunnelStageDto count(num count) => this(count: count);
 
   @override
-  FunnelStageDto tauxEtapePrecedente(num tauxEtapePrecedente) =>
+  FunnelStageDto tauxEtapePrecedente(num? tauxEtapePrecedente) =>
       this(tauxEtapePrecedente: tauxEtapePrecedente);
 
   @override
-  FunnelStageDto tauxGlobal(num tauxGlobal) => this(tauxGlobal: tauxGlobal);
+  FunnelStageDto tauxGlobal(num? tauxGlobal) => this(tauxGlobal: tauxGlobal);
 
   @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `FunnelStageDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -73,11 +73,11 @@ class _$FunnelStageDtoCWProxyImpl implements _$FunnelStageDtoCWProxy {
       tauxEtapePrecedente: tauxEtapePrecedente == const $CopyWithPlaceholder()
           ? _value.tauxEtapePrecedente
           // ignore: cast_nullable_to_non_nullable
-          : tauxEtapePrecedente as num,
+          : tauxEtapePrecedente as num?,
       tauxGlobal: tauxGlobal == const $CopyWithPlaceholder()
           ? _value.tauxGlobal
           // ignore: cast_nullable_to_non_nullable
-          : tauxGlobal as num,
+          : tauxGlobal as num?,
     );
   }
 }
@@ -108,9 +108,9 @@ FunnelStageDto _$FunnelStageDtoFromJson(Map<String, dynamic> json) =>
         count: $checkedConvert('count', (v) => v as num),
         tauxEtapePrecedente: $checkedConvert(
           'tauxEtapePrecedente',
-          (v) => v as num,
+          (v) => v as num?,
         ),
-        tauxGlobal: $checkedConvert('tauxGlobal', (v) => v as num),
+        tauxGlobal: $checkedConvert('tauxGlobal', (v) => v as num?),
       );
       return val;
     });

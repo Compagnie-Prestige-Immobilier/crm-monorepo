@@ -11,7 +11,7 @@
 #       path: ../../packages/api-client-dart
 
 name: crm_api_client
-description: Client HTTP généré pour l'API CPI GO — dart-dio + json_serializable.
+description: Client HTTP généré pour l'API CPI GO (dart-dio + json_serializable).
 version: 0.0.0
 publish_to: 'none'
 
@@ -25,14 +25,14 @@ dependencies:
   # @JsonSerializable : ce sont des classes Dart ordinaires, sans registre
   # global, directement stockables dans Drift et sérialisables dans l'outbox.
   json_annotation: ^4.9.0
-  # `equalityCheckMethod: equatable` — indispensable pour que Riverpod et les
+  # `equalityCheckMethod: equatable` : indispensable pour que Riverpod et les
   # comparaisons de widgets voient deux modèles identiques comme égaux.
   # (Le code généré importe package:equatable/src/equatable_utils.dart, un
   # import d'implémentation : d'où `implementation_imports` non activé dans
   # analysis_options.yaml.)
   equatable: ^2.0.7
   # `skipCopyWith: false` fait émettre l'annotation `@CopyWith()` sur chaque
-  # modèle. Elle vient de copy_with_extension — absente du pubspec écrit par le
+  # modèle. Elle vient de copy_with_extension : absente du pubspec écrit par le
   # générateur, ce qui fait échouer build_runner avec « Could not resolve
   # annotation for `class X` ». Vérifié sur le générateur 7.24.0.
   copy_with_extension: ^6.0.0

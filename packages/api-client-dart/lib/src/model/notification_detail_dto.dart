@@ -25,7 +25,7 @@ class NotificationDetailDto {
   @JsonKey(name: r'notification', required: true, includeIfNull: false)
   final NotificationDto notification;
 
-  /// Une ligne par destinataire — c’est ce qui rend « qui a reçu ? » répondable.
+  /// Une ligne par destinataire, c’est ce qui rend « qui a reçu ? » répondable.
   @JsonKey(name: r'recipients', required: true, includeIfNull: false)
   final List<NotificationRecipientDto> recipients;
 

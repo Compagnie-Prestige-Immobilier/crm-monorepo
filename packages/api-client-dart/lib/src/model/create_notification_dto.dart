@@ -30,8 +30,6 @@ class CreateNotificationDto {
 
     this.route,
 
-    this.payload,
-
     required this.audience,
 
     this.audienceRole,
@@ -63,10 +61,6 @@ class CreateNotificationDto {
   /// Route interne, ex. `/phase2`. Une URL absolue est refusée.
   @JsonKey(name: r'route', required: false, includeIfNull: false)
   final String? route;
-
-  /// Données libres transmises au client.
-  @JsonKey(name: r'payload', required: false, includeIfNull: false)
-  final Object? payload;
 
   @JsonKey(
     name: r'audience',
@@ -112,7 +106,6 @@ class CreateNotificationDto {
                 body,
                 category,
                 route,
-                payload,
                 audience,
                 audienceRole,
                 audienceDepartementId,
@@ -125,7 +118,6 @@ class CreateNotificationDto {
                 other.body,
                 other.category,
                 other.route,
-                other.payload,
                 other.audience,
                 other.audienceRole,
                 other.audienceDepartementId,
@@ -144,7 +136,6 @@ class CreateNotificationDto {
         body,
         category,
         route,
-        payload,
         audience,
         audienceRole,
         audienceDepartementId,

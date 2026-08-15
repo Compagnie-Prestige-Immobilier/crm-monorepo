@@ -9,28 +9,37 @@ import 'dart:convert';
 import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
+import 'package:crm_api_client/src/model/analytics_delays_dto.dart';
 import 'package:crm_api_client/src/model/analytics_funnel_dto.dart';
 import 'package:crm_api_client/src/model/analytics_series_dto.dart';
 import 'package:crm_api_client/src/model/analytics_totals_dto.dart';
+import 'package:crm_api_client/src/model/api_error_dto.dart';
+import 'package:crm_api_client/src/model/bank_aging_dto.dart';
 import 'package:crm_api_client/src/model/bdd_segment.dart';
+import 'package:crm_api_client/src/model/campaign_pilotage_dto.dart';
+import 'package:crm_api_client/src/model/data_quality_dto.dart';
+import 'package:crm_api_client/src/model/departement_yield_list_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
 import 'package:crm_api_client/src/model/enrollment_method_list_dto.dart';
 import 'package:crm_api_client/src/model/named_count_list_dto.dart';
+import 'package:crm_api_client/src/model/origin_breakdown_dto.dart';
 import 'package:crm_api_client/src/model/phase2_status.dart';
 import 'package:crm_api_client/src/model/phase2_status_list_dto.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
+import 'package:crm_api_client/src/model/representant_productivity_list_dto.dart';
 import 'package:crm_api_client/src/model/segment_list_dto.dart';
 import 'package:crm_api_client/src/model/time_granularity.dart';
 import 'package:crm_api_client/src/model/top_commercial_list_dto.dart';
 import 'package:crm_api_client/src/model/top_representant_list_dto.dart';
+import 'package:crm_api_client/src/model/weekly_cohort_list_dto.dart';
 
 class AnalyticsApi {
   final Dio _dio;
 
   const AnalyticsApi(this._dio);
 
-  /// Entonnoir complet et montants encaissés.
-  /// Du prospect saisi au dossier encaissé, plus les montants. Le tableau de bord montrait l’effort — prospects, représentants, téléconseillers — mais jamais le résultat. Une direction qui ne voit que le haut de l’entonnoir peut féliciter une équipe qui saisit beaucoup et ne convertit rien.
+  /// Durées médianes de la chaîne, du prospect à l’encaissement.
+  /// Médiane et neuvième décile, en jours, sur les trois tronçons. Le produit horodate déjà tout : personne ne lisait ces dates, alors qu’elles désignent l’étape qui traîne.
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
@@ -45,6 +54,135 @@ class AnalyticsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
+  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AnalyticsDelaysDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AnalyticsDelaysDto>> getAnalyticsDelays({
+    String? search,
+    String? representantId,
+    String? banqueId,
+    String? syndicatId,
+    String? departementId,
+    String? commercialId,
+    ProspectStatut? statut,
+    BddSegment? segment,
+    Phase2Status? phase2Status,
+    EnrollmentMethod? enrollmentMethod,
+    String? campaignId,
+    String? enrollmentCapturedById,
+    String? origin,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? includeDeleted = false,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/analytics/delays';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (search != null) r'search': search,
+      if (representantId != null) r'representantId': representantId,
+      if (banqueId != null) r'banqueId': banqueId,
+      if (syndicatId != null) r'syndicatId': syndicatId,
+      if (departementId != null) r'departementId': departementId,
+      if (commercialId != null) r'commercialId': commercialId,
+      if (statut != null) r'statut': statut,
+      if (segment != null) r'segment': segment,
+      if (phase2Status != null) r'phase2Status': phase2Status,
+      if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
+      if (campaignId != null) r'campaignId': campaignId,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (includeDeleted != null) r'includeDeleted': includeDeleted,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AnalyticsDelaysDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<AnalyticsDelaysDto, AnalyticsDelaysDto>(
+              rawData,
+              'AnalyticsDelaysDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AnalyticsDelaysDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Entonnoir complet et montants encaissés.
+  /// Du prospect saisi au dossier encaissé, plus les montants. Le tableau de bord montrait l’effort, prospects, représentants, téléconseillers, mais jamais le résultat. Une direction qui ne voit que le haut de l’entonnoir peut féliciter une équipe qui saisit beaucoup et ne convertit rien.
+  ///
+  /// Parameters:
+  /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
+  /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
+  /// * [statut]
+  /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
+  /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
+  /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
+  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -70,6 +208,7 @@ class AnalyticsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -107,6 +246,7 @@ class AnalyticsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
@@ -170,6 +310,7 @@ class AnalyticsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -195,6 +336,7 @@ class AnalyticsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -232,6 +374,7 @@ class AnalyticsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
@@ -279,6 +422,646 @@ class AnalyticsApi {
     );
   }
 
+  /// Vieillissement des dossiers bancaires, par tranche et par étape.
+  /// Ne compte que les dossiers non supprimés stationnant à une étape NON TERMINALE : un dossier encaissé ou rejeté est sorti du portefeuille et son ancienneté ne se pilote plus.
+  ///
+  /// Parameters:
+  /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
+  /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
+  /// * [statut]
+  /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
+  /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
+  /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
+  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
+  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [BankAgingDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<BankAgingDto>> getBankAging({
+    String? search,
+    String? representantId,
+    String? banqueId,
+    String? syndicatId,
+    String? departementId,
+    String? commercialId,
+    ProspectStatut? statut,
+    BddSegment? segment,
+    Phase2Status? phase2Status,
+    EnrollmentMethod? enrollmentMethod,
+    String? campaignId,
+    String? enrollmentCapturedById,
+    String? origin,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? includeDeleted = false,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/analytics/bank-aging';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (search != null) r'search': search,
+      if (representantId != null) r'representantId': representantId,
+      if (banqueId != null) r'banqueId': banqueId,
+      if (syndicatId != null) r'syndicatId': syndicatId,
+      if (departementId != null) r'departementId': departementId,
+      if (commercialId != null) r'commercialId': commercialId,
+      if (statut != null) r'statut': statut,
+      if (segment != null) r'segment': segment,
+      if (phase2Status != null) r'phase2Status': phase2Status,
+      if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
+      if (campaignId != null) r'campaignId': campaignId,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (includeDeleted != null) r'includeDeleted': includeDeleted,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    BankAgingDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BankAgingDto, BankAgingDto>(
+              rawData,
+              'BankAgingDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<BankAgingDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Pilotage d’une campagne d’appels : joignabilité, cadence, fin projetée.
+  /// Sans &#x60;campaignId&#x60;, la mesure porte sur l’ensemble des campagnes ACTIVES. La progression était jusqu’ici calculée à la volée et ne remontait dans aucun tableau de bord : « 42 % faits » ne dit ni si les numéros répondent, ni quand la campagne se termine.
+  ///
+  /// Parameters:
+  /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
+  /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
+  /// * [statut]
+  /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
+  /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
+  /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
+  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
+  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [CampaignPilotageDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<CampaignPilotageDto>> getCampaignPilotage({
+    String? search,
+    String? representantId,
+    String? banqueId,
+    String? syndicatId,
+    String? departementId,
+    String? commercialId,
+    ProspectStatut? statut,
+    BddSegment? segment,
+    Phase2Status? phase2Status,
+    EnrollmentMethod? enrollmentMethod,
+    String? campaignId,
+    String? enrollmentCapturedById,
+    String? origin,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? includeDeleted = false,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/analytics/campaign-pilotage';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (search != null) r'search': search,
+      if (representantId != null) r'representantId': representantId,
+      if (banqueId != null) r'banqueId': banqueId,
+      if (syndicatId != null) r'syndicatId': syndicatId,
+      if (departementId != null) r'departementId': departementId,
+      if (commercialId != null) r'commercialId': commercialId,
+      if (statut != null) r'statut': statut,
+      if (segment != null) r'segment': segment,
+      if (phase2Status != null) r'phase2Status': phase2Status,
+      if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
+      if (campaignId != null) r'campaignId': campaignId,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (includeDeleted != null) r'includeDeleted': includeDeleted,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    CampaignPilotageDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<CampaignPilotageDto, CampaignPilotageDto>(
+              rawData,
+              'CampaignPilotageDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<CampaignPilotageDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Part de numéros injoignables ou erronés, par représentant et par département.
+  /// Se branche sur les issues d’appel UNREACHABLE et WRONG_NUMBER. Les deux listes comptent la même population de tentatives selon deux axes.
+  ///
+  /// Parameters:
+  /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
+  /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
+  /// * [statut]
+  /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
+  /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
+  /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
+  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
+  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [DataQualityDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<DataQualityDto>> getDataQuality({
+    String? search,
+    String? representantId,
+    String? banqueId,
+    String? syndicatId,
+    String? departementId,
+    String? commercialId,
+    ProspectStatut? statut,
+    BddSegment? segment,
+    Phase2Status? phase2Status,
+    EnrollmentMethod? enrollmentMethod,
+    String? campaignId,
+    String? enrollmentCapturedById,
+    String? origin,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? includeDeleted = false,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/analytics/data-quality';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (search != null) r'search': search,
+      if (representantId != null) r'representantId': representantId,
+      if (banqueId != null) r'banqueId': banqueId,
+      if (syndicatId != null) r'syndicatId': syndicatId,
+      if (departementId != null) r'departementId': departementId,
+      if (commercialId != null) r'commercialId': commercialId,
+      if (statut != null) r'statut': statut,
+      if (segment != null) r'segment': segment,
+      if (phase2Status != null) r'phase2Status': phase2Status,
+      if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
+      if (campaignId != null) r'campaignId': campaignId,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (includeDeleted != null) r'includeDeleted': includeDeleted,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    DataQualityDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<DataQualityDto, DataQualityDto>(
+              rawData,
+              'DataQualityDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<DataQualityDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Rendement par département : taux, et pas seulement volume.
+  ///
+  ///
+  /// Parameters:
+  /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
+  /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
+  /// * [statut]
+  /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
+  /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
+  /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
+  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
+  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [DepartementYieldListDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<DepartementYieldListDto>> getDepartementYield({
+    String? search,
+    String? representantId,
+    String? banqueId,
+    String? syndicatId,
+    String? departementId,
+    String? commercialId,
+    ProspectStatut? statut,
+    BddSegment? segment,
+    Phase2Status? phase2Status,
+    EnrollmentMethod? enrollmentMethod,
+    String? campaignId,
+    String? enrollmentCapturedById,
+    String? origin,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? includeDeleted = false,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/analytics/departement-yield';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (search != null) r'search': search,
+      if (representantId != null) r'representantId': representantId,
+      if (banqueId != null) r'banqueId': banqueId,
+      if (syndicatId != null) r'syndicatId': syndicatId,
+      if (departementId != null) r'departementId': departementId,
+      if (commercialId != null) r'commercialId': commercialId,
+      if (statut != null) r'statut': statut,
+      if (segment != null) r'segment': segment,
+      if (phase2Status != null) r'phase2Status': phase2Status,
+      if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
+      if (campaignId != null) r'campaignId': campaignId,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (includeDeleted != null) r'includeDeleted': includeDeleted,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    DepartementYieldListDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<DepartementYieldListDto, DepartementYieldListDto>(
+              rawData,
+              'DepartementYieldListDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<DepartementYieldListDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Provenance des fiches, avec le détail lisible en second niveau.
+  /// Une provenance absente n’est pas une provenance inconnue : c’est le chemin normal, la saisie terrain.
+  ///
+  /// Parameters:
+  /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
+  /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
+  /// * [statut]
+  /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
+  /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
+  /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
+  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
+  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [OriginBreakdownDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<OriginBreakdownDto>> getOriginBreakdown({
+    String? search,
+    String? representantId,
+    String? banqueId,
+    String? syndicatId,
+    String? departementId,
+    String? commercialId,
+    ProspectStatut? statut,
+    BddSegment? segment,
+    Phase2Status? phase2Status,
+    EnrollmentMethod? enrollmentMethod,
+    String? campaignId,
+    String? enrollmentCapturedById,
+    String? origin,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? includeDeleted = false,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/analytics/origin-breakdown';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (search != null) r'search': search,
+      if (representantId != null) r'representantId': representantId,
+      if (banqueId != null) r'banqueId': banqueId,
+      if (syndicatId != null) r'syndicatId': syndicatId,
+      if (departementId != null) r'departementId': departementId,
+      if (commercialId != null) r'commercialId': commercialId,
+      if (statut != null) r'statut': statut,
+      if (segment != null) r'segment': segment,
+      if (phase2Status != null) r'phase2Status': phase2Status,
+      if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
+      if (campaignId != null) r'campaignId': campaignId,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (includeDeleted != null) r'includeDeleted': includeDeleted,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    OriginBreakdownDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OriginBreakdownDto, OriginBreakdownDto>(
+              rawData,
+              'OriginBreakdownDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<OriginBreakdownDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Répartition par banque.
   ///
   ///
@@ -295,6 +1078,7 @@ class AnalyticsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -320,6 +1104,7 @@ class AnalyticsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -357,6 +1142,7 @@ class AnalyticsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
@@ -420,6 +1206,7 @@ class AnalyticsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -445,6 +1232,7 @@ class AnalyticsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -482,6 +1270,7 @@ class AnalyticsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
@@ -545,6 +1334,7 @@ class AnalyticsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -570,6 +1360,7 @@ class AnalyticsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -607,6 +1398,7 @@ class AnalyticsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
@@ -670,6 +1462,7 @@ class AnalyticsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -695,6 +1488,7 @@ class AnalyticsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -732,6 +1526,7 @@ class AnalyticsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
@@ -795,6 +1590,7 @@ class AnalyticsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -820,6 +1616,7 @@ class AnalyticsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -857,6 +1654,7 @@ class AnalyticsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
@@ -920,6 +1718,7 @@ class AnalyticsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -945,6 +1744,7 @@ class AnalyticsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -982,6 +1782,7 @@ class AnalyticsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
@@ -1045,6 +1846,7 @@ class AnalyticsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -1071,6 +1873,7 @@ class AnalyticsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -1109,6 +1912,7 @@ class AnalyticsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
@@ -1157,6 +1961,140 @@ class AnalyticsApi {
     );
   }
 
+  /// Productivité des représentants, et repérage des dormants.
+  /// Prospects apportés, taux de conversion, dernier apport. &#x60;dormantDays&#x60; fixe le silence à partir duquel un représentant est déclaré dormant (90 jours par défaut).
+  ///
+  /// Parameters:
+  /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
+  /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
+  /// * [statut]
+  /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
+  /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
+  /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
+  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
+  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
+  /// * [limit]
+  /// * [dormantDays] - Ancienneté, en jours, au delà de laquelle un représentant sans nouvel apport est déclaré dormant. Le seuil est un paramètre parce qu’il dépend du rythme de la zone : trois mois de silence n’ont pas le même sens partout.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RepresentantProductivityListDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RepresentantProductivityListDto>>
+  getRepresentantProductivity({
+    String? search,
+    String? representantId,
+    String? banqueId,
+    String? syndicatId,
+    String? departementId,
+    String? commercialId,
+    ProspectStatut? statut,
+    BddSegment? segment,
+    Phase2Status? phase2Status,
+    EnrollmentMethod? enrollmentMethod,
+    String? campaignId,
+    String? enrollmentCapturedById,
+    String? origin,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? includeDeleted = false,
+    num? limit = 10,
+    num? dormantDays = 90,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/analytics/representant-productivity';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (search != null) r'search': search,
+      if (representantId != null) r'representantId': representantId,
+      if (banqueId != null) r'banqueId': banqueId,
+      if (syndicatId != null) r'syndicatId': syndicatId,
+      if (departementId != null) r'departementId': departementId,
+      if (commercialId != null) r'commercialId': commercialId,
+      if (statut != null) r'statut': statut,
+      if (segment != null) r'segment': segment,
+      if (phase2Status != null) r'phase2Status': phase2Status,
+      if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
+      if (campaignId != null) r'campaignId': campaignId,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (includeDeleted != null) r'includeDeleted': includeDeleted,
+      if (limit != null) r'limit': limit,
+      if (dormantDays != null) r'dormantDays': dormantDays,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RepresentantProductivityListDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<
+              RepresentantProductivityListDto,
+              RepresentantProductivityListDto
+            >(rawData, 'RepresentantProductivityListDto', growable: true);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RepresentantProductivityListDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Classement des commerciaux.
   ///
   ///
@@ -1173,6 +2111,7 @@ class AnalyticsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -1199,6 +2138,7 @@ class AnalyticsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -1237,6 +2177,7 @@ class AnalyticsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
@@ -1301,6 +2242,7 @@ class AnalyticsApi {
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
@@ -1327,6 +2269,7 @@ class AnalyticsApi {
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
     String? enrollmentCapturedById,
+    String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted = false,
@@ -1365,6 +2308,7 @@ class AnalyticsApi {
       if (campaignId != null) r'campaignId': campaignId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
@@ -1402,6 +2346,134 @@ class AnalyticsApi {
     }
 
     return Response<TopRepresentantListDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Cohortes hebdomadaires d’entrée, suivies jusqu’à l’encaissement.
+  /// La seule mesure qui distingue une amélioration réelle d’un effet de volume. La semaine est celle de la saisie terrain, pas de l’arrivée en base.
+  ///
+  /// Parameters:
+  /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
+  /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
+  /// * [statut]
+  /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
+  /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
+  /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
+  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
+  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [WeeklyCohortListDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<WeeklyCohortListDto>> getWeeklyCohorts({
+    String? search,
+    String? representantId,
+    String? banqueId,
+    String? syndicatId,
+    String? departementId,
+    String? commercialId,
+    ProspectStatut? statut,
+    BddSegment? segment,
+    Phase2Status? phase2Status,
+    EnrollmentMethod? enrollmentMethod,
+    String? campaignId,
+    String? enrollmentCapturedById,
+    String? origin,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool? includeDeleted = false,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/analytics/weekly-cohorts';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (search != null) r'search': search,
+      if (representantId != null) r'representantId': representantId,
+      if (banqueId != null) r'banqueId': banqueId,
+      if (syndicatId != null) r'syndicatId': syndicatId,
+      if (departementId != null) r'departementId': departementId,
+      if (commercialId != null) r'commercialId': commercialId,
+      if (statut != null) r'statut': statut,
+      if (segment != null) r'segment': segment,
+      if (phase2Status != null) r'phase2Status': phase2Status,
+      if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
+      if (campaignId != null) r'campaignId': campaignId,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
+      if (origin != null) r'origin': origin,
+      if (dateFrom != null) r'dateFrom': dateFrom,
+      if (dateTo != null) r'dateTo': dateTo,
+      if (includeDeleted != null) r'includeDeleted': includeDeleted,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    WeeklyCohortListDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<WeeklyCohortListDto, WeeklyCohortListDto>(
+              rawData,
+              'WeeklyCohortListDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<WeeklyCohortListDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

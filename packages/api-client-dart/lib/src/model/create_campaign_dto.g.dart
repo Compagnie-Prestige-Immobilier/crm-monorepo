@@ -13,6 +13,8 @@ abstract class _$CreateCampaignDtoCWProxy {
 
   CreateCampaignDto commercialIds(List<String> commercialIds);
 
+  CreateCampaignDto spreadDays(num? spreadDays);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateCampaignDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -23,6 +25,7 @@ abstract class _$CreateCampaignDtoCWProxy {
     String name,
     CampaignScope scope,
     List<String> commercialIds,
+    num? spreadDays,
   });
 }
 
@@ -43,6 +46,9 @@ class _$CreateCampaignDtoCWProxyImpl implements _$CreateCampaignDtoCWProxy {
       this(commercialIds: commercialIds);
 
   @override
+  CreateCampaignDto spreadDays(num? spreadDays) => this(spreadDays: spreadDays);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateCampaignDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -53,6 +59,7 @@ class _$CreateCampaignDtoCWProxyImpl implements _$CreateCampaignDtoCWProxy {
     Object? name = const $CopyWithPlaceholder(),
     Object? scope = const $CopyWithPlaceholder(),
     Object? commercialIds = const $CopyWithPlaceholder(),
+    Object? spreadDays = const $CopyWithPlaceholder(),
   }) {
     return CreateCampaignDto(
       name: name == const $CopyWithPlaceholder()
@@ -67,6 +74,10 @@ class _$CreateCampaignDtoCWProxyImpl implements _$CreateCampaignDtoCWProxy {
           ? _value.commercialIds
           // ignore: cast_nullable_to_non_nullable
           : commercialIds as List<String>,
+      spreadDays: spreadDays == const $CopyWithPlaceholder()
+          ? _value.spreadDays
+          // ignore: cast_nullable_to_non_nullable
+          : spreadDays as num?,
     );
   }
 }
@@ -99,6 +110,7 @@ CreateCampaignDto _$CreateCampaignDtoFromJson(Map<String, dynamic> json) =>
           'commercialIds',
           (v) => (v as List<dynamic>).map((e) => e as String).toList(),
         ),
+        spreadDays: $checkedConvert('spreadDays', (v) => v as num? ?? 1),
       );
       return val;
     });
@@ -108,6 +120,7 @@ Map<String, dynamic> _$CreateCampaignDtoToJson(CreateCampaignDto instance) =>
       'name': instance.name,
       'scope': _$CampaignScopeEnumMap[instance.scope]!,
       'commercialIds': instance.commercialIds,
+      if (instance.spreadDays case final value?) 'spreadDays': value,
     };
 
 const _$CampaignScopeEnumMap = {

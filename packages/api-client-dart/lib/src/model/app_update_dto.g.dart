@@ -25,7 +25,7 @@ abstract class _$AppUpdateDtoCWProxy {
 
   AppUpdateDto publishedAt(String publishedAt);
 
-  AppUpdateDto notes(Object? notes);
+  AppUpdateDto notes(String? notes);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `AppUpdateDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
@@ -43,7 +43,7 @@ abstract class _$AppUpdateDtoCWProxy {
     String sha256,
     String downloadUrl,
     String publishedAt,
-    Object? notes,
+    String? notes,
   });
 }
 
@@ -84,7 +84,7 @@ class _$AppUpdateDtoCWProxyImpl implements _$AppUpdateDtoCWProxy {
       this(publishedAt: publishedAt);
 
   @override
-  AppUpdateDto notes(Object? notes) => this(notes: notes);
+  AppUpdateDto notes(String? notes) => this(notes: notes);
 
   @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `AppUpdateDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -145,7 +145,7 @@ class _$AppUpdateDtoCWProxyImpl implements _$AppUpdateDtoCWProxy {
       notes: notes == const $CopyWithPlaceholder()
           ? _value.notes
           // ignore: cast_nullable_to_non_nullable
-          : notes as Object?,
+          : notes as String?,
     );
   }
 }
@@ -174,6 +174,7 @@ AppUpdateDto _$AppUpdateDtoFromJson(Map<String, dynamic> json) =>
           'sha256',
           'downloadUrl',
           'publishedAt',
+          'notes',
         ],
       );
       final val = AppUpdateDto(
@@ -186,7 +187,7 @@ AppUpdateDto _$AppUpdateDtoFromJson(Map<String, dynamic> json) =>
         sha256: $checkedConvert('sha256', (v) => v as String),
         downloadUrl: $checkedConvert('downloadUrl', (v) => v as String),
         publishedAt: $checkedConvert('publishedAt', (v) => v as String),
-        notes: $checkedConvert('notes', (v) => v),
+        notes: $checkedConvert('notes', (v) => v as String?),
       );
       return val;
     });
@@ -202,5 +203,5 @@ Map<String, dynamic> _$AppUpdateDtoToJson(AppUpdateDto instance) =>
       'sha256': instance.sha256,
       'downloadUrl': instance.downloadUrl,
       'publishedAt': instance.publishedAt,
-      if (instance.notes case final value?) 'notes': value,
+      'notes': instance.notes,
     };

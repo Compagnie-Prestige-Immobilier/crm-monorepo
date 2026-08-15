@@ -18,7 +18,7 @@ export interface ApiClientOptions {
   getAccessToken?: TokenProvider;
   /**
    * Called on any 401. This is the single place the app learns its session
-   * died — refresh the token, or clear it and bounce to /login. It runs before
+   * died : refresh the token, or clear it and bounce to /login. It runs before
    * the caller sees the response, so a refresh-and-retry strategy belongs here.
    */
   onUnauthorized?: (response: Response) => void | Promise<void>;

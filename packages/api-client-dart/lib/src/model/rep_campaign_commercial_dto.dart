@@ -1,0 +1,94 @@
+//
+// AUTO-GENERATED FILE, DO NOT MODIFY!
+//
+
+// ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/rep_campaign_progress_dto.dart';
+import 'package:copy_with_extension/copy_with_extension.dart';
+import 'package:json_annotation/json_annotation.dart';
+import 'package:equatable/src/equatable_utils.dart';
+
+part 'rep_campaign_commercial_dto.g.dart';
+
+@CopyWith()
+@JsonSerializable(
+  checked: true,
+  createToJson: true,
+  disallowUnrecognizedKeys: false,
+  explicitToJson: true,
+)
+class RepCampaignCommercialDto {
+  /// Returns a new [RepCampaignCommercialDto] instance.
+  RepCampaignCommercialDto({
+    required this.userId,
+
+    required this.fullName,
+
+    required this.username,
+
+    required this.position,
+
+    required this.progress,
+
+    required this.perDay,
+  });
+
+  @JsonKey(name: r'userId', required: true, includeIfNull: false)
+  final String userId;
+
+  @JsonKey(name: r'fullName', required: true, includeIfNull: false)
+  final String fullName;
+
+  @JsonKey(name: r'username', required: true, includeIfNull: false)
+  final String username;
+
+  /// Rang dans le tourniquet, à partir de 1.
+  @JsonKey(name: r'position', required: true, includeIfNull: false)
+  final num position;
+
+  @JsonKey(name: r'progress', required: true, includeIfNull: false)
+  final RepCampaignProgressDto progress;
+
+  /// Lignes par journée, jour 1 en tête.
+  @JsonKey(name: r'perDay', required: true, includeIfNull: false)
+  final List<num> perDay;
+
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is RepCampaignCommercialDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [userId, fullName, username, position, progress, perDay],
+              [
+                other.userId,
+                other.fullName,
+                other.username,
+                other.position,
+                other.progress,
+                other.perDay,
+              ],
+            );
+  }
+
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
+        userId,
+        fullName,
+        username,
+        position,
+        progress,
+        perDay,
+      ]);
+
+  factory RepCampaignCommercialDto.fromJson(Map<String, dynamic> json) =>
+      _$RepCampaignCommercialDtoFromJson(json);
+
+  Map<String, dynamic> toJson() => _$RepCampaignCommercialDtoToJson(this);
+
+  @override
+  String toString() {
+    return toJson().toString();
+  }
+}

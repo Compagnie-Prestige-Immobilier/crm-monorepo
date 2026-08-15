@@ -25,6 +25,8 @@ abstract class _$CampaignSummaryDtoCWProxy {
 
   CampaignSummaryDto commercialCount(num commercialCount);
 
+  CampaignSummaryDto spreadDays(num spreadDays);
+
   CampaignSummaryDto progress(CampaignProgressDto progress);
 
   CampaignSummaryDto createdAt(DateTime createdAt);
@@ -47,6 +49,7 @@ abstract class _$CampaignSummaryDtoCWProxy {
     String createdById,
     String createdByName,
     num commercialCount,
+    num spreadDays,
     CampaignProgressDto progress,
     DateTime createdAt,
     DateTime? closedAt,
@@ -91,6 +94,9 @@ class _$CampaignSummaryDtoCWProxyImpl implements _$CampaignSummaryDtoCWProxy {
       this(commercialCount: commercialCount);
 
   @override
+  CampaignSummaryDto spreadDays(num spreadDays) => this(spreadDays: spreadDays);
+
+  @override
   CampaignSummaryDto progress(CampaignProgressDto progress) =>
       this(progress: progress);
 
@@ -118,6 +124,7 @@ class _$CampaignSummaryDtoCWProxyImpl implements _$CampaignSummaryDtoCWProxy {
     Object? createdById = const $CopyWithPlaceholder(),
     Object? createdByName = const $CopyWithPlaceholder(),
     Object? commercialCount = const $CopyWithPlaceholder(),
+    Object? spreadDays = const $CopyWithPlaceholder(),
     Object? progress = const $CopyWithPlaceholder(),
     Object? createdAt = const $CopyWithPlaceholder(),
     Object? closedAt = const $CopyWithPlaceholder(),
@@ -159,6 +166,10 @@ class _$CampaignSummaryDtoCWProxyImpl implements _$CampaignSummaryDtoCWProxy {
           ? _value.commercialCount
           // ignore: cast_nullable_to_non_nullable
           : commercialCount as num,
+      spreadDays: spreadDays == const $CopyWithPlaceholder()
+          ? _value.spreadDays
+          // ignore: cast_nullable_to_non_nullable
+          : spreadDays as num,
       progress: progress == const $CopyWithPlaceholder()
           ? _value.progress
           // ignore: cast_nullable_to_non_nullable
@@ -200,6 +211,7 @@ CampaignSummaryDto _$CampaignSummaryDtoFromJson(Map<String, dynamic> json) =>
           'createdById',
           'createdByName',
           'commercialCount',
+          'spreadDays',
           'progress',
           'createdAt',
           'closedAt',
@@ -229,6 +241,7 @@ CampaignSummaryDto _$CampaignSummaryDtoFromJson(Map<String, dynamic> json) =>
         createdById: $checkedConvert('createdById', (v) => v as String),
         createdByName: $checkedConvert('createdByName', (v) => v as String),
         commercialCount: $checkedConvert('commercialCount', (v) => v as num),
+        spreadDays: $checkedConvert('spreadDays', (v) => v as num),
         progress: $checkedConvert(
           'progress',
           (v) => CampaignProgressDto.fromJson(v as Map<String, dynamic>),
@@ -256,6 +269,7 @@ Map<String, dynamic> _$CampaignSummaryDtoToJson(CampaignSummaryDto instance) =>
       'createdById': instance.createdById,
       'createdByName': instance.createdByName,
       'commercialCount': instance.commercialCount,
+      'spreadDays': instance.spreadDays,
       'progress': instance.progress.toJson(),
       'createdAt': instance.createdAt.toIso8601String(),
       'closedAt': instance.closedAt?.toIso8601String(),

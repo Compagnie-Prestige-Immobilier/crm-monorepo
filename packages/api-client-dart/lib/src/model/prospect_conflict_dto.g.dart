@@ -7,9 +7,15 @@ part of 'prospect_conflict_dto.dart';
 // **************************************************************************
 
 abstract class _$ProspectConflictDtoCWProxy {
+  ProspectConflictDto statusCode(num statusCode);
+
   ProspectConflictDto code(ProspectConflictDtoCodeEnum code);
 
   ProspectConflictDto message(String message);
+
+  ProspectConflictDto details(List<String>? details);
+
+  ProspectConflictDto requestId(String? requestId);
 
   ProspectConflictDto existing(ProspectConflictExistingDto existing);
 
@@ -20,8 +26,11 @@ abstract class _$ProspectConflictDtoCWProxy {
   /// ProspectConflictDto(...).copyWith(id: 12, name: "My name")
   /// ````
   ProspectConflictDto call({
+    num statusCode,
     ProspectConflictDtoCodeEnum code,
     String message,
+    List<String>? details,
+    String? requestId,
     ProspectConflictExistingDto existing,
   });
 }
@@ -33,11 +42,22 @@ class _$ProspectConflictDtoCWProxyImpl implements _$ProspectConflictDtoCWProxy {
   final ProspectConflictDto _value;
 
   @override
+  ProspectConflictDto statusCode(num statusCode) =>
+      this(statusCode: statusCode);
+
+  @override
   ProspectConflictDto code(ProspectConflictDtoCodeEnum code) =>
       this(code: code);
 
   @override
   ProspectConflictDto message(String message) => this(message: message);
+
+  @override
+  ProspectConflictDto details(List<String>? details) => this(details: details);
+
+  @override
+  ProspectConflictDto requestId(String? requestId) =>
+      this(requestId: requestId);
 
   @override
   ProspectConflictDto existing(ProspectConflictExistingDto existing) =>
@@ -51,11 +71,18 @@ class _$ProspectConflictDtoCWProxyImpl implements _$ProspectConflictDtoCWProxy {
   /// ProspectConflictDto(...).copyWith(id: 12, name: "My name")
   /// ````
   ProspectConflictDto call({
+    Object? statusCode = const $CopyWithPlaceholder(),
     Object? code = const $CopyWithPlaceholder(),
     Object? message = const $CopyWithPlaceholder(),
+    Object? details = const $CopyWithPlaceholder(),
+    Object? requestId = const $CopyWithPlaceholder(),
     Object? existing = const $CopyWithPlaceholder(),
   }) {
     return ProspectConflictDto(
+      statusCode: statusCode == const $CopyWithPlaceholder()
+          ? _value.statusCode
+          // ignore: cast_nullable_to_non_nullable
+          : statusCode as num,
       code: code == const $CopyWithPlaceholder()
           ? _value.code
           // ignore: cast_nullable_to_non_nullable
@@ -64,6 +91,14 @@ class _$ProspectConflictDtoCWProxyImpl implements _$ProspectConflictDtoCWProxy {
           ? _value.message
           // ignore: cast_nullable_to_non_nullable
           : message as String,
+      details: details == const $CopyWithPlaceholder()
+          ? _value.details
+          // ignore: cast_nullable_to_non_nullable
+          : details as List<String>?,
+      requestId: requestId == const $CopyWithPlaceholder()
+          ? _value.requestId
+          // ignore: cast_nullable_to_non_nullable
+          : requestId as String?,
       existing: existing == const $CopyWithPlaceholder()
           ? _value.existing
           // ignore: cast_nullable_to_non_nullable
@@ -85,8 +120,12 @@ extension $ProspectConflictDtoCopyWith on ProspectConflictDto {
 
 ProspectConflictDto _$ProspectConflictDtoFromJson(Map<String, dynamic> json) =>
     $checkedCreate('ProspectConflictDto', json, ($checkedConvert) {
-      $checkKeys(json, requiredKeys: const ['code', 'message', 'existing']);
+      $checkKeys(
+        json,
+        requiredKeys: const ['statusCode', 'code', 'message', 'existing'],
+      );
       final val = ProspectConflictDto(
+        statusCode: $checkedConvert('statusCode', (v) => v as num),
         code: $checkedConvert(
           'code',
           (v) => $enumDecode(
@@ -96,6 +135,11 @@ ProspectConflictDto _$ProspectConflictDtoFromJson(Map<String, dynamic> json) =>
           ),
         ),
         message: $checkedConvert('message', (v) => v as String),
+        details: $checkedConvert(
+          'details',
+          (v) => (v as List<dynamic>?)?.map((e) => e as String).toList(),
+        ),
+        requestId: $checkedConvert('requestId', (v) => v as String?),
         existing: $checkedConvert(
           'existing',
           (v) =>
@@ -108,8 +152,11 @@ ProspectConflictDto _$ProspectConflictDtoFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$ProspectConflictDtoToJson(
   ProspectConflictDto instance,
 ) => <String, dynamic>{
+  'statusCode': instance.statusCode,
   'code': _$ProspectConflictDtoCodeEnumEnumMap[instance.code]!,
   'message': instance.message,
+  if (instance.details case final value?) 'details': value,
+  if (instance.requestId case final value?) 'requestId': value,
   'existing': instance.existing.toJson(),
 };
 
