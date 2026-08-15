@@ -539,3 +539,90 @@ describe('mode démonstration allumé, la remontée hors ligne reste du travail 
     expect(demoDb.prospects.get(prospectId)?.isDemo ?? false).toBe(false);
   });
 });
+
+/**
+ * MAIS L'ANIMATEUR, LUI, N'EST PAS UN VRAI COMMERCIAL.
+ *
+ * Le bloc précédent est juste, et sa conclusion a pourtant été tirée trop
+ * loin : « tout ce qui arrive par le chemin dispensé est du travail réel ».
+ * C'est faux pour UN cas, et c'est précisément celui que la démonstration
+ * met en scène. L'animateur se connecte sur le téléphone avec un compte de
+ * démonstration pour montrer la saisie terrain ; ce qu'il pousse est fictif.
+ *
+ * Le drapeau ne suit donc pas l'INTERRUPTEUR (le bloc précédent le prouve),
+ * il suit l'AUTEUR et le PARENT.
+ */
+describe('la remontée d’un COMPTE de démonstration écrit du fictif', () => {
+  const animateur: AuthenticatedUser = { ...alice, id: 'demo-awa', username: 'demo.awa' };
+  const PROSPECT = '0198f000-0000-7000-8000-000000000009';
+
+  beforeEach(() => {
+    db.addDemoUser(animateur.id);
+  });
+
+  it('LE REPRÉSENTANT SAISI PAR L’ANIMATEUR EST FICTIF', async () => {
+    await sync.push(animateur, batch([createRep(REP_A, '77 123 45 67')]));
+
+    // Sans cela, la fiche fictive entre dans l'annuaire RÉEL : listée,
+    // exportée, et tirée dans les campagnes.
+    expect(db.representants.get(REP_A)?.isDemo).toBe(true);
+  });
+
+  it('et il est INSCRIT AU REGISTRE, sans quoi la purge resterait bloquée', async () => {
+    await sync.push(animateur, batch([createRep(REP_A, '77 123 45 67')]));
+
+    // `Representant.createdById` est en `onDelete: Restrict` : une fiche
+    // fictive hors registre retient le compte semé qui l'a créée, et la purge
+    // entière échoue. Le jeu de démonstration devient indéboulonnable.
+    expect(db.demoEntities).toContainEqual(
+      expect.objectContaining({ entityType: 'representant', entityId: REP_A }),
+    );
+  });
+
+  it('le prospect suit, et part du registre AVANT son représentant', async () => {
+    await sync.push(
+      animateur,
+      batch([
+        createRep(REP_A, '77 123 45 67', 0),
+        createProspect(PROSPECT, REP_A, '78 222 33 44', 1),
+      ]),
+    );
+
+    expect(db.prospects.get(PROSPECT)?.isDemo).toBe(true);
+
+    // La purge parcourt le registre à l'ENVERS : le prospect doit donc porter
+    // un rang plus élevé que son représentant, sinon `onDelete: Restrict`
+    // arrête la suppression sur le parent.
+    const rang = (entityId: string): number =>
+      db.demoEntities.find((row) => row.entityId === entityId)?.sequence ?? -1;
+    expect(rang(PROSPECT)).toBeGreaterThan(rang(REP_A));
+  });
+
+  it('UN VRAI COMMERCIAL rattaché à un représentant FICTIF écrit du fictif', async () => {
+    // L'annuaire de phase 2 n'est pas cloisonné par commercial : un vrai
+    // commercial peut compléter n'importe quel numéro, y compris fictif. Le
+    // prospect doit suivre son parent, sans quoi la paire se désolidarise à
+    // l'extinction et la purge bute sur le prospect resté réel.
+    await sync.push(animateur, batch([createRep(REP_A, '77 123 45 67')]));
+
+    const admin: AuthenticatedUser = { ...alice, id: 'com-admin', role: Role.ADMIN };
+    await sync.push(admin, batch([createProspect(PROSPECT, REP_A, '78 222 33 44', 0)]));
+
+    expect(db.prospects.get(PROSPECT)?.isDemo).toBe(true);
+  });
+
+  it('un compte RÉEL sur un représentant RÉEL n’écrit rien de fictif', async () => {
+    // Le contrôle inverse : la correction ne doit pas colorier la production.
+    await sync.push(
+      alice,
+      batch([
+        createRep(REP_B, '77 999 88 77', 0),
+        createProspect(PROSPECT, REP_B, '78 222 33 44', 1),
+      ]),
+    );
+
+    expect(db.representants.get(REP_B)?.isDemo ?? false).toBe(false);
+    expect(db.prospects.get(PROSPECT)?.isDemo ?? false).toBe(false);
+    expect(db.demoEntities).toHaveLength(0);
+  });
+});

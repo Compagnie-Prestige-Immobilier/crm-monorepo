@@ -119,7 +119,7 @@ export class UsersService {
         // cloisonne DÉJÀ par `demoScope`. Le compte ouvert pendant une
         // démonstration disparaissait donc de l'écran qui aurait permis de le
         // voir, tout en restant en base et connectable.
-        isDemo: await this.demo.enabled(),
+        isDemo: await this.demo.enabledForWrite(),
       },
       include: INCLUDE,
     });

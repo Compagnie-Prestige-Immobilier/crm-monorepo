@@ -253,7 +253,7 @@ export class RepresentantsService {
         // une VRAIE fiche de l'annuaire : encore listée après l'extinction,
         // comptée dans la productivité, et que rien ne désigne comme fictive,
         // ni le filtre d'affichage ni un nettoyage ultérieur par `isDemo`.
-        isDemo: await this.demo.enabled(),
+        isDemo: await this.demo.enabledForWrite(),
       },
       include: INCLUDE,
     });
