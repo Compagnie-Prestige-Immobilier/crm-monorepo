@@ -5,8 +5,8 @@
  * « Thies » doit trouver « Thiès ».
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Les référentiels sénégalais sont pleins d'accents — Thiès, Kédougou, Sédhiou,
- * Ndoffane Sérère — et personne ne les tape depuis un clavier de bureau à
+ * Les référentiels sénégalais sont pleins d'accents : Thiès, Kédougou, Sédhiou,
+ * Ndoffane Sérère : et personne ne les tape depuis un clavier de bureau à
  * disposition américaine. Une comparaison brute renvoie « Aucun résultat » sur
  * une valeur qui existe pourtant, et l'utilisateur en conclut que le
  * département n'est pas dans la liste.

@@ -1,7 +1,7 @@
 /**
  * Constantes partagées par les trois environnements d'exécution du panel :
  * le rendu serveur (React Server Components), les Route Handlers et le
- * navigateur. Aucun `next/headers` ici — ce module est atteint depuis le
+ * navigateur. Aucun `next/headers` ici : ce module est atteint depuis le
  * graphe client, où un import de `next/headers` ferait échouer le build.
  */
 
@@ -34,8 +34,8 @@ export const REFRESH_SKEW_SECONDS = 60;
  * réseau.
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * `API_URL` absent et backend éteint produisent le même symptôme — aucune
- * donnée — mais pas la même réparation. Le panel affichait « Serveur
+ * `API_URL` absent et backend éteint produisent le même symptôme : aucune
+ * donnée : mais pas la même réparation. Le panel affichait « Serveur
  * injoignable. Vérifiez la connexion, puis réessayez. » dans les deux cas :
  * l'utilisateur a cherché une panne de réseau pendant qu'une variable
  * d'environnement manquait. Le message qui accuse la mauvaise cause coûte plus
@@ -119,7 +119,7 @@ export function configErrorBody(error: ApiConfigurationError): {
 /**
  * Base d'URL utilisée DANS LE NAVIGATEUR : l'origine courante.
  *
- * Le navigateur n'appelle jamais NestJS directement — le jeton vit dans un
+ * Le navigateur n'appelle jamais NestJS directement : le jeton vit dans un
  * cookie `httpOnly`, donc hors de portée de `fetch` côté client. Les requêtes
  * partent vers `/api/v1/…` de Next, relayées par
  * `src/app/api/v1/[...path]/route.ts`, qui rattache l'en-tête `Authorization`

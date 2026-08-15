@@ -16,12 +16,12 @@ import { explain, type StatKey } from '@/lib/stat-explanations';
  * Au survol seul, l'information est inatteignable au tactile et au clavier :
  * sur une tablette, la bulle n'existe tout simplement pas. Au clic seul, il
  * faut deviner qu'il y a quelque chose à cliquer, puis refermer chaque bulle
- * après lecture — sur une page qui en compte quinze, personne ne le fait.
+ * après lecture : sur une page qui en compte quinze, personne ne le fait.
  *
  * La combinaison demande une seule précaution, et c'est tout l'objet du code
  * ci-dessous : une bulle ouverte au CLIC ne doit pas se refermer quand la
  * souris s'éloigne. Sans `pinned`, l'utilisateur qui clique pour figer la bulle
- * la voit disparaître dès qu'il bouge d'un pixel — le comportement est vécu
+ * la voit disparaître dès qu'il bouge d'un pixel : le comportement est vécu
  * comme un défaut, et il l'est.
  *
  * Le focus clavier ouvre également : `Tab` jusqu'à l'icône suffit, sans avoir à

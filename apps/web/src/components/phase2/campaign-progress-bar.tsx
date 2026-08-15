@@ -5,7 +5,7 @@ import type { CampaignProgress } from '@/lib/types';
  * Avancement d'une campagne : abouties / annulées / restantes.
  *
  * Trois segments et non un pourcentage seul. « 60 % » ne dit pas si les 40 %
- * manquants sont encore à appeler ou ont été annulés par une clôture — or
+ * manquants sont encore à appeler ou ont été annulés par une clôture : or
  * c'est exactement la question qu'on se pose devant une campagne en retard.
  *
  * La barre n'est pas le support de l'information : elle est

@@ -4,31 +4,18 @@ import { unwrap } from '@crm/api-client/query';
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
 import type { CreateUserInput, Paginated, Role, UpdateUserInput, UserRow } from '@/lib/types';
+import type { UserFilters } from '@/lib/user-filters';
 
 /**
- * Comptes commerciaux — `GET|POST /users`, `PATCH|DELETE /users/{id}`,
+ * Comptes commerciaux : `GET|POST /users`, `PATCH|DELETE /users/{id}`,
  * `PUT /users/{id}/active`, `PUT /users/{id}/password`.
  *
  * Réservé à l'ADMIN : l'API répond 403 à un COMMERCIAL, et l'écran coupe déjà
  * en amont (`getAdminSession`).
+ *
+ * Les critères vivent dans `lib/user-filters.ts` : ils sont portés par l'URL,
+ * comme sur les prospects et les dossiers.
  */
-
-export interface UserFilters {
-  search: string;
-  role: Role | null;
-  /** `null` = tous les états ; c'est le défaut, un compte désactivé reste visible. */
-  isActive: boolean | null;
-  page: number;
-  pageSize: number;
-}
-
-export const DEFAULT_USER_FILTERS: UserFilters = {
-  search: '',
-  role: 'COMMERCIAL',
-  isActive: null,
-  page: 1,
-  pageSize: 25,
-};
 
 export async function fetchUsers(
   filters: UserFilters,

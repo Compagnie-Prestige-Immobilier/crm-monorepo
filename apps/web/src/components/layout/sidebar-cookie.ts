@@ -7,7 +7,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * La constante vivait d'abord dans `sidebar-shell.tsx`, qui porte `'use
- * client'`. Le layout SERVEUR l'importait pour lire le cookie — et recevait,
+ * client'`. Le layout SERVEUR l'importait pour lire le cookie : et recevait,
  * non pas la chaîne, mais la RÉFÉRENCE CLIENT que Next substitue à tout export
  * d'un module client atteint depuis le graphe serveur. `cookies().get(…)`
  * cherchait donc un cookie dont le nom n'était pas `cpi_sidebar` : la

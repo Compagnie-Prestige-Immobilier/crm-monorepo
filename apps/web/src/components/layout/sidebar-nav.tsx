@@ -15,10 +15,10 @@ import { cn } from '@/lib/utils';
  * clair posé sur du bordeaux profond donne un bloc sombre illisible.
  *
  * Le texte or de l'élément actif est `accent-on-dark` (#FFC65A, 11,3:1 sur la
- * sidebar) et non l'or décoratif — voir design.md §2.3.
+ * sidebar) et non l'or décoratif : voir design.md §2.3.
  *
  * Le contenu dépend du RÔLE : un agent Banque & Finance n'y voit que ses quatre
- * écrans. Le rôle vient du layout serveur, qui l'a lu sur la session — pas d'un
+ * écrans. Le rôle vient du layout serveur, qui l'a lu sur la session : pas d'un
  * appel client, qui afficherait un menu vide le temps d'un aller-retour.
  */
 export function SidebarNav({
@@ -29,7 +29,7 @@ export function SidebarNav({
   /**
    * Barre RÉDUITE : icônes seules.
    *
-   * Le libellé quitte l'écran mais PAS l'arbre d'accessibilité — il passe en
+   * Le libellé quitte l'écran mais PAS l'arbre d'accessibilité : il passe en
    * `sr-only` et sert d'`aria-label`. Une navigation réduite à onze icônes
    * muettes serait inutilisable au lecteur d'écran, et c'est le genre de
    * régression qu'un repli purement visuel introduit sans qu'on la voie.

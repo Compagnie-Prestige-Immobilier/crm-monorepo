@@ -21,12 +21,13 @@ const hrefs = (role: Parameters<typeof navItems>[0]): string[] =>
   navItems(role).map((item) => item.href);
 
 describe('navigation d’un agent BANQUE_FINANCE', () => {
-  it('ne montre QUE ses quatre écrans', () => {
+  it('ne montre QUE ses écrans', () => {
     expect(hrefs('BANQUE_FINANCE')).toEqual([
       '/banque',
       '/dossiers',
       '/dossiers/nouveau',
       '/dossiers/export',
+      '/demandes-clients',
     ]);
   });
 
@@ -36,6 +37,7 @@ describe('navigation d’un agent BANQUE_FINANCE', () => {
       '/tableau-de-bord',
       '/prospects',
       '/campagnes',
+      '/notifications',
       '/representants',
       '/commerciaux',
       '/supervision',
@@ -66,6 +68,8 @@ describe('navigation d’un ADMIN', () => {
       '/dossiers/nouveau',
       '/dossiers/export',
       '/dossiers/etapes',
+      '/demandes-clients',
+      '/notifications',
       '/representants',
       '/commerciaux',
       '/supervision',
@@ -74,6 +78,32 @@ describe('navigation d’un ADMIN', () => {
     ]) {
       expect(visible).toContain(expected);
     }
+  });
+
+  it('propose les deux écrans qui n’étaient joignables qu’en tapant leur URL', () => {
+    // `/notifications` (composeur) existait sans entrée de menu ; l'arbitrage
+    // des demandes de création de client venait de naître au même endroit. Un
+    // écran sans entrée de menu est un écran que personne n'ouvre.
+    const visible = hrefs('ADMIN');
+    expect(visible).toContain('/notifications');
+    expect(visible).toContain('/demandes-clients');
+  });
+
+  it('ne propose PAS le composeur de notifications à un agent bancaire', () => {
+    expect(hrefs('BANQUE_FINANCE')).not.toContain('/notifications');
+  });
+
+  it('propose à l’agent bancaire le SUIVI de ses demandes, sous son propre libellé', () => {
+    // Le même chemin, deux métiers : l'ADMIN arbitre (« Demandes clients »),
+    // l'agent suit les siennes (« Mes demandes »). Sans cette entrée, l'écran
+    // n'était joignable que par la notification de refus, et il n'existait
+    // aucun moyen d'y revenir : l'API restreint pourtant déjà la liste à
+    // `requestedById = user.id`.
+    const entry = navItems('BANQUE_FINANCE').find((item) => item.href === '/demandes-clients');
+    expect(entry?.label).toBe('Mes demandes');
+    expect(navItems('ADMIN').find((item) => item.href === '/demandes-clients')?.label).toBe(
+      'Demandes clients',
+    );
   });
 
   it('ne voit PAS le tableau de bord bancaire en doublon de son propre tableau de bord', () => {

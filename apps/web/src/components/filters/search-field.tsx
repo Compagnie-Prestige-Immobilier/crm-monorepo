@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
  *
  * 1. **Le contenu est SÉLECTIONNÉ à la prise de focus quand le champ porte
  *    déjà quelque chose.** Sans cela, le curseur se pose là où le clic est
- *    tombé — au milieu du mot — et remplacer une recherche demande de vider le
+ *    tombé : au milieu du mot : et remplacer une recherche demande de vider le
  *    champ caractère par caractère, ou de viser précisément sa fin. Avec, une
  *    frappe remplace, `Supprimer` vide. C'est le comportement de la barre
  *    d'adresse d'un navigateur, et personne n'a besoin qu'on le lui explique.

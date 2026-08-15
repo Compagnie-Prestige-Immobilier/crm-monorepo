@@ -4,7 +4,7 @@ import { ACCESS_COOKIE, REFRESH_COOKIE } from '@/lib/api/config';
 import { mockCookies, type FakeCookieStore } from '@/test/cookie-store';
 
 /**
- * Relais `/api/v1/*` — rotation du refresh token sur 401.
+ * Relais `/api/v1/*` : rotation du refresh token sur 401.
  *
  * C'est la mécanique la moins visible du panel et la plus coûteuse quand elle
  * manque : l'access token vaut 15 minutes, le refresh token 30 jours. Sans
@@ -13,7 +13,7 @@ import { mockCookies, type FakeCookieStore } from '@/test/cookie-store';
  *
  * Trois invariants, et un seul est évident :
  *  1. une réponse 401 déclenche EXACTEMENT UNE tentative de rafraîchissement ;
- *  2. la requête d'origine est REJOUÉE avec le nouveau jeton — rafraîchir sans
+ *  2. la requête d'origine est REJOUÉE avec le nouveau jeton : rafraîchir sans
  *     rejouer ne répare rien du point de vue de l'utilisateur ;
  *  3. si le rafraîchissement échoue, les DEUX cookies sont effacés et la
  *     réponse porte un code que le client sait reconnaître pour rediriger.
@@ -110,6 +110,29 @@ describe('relais en régime normal', () => {
     expect(headers.get('accept')).toBe('application/json');
   });
 
+  it('recopie `X-Demo-Mode`, la marque hors fichier des exports', async () => {
+    // L'export des représentants et les programmes PDF passent par CE relais.
+    // Sans cet en-tête, le client ne peut pas suffixer le nom du fichier, et un
+    // classeur de chiffres fictifs arrive dans Téléchargements sous le nom d'un
+    // vrai export.
+    fetchMock.mockResolvedValue(
+      new Response(new Uint8Array([0x50, 0x4b]), {
+        status: 200,
+        headers: {
+          'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'content-disposition': 'attachment; filename="representants-DEMONSTRATION.xlsx"',
+          'x-demo-mode': 'true',
+        },
+      }),
+    );
+    const { GET } = await import('@/app/api/v1/[...path]/route');
+
+    const response = await GET(relayRequest(), params(['export', 'representants.xlsx']));
+
+    expect(response.headers.get('x-demo-mode')).toBe('true');
+    expect(response.headers.get('content-disposition')).toContain('DEMONSTRATION');
+  });
+
   it('propage un 4xx métier tel quel, sans tenter de rafraîchir', async () => {
     // Un 409 « représentant encore rattaché » doit atteindre l'écran pour qu'il
     // propose la réaffectation. Le convertir en « session expirée » serait
@@ -130,7 +153,7 @@ describe('relais en régime normal', () => {
 describe('rotation sur 401', () => {
   it('rafraîchit UNE fois, rejoue la requête et réécrit les deux cookies', async () => {
     fetchMock
-      // 1. la requête d'origine — l'access token a expiré
+      // 1. la requête d'origine : l'access token a expiré
       .mockResolvedValueOnce(json({ statusCode: 401, message: 'Unauthorized' }, 401))
       // 2. POST /auth/refresh
       .mockResolvedValueOnce(
@@ -154,7 +177,7 @@ describe('rotation sur 401', () => {
     );
     expect(refreshCalls).toHaveLength(1);
 
-    // Le rejeu porte le NOUVEAU jeton — c'est tout l'intérêt de l'opération.
+    // Le rejeu porte le NOUVEAU jeton : c'est tout l'intérêt de l'opération.
     expect(authOf(fetchMock.mock.calls[0])).toBe(`Bearer ${OLD_ACCESS}`);
     expect(authOf(fetchMock.mock.calls[2])).toBe(`Bearer ${NEW_ACCESS}`);
     // ...et vise la même ressource.

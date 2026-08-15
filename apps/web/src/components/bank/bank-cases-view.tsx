@@ -11,6 +11,7 @@ import {
   PlusIcon,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import { BankExportMenu } from '@/components/bank/bank-export-menu';
 import { BankFiltersBar } from '@/components/bank/bank-filters-bar';
@@ -62,7 +63,7 @@ function isSortField(id: string): id is BankCaseSortField {
  * colonnes ; en dessous, une CARTE par dossier. Un tableau de huit colonnes
  * comprimé sur un téléphone donne des colonnes de quarante pixels où
  * « 1 200 000 FCFA » se coupe en trois lignes et où la référence devient
- * « CPI-2… » — l'agent doit alors ouvrir chaque fiche pour savoir laquelle il
+ * « CPI-2… » : l'agent doit alors ouvrir chaque fiche pour savoir laquelle il
  * cherchait. La carte affiche les mêmes champs, empilés dans l'ordre de
  * lecture, et tient dans un pouce.
  *
@@ -72,6 +73,7 @@ function isSortField(id: string): id is BankCaseSortField {
  */
 export function BankCasesView() {
   const { filters, setFilters } = useBankFilters();
+  const router = useRouter();
 
   const { data, isPending, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.bankCases(filters),
@@ -190,7 +192,19 @@ export function BankCasesView() {
               </TableHeader>
               <TableBody>
                 {data.items.map((bankCase) => (
-                  <TableRow key={bankCase.id}>
+                  /* Même arrangement que la carte : la ligne entière ouvre le
+                     dossier, mais uniquement si aucun texte n'est sélectionné et
+                     si le clic n'est pas tombé sur le lien de la référence. Le
+                     `<Link>` reste le seul élément atteignable au clavier, et
+                     `focus-within` montre la ligne visée. */
+                  <TableRow
+                    key={bankCase.id}
+                    className="cursor-pointer focus-within:bg-muted/60"
+                    onClick={(event) => {
+                      if (isTextSelected() || !isPlainAreaClick(event.target)) return;
+                      router.push(`/dossiers/${bankCase.id}`);
+                    }}
+                  >
                     <TableCell>
                       <Link
                         href={`/dossiers/${bankCase.id}`}
@@ -214,7 +228,7 @@ export function BankCasesView() {
                       <StageBadge stage={bankCase.currentStage} />
                     </TableCell>
                     <TableCell className="whitespace-nowrap tabular-nums">
-                      {/* « — » et non « 0 FCFA » : un dossier en instruction n'a
+                      {/* « : » et non « 0 FCFA » : un dossier en instruction n'a
                           AUCUN montant, ce qui n'est pas la même information
                           qu'un montant nul (celui d'un rejet). */}
                       {formatXof(bankCase.amountXof)}
@@ -349,13 +363,51 @@ function SortableHead({
  *
  * L'ordre suit la question qu'on se pose en cherchant un dossier : « c'est
  * lequel ? » (référence, client), « où en est-il ? » (étape, montant), « qui l'a
- * touché en dernier ? ». La carte entière n'est pas cliquable — seul le titre
- * l'est — pour que le texte reste sélectionnable et que le nom accessible du
- * lien soit la référence, pas le contenu complet de la carte.
+ * touché en dernier ? ».
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Carte cliquable ET texte sélectionnable : les deux, pas l'un ou l'autre.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Seule la référence était un lien, pour deux raisons valables : garder le
+ * texte sélectionnable (on recopie un numéro de téléphone à la souris) et
+ * donner au lien un nom accessible utile : « CPI-2026-000142 » et non le
+ * contenu entier de la carte, lu d'une traite par un lecteur d'écran. Mais une
+ * carte de la hauteur d'un pouce dont seuls quinze caractères réagissent se
+ * rate une fois sur deux au doigt.
+ *
+ * Les deux objectifs tiennent ensemble : le `<Link>` RESTE sur la référence
+ * (nom accessible et navigation clavier inchangés, aucun rôle ajouté sur la
+ * carte), et la carte porte en plus un `onClick` qui ne navigue QUE si rien
+ * n'est sélectionné et si le clic n'est pas déjà tombé sur un élément
+ * interactif. Sélectionner du texte à la souris ne déclenche donc rien, et
+ * cliquer sur le lien ne navigue pas deux fois.
  */
+function isPlainAreaClick(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  // Un clic déjà pris en charge par un lien, un bouton ou un champ : la carte
+  // se tait, sinon elle doublerait l'action ou l'annulerait.
+  return target.closest('a, button, input, select, textarea, [role="button"]') === null;
+}
+
+function isTextSelected(): boolean {
+  // La sélection est lue au MOMENT du clic : un glisser qui se termine sur la
+  // carte laisse une sélection non vide, c'est le signal qu'on lisait, pas
+  // qu'on voulait ouvrir la fiche.
+  return (window.getSelection()?.toString() ?? '') !== '';
+}
+
 function BankCaseCard({ bankCase }: { bankCase: BankCase }) {
+  const router = useRouter();
+
   return (
-    <Card className="animate-rise">
+    <Card
+      className="animate-rise cursor-pointer transition-shadow hover:shadow-elev-hover focus-within:shadow-elev-hover focus-within:ring-2 focus-within:ring-ring"
+      onClick={(event) => {
+        if (isTextSelected() || !isPlainAreaClick(event.target)) return;
+        router.push(`/dossiers/${bankCase.id}`);
+      }}
+    >
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <h3 className="min-w-0 font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">

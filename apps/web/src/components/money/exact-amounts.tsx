@@ -7,7 +7,7 @@ import { formatXof, formatXofCompact } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
 /**
- * Montants abrégés ou exacts — le basculement vaut pour TOUT l'écran.
+ * Montants abrégés ou exacts : le basculement vaut pour TOUT l'écran.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * Abréger sans donner accès au nombre exact, c'est cacher la donnée.
@@ -15,14 +15,14 @@ import { cn } from '@/lib/utils';
  *
  * `1 250 000 000 FCFA` déborde d'une tuile d'indicateur : l'abrégé est
  * nécessaire. Mais un directeur financier qui lit « 1,25 Mrd » doit pouvoir
- * obtenir « 1 250 000 000 » sans quitter la page ni ouvrir un export — sinon
+ * obtenir « 1 250 000 000 » sans quitter la page ni ouvrir un export : sinon
  * l'écran de pilotage cesse d'être une source et redevient une vitrine.
  *
  * Trois voies vers le chiffre exact, et il en faut trois :
  *
  *  1. l'info-bulle native (`title`), pour la souris ;
  *  2. un interrupteur « Chiffres exacts » qui bascule l'écran entier, pour le
- *     tactile, le clavier, et surtout pour la lecture prolongée — vérifier
+ *     tactile, le clavier, et surtout pour la lecture prolongée : vérifier
  *     douze montants un par un au survol est intenable ;
  *  3. le texte accessible, qui porte TOUJOURS le montant exact : un abrégé
  *     annoncé « un virgule vingt-cinq milliard » à un lecteur d'écran serait

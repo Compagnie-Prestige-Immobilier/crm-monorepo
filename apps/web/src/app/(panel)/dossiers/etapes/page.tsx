@@ -8,7 +8,7 @@ import { guardRoles } from '@/lib/session';
 export const metadata: Metadata = { title: 'Étapes bancaires' };
 
 /**
- * Configuration du flux — ADMIN seulement.
+ * Configuration du flux : ADMIN seulement.
  *
  * Un agent BANQUE_FINANCE LIT les étapes (elles teintent ses pastilles) mais ne
  * les modifie pas : réordonner le flux change le parcours de tous les dossiers

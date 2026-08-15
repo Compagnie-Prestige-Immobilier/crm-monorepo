@@ -8,7 +8,7 @@ import { AA_LARGE, AA_TEXT, TOKENS, contrastRatio, parseHex, ratio } from '@/lib
  * Deux familles de tests, et la seconde est celle qui manquait :
  *
  *  1. Les paires sur fond CLAIR, celles que `docs/design.md` mesure.
- *  2. Les paires sur fond SOMBRE — bordeaux `#630210`, sidebar `#3A010A`. Le
+ *  2. Les paires sur fond SOMBRE : bordeaux `#630210`, sidebar `#3A010A`. Le
  *     document ne les mesure pas, et c'est précisément là que les quatre
  *     tokens de statut deviennent illisibles : ce sont tous des teintes
  *     foncées.
@@ -126,7 +126,7 @@ describe('la règle de l’or (design.md §2.3)', () => {
   });
 });
 
-describe('texte sur surface SOMBRE — ce que design.md ne mesure pas', () => {
+describe('texte sur surface SOMBRE : ce que design.md ne mesure pas', () => {
   const DARK_SURFACES: readonly [string, string][] = [
     ['bordeaux primary', TOKENS.primary],
     ['sidebar', TOKENS.sidebar],
@@ -161,7 +161,7 @@ describe('texte sur surface SOMBRE — ce que design.md ne mesure pas', () => {
     }
     // #856011 sur bordeaux : la déclinaison texte du mode CLAIR ne survit pas
     // au passage sur fond sombre. Sur la sidebar elle atteint 3,09:1, ce qui
-    // suffirait à un TRAIT mais pas à du texte — la nuance compte, et c'est
+    // suffirait à un TRAIT mais pas à du texte : la nuance compte, et c'est
     // pourquoi les deux seuils sont distingués ici.
     expectFailsEntirely('accent-text sur bordeaux', TOKENS.accentText, TOKENS.primary);
     expectFailsAsText('accent-text sur sidebar', TOKENS.accentText, TOKENS.sidebar);

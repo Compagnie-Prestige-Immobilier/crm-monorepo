@@ -45,12 +45,12 @@ import { cn } from '@/lib/utils';
  * La taille et la couleur vivent sur DEUX éléments, et ce n'est pas un caprice.
  *
  * `cn()` passe par `tailwind-merge`, qui range `text-display` et
- * `text-primary-text` dans le même groupe — il ne connaît que l'échelle de
+ * `text-primary-text` dans le même groupe : il ne connaît que l'échelle de
  * tailles par défaut, et classe donc notre `text-display` comme une COULEUR.
  * Réunies sur un même élément, la dernière écrase la première : le chiffre de
  * tête sortait à la taille du corps de texte, plus petit que les tuiles
- * secondaires posées à côté de lui. Le défaut est silencieux — aucune erreur,
- * juste une hiérarchie inversée — et il ne se voit qu'à l'écran.
+ * secondaires posées à côté de lui. Le défaut est silencieux : aucune erreur,
+ * juste une hiérarchie inversée : et il ne se voit qu'à l'écran.
  */
 function MoneyHeadline({ finance }: { finance: Funnel['finance'] }) {
   return (
@@ -150,8 +150,8 @@ export function MoneyBand({ finance }: { finance: Funnel['finance'] }) {
  *
  * Plancher à 1,5 % : une marche à 0,2 % du total produirait une barre d'un
  * pixel, indistinguable d'une absence de barre. La barre ne porte aucune
- * information à elle seule — les trois colonnes chiffrées la doublent (WCAG
- * 1.4.1) — mais elle doit rester visible pour que la forme de l'entonnoir se
+ * information à elle seule : les trois colonnes chiffrées la doublent (WCAG
+ * 1.4.1) : mais elle doit rester visible pour que la forme de l'entonnoir se
  * lise d'un coup d'œil.
  */
 function barWidth(stage: FunnelStage): string {

@@ -3,6 +3,7 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { toFilterQuery } from '@/lib/api/query-params';
+import { MAX_CHART_SERIES, groupTail } from '@/lib/data/series';
 import type {
   BddSegment,
   EnrollmentMethod,
@@ -12,7 +13,7 @@ import type {
 } from '@/lib/types';
 
 /**
- * Écran « Statistiques » — volet téléconseil.
+ * Écran « Statistiques » : volet téléconseil.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * Ce module NE RECALCULE PAS ce que l'API sait déjà.
@@ -21,7 +22,7 @@ import type {
  * Les totaux, les répartitions et les parts viennent du serveur, qui les
  * calcule en SQL sur la population filtrée. Un panel qui referait ces sommes à
  * partir d'une page de résultats afficherait, tôt ou tard, un chiffre différent
- * de celui du tableau d'à côté — et c'est l'écart qu'un directeur remarque en
+ * de celui du tableau d'à côté : et c'est l'écart qu'un directeur remarque en
  * premier.
  *
  * Ne sont dérivés ici que les RAPPORTS entre deux chiffres déjà servis : ils
@@ -117,8 +118,8 @@ export function dailyAverage(prospects30Jours: number): number {
  * Variation entre les 7 derniers jours et les 7 précédents, en pourcentage.
  *
  * Les 7 précédents s'obtiennent par différence : `30 jours` couvre les 7
- * derniers. C'est une approximation ASSUMÉE — la fenêtre de comparaison fait 23
- * jours ramenés à 7 — et c'est pourquoi l'écran ne l'affiche pas comme une
+ * derniers. C'est une approximation ASSUMÉE : la fenêtre de comparaison fait 23
+ * jours ramenés à 7 : et c'est pourquoi l'écran ne l'affiche pas comme une
  * tendance mais comme un rythme. Rien ne justifierait un septième appel d'API
  * pour un chiffre indicatif.
  */
@@ -169,15 +170,15 @@ export function hoursToDays(hours: number | null): number | null {
   return Math.round((hours / 24) * 10) / 10;
 }
 
-/** Au-delà de 5 séries on regroupe — docs/design.md §2.6. */
-export const MAX_SERIES = 5;
-
-export function groupTail(items: NamedCount[], limit = MAX_SERIES): NamedCount[] {
-  if (items.length <= limit) return items;
-  const head = items.slice(0, limit - 1);
-  const rest = items.slice(limit - 1).reduce((sum, item) => sum + item.value, 0);
-  return [...head, { id: '__autres__', label: 'Autres', value: rest }];
-}
+/**
+ * Au-delà de 5 séries on regroupe : docs/design.md §2.6.
+ *
+ * La fonction et son seuil vivent dans `lib/data/series.ts`, partagés avec le
+ * tableau de bord. Ils étaient dupliqués mot pour mot entre les deux modules :
+ * deux copies d'une règle de rendu divergent tôt ou tard, et deux écrans
+ * afficheraient alors la même distribution autrement.
+ */
+export { MAX_CHART_SERIES as MAX_SERIES, groupTail };
 
 // ─── Chargement ──────────────────────────────────────────────────────────────
 

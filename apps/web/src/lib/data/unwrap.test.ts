@@ -7,7 +7,7 @@ import { fetchProspects } from '@/lib/data/prospects';
 import { fetchDashboardStats } from '@/lib/data/stats';
 import { fetchUsers } from '@/lib/data/users';
 import { EMPTY_FILTERS } from '@/lib/filters';
-import { DEFAULT_USER_FILTERS } from '@/lib/data/users';
+import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
 
 /**
  * LE test de non-régression du panel.
@@ -21,7 +21,7 @@ import { DEFAULT_USER_FILTERS } from '@/lib/data/users';
  * au lieu de « le serveur a répondu 500 ». C'est un mensonge silencieux, et
  * c'est exactement ce que ces tests interdisent.
  *
- * On ne teste pas `unwrap` lui-même — il est couvert dans `@crm/api-client`.
+ * On ne teste pas `unwrap` lui-même : il est couvert dans `@crm/api-client`.
  * On teste que CHAQUE fonction de `src/lib/data` le traverse, et que l'erreur
  * arrive bien jusqu'à l'état d'erreur de React Query.
  */
@@ -58,10 +58,10 @@ describe('propagation des erreurs par unwrap()', () => {
     expect((failure as ApiError).message).toBe('Le calcul des statistiques a échoué.');
   });
 
-  it('fetchUsers rejette sur 403 — un COMMERCIAL ne doit pas voir une liste vide', async () => {
+  it('fetchUsers rejette sur 403 : un COMMERCIAL ne doit pas voir une liste vide', async () => {
     const { client } = clientReplying(403, { statusCode: 403, message: 'Accès refusé.' });
 
-    const failure = await fetchUsers(DEFAULT_USER_FILTERS, client).catch((e: unknown) => e);
+    const failure = await fetchUsers(EMPTY_USER_FILTERS, client).catch((e: unknown) => e);
 
     expect(failure).toBeInstanceOf(ApiError);
     expect((failure as ApiError).status).toBe(403);
@@ -69,7 +69,7 @@ describe('propagation des erreurs par unwrap()', () => {
 
   it('fetchDashboardStats rejette si UN SEUL des sept appels échoue', async () => {
     // Le tableau de bord agrège sept endpoints en parallèle. Si l'un tombe et
-    // que l'erreur est avalée, les KPI affichent des zéros crédibles — le pire
+    // que l'erreur est avalée, les KPI affichent des zéros crédibles : le pire
     // cas possible pour un écran de direction.
     let call = 0;
     const fetchImpl = vi.fn(() => {

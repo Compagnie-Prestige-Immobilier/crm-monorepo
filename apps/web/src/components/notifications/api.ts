@@ -21,7 +21,7 @@ import type {
  * `fetch` direct plutôt que le client généré, parce que ces routes ne figurent
  * pas encore dans `packages/api-client/src/generated`. Les erreurs sont
  * néanmoins converties en `ApiError`, de sorte que `apiErrorText` et
- * `QueryErrorState` fonctionnent exactement comme sur les autres écrans — un
+ * `QueryErrorState` fonctionnent exactement comme sur les autres écrans : un
  * 403 doit s'afficher comme un refus de droits, pas comme une panne.
  *
  * TODO(generated-client) : remplacer par `client.GET('/api/v1/notifications')`
@@ -69,8 +69,6 @@ export interface NotificationFilters {
   status?: string | undefined;
   category?: string | undefined;
 }
-
-export const DEFAULT_NOTIFICATION_FILTERS: NotificationFilters = { page: 1, pageSize: 20 };
 
 export function fetchNotifications(filters: NotificationFilters): Promise<NotificationList> {
   return request<NotificationList>(

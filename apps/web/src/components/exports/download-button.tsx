@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
+import { isDemoResponse, withDemoSuffix } from '@/lib/demo-marking';
 import { apiErrorMessage } from '@/lib/utils';
 
 /**
@@ -11,7 +12,7 @@ import { apiErrorMessage } from '@/lib/utils';
  * On ne pose JAMAIS un simple `<a download>` : la réponse peut être une erreur
  * JSON (session expirée, rôle refusé, API indisponible), et un lien nu
  * enregistrerait alors un fichier `.xlsx` ou `.pdf` contenant du texte
- * d'erreur — que l'utilisateur transmettrait sans le savoir, et que le
+ * d'erreur : que l'utilisateur transmettrait sans le savoir, et que le
  * destinataire ouvrirait devant sa direction. On récupère donc la réponse, on
  * vérifie le statut, et on ne déclenche l'enregistrement qu'ensuite.
  *
@@ -37,11 +38,24 @@ export function useFileDownload(): {
           return;
         }
 
+        /**
+         * Le nom ENREGISTRÉ porte la marque de démonstration.
+         *
+         * C'est ici, et nulle part ailleurs, que le nom du fichier se décide :
+         * le téléchargement passe par un blob et `anchor.download`, si bien que
+         * le `Content-Disposition` de la réponse : celui-là même que l'API a
+         * suffixé en `-DEMONSTRATION` : n'est jamais lu par le navigateur.
+         * Sans cette ligne, un classeur de chiffres fictifs arrive dans le
+         * dossier Téléchargements sous le nom d'un vrai export, et repart par
+         * courriel sans qu'aucune marque extérieure ne subsiste.
+         */
+        const fileName = withDemoSuffix(input.fileName, isDemoResponse(response.headers));
+
         const blob = await response.blob();
         const objectUrl = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
         anchor.href = objectUrl;
-        anchor.download = input.fileName;
+        anchor.download = fileName;
         anchor.click();
         // Sans révocation, le blob reste en mémoire tant que l'onglet est ouvert.
         URL.revokeObjectURL(objectUrl);

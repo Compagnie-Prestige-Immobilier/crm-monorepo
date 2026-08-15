@@ -13,7 +13,7 @@ import {
 import { rotateRefreshTokenDetailed, type RotatedTokens } from '@/lib/api/tokens';
 
 /**
- * Client d'API CÔTÉ SERVEUR — rendu des pages, Route Handlers, Server Actions.
+ * Client d'API CÔTÉ SERVEUR : rendu des pages, Route Handlers, Server Actions.
  *
  * Deux responsabilités que rien d'autre n'assume :
  *
@@ -82,7 +82,7 @@ export async function getRefreshToken(): Promise<string | null> {
  * `true` si l'écriture a abouti.
  *
  * Next refuse d'écrire un cookie pendant le rendu d'un composant serveur : les
- * en-têtes sont déjà partis. Ce n'est pas une anomalie — le middleware tourne
+ * en-têtes sont déjà partis. Ce n'est pas une anomalie : le middleware tourne
  * les jetons AVANT le rendu, et la voie réactive (Route Handlers, Server
  * Actions) écrit normalement. On rend l'échec à l'appelant au lieu de faire
  * tomber la page.
@@ -173,7 +173,7 @@ const fetchWithRotation: typeof globalThis.fetch = async (input, init) => {
 
 /**
  * Un client par requête. `cache()` garantit que les six préchargements d'une
- * même page partagent le même client — donc le même verrou de rotation.
+ * même page partagent le même client : donc le même verrou de rotation.
  */
 export const getServerApiClient = cache((): ApiClient =>
   createApiClient(serverApiOrigin(), {

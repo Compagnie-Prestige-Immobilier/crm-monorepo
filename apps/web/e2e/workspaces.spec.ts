@@ -10,13 +10,13 @@ import { expect, test, type Page } from '@playwright/test';
  * UN SEUL fichier, en `describe.serial`, et c'est nécessaire : ces parcours
  * partagent un ÉTAT DE BASE DE DONNÉES. Les campagnes ont besoin de prospects
  * en attente, les dossiers bancaires de clients dont la méthode d'enrôlement
- * est obtenue — et c'est précisément le mode démonstration qui les crée. Répartis
+ * est obtenue, et c'est précisément le mode démonstration qui les crée. Répartis
  * en trois fichiers, Playwright les jouerait dans l'ordre alphabétique, donc
  * les dossiers AVANT l'ensemencement, et la suite échouerait pour une raison
  * qui n'a rien à voir avec le code testé.
  *
  * L'ordre est donc : on ensemence, on éprouve, on nettoie. Le nettoyage final
- * n'est pas une politesse — c'est le dernier parcours à vérifier, celui de la
+ * n'est pas une politesse, c'est le dernier parcours à vérifier, celui de la
  * désactivation.
  *
  * La CONNEXION n'est jouée qu'une fois, par `auth.setup.ts`, et son état est
@@ -45,7 +45,7 @@ async function expectNoErrorState(page: Page): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. Mode démonstration — activation
+// 1. Mode démonstration : activation
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('le mode démonstration s’active et pose un bandeau sur tous les écrans', async ({ page }) => {
@@ -87,7 +87,7 @@ test('le mode démonstration s’active et pose un bandeau sur tous les écrans'
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. Prospects — surface de phase 2 et double export
+// 2. Prospects : surface de phase 2 et double export
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('les filtres de phase 2 vivent dans l’URL et survivent au rechargement', async ({ page }) => {
@@ -116,7 +116,7 @@ test('les filtres de phase 2 vivent dans l’URL et survivent au rechargement', 
     filtered,
   );
 
-  // Les colonnes de phase 2 sont bien là — c'est ce qui évitait d'ouvrir
+  // Les colonnes de phase 2 sont bien là, c'est ce qui évitait d'ouvrir
   // l'export pour savoir qui a obtenu le résultat et quand.
   for (const header of ['Segment', 'Phase 2', 'Méthode', 'Dernier appel', 'Obtenu par']) {
     await expect(page.getByRole('columnheader', { name: header })).toBeVisible();
@@ -154,7 +154,7 @@ test('le menu d’export produit les DEUX classeurs', async ({ page }) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Phase 2 — campagne, aperçu, programme PDF, clôture
+// 3. Phase 2 : campagne, aperçu, programme PDF, clôture
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('création d’une campagne : l’aperçu chiffre AVANT la confirmation', async ({ page }) => {
@@ -244,7 +244,7 @@ test('la clôture annonce les tâches annulées avant de les annuler', async ({ 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. Banque & Finance — cycle complet d'un dossier
+// 4. Banque & Finance : cycle complet d'un dossier
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Ouvre un dossier sur le premier client trouvé et rend sa référence. */
@@ -282,7 +282,7 @@ test('un dossier peut être mené jusqu’à l’encaissement', async ({ page })
   await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 30_000 });
 
   // Encaissement : le montant est demandé, et l'aperçu formaté doit apparaître
-  // AVANT la validation — « 12000000 » et « 1200000 » se distinguent mal.
+  // AVANT la validation : « 12000000 » et « 1200000 » se distinguent mal.
   const cash = page.getByRole('button', { name: 'Déclarer l’encaissement' });
   await expect(cash).toBeVisible({ timeout: 30_000 });
   await cash.click();
@@ -436,7 +436,7 @@ test('la configuration des étapes se réordonne au clavier, sans glisser-dépos
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. Mode démonstration — désactivation
+// 5. Mode démonstration : désactivation
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('la désactivation exige une confirmation et affirme que le réel est intact', async ({

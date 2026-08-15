@@ -24,7 +24,7 @@ import {
  * et permettre de le retirer sans le rouvrir.
  *
  * D'où la forme retenue : un compte sur le bouton, et une puce par critère
- * portant le champ ET sa valeur. « Banque » seul ne suffit pas — savoir qu'un
+ * portant le champ ET sa valeur. « Banque » seul ne suffit pas : savoir qu'un
  * filtre banque existe sans savoir laquelle oblige à rouvrir le panneau, ce qui
  * annule le bénéfice.
  *

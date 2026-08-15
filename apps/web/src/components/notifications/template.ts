@@ -1,5 +1,5 @@
 /**
- * Substitution `{{variable}}` — PORT EXACT de
+ * Substitution `{{variable}}` : PORT EXACT de
  * `apps/api/src/modules/notifications/template.ts`.
  *
  * Dupliqué délibérément, et la duplication est le point : l'aperçu du
@@ -7,7 +7,7 @@
  * réseau ne peut pas faire sans saccade ni condition de course entre réponses.
  *
  * La contrainte qui en découle : les deux implémentations doivent avoir la même
- * sémantique, en particulier sur la variable manquante — marqueur laissé
+ * sémantique, en particulier sur la variable manquante : marqueur laissé
  * visible, nom remonté dans `missing`. `template.test.ts` fixe cette sémantique
  * des deux côtés avec les mêmes cas.
  */
@@ -31,7 +31,7 @@ export function extractVariables(template: string): string[] {
 
 /**
  * Rend un gabarit. Une variable manquante laisse son marqueur EN PLACE et son
- * nom est signalé — voir l'en-tête du fichier serveur pour le raisonnement.
+ * nom est signalé : voir l'en-tête du fichier serveur pour le raisonnement.
  */
 export function renderTemplate(
   template: string,
@@ -87,7 +87,7 @@ export function mergedVariables(titleTemplate: string, bodyTemplate: string): st
  *
  * Android replie une notification sur UNE ligne de titre et deux de corps tant
  * qu'elle n'est pas dépliée. L'aperçu doit donc montrer le texte tel qu'il sera
- * REELLEMENT lu — un aperçu qui affiche cinq lignes confortables laisse
+ * REELLEMENT lu : un aperçu qui affiche cinq lignes confortables laisse
  * l'auteur croire que sa phrase passe en entier, alors qu'elle sera coupée au
  * milieu sur le téléphone.
  */

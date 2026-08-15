@@ -25,7 +25,7 @@ const buttonVariants = cva(
      * `disabled:opacity-40` mesurait 1,53:1 en clair et 3,39:1 en sombre sur
      * « Ouvrir le dossier » : le bouton devenait un fantôme illisible. WCAG
      * exempte les commandes inactives, ce qui rend l'échec invisible en audit
-     * automatique — mais un utilisateur qui ne peut plus lire le libellé ne
+     * automatique : mais un utilisateur qui ne peut plus lire le libellé ne
      * sait plus ce que le bouton refuse de faire.
      *
      * Le signal « désactivé » passe donc par la PERTE de couleur, d'ombre et
@@ -51,7 +51,7 @@ const buttonVariants = cva(
       size: {
         default: 'h-11 px-4 text-[0.9375rem]',
         // 36 px de haut, mais la zone tactile est portée à 44 px par le
-        // pseudo-élément ci-dessous — même raison que `icon-sm`.
+        // pseudo-élément ci-dessous : même raison que `icon-sm`.
         sm: 'relative h-9 rounded-sm px-3 text-[0.8125rem] before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-[""]',
         lg: 'h-12 rounded-md px-6 text-[1rem]',
         icon: 'size-11 rounded-md',

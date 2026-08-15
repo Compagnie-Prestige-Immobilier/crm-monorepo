@@ -22,7 +22,7 @@ import { ApiError } from '@crm/api-client/query';
  * `unwrap()` fait bien rejeter la requête, `data` restait `undefined` et le
  * rendu tombait sur l'état VIDE. Un 500 du serveur s'affichait donc en
  * « Aucun prospect ne correspond à ces filtres. Élargissez la période ou
- * retirez un critère. » — un message qui accuse l'utilisateur d'avoir mal
+ * retirez un critère. » : un message qui accuse l'utilisateur d'avoir mal
  * filtré alors que le serveur est en panne, et qui l'envoie tripoter ses
  * critères pendant que la vraie cause reste invisible.
  *
@@ -30,7 +30,7 @@ import { ApiError } from '@crm/api-client/query';
  *  - jamais un « Erreur » nu : `apiErrorText` traduit le statut en une phrase
  *    qui dit quoi faire ensuite ;
  *  - un 403 n'est pas une panne mais un refus de permission, et il se présente
- *    autrement — proposer « Réessayer » sur un refus de droits ferait recliquer
+ *    autrement : proposer « Réessayer » sur un refus de droits ferait recliquer
  *    dans le vide.
  */
 

@@ -8,7 +8,7 @@
  * Rien dans la pile ne diffuse d'événements : l'API est un NestJS sur Fastify
  * derrière un relais Next qui recopie les réponses. Ajouter un flux SSE
  * supposerait de tenir une connexion ouverte à travers ce relais, d'y faire
- * survivre la rotation du jeton d'accès et de gérer la reconnexion — pour des
+ * survivre la rotation du jeton d'accès et de gérer la reconnexion : pour des
  * agrégats qui changent au rythme des saisies, c'est-à-dire quelques fois par
  * minute. Le sondage sur les endpoints EXISTANTS coûte une requête toutes les
  * dix secondes et ne demande aucune infrastructure nouvelle.
@@ -55,7 +55,7 @@ export function liveInterval(state: LiveState): number | false {
  * Faut-il montrer le squelette ?
  *
  * UNIQUEMENT au tout premier chargement. Le remettre à chaque cycle ferait
- * clignoter l'écran toutes les dix secondes — c'est le défaut qui rend un
+ * clignoter l'écran toutes les dix secondes : c'est le défaut qui rend un
  * tableau de bord « temps réel » illisible, et il ne se voit qu'en conditions
  * réelles, jamais sur une pile de développement instantanée.
  */

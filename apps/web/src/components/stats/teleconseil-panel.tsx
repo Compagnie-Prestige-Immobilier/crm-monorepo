@@ -12,6 +12,7 @@ import {
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
 import { QueryErrorState } from '@/components/query-error-state';
+import { DelaysStrip, PortfolioBlocks } from '@/components/stats/portfolio-blocks';
 import {
   StatChartCard,
   StatChartsSkeleton,
@@ -204,6 +205,14 @@ export function TeleconseilPanel() {
           <CategoryBarChart items={segmentItems} label="Prospects" />
         </StatChartCard>
       </div>
+
+      {/* Les blocs ajoutés vivent SOUS les graphiques historiques et dans leur
+          propre composant : ils portent chacun leur requête, et faire dépendre
+          des calculs lourds (médianes, cohortes hebdomadaires) du cycle de
+          rafraîchissement continu ci-dessus multiplierait la charge SQL pour
+          des chiffres qui ne bougent pas à la minute. */}
+      <DelaysStrip />
+      <PortfolioBlocks />
     </div>
   );
 }

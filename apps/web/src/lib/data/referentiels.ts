@@ -11,7 +11,7 @@ import type { Banque, Departement, Syndicat } from '@/lib/types';
  *
  * Point métier que l'écran doit rendre explicite : DÉSACTIVER N'EST PAS
  * SUPPRIMER. Les prospects qui référencent une banque retirée la gardent, et
- * c'est indispensable — un export de mars doit rester lisible en décembre.
+ * c'est indispensable : un export de mars doit rester lisible en décembre.
  * `usageCounts` sert précisément à afficher combien de fiches sont concernées
  * AVANT de laisser cliquer.
  */

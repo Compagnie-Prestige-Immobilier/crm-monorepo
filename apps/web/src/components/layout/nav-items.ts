@@ -1,5 +1,6 @@
 import {
   ActivityIcon,
+  BellIcon,
   ChartColumnIcon,
   FileSpreadsheetIcon,
   HeadsetIcon,
@@ -10,6 +11,7 @@ import {
   MegaphoneIcon,
   PlusCircleIcon,
   SettingsIcon,
+  UserPlusIcon,
   UsersIcon,
   UsersRoundIcon,
   type LucideIcon,
@@ -33,14 +35,14 @@ export interface NavSection {
 }
 
 /**
- * Navigation du panel — DÉPENDANTE DU RÔLE, et pas seulement en apparence.
+ * Navigation du panel : DÉPENDANTE DU RÔLE, et pas seulement en apparence.
  *
  * Un agent BANQUE_FINANCE ne voit ni Prospects, ni Représentants, ni
  * Commerciaux, ni Campagnes, ni Référentiels. Ce n'est pas de la cosmétique :
  * l'API lui répondrait 403 sur chacun de ces écrans, et une entrée de menu qui
  * mène à un refus de droits est un défaut de conception, pas une protection.
- * Son métier tient en quatre gestes — regarder ses chiffres, ouvrir la liste de
- * ses dossiers, en créer un, exporter — et le menu ne montre que ceux-là.
+ * Son métier tient en quatre gestes : regarder ses chiffres, ouvrir la liste de
+ * ses dossiers, en créer un, exporter : et le menu ne montre que ceux-là.
  *
  * Le masquage ne remplace évidemment PAS le contrôle : chaque page serveur
  * vérifie le rôle de son côté (voir `lib/session.ts`). Ce fichier décide de ce
@@ -116,6 +118,22 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN', 'BANQUE_FINANCE'],
       },
       {
+        /**
+         * Le SUIVI de ses propres demandes, pour un agent bancaire.
+         *
+         * Refuser une demande lui envoie une notification dont la route est
+         * `/demandes-clients` : sans cette entrée, le seul chemin vers l'écran
+         * était ce lien-là, et rien ne permettait d'y revenir ensuite. L'API
+         * restreint la liste à `requestedById = user.id` : il n'y voit que ses
+         * demandes, et l'écran ne lui propose aucun geste d'arbitrage.
+         */
+        href: '/demandes-clients',
+        label: 'Mes demandes',
+        icon: UserPlusIcon,
+        description: 'Créations de client demandées',
+        roles: ['BANQUE_FINANCE'],
+      },
+      {
         href: '/dossiers/etapes',
         label: 'Étapes bancaires',
         icon: ListOrderedIcon,
@@ -127,6 +145,26 @@ const SECTIONS: readonly NavSection[] = [
   {
     title: 'Administration',
     items: [
+      {
+        // L'arbitrage des demandes déposées par les banques. Sans entrée de
+        // menu, l'écran n'était atteignable qu'en tapant son URL, et la
+        // demande d'une banque restait en attente indéfiniment.
+        href: '/demandes-clients',
+        label: 'Demandes clients',
+        icon: UserPlusIcon,
+        description: 'Créations demandées par les banques',
+        roles: ['ADMIN'],
+      },
+      {
+        // Même défaut, même correction : le composeur existait depuis le début
+        // et ne figurait dans aucune section. La cloche montre ce qu'on
+        // REÇOIT ; cet écran sert à ÉMETTRE, et les deux se cherchaient.
+        href: '/notifications',
+        label: 'Notifications',
+        icon: BellIcon,
+        description: 'Annonces et rappels envoyés',
+        roles: ['ADMIN'],
+      },
       {
         href: '/representants',
         label: 'Représentants',
@@ -184,7 +222,7 @@ export function navItems(role: Role): NavItem[] {
  *
  * COMMERCIAL n'a pas de panel : il est refusé à la porte (voir
  * `lib/data/auth.ts`). La fonction lui renvoie tout de même la connexion plutôt
- * qu'une exception — un rôle ajouté demain au contrat ne doit pas faire tomber
+ * qu'une exception : un rôle ajouté demain au contrat ne doit pas faire tomber
  * l'écran de login.
  */
 export function homePathForRole(role: Role): string {

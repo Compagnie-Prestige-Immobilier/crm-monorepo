@@ -7,7 +7,7 @@ import { LOGIN_PATH, redirectToLogin, resetSessionExpiryGuard } from '@/lib/api/
  *
  * Le comportement corrigé : avant, un 401 terminal laissait l'écran en place
  * sur des données périmées. On vérifie ici les trois pièges de ce genre de
- * redirection — la boucle, la rafale, et la redirection ouverte.
+ * redirection : la boucle, la rafale, et la redirection ouverte.
  */
 
 const replace = vi.fn();
@@ -46,7 +46,7 @@ describe('redirectToLogin', () => {
     expect(target.searchParams.get('suite')).toBe('/prospects?statut=CONVERTI&banqueId=b-1');
   });
 
-  it('ne redirige PAS depuis l’écran de connexion — sinon on ne peut plus s’y connecter', () => {
+  it('ne redirige PAS depuis l’écran de connexion : sinon on ne peut plus s’y connecter', () => {
     stubLocation(LOGIN_PATH);
 
     expect(redirectToLogin()).toBe(false);

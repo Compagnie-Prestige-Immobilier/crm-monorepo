@@ -8,9 +8,13 @@ import { SidebarShell } from '@/components/layout/sidebar-shell';
 import { Topbar } from '@/components/layout/topbar';
 import { QueryErrorState } from '@/components/query-error-state';
 import { getServerApiClient } from '@/lib/api/server';
-import { fetchDemoStatus, seededAtOrNull } from '@/lib/data/demo';
+import {
+  demoBannerState,
+  fetchDemoStatus,
+  NO_DEMO_BANNER,
+  type DemoBannerState,
+} from '@/lib/data/demo';
 import { readSession } from '@/lib/session';
-import type { Role } from '@/lib/types';
 
 /**
  * Coquille du panel et unique porte d'entrée authentifiée.
@@ -22,7 +26,7 @@ import type { Role } from '@/lib/types';
  */
 
 /**
- * JAMAIS de prérendu, JAMAIS de cache partagé — pour tout le panel.
+ * JAMAIS de prérendu, JAMAIS de cache partagé : pour tout le panel.
  *
  * Défaut observé en production, et le plus grave rencontré sur ce projet :
  * `next build` prérendait ces pages, et Next les servait ensuite depuis le
@@ -32,14 +36,14 @@ import type { Role } from '@/lib/types';
  * Deux conséquences, de gravité croissante :
  *
  *  1. Au build, l'API n'existe pas. `readSession()` échouait, la branche
- *     « Serveur injoignable » était rendue — et FIGÉE pour un an. L'écran
+ *     « Serveur injoignable » était rendue : et FIGÉE pour un an. L'écran
  *     n'était donc pas une panne passagère : c'était du HTML mort en cache.
  *  2. Si le build AVAIT joint l'API, la page prérendue aurait contenu les
  *     données d'une session, et cette page-là aurait été servie à un visiteur
  *     anonyme. Une coquille authentifiée n'est pas un contenu statique.
  *
  * `force-dynamic` répond aux deux : chaque requête est rendue avec ses propres
- * cookies, et rien n'est mis en cache. Le coût est nul ici — aucune page du
+ * cookies, et rien n'est mis en cache. Le coût est nul ici : aucune page du
  * panel n'a de sens sans session.
  */
 export const dynamic = 'force-dynamic';
@@ -48,24 +52,33 @@ export const revalidate = 0;
 /**
  * État du mode démonstration, pour le bandeau global.
  *
- * `GET /admin/demo` est réservé à l'ADMIN côté API : un agent BANQUE_FINANCE
- * recevrait un 403. On ne l'interroge donc que pour un ADMIN, et tout échec est
- * avalé — un bandeau est une information, jamais une raison de faire tomber
- * l'écran entier. LIMITE CONNUE, à porter côté API : tant que l'endpoint reste
- * fermé aux autres rôles, un agent Banque & Finance ne verra pas ce bandeau.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Interrogé pour TOUS les rôles, et c'est le point.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Cette fonction ne posait la question que pour un ADMIN, parce que
+ * `GET /admin/demo` lui était réservé. Un agent BANQUE_FINANCE ne voyait donc
+ * jamais le bandeau : alors qu'il a `/banque` et `/dossiers/export` dans sa
+ * barre latérale, et qu'un classeur de chiffres fictifs envoyé à une direction
+ * est très exactement l'accident que ce bandeau existe pour éviter.
+ * `DemoBanner` sait d'ailleurs déjà se rendre pour ce rôle : seul l'appel
+ * manquait.
+ *
+ * L'endpoint est ouvert à tout utilisateur authentifié côté API. Tout échec
+ * reste avalé : un bandeau est une information, jamais une raison de faire
+ * tomber l'écran entier ; et une API qui n'aurait pas encore été déployée doit
+ * dégrader en « pas de bandeau », pas en page blanche.
  */
-async function demoSeededAt(role: Role): Promise<string | null> {
-  if (role !== 'ADMIN') return null;
+async function demoBanner(): Promise<DemoBannerState> {
   try {
-    const status = await fetchDemoStatus(getServerApiClient());
-    return status.enabled ? (seededAtOrNull(status) ?? '') : null;
+    return demoBannerState(await fetchDemoStatus(getServerApiClient()));
   } catch (error) {
     // `unstable_rethrow` D'ABORD : Next signale la redirection, le `notFound()`
     // et la bascule en rendu dynamique en LEVANT une erreur de contrôle. Un
     // `catch` nu les avale et transforme un signal du framework en « pas de
-    // bandeau » — ou, comme ici en production, en page prérendue à tort.
+    // bandeau » : ou, comme ici en production, en page prérendue à tort.
     unstable_rethrow(error);
-    return null;
+    return NO_DEMO_BANNER;
   }
 }
 
@@ -74,7 +87,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
 
   // Seul un REFUS de l'API déconnecte. Une indisponibilité (429 du limiteur de
   // débit, 5xx, backend redémarré) laissait auparavant croire à une session
-  // absente et renvoyait vers /connexion malgré deux cookies valides — puis la
+  // absente et renvoyait vers /connexion malgré deux cookies valides : puis la
   // reconnexion consommait le quota de connexion et le cycle recommençait.
   if (session.status === 'anonymous') redirect('/connexion');
 
@@ -90,7 +103,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   }
 
   const user = session.user;
-  const seededAt = await demoSeededAt(user.role);
+  const demo = await demoBanner();
   const sidebarCollapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === '1';
 
   return (
@@ -102,9 +115,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
       <SidebarShell role={user.role} defaultCollapsed={sidebarCollapsed} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {seededAt !== null ? (
-          <DemoBanner seededAt={seededAt === '' ? null : seededAt} role={user.role} />
-        ) : null}
+        {demo.enabled ? <DemoBanner seededAt={demo.seededAt} role={user.role} /> : null}
         <Topbar user={user} />
         <main id="contenu-principal" className="flex-1 p-4 md:p-6">
           {children}

@@ -3,7 +3,7 @@ import type * as React from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * Squelette de chargement — jamais un spinner (exigence produit).
+ * Squelette de chargement : jamais un spinner (exigence produit).
  *
  * Un squelette conserve la géométrie de l'écran : rien ne saute quand les
  * données arrivent. Un spinner ne dit ni ce qui charge, ni quelle place cela

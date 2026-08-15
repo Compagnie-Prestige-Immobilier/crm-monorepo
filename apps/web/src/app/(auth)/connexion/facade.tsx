@@ -1,5 +1,5 @@
 /**
- * Motif de façade — l'élément signature du panneau de marque.
+ * Motif de façade : l'élément signature du panneau de marque.
  *
  * Il n'est pas inventé : c'est la géométrie du logotype CPI lui-même. Le
  * `favicon.svg` du patrimoine de marque est une grille 3×3 de blocs arrondis

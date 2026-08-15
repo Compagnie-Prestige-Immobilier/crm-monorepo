@@ -50,7 +50,7 @@ const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DO
  *
  * La liste des variables n'est JAMAIS saisie : elle est déduite du texte, ici
  * comme sur le serveur. Un champ « variables » à remplir à la main diverge du
- * gabarit dès la première correction — l'auteur ajoute `{{campagne}}` au corps,
+ * gabarit dès la première correction : l'auteur ajoute `{{campagne}}` au corps,
  * oublie la liste, et le compositeur cesse de proposer le champ. La variable
  * reste alors éternellement non substituée.
  */

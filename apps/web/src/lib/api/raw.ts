@@ -17,7 +17,7 @@ import { redirectToLogin } from '@/lib/api/session-expiry';
  *
  * Deux issues, et une seule est acceptable :
  *
- *  - élargir à la main les types engendrés — ils seraient écrasés à la
+ *  - élargir à la main les types engendrés : ils seraient écrasés à la
  *    prochaine génération, et l'écart entre le contrat réel et le contrat
  *    déclaré passerait inaperçu ;
  *  - passer par `fetch`, en déclarant EXPLICITEMENT la forme attendue et en la

@@ -60,7 +60,7 @@ function DropdownMenuItem({
       className={cn(
         'relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-2',
         'text-[0.875rem] outline-none transition-colors',
-        // Le fond `secondary` seul ne fait que 1,16:1 contre `popover` — loin
+        // Le fond `secondary` seul ne fait que 1,16:1 contre `popover` : loin
         // des 3:1 exigés d'un indicateur de focus. `focus:` et non
         // `focus-visible:` : Radix déplace le focus par programme.
         'focus:outline-2 focus:-outline-offset-2 focus:outline-ring',

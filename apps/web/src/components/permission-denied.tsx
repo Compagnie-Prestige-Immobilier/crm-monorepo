@@ -7,12 +7,12 @@ import { homePathForRole } from '@/components/layout/nav-items';
 import { ROLE_LABELS, type Role } from '@/lib/types';
 
 /**
- * Refus de droits — l'état qui manquait aux écrans réservés.
+ * Refus de droits : l'état qui manquait aux écrans réservés.
  *
  * Ce n'est ni une erreur ni une page introuvable, et le présenter comme telle
  * serait trompeur : la session est valide, la page existe, c'est le rôle qui ne
- * convient pas. On le dit, on nomme le rôle en cours — sans quoi l'utilisateur
- * ne peut pas savoir quoi demander à son administrateur — et on offre une
+ * convient pas. On le dit, on nomme le rôle en cours : sans quoi l'utilisateur
+ * ne peut pas savoir quoi demander à son administrateur : et on offre une
  * sortie vers un écran qui, lui, lui est ouvert.
  *
  * Surtout pas de bouton « Réessayer » : recliquer sur un refus de droits ne
