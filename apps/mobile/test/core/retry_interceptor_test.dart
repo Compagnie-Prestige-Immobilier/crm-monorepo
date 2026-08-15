@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:cpi_go/core/network/retry_after.dart';
 import 'package:cpi_go/core/network/retry_interceptor.dart';
+import 'package:cpi_go/core/sync/backoff.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -154,6 +155,25 @@ void main() {
           .subtract(const Duration(minutes: 5))
           .toIso8601String();
       expect(retryAfterOf(withHeader(past)), Duration.zero);
+    });
+
+    /// Le plafond ne portait que sur la forme numérique. Les deux formes sont
+    /// légales et un proxy peut passer de l'une à l'autre : une date lointaine,
+    /// aberrante ou hostile, suspendait la file aussi longtemps qu'elle le
+    /// disait, sans qu'aucun mécanisme ne puisse la contredire.
+    test('plafonne AUSSI la forme datée', () {
+      final String faraway = DateTime.now()
+          .toUtc()
+          .add(const Duration(days: 3))
+          .toIso8601String();
+      expect(retryAfterOf(withHeader(faraway)), kMaxRetryAfter);
+    });
+
+    /// Et la borne est bien celle que la réparation d'horloge tient pour
+    /// plausible : si les deux divergeaient, l'une effacerait le travail de
+    /// l'autre.
+    test('la borne est celle que le moteur sait écrire', () {
+      expect(retryAfterOf(withHeader('999999')), kMaxRetryAfter);
     });
 
     test('sans en-tête, rien', () {

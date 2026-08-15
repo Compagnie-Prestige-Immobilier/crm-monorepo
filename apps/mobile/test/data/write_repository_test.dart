@@ -317,10 +317,55 @@ void main() {
       expect(seqs, contains('A1'));
       // « Rattacher mes prospects » : la création du représentant est devenue
       // inutile, mais ses prospects viennent d'être repointés et doivent partir.
-      await repo.discardOwnCreateOnly('A1');
+      final DiscardResult result = await repo.discardOwnCreateOnly('A1');
+      expect(result.outcome, DiscardOutcome.discarded);
+      expect(result.removed, 1);
       final List<OutboxData> left = await allOutbox(db);
       expect(left.map((OutboxData o) => o.id), <String>['A2', 'A3', 'B1', 'B2']);
       expect(await db.select(db.prospects).get(), hasLength(3));
+    });
+
+    /// Le nom de la méthode dit « create » ; rien ne l'imposait. Un `id` périmé
+    /// désignant une modification faisait disparaître une intention utilisateur
+    /// que rien ne reconstruit : le prochain tirage ramènerait la valeur d'avant
+    /// sans que personne puisse dire pourquoi.
+    test('discardOwnCreateOnly ne touche pas une opération qui n\'est pas un create', () async {
+      await insertRepresentant(
+        db,
+        id: 'repA',
+        phone: '+221770000001',
+        serverUpdatedAt: t0,
+      );
+      await queueOp(
+        db,
+        id: 'U1',
+        entityType: 'representant',
+        entityId: 'repA',
+        op: 'update',
+        status: OutboxStatus.failed,
+        payload: <String, Object?>{'fullName': 'Awa Ndiaye'},
+      );
+
+      final DiscardResult result = await repo.discardOwnCreateOnly('U1');
+
+      expect(result.outcome, DiscardOutcome.notFound);
+      expect(result.removed, 0);
+      expect(await allOutbox(db), hasLength(1));
+      expect(
+        jsonDecode((await outboxById(db, 'U1')).payload),
+        <String, Object?>{'fullName': 'Awa Ndiaye'},
+      );
+    });
+
+    /// Une correction réécrit la ligne sous un `id` NEUF (`_amendInPlace`). La
+    /// feuille d'arbitrage, elle, tient l'ANCIEN : sans retour, elle croyait
+    /// avoir abandonné une création toujours en file.
+    test('discardOwnCreateOnly rend notFound sur un identifiant périmé', () async {
+      await seedChains();
+      final DiscardResult result = await repo.discardOwnCreateOnly('identifiant-mort');
+      expect(result.outcome, DiscardOutcome.notFound);
+      expect(result.removed, 0);
+      expect(await allOutbox(db), hasLength(5));
     });
 
     test('abandonner une opération inexistante ne fait rien', () async {

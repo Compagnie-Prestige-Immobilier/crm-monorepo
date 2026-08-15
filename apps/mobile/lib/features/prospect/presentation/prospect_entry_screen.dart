@@ -441,8 +441,18 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
                       SliverToBoxAdapter(
                         child: _ResumeStrip(
                           onResume: () => _apply(_pendingRestore!),
+                          // L'identifiant du brouillon RETROUVÉ, pas celui de
+                          // l'écran. L'adoption n'a lieu que dans `_apply` :
+                          // arrivé par `latestFor`, `_draftId` est encore
+                          // l'identifiant neuf tiré au montage, et la
+                          // suppression ne touchait aucune ligne. La bannière
+                          // disparaissait, le brouillon survivait, et la même
+                          // saisie périmée revenait à chaque ouverture pendant
+                          // sept jours.
                           onDiscard: () async {
-                            await ref.read(draftRepositoryProvider).delete(_draftId);
+                            await ref
+                                .read(draftRepositoryProvider)
+                                .delete(_pendingRestore!.draftId);
                             if (mounted) setState(() => _pendingRestore = null);
                           },
                         ),

@@ -124,8 +124,23 @@ void main() {
       }
     });
 
-    test('la purge de déconnexion n\'oublie ni l\'annuaire, ni les tentatives, '
-        'ni la file, ni le curseur', () async {
+    /// ═══ CE QUE LA DÉCONNEXION A LE DROIT DE DÉTRUIRE ═══
+    ///
+    /// La purge emportait `call_attempts` en entier et TOUTES les opérations
+    /// `call_attempt` de la file. Or l'écran de déconnexion compte les éléments
+    /// en attente avec `countPendingOutbox`, qui ne filtre pas sur le type
+    /// d'entité : les appels non envoyés étaient donc annoncés à l'utilisateur,
+    /// avec la promesse « ces saisies ne partiront qu'à la prochaine connexion
+    /// avec ce compte ». Il confirmait, et la purge détruisait ce qu'on venait
+    /// de lui garantir, sans que le serveur en ait jamais eu copie.
+    ///
+    /// Le contrat est désormais celui-ci : **le numéro part, le travail reste**.
+    /// Le secret à protéger n'est que dans `phase2_directory` ; le test voisin
+    /// vérifie qu'aucune colonne nominative n'a été glissée dans
+    /// `call_attempts`, donc garder une tentative non envoyée ne garde aucun
+    /// numéro.
+    test('la purge de déconnexion emporte l\'annuaire et le curseur, '
+        'jamais un appel non envoyé', () async {
       await seedDirectory();
       await writes.recordCallAttempt(
         prospectId: 'pros-1',
@@ -135,20 +150,59 @@ void main() {
       await directory.writeCursor('curseur-au-milieu');
 
       // De la phase 1 dans la même base : elle ne doit PAS partir. La purge vise
-      // la phase 2, pas les saisies de prospection qui n'ont pas encore été
+      // l'annuaire, pas les saisies de prospection qui n'ont pas encore été
       // envoyées : les emporter détruirait le travail de la journée.
       await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
       await queueOp(db, id: 'op-p1', entityType: 'representant', entityId: 'rep-1');
 
       await directory.purge();
 
+      // Ce qui part : les 500 000 numéros, et le curseur qui ferait croire au
+      // prochain utilisateur que son annuaire est à jour.
       expect(await db.countPhase2Directory().getSingle(), 0);
-      expect(await db.countMyAttempts().getSingle(), 0);
-      expect(await db.countPhase2Pending().getSingle(), 0);
       expect(await directory.readCursor(), isNull);
 
+      // Ce qui reste : l'appel que le serveur n'a jamais vu, et son opération.
+      expect(
+        await db.countMyAttempts().getSingle(),
+        1,
+        reason: 'le serveur n\'en a pas copie : la perte serait définitive',
+      );
+      expect(await db.countPhase2Pending().getSingle(), 1);
+
       expect(await db.countRepresentants().getSingle(), 1);
-      expect(await db.countPendingOutbox().getSingle(), 1);
+      expect(await db.countPendingOutbox().getSingle(), 2);
+    });
+
+    /// Le pendant : une tentative DÉJÀ partie n'a plus de raison de rester. Le
+    /// serveur la détient, et le prochain utilisateur de l'appareil n'a pas à
+    /// lire le journal d'appels de son prédécesseur.
+    test('la purge emporte les appels déjà envoyés', () async {
+      await seedDirectory();
+      final String sent = await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.callback,
+        createdById: 'me',
+      );
+      await seedDirectory(prospectId: 'pros-2', phone: '+221771234568');
+      final String unsent = await writes.recordCallAttempt(
+        prospectId: 'pros-2',
+        outcome: CallOutcomes.refused,
+        createdById: 'me',
+      );
+
+      // Le premier appel est acquitté, le second est toujours en file.
+      await (db.update(db.outbox)
+            ..where((Outbox o) => o.entityId.equals(sent)))
+          .write(const OutboxCompanion(status: Value<String>(OutboxStatus.done)));
+
+      await directory.purge();
+
+      final List<String> left = (await db.select(db.callAttempts).get())
+          .map((CallAttempt a) => a.id)
+          .toList(growable: false);
+      expect(left, <String>[unsent]);
+      expect(await db.countPhase2Pending().getSingle(), 1);
     });
   });
 

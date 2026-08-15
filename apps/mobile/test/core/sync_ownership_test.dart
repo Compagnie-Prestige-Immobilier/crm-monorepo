@@ -971,6 +971,96 @@ void main() {
       expect(slow.rows.keys, containsAll(<String>['repA', 'pA1']));
     });
 
+    /// ═══ « RATTACHER MES PROSPECTS » N'EFFACE PAS UNE CRÉATION EN VOL ═══
+    ///
+    /// La feuille d'arbitrage supprime la création du représentant par son
+    /// `id` d'opération, sans cascade : ses prospects viennent d'être repointés
+    /// et doivent partir. La suppression ne posait AUCUNE condition : ni le
+    /// type d'opération, ni la possession, ni le nombre de lignes touchées.
+    /// Tenir cet `id` suffisait donc à effacer une création que le serveur est
+    /// en train d'appliquer, et il restait côté serveur un représentant que ce
+    /// téléphone ne savait plus rattacher, sans plus aucune trace locale de
+    /// l'envoi.
+    test('« rattacher » refuse d\'effacer une création en cours d\'envoi', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await insertProspect(
+        db,
+        id: 'pA1',
+        representantId: 'repA',
+        phone: '+221780000002',
+      );
+      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+      await queueOp(
+        db,
+        id: 'A2',
+        entityType: 'prospect',
+        entityId: 'pA1',
+        dependencyKey: 'repA',
+      );
+
+      final _GatedApi slow = _GatedApi();
+      final SyncEngine isolateA = workerOn(slow);
+      final Future<int> pushA = isolateA.drain();
+      await slow.entered.future;
+
+      // L'envoi dépasse son bail, et il est TOUJOURS en vol : c'est l'ordinaire
+      // d'un lien 2G, pas un cas limite.
+      clock.advance(engine.leaseDuration + const Duration(seconds: 1));
+
+      final DiscardResult result = await repo.discardOwnCreateOnly('A1');
+
+      expect(result.outcome, DiscardOutcome.claimed);
+      expect(result.removed, 0);
+      expect(
+        await allOutbox(db),
+        hasLength(2),
+        reason: 'la ligne d\'outbox est le seul lien qui reste vers l\'envoi en vol',
+      );
+
+      // L'envoi aboutit : le serveur a la fiche, et le téléphone la reconnaît.
+      slow.release();
+      await pushA;
+
+      expect(slow.rows.keys, contains('repA'));
+      expect((await outboxById(db, 'A1')).status, OutboxStatus.done);
+    });
+
+    /// Le pendant positif : hors réservation, l'abandon sans cascade fait
+    /// toujours son travail, et il le dit.
+    test('« rattacher » abandonne la création libre et laisse les prospects', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await insertProspect(
+        db,
+        id: 'pA1',
+        representantId: 'repA',
+        phone: '+221780000002',
+      );
+      await queueOp(
+        db,
+        id: 'A1',
+        entityType: 'representant',
+        entityId: 'repA',
+        status: OutboxStatus.conflict,
+      );
+      await queueOp(
+        db,
+        id: 'A2',
+        entityType: 'prospect',
+        entityId: 'pA1',
+        dependencyKey: 'repA',
+      );
+
+      final DiscardResult result = await repo.discardOwnCreateOnly('A1');
+
+      expect(result.outcome, DiscardOutcome.discarded);
+      expect(result.removed, 1);
+      expect(
+        (await allOutbox(db)).map((OutboxData o) => o.id),
+        <String>['A2'],
+      );
+      expect(await db.select(db.prospects).get(), hasLength(1));
+    });
+
     /// ═══ L'AMENDEMENT NE VOLE PAS LA RÉSERVATION D'UN AUTRE ═══
     ///
     /// **Ce test n'est pas un entrelacement, et c'est délibéré.** L'état qu'il

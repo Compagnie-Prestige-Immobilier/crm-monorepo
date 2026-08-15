@@ -1,5 +1,26 @@
 import 'dart:math';
 
+/// Le délai le plus lointain que le moteur ait le droit d'inscrire dans
+/// `next_attempt_at`.
+///
+/// Ce n'est PAS le plafond du back-off : un `Retry-After` va au-delà, et c'est
+/// légitime, c'est le serveur qui l'impose. C'est la borne commune des deux
+/// écritures d'échéance, et elle doit être unique :
+///
+/// * `retryAfterOf` s'en sert pour refuser un `Retry-After` aberrant ou
+///   hostile, quelle que soit la forme de l'en-tête ;
+/// * `SyncEngine.repairClockDrift` s'en sert pour reconnaître une échéance qui
+///   ne peut PAS avoir été produite par le moteur, donc qui vient d'une horloge
+///   qui a bougé.
+///
+/// Séparées, les deux bornes se contredisaient : la réparation d'horloge
+/// plafonnait à 15 minutes, alors qu'un `Retry-After: 1800` en écrivait 30.
+/// Elle effaçait donc, en moins d'une minute, l'attente que le serveur venait
+/// d'exiger, et le client repartait pousser dans le limiteur de débit. Le
+/// serveur répondait la même limitation, indéfiniment : une boucle que
+/// l'utilisateur voit comme une file qui ne se vide jamais.
+const Duration kMaxRetryAfter = Duration(hours: 1);
+
 /// Back-off exponentiel à **gigue complète** : Dart pur.
 ///
 /// `min(2 s × 2^(n-1), 15 min)`, puis un tirage uniforme dans `[0, delai]`.
