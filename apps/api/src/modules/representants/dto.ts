@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsEnum,
   IsISO8601,
   IsInt,
   IsOptional,
@@ -13,7 +14,8 @@ import {
   MinLength,
 } from 'class-validator';
 
-import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
+import { PageMetaDto, SortOrder } from '../../common/dto/prospect-filter.dto.js';
+import { queryBoolean } from '../../common/dto/query-boolean.js';
 
 export class CreateRepresentantDto {
   @ApiPropertyOptional({
@@ -50,7 +52,7 @@ export class CreateRepresentantDto {
     description:
       'IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ' +
       'ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait ' +
-      'rétroactivement. Le département reste obligatoire — il se déduit de l’IEF, ' +
+      'rétroactivement. Le département reste obligatoire, il se déduit de l’IEF, ' +
       'jamais l’inverse.',
   })
   @IsOptional()
@@ -99,7 +101,37 @@ export class RepresentantListDto {
   @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
 }
 
-export class RepresentantQueryDto {
+/** Colonnes de tri admises. Fermée : un nom de colonne libre serait une injection. */
+export enum RepresentantSortField {
+  CLIENT_CREATED_AT = 'clientCreatedAt',
+  CREATED_AT = 'createdAt',
+  FULL_NAME = 'fullName',
+  PROSPECTS = 'prospects',
+}
+
+/**
+ * Filtres de la liste des représentants.
+ *
+ * Les cinq critères ajoutés (dates, tri, présence de prospects) portent
+ * exactement les noms attendus par le panneau « Filtres avancés » du web, dont
+ * l'état est porté par l'URL : un écart de nommage rendrait une URL partagée
+ * impossible à reconstituer dans un autre onglet.
+ */
+/**
+ * Filtres d'un listing de représentants, SANS pagination ni tri.
+ *
+ * Séparé de `RepresentantQueryDto` parce que l'export Excel n'a ni page ni
+ * tri : `representants-export.service.ts` parcourt la table en keyset sur
+ * `id asc` pour rendre la totalité du périmètre en flux, et ne lit donc ni
+ * `page`, ni `pageSize`, ni `sortBy`, ni `sortOrder`.
+ *
+ * Tant que l'export réutilisait le DTO complet, le contrat ANNONÇAIT ces
+ * quatre paramètres sur `/export/representants.xlsx`. Un client qui demandait
+ * `?page=3&sortBy=prospects` recevait le classeur entier, trié par
+ * identifiant, sans le moindre avertissement : le contrat promettait un
+ * comportement que le serveur n'a jamais eu.
+ */
+export class RepresentantExportQueryDto {
   @ApiPropertyOptional({ maxLength: 120 })
   @IsOptional()
   @IsString()
@@ -120,6 +152,65 @@ export class RepresentantQueryDto {
   @IsOptional()
   @IsUUID()
   commercialId?: string;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description: 'Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  dateFrom?: string;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description: 'Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  dateTo?: string;
+
+  /**
+   * Présence de prospects rattachés.
+   *
+   * `true` : au moins un prospect vivant. `false` : aucun, c'est-à-dire le
+   * représentant DORMANT, la population que vise la campagne de relance. Le
+   * filtre ne compte que les prospects non supprimés : un représentant dont
+   * toutes les fiches ont été effacées est redevenu dormant, et le voir compté
+   * comme actif ferait manquer exactement les cas à rappeler.
+   */
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'true : au moins un prospect vivant. false : aucun (représentant dormant).',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  hasProspects?: boolean;
+}
+
+/**
+ * Les mêmes filtres, plus la pagination et le tri du listing paginé.
+ *
+ * L'héritage garantit qu'un filtre ajouté un jour au listing arrive
+ * automatiquement dans l'export, et qu'il n'existe jamais deux définitions
+ * d'un même critère susceptibles de diverger.
+ */
+export class RepresentantQueryDto extends RepresentantExportQueryDto {
+  @ApiPropertyOptional({ enum: RepresentantSortField, enumName: 'RepresentantSortField' })
+  @IsOptional()
+  @IsEnum(RepresentantSortField)
+  sortBy?: RepresentantSortField;
+
+  /**
+   * `SortOrder` (commun) et non une énumération propre au module : « asc / desc »
+   * ne dépend pas de ce qu'on trie. Le doublon `RepresentantSortOrder`, de
+   * valeurs identiques, faisait porter à chaque client engendré deux types pour
+   * le même choix, et rendait possible une divergence sans aucun sens.
+   */
+  @ApiPropertyOptional({ enum: SortOrder, enumName: 'SortOrder' })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 
   @ApiPropertyOptional({ minimum: 1, default: 1 })
   @IsOptional()
@@ -183,7 +274,91 @@ export class DeleteQueryDto {
     description: 'Supprimer aussi les prospects rattachés. Sinon la suppression est refusée.',
   })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(queryBoolean)
   @IsBoolean()
   cascade?: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Import de masse
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Une ligne du classeur qui n'a PAS pu être retenue.
+ *
+ * Le numéro de ligne est celui du FICHIER, en-tête compris : c'est ce que la
+ * personne voit dans Excel. Renvoyer un index de tableau la ferait chercher au
+ * mauvais endroit, sur un fichier de mille lignes.
+ */
+export class ImportRowErrorDto {
+  @ApiProperty({ type: Number, description: 'Numéro de ligne dans le fichier, en-tête compris.' })
+  line!: number;
+
+  @ApiProperty({ description: 'Code stable du motif, pour que l’interface puisse le traduire.' })
+  code!: string;
+
+  @ApiProperty({ description: 'Motif lisible, prêt à afficher.' }) message!: string;
+
+  @ApiProperty({ type: String, nullable: true, description: 'Valeur fautive, telle que saisie.' })
+  value!: string | null;
+}
+
+/** Une ligne retenue, telle qu'elle sera écrite. Sert au tableau de prévisualisation. */
+export class ImportRowPreviewDto {
+  @ApiProperty({ type: Number }) line!: number;
+  @ApiProperty() fullName!: string;
+  @ApiProperty({ description: 'Téléphone normalisé E.164 par le serveur.' }) phoneE164!: string;
+  @ApiProperty() departementName!: string;
+  @ApiProperty({ type: String, nullable: true }) iefName!: string | null;
+  @ApiProperty({ type: String, nullable: true }) notes!: string | null;
+}
+
+export class ImportReportDto {
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'Vrai si rien n’a été écrit. Le premier temps de l’import est TOUJOURS une simulation : appliquer 4 000 lignes sans les avoir vues ne se rattrape pas.',
+  })
+  dryRun!: boolean;
+
+  @ApiProperty({ type: Number, description: 'Lignes de données lues, en-tête exclu.' })
+  totalRows!: number;
+
+  @ApiProperty({ type: Number, description: 'Lignes retenues.' }) valid!: number;
+  @ApiProperty({ type: Number, description: 'Lignes rejetées.' }) rejected!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Doublons de téléphone : déjà en base, ou répétés à l’intérieur du fichier. Comptés dans `rejected`.',
+  })
+  duplicates!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Représentants réellement créés. Toujours 0 en simulation.',
+  })
+  created!: number;
+
+  @ApiProperty({ type: () => [ImportRowErrorDto], description: 'Au plus 200 erreurs détaillées.' })
+  errors!: ImportRowErrorDto[];
+
+  @ApiProperty({
+    type: () => [ImportRowPreviewDto],
+    description: 'Au plus 50 lignes valides, pour la prévisualisation.',
+  })
+  preview!: ImportRowPreviewDto[];
+}
+
+export class ImportQueryDto {
+  @ApiPropertyOptional({
+    type: Boolean,
+    default: true,
+    description:
+      'Simulation. Vaut VRAI par défaut : l’écriture doit être un acte explicite, pas ce qui arrive quand on oublie un paramètre.',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  dryRun?: boolean;
 }
