@@ -9,9 +9,7 @@ import type { DemoVisibilityService } from './demo-visibility.service.js';
  * Par défaut le mode est ÉTEINT, l'état d'une plateforme en service, et celui
  * qu'un test doit exercer sauf mention contraire.
  */
-export const fakeDemoVisibility = (
-  enabled: boolean | 'unknown' = false,
-): DemoVisibilityService =>
+export const fakeDemoVisibility = (enabled: boolean | 'unknown' = false): DemoVisibilityService =>
   ({
     // `unknown` représente une lecture du réglage qui a ÉCHOUÉ. Il compte comme
     // « pas allumé » pour la visibilité, qui masque dans le doute, et comme
