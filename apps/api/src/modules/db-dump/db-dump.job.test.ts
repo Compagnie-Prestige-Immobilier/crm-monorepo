@@ -107,12 +107,39 @@ describe('effectiveStatus', () => {
   });
 
   /**
-   * Un `ready` sans échéance ne doit pas être réputé éternel par accident,
-   * mais il ne doit pas non plus disparaître : le service en écrit toujours
-   * une, et l'absence signale une ligne d'une version antérieure.
+   * ═══════════════════════════════════════════════════════════════════════════
+   * CE TEST AFFIRMAIT « ready », ET IL RENDAIT L'ARCHIVE ÉTERNELLE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * `effectiveStatus` est la SEULE porte par laquelle un export prêt devient
+   * échu, donc la seule par laquelle le fichier est détruit. Un `ready` sans
+   * échéance la traversait sans jamais la franchir : la réconciliation horaire
+   * ne pouvait plus rien contre lui, et une archive contenant toute la
+   * clientèle survivait indéfiniment sur le volume, très au-delà des six heures
+   * annoncées. Une valeur héritée ou malformée dans `app_settings` suffisait.
+   *
+   * `execute()` écrit TOUJOURS une échéance en passant `ready`. Une ligne qui
+   * n'en a pas est une anomalie, et le doute penche du côté qui détruit :
+   * relancer un export coûte quelques minutes, un second exemplaire de la base
+   * oublié sur le disque ne se rattrape pas.
    */
-  it('laisse « ready » un export sans échéance enregistrée', () => {
-    expect(effectiveStatus(job({ status: 'ready', expiresAt: null }), NOW)).toBe('ready');
+  it('ÉCHOIT un export prêt dont l’échéance manque', () => {
+    expect(effectiveStatus(job({ status: 'ready', expiresAt: null }), NOW)).toBe('expired');
+  });
+
+  it('ÉCHOIT un export prêt dont l’échéance est illisible', () => {
+    // `Date.parse` rend `NaN`, et `NaN <= t` est faux : la comparaison seule
+    // laissait cette ligne éternelle elle aussi.
+    expect(effectiveStatus(job({ status: 'ready', expiresAt: 'jamais' }), NOW)).toBe('expired');
+  });
+
+  /**
+   * Contre-épreuve : une fonction qui rendrait « expired » sans condition
+   * ferait passer les deux tests ci-dessus en cassant la fonctionnalité.
+   */
+  it('laisse « ready » un export dont l’échéance est encore devant', () => {
+    const expiresAt = new Date(NOW.getTime() + 60_000).toISOString();
+    expect(effectiveStatus(job({ status: 'ready', expiresAt }), NOW)).toBe('ready');
   });
 });
 

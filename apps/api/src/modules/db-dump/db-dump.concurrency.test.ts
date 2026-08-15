@@ -423,4 +423,45 @@ describe('réconciliation d’amorçage', () => {
     expect(await files()).toEqual(before);
     expect((await app.inject({ method: 'GET', url: DOWNLOAD_URL })).statusCode).toBe(200);
   });
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * LE BALAYAGE HORAIRE EFFAÇAIT LA SORTIE DU `pg_dump` EN COURS
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * `sweep()` ne protégeait que le fichier nommé par une ligne `ready`. Or
+   * `fileName` n'était écrit qu'à l'ARRIVÉE : pendant tout l'export, la ligne
+   * durable ne désignait aucun fichier, et le balayage traitait donc la sortie
+   * en cours d'écriture comme un orphelin.
+   *
+   * Ce n'est pas un cas de coin : `sweepExpired` tique TOUTES LES HEURES, quoi
+   * qu'il arrive, et finit forcément par tomber au milieu d'un export. Le
+   * résultat était un `pg_dump` qui continuait d'écrire dans un inode détaché,
+   * un `stat` final en échec, et une ligne bloquée `running` jusqu'à ce que la
+   * borne de trente minutes l'enterre.
+   *
+   * La vérification a lieu PENDANT que l'export est retenu : une fois relâchée,
+   * la doublure recréerait le fichier et masquerait la destruction. C'est aussi
+   * ce qui distingue la doublure du vrai `pg_dump`, qui garde son descripteur
+   * ouvert et ne récupère jamais un fichier effacé sous lui.
+   */
+  it('ne détruit pas la sortie d’un pg_dump EN COURS', async () => {
+    runner.holdWithOutput();
+    await app.inject({ method: 'POST', url: STATE_URL });
+
+    // Attendre que la sortie partielle existe : c'est elle qui est en jeu.
+    for (let attempt = 0; attempt < 200 && (await files()).length === 0; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    const enCours = await files();
+    expect(enCours).toHaveLength(1);
+
+    // Le balayage horaire tombe au milieu de l'export.
+    await service().sweepExpired();
+
+    expect(await files()).toEqual(enCours);
+
+    runner.release();
+    expect((await settle()).status).toBe('ready');
+  });
 });
