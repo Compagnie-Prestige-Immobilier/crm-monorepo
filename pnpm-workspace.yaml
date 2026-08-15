@@ -110,6 +110,14 @@ catalog:
   'pino-http': '^10.4.0'
   'pino-pretty': '^13.0.0'
   'uuid': '^13.0.0'
+  # Lecture du `AndroidManifest.xml` d'un APK. Ce manifeste est du XML BINAIRE
+  # Android (AXML) : une table de chaînes suivie d'un flux d'enregistrements,
+  # que ni une expression régulière ni un analyseur XML ordinaire ne savent
+  # lire. Fork DeviceFarmer (les mainteneurs d'OpenSTF), republié en 2026, 40 Ko
+  # de source, Apache-2.0, et exercé chaque jour sur des milliers d'APK réels
+  # dans des fermes d'appareils. Voir `apk-manifest.ts` pour les alternatives
+  # écartées.
+  '@devicefarmer/adbkit-apkreader': '3.2.4'
 
   # --- database ---
   '@prisma/adapter-pg': '7.9.0'

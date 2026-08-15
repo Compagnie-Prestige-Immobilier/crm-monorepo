@@ -121,6 +121,12 @@ export class PrismaExceptionFilter extends BaseExceptionFilter {
     // Tout ce qui n'est ni une erreur Prisma traduisible ni une exception HTTP
     // est une panne : on laisse Nest la journaliser et rendre son 500, plutôt
     // que d'habiller en contrat ce qui n'en est pas un.
+    //
+    // LES REFUS PRODUITS PAR FASTIFY LUI-MÊME (429 du limiteur, 413 de
+    // `bodyLimit`, 416 des plages) NE PASSENT PAS PAR ICI : ils sont levés hors
+    // du cycle Nest et c'est le gestionnaire posé dans `bootstrap.ts` qui les
+    // normalise. Vérifié en l'instrumentant, il tourne bel et bien, et
+    // `bootstrap.error-handler.test.ts` lit le corps réellement émis.
     if (!prismaBody && !(error instanceof HttpException)) {
       super.catch(error, host);
       return;

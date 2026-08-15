@@ -5,6 +5,7 @@ import { redirect, unstable_rethrow } from 'next/navigation';
 import { PermissionDenied } from '@/components/permission-denied';
 import { DemoModeCard } from '@/components/settings/demo-mode-card';
 import { AndroidReleaseCard } from '@/components/settings/android-release-card';
+import { DatabaseDumpCard } from '@/components/settings/database-dump-card';
 import { PurgeCard } from '@/components/settings/purge-card';
 import { getServerApiClient } from '@/lib/api/server';
 import { fetchDemoStatus } from '@/lib/data/demo';
@@ -51,6 +52,13 @@ export default async function ParametresPage() {
           allonger le premier rendu d'un écran qu'on ouvre le plus souvent pour
           tout autre chose. */}
       <PurgeCard />
+
+      {/* EN DERNIER, et sans mise en avant. L'export intégral produit une copie
+          complète de la clientèle : ce n'est pas une commande de tous les
+          jours, et la placer plus haut inviterait à la lancer par curiosité.
+          Comme la purge, la carte n'est pas préchargée côté serveur : son état
+          ne vaut rien tant que personne n'a demandé d'export. */}
+      <DatabaseDumpCard />
     </div>
   );
 }

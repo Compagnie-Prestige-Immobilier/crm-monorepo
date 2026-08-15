@@ -93,6 +93,7 @@ export 'package:crm_api_client/src/model/create_syndicat_dto.dart';
 export 'package:crm_api_client/src/model/create_user_dto.dart';
 export 'package:crm_api_client/src/model/data_quality_dto.dart';
 export 'package:crm_api_client/src/model/data_quality_row_dto.dart';
+export 'package:crm_api_client/src/model/database_dump_job_dto.dart';
 export 'package:crm_api_client/src/model/delay_leg.dart';
 export 'package:crm_api_client/src/model/delay_leg_dto.dart';
 export 'package:crm_api_client/src/model/demo_counts_dto.dart';
