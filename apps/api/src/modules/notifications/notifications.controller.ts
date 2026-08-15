@@ -1,8 +1,11 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
+import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { Role } from '@crm/database';
 
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { DemoWritable } from '../../common/decorators/demo-writable.decorator.js';
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -39,11 +42,17 @@ const ANY_AUTHENTICATED = [Role.ADMIN, Role.COMMERCIAL, Role.BANQUE_FINANCE] as 
  *    utilisateur. `RolesGuard` lit `getAllAndOverride([handler, class])` : le
  *    décorateur de méthode REMPLACE celui de classe, il ne s'y ajoute pas.
  *    C'est pourquoi `mine` et `read` énumèrent les trois rôles au lieu de
- *    simplement omettre le décorateur — une omission laisserait l'ADMIN seul.
+ *    simplement omettre le décorateur, une omission laisserait l'ADMIN seul.
  */
 @ApiTags('notifications')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
+// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
+// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
+// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
+// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
+// cas sur 116 opérations sur 119.
+@ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'notifications', version: '1' })
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
@@ -53,11 +62,12 @@ export class NotificationsController {
     operationId: 'createNotification',
     summary: 'Compose et envoie, ou programme, une notification.',
     description:
-      'Le public est résolu et les lignes de livraison écrites AVANT toute remise. Sans compte de service FCM, la notification est stockée et mise en file : `transportStatus` vaut alors NOT_CONFIGURED et l’interface doit le dire.',
+      'Le public est résolu et les lignes de livraison écrites AVANT toute remise. Sans clé Brevo, la notification est stockée et reste visible dans la boîte de réception : `transportStatus` vaut alors NOT_CONFIGURED, aucun e-mail n’est parti, et l’interface doit le dire.',
   })
   @ApiResponse({ status: 201, type: NotificationDto })
   @ApiResponse({
     status: 422,
+    type: ApiErrorDto,
     description:
       'NOTIFICATION_AUDIENCE_EMPTY, NOTIFICATION_AUDIENCE_ROLE_REQUIRED, NOTIFICATION_AUDIENCE_DEPARTEMENT_REQUIRED, NOTIFICATION_AUDIENCE_USERS_REQUIRED, NOTIFICATION_SCHEDULE_IN_PAST, NOTIFICATION_ROUTE_INVALID.',
   })
@@ -86,7 +96,7 @@ export class NotificationsController {
     operationId: 'listMyNotifications',
     summary: 'Boîte de réception de l’utilisateur courant.',
     description:
-      'Fonctionne même sans transport push : une notification en file y figure dès sa composition, ce qui rend le centre de notifications utile avant tout provisionnement Firebase.',
+      'C’est le canal qui fait foi : une notification y figure dès sa composition, indépendamment de toute remise sortante. Le mobile s’en sert désormais comme unique source.',
   })
   @ApiResponse({ status: 200, type: InboxDto })
   mine(@CurrentUser() user: AuthenticatedUser, @Query() query: InboxQueryDto): Promise<InboxDto> {
@@ -119,7 +129,7 @@ export class NotificationsController {
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: NotificationDetailDto })
-  @ApiResponse({ status: 404, description: 'NOTIFICATION_NOT_FOUND.' })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'NOTIFICATION_NOT_FOUND.' })
   get(@Param('id', ParseUUIDPipe) id: string): Promise<NotificationDetailDto> {
     return this.notifications.get(id);
   }
@@ -133,11 +143,19 @@ export class NotificationsController {
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 201, type: NotificationDto })
-  @ApiResponse({ status: 409, description: 'NOTIFICATION_NOT_SCHEDULED.' })
+  @ApiResponse({ status: 409, type: ApiErrorDto, description: 'NOTIFICATION_NOT_SCHEDULED.' })
   cancel(@Param('id', ParseUUIDPipe) id: string): Promise<NotificationDto> {
     return this.notifications.cancel(id);
   }
 
+  // Geste PERSONNEL et sans effet sur les chiffres : marquer lue sa propre
+  // notification n'écrit qu'un horodatage sur la ligne de livraison de
+  // l'utilisateur courant. Le refuser laisserait la pastille du mobile
+  // afficher un compteur qu'aucun geste ne peut plus faire retomber, et le
+  // client rejouerait l'appel indéfiniment. Le CONTRAIRE de `cancel` et de la
+  // création, qui restent bloquées : celles-là portent sur la campagne d'un
+  // autre.
+  @DemoWritable('acte personnel et inoffensif, sans effet sur les chiffres')
   @Roles(...ANY_AUTHENTICATED)
   @Post(':id/read')
   @ApiOperation({

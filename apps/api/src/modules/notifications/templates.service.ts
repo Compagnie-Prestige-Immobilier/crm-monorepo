@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { NotificationCategory, Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { demoScope } from '../../prisma/demo-visibility.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { extractVariables, renderNotification } from './template.js';
 import { routeInvalid, templateNameConflict, templateNotFound } from './errors.js';
@@ -14,29 +16,51 @@ import {
   type UpdateNotificationTemplateDto,
 } from './dto.js';
 
+/**
+ * Gabarits de notification.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * POURQUOI UN GABARIT PORTE `isDemo` COMME LE RESTE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Un gabarit rédigé pendant une démonstration n'a rien à faire dans le
+ * compositeur d'une plateforme en service : il y traîne un texte d'exemple que
+ * quelqu'un finira par envoyer pour de bon. La colonne existe en base depuis le
+ * début ; ce service était le seul à l'ignorer, aussi bien en écriture qu'en
+ * lecture.
+ *
+ * TOUTES les résolutions passent donc par `findVisible`, y compris celles qui
+ * portent déjà la clé primaire : un gabarit masqué ne doit pas non plus être
+ * relisible, modifiable ni rendu par son identifiant, sans quoi le masquage ne
+ * couvrirait que la liste.
+ */
 @Injectable()
 export class NotificationTemplatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demo: DemoVisibilityService,
+  ) {}
 
   async list(includeInactive: boolean): Promise<NotificationTemplateListDto> {
     const rows = await this.prisma.notificationTemplate.findMany({
-      where: includeInactive ? {} : { isActive: true },
+      where: {
+        ...(includeInactive ? {} : { isActive: true }),
+        ...demoScope(await this.demo.enabled()),
+      },
       orderBy: { name: 'asc' },
     });
     return { items: rows.map(toDto) };
   }
 
   async get(id: string): Promise<NotificationTemplateDto> {
-    const row = await this.prisma.notificationTemplate.findUnique({ where: { id } });
-    if (!row) throw templateNotFound();
-    return toDto(row);
+    return toDto(await this.findVisible(id));
   }
 
   /**
    * `variables` n'est JAMAIS saisi par l'auteur : il est recalculé depuis le
    * texte à chaque écriture.
    *
-   * Une liste tenue à la main diverge du gabarit à la première correction —
+   * Une liste tenue à la main diverge du gabarit à la première correction,
    * l'auteur ajoute `{{campagne}}` dans le corps, oublie de l'ajouter à la
    * liste, et le compositeur cesse de proposer le champ. La variable reste
    * alors éternellement non substituée.
@@ -57,6 +81,8 @@ export class NotificationTemplatesService {
           route: body.route ?? null,
           variables: mergedVariables(body.titleTemplate, body.bodyTemplate),
           createdById: user.id,
+          // Aucune ligne source dont hériter : l'interrupteur décide seul.
+          isDemo: await this.demo.enabled(),
         },
       });
       return toDto(row);
@@ -69,8 +95,7 @@ export class NotificationTemplatesService {
   async update(id: string, body: UpdateNotificationTemplateDto): Promise<NotificationTemplateDto> {
     if (body.route !== undefined && !ROUTE_PATTERN.test(body.route)) throw routeInvalid();
 
-    const current = await this.prisma.notificationTemplate.findUnique({ where: { id } });
-    if (!current) throw templateNotFound();
+    const current = await this.findVisible(id);
 
     const titleTemplate = body.titleTemplate ?? current.titleTemplate;
     const bodyTemplate = body.bodyTemplate ?? current.bodyTemplate;
@@ -103,11 +128,26 @@ export class NotificationTemplatesService {
    * l'envoi plutôt que refuser un aperçu à moitié rempli pendant la frappe.
    */
   async render(id: string, variables: Record<string, string>): Promise<RenderedTemplateDto> {
-    const row = await this.prisma.notificationTemplate.findUnique({ where: { id } });
-    if (!row) throw templateNotFound();
+    const row = await this.findVisible(id);
 
     const rendered = renderNotification(row.titleTemplate, row.bodyTemplate, variables);
     return { title: rendered.title, body: rendered.body, missing: [...rendered.missing] };
+  }
+
+  /**
+   * Le gabarit, s'il est visible dans le mode courant.
+   *
+   * `findFirst` et non `findUnique` : `findUnique` n'accepte qu'une clé
+   * unique, on ne peut donc pas y composer la visibilité. Un gabarit masqué
+   * répond « introuvable », le même refus que s'il n'existait pas, ce qui est
+   * exactement l'effet recherché.
+   */
+  private async findVisible(id: string): Promise<TemplateRow> {
+    const row = await this.prisma.notificationTemplate.findFirst({
+      where: { id, ...demoScope(await this.demo.enabled()) },
+    });
+    if (!row) throw templateNotFound();
+    return row;
   }
 }
 

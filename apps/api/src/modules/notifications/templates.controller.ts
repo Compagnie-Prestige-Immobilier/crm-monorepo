@@ -1,8 +1,11 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
+import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { Role } from '@crm/database';
 
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { DemoWritable } from '../../common/decorators/demo-writable.decorator.js';
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -22,6 +25,12 @@ import {
 @ApiTags('notification-templates')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
+// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
+// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
+// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
+// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
+// cas sur 116 opérations sur 119.
+@ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'notification-templates', version: '1' })
 export class NotificationTemplatesController {
   constructor(private readonly templates: NotificationTemplatesService) {}
@@ -44,7 +53,11 @@ export class NotificationTemplatesController {
       '`variables` n’est pas saisi : il est déduit du texte à chaque écriture. Une liste tenue à la main diverge du gabarit dès la première correction.',
   })
   @ApiResponse({ status: 201, type: NotificationTemplateDto })
-  @ApiResponse({ status: 409, description: 'NOTIFICATION_TEMPLATE_NAME_CONFLICT.' })
+  @ApiResponse({
+    status: 409,
+    type: ApiErrorDto,
+    description: 'NOTIFICATION_TEMPLATE_NAME_CONFLICT.',
+  })
   create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: CreateNotificationTemplateDto,
@@ -56,7 +69,7 @@ export class NotificationTemplatesController {
   @ApiOperation({ operationId: 'getNotificationTemplate', summary: 'Un gabarit.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: NotificationTemplateDto })
-  @ApiResponse({ status: 404, description: 'NOTIFICATION_TEMPLATE_NOT_FOUND.' })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'NOTIFICATION_TEMPLATE_NOT_FOUND.' })
   get(@Param('id', ParseUUIDPipe) id: string): Promise<NotificationTemplateDto> {
     return this.templates.get(id);
   }
@@ -72,6 +85,12 @@ export class NotificationTemplatesController {
     return this.templates.update(id, body);
   }
 
+  // POST qui n'ÉCRIT RIEN : la substitution est calculée et rendue, aucune
+  // ligne n'est touchée. La méthode ne vaut POST que parce que l'aperçu prend
+  // un corps, et la garde ne juge que la méthode. La bloquer casserait
+  // l'aperçu du compositeur pendant une démonstration, c'est à dire au moment
+  // précis où on le montre.
+  @DemoWritable('aperçu calculé, aucune écriture malgré la méthode POST')
   @Post(':id/render')
   @ApiOperation({
     operationId: 'renderNotificationTemplate',
