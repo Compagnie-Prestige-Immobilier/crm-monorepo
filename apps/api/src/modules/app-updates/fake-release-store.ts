@@ -103,28 +103,39 @@ export async function createAppUpdatesApp(
   return app;
 }
 
-/** Corps multipart minimal : `app.inject` n'en fabrique pas. */
+/**
+ * Corps multipart minimal : `app.inject` n'en fabrique pas.
+ *
+ * `trailingFields` place des champs APRÈS la partie fichier. Rien n'impose
+ * l'ordre des parties d'un envoi multipart, et le service lisait les champs au
+ * moment où la partie fichier lui parvenait : tout ce qui suivait était ignoré
+ * en silence. Une aide de test qui n'émet QUE l'ordre commode ne peut pas faire
+ * apparaître ce défaut, elle le cache.
+ */
 export function multipartBody(
   fields: Record<string, string>,
   file: { name: string; content: Buffer },
+  trailingFields: Record<string, string> = {},
 ): { payload: Buffer; headers: Record<string, string> } {
   const boundary = '----cpitest0123456789';
-  const parts: Buffer[] = [];
-  for (const [key, value] of Object.entries(fields)) {
-    parts.push(
-      Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`,
-      ),
+  const fieldPart = (key: string, value: string): Buffer =>
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`,
     );
-  }
+
+  const parts: Buffer[] = [];
+  for (const [key, value] of Object.entries(fields)) parts.push(fieldPart(key, value));
   parts.push(
     Buffer.from(
       `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${file.name}"\r\n` +
         'Content-Type: application/vnd.android.package-archive\r\n\r\n',
     ),
     file.content,
-    Buffer.from(`\r\n--${boundary}--\r\n`),
+    Buffer.from('\r\n'),
   );
+  for (const [key, value] of Object.entries(trailingFields)) parts.push(fieldPart(key, value));
+  parts.push(Buffer.from(`--${boundary}--\r\n`));
+
   return {
     payload: Buffer.concat(parts),
     headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },

@@ -14,11 +14,23 @@ export const DEMO_MODE_STATE_UNKNOWN = 'DEMO_MODE_STATE_UNKNOWN';
 
 /**
  * 409 et non 500 : l'état de la plateforme est en cause, pas la requête, et il
- * changera de lui-même. C'est le même statut que le refus de lecture seule, ce
- * qui évite d'élargir le contrat des routes concernées, toutes déjà porteuses
- * d'un 409.
+ * changera de lui-même. C'est le même statut que le refus de lecture seule.
+ *
+ * ═══ CE QUE LE CONTRAT EN DIT, ET CE QU'IL N'EN DISAIT PAS ═══
+ *
+ * Ce code est TRANSVERSE, comme `DEMO_MODE_READ_ONLY` : il peut sortir de
+ * n'importe quelle route mutante non dispensée, et ne se déclare donc pas
+ * route par route. Il ne l'était pas non plus dans la description d'`ApiErrorDto`,
+ * où l'autre figure : les deux clients générés recevaient un code qu'aucun
+ * contrat ne nomme.
+ *
+ * La justification écrite ici, « les routes concernées sont toutes déjà
+ * porteuses d'un 409 », était fausse : `POST /api/v1/notifications`, pour ne
+ * citer qu'elle, déclare 201, 400, 401, 403 et 422. Le 409 transverse n'est pas
+ * couvert par les déclarations d'opération, il l'est par la description du
+ * champ `code`, qui l'énumère désormais.
  */
-const demoStateUnknown = (): ConflictException =>
+export const demoStateUnknown = (): ConflictException =>
   new ConflictException({
     code: DEMO_MODE_STATE_UNKNOWN,
     message:

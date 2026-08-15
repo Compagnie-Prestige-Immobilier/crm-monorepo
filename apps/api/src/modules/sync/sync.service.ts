@@ -1047,16 +1047,27 @@ async function isDemoAuthor(tx: Prisma.TransactionClient, userId: string): Promi
  *
  * `upsert` et non `create` : une fiche supprimée puis ressaisie repasse par la
  * branche de création, et `(entityType, entityId)` est unique.
+ *
+ * ═══ POURQUOI `update: {}`, C'EST-À-DIRE AUCUNE RE-NUMÉROTATION ═══
+ *
+ * Une ligne déjà inscrite garde son rang, même si elle vient d'être rattachée
+ * à un parent inscrit APRÈS elle. Ce n'est pas un oubli, et le réparer ici
+ * serait une faute : hisser la ligne au sommet la ferait passer avant ses
+ * propres enfants (tâches d'appel, dossiers bancaires semés sur un prospect),
+ * et la purge casserait dans l'autre sens. Aucun rang chronologique ne peut
+ * satisfaire les deux contraintes à la fois.
+ *
+ * C'est donc `DemoService.purge` qui ne s'appuie plus sur la séquence pour
+ * l'ordre de suppression, mais sur l'ordre des TYPES, structurellement juste.
+ * La séquence ne sert plus qu'à départager deux lignes d'un même type.
  */
 async function recordDemoEntity(
   tx: Prisma.TransactionClient,
   entityType: 'representant' | 'prospect',
   entityId: string,
 ): Promise<void> {
-  // Le rang le plus élevé : la purge parcourt le registre à l'envers, une
-  // ligne née après l'ensemencement doit donc partir avant lui. C'est ce qui
-  // fait sortir le prospect de l'animateur avant le représentant semé auquel
-  // il est accroché.
+  // Rang le plus élevé, pour que l'inscription reste lisible dans l'ordre où
+  // elle a eu lieu. L'ordre de suppression, lui, vient des types.
   const highest = await tx.demoEntity.aggregate({ _max: { sequence: true } });
 
   await tx.demoEntity.upsert({

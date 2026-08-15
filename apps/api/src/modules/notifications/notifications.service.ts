@@ -57,6 +57,13 @@ export const DELIVERY_RETRY_ERROR = 'EMAIL_RETRY';
  * Marqueur d'une livraison qui ne sera JAMAIS servie par e-mail : le
  * destinataire n'est pas téléconseiller, ou n'a pas d'adresse. Ce n'est pas un
  * échec, la personne verra le message dans sa boîte de réception.
+ *
+ * IL DÉCRIT LE DESTINATAIRE, JAMAIS L'ÉTAT DU TRANSPORT. Il s'écrivait aussi
+ * quand `isConfigured()` rendait `false`, c'est-à-dire sur des téléconseillers
+ * parfaitement joignables dès qu'une clé serait branchée, et il écrasait au
+ * passage le marqueur de réessai qu'un passage précédent avait posé sur la
+ * même ligne. Une absence de clé n'apprend rien sur le destinataire : la ligne
+ * reste en file SANS marqueur, ce que `dispatch()` garantit désormais.
  */
 export const DELIVERY_INBOX_ONLY = 'INBOX_ONLY';
 
@@ -110,7 +117,16 @@ export interface DispatchSummary {
   readonly sent: number;
   readonly failed: number;
   readonly pending: number;
-  /** Adresses acceptées par Brevo. Redondant avec `sent`, conservé pour le journal. */
+  /**
+   * Adresses acceptées par Brevo, comptées sur les ISSUES du transport.
+   *
+   * PAS un synonyme de `sent`, qui compte des LIGNES DE LIVRAISON. Les deux
+   * divergent sur l'ISSUE MUETTE : un transport qui ne dit rien d'une adresse
+   * qu'il a reçue la fait compter `sent` (la ligne passe à SENT, voir le
+   * verdict par défaut plus bas) sans être comptée `emailed`, qui n'additionne
+   * que des issues explicitement acceptées. Le chiffre du journal est
+   * `emailed`, celui de la base est `sent`.
+   */
   readonly emailed: number;
   readonly emailStatus: BrevoTransportStatus;
 }
@@ -373,7 +389,16 @@ export class NotificationsService {
       failed += 1;
     }
 
-    if (inboxOnly.length) {
+    // LE MARQUEUR NE S'ÉCRIT QUE SI LA BRANCHE E-MAIL A RÉELLEMENT JUGÉ.
+    //
+    // Sans transport configuré, elle n'a jugé personne : elle rend une table
+    // de verdicts vide, et TOUTES les livraisons tombent dans la branche
+    // ci-dessus. Les estampiller « boîte de réception seule » affirmerait d'un
+    // téléconseiller joignable qu'il ne sera jamais servi par e-mail, et
+    // écraserait le marqueur de réessai qu'un passage précédent avait posé sur
+    // la même ligne, seule trace qui distingue « à reprendre » de « rien à
+    // envoyer ». Sans clé, la ligne reste en file sans marqueur.
+    if (inboxOnly.length && email.status !== 'NOT_CONFIGURED') {
       await this.prisma.notificationDelivery.updateMany({
         where: { id: { in: inboxOnly } },
         data: { error: DELIVERY_INBOX_ONLY },
@@ -398,6 +423,18 @@ export class NotificationsService {
    * momentanément indisponible laissent les lignes EN FILE, avec le marqueur de
    * réessai, plutôt que de faire échouer l'appel ou d'enterrer les livraisons.
    *
+   * CETTE PHRASE ÉTAIT FAUSSE POUR LA BRANCHE BASE, et c'est le défaut que
+   * `candidates` répare. Le rattrapage ne connaissait que `targeted`, rempli
+   * APRÈS la lecture des comptes : quand c'est cette lecture-là qui lâchait
+   * (délai d'attente du pool, requête interrompue), il remettait en file une
+   * liste VIDE. Aucune livraison ne portait alors de verdict, `dispatch()` les
+   * comptait toutes « rien à envoyer », `retryable` restait à zéro, et
+   * `settleNotification` refermait l'envoi sur SENT. Zéro e-mail parti, toutes
+   * les lignes `PENDING` estampillées « boîte de réception seule », et aucun
+   * des deux filets de reprise ne pouvait les retrouver : `dispatchDue` ne
+   * reprend que les SCHEDULED et les SENDING au bail expiré, `retryStalled`
+   * exige un `reminderKey` que les envois composés n'ont jamais.
+   *
    * Les identifiants viennent des lignes de livraison, donc d'un public déjà
    * résolu avec la visibilité de démonstration : le filtre n'a pas à être
    * réappliqué sur une liste qui en sort.
@@ -415,6 +452,20 @@ export class NotificationsService {
     // marquer ces lignes-là à réessayer, et elles seules.
     let targeted: { userId: string; email: string; fullName: string }[] = [];
 
+    /**
+     * Population du rattrapage, VALABLE DÈS LA PREMIÈRE LIGNE DU `try`.
+     *
+     * Elle vaut d'abord tout le public visé, faute de savoir qui est
+     * réellement servi par e-mail : cette réponse-là est précisément ce que la
+     * lecture des comptes devait apporter. Trop large, donc, et c'est
+     * délibéré : une ligne remise en file à tort porte un marqueur de réessai
+     * qu'un passage ultérieur corrige de lui-même (le destinataire non servi
+     * retombe dans la branche « rien à envoyer »), alors qu'une ligne oubliée
+     * ne revient JAMAIS. Une fois les comptes lus, elle se resserre sur les
+     * seuls destinataires réellement visés.
+     */
+    let candidates: readonly { userId: string }[] = userIds.map((userId) => ({ userId }));
+
     /** Verdicts DÉJÀ ÉCRITS en base, groupe par groupe. */
     const verdicts = new Map<string, DeliveryVerdict>();
     let emailed = 0;
@@ -429,6 +480,8 @@ export class NotificationsService {
       targeted = users
         .filter((user) => user.email.trim().length > 0)
         .map((user) => ({ userId: user.id, email: user.email.trim(), fullName: user.fullName }));
+      // Les comptes sont connus : le rattrapage se resserre sur eux.
+      candidates = targeted;
 
       if (!targeted.length) return { emailed: 0, status: 'SENT', verdicts: empty };
 
@@ -457,36 +510,58 @@ export class NotificationsService {
 
         const groupVerdicts = new Map<string, DeliveryVerdict>();
 
-        if (result.status === 'TRANSPORT_ERROR') {
-          // Aucun lot du groupe n'est passé : ce ne sont pas les adresses qui
-          // sont en cause, c'est le service ou la clé. Tout le groupe reste à
-          // réessayer.
+        // ═══ `TRANSPORT_ERROR` NE DIT PAS « PASSAGER » ═══
+        //
+        // Le transport l'annonce dès qu'aucun lot n'est passé, QUELLE QUE SOIT
+        // la nature des refus. Or un public de moins de cent adresses tient
+        // dans un seul lot : une clé invalide (401), un expéditeur non vérifié
+        // (403) ou un corps refusé (400) y produisent donc toujours
+        // `TRANSPORT_ERROR`, alors que ce sont des refus DÉFINITIFS. Le
+        // traduire en bloc par « tout le monde réessaie » épinglait la
+        // notification en SENDING et la faisait repartir tous les quarts
+        // d'heure, indéfiniment, pour un état que l'attente ne change pas.
+        //
+        // La nature de l'échec se lit donc sur l'ISSUE, ici comme sur le
+        // chemin nominal. L'état global ne décide plus que du sort des
+        // adresses dont le transport n'a rien dit.
+        const refusedGroup = result.status === 'TRANSPORT_ERROR';
+        if (refusedGroup) {
           refused = true;
           this.logger.warn(
-            `Notification ${notification.id} : e-mail non parti (${result.detail ?? 'sans détail'}). Les livraisons restent en file.`,
+            `Notification ${notification.id} : e-mail non parti (${result.detail ?? 'sans détail'}). Sort décidé par issue.`,
           );
-          for (const row of group) {
-            groupVerdicts.set(row.userId, { kind: 'retry', error: DELIVERY_RETRY_ERROR });
-          }
-        } else {
-          const byEmail = new Map(result.outcomes.map((outcome) => [outcome.email, outcome]));
-          for (const row of group) {
-            const outcome = byEmail.get(row.email);
-            if (outcome === undefined || outcome.ok) {
-              // Adresse acceptée, ou issue muette : un transport qui ne dit
-              // rien d'une adresse qu'il a reçue l'a prise en charge, et le
-              // doute ne justifie ni un échec ni un réessai.
-              groupVerdicts.set(row.userId, { kind: 'sent' });
-              continue;
-            }
-            const error = outcome.errorCode ?? 'UNKNOWN';
+        }
+
+        const byEmail = new Map(result.outcomes.map((outcome) => [outcome.email, outcome]));
+        for (const row of group) {
+          const outcome = byEmail.get(row.email);
+          if (outcome === undefined) {
+            // ISSUE MUETTE. Sur un envoi qui a abouti, un transport qui ne dit
+            // rien d'une adresse qu'il a reçue l'a prise en charge, et le
+            // doute ne justifie ni un échec ni un réessai. Sur un envoi que le
+            // transport déclare non parti, le même silence dit l'inverse : la
+            // ligne reste en file.
             groupVerdicts.set(
               row.userId,
-              outcome.kind === 'transient'
-                ? { kind: 'retry', error: DELIVERY_RETRY_ERROR }
-                : { kind: 'failed', error },
+              refusedGroup ? { kind: 'retry', error: DELIVERY_RETRY_ERROR } : { kind: 'sent' },
             );
+            continue;
           }
+          if (outcome.ok) {
+            groupVerdicts.set(row.userId, { kind: 'sent' });
+            continue;
+          }
+          const error = outcome.errorCode ?? 'UNKNOWN';
+          // `permanent` et non `!== 'transient'` : une issue en échec sans
+          // nature annoncée doit repartir en file. Classer un passager en
+          // définitif est la faute coûteuse, elle enterre un envoi que la
+          // seule attente aurait fait passer.
+          groupVerdicts.set(
+            row.userId,
+            outcome.kind === 'permanent'
+              ? { kind: 'failed', error }
+              : { kind: 'retry', error: DELIVERY_RETRY_ERROR },
+          );
         }
 
         await this.persistVerdicts(notification.id, groupVerdicts);
@@ -511,10 +586,14 @@ export class NotificationsService {
       );
 
       // SEULS LES DESTINATAIRES PAS ENCORE TRANCHÉS repartent en file. Remettre
-      // tout `targeted` à réessayer réécrirait en `PENDING` des lignes déjà
+      // tout le monde à réessayer réécrirait en `PENDING` des lignes déjà
       // passées à `SENT` par un groupe précédent, et le passage suivant leur
       // renverrait l'e-mail qu'elles ont reçu.
-      const unresolved = retryAll(targeted.filter((row) => !verdicts.has(row.userId)));
+      //
+      // `candidates` et non `targeted` : voir sa déclaration. Avant la lecture
+      // des comptes, `targeted` est vide, et filtrer une liste vide ne rend
+      // rien à réessayer, donc rien qui retienne la notification.
+      const unresolved = retryAll(candidates.filter((row) => !verdicts.has(row.userId)));
       // L'écriture peut échouer à son tour, c'est même le cas typique quand
       // c'est la base qui a lâché. Sans marqueur, les lignes restent `PENDING`
       // et la notification reste prenable : la reprise est assurée par le bail,
@@ -522,7 +601,11 @@ export class NotificationsService {
       await this.persistVerdicts(notification.id, unresolved).catch(() => undefined);
       for (const [userId, verdict] of unresolved) verdicts.set(userId, verdict);
 
-      return { emailed, status: 'TRANSPORT_ERROR', verdicts };
+      // MÊME RÈGLE QUE LE CHEMIN NOMINAL, et pour la même raison : annoncer
+      // une panne de transport alors que des e-mails sont partis ferait
+      // chercher du côté de la clé. L'interruption reste visible, dans le
+      // journal et dans les lignes laissées en file.
+      return { emailed, status: emailed === 0 ? 'TRANSPORT_ERROR' : 'SENT', verdicts };
     }
   }
 
@@ -831,6 +914,27 @@ export class NotificationsService {
    * marquer lue la notification d'un autre, même en devinant l'identifiant.
    * L'opération est idempotente, `readAt: null` empêche d'écraser la première
    * lecture, qui est la seule intéressante.
+   *
+   * ═══ POURQUOI DEUX ÉCRITURES ET NON UNE ═══
+   *
+   * LA DATE DE LECTURE ET LE STATUT NE DISENT PAS LA MÊME CHOSE. `readAt`
+   * décrit ce que l'utilisateur a fait, et vaut pour toute ligne qu'il a pu
+   * ouvrir ; `status` décrit ce que la PLATEFORME a fait de l'envoi.
+   *
+   * Une seule écriture sans prédicat de statut les confondait, et effaçait
+   * deux informations que rien ne reconstitue :
+   *
+   *   · une livraison FAILED devenait READ à la première ouverture de
+   *     l'application. L'échec disparaissait de `tally()` et de `countsFor()`,
+   *     donc de l'écran d'administration : l'envoi s'affichait comme lu par
+   *     quelqu'un qui ne l'a jamais reçu par e-mail ;
+   *   · une livraison PENDING en attente de réessai devenait READ elle aussi,
+   *     sortait de la population `PENDING` que le passage suivant reprend, et
+   *     son réessai était annulé en silence.
+   *
+   * Seules les lignes RÉELLEMENT REMISES passent donc READ. Les autres sont
+   * horodatées sans changer d'état : la pastille de non-lues se vide (elle se
+   * compte sur `readAt`), et la reprise garde sa population.
    */
   async markRead(user: AuthenticatedUser, notificationId: string): Promise<{ ok: boolean }> {
     // MÊME PORTÉE QUE LA BOÎTE qui a servi cet identifiant, sur l'écriture
@@ -838,11 +942,30 @@ export class NotificationsService {
     // « c'est fait » sur une ligne que l'utilisateur ne voit nulle part, et
     // écrirait une date de lecture sur une ligne que le mode éteint nie.
     const demoEnabled = await this.demo.enabled();
+    const scope = { notificationId, userId: user.id, readAt: null, ...demoScope(demoEnabled) };
+    const readAt = new Date();
 
-    const result = await this.prisma.notificationDelivery.updateMany({
-      where: { notificationId, userId: user.id, readAt: null, ...demoScope(demoEnabled) },
-      data: { status: NotificationDeliveryStatus.READ, readAt: new Date() },
+    const advanced = await this.prisma.notificationDelivery.updateMany({
+      where: {
+        ...scope,
+        status: {
+          in: [NotificationDeliveryStatus.SENT, NotificationDeliveryStatus.DELIVERED],
+        },
+      },
+      data: { status: NotificationDeliveryStatus.READ, readAt },
     });
+
+    const stamped = await this.prisma.notificationDelivery.updateMany({
+      where: {
+        ...scope,
+        status: {
+          in: [NotificationDeliveryStatus.PENDING, NotificationDeliveryStatus.FAILED],
+        },
+      },
+      data: { readAt },
+    });
+
+    const result = { count: advanced.count + stamped.count };
 
     if (result.count === 0) {
       const existing = await this.prisma.notificationDelivery.findFirst({
