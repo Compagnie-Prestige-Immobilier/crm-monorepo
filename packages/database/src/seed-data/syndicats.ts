@@ -4,7 +4,7 @@
  * C'est une liste de DÉPART, pas un référentiel figé : le panel admin permet
  * d'ajouter, renommer et désactiver des entrées, et le mobile les récupère à la
  * synchronisation suivante. Elle couvre les structures les plus représentatives,
- * pas l'exhaustivité — laquelle n'existe nulle part sous forme publiable.
+ * pas l'exhaustivité : laquelle n'existe nulle part sous forme publiable.
  *
  * Le G7 est l'intersyndicale des sept syndicats d'enseignants les plus
  * représentatifs, créée le 1er mai 2019.
@@ -23,7 +23,7 @@ export interface SyndicatSeed {
 }
 
 export const SYNDICATS_SENEGAL: readonly SyndicatSeed[] = [
-  // Coopératives d'habitat partenaires — en tête parce que ce sont les plus
+  // Coopératives d'habitat partenaires : en tête parce que ce sont les plus
   // saisies sur le terrain.
   {
     name: "Coopérative d'Habitat de l'Union des Enseignants du Sénégal",
@@ -38,7 +38,7 @@ export const SYNDICATS_SENEGAL: readonly SyndicatSeed[] = [
     sortOrder: 2,
   },
 
-  // G7 — intersyndicale enseignante
+  // G7 : intersyndicale enseignante
   {
     name: 'Syndicat Autonome des Enseignants du Moyen Secondaire du Sénégal',
     sigle: 'SAEMSS',

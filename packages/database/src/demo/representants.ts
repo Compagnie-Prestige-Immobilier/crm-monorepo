@@ -1,5 +1,5 @@
 /**
- * Représentants de démonstration — 15 délégués répartis sur 12 départements de
+ * Représentants de démonstration : 15 délégués répartis sur 12 départements de
  * 6 régions.
  *
  * Le département est désigné par `Departement.code` (voir `seed-data/geo.ts`),

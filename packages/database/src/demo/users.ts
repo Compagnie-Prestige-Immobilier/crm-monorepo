@@ -6,10 +6,10 @@
  * pendant la démonstration, ni dans un export, ni dans le journal d'audit.
  *
  * L'équipe raconte une histoire lisible sur le tableau de bord :
- *   Awa      — la meilleure commerciale, 42 prospects, Dakar
- *   Moussa   — 30 prospects, Thiès
- *   Fatou    — 26 prospects, Saint-Louis
- *   Ibrahima — le dernier arrivé, 22 prospects, Kaolack
+ *   Awa      : la meilleure commerciale, 42 prospects, Dakar
+ *   Moussa   : 30 prospects, Thiès
+ *   Fatou    : 26 prospects, Saint-Louis
+ *   Ibrahima : le dernier arrivé, 22 prospects, Kaolack
  * Un panel où les quatre commerciaux ont exactement le même score ressemble à
  * du bruit généré ; celui-ci se lit d'un coup d'œil.
  */
@@ -19,7 +19,7 @@ import type { DemoUser } from './types.js';
  * MOT DE PASSE PARTAGÉ des six comptes de démonstration, en clair et assumé :
  * l'animateur doit pouvoir se connecter devant l'auditoire sans chercher.
  *
- * Le semeur le hache avec argon2id avant écriture — il n'est jamais stocké tel
+ * Le semeur le hache avec argon2id avant écriture : il n'est jamais stocké tel
  * quel. Il ne donne accès qu'à des données de démonstration, effacées avec
  * elles quand l'interrupteur est refermé.
  */

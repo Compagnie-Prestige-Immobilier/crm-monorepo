@@ -1,5 +1,5 @@
 /**
- * Seed idempotent — conçu pour être relancé sur une base déjà peuplée sans
+ * Seed idempotent : conçu pour être relancé sur une base déjà peuplée sans
  * jamais dupliquer ni écraser des données de production.
  *
  * Chaque entité est écrite en `upsert` sur sa clé naturelle (`code`, `name`,

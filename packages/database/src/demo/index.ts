@@ -1,13 +1,13 @@
 /**
- * JEU DE DONNÉES DE DÉMONSTRATION — CPI GO
+ * JEU DE DONNÉES DE DÉMONSTRATION : CPI GO
  *
  * À quoi ça sert
  * ──────────────
  * Peupler la plateforme d'une activité crédible le temps d'une démonstration :
  * six comptes, quinze représentants, cent vingt prospects répartis sur les
  * quatre segments BDD, deux campagnes d'appels et vingt dossiers bancaires.
- * Tous les écrans — listes, tableau de bord, programme d'appel, tableau
- * Banque & Finance, courbes dans le temps — doivent avoir quelque chose à
+ * Tous les écrans : listes, tableau de bord, programme d'appel, tableau
+ * Banque & Finance, courbes dans le temps : doivent avoir quelque chose à
  * montrer, et ce quelque chose doit se tenir : un tableau de bord rempli de
  * bruit aléatoire se lit comme du bruit aléatoire.
  *
@@ -16,7 +16,7 @@
  * derrière l'interrupteur admin, et qui l'efface en s'appuyant sur le registre
  * `DemoEntity`. Le jeu de données ignore tout de la manière dont il est semé.
  *
- * Règle nº 1 — RÉFÉRENCE PAR CLÉ NATURELLE
+ * Règle nº 1 : RÉFÉRENCE PAR CLÉ NATURELLE
  * ────────────────────────────────────────
  * Rien ici ne désigne une ligne par son identifiant. Les référentiels sont
  * référencés par la clé stable qui porte le sens métier :
@@ -30,11 +30,11 @@
  * Les identifiants sont générés : ils diffèrent entre le poste du développeur,
  * la préproduction et la production. Un jeu de données qui en contiendrait ne
  * serait semable que sur la base où il a été écrit. Le semeur résout ces clés
- * au moment du semis ; une clé absente du référentiel fait échouer le semis —
+ * au moment du semis ; une clé absente du référentiel fait échouer le semis :
  * c'est pourquoi `demo.test.ts` vérifie CHACUNE d'entre elles contre
  * `seed-data/`, à froid, plutôt que devant un auditoire.
  *
- * Règle nº 2 — DATES RELATIVES ET DÉTERMINISME
+ * Règle nº 2 : DATES RELATIVES ET DÉTERMINISME
  * ────────────────────────────────────────────
  * Aucune date absolue, aucun `Date.now()`, aucun `Math.random()`. Tout est un
  * décalage `daysAgo` que le semeur convertit à l'instant du semis. Le même jeu
