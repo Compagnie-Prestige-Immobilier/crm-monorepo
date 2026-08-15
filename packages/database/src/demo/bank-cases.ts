@@ -3,7 +3,7 @@
  *
  * RÈGLE PRODUIT : un dossier ne s'ouvre que sur un prospect `METHOD_OBTAINED`.
  * Les 20 prospects retenus le sont tous, et chaque dossier est daté APRÈS la
- * capture de la méthode — un dossier antérieur à l'enrôlement raconterait une
+ * capture de la méthode : un dossier antérieur à l'enrôlement raconterait une
  * histoire impossible à la première question de l'auditoire.
  *
  * ── Répartition VOULUE ───────────────────────────────────────────────────────
@@ -13,7 +13,7 @@
  *   Rejeté                 4
  *
  * L'histoire que les chiffres doivent raconter :
- *   · la CBAO domine — 9 dossiers sur 20, et 12 000 000 XOF encaissés sur 22 ;
+ *   · la CBAO domine : 9 dossiers sur 20, et 12 000 000 XOF encaissés sur 22 ;
  *   · le motif « Document manquant » domine les rejets (2 sur 4), ce qui donne
  *     un enseignement exploitable au lieu d'un camembert plat.
  *
@@ -130,7 +130,7 @@ function buildCase(spec: CaseSpec): DemoBankCase {
 }
 
 const CASE_SPECS: CaseSpec[] = [
-  // ── Encaissés — 7 dossiers, 22 000 000 XOF ─────────────────────────────────
+  // ── Encaissés : 7 dossiers, 22 000 000 XOF ─────────────────────────────────
   {
     key: 'bc01',
     reference: 'CPI-DEMO-0001',
@@ -202,7 +202,7 @@ const CASE_SPECS: CaseSpec[] = [
     outcome: { kind: 'ENCAISSE', daysAgo: 33, amountXof: '2750000' },
   },
 
-  // ── Rejetés — 4 dossiers, « Document manquant » en tête ────────────────────
+  // ── Rejetés : 4 dossiers, « Document manquant » en tête ────────────────────
   {
     key: 'bc08',
     reference: 'CPI-DEMO-0008',
@@ -251,7 +251,7 @@ const CASE_SPECS: CaseSpec[] = [
     },
   },
 
-  // ── En traitement banque — 5 dossiers ──────────────────────────────────────
+  // ── En traitement banque : 5 dossiers ──────────────────────────────────────
   {
     key: 'bc12',
     reference: 'CPI-DEMO-0012',
@@ -303,7 +303,7 @@ const CASE_SPECS: CaseSpec[] = [
     outcome: null,
   },
 
-  // ── À traiter — 4 dossiers ─────────────────────────────────────────────────
+  // ── À traiter : 4 dossiers ─────────────────────────────────────────────────
   {
     key: 'bc17',
     reference: 'CPI-DEMO-0017',

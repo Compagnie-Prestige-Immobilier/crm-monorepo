@@ -4,9 +4,9 @@
  * se découvrent pas à ce moment-là : ces tests sont le filet.
  *
  * Ils vérifient deux familles de propriétés :
- *   · l'INTÉGRITÉ — chaque clé naturelle citée existe vraiment dans
+ *   · l'INTÉGRITÉ : chaque clé naturelle citée existe vraiment dans
  *     `seed-data/`, chaque clé locale pointe sur une entité du jeu ;
- *   · la COHÉRENCE MÉTIER — les invariants que la base pose en CHECK, plus la
+ *   · la COHÉRENCE MÉTIER : les invariants que la base pose en CHECK, plus la
  *     répartition annoncée en commentaire, recalculée ici pour que le
  *     commentaire ne puisse pas mentir.
  */
@@ -73,7 +73,7 @@ describe('volumétrie', () => {
   });
 });
 
-describe('clés naturelles — toutes présentes dans seed-data', () => {
+describe('clés naturelles : toutes présentes dans seed-data', () => {
   it('les départements des utilisateurs et des représentants existent', () => {
     for (const user of DEMO_USERS) {
       if (user.departementCode !== null) {
@@ -114,7 +114,7 @@ describe('clés naturelles — toutes présentes dans seed-data', () => {
   });
 });
 
-describe('clés locales — aucune référence pendante', () => {
+describe('clés locales : aucune référence pendante', () => {
   it('les représentants pointent sur un commercial du jeu', () => {
     for (const representant of DEMO_REPRESENTANTS) {
       expect(USER_KEYS, representant.key).toContain(representant.createdByKey);
@@ -159,7 +159,7 @@ describe('clés locales — aucune référence pendante', () => {
   });
 });
 
-describe('segments BDD — la répartition annoncée est la répartition réelle', () => {
+describe('segments BDD : la répartition annoncée est la répartition réelle', () => {
   const counts: Record<BddSegment, number> = { BDD1: 0, BDD2: 0, BDD3: 0, BDD4: 0 };
   for (const prospect of DEMO_PROSPECTS) {
     counts[
@@ -202,7 +202,7 @@ describe('segments BDD — la répartition annoncée est la répartition réelle
   });
 });
 
-describe('phase 2 — méthode et statut ne peuvent pas se contredire', () => {
+describe('phase 2 : méthode et statut ne peuvent pas se contredire', () => {
   it('la méthode est présente si et seulement si le statut est METHOD_OBTAINED', () => {
     for (const prospect of DEMO_PROSPECTS) {
       if (prospect.phase2Status === 'METHOD_OBTAINED') {
@@ -269,7 +269,7 @@ describe('téléphones', () => {
     }
   });
 
-  it('sont uniques toutes entités confondues — le numéro est la clé de dédoublonnage', () => {
+  it('sont uniques toutes entités confondues : le numéro est la clé de dédoublonnage', () => {
     const phones = [
       ...DEMO_USERS.map((user) => user.phoneE164),
       ...DEMO_REPRESENTANTS.map((representant) => representant.phoneE164),

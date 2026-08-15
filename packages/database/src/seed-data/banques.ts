@@ -3,7 +3,7 @@
  *
  * Les 29 banques agréées sont reprises TELLES QUELLES de la liste officielle
  * BCEAO « Établissements de crédit agréés dans l'UMOA au 31 décembre 2025 »
- * (section Sénégal, pages 10-11) — pas d'une liste reconstituée de mémoire.
+ * (section Sénégal, pages 10-11) : pas d'une liste reconstituée de mémoire.
  * Deux dénominations ont changé récemment et un seed de mémoire les aurait
  * ratées :
  *   - BICIS  → SUNU BANK SÉNÉGAL
@@ -81,7 +81,7 @@ export const BANQUES_SENEGAL: readonly BanqueSeed[] = [
     sortOrder: 43,
   },
 
-  // Microfinance — absentes de la liste BCEAO des banques, mais très présentes
+  // Microfinance : absentes de la liste BCEAO des banques, mais très présentes
   // chez les salariés syndiqués.
   { name: 'Crédit Mutuel du Sénégal', shortName: 'CMS', sortOrder: 60 },
   { name: 'PAMECAS', shortName: 'PAMECAS', sortOrder: 61 },

@@ -1,5 +1,5 @@
 /**
- * Workflow Banque & Finance — état initial.
+ * Workflow Banque & Finance : état initial.
  *
  * Les trois étapes marquées `isSystem` portent des règles financières fixes et
  * ne peuvent être ni supprimées ni désactivées par l'admin :
@@ -7,7 +7,7 @@
  *   - « Encaissé » exige un montant strictement positif ;
  *   - « Rejeté » force le montant à zéro et exige un motif.
  *
- * Seules les étapes OPEN intermédiaires sont configurables — ajout, renommage,
+ * Seules les étapes OPEN intermédiaires sont configurables : ajout, renommage,
  * réordonnancement, désactivation.
  *
  * Les couleurs sont des rôles du design system (docs/design.md), pas des hex :
@@ -64,7 +64,7 @@ export const BANK_STAGES: readonly BankStageSeed[] = [
 ] as const;
 
 /**
- * Motifs de rejet — référentiel plutôt que texte libre.
+ * Motifs de rejet : référentiel plutôt que texte libre.
  *
  * Le tableau de bord affiche une répartition des motifs : sur du texte saisi à
  * la main, ce graphique serait illisible dès la centième ligne. Le champ

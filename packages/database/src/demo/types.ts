@@ -6,7 +6,7 @@
  *
  * 1. RÉFÉRENCE PAR CLÉ NATURELLE. Aucun identifiant de base n'apparaît ici.
  *    Les référentiels sont désignés par la clé stable et lisible qui porte le
- *    sens métier — `Banque.shortName`, `Syndicat.sigle`, `Departement.code`,
+ *    sens métier : `Banque.shortName`, `Syndicat.sigle`, `Departement.code`,
  *    `BankCaseStage.code`, `BankRejectionReason.code`. Les identifiants sont
  *    générés et diffèrent d'un environnement à l'autre : un jeu de données qui
  *    en contiendrait ne serait semable que sur la base où il a été écrit.
@@ -47,7 +47,7 @@ export interface DemoUser {
   password: string;
   role: Role;
   phoneE164: string;
-  /** `Departement.code` — clé naturelle, jamais l'identifiant. */
+  /** `Departement.code` : clé naturelle, jamais l'identifiant. */
   departementCode: string | null;
   lastLoginDaysAgo: number | null;
 }
@@ -68,9 +68,9 @@ export interface DemoProspect {
   key: string;
   prenom: string;
   nom: string;
-  /** `Syndicat.sigle` — premier axe du segment BDD. */
+  /** `Syndicat.sigle` : premier axe du segment BDD. */
   syndicatSigle: string;
-  /** `Banque.shortName` — second axe du segment BDD. */
+  /** `Banque.shortName` : second axe du segment BDD. */
   banqueShortName: string;
   phoneE164: string;
   representantKey: string;
@@ -158,7 +158,7 @@ export interface DemoBankCase {
   prospectKey: string;
   /** `Banque.shortName` de la banque qui traite le dossier. */
   processingBankShortName: string;
-  /** `BankCaseStage.code` — égal au `toStageCode` de la dernière transition. */
+  /** `BankCaseStage.code` : égal au `toStageCode` de la dernière transition. */
   currentStageCode: string;
   /** `null` tant que le dossier est ouvert, `"0"` s'il est rejeté. */
   amountXof: string | null;
