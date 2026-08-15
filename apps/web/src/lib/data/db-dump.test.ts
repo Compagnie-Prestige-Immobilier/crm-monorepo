@@ -111,6 +111,39 @@ describe('dumpNoticeWarning', () => {
     expect(dumpNoticeWarning(dump({ noticeStatus: null }))).toBeNull();
     expect(dumpNoticeWarning(undefined)).toBeNull();
   });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * `INBOX_ONLY` EST L'ISSUE NOMINALE, ET ELLE NE DOIT RIEN DIRE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Aucun e-mail ne part JAMAIS pour cet avis : la sélection des destinataires
+   * d'e-mail ne retient que les comptes COMMERCIAL, et le demandeur d'un export
+   * est toujours un ADMIN. L'état portait pourtant `SENT`, que cet écran
+   * présentait comme « le message est parti ». L'administrateur attendait alors
+   * un e-mail qui ne viendrait pas, concluait à une panne, et relançait
+   * l'export : la promesse fausse PRODUISAIT une copie de plus de la clientèle
+   * sur le disque.
+   *
+   * L'avis arrive bien, dans la cloche. Il n'y a donc rien à signaler, et la
+   * carte annonce désormais l'absence d'e-mail AVANT l'export plutôt que de la
+   * faire découvrir après.
+   */
+  it('ne dit rien quand l’avis n’est arrivé que dans la cloche', () => {
+    expect(dumpNoticeWarning(dump({ noticeStatus: 'INBOX_ONLY' }))).toBeNull();
+  });
+
+  /**
+   * Et l'avertissement ne parle plus d'e-mail : il n'y en a pas, promettre d'y
+   * renoncer laisserait croire qu'il en existait un.
+   */
+  it('n’oriente jamais vers un e-mail qui n’existe pas', () => {
+    for (const status of ['NOT_CONFIGURED', 'TRANSPORT_ERROR', 'FAILED']) {
+      const warning = dumpNoticeWarning(dump({ noticeStatus: status }));
+      expect(warning).not.toBeNull();
+      expect(warning).toContain('cloche');
+    }
+  });
 });
 
 describe('téléchargement', () => {
