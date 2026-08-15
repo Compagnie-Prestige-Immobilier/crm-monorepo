@@ -23,6 +23,8 @@ abstract class _$SyncOperationDtoCWProxy {
 
   SyncOperationDto data(SyncEntityDataDto? data);
 
+  SyncOperationDto clearedFields(List<String>? clearedFields);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncOperationDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -38,6 +40,7 @@ abstract class _$SyncOperationDtoCWProxy {
     DateTime clientUpdatedAt,
     num? baseRev,
     SyncEntityDataDto? data,
+    List<String>? clearedFields,
   });
 }
 
@@ -73,6 +76,10 @@ class _$SyncOperationDtoCWProxyImpl implements _$SyncOperationDtoCWProxy {
   SyncOperationDto data(SyncEntityDataDto? data) => this(data: data);
 
   @override
+  SyncOperationDto clearedFields(List<String>? clearedFields) =>
+      this(clearedFields: clearedFields);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncOperationDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -88,6 +95,7 @@ class _$SyncOperationDtoCWProxyImpl implements _$SyncOperationDtoCWProxy {
     Object? clientUpdatedAt = const $CopyWithPlaceholder(),
     Object? baseRev = const $CopyWithPlaceholder(),
     Object? data = const $CopyWithPlaceholder(),
+    Object? clearedFields = const $CopyWithPlaceholder(),
   }) {
     return SyncOperationDto(
       opId: opId == const $CopyWithPlaceholder()
@@ -122,6 +130,10 @@ class _$SyncOperationDtoCWProxyImpl implements _$SyncOperationDtoCWProxy {
           ? _value.data
           // ignore: cast_nullable_to_non_nullable
           : data as SyncEntityDataDto?,
+      clearedFields: clearedFields == const $CopyWithPlaceholder()
+          ? _value.clearedFields
+          // ignore: cast_nullable_to_non_nullable
+          : clearedFields as List<String>?,
     );
   }
 }
@@ -180,6 +192,10 @@ SyncOperationDto _$SyncOperationDtoFromJson(Map<String, dynamic> json) =>
               ? null
               : SyncEntityDataDto.fromJson(v as Map<String, dynamic>),
         ),
+        clearedFields: $checkedConvert(
+          'clearedFields',
+          (v) => (v as List<dynamic>?)?.map((e) => e as String).toList(),
+        ),
       );
       return val;
     });
@@ -194,6 +210,7 @@ Map<String, dynamic> _$SyncOperationDtoToJson(SyncOperationDto instance) =>
       'clientUpdatedAt': instance.clientUpdatedAt.toIso8601String(),
       if (instance.baseRev case final value?) 'baseRev': value,
       if (instance.data?.toJson() case final value?) 'data': value,
+      if (instance.clearedFields case final value?) 'clearedFields': value,
     };
 
 const _$SyncEntityEnumMap = {

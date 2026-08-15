@@ -13864,6 +13864,13 @@
           },
           "data": {
             "$ref": "#/components/schemas/SyncEntityDataDto"
+          },
+          "clearedFields": {
+            "description": "Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": ["opId", "seq", "entity", "op", "entityId", "clientUpdatedAt"]
