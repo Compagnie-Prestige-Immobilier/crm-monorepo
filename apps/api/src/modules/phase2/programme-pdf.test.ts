@@ -66,7 +66,7 @@ const ROWS: ProgrammeRow[] = PROSPECTS.map((prospect, index) => ({
 const DATA: ProgrammeData = {
   campaignName: 'Campagne CHUES avril',
   commercialName: 'Awa Sy',
-  segmentLabel: 'BDD1 — CHUES / CBAO',
+  segmentLabel: 'BDD1, CHUES / CBAO',
   generatedAt: new Date('2026-04-08T14:30:00.000Z'),
   rows: ROWS,
 };
@@ -78,7 +78,7 @@ describe('writeProgrammePdf', () => {
     expect(pdf.subarray(-6).toString('latin1')).toContain('%%EOF');
   });
 
-  it('n’écrit AUCUN nom de prospect — nulle part, jamais', async () => {
+  it('n’écrit AUCUN nom de prospect, nulle part, jamais', async () => {
     const text = extractPdfText(await render(DATA));
     for (const prospect of PROSPECTS) {
       expect(text).not.toContain(prospect.nom);
@@ -183,5 +183,68 @@ describe('programmeFilename', () => {
     expect(programmeFilename({ generatedAt: new Date('2026-04-08T14:30:00.000Z') })).toBe(
       'programme-appels-2026-04-08.pdf',
     );
+  });
+
+  it('porte la journée quand la campagne est étalée', () => {
+    // Sept programmes téléchargés le même jour s'appelleraient sinon tous
+    // « programme-appels-2026-04-08 (3).pdf », et personne ne saurait lequel
+    // imprimer.
+    expect(
+      programmeFilename({ generatedAt: new Date('2026-04-08T14:30:00.000Z'), dayNumber: 3 }),
+    ).toBe('programme-appels-2026-04-08-jour-3.pdf');
+  });
+});
+
+describe('mise en page refaite', () => {
+  it('titre le document et pagine « Page N / M », sans mention de confidentialité', async () => {
+    const many: ProgrammeRow[] = Array.from({ length: 30 }, (_, index) => ({
+      position: index + 1,
+      shortCode: shortCode(`01931f3c-1a2b-7c4d-8e5f-${String(index).padStart(12, '0')}`),
+      phoneE164: `+2217710${String(index).padStart(5, '0')}`,
+    }));
+    const text = extractPdfText(await render({ ...DATA, rows: many }));
+
+    expect(text).toContain('Programme d’appels');
+    // Le total est CALCULÉ avant la première page : le document part en flux,
+    // on ne peut pas revenir écrire « / 4 » après coup.
+    expect(text).toMatch(/Page 1 \/ \d+/);
+    expect(text).toMatch(/Page 2 \/ \d+/);
+    expect(text.toLowerCase()).not.toContain('confidentiel');
+  });
+
+  it('annonce la journée d’étalement dans la ligne méta', async () => {
+    const text = extractPdfText(await render({ ...DATA, dayNumber: 3, dayCount: 7 }));
+    expect(text).toContain('Jour 3 sur 7');
+  });
+
+  it('n’annonce aucune journée quand la campagne n’est pas étalée', async () => {
+    const text = extractPdfText(await render(DATA));
+    expect(text).not.toContain('Jour ');
+  });
+
+  it('accepte un jeu de cases différent, pour les campagnes représentants', async () => {
+    // Le générateur est PARTAGÉ avec les campagnes représentants : le même
+    // commercial reçoit les deux liasses le même matin, elles doivent se
+    // ressembler au point près.
+    const text = extractPdfText(
+      await render({
+        ...DATA,
+        title: 'Programme d’appels représentants',
+        scopeCaption: 'Périmètre',
+        checkboxGroups: [{ caption: 'Résultat', options: ['Échange fait', 'Fiches promises'] }],
+      }),
+    );
+
+    expect(text).toContain('Programme d’appels représentants');
+    expect(text).toContain('Fiches promises');
+    expect(text).not.toContain('Plateforme');
+  });
+
+  it('BORNE la ligne méta : un nom de campagne long ne déborde pas de la page', async () => {
+    const long = 'C'.repeat(120);
+    const pdf = await render({ ...DATA, campaignName: long });
+    // Le document reste valide et le texte est coupé, pas répandu hors cadre.
+    expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(extractPdfText(pdf)).not.toContain(long);
   });
 });

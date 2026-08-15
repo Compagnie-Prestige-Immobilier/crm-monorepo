@@ -1,7 +1,7 @@
 import { inflateSync } from 'node:zlib';
 
 /**
- * Extraction du texte d'un PDF produit par pdfkit — outil de TEST uniquement.
+ * Extraction du texte d'un PDF produit par pdfkit, outil de TEST uniquement.
  *
  * Il existe pour qu'une règle de confidentialité soit VÉRIFIÉE et non
  * seulement affirmée : « aucun nom de prospect n'apparaît sur le programme »
@@ -11,7 +11,7 @@ import { inflateSync } from 'node:zlib';
  * régénérer un PDF non compressé pour le test, sinon le test validerait un
  * document que personne ne télécharge jamais.
  *
- * L'analyse est volontairement rudimentaire — pdfkit émet ses chaînes en
+ * L'analyse est volontairement rudimentaire, pdfkit émet ses chaînes en
  * hexadécimal dans des opérateurs `TJ`, avec les polices standard encodées en
  * WinAnsi. Ce n'est pas un analyseur PDF général et cela n'a pas à l'être.
  */
@@ -93,7 +93,7 @@ export function extractPdfText(pdf: Buffer): string {
   // Un opérateur `TJ` porte un TABLEAU : pdfkit y intercale des ajustements de
   // crénage, si bien qu'un seul mot arrive découpé en plusieurs morceaux
   // (`[<50726f>-25<6772616d6d65>] TJ`). Les morceaux d'un même opérateur sont
-  // recollés SANS séparateur — sans quoi « Programme » deviendrait illisible et
+  // recollés SANS séparateur, sans quoi « Programme » deviendrait illisible et
   // un test de présence échouerait à tort. Les opérateurs successifs, eux, sont
   // séparés : deux libellés voisins ne doivent jamais fabriquer un mot qui
   // n'existe pas et faire échouer à tort un test d'absence.
