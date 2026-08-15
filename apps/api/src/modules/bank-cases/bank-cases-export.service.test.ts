@@ -87,7 +87,7 @@ const stubAnalytics = (): BankCaseAnalyticsService =>
     ]),
     byBank: vi.fn().mockResolvedValue([
       {
-        bankId: 'bnq-cbao',
+        banqueId: 'bnq-cbao',
         label: 'CBAO',
         cases: 2,
         cashed: 1,
@@ -97,7 +97,7 @@ const stubAnalytics = (): BankCaseAnalyticsService =>
         meanProcessingHours: 12.5,
       },
       {
-        bankId: 'bnq-bhs',
+        banqueId: 'bnq-bhs',
         label: 'BHS',
         cases: 1,
         cashed: 0,
@@ -191,7 +191,7 @@ beforeEach(() => {
 /**
  * Produit puis relit le classeur. La lecture est branchée AVANT l'écriture : le
  * service pousse le XML au fil de l'eau et le tampon d'un `PassThrough` est
- * borné — accumuler d'abord ferait tenir tout le fichier en mémoire, ce que la
+ * borné, accumuler d'abord ferait tenir tout le fichier en mémoire, ce que la
  * génération en flux existe précisément pour éviter.
  */
 async function build(
@@ -285,7 +285,7 @@ describe('feuille Dossiers', () => {
     expect(sheet.getRow(4).getCell(index).value).toBe(1200000);
     expect(sheet.getColumn(index).style.numFmt).toBe('#,##0" FCFA"');
     // Un dossier ouvert n'a pas de montant : la cellule reste vide, elle ne
-    // vaut pas zéro — sans quoi la somme de la colonne resterait juste mais la
+    // vaut pas zéro, sans quoi la somme de la colonne resterait juste mais la
     // moyenne deviendrait fausse.
     expect(sheet.getRow(2).getCell(index).value).toBeNull();
   });
@@ -349,7 +349,7 @@ describe('feuille Synthèse', () => {
     expect(libelles).toContain('Aucun rejet');
   });
 
-  it('un délai moyen indisponible s’écrit « — » et non zéro', async () => {
+  it('un délai moyen indisponible s’écrit « n/d » et non zéro', async () => {
     const analytics = stubAnalytics();
     vi.spyOn(analytics, 'totals').mockResolvedValue({
       total: 0,
@@ -371,13 +371,13 @@ describe('feuille Synthèse', () => {
 
     const libelles = column(sheet, 'Indicateur');
     const valeurs = column(sheet, 'Valeur');
-    expect(valeurs[libelles.indexOf('Délai moyen de traitement (h)')]).toBe('—');
+    expect(valeurs[libelles.indexOf('Délai moyen de traitement (h)')]).toBe('n/d');
   });
 });
 
 describe('filtrage', () => {
   it('n’exporte QUE les dossiers retenus par le filtre, historique compris', async () => {
-    const workbook = await build({ bankId: 'bnq-bhs' }, (row) => row.id === 'case-002');
+    const workbook = await build({ banqueId: 'bnq-bhs' }, (row) => row.id === 'case-002');
 
     expect(column(sheetOf(workbook, 'Dossiers'), 'Référence')).toEqual(['BNK 2026-002']);
     // L'historique suit : aucune transition d'un dossier hors filtre ne fuit.

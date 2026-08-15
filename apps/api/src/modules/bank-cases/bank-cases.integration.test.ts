@@ -80,7 +80,7 @@ let prospects: string[] = [];
  * Efface les données d'un test, et rien d'autre : la base est partagée avec le
  * reste du dépôt et tout est préfixé par `TAG`.
  *
- * L'ORDRE suit les clés étrangères en `Restrict` — transitions, dossiers,
+ * L'ORDRE suit les clés étrangères en `Restrict`, transitions, dossiers,
  * prospects, étapes. Un `deleteMany` dans le désordre échouerait sur une
  * contrainte au lieu de nettoyer.
  */
@@ -395,7 +395,7 @@ describe('liste et filtres, en SQL', () => {
     expect((await service.list({ ...mine, stageId: stageEncaisse })).meta.total).toBe(1);
     expect((await service.list({ ...mine, stageType: 'CASHED' })).meta.total).toBe(1);
     expect((await service.list({ ...mine, stageType: 'OPEN' })).meta.total).toBe(2);
-    expect((await service.list({ ...mine, bankId: banqueB })).meta.total).toBe(1);
+    expect((await service.list({ ...mine, banqueId: banqueB })).meta.total).toBe(1);
   });
 
   it('filtre par agent, créateur OU dernier intervenant', async () => {
@@ -507,7 +507,7 @@ describe('les KPI sont les agrégats de la MÊME liste filtrée', () => {
 
     expect(parBanque.reduce((total, row) => total + row.cases, 0)).toBe(liste.meta.total);
     for (const banque of parBanque) {
-      const siennes = liste.items.filter((row) => row.processingBankId === banque.bankId);
+      const siennes = liste.items.filter((row) => row.processingBankId === banque.banqueId);
       expect(banque.cases).toBe(siennes.length);
       const somme = siennes
         .filter((row) => row.currentStage.type === 'CASHED')
@@ -553,17 +553,19 @@ describe('les KPI sont les agrégats de la MÊME liste filtrée', () => {
 
 describe('autocomplétion des prospects', () => {
   it('retrouve un nom accentué écrit SANS accents, et l’inverse', async () => {
-    expect((await service.prospectSearch({ q: 'Aissatou' })).items).toHaveLength(1);
-    expect((await service.prospectSearch({ q: 'aïssatou' })).items).toHaveLength(1);
-    expect((await service.prospectSearch({ q: 'AISSATOU' })).items).toHaveLength(1);
+    expect((await service.prospectSearch({ search: 'Aissatou' })).items).toHaveLength(1);
+    expect((await service.prospectSearch({ search: 'aïssatou' })).items).toHaveLength(1);
+    expect((await service.prospectSearch({ search: 'AISSATOU' })).items).toHaveLength(1);
     // Nom de famille seul, et ordre prénom/nom indifférent.
-    expect((await service.prospectSearch({ q: `${TAG}Ndiaye` })).items).toHaveLength(1);
-    expect((await service.prospectSearch({ q: `Aissatou ${TAG}Ndiaye` })).items).toHaveLength(1);
+    expect((await service.prospectSearch({ search: `${TAG}Ndiaye` })).items).toHaveLength(1);
+    expect((await service.prospectSearch({ search: `Aissatou ${TAG}Ndiaye` })).items).toHaveLength(
+      1,
+    );
   });
 
   it('retrouve le MÊME abonné sous quatre écritures du numéro', async () => {
     for (const saisie of ['+221771234567', '221771234567', '77 123 45 67', '77-123-45-67']) {
-      const trouve = await service.prospectSearch({ q: saisie });
+      const trouve = await service.prospectSearch({ search: saisie });
       expect(
         trouve.items.map((row) => row.phoneE164),
         saisie,
@@ -572,14 +574,14 @@ describe('autocomplétion des prospects', () => {
   });
 
   it('ne propose QUE des prospects enrôlés : un dossier ne s’ouvre pas ailleurs', async () => {
-    const tous = await service.prospectSearch({ q: TAG, pageSize: 50 });
+    const tous = await service.prospectSearch({ search: TAG, pageSize: 50 });
     expect(tous.items).toHaveLength(3);
     expect(tous.items.map((row) => row.nom)).not.toContain(`${TAG}Fall`);
   });
 
   /** La projection EST la mesure de confidentialité : rien d'autre n'est lu. */
   it('ne renvoie que l’identité, le téléphone et la banque courante', async () => {
-    const item = (await service.prospectSearch({ q: `${TAG}Ndiaye` })).items[0];
+    const item = (await service.prospectSearch({ search: `${TAG}Ndiaye` })).items[0];
     expect(Object.keys(item ?? {}).sort()).toEqual([
       'banqueId',
       'banqueName',
@@ -596,7 +598,7 @@ describe('autocomplétion des prospects', () => {
       where: { id: prospects[0] ?? '' },
       data: { deletedAt: new Date() },
     });
-    expect((await service.prospectSearch({ q: `${TAG}Ndiaye` })).items).toHaveLength(0);
+    expect((await service.prospectSearch({ search: `${TAG}Ndiaye` })).items).toHaveLength(0);
   });
 });
 

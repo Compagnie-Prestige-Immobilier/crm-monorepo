@@ -4,8 +4,8 @@ import { Prisma } from '@crm/database';
  * Le franc CFA est exposé en CHAÎNE, jamais en nombre JSON.
  *
  * XOF n'a pas de décimales et la colonne est un `Decimal(18,0)`. Un montant
- * au-delà de 2^53 — 9 007 199 254 740 992 FCFA, soit l'ordre de grandeur d'un
- * portefeuille consolidé — perdrait de la précision dès la désérialisation
+ * au-delà de 2^53, 9 007 199 254 740 992 FCFA, soit l'ordre de grandeur d'un
+ * portefeuille consolidé, perdrait de la précision dès la désérialisation
  * JSON, silencieusement. Le client formate la chaîne en FCFA ; il n'a jamais
  * besoin d'en faire de l'arithmétique.
  */

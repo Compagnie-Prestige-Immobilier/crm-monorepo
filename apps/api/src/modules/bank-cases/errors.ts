@@ -1,15 +1,10 @@
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 
 /**
  * Erreurs métier du module, toutes typées par un `code` stable.
  *
  * Aucune de ces situations ne doit remonter en 500. Les invariants sont posés
- * DEUX FOIS — ici et en contrainte PostgreSQL — et ce n'est pas une redondance
+ * DEUX FOIS, ici et en contrainte PostgreSQL, et ce n'est pas une redondance
  * inutile : la base est la vérité en cas de course, le service est ce qui
  * permet au client de savoir quoi corriger. Une contrainte qui remonte nue
  * produit « erreur interne » là où l'agent attend « ce numéro de dossier est
@@ -74,11 +69,25 @@ export const prospectNotEnrolled = (
     phase2Status,
   });
 
-export const bankNotFound = (bankId: string): BadRequestException =>
-  new BadRequestException({
+/**
+ * 422 et non 400, et `banqueId` et non `bankId`.
+ *
+ * Le statut : la requête est BIEN FORMÉE, l'identifiant est un UUID valide, il
+ * ne désigne simplement aucune banque. C'est la même classe de faute que
+ * `CLIENT_REQUEST_BANQUE_NOT_FOUND`, qui sortait déjà en 422, et que les
+ * destinataires introuvables des campagnes. Trois statuts pour une même faute
+ * obligeaient le client à connaître le module avant de savoir s'il devait
+ * faire relire la saisie ou la sélection.
+ *
+ * Le nom du champ : le reste du contrat appelle cette clé `banqueId`. La
+ * publier sous `bankId` dans le corps d'erreur forçait l'appelant à connaître
+ * deux noms pour la même chose selon qu'il lisait une réponse ou une erreur.
+ */
+export const bankNotFound = (banqueId: string): UnprocessableEntityException =>
+  new UnprocessableEntityException({
     code: BankCaseError.BANK_NOT_FOUND,
     message: 'Banque de traitement inconnue.',
-    bankId,
+    banqueId,
   });
 
 /** Porte l'identifiant du dossier existant : le client peut y renvoyer l'agent. */

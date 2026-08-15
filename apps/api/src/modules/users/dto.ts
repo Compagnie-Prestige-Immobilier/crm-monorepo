@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsEmail,
@@ -17,6 +17,7 @@ import {
 import { Role } from '@crm/database';
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
+import { queryBoolean } from '../../common/dto/query-boolean.js';
 
 export class CreateUserDto {
   @ApiProperty({ format: 'email', maxLength: 254 })
@@ -122,7 +123,7 @@ export class UserListQueryDto {
 
   @ApiPropertyOptional({ type: Boolean })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(queryBoolean)
   @IsBoolean()
   isActive?: boolean;
 

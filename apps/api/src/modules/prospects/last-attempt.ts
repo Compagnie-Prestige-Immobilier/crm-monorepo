@@ -4,7 +4,7 @@ import type { CallOutcome } from '@crm/database';
 /**
  * Dernière tentative d'appel de chaque prospect, en UNE requête.
  *
- * L'écriture naïve — une lecture `call_attempts` par ligne affichée — coûte 25
+ * L'écriture naïve, une lecture `call_attempts` par ligne affichée, coûte 25
  * allers-retours pour une page de 25 et 500 000 pour un export complet ; le
  * temps de réponse devient linéaire en nombre de lignes et la base passe son
  * temps en planification. Le `JOIN LATERAL` demande au contraire à PostgreSQL

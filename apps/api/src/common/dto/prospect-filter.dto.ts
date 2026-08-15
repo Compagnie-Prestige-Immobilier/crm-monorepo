@@ -1,9 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsEnum,
   IsISO8601,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -13,6 +14,10 @@ import {
   Min,
 } from 'class-validator';
 import { BddSegment, EnrollmentMethod, Phase2Status, ProspectStatut } from '@crm/database';
+
+import { queryBoolean } from './query-boolean.js';
+import { PROSPECT_ORIGINS } from '../prospect-origin.js';
+import type { ProspectOrigin } from '../prospect-origin.js';
 
 /**
  * Filtre commun à la liste des prospects, aux endpoints analytiques et à
@@ -136,6 +141,23 @@ export class ProspectFilterDto {
   @IsUUID()
   enrollmentCapturedById?: string;
 
+  /**
+   * Provenance, pour isoler ce qui n'entre PAS par la tournée terrain.
+   *
+   * Fermée sur `PROSPECT_ORIGINS` plutôt que libre : la colonne est contrainte
+   * en base au même vocabulaire, et accepter une chaîne quelconque ne ferait
+   * que rendre un ensemble vide indiscernable d'une faute de frappe.
+   */
+  @ApiPropertyOptional({
+    type: String,
+    enum: PROSPECT_ORIGINS,
+    description:
+      'Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.',
+  })
+  @IsOptional()
+  @IsIn(PROSPECT_ORIGINS)
+  origin?: ProspectOrigin;
+
   @ApiPropertyOptional({
     format: 'date-time',
     description: 'Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.',
@@ -157,7 +179,7 @@ export class ProspectFilterDto {
     default: false,
   })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(queryBoolean)
   @IsBoolean()
   includeDeleted?: boolean;
 }

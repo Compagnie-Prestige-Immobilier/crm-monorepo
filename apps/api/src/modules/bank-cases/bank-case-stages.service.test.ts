@@ -151,7 +151,7 @@ describe('modification', () => {
 
 describe('activation', () => {
   /**
-   * Les étapes système portent les règles financières du module — point
+   * Les étapes système portent les règles financières du module, point
    * d'entrée, encaissement, rejet. Les désactiver rendrait le workflow
    * inexploitable sans le moindre message d'erreur.
    */
@@ -288,7 +288,7 @@ describe('réordonnancement', () => {
     expect(bodyOf(error).missing).toHaveLength(1);
   });
 
-  it('une étape inconnue — ou système — dans la liste est refusée', async () => {
+  it('une étape inconnue, ou système, dans la liste est refusée', async () => {
     const error = await refusal(() =>
       service.reorder({
         stageIds: [STAGE_A_TRAITER.id, STAGE_EN_TRAITEMENT.id, STAGE_ENCAISSE.id],
