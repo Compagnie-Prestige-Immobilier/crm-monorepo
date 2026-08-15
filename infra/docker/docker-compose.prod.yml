@@ -1,5 +1,11 @@
 # =============================================================================
-# CPI GO, production, VPS unique.
+# CPI GO, VPS unique et NU, sans Dokploy.
+#
+# Ce fichier ne décrit PAS la production actuelle, qui tourne sur un hôte
+# Dokploy approvisionné par infra/dokploy/deploy.py. Il ne peut pas y tourner :
+# le Caddy ci-dessous réclame les ports 80 et 443, que Traefik occupe déjà. Le
+# service `backup` plus bas ne s'exécute donc PAS en production ; la sauvegarde
+# de production est le routeur natif de Dokploy, voir infra/README.md § 4.
 #
 #   caddy     seul conteneur exposé sur Internet, termine TLS (Let's Encrypt)
 #   web       Next.js 16, rendu du panel admin
