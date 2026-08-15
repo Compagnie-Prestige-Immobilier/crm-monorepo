@@ -122,6 +122,15 @@ apps/mobile/android/**/GeneratedPluginRegistrant.java
 *.apk
 *.aab
 *.aar
+# EXCEPTION, et elle est délibérée : les APK d'essai du lecteur de manifeste.
+#
+# Quatre fichiers de moins de 700 octets, produits par `aapt2`, qui ne
+# contiennent qu'un manifeste et une table de ressources vide : ni code, ni
+# image. Ce sont de VRAIS APK, et il le faut : `AndroidManifest.xml` est du XML
+# binaire, et un tampon fabriqué à la main dans un test décrirait la lecture
+# qu'on imagine plutôt que le format qu'`aapt2` écrit. Voir
+# `apps/api/src/modules/app-updates/apk-manifest.test.ts`.
+!apps/api/src/modules/app-updates/fixtures/*.apk
 
 # iOS (non ciblé aujourd'hui, mais le jour où il l'est, ce sera trop tard)
 apps/mobile/ios/Pods/

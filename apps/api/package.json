@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@crm/database": "workspace:*",
+    "@devicefarmer/adbkit-apkreader": "catalog:",
     "@fastify/cors": "catalog:",
     "@fastify/helmet": "catalog:",
     "@fastify/multipart": "9.2.1",
