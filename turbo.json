@@ -1,6 +1,22 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalEnv": ["DATABASE_URL", "NODE_ENV", "TURBO_TELEMETRY_DISABLED"],
+  // Turbo ne hache RIEN à la racine de lui-même : ni le `package.json` racine
+  // au-delà de ses dépendances, ni les fichiers de configuration des outils.
+  // Vérifié sur turbo 2.10.5, `globalCacheInputs.files` était littéralement `{}`.
+  //
+  // Or `openapi:generate` et `generate` finissent tous deux par un
+  // `prettier --write` : changer `printWidth` réécrit `apps/api/openapi.json`
+  // ET `packages/api-client/src/generated/schema.ts` octet pour octet, sans
+  // qu'aucune empreinte de tâche ne bouge. Une entrée de cache écrite avant le
+  // changement redeviendrait alors la « bonne » réponse, et le portillon
+  // anti-dérive comparerait du code mis en forme selon deux règles différentes.
+  //
+  // C'est une dépendance GLOBALE et non une entrée de ces deux tâches, parce
+  // qu'un changement de configuration Prettier est aussi susceptible de
+  // déplacer le verdict de `lint`. Le coût est une invalidation complète, une
+  // fois, le jour où l'on touche à ces fichiers, ce qui n'arrive jamais.
+  "globalDependencies": [".prettierrc", ".prettierignore"],
   "tasks": {
     // `generate` n'est PAS une dépendance globale de `build`. Le faire créerait
     // un cycle : @crm/database#build -> generate -> @crm/api#openapi:generate
@@ -10,8 +26,20 @@
       "dependsOn": ["^build"],
       "outputs": [".next/**", "dist/**", "!.next/cache/**"]
     },
+    // `outputs` DOIT être redéclaré ici. Une définition `paquet#tâche` REMPLACE
+    // la définition générique, elle ne la complète pas : sans cette ligne la
+    // tâche héritait de `outputs: null` et turbo ne capturait pas `dist/`.
+    //
+    // C'était inoffensif tant que le cache n'était jamais restauré. Depuis que
+    // `.github/actions/setup-node` a des `restore-keys`, ça ne l'est plus : une
+    // entrée retrouvée fait SAUTER `tsc` sans rien remettre sur le disque, et
+    // `@crm/api#openapi:generate`, qui boote l'app NestJS et importe donc le
+    // `dist` de ce paquet, échoue sur un module introuvable, sur un runner
+    // neuf uniquement. Déclarer les sorties rend le saut légitime : ce qui a
+    // été sauté est restauré.
     "@crm/database#build": {
-      "dependsOn": ["db:generate"]
+      "dependsOn": ["db:generate"],
+      "outputs": ["dist/**"]
     },
     "@crm/api-client#build": {
       "dependsOn": ["^build", "generate"],
@@ -53,7 +81,17 @@
       // génération du contrat échoue sur un `dist` absent ou périmé — et
       // seulement sur une machine propre, jamais sur celle du développeur.
       "dependsOn": ["@crm/database#db:generate", "@crm/database#build"],
-      "inputs": ["src/**/*.ts", "package.json", "tsconfig.json"],
+      // `tsconfig.gen.json` est le fichier que la commande compile réellement
+      // (`tsc -p tsconfig.gen.json`), et il manquait : seul `tsconfig.json`
+      // était déclaré. Changer la cible, le `include` ou le `outDir` de la
+      // configuration de génération ne déplaçait donc pas l'empreinte, et turbo
+      // pouvait restituer un `openapi.json` produit par l'ancienne.
+      //
+      // `src/**` et non `src/**/*.ts` : un surensemble. La génération boote
+      // l'application entière, qui peut lire autre chose que du TypeScript. Se
+      // tromper dans ce sens coûte un cache manqué ; se tromper dans l'autre
+      // sens rend le contrat faux.
+      "inputs": ["src/**", "package.json", "tsconfig.json", "tsconfig.gen.json"],
       "outputs": ["openapi.json"],
       "env": ["OPENAPI_GENERATION"]
     },
@@ -62,16 +100,70 @@
     // so `^` would silently resolve to the empty set and the edge would be a
     // no-op, generating clients against a stale spec whenever the tasks were
     // not run in the right order by hand.
+    //
+    // ─────────────────────────────────────────────────────────────────────────
+    // LES `inputs` DE CETTE TÂCHE SONT UN DISPOSITIF DE SÛRETÉ, PAS UNE
+    // OPTIMISATION.
+    //
+    // Déclarer `inputs` nommément coupe le défaut de turbo (tous les fichiers
+    // suivis du paquet). Tout ce qui change la sortie et n'est pas listé ici
+    // devient invisible : l'empreinte ne bouge pas, turbo restitue les
+    // `*.g.dart` et le `schema.ts` du générateur PRÉCÉDENT, et le portillon
+    // anti-dérive de la CI passe au vert sur des artefacts que le générateur
+    // courant n'écrit plus. C'est le seul endroit du dépôt où une erreur de
+    // configuration produit un vert mensonger plutôt qu'un rouge.
+    //
+    // Ce qui manquait, et que chaque ligne ajoutée ci-dessous répare :
+    //
+    //   ../../openapitools.json
+    //       La version ÉPINGLÉE du générateur (7.24.0). L'entrée s'appelait
+    //       `openapitools.json`, chemin relatif au paquet, or ce fichier n'est
+    //       qu'à la racine. Le motif ne correspondait à AUCUN fichier :
+    //       constaté sur `turbo run generate --dry=json`, où il n'apparaissait
+    //       pas dans les entrées résolues. Le relèvement du générateur, qui
+    //       réécrit les 193 fichiers Dart, était donc invisible.
+    //   ../../tools/dev/generate-dart-client.mjs
+    //       LE script qui génère. `scripts/**` ne couvrait que le
+    //       `check-generated.mjs` du paquet ; l'appel du générateur, l'élagage
+    //       des fichiers d'un contrat révolu et l'enchaînement build_runner +
+    //       dart format vivent tous ici.
+    //   build.yaml
+    //       Les options json_serializable. Basculer `explicit_to_json` ou
+    //       `disallow_unrecognized_keys` réécrit chaque `*.g.dart`.
+    //   pubspec.yaml
+    //       Les contraintes de version des générateurs Dart.
+    //   analysis_options.yaml
+    //       `dart format` y lit sa largeur de page depuis Dart 3.7.
+    //
+    // CE QUI RESTE HORS DE PORTÉE, et il faut le savoir : `pubspec.lock` est
+    // ignoré par git (packages/api-client-dart/.gitignore, convention Dart pour
+    // une bibliothèque). Or turbo hache par l'index git : un fichier ignoré
+    // n'est jamais haché, l'ajouter ici ne ferait rien. Les contraintes en
+    // `^x.y.z` de pubspec.yaml peuvent donc se résoudre sur un json_serializable
+    // plus récent sans qu'aucun fichier suivi ne bouge. Même angle mort pour la
+    // version du SDK Dart et du JDK, qui sont épinglées dans les workflows.
+    // C'est la raison, la seule qui subsiste, pour laquelle le job `contract`
+    // coupe le cache turbo. Voir le commentaire de .github/workflows/ci.yml.
+    // ─────────────────────────────────────────────────────────────────────────
     "generate": {
       "dependsOn": ["@crm/api#openapi:generate"],
       "inputs": [
         "../../apps/api/openapi.json",
+        "../../openapitools.json",
+        "../../tools/dev/generate-dart-client.mjs",
         "openapi-config.yaml",
-        "openapitools.json",
-        "scripts/**",
-        ".openapi-generator-ignore"
+        "build.yaml",
+        "pubspec.yaml",
+        "analysis_options.yaml",
+        ".openapi-generator-ignore",
+        "scripts/**"
       ],
-      "outputs": ["src/generated/**", "lib/**"]
+      // `.openapi-generator/**` est une sortie au même titre que `lib/` :
+      // `FILES` est le manifeste réécrit à chaque exécution, et c'est lui qui
+      // pilote l'élagage des fichiers d'un contrat révolu. Le laisser hors des
+      // sorties rendait le couple restitué incohérent, un `lib/` du cache face
+      // à un manifeste de l'arbre de travail.
+      "outputs": ["src/generated/**", "lib/**", ".openapi-generator/**"]
     }
   }
 }
