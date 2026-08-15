@@ -81,7 +81,6 @@ function ApproveDialog({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const representantId = useId();
   const syndicatId = useId();
   const methodId = useId();
 
@@ -151,12 +150,15 @@ function ApproveDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
+          {/* `required` : le champ bloque l'envoi au même titre que ses deux
+              voisins, il doit donc porter la même marque. */}
           <FilterCombobox
             label="Représentant de rattachement"
             placeholder="Choisir un représentant"
             value={representant}
             options={reference?.representants ?? []}
             onChange={setRepresentant}
+            required
           />
 
           <div className="flex flex-col gap-1.5">
@@ -210,7 +212,16 @@ function ApproveDialog({
             </p>
           </div>
 
-          <p className="text-[0.75rem] text-muted-foreground" id={representantId}>
+          {/*
+            L'identifiant porté ici ne servait à RIEN : il était engendré pour le
+            champ « Représentant », posé sur ce paragraphe, et le
+            `FilterCombobox` ne le référençait nulle part. Un `id` qu'aucun
+            `aria-labelledby` ni `aria-describedby` ne cite n'est pas une demi-
+            mesure d'accessibilité, c'est du bruit qui donne l'illusion qu'un
+            champ est décrit. La phrase vaut pour le dialogue entier, pas pour un
+            champ, et reste donc un simple paragraphe.
+          */}
+          <p className="text-[0.75rem] text-muted-foreground">
             La banque demandeuse devient la provenance de la fiche.
           </p>
         </div>

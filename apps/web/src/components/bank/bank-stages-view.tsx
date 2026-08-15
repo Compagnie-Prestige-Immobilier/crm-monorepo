@@ -212,10 +212,30 @@ export function BankStagesView() {
               const canMoveUp = index > 0 && !(initialLocked && (index === 1 || index === 0));
               const canMoveDown = index < open.length - 1 && !(initialLocked && index === 0);
 
-              const lockedLabel =
-                stage.isSystem || stage.isInitial
-                  ? 'Étape système ou initiale : désactivation impossible.'
-                  : undefined;
+              /**
+               * ═════════════════════════════════════════════════════════════
+               * La RAISON du verrouillage doit être du TEXTE, dans les deux
+               * rendus.
+               * ═════════════════════════════════════════════════════════════
+               *
+               * Elle n'était portée que par un attribut `title` sur le bouton
+               * du bureau, et pas du tout sous 1024 px. Or `title` sur un
+               * élément DÉSACTIVÉ est le pire des supports : il ne s'ouvre pas
+               * au survol dans plusieurs navigateurs, il ne s'atteint jamais au
+               * clavier (l'élément n'est pas focalisable), et les lecteurs
+               * d'écran l'annoncent rarement. L'administrateur voyait donc
+               * « Désactiver » grisé, sans la moindre explication, et concluait
+               * à une panne de droits.
+               *
+               * La phrase est maintenant rendue en toutes lettres à côté du
+               * bouton sur le bureau, et dans l'entrée de menu sous 1024 px.
+               */
+              const locked = stage.isSystem || stage.isInitial;
+              const lockedLabel = stage.isSystem
+                ? 'Étape système : sa désactivation casserait le flux.'
+                : stage.isInitial
+                  ? 'Étape initiale : tout nouveau dossier y entre.'
+                  : null;
               const toggleLabel = stage.isActive ? 'Désactiver' : 'Réactiver';
               const toggle = (): void => {
                 if (stage.isActive) {
@@ -305,12 +325,16 @@ export function BankStagesView() {
                       variant={stage.isActive ? 'ghost' : 'secondary'}
                       size="sm"
                       className="tap-target"
-                      disabled={stage.isSystem || stage.isInitial || toggleActive.isPending}
-                      title={lockedLabel}
+                      disabled={locked || toggleActive.isPending}
                       onClick={toggle}
                     >
                       {toggleLabel}
                     </Button>
+                    {lockedLabel === null ? null : (
+                      <span className="max-w-56 text-[0.75rem] leading-tight text-muted-foreground">
+                        {lockedLabel}
+                      </span>
+                    )}
                   </div>
 
                   {/* ─── Actions, sous 1024 px ────────────────────────────────
@@ -359,7 +383,7 @@ export function BankStagesView() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          disabled={stage.isSystem || stage.isInitial || toggleActive.isPending}
+                          disabled={locked || toggleActive.isPending}
                           variant={stage.isActive ? 'destructive' : 'default'}
                           onSelect={toggle}
                         >
@@ -370,6 +394,14 @@ export function BankStagesView() {
                           )}
                           {toggleLabel}
                         </DropdownMenuItem>
+                        {lockedLabel === null ? null : (
+                          /* Hors du `DropdownMenuItem` : une entrée désactivée
+                             n'est pas atteignable au clavier, donc sa
+                             description ne serait jamais lue. */
+                          <p className="px-2 py-1.5 text-[0.75rem] leading-tight text-muted-foreground">
+                            {lockedLabel}
+                          </p>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

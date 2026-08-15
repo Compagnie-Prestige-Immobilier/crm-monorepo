@@ -11,7 +11,7 @@ import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Campagnes' };
+export const metadata: Metadata = { title: 'Campagnes d’appels prospects' };
 
 export default async function CampagnesPage({
   searchParams,
@@ -24,7 +24,9 @@ export default async function CampagnesPage({
   const guard = await guardRoles(['ADMIN']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
-    return <PermissionDenied role={guard.user.role} what="Le suivi des campagnes d’appels" />;
+    return (
+      <PermissionDenied role={guard.user.role} what="Le suivi des campagnes d’appels prospects" />
+    );
   }
 
   // Filtres lus dans l'URL côté serveur : un lien partagé s'ouvre directement

@@ -10,13 +10,15 @@ import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Campagne' };
+export const metadata: Metadata = { title: 'Campagne d’appels prospects' };
 
 export default async function CampagnePage({ params }: { params: Promise<{ id: string }> }) {
   const guard = await guardRoles(['ADMIN']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
-    return <PermissionDenied role={guard.user.role} what="Le détail d’une campagne" />;
+    return (
+      <PermissionDenied role={guard.user.role} what="Le détail d’une campagne d’appels prospects" />
+    );
   }
 
   const { id } = await params;
