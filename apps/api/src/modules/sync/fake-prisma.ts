@@ -43,6 +43,14 @@ export interface RepresentantRow {
   fullName: string;
   phoneE164: string;
   notes: string | null;
+  /**
+   * IEF de rattachement, FACULTATIVE.
+   *
+   * Présente dans la doublure parce que c'est le seul champ que l'utilisateur
+   * peut VIDER : sans elle, le test qui distingue « champ absent » de « champ
+   * vidé » n'aurait rien à observer.
+   */
+  iefId?: string | null;
   rev: number;
   departementId: string;
   createdById: string;
@@ -120,13 +128,25 @@ export class FakePrisma {
    * ce qui est l'état de la quasi-totalité des tests et leur évite d'avoir à
    * déclarer un utilisateur qui ne les concerne pas.
    */
-  users = new Map<string, { id: string; isDemo: boolean }>();
+  users = new Map<string, { id: string; isDemo: boolean; role?: string }>();
   /** Entrées du registre de purge, dans leur ordre d'inscription. */
   demoEntities: { entityType: string; entityId: string; sequence: number }[] = [];
 
   /** Déclare un compte de démonstration, pour les tests qui parlent de lui. */
   addDemoUser(id: string): void {
     this.users.set(id, { id, isDemo: true });
+  }
+
+  /**
+   * Déclare un compte avec son RÔLE.
+   *
+   * Le rôle vient désormais de la même lecture que `isDemo`, parce que le lot
+   * lit son autorité en une fois : une doublure qui ne porterait pas le rôle
+   * ferait retomber le service sur celui du jeton quoi qu'il arrive, et le test
+   * de cohérence du lot ne pourrait pas rougir.
+   */
+  addUser(id: string, row: { role?: string; isDemo?: boolean } = {}): void {
+    this.users.set(id, { id, isDemo: row.isDemo ?? false, ...(row.role ? { role: row.role } : {}) });
   }
 
   /** Compte les tentatives de transaction, pour vérifier une-transaction-par-groupe. */

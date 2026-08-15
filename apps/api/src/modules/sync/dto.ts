@@ -6,6 +6,7 @@ import {
   IsArray,
   IsEnum,
   IsISO8601,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -74,6 +75,30 @@ export enum SyncOpStatus {
  * formée ressort en `invalid` DANS le corps de réponse, jamais en 400 pour
  * tout le lot, ce qui condamnerait les 199 autres opérations.
  */
+/**
+ * Les seuls champs qu'une remontée peut VIDER.
+ *
+ * La liste est courte parce que la question ne se pose que pour une colonne à
+ * la fois FACULTATIVE en base et MODIFIABLE par l'utilisateur :
+ *
+ *   · `iefId` : l'IEF de rattachement d'un représentant, que le formulaire
+ *     mobile permet explicitement de retirer ;
+ *   · `notes` : les notes libres d'un représentant, effaçables dès que le
+ *     formulaire les expose.
+ *
+ * Tout le reste de `SyncEntityDataDto` désigne soit une colonne obligatoire
+ * (nom, téléphone, département, banque, syndicat, rattachement, statut), où
+ * « vidé » n'a pas de sens, soit une entité créée et jamais modifiée par la
+ * synchronisation (la tentative d'appel et ses champs `method` et `comment`),
+ * où l'absence à la création dit déjà « pas de valeur ».
+ *
+ * La liste vit ICI, dans le contrat, et non dans le service : c'est elle que la
+ * validation applique, et c'est elle que le client engendré lit.
+ */
+export const CLEARABLE_FIELDS = ['iefId', 'notes'] as const;
+
+export type ClearableField = (typeof CLEARABLE_FIELDS)[number];
+
 export class SyncEntityDataDto {
   @ApiPropertyOptional({ maxLength: 160, description: 'Représentant : nom complet.' })
   @IsOptional()
@@ -243,6 +268,73 @@ export class SyncOperationDto {
   @ValidateNested()
   @Type(() => SyncEntityDataDto)
   data?: SyncEntityDataDto;
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * CHAMPS QUE LE CLIENT DEMANDE EXPLICITEMENT DE VIDER
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * ═══ LE DÉFAUT : « ABSENT » ET « VIDÉ » ARRIVAIENT IDENTIQUES ═══
+   *
+   * `data` est un correctif partiel : une clé absente veut dire « inchangé »,
+   * et c'est ce qui garde un lot de deux cents opérations à une taille
+   * raisonnable sur une liaison EDGE. Le service applique donc la règle
+   * `undefined` égale « ne touche pas », qui est la bonne règle.
+   *
+   * Sauf qu'un client ne pouvait PAS dire l'autre chose. Le client Dart est
+   * engendré avec `includeIfNull: false` : un `iefId` mis à `null` parce que
+   * l'utilisateur a vidé le champ était SUPPRIMÉ de la charge utile avant
+   * l'envoi, et arrivait donc exactement comme un champ jamais touché. Le
+   * téléphone affichait le champ vide, le serveur gardait l'ancienne valeur, et
+   * la réponse alignait la révision locale sur celle du serveur : aucune
+   * relecture ultérieure ne pouvait plus rattraper l'écart, et rien nulle part
+   * ne le signalait.
+   *
+   * Ce n'est un défaut d'aucune des trois couches prises isolément. Il vit dans
+   * la COUTURE, ce qui est précisément la raison pour laquelle six rondes
+   * d'audit par module ne l'ont pas vu.
+   *
+   * ═══ POURQUOI UNE LISTE, ET NON UN `null` SUR LE CHAMP ═══
+   *
+   * Trois réparations étaient possibles :
+   *
+   *   · engendrer le client avec `includeIfNull: true`. C'est un réglage
+   *     GLOBAL du générateur : tous les DTO de tous les modules émettraient
+   *     alors leurs champs nuls, et la remontée hors ligne perdrait la
+   *     propriété « les champs inchangés sont omis » sur laquelle repose la
+   *     taille des lots. On ne paie pas la taille de toutes les charges utiles
+   *     pour deux champs facultatifs ;
+   *   · traiter l'absence comme un vidage sur les `update`. Cela ferait effacer
+   *     une IEF renseignée par toute application ANCIENNE, qui n'envoie pas le
+   *     champ parce qu'elle ne le connaît pas. Une correction qui détruit des
+   *     données chez les clients non mis à jour n'en est pas une ;
+   *   · nommer l'intention. C'est ce qui est fait ici.
+   *
+   * La liste est explicite, elle ne coûte que les champs réellement vidés (donc
+   * presque jamais rien), et elle laisse intacte la règle « absent égale
+   * inchangé » dont le reste de la charge utile dépend.
+   *
+   * ═══ CE QUI PEUT ÊTRE VIDÉ, ET RIEN D'AUTRE ═══
+   *
+   * Seuls les noms de `CLEARABLE_FIELDS` sont acceptés. Un nom inconnu, ou un
+   * nom qui désigne une colonne obligatoire, est refusé en 400 : sans ce
+   * contrôle, cette liste deviendrait un moyen d'écrire `null` dans n'importe
+   * quelle colonne, y compris celles que le schéma déclare non nulles, et
+   * l'erreur remonterait du pilote de base plutôt que de la validation.
+   */
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; ' +
+      'un champ nommé ici est écrit à NULL. Valeurs acceptées : ' +
+      CLEARABLE_FIELDS.join(', ') +
+      '.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(CLEARABLE_FIELDS.length)
+  @IsIn([...CLEARABLE_FIELDS], { each: true })
+  clearedFields?: string[];
 }
 
 /**
