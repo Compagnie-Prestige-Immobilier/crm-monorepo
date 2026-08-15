@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-CPI GO — approvisionnement et déploiement Dokploy.
+CPI GO, approvisionnement et déploiement Dokploy.
 
 Un seul fichier, en Python plutôt qu'en bash : la construction du JSON et
 l'appel HTTP vivent dans le même langage, donc plus aucune imbrication de
-guillemets entre shell et interpréteur — c'est exactement ce qui avait cassé la
+guillemets entre shell et interpréteur, c'est exactement ce qui avait cassé la
 version précédente.
 
 USAGE
@@ -23,8 +23,8 @@ script qui plante.
 
 POURQUOI PAS docker-compose.prod.yml
     Il lance Caddy sur les ports 80 et 443, qui appartiennent déjà à Traefik sur
-    un hôte Dokploy. La forme native — un service Postgres, deux applications
-    construites depuis leurs Dockerfile — rend à Traefik le domaine et le TLS.
+    un hôte Dokploy. La forme native, un service Postgres, deux applications
+    construites depuis leurs Dockerfile, rend à Traefik le domaine et le TLS.
 """
 
 from __future__ import annotations
@@ -177,7 +177,7 @@ def call(procedure: str, payload: dict | None = None, *, method: str = "POST"):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Secrets et identifiants — engendrés une fois, relus ensuite
+# Secrets et identifiants, engendrés une fois, relus ensuite
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -237,7 +237,7 @@ def save_ids(ids: dict[str, str]) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Découverte de l'existant — c'est ce qui rend les étapes idempotentes
+# Découverte de l'existant, c'est ce qui rend les étapes idempotentes
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -295,7 +295,7 @@ def ensure_ssh_key(ids: dict[str, str]) -> str:
 
     pub_path = HERE / "deploy-key.pub"
     pub_path.write_text(pair.get("publicKey", "") + "\n")
-    ok(f"clé SSH engendrée — publique dans {pub_path.name}")
+    ok(f"clé SSH engendrée, publique dans {pub_path.name}")
     warn("déposez cette clé publique dans GitHub → Settings → Deploy keys")
     return key_id
 
@@ -322,7 +322,7 @@ def find_existing() -> dict[str, str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Étape 1 — approvisionnement
+# Étape 1, approvisionnement
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -333,7 +333,7 @@ def cmd_provision() -> None:
 
     step("Base de données Postgres")
     if ids.get("POSTGRES_ID"):
-        ok(f"existe déjà — {ids['POSTGRES_ID']}")
+        ok(f"existe déjà, {ids['POSTGRES_ID']}")
     else:
         result = call(
             "postgres.create",
@@ -349,15 +349,15 @@ def cmd_provision() -> None:
             },
         )
         ids["POSTGRES_ID"] = (result or {}).get("postgresId", "")
-        ok(f"créée — {ids['POSTGRES_ID']}")
+        ok(f"créée, {ids['POSTGRES_ID']}")
 
     for key, name, description in (
-        ("API_ID", API_NAME, "API NestJS — source du contrat OpenAPI"),
+        ("API_ID", API_NAME, "API NestJS, source du contrat OpenAPI"),
         ("WEB_ID", WEB_NAME, "Panel admin Next.js"),
     ):
         step(f"Application {name}")
         if ids.get(key):
-            ok(f"existe déjà — {ids[key]}")
+            ok(f"existe déjà, {ids[key]}")
             continue
         result = call(
             "application.create",
@@ -369,15 +369,39 @@ def cmd_provision() -> None:
             },
         )
         ids[key] = (result or {}).get("applicationId", "")
-        ok(f"créée — {ids[key]}")
+        ok(f"créée, {ids[key]}")
 
     save_ids(ids)
     print(f"\n{DIM}Identifiants écrits dans {IDS_FILE.name}{RESET}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Étape 2 — configuration
+# Étape 2, configuration
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def _brevo_env() -> list[str]:
+    """Courrier transactionnel Brevo, repris de l'environnement de l'opérateur.
+
+    La clé n'est jamais écrite dans le dépôt, exactement comme DOKPLOY_KEY :
+    elle ne vit que dans la variable d'environnement, le temps de la session.
+
+    Absente, les trois lignes disparaissent au lieu de partir vides. L'API
+    traite Brevo comme un transport facultatif : sans clé elle démarre et
+    marque les envois NOT_CONFIGURED. Écrire BREVO_API_KEY= ne changerait rien
+    au comportement, mais laisserait croire, en lisant le panneau Dokploy, que
+    la variable a été posée puis perdue.
+    """
+    key = os.environ.get("BREVO_API_KEY", "").strip()
+    if not key:
+        return []
+    sender = os.environ.get("BREVO_SENDER_EMAIL", "no-reply@cpi.sn").strip()
+    name = os.environ.get("BREVO_SENDER_NAME", "CRM CPI").strip()
+    return [
+        f"BREVO_API_KEY={key}",
+        f"BREVO_SENDER_EMAIL={sender}",
+        f"BREVO_SENDER_NAME={name}",
+    ]
 
 
 def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
@@ -395,7 +419,7 @@ def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
             f"PUBLIC_WEB_URL=https://{WEB_DOMAIN}",
             f"API_CORS_ORIGINS=https://{WEB_DOMAIN}",
             # Traefik est en amont et réécrit X-Forwarded-For : l'en-tête est
-            # fiable ici, et il le faut — sinon toutes les requêtes semblent
+            # fiable ici, et il le faut, sinon toutes les requêtes semblent
             # venir de Traefik et la limitation de débit devient globale.
             "API_TRUST_PROXY_HEADERS=true",
             # Swagger fermé : le contrat est publié par la CI, pas par le serveur.
@@ -412,6 +436,7 @@ def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
             "SEED_ADMIN_USERNAME=admin",
             f"SEED_ADMIN_PASSWORD={s['ADMIN_PASSWORD']}",
             "SEED_ADMIN_FULL_NAME=Administrateur CPI",
+            *_brevo_env(),
         ]
     )
 
@@ -463,7 +488,7 @@ def _web_env(names: dict[str, str]) -> str:
 def service_app_names(ids: dict[str, str]) -> dict[str, str]:
     """Noms de service RÉELS, tels que Docker les résout.
 
-    Dokploy suffixe chaque `appName` d'un identifiant court — `cpi-go-postgres`
+    Dokploy suffixe chaque `appName` d'un identifiant court, `cpi-go-postgres`
     devient `cpi-go-postgres-cmsq36`. C'est ce nom suffixé, et lui seul, qui
     résout dans le réseau Docker. Écrire le nom court dans DATABASE_URL fait
     échouer la résolution DNS : `migrate deploy` ne trouve pas la base, le point
@@ -484,7 +509,7 @@ def service_app_names(ids: dict[str, str]) -> dict[str, str]:
                 ) or {}
                 names[slot] = app.get("appName") or names[slot]
     except DokployError as exc:
-        warn(f"noms de service non résolus ({exc}) — noms courts utilisés")
+        warn(f"noms de service non résolus ({exc}), noms courts utilisés")
     return names
 
 
@@ -493,7 +518,7 @@ def cmd_configure() -> None:
     ids = load_ids()
     ids.update({k: v for k, v in find_existing().items() if v})
     if not ids.get("API_ID") or not ids.get("WEB_ID"):
-        fail("applications introuvables — lancez d'abord `provision`.")
+        fail("applications introuvables, lancez d'abord `provision`.")
         sys.exit(1)
     save_ids(ids)
 
@@ -502,7 +527,7 @@ def cmd_configure() -> None:
     save_ids(ids)
     ok(f"clé {ids['SSH_KEY_ID']}")
 
-    step(f"Source Git — {GIT_URL} @ {BRANCH}")
+    step(f"Source Git, {GIT_URL} @ {BRANCH}")
     for key in ("API_ID", "WEB_ID"):
         call(
             "application.saveGitProvider",
@@ -533,7 +558,7 @@ def cmd_configure() -> None:
             "railpackVersion": "",
         },
     )
-    ok("API — infra/docker/Dockerfile.api (étape runner)")
+    ok("API, infra/docker/Dockerfile.api (étape runner)")
 
     step("Stockage persistant des releases Android")
     ensure_apk_mount(ids["API_ID"])
@@ -550,7 +575,7 @@ def cmd_configure() -> None:
             "railpackVersion": "",
         },
     )
-    ok("Web — infra/docker/Dockerfile.web")
+    ok("Web, infra/docker/Dockerfile.web")
 
     step("Variables d'environnement")
     names = service_app_names(ids)
@@ -566,7 +591,7 @@ def cmd_configure() -> None:
             "createEnvFile": True,
         },
     )
-    ok(f"API — {len(api_env.splitlines())} variables")
+    ok(f"API, {len(api_env.splitlines())} variables")
 
     web_env = _web_env(names)
     call(
@@ -579,11 +604,11 @@ def cmd_configure() -> None:
             "createEnvFile": True,
         },
     )
-    ok(f"Web — {len(web_env.splitlines())} variables")
+    ok(f"Web, {len(web_env.splitlines())} variables")
 
     # `https: true` SANS certificateType 'letsencrypt' : le certificat est celui
     # d'origine Cloudflare, posé sur le serveur. Demander Let's Encrypt ici
-    # échouerait — Cloudflare proxifie, donc le challenge HTTP n'atteint jamais
+    # échouerait, Cloudflare proxifie, donc le challenge HTTP n'atteint jamais
     # Traefik.
     step("Domaines")
     for app_key, host, port in (
@@ -606,13 +631,13 @@ def cmd_configure() -> None:
             ok(f"{host} → :{port}")
         except DokployError as exc:
             if "already" in str(exc).lower() or "unique" in str(exc).lower():
-                ok(f"{host} — déjà configuré")
+                ok(f"{host}, déjà configuré")
             else:
                 raise
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Étape 3 — déploiement
+# Étape 3, déploiement
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -621,7 +646,7 @@ def cmd_deploy() -> None:
     ids = load_ids()
     ids.update({k: v for k, v in find_existing().items() if v})
     if not ids.get("POSTGRES_ID"):
-        fail("Postgres introuvable — lancez d'abord `provision`.")
+        fail("Postgres introuvable, lancez d'abord `provision`.")
         sys.exit(1)
 
     step("Démarrage de Postgres")
@@ -636,12 +661,12 @@ def cmd_deploy() -> None:
         ("API_ID", "API", "Dockerfile.api"),
         ("WEB_ID", "panel web", "Dockerfile.web"),
     ):
-        step(f"Déploiement — {label}")
+        step(f"Déploiement, {label}")
         if not ids.get(key):
             fail(f"{label} introuvable")
             continue
         call("application.deploy", {"applicationId": ids[key]})
-        ok(f"demandé — construction depuis infra/docker/{dockerfile}")
+        ok(f"demandé, construction depuis infra/docker/{dockerfile}")
 
     print(_epilogue(secrets_))
 
@@ -657,11 +682,11 @@ VÉRIFICATION, une fois les trois services verts
   curl -s -o /dev/null -w '%{{http_code}}\\n' https://{API_DOMAIN}/api/v1/referentiels/banques
 
   401 est le résultat ATTENDU : le service répond et le garde d'authentification
-  fait son travail. Un 200 signifierait que les routes sont ouvertes — à
+  fait son travail. Un 200 signifierait que les routes sont ouvertes, à
   corriger d'urgence. Un 502 ou 526 signale que le certificat d'origine n'est
   pas en place.
 
-AMORÇAGE — une seule fois, depuis un terminal du conteneur API
+AMORÇAGE, une seule fois, depuis un terminal du conteneur API
 
   pnpm --filter @crm/database db:deploy   # migrations
   pnpm --filter @crm/database db:seed     # référentiels + compte administrateur
@@ -679,7 +704,7 @@ IDENTIFIANTS
 
 À FAIRE ENSUITE
   • Poser le certificat d'origine Cloudflare, PUIS passer le mode SSL en
-    Full (strict) — dans l'autre ordre, le site répond 526 entre les deux.
+    Full (strict), dans l'autre ordre, le site répond 526 entre les deux.
   • Régénérer la clé d'API Dokploy : elle a circulé en clair.
   • Changer le mot de passe administrateur à la première connexion.
 {'─' * 76}
