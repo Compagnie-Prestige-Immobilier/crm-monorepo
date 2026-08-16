@@ -71,6 +71,21 @@ const DEMO_MODELS = [
    * cloisonner.
    */
   'deviceToken',
+  /**
+   * Les bascules de segment. Elles portent `isDemo` parce qu'une conversion
+   * jouée devant un auditoire ne doit pas entrer dans le décompte réel des
+   * conversions du mois, qui est précisément ce que cette table sert à établir.
+   */
+  'segmentChange',
+  /**
+   * Les travaux d'import. Ils portent `isDemo` pour la même raison que le
+   * reste, mais avec une nuance qui compte : un import est lancé par un CRON
+   * qui échappe à la garde de lecture seule. Le drapeau y est donc écrit EN
+   * DUR à `false` par les adaptateurs, jamais déduit de l'interrupteur de
+   * démonstration — sans quoi un import lancé pendant une démonstration
+   * naîtrait fictif et ses lignes disparaîtraient à l'extinction du mode.
+   */
+  'importJob',
 ] as const;
 
 /**
@@ -167,6 +182,10 @@ const DEMO_TABLES = [
   'notification_deliveries',
   /** Pendant SQL de `deviceToken` ci-dessus : table retirée de l'usage, conservée une version. */
   'device_tokens',
+  /** Pendant SQL de `segmentChange`. */
+  'segment_changes',
+  /** Pendant SQL de `importJob` : voir le motif au-dessus, dans `DEMO_MODELS`. */
+  'import_jobs',
 ] as const;
 
 /**

@@ -35,6 +35,8 @@ import {
   RepresentantProductivityListDto,
   RepresentantProductivityQueryDto,
 } from './quality.dto.js';
+import { SegmentConversionsService } from './segment-conversions.service.js';
+import { SegmentConversionListDto, SegmentConversionsQueryDto } from './segment-conversions.dto.js';
 
 /**
  * Tableau de bord. Tous les endpoints acceptent le filtre de la liste des
@@ -68,6 +70,7 @@ export class AnalyticsController {
     private readonly pilotage: PilotageService,
     private readonly portfolio: PortfolioService,
     private readonly quality: QualityService,
+    private readonly segments: SegmentConversionsService,
   ) {}
 
   @Get('funnel')
@@ -329,6 +332,33 @@ export class AnalyticsController {
     @Query() query: AnalyticsQueryDto,
   ): Promise<DataQualityDto> {
     return this.quality.dataQuality(user, query);
+  }
+
+  /**
+   * MÊMES rôles que le reste du contrôleur, écrits une seconde fois.
+   *
+   * Cette route ne lit pas des prospects mais l'HISTOIRE de leurs conversions,
+   * une table que le cloisonnement de `prospectConditions` ne protège pas : la
+   * garde qui vaut pour les dix-neuf autres ne vaudrait ici que par héritage,
+   * et l'héritage se perd le jour où quelqu'un déplace la route.
+   */
+  @Get('segment-conversions')
+  @Roles(Role.ADMIN, Role.COMMERCIAL)
+  @ApiOperation({
+    operationId: 'getSegmentConversions',
+    summary: 'Bascules de segment : sur la période, par segment d’origine, et par auteur.',
+    description:
+      'Le segment n’étant pas stocké sur le prospect, une conversion ne laisse aucune ' +
+      'trace en dehors de `SegmentChange`. Cette opération est donc la seule à pouvoir ' +
+      'répondre « combien de BDD3 avons-nous fait basculer ce mois, et par qui ». Les ' +
+      'deux décomptes portent sur toute la période filtrée, pas sur la page affichée.',
+  })
+  @ApiResponse({ status: 200, type: SegmentConversionListDto })
+  segmentConversions(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: SegmentConversionsQueryDto,
+  ): Promise<SegmentConversionListDto> {
+    return this.segments.conversions(user, query);
   }
 
   @Get('origin-breakdown')

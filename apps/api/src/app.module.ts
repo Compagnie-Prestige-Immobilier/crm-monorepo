@@ -22,6 +22,7 @@ import { Phase2Module } from './modules/phase2/phase2.module.js';
 import { RepCampaignsModule } from './modules/rep-campaigns/rep-campaigns.module.js';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
 import { ExportModule } from './modules/export/export.module.js';
+import { ImportsModule } from './modules/imports/imports.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { ProspectsModule } from './modules/prospects/prospects.module.js';
 import { ReferentielsModule } from './modules/referentiels/referentiels.module.js';
@@ -93,6 +94,7 @@ const env = readEnv();
     ExportModule,
     AppUpdatesModule,
     DbDumpModule,
+    ImportsModule,
   ],
   providers: [
     // L'ordre compte. Le throttler s'applique avant toute lecture de base ;

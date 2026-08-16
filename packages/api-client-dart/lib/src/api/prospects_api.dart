@@ -11,6 +11,7 @@ import 'package:dio/dio.dart';
 
 import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/bdd_segment.dart';
+import 'package:crm_api_client/src/model/change_prospect_segment_dto.dart';
 import 'package:crm_api_client/src/model/create_prospect_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
 import 'package:crm_api_client/src/model/merge_prospects_dto.dart';
@@ -23,6 +24,7 @@ import 'package:crm_api_client/src/model/prospect_sort_field.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
 import 'package:crm_api_client/src/model/reassign_prospects_dto.dart';
 import 'package:crm_api_client/src/model/reassign_result_dto.dart';
+import 'package:crm_api_client/src/model/segment_change_list_dto.dart';
 import 'package:crm_api_client/src/model/sort_order.dart';
 import 'package:crm_api_client/src/model/update_prospect_dto.dart';
 
@@ -30,6 +32,105 @@ class ProspectsApi {
   final Dio _dio;
 
   const ProspectsApi(this._dio);
+
+  /// Fait basculer un prospect de segment, avec motif et trace.
+  /// Écrit la banque, le syndicat ET la ligne de &#x60;SegmentChange&#x60; dans la MÊME transaction. Le segment n’étant pas stocké, c’est le seul chemin qui laisse une trace de la conversion : la modification ordinaire écrirait les deux clés sans que rien ne distingue ensuite une fiche convertie d’une fiche née là.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [changeProspectSegmentDto]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ProspectDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ProspectDto>> changeProspectSegment({
+    required String id,
+    required ChangeProspectSegmentDto changeProspectSegmentDto,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/prospects/{id}/segment'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'PATCH',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(changeProspectSegmentDto);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ProspectDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ProspectDto, ProspectDto>(
+              rawData,
+              'ProspectDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ProspectDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
 
   /// Enregistre un prospect.
   ///
@@ -272,6 +373,88 @@ class ProspectsApi {
     }
 
     return Response<ProspectDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Bascules de segment déjà subies par une fiche, de la plus récente à la plus ancienne.
+  ///
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [SegmentChangeListDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<SegmentChangeListDto>> listProspectSegmentChanges({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/prospects/{id}/segment-history'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    SegmentChangeListDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SegmentChangeListDto, SegmentChangeListDto>(
+              rawData,
+              'SegmentChangeListDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<SegmentChangeListDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

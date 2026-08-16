@@ -21,7 +21,9 @@ import {
 import { OkDto } from '../../common/dto/ok.dto.js';
 import { ProspectQueryDto } from '../../common/dto/prospect-filter.dto.js';
 import { ProspectsService } from './prospects.service.js';
+import { SegmentChangeService } from './segment-change.service.js';
 import {
+  ChangeProspectSegmentDto,
   CreateProspectDto,
   MergeProspectsDto,
   ProspectConflictDto,
@@ -29,6 +31,7 @@ import {
   ProspectListDto,
   ReassignProspectsDto,
   ReassignResultDto,
+  SegmentChangeListDto,
   UpdateProspectDto,
 } from './dto.js';
 
@@ -79,7 +82,10 @@ import {
 @Roles(Role.COMMERCIAL, Role.ADMIN)
 @Controller({ path: 'prospects', version: '1' })
 export class ProspectsController {
-  constructor(private readonly prospects: ProspectsService) {}
+  constructor(
+    private readonly prospects: ProspectsService,
+    private readonly segments: SegmentChangeService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -160,6 +166,60 @@ export class ProspectsController {
     @Body() body: MergeProspectsDto,
   ): Promise<ProspectDto> {
     return this.prospects.merge(user, body);
+  }
+
+  /**
+   * MÊMES rôles que le reste du contrôleur, écrits une seconde fois.
+   *
+   * Redondant avec le `@Roles` de classe, et volontairement : c'est la seule
+   * route du module qui écrit une pièce d'HISTOIRE, et la question « qui peut
+   * convertir une fiche » doit se lire à l'endroit où on la pose, sans avoir à
+   * remonter cent lignes. Le cloisonnement par auteur s'applique en plus, dans
+   * le service : un COMMERCIAL ne convertit que ses propres fiches.
+   */
+  @Patch(':id/segment')
+  @Roles(Role.COMMERCIAL, Role.ADMIN)
+  @ApiOperation({
+    operationId: 'changeProspectSegment',
+    summary: 'Fait basculer un prospect de segment, avec motif et trace.',
+    description:
+      'Écrit la banque, le syndicat ET la ligne de `SegmentChange` dans la MÊME ' +
+      'transaction. Le segment n’étant pas stocké, c’est le seul chemin qui laisse ' +
+      'une trace de la conversion : la modification ordinaire écrirait les deux clés ' +
+      'sans que rien ne distingue ensuite une fiche convertie d’une fiche née là.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: ProspectDto })
+  @ApiErrors({
+    404: 'PROSPECT_NOT_FOUND · fiche absente ou supprimée.',
+    409: 'PROSPECT_REV_CONFLICT · la fiche a bougé depuis son affichage ; le corps porte `currentRev`.',
+    422:
+      'PROSPECT_SEGMENT_UNCHANGED · ni la banque ni le syndicat ne changent. ' +
+      'PROSPECT_BANQUE_NOT_FOUND, PROSPECT_SYNDICAT_NOT_FOUND · destination inconnue.',
+  })
+  changeSegment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ChangeProspectSegmentDto,
+  ): Promise<ProspectDto> {
+    return this.segments.migrate(user, id, body);
+  }
+
+  @Get(':id/segment-history')
+  @Roles(Role.COMMERCIAL, Role.ADMIN)
+  @ApiOperation({
+    operationId: 'listProspectSegmentChanges',
+    summary:
+      'Bascules de segment déjà subies par une fiche, de la plus récente à la plus ancienne.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: SegmentChangeListDto })
+  @ApiErrors({ 404: 'PROSPECT_NOT_FOUND · fiche absente ou supprimée.' })
+  segmentHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<SegmentChangeListDto> {
+    return this.segments.history(user, id);
   }
 
   @Post('reassign')

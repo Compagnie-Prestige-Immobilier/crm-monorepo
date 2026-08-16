@@ -52,6 +52,14 @@ const PURGE_EXEMPT = new Map<string, string>([
     'sessions, emportées en cascade avec leur compte ; les purger seules déconnecterait tout le monde sans rien effacer',
   ],
   [
+    'segment_changes',
+    'histoire des bascules de segment, emportée en CASCADE avec le prospect qu’elle décrit ; `changedById` pointe vers `users` en Restrict, mais le domaine « Comptes téléconseillers » entraîne déjà « Prospects », qui les fait toutes partir avant les comptes',
+  ],
+  [
+    'import_jobs',
+    'journal des dépôts d’import : il décrit un GESTE d’administration, pas une donnée métier. Purger le domaine « Prospects » n’efface pas la trace qu’un classeur a été déposé un jour, de la même façon que la purge ne réécrit pas le journal d’audit. Les lignes s’effacent d’elles-mêmes par `expiresAt`, et `requestedById` pointe vers `users` en Restrict : le compte demandeur ne peut pas partir en laissant un travail orphelin',
+  ],
+  [
     'device_tokens',
     'sous-système push retiré : aucun code n’écrit plus cette table, conservée une version pour que la mise à jour reste réversible (docs/migrations-en-attente.md), et emportée en cascade avec son compte',
   ],
