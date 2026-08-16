@@ -793,13 +793,9 @@ export class DbDumpService implements OnModuleInit {
   ): Promise<{ noticeStatus: string | null; noticeDetail: string | null }> {
     try {
       await this.notifications.create(actor, {
-        title: 'Export de la base prêt',
-        body:
-          'L’export intégral que vous avez demandé est terminé. Ouvrez Paramètres ' +
-          'dans le panel et téléchargez-le depuis la carte « Export intégral ». ' +
-          'Aucun lien n’est joint à cet avis, et il n’y en aura pas : le fichier ' +
-          'contient toute la base et ne quitte le serveur que dans une session ' +
-          'authentifiée.',
+        title: 'Export prêt',
+        body: 'Téléchargez-le dans Paramètres > Export intégral.',
+        route: '/parametres',
         category: NotificationCategory.SYSTEME,
         audience: NotificationAudience.USERS,
         audienceUserIds: [actor.id],
