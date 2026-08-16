@@ -28,9 +28,7 @@ function openCalendar() {
 }
 
 function renderPicker() {
-  return render(
-    <DatePicker id="du" label="Date de début" value="2026-03-18" onChange={vi.fn()} />,
-  );
+  return render(<DatePicker id="du" label="Date de début" value="2026-03-18" onChange={vi.fn()} />);
 }
 
 describe('la structure ARIA du calendrier', () => {

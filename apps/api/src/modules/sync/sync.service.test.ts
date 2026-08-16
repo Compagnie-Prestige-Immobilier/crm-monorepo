@@ -758,7 +758,11 @@ describe('champs vidés', () => {
     entityId: REP_ID,
     clientUpdatedAt: '2026-08-10T11:00:00.000Z',
     baseRev: 1,
-    data: { fullName: 'Rep A', phone: '+221770000001', departementId: '0198c000-0000-7000-8000-000000000001' },
+    data: {
+      fullName: 'Rep A',
+      phone: '+221770000001',
+      departementId: '0198c000-0000-7000-8000-000000000001',
+    },
     ...extra,
   });
 

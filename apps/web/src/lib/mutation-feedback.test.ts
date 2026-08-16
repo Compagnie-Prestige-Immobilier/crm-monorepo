@@ -224,8 +224,9 @@ const UNKNOWN_MESSAGE =
   'Impossible de lire l’état du mode démonstration : l’écriture est refusée pour ne pas ' +
   'enregistrer une ligne dont on ne saurait pas dire si elle est réelle. Réessayez.';
 
-const stateUnknown = (body: unknown = { code: 'DEMO_MODE_STATE_UNKNOWN', message: UNKNOWN_MESSAGE }) =>
-  fail(409, body);
+const stateUnknown = (
+  body: unknown = { code: 'DEMO_MODE_STATE_UNKNOWN', message: UNKNOWN_MESSAGE },
+) => fail(409, body);
 
 describe('le refus d’écriture quand l’état du mode est inconnu', () => {
   beforeEach(() => {
