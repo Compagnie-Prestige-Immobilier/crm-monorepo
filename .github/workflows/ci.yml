@@ -156,7 +156,24 @@ jobs:
     # Configure SONAR_TOKEN as a repository secret and the two repository
     # variables before enabling this gate. A missing token must be visible,
     # never silently treated as a passing analysis.
-    if: ${{ vars.SONAR_ENABLED == 'true' }}
+    #
+    # ═══ PAS SUR `prod`, ET CE N'EST PAS UN ASSOUPLISSEMENT ═══
+    #
+    # `prod` ne reçoit que des avances rapides de `dev` : le commit qui y arrive
+    # est, au bit près, celui que SonarCloud vient d'analyser et de valider sur
+    # `dev`. Le rejouer n'apprend donc rien.
+    #
+    # Et il ne peut de toute façon pas aboutir. SonarCloud auto-configure `prod`
+    # en branche COURTE (« Branch name: prod, type: short » dans le journal du
+    # 16 août 2026), et l'interrogation du portillon y répond « Not authorized
+    # or project not found » alors que l'analyse, elle, s'est bien televersée.
+    # Le job échouait donc sur une branche non déclarée côté SonarCloud, et
+    # entraînait le `deploy` dans sa chute : une mise en ligne empêchée par un
+    # portillon incapable de rendre un verdict, sur du code déjà validé.
+    #
+    # La garantie est conservée là où elle s'exerce vraiment : rien n'atteint
+    # `prod` sans être passé par `dev`, où ce job tourne et bloque.
+    if: ${{ vars.SONAR_ENABLED == 'true' && github.ref != 'refs/heads/prod' }}
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
