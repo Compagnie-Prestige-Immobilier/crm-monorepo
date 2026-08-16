@@ -3,7 +3,6 @@ import {
   BellIcon,
   ChartColumnIcon,
   FileSpreadsheetIcon,
-  HeadsetIcon,
   FolderOpenIcon,
   LayoutDashboardIcon,
   LibraryIcon,
@@ -180,9 +179,9 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/commerciaux',
-        label: 'Téléconseillers',
-        icon: HeadsetIcon,
-        description: 'Comptes et activité',
+        label: 'Utilisateurs',
+        icon: UsersIcon,
+        description: 'Comptes, rôles et accès',
         roles: ['ADMIN'],
       },
       {

@@ -145,10 +145,22 @@ describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
     expect(navTitle('ADMIN', '/dossiers/etapes')).toBe('Étapes bancaires');
   });
 
-  it('nomme les téléconseillers par leur métier, pas par leur lieu', () => {
-    // L'application sert des téléconseillers sur place. « Commerciaux »
-    // décrivait un métier de terrain qui n'existe pas ici.
-    expect(navTitle('ADMIN', '/commerciaux')).toBe('Téléconseillers');
+  it('nomme l’écran des comptes par ce qu’il contient VRAIMENT', () => {
+    /*
+     * Deux renommages successifs, et le second corrige le premier.
+     *
+     * « Commerciaux » décrivait un métier de terrain qui n'existe pas ici : le
+     * produit sert des téléconseillers sur place. D'où « Téléconseillers ».
+     *
+     * Mais l'écran gère TOUS les comptes — il sait déjà filtrer par rôle, et le
+     * formulaire crée désormais les trois. L'appeler « Téléconseillers » faisait
+     * chercher ailleurs un endroit pour créer un accès « Banque & Finance », qui
+     * n'existait nulle part : c'est ce qui a fait conclure que la fonction
+     * manquait, alors que seule l'étiquette manquait de vérité.
+     */
+    expect(navTitle('ADMIN', '/commerciaux')).toBe('Utilisateurs');
+    // L'interdit d'origine tient toujours : pas de « Commerciaux ».
+    expect(navTitle('ADMIN', '/commerciaux')).not.toContain('Commerciaux');
     expect(navTitle('ADMIN', '/supervision')).toBe('Supervision');
     expect(navTitle('ADMIN', '/statistiques')).toBe('Statistiques');
   });

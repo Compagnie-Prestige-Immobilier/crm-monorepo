@@ -173,7 +173,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
           }}
         >
           <UserPlusIcon aria-hidden="true" />
-          Nouveau téléconseiller
+          Nouvel utilisateur
         </Button>
       </div>
 
@@ -265,7 +265,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Téléconseiller</TableHead>
+                <TableHead>Utilisateur</TableHead>
                 <TableHead>Identifiants</TableHead>
                 <TableHead>Département</TableHead>
                 <TableHead className="text-right">Prospects</TableHead>

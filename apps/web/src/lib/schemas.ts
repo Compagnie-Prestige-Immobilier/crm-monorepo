@@ -52,6 +52,24 @@ const userBaseSchema = z.object({
   // « 77 123 45 67 » écrit naturellement serait absurde.
   phone: z.string().trim().max(40, 'Numéro trop long.'),
   departementId: z.string().trim(),
+  /**
+   * LE RÔLE ÉTAIT ABSENT DU FORMULAIRE, ET FIGÉ À `COMMERCIAL` À LA CRÉATION.
+   *
+   * L'API accepte les trois rôles depuis toujours (`CreateUserDto.role`), et la
+   * liste sait déjà FILTRER dessus. Seule la création ne savait pas le poser :
+   * aucun compte `BANQUE_FINANCE` ne pouvait donc naître depuis le panel, alors
+   * que tout l'espace bancaire leur est destiné. Il fallait un UPDATE en base
+   * pour créer le premier, ce qu'aucun écran ne disait.
+   */
+  role: z.enum(['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE'], {
+    // AUCUN DÉFAUT, et c'est délibéré. Un rôle prérempli à « téléconseiller »
+    // est celui qu'on obtient en ne lisant pas le champ : c'est exactement
+    // ainsi qu'un accès bancaire ou administrateur se crée par inadvertance,
+    // ou qu'un compte bancaire naît téléconseiller sans que personne ne le
+    // remarque avant qu'il ne trouve son espace vide. Le rôle décide de ce que
+    // le compte pourra voir : il se choisit, il ne se subit pas.
+    message: 'Choisissez le rôle du compte.',
+  }),
 });
 
 /**
