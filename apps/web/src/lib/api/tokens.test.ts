@@ -163,6 +163,30 @@ describe('rotateRefreshToken', () => {
     }
   });
 
+  /**
+   * LE 2xx AU CORPS INEXPLOITABLE, qui décrit un intermédiaire et non un
+   * verdict. Ces trois formes rendaient `invalid`, donc effaçaient les deux
+   * cookies : une passerelle qui répond 200 avec une page HTML déconnectait
+   * tout le monde alors que le jeton de rafraîchissement était intact.
+   */
+  it('ne tue PAS la session sur un 2xx dont le corps ne vient pas de l’API', async () => {
+    const corps = [
+      ['une page HTML de passerelle', '<html><body>502 Bad Gateway</body></html>', 200],
+      ['un corps vide', '', 200],
+      ['un JSON qui n’est pas un objet', '"bonjour"', 200],
+      ['un objet sans les deux jetons', '{"accessToken":"a"}', 200],
+      ['un corps tronqué', '{"accessToken":"a","refresh', 200],
+    ] as const;
+
+    for (const [nom, body, status] of corps) {
+      const fetchImpl = vi.fn(() => Promise.resolve(new Response(body, { status })));
+      await expect(
+        rotateRefreshTokenDetailed('http://api.test', `jeton-${nom}`, fetchImpl),
+        nom,
+      ).resolves.toEqual({ ok: false, reason: 'unavailable' });
+    }
+  });
+
   it('tue la session sur un 401 : là, l’API s’est prononcée sur le jeton', async () => {
     // Le pendant indispensable des deux tests ci-dessus : élargir `unavailable`
     // à tout ne ferait plus jamais effacer un jeton révoqué, et l'utilisateur

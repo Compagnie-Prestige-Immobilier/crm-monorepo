@@ -5,6 +5,7 @@ import { HourglassIcon } from 'lucide-react';
 
 import { RankBarChart, ShareDoughnutChart } from '@/components/dashboard/charts';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
+import { QueryErrorInline } from '@/components/query-error-state';
 import { StatChartCard, StatTile } from '@/components/stats/stat-tile';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,6 +26,7 @@ import {
   formatDelayDays,
 } from '@/lib/data/advanced-stats';
 import { groupTail } from '@/lib/data/series';
+import { shouldShowError } from '@/lib/live';
 import { formatNumber, formatRateOrNone, formatShortDate } from '@/lib/format';
 import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
@@ -53,11 +55,40 @@ import type { NamedCount } from '@/lib/types';
 export function DelaysStrip() {
   const { filters } = useProspectFilters();
 
-  const { data, isPending } = useQuery({
+  const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: queryKeys.statsDelais(filters),
     queryFn: () => fetchAnalyticsDelays(filters),
     placeholderData: keepPreviousData,
   });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * L'ÉCHEC PASSAIT PAR LA BRANCHE DU CHARGEMENT
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * TanStack pose `isPending: false` ET `data: undefined` quand la requête
+   * échoue. La condition `isPending || data === undefined` attrapait donc les
+   * deux états sans les distinguer, et l'échec s'affichait en squelettes — pour
+   * toujours, puisque plus rien ne les remplacera.
+   *
+   * Devant trois squelettes, personne ne soupçonne une panne : on attend. C'est
+   * la variante silencieuse du défaut corrigé ailleurs par `QueryErrorState`,
+   * et elle est pire, parce qu'elle ne propose même pas de réessayer.
+   *
+   * `shouldShowError` et non `isError` nu : un cycle de sondage raté ne doit pas
+   * effacer des chiffres déjà lisibles à l'écran.
+   */
+  if (shouldShowError({ isError, hasData: data !== undefined })) {
+    return (
+      <QueryErrorInline
+        error={error}
+        onRetry={() => {
+          void refetch();
+        }}
+        fallback="Les délais n’ont pas pu être calculés."
+      />
+    );
+  }
 
   if (isPending || data === undefined) {
     return (
@@ -152,6 +183,38 @@ export function PortfolioBlocks() {
 
   const dormant = (productivity.data?.items ?? []).filter((row) => row.dormant);
 
+  /**
+   * Une par requête, et NON un drapeau commun aux quatre.
+   *
+   * Les quatre blocs portent leur propre requête pour que le plus rapide ne
+   * patiente pas derrière le plus lent ; les fondre dans un seul « une erreur
+   * quelque part » effacerait trois blocs valides pour un seul en panne, ce qui
+   * annulerait l'intérêt de les avoir séparés.
+   *
+   * Sans ces quatre lignes, l'échec se déguisait selon le bloc : un graphique
+   * VIDE pour le rendement et la provenance (`data?.items ?? []` rend un tableau
+   * vide, que le graphique dessine sans broncher), et un « Calcul en cours… »
+   * PERPÉTUEL pour les cohortes et la productivité. Un graphique vide est le
+   * plus grave des deux : il ne se contente pas de cacher la panne, il affirme
+   * qu'il n'y a rien à montrer.
+   */
+  const yieldsFailed = shouldShowError({
+    isError: yields.isError,
+    hasData: yields.data !== undefined,
+  });
+  const originsFailed = shouldShowError({
+    isError: origins.isError,
+    hasData: origins.data !== undefined,
+  });
+  const cohortsFailed = shouldShowError({
+    isError: cohorts.isError,
+    hasData: cohorts.data !== undefined,
+  });
+  const productivityFailed = shouldShowError({
+    isError: productivity.isError,
+    hasData: productivity.data !== undefined,
+  });
+
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 xl:grid-cols-2">
@@ -160,7 +223,17 @@ export function PortfolioBlocks() {
           title="Rendement par département"
           description="Part des prospects allés jusqu’à l’encaissement"
         >
-          <RankBarChart items={yieldItems} label="Conversion (%)" />
+          {yieldsFailed ? (
+            <QueryErrorInline
+              error={yields.error}
+              onRetry={() => {
+                void yields.refetch();
+              }}
+              fallback="Le rendement par département n’a pas pu être calculé."
+            />
+          ) : (
+            <RankBarChart items={yieldItems} label="Conversion (%)" />
+          )}
         </StatChartCard>
 
         <StatChartCard
@@ -168,7 +241,17 @@ export function PortfolioBlocks() {
           title="Provenance des fiches"
           description="Tournée terrain ou demande hors base"
         >
-          <ShareDoughnutChart items={originItems} />
+          {originsFailed ? (
+            <QueryErrorInline
+              error={origins.error}
+              onRetry={() => {
+                void origins.refetch();
+              }}
+              fallback="La provenance des fiches n’a pas pu être calculée."
+            />
+          ) : (
+            <ShareDoughnutChart items={originItems} />
+          )}
         </StatChartCard>
       </div>
 
@@ -181,7 +264,17 @@ export function PortfolioBlocks() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {cohorts.data === undefined ? (
+          {cohortsFailed ? (
+            <div className="px-5 pb-5">
+              <QueryErrorInline
+                error={cohorts.error}
+                onRetry={() => {
+                  void cohorts.refetch();
+                }}
+                fallback="Les cohortes n’ont pas pu être calculées."
+              />
+            </div>
+          ) : cohorts.data === undefined ? (
             <div className="px-5 pb-5" aria-hidden="true">
               <Skeleton className="h-40 w-full" />
             </div>
@@ -240,13 +333,25 @@ export function PortfolioBlocks() {
         <CardHeader>
           <CardTitle className="text-[1.0625rem]">Productivité des représentants</CardTitle>
           <CardDescription>
-            {productivity.data === undefined
-              ? 'Calcul en cours…'
-              : `${formatNumber(dormant.length)} représentant${dormant.length > 1 ? 's' : ''} sans aucun apport depuis ${formatNumber(productivity.data.dormantDays)} jours.`}
+            {productivityFailed
+              ? 'Productivité indisponible.'
+              : productivity.data === undefined
+                ? 'Calcul en cours…'
+                : `${formatNumber(dormant.length)} représentant${dormant.length > 1 ? 's' : ''} sans aucun apport depuis ${formatNumber(productivity.data.dormantDays)} jours.`}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {productivity.data === undefined ? (
+          {productivityFailed ? (
+            <div className="px-5 pb-5">
+              <QueryErrorInline
+                error={productivity.error}
+                onRetry={() => {
+                  void productivity.refetch();
+                }}
+                fallback="La productivité des représentants n’a pas pu être calculée."
+              />
+            </div>
+          ) : productivity.data === undefined ? (
             <div className="px-5 pb-5" aria-hidden="true">
               <Skeleton className="h-40 w-full" />
             </div>

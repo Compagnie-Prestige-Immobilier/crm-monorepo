@@ -166,14 +166,37 @@ async function rotateRefreshTokenOnce(
 
   if (!response.ok) return { ok: false, reason: refusalReason(response.status) };
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * UN CORPS ILLISIBLE DERRIÈRE UN 2xx N'EST PAS UN JUGEMENT SUR LE JETON
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Ces trois sorties rendaient `invalid`, et `invalid` fait EFFACER LES DEUX
+   * COOKIES par l'appelant (`proxy.ts`, `server.ts`). La distinction que cette
+   * fonction existe pour tenir — « l'API a jugé le jeton » contre « je n'ai pas
+   * pu demander » — était donc respectée sur le code de statut, puis perdue une
+   * ligne plus bas sur la forme du corps.
+   *
+   * Or l'API ne rend JAMAIS 2xx avec un corps qui n'est pas cette paire de
+   * jetons : ce qui arrive ici décrit un intermédiaire, pas un verdict. Une
+   * passerelle qui répond 200 avec une page de courtoisie en HTML, un 204 d'un
+   * proxy qui a avalé le corps, une réponse tronquée par une coupure au milieu
+   * du transfert. Dans les trois cas le jeton de rafraîchissement est INTACT
+   * côté serveur, et la session était pourtant détruite : l'utilisateur se
+   * retrouvait à l'écran de connexion pendant qu'un proxy toussait.
+   *
+   * `unavailable` laisse les cookies en place et fait remonter une erreur
+   * temporaire. Si le jeton est réellement mort, l'API le dira par un 401, qui
+   * est déjà traité par `refusalReason` et reste, lui, une déconnexion.
+   */
   try {
     const body: unknown = await response.json();
     if (typeof body !== 'object' || body === null) {
-      return { ok: false, reason: 'invalid' };
+      return { ok: false, reason: 'unavailable' };
     }
     const { accessToken, refreshToken: next, expiresIn } = body as Record<string, unknown>;
     if (typeof accessToken !== 'string' || typeof next !== 'string') {
-      return { ok: false, reason: 'invalid' };
+      return { ok: false, reason: 'unavailable' };
     }
     return {
       ok: true,
@@ -184,6 +207,6 @@ async function rotateRefreshTokenOnce(
       },
     };
   } catch {
-    return { ok: false, reason: 'invalid' };
+    return { ok: false, reason: 'unavailable' };
   }
 }
