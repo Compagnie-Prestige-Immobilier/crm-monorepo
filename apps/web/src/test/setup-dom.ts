@@ -49,8 +49,33 @@ afterEach(() => {
  *
  * On répond « ne correspond pas » : c'est le défaut de l'écran (animations
  * actives, thème clair), donc le rendu éprouvé est celui que voit la majorité.
+ *
+ * ═══ LA GARDE PORTE SUR `typeof`, ET C'EST TOUT L'ENJEU ═══
+ *
+ * Elle s'écrivait `if (!('matchMedia' in window))`, et ce test était FAUX :
+ * jsdom DÉCLARE `matchMedia` comme un accesseur non implémenté. Mesuré ici
+ * même, sur jsdom tel qu'installé :
+ *
+ *     'matchMedia' in window            → true
+ *     typeof window.matchMedia          → 'undefined'
+ *     descripteur                       → { enumerable: false, configurable: true }
+ *                                         (un accesseur, donc sans `value`)
+ *
+ * `in` répond donc « présent », la garde conclut « rien à combler », et le
+ * remplacement ci-dessous n'était JAMAIS installé. Tout composant traversant
+ * `usePrefersReducedMotion` — les six graphiques du tableau de bord, les blocs
+ * de portefeuille — mourait sur « window.matchMedia is not a function », pour
+ * une raison sans aucun rapport avec ce qu'il éprouvait. C'est précisément ce
+ * que l'en-tête de ce fichier promet d'éviter.
+ *
+ * Le défaut est resté invisible parce qu'aucun test de rendu n'avait encore
+ * monté de graphique : la seule chose qui manquait à ce bloc, c'était quelqu'un
+ * pour l'utiliser.
+ *
+ * `typeof … !== 'function'` couvre l'absence ET la présence inerte, qui sont
+ * la même chose pour l'appelant.
  */
-if (!('matchMedia' in window)) {
+if (typeof window.matchMedia !== 'function') {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: (query: string) => ({
