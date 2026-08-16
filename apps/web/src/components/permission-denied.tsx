@@ -1,10 +1,11 @@
 import { LockIcon } from 'lucide-react';
 import Link from 'next/link';
 
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { homePathForRole } from '@/components/layout/nav-items';
 import { ROLE_LABELS, type Role } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 /**
  * Refus de droits : l'état qui manquait aux écrans réservés.
@@ -41,9 +42,14 @@ export function PermissionDenied({
         {what} est réservé à un autre rôle. Rôle en cours :{' '}
         <strong className="font-[600] text-foreground">{ROLE_LABELS[role]}</strong>.
       </p>
-      <Button asChild variant="outline" className="mt-1">
-        <Link href={homePathForRole(role)}>Retour à l’accueil</Link>
-      </Button>
+      {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI poserait
+          `role="button"` sur le `<a>` et lui retirerait sa sémantique de lien. */}
+      <Link
+        href={homePathForRole(role)}
+        className={cn(buttonVariants({ variant: 'outline' }), 'mt-1')}
+      >
+        Retour à l’accueil
+      </Link>
     </Card>
   );
 }

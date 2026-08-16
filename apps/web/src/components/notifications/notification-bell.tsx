@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { useLive } from '@/components/live/use-live';
 import { CATEGORY_LABELS } from '@/components/notifications/types';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -150,26 +150,28 @@ export function NotificationBell() {
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative"
-          aria-label={bellLabel(unreadCount)}
-        >
-          <BellIcon
-            className={cn('size-5', swinging && 'motion-safe:animate-bell-swing')}
-            aria-hidden="true"
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative"
+            aria-label={bellLabel(unreadCount)}
           />
-          {unreadCount > 0 ? (
-            <span
-              aria-hidden="true"
-              className="motion-safe:animate-badge-pulse absolute -top-0.5 -right-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[0.625rem] font-[700] leading-4 text-destructive-foreground tabular-nums"
-            >
-              {unreadBadgeLabel(unreadCount)}
-            </span>
-          ) : null}
-        </Button>
+        }
+      >
+        <BellIcon
+          className={cn('size-5', swinging && 'motion-safe:animate-bell-swing')}
+          aria-hidden="true"
+        />
+        {unreadCount > 0 ? (
+          <span
+            aria-hidden="true"
+            className="motion-safe:animate-badge-pulse absolute -top-0.5 -right-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[0.625rem] font-[700] leading-4 text-destructive-foreground tabular-nums"
+          >
+            {unreadBadgeLabel(unreadCount)}
+          </span>
+        ) : null}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-[22rem] max-w-[calc(100vw-2rem)] p-0">
@@ -235,16 +237,17 @@ export function NotificationBell() {
           décrire qu'un arriéré qu'on ne peut pas solder.
         */}
         <div className="flex items-center justify-between gap-2 border-t border-border px-2 py-1.5">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
+          {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
+              poserait `role="button"` sur le `<a>`. */}
+          <Link
+            href="/notifications?onglet=reception"
+            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
             onClick={() => {
               setOpen(false);
             }}
           >
-            <Link href="/notifications?onglet=reception">Tout voir</Link>
-          </Button>
+            Tout voir
+          </Link>
           <Button
             type="button"
             variant="ghost"

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { BankFiltersBar } from '@/components/bank/bank-filters-bar';
 import { useBankFilters } from '@/components/bank/use-bank-filters';
 import { useFileDownload } from '@/components/exports/download-button';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { countActiveBankFilters } from '@/lib/bank-filters';
 import { bankExportFileName, buildBankExportUrl } from '@/lib/data/export';
@@ -95,9 +95,11 @@ export function BankExportView() {
                 </>
               )}
             </Button>
-            <Button asChild variant="ghost">
-              <Link href="/dossiers">Voir la liste</Link>
-            </Button>
+            {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
+                poserait `role="button"` sur le `<a>`. */}
+            <Link href="/dossiers" className={buttonVariants({ variant: 'ghost' })}>
+              Voir la liste
+            </Link>
           </div>
         </CardContent>
       </Card>

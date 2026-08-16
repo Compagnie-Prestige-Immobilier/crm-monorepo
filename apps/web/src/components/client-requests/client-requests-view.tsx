@@ -18,7 +18,7 @@ import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { SearchField } from '@/components/filters/search-field';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -409,18 +409,21 @@ function RequestCard({
             comme une espace et la recherche partirait sur un numéro amputé.
             C'est ce dernier point qu'éprouve `lib/filters.test.ts`.
           */}
+          {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
+              poserait `role="button"` sur le `<a>`. */}
           {request.createdProspectId !== null && canReview ? (
-            <Button asChild variant="outline">
-              <Link href={`/prospects?search=${encodeURIComponent(request.phoneE164)}`}>
-                Voir le prospect créé
-              </Link>
-            </Button>
+            <Link
+              href={`/prospects?search=${encodeURIComponent(request.phoneE164)}`}
+              className={buttonVariants({ variant: 'outline' })}
+            >
+              Voir le prospect créé
+            </Link>
           ) : null}
 
           {request.createdProspectId !== null && !canReview ? (
-            <Button asChild variant="outline">
-              <Link href="/dossiers/nouveau">Ouvrir un dossier pour ce client</Link>
-            </Button>
+            <Link href="/dossiers/nouveau" className={buttonVariants({ variant: 'outline' })}>
+              Ouvrir un dossier pour ce client
+            </Link>
           ) : null}
         </div>
       </CardContent>

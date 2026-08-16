@@ -37,16 +37,14 @@ export function ProspectExportMenu({ filters }: { filters: ProspectFilters }) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" disabled={pending}>
-          {pending ? (
-            <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <FileSpreadsheetIcon aria-hidden="true" />
-          )}
-          Exporter
-          <ChevronDownIcon className="size-4 opacity-60" aria-hidden="true" />
-        </Button>
+      <DropdownMenuTrigger render={<Button variant="outline" disabled={pending} />}>
+        {pending ? (
+          <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <FileSpreadsheetIcon aria-hidden="true" />
+        )}
+        Exporter
+        <ChevronDownIcon className="size-4 opacity-60" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel>Export Excel</DropdownMenuLabel>

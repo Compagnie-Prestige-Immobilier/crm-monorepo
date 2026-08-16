@@ -121,6 +121,21 @@ export function ProspectEditDialog({
   const representantId = watch('representantId');
   const statut = watch('statut');
 
+  /**
+   * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item.
+   * Sans ces tables, les gâchettes montreraient des identifiants bruts au lieu
+   * du nom de la banque, du sigle du syndicat ou du libellé du statut.
+   */
+  const banqueItems = (reference?.banques ?? []).map((banque) => ({
+    value: banque.id,
+    label: withRetired(banque.shortName, banque.isActive),
+  }));
+  const syndicatItems = (reference?.syndicats ?? []).map((syndicat) => ({
+    value: syndicat.id,
+    label: withRetired(syndicat.sigle, syndicat.isActive),
+  }));
+  const representantItems = reference?.representants ?? [];
+
   return (
     <Dialog
       open={prospect !== null}
@@ -163,9 +178,11 @@ export function ProspectEditDialog({
           <Field label="Statut" required error={formState.errors.statut?.message}>
             {(props) => (
               <Select
+                items={PROSPECT_STATUT_LABELS}
                 value={statut}
                 onValueChange={(value) => {
-                  setValue('statut', value as ProspectFormInput['statut'], { shouldDirty: true });
+                  if (value === null) return;
+                  setValue('statut', value, { shouldDirty: true });
                 }}
               >
                 <SelectTrigger id={props.id}>
@@ -185,8 +202,10 @@ export function ProspectEditDialog({
           <Field label="Banque" required error={formState.errors.banqueId?.message}>
             {(props) => (
               <Select
+                items={banqueItems}
                 value={banqueId}
                 onValueChange={(value) => {
+                  if (value === null) return;
                   setValue('banqueId', value, { shouldDirty: true });
                 }}
               >
@@ -194,9 +213,9 @@ export function ProspectEditDialog({
                   <SelectValue placeholder="Choisir une banque" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(reference?.banques ?? []).map((banque) => (
-                    <SelectItem key={banque.id} value={banque.id}>
-                      {withRetired(banque.shortName, banque.isActive)}
+                  {banqueItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -207,8 +226,10 @@ export function ProspectEditDialog({
           <Field label="Syndicat" required error={formState.errors.syndicatId?.message}>
             {(props) => (
               <Select
+                items={syndicatItems}
                 value={syndicatId}
                 onValueChange={(value) => {
+                  if (value === null) return;
                   setValue('syndicatId', value, { shouldDirty: true });
                 }}
               >
@@ -216,9 +237,9 @@ export function ProspectEditDialog({
                   <SelectValue placeholder="Choisir un syndicat" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(reference?.syndicats ?? []).map((syndicat) => (
-                    <SelectItem key={syndicat.id} value={syndicat.id}>
-                      {withRetired(syndicat.sigle, syndicat.isActive)}
+                  {syndicatItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -234,8 +255,10 @@ export function ProspectEditDialog({
           >
             {(props) => (
               <Select
+                items={representantItems}
                 value={representantId}
                 onValueChange={(value) => {
+                  if (value === null) return;
                   setValue('representantId', value, { shouldDirty: true });
                 }}
               >
@@ -243,7 +266,7 @@ export function ProspectEditDialog({
                   <SelectValue placeholder="Choisir un représentant" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(reference?.representants ?? []).map((option) => (
+                  {representantItems.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>

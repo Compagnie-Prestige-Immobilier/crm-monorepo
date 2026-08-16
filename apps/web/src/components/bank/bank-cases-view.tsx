@@ -19,7 +19,7 @@ import { StageBadge } from '@/components/bank/stage-badge';
 import { useBankFilters } from '@/components/bank/use-bank-filters';
 import { EmptyState } from '@/components/empty-state';
 import { QueryErrorState } from '@/components/query-error-state';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
@@ -98,12 +98,12 @@ export function BankCasesView() {
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <BankExportMenu filters={filters} />
-          <Button asChild>
-            <Link href="/dossiers/nouveau">
-              <PlusIcon aria-hidden="true" />
-              Nouveau dossier
-            </Link>
-          </Button>
+          {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
+              poserait `role="button"` sur le `<a>`. */}
+          <Link href="/dossiers/nouveau" className={buttonVariants()}>
+            <PlusIcon aria-hidden="true" />
+            Nouveau dossier
+          </Link>
         </div>
       </div>
 
@@ -134,12 +134,10 @@ export function BankCasesView() {
           }
           action={
             countActiveBankFilters(filters) === 0 ? (
-              <Button asChild>
-                <Link href="/dossiers/nouveau">
-                  <PlusIcon aria-hidden="true" />
-                  Nouveau dossier
-                </Link>
-              </Button>
+              <Link href="/dossiers/nouveau" className={buttonVariants()}>
+                <PlusIcon aria-hidden="true" />
+                Nouveau dossier
+              </Link>
             ) : null
           }
         />
@@ -268,6 +266,7 @@ export function BankCasesView() {
                 <Select
                   value={String(filters.pageSize)}
                   onValueChange={(value) => {
+                    if (value === null) return;
                     setFilters({ pageSize: Number(value), page: 1 });
                   }}
                 >

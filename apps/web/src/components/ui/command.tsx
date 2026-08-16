@@ -37,7 +37,8 @@ function CommandDialog({
   description = 'Cherchez puis sélectionnez une entrée.',
   children,
   ...props
-}: React.ComponentProps<typeof Dialog> & {
+}: Omit<React.ComponentProps<typeof Dialog>, 'children'> & {
+  children?: React.ReactNode;
   title?: string | undefined;
   description?: string | undefined;
 }) {

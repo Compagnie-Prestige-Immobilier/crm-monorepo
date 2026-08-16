@@ -344,15 +344,17 @@ export function BankStagesView() {
                       que quatre pictogrammes ne disaient pas. */}
                   <div className="ml-auto shrink-0 lg:hidden">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          aria-label={`Actions pour « ${stage.label} »`}
-                        >
-                          <MoreHorizontalIcon className="size-4" aria-hidden="true" />
-                        </Button>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            aria-label={`Actions pour « ${stage.label} »`}
+                          />
+                        }
+                      >
+                        <MoreHorizontalIcon className="size-4" aria-hidden="true" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuItem
@@ -640,7 +642,16 @@ function StageFormDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={colorId}>Couleur de la pastille</Label>
-            <Select value={color} onValueChange={setColor}>
+            {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
+                pas le texte de l'item. */}
+            <Select
+              items={COLOR_ROLES}
+              value={color}
+              onValueChange={(value) => {
+                if (value === null) return;
+                setColor(value);
+              }}
+            >
               <SelectTrigger id={colorId} className="w-full">
                 <SelectValue />
               </SelectTrigger>

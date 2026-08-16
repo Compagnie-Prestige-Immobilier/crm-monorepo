@@ -1,11 +1,12 @@
 'use client';
 
-import * as TabsPrimitive from '@radix-ui/react-tabs';
-import type * as React from 'react';
+import { Tabs as TabsPrimitive } from '@base-ui/react/tabs';
 
 import { cn } from '@/lib/utils';
 
-function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
+type TabsProps = Omit<TabsPrimitive.Root.Props, 'className'> & { className?: string | undefined };
+
+function Tabs({ className, ...props }: TabsProps) {
   return (
     <TabsPrimitive.Root
       data-slot="tabs"
@@ -15,7 +16,11 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
   );
 }
 
-function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.List>) {
+type TabsListProps = Omit<TabsPrimitive.List.Props, 'className'> & {
+  className?: string | undefined;
+};
+
+function TabsList({ className, ...props }: TabsListProps) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
@@ -28,16 +33,27 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
   );
 }
 
-function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
+type TabsTriggerProps = Omit<TabsPrimitive.Tab.Props, 'className'> & {
+  className?: string | undefined;
+};
+
+/**
+ * `Trigger` de Radix devient `Tab`. Le nom public reste `TabsTrigger` : les
+ * écrans n'ont pas à connaître la primitive sous-jacente.
+ *
+ * L'onglet désactivé n'expose plus l'attribut `disabled` mais `data-disabled` /
+ * `aria-disabled` : les variantes Tailwind `disabled:*` seraient du code mort.
+ */
+function TabsTrigger({ className, ...props }: TabsTriggerProps) {
   return (
-    <TabsPrimitive.Trigger
+    <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
         'inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-sm px-3',
         'text-[0.875rem] font-[600] whitespace-nowrap transition-colors',
-        'data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-elev-xs',
+        'data-active:bg-card data-active:text-foreground data-active:shadow-elev-xs',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-        'disabled:pointer-events-none disabled:opacity-40',
+        'data-disabled:pointer-events-none data-disabled:opacity-40',
         "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
@@ -46,13 +62,17 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
   );
 }
 
-function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Content>) {
+type TabsContentProps = Omit<TabsPrimitive.Panel.Props, 'className'> & {
+  className?: string | undefined;
+};
+
+function TabsContent({ className, ...props }: TabsContentProps) {
   return (
-    <TabsPrimitive.Content
+    <TabsPrimitive.Panel
       data-slot="tabs-content"
-      /* Radix rend le panneau focusable (`tabIndex=0`) pour que le clavier
-         atteigne son contenu. `outline-none` sec le rendait donc focusable ET
-         invisible : on remplace l'anneau global plutôt que de le supprimer. */
+      /* Le panneau est focusable (`tabIndex=0`) pour que le clavier atteigne
+         son contenu. `outline-none` sec le rendait donc focusable ET invisible :
+         on remplace l'anneau global plutôt que de le supprimer. */
       className={cn(
         'flex-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
         className,

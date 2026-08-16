@@ -83,29 +83,35 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
           if (nextOpen) setMonth(startOfMonth(selected ?? new Date()));
         }}
       >
-        <PopoverTrigger asChild>
-          <Button
-            id={id}
-            type="button"
-            variant="outline"
-            aria-label={label}
-            aria-haspopup="dialog"
-            aria-expanded={open}
-            className={cn(
-              'h-11 min-w-40 justify-between gap-3 rounded-md px-3 font-normal',
-              !selected && 'text-muted-foreground',
-            )}
-          >
-            <span>{selected ? format(selected, 'dd MMM yyyy', { locale: fr }) : 'dd-mm-yyyy'}</span>
-            <CalendarDaysIcon aria-hidden="true" className="size-4 shrink-0" />
-          </Button>
+        <PopoverTrigger
+          render={
+            <Button
+              id={id}
+              type="button"
+              variant="outline"
+              aria-label={label}
+              aria-haspopup="dialog"
+              className={cn(
+                'h-11 min-w-40 justify-between gap-3 rounded-md px-3 font-normal',
+                !selected && 'text-muted-foreground',
+              )}
+            />
+          }
+        >
+          <span>{selected ? format(selected, 'dd MMM yyyy', { locale: fr }) : 'dd-mm-yyyy'}</span>
+          <CalendarDaysIcon aria-hidden="true" className="size-4 shrink-0" />
         </PopoverTrigger>
         <PopoverContent className="w-[19rem] p-3" align="start">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-1">
               <Select
+                /* `Select.Value` de Base UI affiche la VALEUR, pas le texte de
+                   l'item : sans `items`, la gâchette montrerait « 0 » au lieu
+                   de « janvier ». */
+                items={MONTHS}
                 value={String(month.getMonth())}
                 onValueChange={(value) => {
+                  if (value === null) return;
                   setMonth((current) => new Date(current.getFullYear(), Number(value), 1));
                 }}
               >
@@ -127,6 +133,7 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
               <Select
                 value={String(month.getFullYear())}
                 onValueChange={(value) => {
+                  if (value === null) return;
                   setMonth((current) => new Date(Number(value), current.getMonth(), 1));
                 }}
               >

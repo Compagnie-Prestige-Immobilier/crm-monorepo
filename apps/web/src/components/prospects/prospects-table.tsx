@@ -275,6 +275,7 @@ export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
             <Select
               value={String(filters.pageSize)}
               onValueChange={(value) => {
+                if (value === null) return;
                 setFilters({ pageSize: Number(value), page: 1 });
               }}
             >

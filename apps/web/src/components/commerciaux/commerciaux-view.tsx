@@ -66,6 +66,22 @@ const ACTIVE_FILTER: Record<ActiveFilterValue, boolean | null> = {
 const ALL_ROLES = 'tous';
 
 /**
+ * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item :
+ * sans ces tables, les gâchettes montreraient « TELECONSEILLER » ou
+ * « desactives » au lieu des libellés.
+ */
+const ROLE_ITEMS = [
+  { value: ALL_ROLES, label: 'Tous les rôles' },
+  ...ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] })),
+];
+
+const ACTIVE_ITEMS = [
+  { value: 'tous', label: 'Tous' },
+  { value: 'actifs', label: 'Actifs' },
+  { value: 'desactives', label: 'Désactivés' },
+];
+
+/**
  * Comptes des téléconseillers.
  *
  * Un compte désactivé n'est pas rendu par une case à cocher dans une colonne :
@@ -204,8 +220,10 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
         <div className="flex w-48 flex-col gap-1.5">
           <Label htmlFor="role-compte">Rôle</Label>
           <Select
+            items={ROLE_ITEMS}
             value={filters.role ?? ALL_ROLES}
             onValueChange={(value) => {
+              if (value === null) return;
               setFilters({ role: value === ALL_ROLES ? null : (value as Role) });
             }}
           >
@@ -213,10 +231,9 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL_ROLES}>Tous les rôles</SelectItem>
-              {ROLES.map((role) => (
-                <SelectItem key={role} value={role}>
-                  {ROLE_LABELS[role]}
+              {ROLE_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -226,18 +243,22 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
         <div className="flex w-48 flex-col gap-1.5">
           <Label htmlFor="etat-compte">État du compte</Label>
           <Select
+            items={ACTIVE_ITEMS}
             value={activeValue}
             onValueChange={(value) => {
-              setFilters({ isActive: ACTIVE_FILTER[value as ActiveFilterValue] });
+              if (value === null) return;
+              setFilters({ isActive: ACTIVE_FILTER[value] });
             }}
           >
             <SelectTrigger id="etat-compte">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="tous">Tous</SelectItem>
-              <SelectItem value="actifs">Actifs</SelectItem>
-              <SelectItem value="desactives">Désactivés</SelectItem>
+              {ACTIVE_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -336,14 +357,16 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={`Actions pour ${user.fullName}`}
-                          >
-                            <MoreHorizontalIcon className="size-4" aria-hidden="true" />
-                          </Button>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Actions pour ${user.fullName}`}
+                            />
+                          }
+                        >
+                          <MoreHorizontalIcon className="size-4" aria-hidden="true" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
                           <DropdownMenuItem

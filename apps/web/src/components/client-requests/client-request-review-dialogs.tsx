@@ -168,7 +168,19 @@ function ApproveDialog({
                 *
               </span>
             </Label>
-            <Select value={syndicat ?? ''} onValueChange={setSyndicat}>
+            {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
+                pas le texte de l'item — ici, l'identifiant du syndicat. */}
+            <Select
+              items={(reference?.syndicats ?? []).map((item) => ({
+                value: item.id,
+                label: `${item.sigle}, ${item.name}`,
+              }))}
+              value={syndicat ?? ''}
+              onValueChange={(value) => {
+                if (value === null) return;
+                setSyndicat(value);
+              }}
+            >
               <SelectTrigger id={syndicatId} className="w-full">
                 <SelectValue placeholder="Choisir un syndicat" />
               </SelectTrigger>
@@ -190,8 +202,10 @@ function ApproveDialog({
               </span>
             </Label>
             <Select
+              items={ENROLLMENT_METHOD_LABELS}
               value={method ?? ''}
               onValueChange={(value) => {
+                if (value === null) return;
                 setMethod(value as EnrollmentMethod);
               }}
             >

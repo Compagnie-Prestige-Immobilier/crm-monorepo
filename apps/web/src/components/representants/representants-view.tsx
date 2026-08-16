@@ -19,7 +19,7 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
 import { RepresentantsFiltersBar } from '@/components/representants/representants-filters-bar';
 import { useRepresentantFilters } from '@/components/representants/use-representant-filters';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -111,12 +111,12 @@ export function RepresentantsView() {
             Nouveau représentant
           </Button>
 
-          <Button asChild variant="outline">
-            <Link href="/representants/import">
-              <UploadIcon aria-hidden="true" />
-              Import Excel
-            </Link>
-          </Button>
+          {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
+              poserait `role="button"` sur le `<a>`. */}
+          <Link href="/representants/import" className={buttonVariants({ variant: 'outline' })}>
+            <UploadIcon aria-hidden="true" />
+            Import Excel
+          </Link>
 
           {/* L'export part des filtres de l'URL, pas de la page affichée :
               celui qui envoie le fichier doit pouvoir jurer qu'il contient ce

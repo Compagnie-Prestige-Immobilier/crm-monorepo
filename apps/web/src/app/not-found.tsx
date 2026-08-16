@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { homePathForRole } from '@/components/layout/nav-items';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { getSession } from '@/lib/session';
 
 /**
@@ -45,9 +45,12 @@ export default async function NotFound() {
       <p className="max-w-md text-[0.9375rem] text-muted-foreground">
         Cette adresse ne correspond à aucun écran du panel.
       </p>
-      <Button asChild>
-        <Link href={home}>{session === null ? 'Aller à la connexion' : 'Retour à l’accueil'}</Link>
-      </Button>
+      {/* Un LIEN habillé en bouton, pas un bouton : la primitive `Button` de
+          Base UI poserait `role="button"` sur le `<a>` et lui retirerait sa
+          sémantique de lien. Seule la peau est empruntée. */}
+      <Link href={home} className={buttonVariants()}>
+        {session === null ? 'Aller à la connexion' : 'Retour à l’accueil'}
+      </Link>
     </main>
   );
 }

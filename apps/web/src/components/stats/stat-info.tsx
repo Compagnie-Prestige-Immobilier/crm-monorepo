@@ -60,11 +60,11 @@ export function StatInfo({ stat, label }: { stat: StatKey; label: string }) {
         align="start"
         sideOffset={6}
         className="w-72 p-3 text-[0.8125rem] leading-[1.55]"
-        // Le contenu ne prend pas le focus à l'ouverture : au survol, voler le
-        // focus déplacerait le curseur du clavier à chaque passage de souris.
-        onOpenAutoFocus={(event) => {
-          if (!pinned) event.preventDefault();
-        }}
+        // Le contenu ne prend pas le focus à l'ouverture tant qu'il n'est pas
+        // épinglé : au survol, voler le focus déplacerait le curseur du clavier
+        // à chaque passage de souris. `initialFocus={false}` remplace le
+        // `onOpenAutoFocus` + `preventDefault` de Radix.
+        initialFocus={pinned}
       >
         {explain(stat)}
       </PopoverContent>

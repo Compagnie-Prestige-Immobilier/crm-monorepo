@@ -77,6 +77,15 @@ const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DO
 const AUDIENCES: NotificationAudience[] = ['ALL', 'ROLE', 'DEPARTEMENT', 'USERS'];
 const ROLES: Role[] = ['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE'];
 
+/**
+ * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item :
+ * sans ces tables, les gâchettes montreraient « SYSTEME », « DEPARTEMENT » ou
+ * « BANQUE_FINANCE » au lieu des libellés.
+ */
+const CATEGORY_ITEMS = CATEGORIES.map((item) => ({ value: item, label: CATEGORY_LABELS[item] }));
+const AUDIENCE_ITEMS = AUDIENCES.map((item) => ({ value: item, label: AUDIENCE_LABELS[item] }));
+const ROLE_ITEMS = ROLES.map((item) => ({ value: item, label: ROLE_LABELS[item] }));
+
 const TITLE_MAX = 120;
 const BODY_MAX = 500;
 
@@ -258,8 +267,13 @@ export function NotificationComposer({
                 <Field label="Gabarit" description="Facultatif.">
                   {(props) => (
                     <Select
+                      items={templates.data.items.map((item) => ({
+                        value: item.id,
+                        label: item.name,
+                      }))}
                       value={templateId}
                       onValueChange={(value) => {
+                        if (value === null) return;
                         applyTemplate(value);
                       }}
                     >
@@ -343,18 +357,20 @@ export function NotificationComposer({
                 <Field label="Catégorie">
                   {(props) => (
                     <Select
+                      items={CATEGORY_ITEMS}
                       value={category}
                       onValueChange={(value) => {
-                        setCategory(value as NotificationCategory);
+                        if (value === null) return;
+                        setCategory(value);
                       }}
                     >
                       <SelectTrigger id={props.id}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CATEGORIES.map((item) => (
-                          <SelectItem key={item} value={item}>
-                            {CATEGORY_LABELS[item]}
+                        {CATEGORY_ITEMS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -391,11 +407,13 @@ export function NotificationComposer({
               <Field label="Destinataires" required error={audienceIssue ?? undefined}>
                 {(props) => (
                   <Select
+                    items={AUDIENCE_ITEMS}
                     value={selection.audience}
                     onValueChange={(value) => {
+                      if (value === null) return;
                       setSelection({
                         ...EMPTY_AUDIENCE,
-                        audience: value as NotificationAudience,
+                        audience: value,
                       });
                     }}
                   >
@@ -403,9 +421,9 @@ export function NotificationComposer({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {AUDIENCES.map((item) => (
-                        <SelectItem key={item} value={item}>
-                          {AUDIENCE_LABELS[item]}
+                      {AUDIENCE_ITEMS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -417,8 +435,10 @@ export function NotificationComposer({
                 <Field label="Rôle" required>
                   {(props) => (
                     <Select
+                      items={ROLE_ITEMS}
                       value={selection.audienceRole ?? ''}
                       onValueChange={(value) => {
+                        if (value === null) return;
                         setSelection((current) => ({ ...current, audienceRole: value as Role }));
                       }}
                     >
@@ -426,9 +446,9 @@ export function NotificationComposer({
                         <SelectValue placeholder="Choisir un rôle" />
                       </SelectTrigger>
                       <SelectContent>
-                        {ROLES.map((item) => (
-                          <SelectItem key={item} value={item}>
-                            {ROLE_LABELS[item]}
+                        {ROLE_ITEMS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -441,8 +461,13 @@ export function NotificationComposer({
                 <Field label="Département" required>
                   {(props) => (
                     <Select
+                      items={(departements.data ?? []).map((item) => ({
+                        value: item.id,
+                        label: item.name,
+                      }))}
                       value={selection.audienceDepartementId ?? ''}
                       onValueChange={(value) => {
+                        if (value === null) return;
                         setSelection((current) => ({
                           ...current,
                           audienceDepartementId: value,

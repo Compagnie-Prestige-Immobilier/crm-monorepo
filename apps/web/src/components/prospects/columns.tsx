@@ -237,19 +237,21 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => (
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              /* `size="icon"` (44 px) et non `icon-sm` (36 px) : docs/design.md
-                 §6 fixe la cible tactile minimale à 44 px, et le panel est aussi
-                 consulté sur tablette. Un menu de ligne à 36 px se manque une
-                 fois sur trois au doigt : et l'action manquée juste à côté est
-                 « Supprimer ». */
-              size="icon"
-              aria-label={`Actions pour ${row.original.prenom} ${row.original.nom}`}
-            >
-              <MoreHorizontalIcon className="size-4" aria-hidden="true" />
-            </Button>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                /* `size="icon"` (44 px) et non `icon-sm` (36 px) : docs/design.md
+                   §6 fixe la cible tactile minimale à 44 px, et le panel est aussi
+                   consulté sur tablette. Un menu de ligne à 36 px se manque une
+                   fois sur trois au doigt : et l'action manquée juste à côté est
+                   « Supprimer ». */
+                size="icon"
+                aria-label={`Actions pour ${row.original.prenom} ${row.original.nom}`}
+              />
+            }
+          >
+            <MoreHorizontalIcon className="size-4" aria-hidden="true" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem

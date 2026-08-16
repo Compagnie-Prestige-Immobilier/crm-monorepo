@@ -14,17 +14,9 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@base-ui/react": "catalog:",
     "@crm/api-client": "workspace:*",
     "@hookform/resolvers": "catalog:",
-    "@radix-ui/react-avatar": "catalog:",
-    "@radix-ui/react-dialog": "catalog:",
-    "@radix-ui/react-dropdown-menu": "catalog:",
-    "@radix-ui/react-label": "catalog:",
-    "@radix-ui/react-popover": "catalog:",
-    "@radix-ui/react-select": "catalog:",
-    "@radix-ui/react-separator": "catalog:",
-    "@radix-ui/react-slot": "catalog:",
-    "@radix-ui/react-tabs": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-table": "catalog:",
     "chart.js": "catalog:",
