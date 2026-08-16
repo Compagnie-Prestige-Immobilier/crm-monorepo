@@ -34,9 +34,18 @@ permissions:
   contents: read
 
 # Une PR poussée trois fois de suite n'occupe pas trois fois les runners.
+#
+# SAUF SUR `prod`, ET LA NUANCE EST TOUTE NEUVE. Depuis que le job `deploy` vit
+# dans ce workflow, une annulation n'économise plus seulement des minutes
+# d'exécutant : elle peut tomber PENDANT une mise en ligne. Le job porte bien
+# `concurrency: deploy-prod` avec `cancel-in-progress: false`, mais cette
+# garde-là ne protège que d'un SECOND déploiement simultané ; elle ne peut rien
+# contre une annulation venue du niveau workflow, qui emporte le job en cours.
+# Deux fusions rapprochées vers `prod` auraient donc interrompu la première
+# reconstruction à mi-course.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/prod' }}
 
 env:
   TURBO_TELEMETRY_DISABLED: '1'
@@ -129,6 +138,16 @@ jobs:
       # sont donc régénérés dans le bon ordre sans qu'aucune ligne de ce
       # fichier n'ait à le savoir. Voir le job `contract` pour le détail.
       - run: pnpm build
+
+  # Les quatre scanners de sécurité, appelés ICI et non plus déclenchés à côté.
+  # Voir l'en-tête de security.yml : `needs:` ne franchit pas la frontière d'un
+  # workflow, donc tant qu'ils vivaient dans le leur, `deploy` ne pouvait pas
+  # les attendre — et sur un push vers `prod` ils ne tournaient même pas.
+  securite:
+    name: sécurité — secrets, SAST, dépendances, image
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
 
   sonar:
     name: SonarQube Cloud — quality gate
@@ -496,7 +515,7 @@ jobs:
   deploy:
     name: déploiement Dokploy (prod)
     runs-on: ubuntu-latest
-    needs: [node, sonar, contract, mobile]
+    needs: [node, sonar, contract, mobile, securite]
     if: >-
       !cancelled()
       && github.event_name == 'push'
@@ -504,6 +523,7 @@ jobs:
       && needs.node.result == 'success'
       && needs.contract.result == 'success'
       && needs.mobile.result == 'success'
+      && needs.securite.result == 'success'
       && (needs.sonar.result == 'success' || needs.sonar.result == 'skipped')
     # Une seule mise en ligne à la fois, et celle qui est en cours n'est PAS
     # annulée : interrompre un déploiement à mi-course laisse la pile dans un

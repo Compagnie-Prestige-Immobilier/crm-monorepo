@@ -64,8 +64,14 @@ def setting(name: str, default: str) -> str:
 
     `or` traite l'absence et le vide de la même façon, qui est la seule lecture
     utile ici : personne ne veut régler l'une de ces valeurs à « rien ».
+
+    Le `.strip()` étend la même clémence à une valeur qui n'est QUE des espaces,
+    ce que produit couramment un copier-coller depuis une interface web. Aucun
+    des réglages passés par cette fonction — une URL, des identifiants, un nom
+    de branche, des domaines, une expression cron — n'admet d'espace de tête ou
+    de queue : les retirer ne peut rien casser de légitime.
     """
-    return os.environ.get(name) or default
+    return os.environ.get(name, "").strip() or default
 
 
 DOKPLOY_URL = setting("DOKPLOY_URL", "https://dokploy.cpi-chues.com")
@@ -139,7 +145,7 @@ BACKUP_PREFIX = "cpi-go/postgres/"
 # Cron évalué par Dokploy, à l'heure du serveur. Africa/Dakar est sur UTC toute
 # l'année, sans heure d'été : 2 h ici est 2 h à Dakar, il n'y a pas de décalage
 # à corriger, contrairement à ce qu'exigerait un fuseau européen.
-BACKUP_SCHEDULE = os.environ.get("BACKUP_SCHEDULE", "0 2 * * *")
+BACKUP_SCHEDULE = setting("BACKUP_SCHEDULE", "0 2 * * *")
 # Rétention EN NOMBRE DE FICHIERS, pas en jours. Une sauvegarde par nuit, donc
 # environ un mois d'historique. Une borne en nombre est ce qu'il faut ici : si
 # le cron se met à tourner plus souvent, une borne en jours laisserait le bucket
@@ -492,8 +498,8 @@ def _brevo_env() -> list[str]:
     key = os.environ.get("BREVO_API_KEY", "").strip()
     if not key:
         return []
-    sender = os.environ.get("BREVO_SENDER_EMAIL", "no-reply@cpi.sn").strip()
-    name = os.environ.get("BREVO_SENDER_NAME", "CRM CPI").strip()
+    sender = setting("BREVO_SENDER_EMAIL", "no-reply@cpi.sn")
+    name = setting("BREVO_SENDER_NAME", "CRM CPI")
     return [
         f"BREVO_API_KEY={key}",
         f"BREVO_SENDER_EMAIL={sender}",
