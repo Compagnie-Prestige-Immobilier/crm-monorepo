@@ -3,6 +3,14 @@ import { stat } from 'node:fs/promises';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import {
+  BANQUIER,
+  enableDemo,
+  ensureWorkspaceFixtures,
+  FIXTURE_PASSWORD,
+  purgeDemo,
+} from './fixtures';
+
 /**
  * Parcours de bout en bout des trois surfaces livrées : mode démonstration,
  * campagnes de phase 2, dossiers bancaires.
@@ -26,6 +34,19 @@ import { expect, test, type Page } from '@playwright/test';
  */
 
 test.describe.configure({ mode: 'serial' });
+
+/**
+ * Les données viennent d'un AMORÇAGE RÉEL, plus du mode démonstration.
+ *
+ * Voir l'en-tête de `fixtures.ts` : le mode démonstration met la plateforme en
+ * lecture seule, et la moitié de ce fichier écrit. Les deux ne peuvent pas
+ * coexister. Le mode démonstration reste éprouvé ici — mais pour lui-même, en
+ * ouverture et en clôture, et il est purgé entre les deux.
+ */
+test.beforeAll(async () => {
+  test.setTimeout(180_000);
+  await ensureWorkspaceFixtures();
+});
 
 /** Les quatre premiers octets d'un `.xlsx` : la signature ZIP « PK\x03\x04 ». */
 async function readMagic(path: string, length = 4): Promise<number[]> {
@@ -94,6 +115,17 @@ test('le mode démonstration s’active et pose un bandeau sur tous les écrans'
   await expect(
     page.getByRole('status').filter({ hasText: 'Mode démonstration actif' }),
   ).toBeVisible();
+
+  /**
+   * PURGE ICI, et pas à la fin du fichier.
+   *
+   * Tant que le mode est actif, toute la plateforme refuse l'écriture : les
+   * parcours suivants créent des campagnes et des dossiers, et prendraient un
+   * `409 DEMO_MODE_READ_ONLY`. Le mode démonstration est éprouvé par ce
+   * parcours-ci, du bandeau à la purge ; il est rallumé par le dernier
+   * parcours du fichier, qui éprouve la désactivation depuis l'écran.
+   */
+  await purgeDemo();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -369,8 +401,15 @@ test('chaque téléconseiller a son programme PDF de campagne représentants', a
 // 5. Demandes de création de client : la banque dépose, l'administration crée
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BANK_IDENTIFIER = process.env.E2E_BANK_IDENTIFIER ?? 'demo.banque@cpi.sn';
-const BANK_PASSWORD = process.env.E2E_BANK_PASSWORD ?? 'Demo1-CPI-Sunugal';
+/**
+ * Le compte bancaire vient des FIXTURES, plus du jeu de démonstration.
+ *
+ * `demo.banque@cpi.sn` n'existe que mode démonstration allumé — et il est
+ * emporté par la purge. Depuis que ce fichier s'amorce sur des données réelles,
+ * c'est le compte posé par `ensureWorkspaceFixtures` qu'il faut viser.
+ */
+const BANK_IDENTIFIER = process.env.E2E_BANK_IDENTIFIER ?? BANQUIER.email;
+const BANK_PASSWORD = process.env.E2E_BANK_PASSWORD ?? FIXTURE_PASSWORD;
 const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
 
 test('une demande déposée par une banque devient un prospect qui porte sa provenance', async ({
@@ -735,6 +774,10 @@ test('la configuration des étapes se réordonne au clavier, sans glisser-dépos
 test('la désactivation exige une confirmation et affirme que le réel est intact', async ({
   page,
 }) => {
+  // Rallumé par l'API : ce parcours éprouve la DÉSACTIVATION depuis l'écran,
+  // pas l'activation, qui a déjà son propre parcours en tête de fichier.
+  await enableDemo();
+
   await page.goto('/parametres');
 
   await page.getByRole('button', { name: 'Retirer les données de démonstration' }).click();
