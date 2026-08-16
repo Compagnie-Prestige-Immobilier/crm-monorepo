@@ -387,11 +387,28 @@ jobs:
             echo "::notice::Aucun contrat sur ${GITHUB_BASE_REF} — rien à comparer."
             exit 0
           fi
+          # `|| status=$?` N'EST PAS UNE COQUETTERIE DE STYLE.
+          #
+          # GitHub lance ce bloc avec `bash --noprofile --norc -e -o pipefail`.
+          # Le `-e` vient de l'INVOCATION, et `set -uo pipefail` plus haut ne le
+          # retire pas : `set` ajoute des options, il n'en enlève aucune. Écrit
+          # sans garde, `docker run` en échec terminait donc l'étape SUR PLACE,
+          # avec le code de sortie d'oasdiff. La ligne `status=$?` n'était jamais
+          # atteinte, et les six lignes qui suivent — dont l'acceptation par le
+          # label — étaient du code MORT depuis leur écriture.
+          #
+          # Constaté en clair dans le journal du 16 août 2026 : `BREAKING_ALLOWED:
+          # true` dans l'environnement de l'étape, et l'étape échoue malgré tout
+          # sans avoir imprimé ni le `::warning::` ni le `::error::`, c'est à dire
+          # sans avoir exécuté la moindre ligne après `docker run`.
+          #
+          # Une commande placée à gauche d'un `||` ne déclenche pas `-e` : c'est
+          # la seule forme qui rend le code de sortie lisible ici.
+          status=0
           docker run --rm \
             -v /tmp:/base:ro -v "${PWD}/apps/api:/head:ro" \
             "tufin/oasdiff:${OASDIFF_VERSION}" breaking /base/openapi.base.json /head/openapi.json \
-            --fail-on WARN
-          status=$?
+            --fail-on WARN || status=$?
           if [ "$status" -eq 0 ]; then exit 0; fi
           if [ "${BREAKING_ALLOWED}" = "true" ]; then
             echo "::warning::Ruptures de contrat détectées, acceptées via le label api-breaking."
