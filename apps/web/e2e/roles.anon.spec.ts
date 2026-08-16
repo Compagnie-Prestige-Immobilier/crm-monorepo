@@ -131,7 +131,19 @@ async function login(page: Page, identifier: string, password: string): Promise<
   await page.getByLabel('Mot de passe').fill(password);
   await page.getByRole('button', { name: 'Se connecter' }).click();
 
-  const alert = page.getByRole('alert').first();
+  /**
+   * L'alerte est cherchée DANS LE FORMULAIRE, et c'est tout le sujet.
+   *
+   * `page.getByRole('alert')` attrapait aussi le route-announcer de Next, un
+   * élément global qui annonce le titre de la page à chaque navigation cliente.
+   * À la connexion réussie il affiche « Dossiers bancaires · CPI GO » — et il
+   * gagnait la course contre `waitForURL`. Le parcours concluait donc au refus
+   * d'identifiants alors que la session venait d'être posée et que le
+   * navigateur était déjà sur `/dossiers`.
+   *
+   * Le refus du serveur, lui, est rendu à l'intérieur du `<form>`.
+   */
+  const alert = page.locator('form').getByRole('alert').first();
 
   // Un refus laisse sur /connexion avec une alerte : on le distingue d'une
   // réussite plutôt que d'attendre en vain une URL qui ne viendra pas.
@@ -204,7 +216,7 @@ test('sa navigation ne montre QUE ses écrans', async ({ page }) => {
   for (const hidden of [
     'Prospects',
     'Représentants',
-    'Téléconseillers',
+    'Utilisateurs',
     'Campagnes',
     'Référentiels',
     'Paramètres',
@@ -232,9 +244,15 @@ test('une URL interdite tapée à la main rend un refus lisible, pas une page ca
   await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
   // Le refus NOMME le rôle en cours : sans lui, l'utilisateur ne sait pas quoi
   // demander à son administrateur.
-  await expect(page.getByRole('alert')).toContainText('Banque & Finance');
+  // Filtré : `getByRole('alert')` seul attraperait aussi le route-announcer de
+  // Next, et le mode strict refuserait les deux correspondances.
+  await expect(page.getByRole('alert').filter({ hasText: 'Accès refusé' })).toContainText(
+    'Banque & Finance',
+  );
   // Et il propose une sortie vers un écran qui lui est ouvert.
-  await expect(page.getByRole('link', { name: 'Retour à mon accueil' })).toBeVisible();
+  // `exact` : le logo de la barre latérale est nommé « CPI GO, retour à
+  // l’accueil » et satisferait une correspondance partielle.
+  await expect(page.getByRole('link', { name: 'Retour à l’accueil', exact: true })).toBeVisible();
 
   await page.goto('/parametres');
   await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
@@ -263,7 +281,7 @@ test('un TÉLÉCONSEILLER est refusé à la porte du panel', async ({ page }) =>
   await page.getByLabel('Mot de passe').fill('Demo1-CPI-Sunugal');
   await page.getByRole('button', { name: 'Se connecter' }).click();
 
-  const alert = page.getByRole('alert').first();
+  const alert = page.locator('form').getByRole('alert').first();
   await expect(alert).toBeVisible();
   // Message générique : la réponse ne doit pas permettre d'énumérer les comptes.
   await expect(alert).toContainText(/incorrects ou compte non autorisé/i);

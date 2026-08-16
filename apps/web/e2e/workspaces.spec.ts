@@ -69,6 +69,16 @@ test('le mode démonstration s’active et pose un bandeau sur tous les écrans'
   await expect(enable).toBeVisible();
   await enable.click();
 
+  /**
+   * L'activation passe par une CONFIRMATION, et le parcours doit la traverser.
+   *
+   * Le bouton de la carte n'appelle plus l'API : il ouvre un dialogue qui nomme
+   * ce qui va être créé et prévient que toute la plateforme passe en lecture
+   * seule. Le parcours cliquait donc « Activer » puis attendait quatre-vingt-dix
+   * secondes un bouton qui ne pouvait pas apparaître, personne n'ayant confirmé.
+   */
+  await page.getByRole('button', { name: 'Créer le jeu de démonstration' }).click();
+
   // Le succès n'est PAS annoncé avant la réponse du serveur : le bouton part en
   // état occupé, et c'est l'apparition du bouton inverse qui prouve que
   // l'opération a abouti.
@@ -133,7 +143,18 @@ test('le menu d’export produit les DEUX classeurs', async ({ page }) => {
     page.waitForEvent('download'),
     page.getByRole('menuitem', { name: /Exporter la vue filtrée/ }).click(),
   ]);
-  expect(filteredDownload.suggestedFilename()).toMatch(/^cpi-prospects-\d{4}-\d{2}-\d{2}\.xlsx$/);
+  /**
+   * Le suffixe `-DEMONSTRATION` est ATTENDU, pas toléré.
+   *
+   * Ce parcours s'exécute après l'activation du mode démonstration (le fichier
+   * est en `describe.serial`), et l'API marque alors chaque classeur dans son
+   * nom : c'est la promesse faite à l'écran de bascule, « les classeurs exportés
+   * porteront la mention DEMONSTRATION ». L'expression d'origine, écrite avant
+   * ce marquage, refusait donc le comportement correct.
+   */
+  expect(filteredDownload.suggestedFilename()).toMatch(
+    /^cpi-prospects-\d{4}-\d{2}-\d{2}(-DEMONSTRATION)?\.xlsx$/,
+  );
   const filteredPath = await filteredDownload.path();
   expect((await stat(filteredPath)).size).toBeGreaterThan(1_000);
   // Un VRAI classeur, pas un JSON d'erreur renommé.
@@ -146,7 +167,7 @@ test('le menu d’export produit les DEUX classeurs', async ({ page }) => {
     page.getByRole('menuitem', { name: /Classeur consolidé/ }).click(),
   ]);
   expect(consolidated.suggestedFilename()).toMatch(
-    /^cpi-prospects-consolide-\d{4}-\d{2}-\d{2}\.xlsx$/,
+    /^cpi-prospects-consolide-\d{4}-\d{2}-\d{2}(-DEMONSTRATION)?\.xlsx$/,
   );
   const consolidatedPath = await consolidated.path();
   expect((await stat(consolidatedPath)).size).toBeGreaterThan(1_000);
