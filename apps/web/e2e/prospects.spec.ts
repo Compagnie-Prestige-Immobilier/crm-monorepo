@@ -121,7 +121,7 @@ test('chaque écran du panel se charge sans état d’erreur', async ({ page }) 
     ['/demandes-clients', 'Demandes clients', null],
     ['/representants', 'Représentants', null],
     ['/representants/import', 'Représentants', 'Partir du modèle'],
-    ['/commerciaux', 'Téléconseillers', null],
+    ['/commerciaux', 'Utilisateurs', null],
     ['/supervision', 'Supervision', null],
     ['/referentiels', 'Référentiels', null],
     ['/parametres', 'Paramètres', null],
