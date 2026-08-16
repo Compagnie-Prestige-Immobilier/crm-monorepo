@@ -210,13 +210,18 @@ export class FakeDumpRunner implements DumpRunner {
 
 /** Doublure de l'avis de fin. Elle enregistre ce qui lui a été demandé. */
 export class FakeNotifications {
-  readonly sent: { title: string; body: string; audienceUserIds?: string[] }[] = [];
+  readonly sent: {
+    title: string;
+    body: string;
+    route?: string;
+    audienceUserIds?: string[];
+  }[] = [];
   transportStatus: string | null = 'SENT';
   throwWith: string | null = null;
 
   create(
     _user: AuthenticatedUser,
-    body: { title: string; body: string; audienceUserIds?: string[] },
+    body: { title: string; body: string; route?: string; audienceUserIds?: string[] },
   ): Promise<{ transportStatus: string | null }> {
     if (this.throwWith !== null) return Promise.reject(new Error(this.throwWith));
     this.sent.push(body);

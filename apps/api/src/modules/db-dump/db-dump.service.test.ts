@@ -381,6 +381,11 @@ describe('avis de fin', () => {
     await settle();
 
     expect(notifications.sent).toHaveLength(1);
+    expect(notifications.sent[0]).toMatchObject({
+      title: 'Export prêt',
+      body: 'Téléchargez-le dans Paramètres > Export intégral.',
+      route: '/parametres',
+    });
     expect(notifications.sent[0]?.audienceUserIds).toEqual([
       '0199a000-0000-7000-8000-000000000001',
     ]);
