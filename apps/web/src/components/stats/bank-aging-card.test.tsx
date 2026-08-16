@@ -30,7 +30,9 @@ const fetchMock = vi.hoisted(() => vi.fn());
 
 describe('la carte d’ancienneté face à une requête en échec', () => {
   it('n’annonce PAS un calcul en cours quand le calcul a échoué', async () => {
-    fetchMock.mockRejectedValue(new ApiError({ message: 'Panne' }, new Response(null, { status: 500 })));
+    fetchMock.mockRejectedValue(
+      new ApiError({ message: 'Panne' }, new Response(null, { status: 500 })),
+    );
 
     renderWithQuery(<BankAgingCard />);
 
@@ -42,7 +44,9 @@ describe('la carte d’ancienneté face à une requête en échec', () => {
   });
 
   it('offre de réessayer, au lieu d’un squelette qui ne bouge plus', async () => {
-    fetchMock.mockRejectedValue(new ApiError({ message: 'Panne' }, new Response(null, { status: 500 })));
+    fetchMock.mockRejectedValue(
+      new ApiError({ message: 'Panne' }, new Response(null, { status: 500 })),
+    );
 
     renderWithQuery(<BankAgingCard />);
 
@@ -57,7 +61,9 @@ describe('la carte d’ancienneté face à une requête en échec', () => {
     fetchMock.mockResolvedValue({
       total: 3,
       buckets: [{ bucket: '0-7', label: '0 à 7 jours', dossiers: 3, share: 1 }],
-      stages: [{ stageId: 's1', label: 'Vérification', dossiers: 3, share: 1, medianStationDays: 4 }],
+      stages: [
+        { stageId: 's1', label: 'Vérification', dossiers: 3, share: 1, medianStationDays: 4 },
+      ],
     });
 
     renderWithQuery(<BankAgingCard />);

@@ -51,6 +51,10 @@ const PURGE_EXEMPT = new Map<string, string>([
     'refresh_tokens',
     'sessions, emportées en cascade avec leur compte ; les purger seules déconnecterait tout le monde sans rien effacer',
   ],
+  [
+    'device_tokens',
+    'sous-système push retiré : aucun code n’écrit plus cette table, conservée une version pour que la mise à jour reste réversible (docs/migrations-en-attente.md), et emportée en cascade avec son compte',
+  ],
 ]);
 
 /** Sous-mot : `sequence` apparaît-elle dans `reference`, dans le même ordre ? */

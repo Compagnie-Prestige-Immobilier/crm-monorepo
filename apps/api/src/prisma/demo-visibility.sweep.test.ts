@@ -62,6 +62,15 @@ const DEMO_MODELS = [
   'notification',
   'notificationTemplate',
   'notificationDelivery',
+  /**
+   * `deviceToken` porte `isDemo` sans qu'aucun service ne le lise : le
+   * sous-système push est retiré, le modèle n'est conservé qu'une version pour
+   * que celle-ci reste réversible (`docs/migrations-en-attente.md`). Il entre
+   * ici parce que le test « la liste suit le schéma » l'exige, et sa présence
+   * ne coûte rien : un modèle que personne ne lit n'a aucun site d'appel à
+   * cloisonner.
+   */
+  'deviceToken',
 ] as const;
 
 /**
@@ -156,6 +165,8 @@ const DEMO_TABLES = [
   'notifications',
   'notification_templates',
   'notification_deliveries',
+  /** Pendant SQL de `deviceToken` ci-dessus : table retirée de l'usage, conservée une version. */
+  'device_tokens',
 ] as const;
 
 /**

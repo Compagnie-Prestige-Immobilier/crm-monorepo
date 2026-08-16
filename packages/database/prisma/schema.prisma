@@ -211,6 +211,7 @@ model User {
   appSettingsUpdated AppSetting[] @relation("AppSettingUpdatedBy")
 
   // Notifications
+  deviceTokens           DeviceToken[]          @relation("DeviceTokenUser")
   notificationsCreated   Notification[]         @relation("NotificationCreatedBy")
   notificationDeliveries NotificationDelivery[] @relation("NotificationDeliveryUser")
   notificationTemplates  NotificationTemplate[] @relation("NotificationTemplateCreatedBy")
@@ -1210,6 +1211,58 @@ enum NotificationAudience {
   USERS
 }
 
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
+/// SOUS-SYSTÈME RETIRÉ. Table conservée UNE VERSION, puis supprimée.
+///
+/// Firebase a quitté l'application mobile : plus aucun client ne peut produire
+/// un jeton d'enregistrement, les deux routes qui alimentaient cette table sont
+/// parties avec lui, et AUCUN code de ce dépôt ne lit ni n'écrit ce modèle. Il
+/// n'y a rien à construire ici, et rien à y brancher : lire ces lignes comme
+/// une fonctionnalité vivante serait un contresens.
+///
+/// POURQUOI ELLE N'EST PAS DÉJÀ SUPPRIMÉE. La suppression était écrite, puis
+/// retirée de cette version. La version actuellement en production sélectionne
+/// ces colonnes nommément, comme le fait tout client Prisma : les faire
+/// disparaître rendrait le retour arrière de l'application impossible sans
+/// restaurer la base au préalable, et aucune restauration n'a jamais été
+/// éprouvée sur cette installation. Le reste de cette version n'ajoute que des
+/// tables et des colonnes ; cette suppression était, à elle seule, ce qui la
+/// rendait irréversible.
+///
+/// CE QUI LÈVE LA CONSERVATION : une sauvegarde restaurée avec succès, puis la
+/// migration décrite dans `docs/migrations-en-attente.md`, déployée seule.
+model DeviceToken {
+  id     String @id @default(uuid(7))
+  userId String
+  user   User   @relation("DeviceTokenUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  token      String         @unique
+  platform   DevicePlatform @default(ANDROID)
+  appVersion String?
+
+  lastSeenAt DateTime  @default(now())
+  revokedAt  DateTime?
+
+  pendingOps   Int       @default(0)
+  pendingSince DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Ligne appartenant au jeu de démonstration.
+  isDemo Boolean @default(false)
+
+  @@index([userId, revokedAt])
+  @@index([revokedAt])
+  @@index([isDemo])
+  @@map("device_tokens")
+}
+
 enum NotificationStatus {
   SCHEDULED
   SENDING
@@ -1287,6 +1340,17 @@ model Notification {
   /// telle quelle à go_router, sans jamais ouvrir de navigateur.
   route String?
 
+  /// RETIRÉE DE L'USAGE, CONSERVÉE EN BASE LE TEMPS D'UNE VERSION.
+  ///
+  /// Cette colonne n'était relue que par la construction du message FCM, et
+  /// plus aucun code ne l'écrit ni ne la lit depuis le retrait de Firebase.
+  /// Elle reste déclarée pour que cette version RESTE RÉVERSIBLE : le code
+  /// actuellement en production sélectionne cette colonne nommément, et la
+  /// supprimer maintenant rendrait impossible tout retour en arrière de
+  /// l'application sans restauration de la base. Voir `docs/migrations-en-
+  /// attente.md`.
+  payload Json?
+
   audience              NotificationAudience @default(ALL)
   audienceRole          Role?
   audienceDepartementId String?
@@ -1358,6 +1422,11 @@ model NotificationDelivery {
   user   User   @relation("NotificationDeliveryUser", fields: [userId], references: [id], onDelete: Cascade)
 
   status NotificationDeliveryStatus @default(PENDING)
+
+  /// RETIRÉE DE L'USAGE, CONSERVÉE EN BASE LE TEMPS D'UNE VERSION.
+  /// Même raison que `Notification.payload` : plus aucun code ne l'écrit, mais
+  /// la version en production la sélectionne. Voir `docs/migrations-en-attente.md`.
+  deviceToken String?
 
   /// Marqueur d'issue, jamais un statut : `INBOX_ONLY` quand le destinataire
   /// n'est pas servi par e-mail, `EMAIL_RETRY` quand un échec passager laisse

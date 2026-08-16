@@ -30,7 +30,10 @@ describe('l’affordance de réessai selon le statut', () => {
   it('n’offre PAS de réessayer sur une requête refusée (400, 422)', () => {
     for (const status of [400, 422]) {
       const { unmount } = render(
-        <QueryErrorState error={fail(status, { message: 'Critère hors bornes.' })} onRetry={vi.fn()} />,
+        <QueryErrorState
+          error={fail(status, { message: 'Critère hors bornes.' })}
+          onRetry={vi.fn()}
+        />,
       );
 
       expect(retryButton()).toBeNull();
@@ -39,7 +42,9 @@ describe('l’affordance de réessai selon le statut', () => {
   });
 
   it('nomme la requête plutôt qu’une panne de chargement', () => {
-    render(<QueryErrorState error={fail(422, { message: 'Critère hors bornes.' })} onRetry={vi.fn()} />);
+    render(
+      <QueryErrorState error={fail(422, { message: 'Critère hors bornes.' })} onRetry={vi.fn()} />,
+    );
 
     // « Chargement impossible » décrit une panne et envoie chercher du côté du
     // réseau, alors que la correction est dans les critères.
