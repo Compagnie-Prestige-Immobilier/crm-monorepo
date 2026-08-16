@@ -82,11 +82,27 @@ function DropdownMenuContent({
   );
 }
 
-type DropdownMenuItemProps = Omit<DropdownMenuPrimitive.Item.Props, 'className'> & {
-  className?: string | undefined;
-  inset?: boolean | undefined;
-  variant?: 'default' | 'destructive' | undefined;
-};
+/**
+ * `onSelect` est INTERDIT ici, et le type le dit.
+ *
+ * Radix appelait l'action d'un item dans `onSelect`. Base UI l'appelle dans
+ * `onClick` et n'expose aucun `onSelect`. Mais l'item rend un `<div>`, et
+ * `onSelect` EST un événement DOM valide sur un `<div>` : passé par erreur, il
+ * compile, se pose sur l'élément, et n'est jamais déclenché par un clic. Quinze
+ * actions de menu — dont « Se déconnecter » et les deux exports Excel — sont
+ * ainsi devenues muettes sans qu'aucun type ne bronche ; seuls les parcours
+ * Playwright l'ont vu.
+ *
+ * Le `never` transforme la même erreur en échec de compilation.
+ */
+type NoOnSelect = { onSelect?: never };
+
+type DropdownMenuItemProps = Omit<DropdownMenuPrimitive.Item.Props, 'className'> &
+  NoOnSelect & {
+    className?: string | undefined;
+    inset?: boolean | undefined;
+    variant?: 'default' | 'destructive' | undefined;
+  };
 
 function DropdownMenuItem({
   className,
@@ -118,9 +134,10 @@ function DropdownMenuItem({
   );
 }
 
-type DropdownMenuCheckboxItemProps = Omit<DropdownMenuPrimitive.CheckboxItem.Props, 'className'> & {
-  className?: string | undefined;
-};
+type DropdownMenuCheckboxItemProps = Omit<DropdownMenuPrimitive.CheckboxItem.Props, 'className'> &
+  NoOnSelect & {
+    className?: string | undefined;
+  };
 
 /**
  * `closeOnClick` REND la fermeture au clic.
@@ -166,14 +183,31 @@ type DropdownMenuLabelProps = Omit<DropdownMenuPrimitive.GroupLabel.Props, 'clas
   inset?: boolean | undefined;
 };
 
+/**
+ * Le libellé porte SON PROPRE `Menu.Group`, et ce n'est pas une coquetterie.
+ *
+ * `DropdownMenu.Label` de Radix était un simple `<div>` : on le posait où l'on
+ * voulait. `Menu.GroupLabel` de Base UI exige un `Menu.Group` au-dessus de lui
+ * et lève sinon « MenuGroupContext is missing » — une erreur d'EXÉCUTION, pas
+ * de compilation. Les trois menus qui posaient un libellé (les deux exports
+ * Excel et le menu du compte) plantaient donc à l'ouverture, écran blanc et
+ * overlay d'erreur Next : aucun type, aucun test unitaire ne l'a vu, seuls les
+ * parcours Playwright.
+ *
+ * Envelopper ici plutôt qu'à l'appel garde le libellé posable n'importe où,
+ * comme avant. `DropdownMenuGroup` reste exporté pour grouper libellé ET items
+ * quand le regroupement doit être annoncé.
+ */
 function DropdownMenuLabel({ className, inset, ...props }: DropdownMenuLabelProps) {
   return (
-    <DropdownMenuPrimitive.GroupLabel
-      data-slot="dropdown-menu-label"
-      data-inset={inset}
-      className={cn('px-2 py-1.5 text-[0.75rem] font-[600] text-muted-foreground', className)}
-      {...props}
-    />
+    <DropdownMenuPrimitive.Group>
+      <DropdownMenuPrimitive.GroupLabel
+        data-slot="dropdown-menu-label"
+        data-inset={inset}
+        className={cn('px-2 py-1.5 text-[0.75rem] font-[600] text-muted-foreground', className)}
+        {...props}
+      />
+    </DropdownMenuPrimitive.Group>
   );
 }
 
@@ -193,9 +227,10 @@ function DropdownMenuSeparator({ className, ...props }: DropdownMenuSeparatorPro
 
 const DropdownMenuSub = DropdownMenuPrimitive.SubmenuRoot;
 
-type DropdownMenuSubTriggerProps = Omit<DropdownMenuPrimitive.SubmenuTrigger.Props, 'className'> & {
-  className?: string | undefined;
-};
+type DropdownMenuSubTriggerProps = Omit<DropdownMenuPrimitive.SubmenuTrigger.Props, 'className'> &
+  NoOnSelect & {
+    className?: string | undefined;
+  };
 
 function DropdownMenuSubTrigger({ className, children, ...props }: DropdownMenuSubTriggerProps) {
   return (

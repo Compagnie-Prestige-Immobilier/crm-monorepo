@@ -126,13 +126,22 @@ type SelectLabelProps = Omit<SelectPrimitive.GroupLabel.Props, 'className'> & {
   className?: string | undefined;
 };
 
+/**
+ * Le libellé porte SON PROPRE `Select.Group`, pour la même raison que dans
+ * `dropdown-menu.tsx` : `Select.GroupLabel` lève « SelectGroupContext is
+ * missing » à l'exécution s'il n'est pas enveloppé, là où le `Select.Label` de
+ * Radix se posait n'importe où. Aucun écran n'utilise ce composant
+ * aujourd'hui ; le premier qui l'essaierait sans le savoir planterait.
+ */
 function SelectLabel({ className, ...props }: SelectLabelProps) {
   return (
-    <SelectPrimitive.GroupLabel
-      data-slot="select-label"
-      className={cn('px-2 py-1.5 text-[0.75rem] font-[600] text-muted-foreground', className)}
-      {...props}
-    />
+    <SelectPrimitive.Group>
+      <SelectPrimitive.GroupLabel
+        data-slot="select-label"
+        className={cn('px-2 py-1.5 text-[0.75rem] font-[600] text-muted-foreground', className)}
+        {...props}
+      />
+    </SelectPrimitive.Group>
   );
 }
 

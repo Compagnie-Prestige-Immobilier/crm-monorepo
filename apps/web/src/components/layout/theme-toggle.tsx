@@ -49,7 +49,7 @@ export function ThemeToggle() {
           return (
             <DropdownMenuItem
               key={option.value}
-              onSelect={() => {
+              onClick={() => {
                 setTheme(option.value);
               }}
               className={theme === option.value ? 'bg-secondary' : undefined}

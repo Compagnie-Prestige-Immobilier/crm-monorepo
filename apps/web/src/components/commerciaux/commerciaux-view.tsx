@@ -370,7 +370,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
                           <DropdownMenuItem
-                            onSelect={() => {
+                            onClick={() => {
                               setEditing(user);
                               setFormOpen(true);
                             }}
@@ -379,7 +379,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                             Modifier
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onSelect={() => {
+                            onClick={() => {
                               setPasswordTarget(user);
                             }}
                           >
@@ -392,7 +392,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                             // cours et laisserait CPI sans administrateur.
                             disabled={user.id === currentUserId || toggleActive.isPending}
                             variant={user.isActive ? 'destructive' : 'default'}
-                            onSelect={() => {
+                            onClick={() => {
                               // Fermer un accès passe par une confirmation qui
                               // NOMME le compte et CHIFFRE ses prospects. Le
                               // rouvrir ne coupe rien à personne : immédiat.

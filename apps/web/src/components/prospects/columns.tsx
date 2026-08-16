@@ -255,7 +255,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem
-              onSelect={() => {
+              onClick={() => {
                 actions.onEdit(row.original);
               }}
             >
@@ -265,7 +265,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
             {actions.canAdminister ? (
               <>
                 <DropdownMenuItem
-                  onSelect={() => {
+                  onClick={() => {
                     actions.onReassign(row.original);
                   }}
                 >
@@ -273,7 +273,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
                   Réaffecter
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={() => {
+                  onClick={() => {
                     actions.onMerge(row.original);
                   }}
                 >
@@ -283,7 +283,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
-                  onSelect={() => {
+                  onClick={() => {
                     actions.onDelete(row.original);
                   }}
                 >

@@ -359,7 +359,7 @@ export function BankStagesView() {
                       <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuItem
                           disabled={!canMoveUp || reorder.isPending}
-                          onSelect={() => {
+                          onClick={() => {
                             move(index, -1);
                           }}
                         >
@@ -368,7 +368,7 @@ export function BankStagesView() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={!canMoveDown || reorder.isPending}
-                          onSelect={() => {
+                          onClick={() => {
                             move(index, 1);
                           }}
                         >
@@ -376,7 +376,7 @@ export function BankStagesView() {
                           Descendre
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onSelect={() => {
+                          onClick={() => {
                             setEditing(stage);
                           }}
                         >
@@ -387,7 +387,7 @@ export function BankStagesView() {
                         <DropdownMenuItem
                           disabled={locked || toggleActive.isPending}
                           variant={stage.isActive ? 'destructive' : 'default'}
-                          onSelect={toggle}
+                          onClick={toggle}
                         >
                           {stage.isActive ? (
                             <PowerOffIcon aria-hidden="true" />
