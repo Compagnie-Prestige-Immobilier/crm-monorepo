@@ -14,7 +14,8 @@
 - `SelectTrigger`'s icon: `<SelectPrimitive.Icon asChild><ChevronDownIcon/></SelectPrimitive.Icon>` → `<SelectPrimitive.Icon render={<ChevronDownIcon …/>} />`.
 - `SelectItem` (line 137) anatomy rebuilt: `ItemText` first, then `ItemIndicator render={<span …/>}` wrapping the check icon.
 - Class rewrites: `focus:` → `data-highlighted:` (Base UI marks the active item instead of moving DOM focus), `data-[disabled]:` → `data-disabled:`, `data-[placeholder]:` → `data-placeholder:`, `max-h-(--radix-select-content-available-height)` → `max-h-(--available-height)`, `min-w-(--radix-select-trigger-width)` → `min-w-[max(8rem,var(--anchor-width))]`, `origin-(--radix-…-transform-origin)` → `origin-(--transform-origin)`.
-- Animation idiom → `transition-[opacity,transform] duration-150` + `data-starting-style:*` / `data-ending-style:*`. The `position === 'popper' && data-[side=…]:translate-y-1` nudge was dropped in favour of `sideOffset={4}`.
+- Animation selectors rewritten, keyframes kept: `data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95` / `data-closed:animate-out …`. The `position === 'popper' && data-[side=…]:translate-y-1` nudge was dropped in favour of `sideOffset={4}`.
+- `collisionPadding` defaults to `0` (Base UI's default is 5px) and is exposed in the props.
 
 ### Call sites — `items` tables (30 selects across 17 files)
 
@@ -57,7 +58,7 @@ Leftover scan: `grep -n "radix-ui\|@radix-ui\|asChild\|focus:bg\|data-\[state=" 
 - **`Select.Value` no longer derives its text from the selected `SelectItem`.** It reads the Root's `items` table. Every current call site now supplies one, but any NEW `<Select>` whose values differ from their labels must add `items` or it will display the raw value. This is the single most fragile spot in the migration.
 - **Highlight is not focus** (same as dropdown-menu): `data-highlighted` replaces `:focus`. `document.activeElement` stays on the popup.
 - `align` default differs upstream (Radix `start`, Base UI `center`); the wrapper pins `start`, so nothing moved.
-- Collision padding default 0 → 5px; `arrowPadding` 0 → 5px.
+- Collision padding: restored to 0 via the wrapper default. `arrowPadding` is untouched (0 → 5px upstream); no wrapper renders an arrow.
 - Base UI's scroll arrows do not render on touch input; Radix's did.
 - `Select.Root` renders a hidden `<input>` when `name` is set — unused here (all selects are controlled).
 - `textValue` (typeahead override) is now `label`. Unused.

@@ -20,10 +20,20 @@ type TabsListProps = Omit<TabsPrimitive.List.Props, 'className'> & {
   className?: string | undefined;
 };
 
-function TabsList({ className, ...props }: TabsListProps) {
+/**
+ * `activateOnFocus` REND l'activation automatique au clavier.
+ *
+ * Base UI n'active un onglet qu'à la validation (Entrée ou Espace) : les
+ * flèches ne font que déplacer le focus. Radix activait au déplacement, et
+ * c'est ce que le panel a toujours fait. Sans cette prop, un utilisateur au
+ * clavier qui parcourt « Réception » et « Émission » verrait le focus bouger
+ * sans que le panneau suive, et conclurait que les flèches ne marchent pas.
+ */
+function TabsList({ className, activateOnFocus = true, ...props }: TabsListProps) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
+      activateOnFocus={activateOnFocus}
       className={cn(
         'inline-flex h-11 w-fit items-center justify-center rounded-md bg-secondary p-1 text-muted-foreground',
         className,

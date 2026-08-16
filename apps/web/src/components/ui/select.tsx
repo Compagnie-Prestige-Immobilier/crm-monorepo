@@ -71,7 +71,7 @@ type SelectContentProps = Omit<SelectPrimitive.Popup.Props, 'className'> & {
   className?: string | undefined;
 } & Pick<
     SelectPrimitive.Positioner.Props,
-    'align' | 'alignOffset' | 'side' | 'sideOffset' | 'alignItemWithTrigger'
+    'align' | 'alignOffset' | 'side' | 'sideOffset' | 'alignItemWithTrigger' | 'collisionPadding'
   >;
 
 function SelectContent({
@@ -82,6 +82,8 @@ function SelectContent({
   side,
   sideOffset = 4,
   alignItemWithTrigger = false,
+  // Base UI réserve 5 px au bord de la fenêtre, Radix n'en réservait aucun.
+  collisionPadding = 0,
   ...props
 }: SelectContentProps) {
   return (
@@ -92,6 +94,7 @@ function SelectContent({
         side={side}
         sideOffset={sideOffset}
         alignItemWithTrigger={alignItemWithTrigger}
+        collisionPadding={collisionPadding}
       >
         <SelectPrimitive.Popup
           data-slot="select-content"
@@ -101,9 +104,11 @@ function SelectContent({
             'relative isolate z-50 max-h-(--available-height) min-w-[max(8rem,var(--anchor-width))]',
             'origin-(--transform-origin) overflow-y-auto overflow-x-hidden',
             'rounded-md border border-border bg-popover text-popover-foreground shadow-elev-lg',
-            'transition-[opacity,transform] duration-150',
-            'data-starting-style:opacity-0 data-starting-style:scale-95',
-            'data-ending-style:opacity-0 data-ending-style:scale-95',
+            // Mêmes images-clés que sous Radix (tw-animate-css), rebranchées sur
+            // les attributs de présence de Base UI : la primitive garde le popup
+            // monté jusqu'à la fin de l'animation de sortie.
+            'duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95',
+            'data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
             className,
           )}
           {...props}
@@ -157,9 +162,7 @@ function SelectItem({ className, children, ...props }: SelectItemProps) {
         {children}
       </SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator
-        render={
-          <span className="absolute right-2 flex size-3.5 items-center justify-center" />
-        }
+        render={<span className="absolute right-2 flex size-3.5 items-center justify-center" />}
       >
         <CheckIcon className="size-4 text-primary" />
       </SelectPrimitive.ItemIndicator>

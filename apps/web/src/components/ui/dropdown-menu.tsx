@@ -36,7 +36,10 @@ function DropdownMenuGroup(props: DropdownMenuGroupProps) {
  */
 type DropdownMenuContentProps = Omit<DropdownMenuPrimitive.Popup.Props, 'className'> & {
   className?: string | undefined;
-} & Pick<DropdownMenuPrimitive.Positioner.Props, 'align' | 'alignOffset' | 'side' | 'sideOffset'>;
+} & Pick<
+    DropdownMenuPrimitive.Positioner.Props,
+    'align' | 'alignOffset' | 'side' | 'sideOffset' | 'collisionPadding'
+  >;
 
 function DropdownMenuContent({
   className,
@@ -44,6 +47,10 @@ function DropdownMenuContent({
   align = 'end',
   alignOffset,
   side,
+  // Base UI réserve 5 px au bord de la fenêtre, Radix n'en réservait aucun.
+  // Un menu aligné à droite d'une action de ligne se décalait donc de 5 px
+  // vers l'intérieur : on garde le comportement d'origine.
+  collisionPadding = 0,
   ...props
 }: DropdownMenuContentProps) {
   return (
@@ -54,15 +61,18 @@ function DropdownMenuContent({
         align={align}
         alignOffset={alignOffset}
         side={side}
+        collisionPadding={collisionPadding}
       >
         <DropdownMenuPrimitive.Popup
           data-slot="dropdown-menu-content"
           className={cn(
             'z-50 min-w-[10rem] origin-(--transform-origin) outline-none',
             'overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-elev-lg',
-            'transition-[opacity,transform] duration-150',
-            'data-starting-style:opacity-0 data-starting-style:scale-95',
-            'data-ending-style:opacity-0 data-ending-style:scale-95',
+            // Mêmes images-clés que sous Radix (tw-animate-css), rebranchées sur
+            // les attributs de présence de Base UI : la primitive garde le popup
+            // monté jusqu'à la fin de l'animation de sortie.
+            'duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95',
+            'data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
             className,
           )}
           {...props}
@@ -108,21 +118,29 @@ function DropdownMenuItem({
   );
 }
 
-type DropdownMenuCheckboxItemProps = Omit<
-  DropdownMenuPrimitive.CheckboxItem.Props,
-  'className'
-> & {
+type DropdownMenuCheckboxItemProps = Omit<DropdownMenuPrimitive.CheckboxItem.Props, 'className'> & {
   className?: string | undefined;
 };
 
+/**
+ * `closeOnClick` REND la fermeture au clic.
+ *
+ * Base UI laisse le menu ouvert après avoir coché une case (`false` par
+ * défaut) ; Radix le fermait. Le panel n'a aucun menu à cases multiples où
+ * rester ouvert aurait du sens : garder le comportement d'origine évite qu'un
+ * futur appelant hérite d'une nuance jamais décidée ici. Un menu qui doit
+ * rester ouvert le demandera explicitement.
+ */
 function DropdownMenuCheckboxItem({
   className,
   children,
+  closeOnClick = true,
   ...props
 }: DropdownMenuCheckboxItemProps) {
   return (
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
+      closeOnClick={closeOnClick}
       className={cn(
         'relative flex cursor-default select-none items-center gap-2 rounded-sm py-2 pr-2 pl-8',
         'text-[0.875rem] outline-none',

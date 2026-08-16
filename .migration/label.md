@@ -17,7 +17,7 @@ Leftover scan: `grep -n "radix-ui\|@radix-ui" apps/web/src/components/ui/label.t
 ## Behavior changes
 
 - Radix's `Label` prevented text selection on double-click via an internal `onMouseDown` handler; a native `<label>` does not. The wrapper's own `select-none` class already covers the visible effect.
-- Radix forwarded clicks to a *nested* control even without `htmlFor`. A native `<label>` does this too (implicit association), so nothing is lost.
+- Radix forwarded clicks to a _nested_ control even without `htmlFor`. A native `<label>` does this too (implicit association), so nothing is lost.
 
 ## Verify by hand
 

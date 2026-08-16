@@ -28,10 +28,11 @@ Leftover scan: `grep -n "radix-ui\|@radix-ui\|asChild\|data-\[state=\|focus:bg" 
 ## Behavior changes
 
 - **Highlight is not focus.** Screen-reader and focus-debugging behaviour differs: `document.activeElement` now stays on the popup while arrowing through items. Styling was moved to `data-highlighted`, but any external tooling that watched focus will see a change.
-- **Checkbox/radio items no longer close the menu on click** — Base UI defaults `closeOnClick` to `false` on `CheckboxItem`/`RadioItem` (Radix closed). Flagged, not patched: no consumer uses these parts yet. Plain `Item` still closes.
+- **Close-on-click: restored.** Base UI defaults `closeOnClick` to `false` on `CheckboxItem` (Radix closed the menu). `DropdownMenuCheckboxItem` now pins `closeOnClick = true`; a call site that wants a multi-check menu passes `closeOnClick={false}` explicitly. Plain `Item` always closed and still does.
+- **Collision padding: restored.** `collisionPadding` defaults to `0` on the Positioner (Base UI's default is 5px) and is exposed in the props so a call site can raise it.
+- **Animations: kept as keyframes.** The `tw-animate-css` classes are unchanged; only the selectors moved from `data-[state=open]`/`data-[state=closed]` to `data-open`/`data-closed`. Base UI keeps the popup mounted until the animation finishes.
 - `onOpenChange` gains an `eventDetails` argument; existing `setOpen` handlers are unaffected.
 - Base UI's `Menu.Root` adds `highlightItemOnHover`, `loopFocus`, `closeParentOnEsc`, `disabled`; none used.
-- Collision padding default 0 → 5px, as with popover.
 
 ## Verify by hand
 

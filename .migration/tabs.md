@@ -18,7 +18,7 @@ Leftover scan: `grep -n "radix-ui\|@radix-ui\|data-\[state=" apps/web/src/compon
 
 ## Behavior changes
 
-- **Activation mode, flagged not patched.** Radix defaulted to `activationMode="automatic"`: arrow keys moved the selection immediately. Base UI defaults to **manual** activation — arrow keys move focus, Enter/Space selects. The near-equivalent opt-in is `<TabsList activateOnFocus>`; it was deliberately NOT added, matching the shadcn base registry. If the automatic feel is wanted back, add that prop to `TabsList`.
+- **Activation mode: restored.** Base UI defaults to manual activation (arrow keys move focus, Enter/Space selects) where Radix defaulted to automatic. `TabsList` now pins `activateOnFocus = true`, so arrow keys select again as they always did in this panel. A call site can still pass `activateOnFocus={false}` for the Base UI default. This deviates from the shadcn base registry, which accepts manual activation.
 - `onValueChange` now receives `(value, eventDetails)` with a `reason` (`'none'`, `'initial'`, `'disabled'`, `'missing'`). Existing single-argument handlers are unaffected.
 - `TabsPanel` gains `data-hidden`, `data-starting-style`, `data-ending-style` and `data-index` hooks. Nothing styles them yet.
 - Base UI ships a `Tabs.Indicator` part with no Radix counterpart; unused.
@@ -26,6 +26,6 @@ Leftover scan: `grep -n "radix-ui\|@radix-ui\|data-\[state=" apps/web/src/compon
 ## Verify by hand
 
 1. `/notifications`: click between the "Réception" and "Émission" tabs — content must swap and the active tab must get `bg-card` + the extra-small shadow.
-2. Focus a tab and press Left/Right: focus must move but **the panel must not change until you press Enter or Space**. That is the intended new behaviour; confirm it is acceptable for this screen.
+2. Focus a tab and press Left/Right: the panel must follow immediately, as before.
 3. Tab into the panel body and confirm the focus ring is still drawn (the panel is focusable, `tabIndex=0`).
 4. Deep-link a tab via the URL (`?onglet=reception`) and confirm the right tab is selected on load.
