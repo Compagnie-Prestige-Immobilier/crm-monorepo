@@ -7,6 +7,20 @@ on:
   # déploiement cassé.
   pull_request:
     branches: [dev, prod]
+    # `labeled` EST INDISPENSABLE, et son absence rendait muet le seul moyen
+    # d'accepter une rupture de contrat.
+    #
+    # Les types par défaut sont `opened`, `synchronize` et `reopened`. Le
+    # portillon `oasdiff` lit `github.event.pull_request.labels`, c'est à dire
+    # la charge utile de l'ÉVÉNEMENT, figée au déclenchement. Poser le label
+    # `api-breaking` après coup ne déclenchait donc rien, et relancer le job
+    # rejoue la charge utile d'origine — celle d'avant le label. Le seul recours
+    # était de pousser un commit vide ou de refermer la PR pour la rouvrir.
+    #
+    # Autrement dit : le label documenté comme « le seul moyen de passer » ne
+    # fonctionnait que si on l'avait posé AVANT de pousser, ce qu'aucun auteur
+    # ne peut deviner tant que le portillon n'a pas parlé.
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [dev]
 
