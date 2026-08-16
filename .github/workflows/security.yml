@@ -11,10 +11,26 @@ name: security
 # ne verra jamais une clé AWS commise, et un dépôt qui n'exécute que gitleaks ne
 # verra jamais une injection SQL.
 on:
-  pull_request:
-    branches: [dev, prod]
-  push:
-    branches: [dev]
+  # `workflow_call` EST CE QUI PERMET DE BLOQUER UNE MISE EN LIGNE.
+  #
+  # Ces quatre scanners tournaient dans LEUR PROPRE workflow, à côté de `ci`.
+  # Deux conséquences, invisibles tant que rien ne se déployait tout seul :
+  #
+  #   · sur un push vers `prod`, ils ne tournaient PAS DU TOUT (`push` ne listait
+  #     que `dev`) — c'est à dire jamais sur le commit réellement mis en ligne ;
+  #   · `needs:` ne franchit pas la frontière d'un workflow. Le job `deploy` de
+  #     `ci.yml` ne pouvait donc pas les attendre, même verts.
+  #
+  # Appelés depuis `ci.yml`, ils deviennent des jobs de CETTE exécution :
+  # `deploy` les met dans son `needs`, et un secret commis ou une dépendance
+  # vulnérable empêche la mise en ligne au lieu de la décorer d'une croix rouge
+  # que personne ne regarde.
+  #
+  # `pull_request` et `push` sont retirés d'ici pour la même raison qu'on ne
+  # déclare pas deux fois la même vérité : `ci.yml` porte désormais ces deux
+  # déclencheurs et appelle ce fichier. Les garder ferait tourner les quatre
+  # scanners DEUX fois par PR.
+  workflow_call:
   # Une dépendance saine aujourd'hui est vulnérable demain sans qu'une seule
   # ligne du dépôt n'ait bougé. Sans exécution planifiée, on ne l'apprend qu'au
   # prochain commit — c'est-à-dire peut-être jamais sur une branche stable.
@@ -25,9 +41,12 @@ on:
 permissions:
   contents: read
 
+# Même exception que dans `ci.yml`, et pour la même raison : appelés depuis
+# `ci.yml`, ces jobs précèdent une mise en ligne. Les annuler sur `prod`
+# annulerait l'exécution qui porte le déploiement.
 concurrency:
   group: security-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/prod' }}
 
 jobs:
   secrets:
