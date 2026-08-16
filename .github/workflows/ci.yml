@@ -195,6 +195,10 @@ jobs:
       - uses: ./.github/actions/setup-node
       - run: pnpm db:generate
       - run: pnpm test:coverage
+      - name: Rendre les chemins LCOV lisibles par Sonar
+        run: |
+          sed -i 's#^SF:src/#SF:apps/api/src/#' apps/api/coverage/lcov.info
+          sed -i 's#^SF:src/#SF:apps/web/src/#' apps/web/coverage/lcov.info
       - name: SonarQube Cloud scan and gate
         uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7
         env:
