@@ -36,28 +36,36 @@ The call-site break surface was much larger than `asChild` alone:
 
 ## Verification (final, all re-run after the dependency removal)
 
-| Check | Result |
-|---|---|
-| `tsc -p tsconfig.json --noEmit` (non-incremental) | pass |
-| `tsc -p tsconfig.e2e.json --noEmit` | pass |
-| `eslint src` | pass, 0 problems |
-| `vitest run` | **588 passed / 588**, 52 files |
-| `next build` | pass, all 24 routes emitted |
+| Check                                             | Result                         |
+| ------------------------------------------------- | ------------------------------ |
+| `tsc -p tsconfig.json --noEmit` (non-incremental) | pass                           |
+| `tsc -p tsconfig.e2e.json --noEmit`               | pass                           |
+| `eslint src`                                      | pass, 0 problems               |
+| `vitest run`                                      | **588 passed / 588**, 52 files |
+| `next build`                                      | pass, all 24 routes emitted    |
 
 Baseline before the migration was identical (clean typecheck, clean lint, 588 passing) once `@crm/api-client` was built — the first baseline run failed only because that workspace package had not been compiled yet. No pre-existing failures were inherited or masked.
 
 **Not run: the Playwright e2e suite** (`pnpm test:e2e`), which needs a live server and database. It includes `e2e/accessibility.spec.ts` (axe over every panel route) and is the natural place to catch the accessibility deltas flagged below. Running it is the recommended next step.
 
-## Behaviour deltas — flagged, not patched
+## Behaviour deltas — closed
 
-1. **Tabs activate manually.** Radix moved the selection on arrow keys; Base UI moves focus and waits for Enter/Space. Opt back in with `<TabsList activateOnFocus>` if wanted.
-2. **Separators are announced.** Radix's `decorative` prop (defaulted to `true` here, i.e. `role="none"`) has no Base UI equivalent; every rule now carries `role="separator"`.
-3. **Menu/Select highlight is not DOM focus.** `data-highlighted` replaces `:focus`; `document.activeElement` stays on the popup.
-4. **Checkbox/radio menu items no longer close the menu on click** (`closeOnClick` defaults to `false`). No consumer uses these parts yet.
-5. **`PopoverAnchor` was deleted** — no Base UI equivalent, and it had zero consumers. A future non-trigger anchor needs `Positioner`'s `anchor` prop, which the wrapper does not yet expose.
-6. **Collision defaults shifted upstream**: `collisionPadding` 0 → 5px, `arrowPadding` 0 → 5px on every positioned popup.
-7. **Select scroll arrows do not render on touch input.**
-8. **Enter/exit animations are transitions, not keyframes.** Durations and distances were preserved, but easing now comes from the default transition timing rather than `tw-animate-css`.
+Six deltas were first shipped as flags, then closed in a follow-up commit. Each is now pinned at the wrapper level, so the wrapper's default reproduces the Radix behaviour and a caller can still opt out explicitly.
+
+1. **Tabs activate on arrow keys again.** `TabsList` defaults to `activateOnFocus={true}`. Base UI's own default is manual activation (arrows move focus, Enter/Space selects); the panel has always activated on move.
+2. **Separators are decorative again.** The `decorative` prop is back on the `Separator` wrapper, defaulting to `true` as before, and is translated into `role="none"`. Base UI's primitive always renders `role="separator"`, so without this every rule in the panel became an announcement. `decorative={false}` stays available where a rule really does separate two groups of meaning. (Menu and Select separators are untouched: Radix announced those too.)
+3. **Checkbox menu items close on click again.** `DropdownMenuCheckboxItem` defaults to `closeOnClick={true}`; Base UI's default is `false`.
+4. **`PopoverAnchor` is back.** Base UI has no Anchor part — the `Positioner` takes an `anchor` prop instead. The wrapper restores the Radix API with a small context: `<PopoverAnchor>` registers its element, `PopoverContent` reads it and forwards it to the Positioner. With no anchor declared the value stays `null` and the Positioner falls back to the trigger, exactly as Radix did.
+5. **Collision padding is 0 again.** `collisionPadding` defaults to `0` on the popover, dropdown-menu and select wrappers (Base UI's default is 5px), and is exposed so a call site can raise it. `arrowPadding` is untouched — no wrapper renders an arrow.
+6. **Enter/exit animations are keyframes again.** The `tw-animate-css` classes (`animate-in`, `fade-in-0`, `zoom-in-95`, `slide-in-from-*`, and their `-out` counterparts) are kept verbatim on dialog, sheet, popover, dropdown-menu and select; only the selectors changed, `data-[state=open]` becoming `data-open`. Base UI keeps the popup mounted until the animation finishes, same as Radix, so no `data-starting-style` / `data-ending-style` transition is needed.
+
+## Behaviour deltas — still open
+
+These have no wrapper-level fix and remain true:
+
+- **Menu/Select highlight is not DOM focus.** `data-highlighted` replaces `:focus`; `document.activeElement` stays on the popup. Styling was moved accordingly, but external tooling that watched focus will see a change.
+- **Select scroll arrows do not render on touch input.** Radix's did.
+- **`onOpenChange` / `onValueChange` gain an `eventDetails` argument.** Existing single-argument handlers are unaffected.
 
 ## Left alone (intentionally)
 

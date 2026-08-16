@@ -38,10 +38,10 @@ type SheetContentProps = Omit<SheetPrimitive.Popup.Props, 'className'> & {
 };
 
 /**
- * Le glissement ne passe plus par les keyframes `slide-in-from-*` de
- * tw-animate : Base UI expose les états d'entrée et de sortie
- * (`data-starting-style` / `data-ending-style`), et la translation y est
- * exprimée explicitement, côté par côté.
+ * Les images-clés `slide-in-from-*` / `slide-out-to-*` de tw-animate-css sont
+ * conservées telles quelles : seuls les sélecteurs changent,
+ * `data-[state=open]` devenant `data-open`. Base UI garde le panneau monté
+ * jusqu'à la fin de l'animation de sortie, exactement comme Radix.
  */
 function SheetContent({ className, children, side = 'right', ...props }: SheetContentProps) {
   return (
@@ -50,24 +50,24 @@ function SheetContent({ className, children, side = 'right', ...props }: SheetCo
         data-slot="sheet-overlay"
         className={cn(
           'fixed inset-0 z-50 bg-scrim',
-          'transition-opacity duration-200',
-          'data-starting-style:opacity-0 data-ending-style:opacity-0',
+          'data-open:animate-in data-open:fade-in-0',
+          'data-closed:animate-out data-closed:fade-out-0',
         )}
       />
       <SheetPrimitive.Popup
         data-slot="sheet-content"
         className={cn(
-          'fixed z-50 flex flex-col gap-0 bg-card shadow-elev-xl',
-          'transition-transform ease-in-out',
-          'data-open:duration-300 data-closed:duration-200',
+          'fixed z-50 flex flex-col gap-0 bg-card shadow-elev-xl transition ease-in-out',
+          'data-open:animate-in data-open:duration-300',
+          'data-closed:animate-out data-closed:duration-200',
           side === 'right' &&
-            'inset-y-0 right-0 h-full w-3/4 border-l border-border sm:max-w-sm data-starting-style:translate-x-full data-ending-style:translate-x-full',
+            'inset-y-0 right-0 h-full w-3/4 border-l border-border sm:max-w-sm data-closed:slide-out-to-right data-open:slide-in-from-right',
           side === 'left' &&
-            'inset-y-0 left-0 h-full w-[17rem] border-r border-border data-starting-style:-translate-x-full data-ending-style:-translate-x-full',
+            'inset-y-0 left-0 h-full w-[17rem] border-r border-border data-closed:slide-out-to-left data-open:slide-in-from-left',
           side === 'top' &&
-            'inset-x-0 top-0 h-auto border-b border-border data-starting-style:-translate-y-full data-ending-style:-translate-y-full',
+            'inset-x-0 top-0 h-auto border-b border-border data-closed:slide-out-to-top data-open:slide-in-from-top',
           side === 'bottom' &&
-            'inset-x-0 bottom-0 h-auto border-t border-border data-starting-style:translate-y-full data-ending-style:translate-y-full',
+            'inset-x-0 bottom-0 h-auto border-t border-border data-closed:slide-out-to-bottom data-open:slide-in-from-bottom',
           className,
         )}
         {...props}

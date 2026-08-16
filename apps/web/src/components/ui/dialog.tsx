@@ -39,10 +39,11 @@ type DialogOverlayProps = Omit<DialogPrimitive.Backdrop.Props, 'className'> & {
 };
 
 /**
- * `Overlay` de Radix s'appelle `Backdrop` chez Base UI. Le fondu ne passe plus
- * par des keyframes `animate-in` / `animate-out` mais par une transition entre
- * les styles d'entrée (`data-starting-style`) et de sortie
- * (`data-ending-style`).
+ * `Overlay` de Radix s'appelle `Backdrop` chez Base UI. Les images-clés
+ * `animate-in` / `animate-out` de tw-animate-css sont conservées telles
+ * quelles : seuls les sélecteurs changent, `data-[state=open]` devenant
+ * `data-open`. Base UI garde le fond monté jusqu'à la fin de l'animation de
+ * sortie, exactement comme Radix.
  */
 function DialogOverlay({ className, ...props }: DialogOverlayProps) {
   return (
@@ -50,8 +51,8 @@ function DialogOverlay({ className, ...props }: DialogOverlayProps) {
       data-slot="dialog-overlay"
       className={cn(
         'fixed inset-0 z-50 bg-scrim backdrop-blur-[2px]',
-        'transition-opacity duration-200',
-        'data-starting-style:opacity-0 data-ending-style:opacity-0',
+        'data-open:animate-in data-open:fade-in-0',
+        'data-closed:animate-out data-closed:fade-out-0',
         className,
       )}
       {...props}
@@ -78,9 +79,8 @@ function DialogContent({
         className={cn(
           'fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2',
           'gap-4 rounded-lg border border-border bg-card p-6 shadow-elev-xl sm:max-w-lg',
-          'transition-[opacity,transform] duration-200',
-          'data-starting-style:opacity-0 data-starting-style:scale-95',
-          'data-ending-style:opacity-0 data-ending-style:scale-95',
+          'duration-200 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95',
+          'data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
           className,
         )}
         {...props}

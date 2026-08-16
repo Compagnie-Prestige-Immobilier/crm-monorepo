@@ -1,14 +1,14 @@
 # sheet
 
-2026-08-16, transformation engine. Same primitive as dialog (`@base-ui/react/dialog`); the per-side slide animations were rebuilt from `tw-animate-css` keyframes to explicit transitions.
+2026-08-16, transformation engine. Same primitive as dialog (`@base-ui/react/dialog`); the per-side `tw-animate-css` slide keyframes are kept, only their data-attribute selectors change.
 
 ## Changed
 
 - `apps/web/src/components/ui/sheet.tsx:3` — `* as SheetPrimitive from '@radix-ui/react-dialog'` → `{ Dialog as SheetPrimitive } from '@base-ui/react/dialog'`.
 - `Sheet` is now a bare re-export of `Dialog.Root` (line 16): it renders no element and its props are generic over `<Payload>`.
 - `Overlay` → `Backdrop` (line 49), `Content` → `Popup` (line 58). `data-slot="sheet-overlay"` / `"sheet-content"` kept.
-- Slide animation rewritten (lines 61–71): `data-[state=open]:slide-in-from-right` / `data-[state=closed]:slide-out-to-right` (and the three other sides) → `transition-transform ease-in-out` + `data-starting-style:translate-x-full` / `data-ending-style:translate-x-full` per side, with `-translate-x-full`, `-translate-y-full`, `translate-y-full` for left/top/bottom. Durations kept: `data-open:duration-300` on enter, `data-closed:duration-200` on exit.
-- Backdrop fade rewritten the same way (`transition-opacity duration-200` + starting/ending opacity).
+- Slide animation: selectors rewritten, keyframes kept. `data-[state=open]:slide-in-from-right` / `data-[state=closed]:slide-out-to-right` (and the three other sides) → `data-open:slide-in-from-right` / `data-closed:slide-out-to-right`. Durations unchanged: 300ms on enter, 200ms on exit.
+- Backdrop fade likewise: `data-open:animate-in data-open:fade-in-0` / `data-closed:animate-out data-closed:fade-out-0`.
 - `apps/web/src/components/layout/topbar.tsx:33` — `<SheetTrigger asChild><Button …>` → `<SheetTrigger render={<Button … />}>` with the `MenuIcon` moved to the trigger's children.
 
 Leftover scan: `grep -n "radix-ui\|@radix-ui\|asChild" apps/web/src/components/ui/sheet.tsx apps/web/src/components/layout/topbar.tsx` → clean.
@@ -20,7 +20,7 @@ Leftover scan: `grep -n "radix-ui\|@radix-ui\|asChild" apps/web/src/components/u
 
 ## Behavior changes
 
-- Enter/exit is now a **transition** on `transform` rather than a keyframe animation. The direction, distance (100%) and durations are preserved. The easing is `ease-in-out` as before.
+- Enter/exit is unchanged: same `tw-animate-css` slide keyframes, same directions, distances, durations and `ease-in-out`. Only the data-attribute selectors moved.
 - `onOpenChange` gains a second `eventDetails` argument; the existing `setOpen` handler is unaffected.
 - Base UI's Portal adds a wrapping `<div>`; the popup is `position: fixed`, so there is no layout impact.
 
