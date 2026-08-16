@@ -1,19 +1,23 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import {
   IsBoolean,
   IsEnum,
+  IsInt,
   IsISO8601,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import {
   BddSegment,
   CallOutcome,
+  ChangeSource,
   EnrollmentMethod,
   Phase2Status,
   ProspectStatut,
@@ -267,4 +271,117 @@ export class ReassignResultDto {
   @ApiProperty({ type: Number }) updated!: number;
   @ApiProperty({ type: () => [String], description: 'Identifiants effectivement réaffectés.' })
   prospectIds!: string[];
+}
+
+/**
+ * Migration de segment : ce que le panel envoie pour faire basculer une fiche.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * POURQUOI UNE OPÉRATION À PART, ALORS QUE `PATCH /prospects/:id` SAIT DÉJÀ
+ * ÉCRIRE CES DEUX CLÉS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Le segment n'est pas stocké : il se calcule en croisant le syndicat et la
+ * banque. Changer ces deux clés par la modification ordinaire fait donc
+ * basculer la fiche de BDD3 à BDD1 sans laisser la moindre trace, et plus rien
+ * ensuite ne distingue une fiche CONVERTIE d'une fiche née en BDD1.
+ *
+ * Or convertir est le métier. Cette opération existe pour que la bascule soit
+ * un ACTE : elle exige un motif, elle écrit `SegmentChange` dans la même
+ * transaction que la fiche, et elle refuse de s'exécuter à vide.
+ */
+export class ChangeProspectSegmentDto {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Nouvelle banque. Omise, la banque courante est conservée.',
+  })
+  @IsOptional()
+  @IsUUID()
+  banqueId?: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Nouveau syndicat. Omis, le syndicat courant est conservé.',
+  })
+  @IsOptional()
+  @IsUUID()
+  syndicatId?: string;
+
+  /**
+   * OBLIGATOIRE, et c'est la moitié de l'intérêt de la table.
+   *
+   * « Combien de BDD3 avons-nous fait basculer ce mois » se répond avec des
+   * dates et des segments ; « pourquoi celle-ci » ne se répond qu'avec une
+   * phrase écrite par la personne qui a cliqué, au moment où elle savait
+   * encore.
+   */
+  @ApiProperty({
+    minLength: 5,
+    maxLength: 500,
+    description: 'Motif en clair. Une bascule de segment n’est pas une correction de saisie.',
+  })
+  @IsString()
+  @MinLength(5)
+  @MaxLength(500)
+  reason!: string;
+
+  @ApiProperty({
+    type: Number,
+    minimum: 1,
+    description:
+      'Révision attendue. Un écart renvoie PROSPECT_REV_CONFLICT avec la révision réelle.',
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  expectedRev!: number;
+}
+
+/**
+ * Une bascule déjà écrite.
+ *
+ * Les deux segments sont RELUS en base et jamais recalculés à l'affichage : la
+ * fonction de segmentation peut changer, l'histoire non. Une fiche convertie
+ * vers BDD1 le restera même si la définition de l'axe CBAO évolue.
+ */
+export class SegmentChangeDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ format: 'uuid' }) prospectId!: string;
+
+  @ApiProperty({ enum: BddSegment, enumName: 'BddSegment' }) fromSegment!: BddSegment;
+  @ApiProperty({ enum: BddSegment, enumName: 'BddSegment' }) toSegment!: BddSegment;
+
+  /*
+   * Les quatre clés sont rendues NUES, sans nom de banque ni sigle de
+   * syndicat. `SegmentChange` ne porte aucune relation vers les référentiels,
+   * c'est délibéré côté schéma : l'histoire ne doit pas empêcher de retirer une
+   * banque du référentiel. Les résoudre ici demanderait une lecture de plus
+   * pour afficher ce que les deux segments disent déjà.
+   */
+  @ApiProperty({ format: 'uuid' }) fromBanqueId!: string;
+  @ApiProperty({ format: 'uuid' }) toBanqueId!: string;
+  @ApiProperty({ format: 'uuid' }) fromSyndicatId!: string;
+  @ApiProperty({ format: 'uuid' }) toSyndicatId!: string;
+
+  @ApiProperty({ type: String, nullable: true }) reason!: string | null;
+
+  @ApiProperty({ format: 'uuid' }) changedById!: string;
+  @ApiProperty() changedByName!: string;
+
+  @ApiProperty({
+    enum: ChangeSource,
+    enumName: 'ChangeSource',
+    description: 'Le canal qui a écrit la bascule. Le panel écrit WEB.',
+  })
+  source!: ChangeSource;
+
+  @ApiProperty({ type: String, format: 'date-time' }) changedAt!: string;
+}
+
+export class SegmentChangeListDto {
+  @ApiProperty({
+    type: () => [SegmentChangeDto],
+    description: 'De la plus récente à la plus ancienne.',
+  })
+  items!: SegmentChangeDto[];
 }

@@ -456,6 +456,43 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/prospects/{id}/segment': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Fait basculer un prospect de segment, avec motif et trace.
+     * @description Écrit la banque, le syndicat ET la ligne de `SegmentChange` dans la MÊME transaction. Le segment n’étant pas stocké, c’est le seul chemin qui laisse une trace de la conversion : la modification ordinaire écrirait les deux clés sans que rien ne distingue ensuite une fiche convertie d’une fiche née là.
+     */
+    patch: operations['changeProspectSegment'];
+    trace?: never;
+  };
+  '/api/v1/prospects/{id}/segment-history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Bascules de segment déjà subies par une fiche, de la plus récente à la plus ancienne. */
+    get: operations['listProspectSegmentChanges'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/prospects/reassign': {
     parameters: {
       query?: never;
@@ -1684,6 +1721,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/analytics/segment-conversions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Bascules de segment : sur la période, par segment d’origine, et par auteur.
+     * @description Le segment n’étant pas stocké sur le prospect, une conversion ne laisse aucune trace en dehors de `SegmentChange`. Cette opération est donc la seule à pouvoir répondre « combien de BDD3 avons-nous fait basculer ce mois, et par qui ». Les deux décomptes portent sur toute la période filtrée, pas sur la page affichée.
+     */
+    get: operations['getSegmentConversions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/analytics/origin-breakdown': {
     parameters: {
       query?: never;
@@ -1856,6 +1913,83 @@ export interface paths {
     get: operations['downloadDatabaseDump'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/imports': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Liste paginée des travaux d’import, filtrable par entité et par état. */
+    get: operations['listImportJobs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/imports/representants': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Dépose un classeur de représentants et inscrit le travail. Rend immédiatement.
+     * @description NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail court en arrière-plan ; l’écran sonde `GET /imports/{id}`, dont `processedRows` sur `totalRows` donne l’avancement. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Le modèle de classeur se télécharge par `GET /export/representants-template.xlsx`.
+     */
+    post: operations['createRepresentantsImport'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/imports/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * État d’un travail d’import, et son rapport quand il est terminé.
+     * @description Route de SONDAGE. `processedRows` avance à chaque tranche écrite, sans qu’aucun mécanisme de progression n’ait eu à être inventé : c’est le compteur que la transaction de la tranche avance elle-même.
+     */
+    get: operations['getImportJob'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/imports/{id}/apply': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Applique une simulation terminée : le même fichier est réécrit en base.
+     * @description Remet le MÊME travail en file, en mode `APPLY`. Les compteurs et le rapport de la simulation sont remplacés par ceux de l’application. Refusé si le travail n’est pas une simulation terminée, ou si son échéance est passée — le classeur a alors été détruit.
+     */
+    post: operations['applyImportJob'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2437,6 +2571,55 @@ export interface components {
        * @default false
        */
       preferSource: boolean;
+    };
+    ChangeProspectSegmentDto: {
+      /**
+       * Format: uuid
+       * @description Nouvelle banque. Omise, la banque courante est conservée.
+       */
+      banqueId?: string;
+      /**
+       * Format: uuid
+       * @description Nouveau syndicat. Omis, le syndicat courant est conservé.
+       */
+      syndicatId?: string;
+      /** @description Motif en clair. Une bascule de segment n’est pas une correction de saisie. */
+      reason: string;
+      /** @description Révision attendue. Un écart renvoie PROSPECT_REV_CONFLICT avec la révision réelle. */
+      expectedRev: number;
+    };
+    /**
+     * @description Le canal qui a écrit la bascule. Le panel écrit WEB.
+     * @enum {string}
+     */
+    ChangeSource: 'WEB' | 'MOBILE';
+    SegmentChangeDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      prospectId: string;
+      fromSegment: components['schemas']['BddSegment'];
+      toSegment: components['schemas']['BddSegment'];
+      /** Format: uuid */
+      fromBanqueId: string;
+      /** Format: uuid */
+      toBanqueId: string;
+      /** Format: uuid */
+      fromSyndicatId: string;
+      /** Format: uuid */
+      toSyndicatId: string;
+      reason: string | null;
+      /** Format: uuid */
+      changedById: string;
+      changedByName: string;
+      /** @description Le canal qui a écrit la bascule. Le panel écrit WEB. */
+      source: components['schemas']['ChangeSource'];
+      /** Format: date-time */
+      changedAt: string;
+    };
+    SegmentChangeListDto: {
+      /** @description De la plus récente à la plus ancienne. */
+      items: components['schemas']['SegmentChangeDto'][];
     };
     ReassignProspectsDto: {
       /** @description Identifiants des prospects à réaffecter. */
@@ -3893,6 +4076,40 @@ export interface components {
       /** @description Part globale de numéros inexploitables, en %. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %. */
       badRate: number | null;
     };
+    SegmentConversionDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      prospectId: string;
+      /** @description Prénom et nom de la fiche convertie, au moment de la lecture. */
+      prospectName: string;
+      fromSegment: components['schemas']['BddSegment'];
+      toSegment: components['schemas']['BddSegment'];
+      reason: string | null;
+      /** Format: uuid */
+      changedById: string;
+      changedByName: string;
+      source: components['schemas']['ChangeSource'];
+      /** Format: date-time */
+      changedAt: string;
+    };
+    SegmentConversionOriginDto: {
+      segment: components['schemas']['BddSegment'];
+      conversions: number;
+    };
+    SegmentConversionAuthorDto: {
+      /** Format: uuid */
+      userId: string;
+      fullName: string;
+      conversions: number;
+    };
+    SegmentConversionListDto: {
+      /** @description De la plus récente à la plus ancienne. */
+      items: components['schemas']['SegmentConversionDto'][];
+      meta: components['schemas']['PageMetaDto'];
+      byOriginSegment: components['schemas']['SegmentConversionOriginDto'][];
+      byAuthor: components['schemas']['SegmentConversionAuthorDto'][];
+    };
     OriginCountDto: {
       /** @description Clé de provenance. Nulle pour une fiche née d’une tournée terrain. */
       origin: string | null;
@@ -3965,6 +4182,83 @@ export interface components {
       noticeDetail: string | null;
       /** @description Vrai quand le fichier est servi par GET /admin/database-dump/download. Le téléchargement le détruit. */
       downloadable: boolean;
+    };
+    /** @enum {string} */
+    ImportKind: 'REPRESENTANTS' | 'PROSPECTS';
+    /** @enum {string} */
+    ImportStatus: 'queued' | 'running' | 'succeeded' | 'failed' | 'expired';
+    /**
+     * @description DRY_RUN simule et n’écrit rien. APPLY écrit. Un import naît TOUJOURS en DRY_RUN : appliquer cinquante mille lignes sans les avoir vues ne se rattrape pas.
+     * @enum {string}
+     */
+    ImportMode: 'DRY_RUN' | 'APPLY';
+    ImportJobErrorDto: {
+      /** @description Numéro de ligne DANS LE FICHIER, en-tête compris : ce qu’Excel affiche. */
+      rowNumber: number;
+      /** @description En-tête de la colonne fautive, quand le refus en désigne une. */
+      column: string | null;
+      /** @description Code stable du motif, pour que l’interface puisse le traduire. */
+      code: string;
+      /** @description Motif lisible, prêt à afficher. */
+      message: string;
+    };
+    ImportJobReportDto: {
+      kind: components['schemas']['ImportKind'];
+      /** @description Le mode sous lequel ce rapport a été produit. En DRY_RUN, `createdRows` compte les lignes qui SERAIENT créées ; rien n’a été écrit. */
+      mode: components['schemas']['ImportMode'];
+      /** @description Lignes de données lues, en-tête et exemple exclus. */
+      totalRows: number;
+      processedRows: number;
+      createdRows: number;
+      /** @description Lignes écartées : doublons dans le fichier, ou déjà présentes en base. */
+      skippedRows: number;
+      /** @description Lignes refusées à l’analyse. Compte EXACT. */
+      errorRows: number;
+      /** @description Vrai quand `errors` ne montre qu’une partie des refus. Le compteur `errorRows`, lui, reste exact. */
+      truncated: boolean;
+      /** @description Longueur maximale de `errors`. */
+      maxReportedErrors: number;
+      errors: components['schemas']['ImportJobErrorDto'][];
+    };
+    ImportJobDto: {
+      /** Format: uuid */
+      id: string;
+      kind: components['schemas']['ImportKind'];
+      /** @description `queued` : le travail attend un travailleur. `running` : il court, `processedRows` avance. `succeeded` : terminé, le rapport est là. `failed` : le motif est dans `failureCode`. `expired` : le fichier déposé et le rapport ont été détruits à l’échéance ; ce n’est pas une erreur. */
+      status: components['schemas']['ImportStatus'];
+      /** @description DRY_RUN simule et n’écrit rien. APPLY écrit. Un import naît TOUJOURS en DRY_RUN : appliquer cinquante mille lignes sans les avoir vues ne se rattrape pas. */
+      mode: components['schemas']['ImportMode'];
+      /** Format: uuid */
+      requestedById: string;
+      /** @description Nom du fichier tel que téléversé. JAMAIS utilisé comme chemin. */
+      fileName: string;
+      fileBytes: number;
+      /** @description Dénominateur de l’avancement. NUL tant que le travail n’a pas lu l’en-tête du classeur, et nul aussi quand la feuille ne déclare pas ses dimensions. */
+      totalRows: number | null;
+      processedRows: number;
+      createdRows: number;
+      skippedRows: number;
+      errorRows: number;
+      report: components['schemas']['ImportJobReportDto'] | null;
+      failureCode: string | null;
+      failureMsg: string | null;
+      /** Format: date-time */
+      startedAt: string | null;
+      /** Format: date-time */
+      finishedAt: string | null;
+      /**
+       * Format: date-time
+       * @description Au-delà, le classeur déposé et le rapport sont détruits.
+       */
+      expiresAt: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ImportJobListDto: {
+      items: components['schemas']['ImportJobDto'][];
+      meta: components['schemas']['PageMetaDto'];
     };
   };
   responses: never;
@@ -5834,6 +6128,142 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  changeProspectSegment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangeProspectSegmentDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProspectDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PROSPECT_NOT_FOUND · fiche absente ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PROSPECT_REV_CONFLICT · la fiche a bougé depuis son affichage ; le corps porte `currentRev`. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PROSPECT_SEGMENT_UNCHANGED · ni la banque ni le syndicat ne changent. PROSPECT_BANQUE_NOT_FOUND, PROSPECT_SYNDICAT_NOT_FOUND · destination inconnue. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listProspectSegmentChanges: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SegmentChangeListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PROSPECT_NOT_FOUND · fiche absente ou supprimée. */
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -10304,6 +10734,65 @@ export interface operations {
       };
     };
   };
+  getSegmentConversions: {
+    parameters: {
+      query?: {
+        /** @description Borne basse sur la date de bascule, incluse. Une date nue vaut minuit à Dakar. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de bascule, incluse. Une date nue vaut 23:59:59 à Dakar. */
+        dateTo?: string;
+        /** @description Segment de DÉPART. « Combien de BDD3 avons-nous fait basculer. » */
+        fromSegment?: components['schemas']['BddSegment'];
+        /** @description Segment d’ARRIVÉE. « Combien de conversions vers BDD1. » */
+        toSegment?: components['schemas']['BddSegment'];
+        /** @description Auteur de la bascule. Réservé à l’ADMIN : un COMMERCIAL ne voit que les siennes. */
+        changedById?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SegmentConversionListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   getOriginBreakdown: {
     parameters: {
       query?: {
@@ -10842,6 +11331,260 @@ export interface operations {
       };
       /** @description DATABASE_DUMP_NOT_READY · aucun export disponible, échu, ou déjà téléchargé. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listImportJobs: {
+    parameters: {
+      query?: {
+        kind?: components['schemas']['ImportKind'];
+        status?: components['schemas']['ImportStatus'];
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportJobListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createRepresentantsImport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** Format: binary */
+          file: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportJobDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille. */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Trop de requêtes : réessayez plus tard. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getImportJob: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportJobDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description IMPORT_JOB_NOT_FOUND · ce travail d’import n’existe pas. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  applyImportJob: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportJobDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description IMPORT_JOB_NOT_FOUND · ce travail d’import n’existe pas. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée. DEMO_MODE_READ_ONLY · le mode démonstration est actif. */
+      409: {
         headers: {
           [name: string]: unknown;
         };

@@ -191,6 +191,35 @@ const SITES: Record<string, Site> = {
     verdict: 'HERITE',
     note: 'transition d’étape, refusée en 409 ; la transition suit son dossier',
   },
+  // ── Imports de masse ─────────────────────────────────────────────────────
+  //
+  // Les trois sites écrivent `false` EN TOUTES LETTRES, et c'est la décision.
+  //
+  // Un import est exécuté par un CRON, qui n'entre dans aucune requête HTTP et
+  // échappe donc à `DemoReadOnlyGuard`. Lire l'interrupteur de démonstration
+  // pour décider `isDemo` ferait naître fictive toute ligne importée pendant
+  // une démonstration : elle disparaîtrait à l'extinction du mode, alors que le
+  // classeur, lui, portait des personnes réelles. Le sens de l'erreur compte —
+  // une fiche réelle marquée fictive s'évapore, l'inverse se corrige.
+  'modules/imports/imports.service.ts → false': {
+    verdict: 'REEL',
+    note: 'création du travail d’import ; le CRON échappe à la garde de lecture seule, la valeur est donc littérale',
+  },
+  'modules/imports/representants.adapter.ts → false': {
+    verdict: 'REEL',
+    note: 'les représentants importés sont réels par construction : le classeur vient du terrain',
+  },
+  'modules/imports/prospects-import.adapter.ts → false': {
+    verdict: 'REEL',
+    note: 'idem pour les prospects ; un import de démonstration passe par l’ensemenceur, jamais par ce chemin',
+  },
+  'modules/prospects/segment-change.service.ts → existing.isDemo': {
+    verdict: 'HERITE',
+    note:
+      'PATCH /v1/prospects/:id/segment, refusé en 409 pendant une démonstration ; la trace de bascule suit ' +
+      'la FICHE qu’elle décrit, et non le mode en vigueur à la seconde du clic. SegmentChange.prospect est ' +
+      'en onDelete: Cascade : une trace née sur un prospect fictif part avec lui à la purge',
+  },
   'modules/client-requests/client-requests.service.ts → request.isDemo': {
     verdict: 'HERITE',
     note: 'approbation d’une demande, refusée en 409 ; le prospect créé suit la demande',

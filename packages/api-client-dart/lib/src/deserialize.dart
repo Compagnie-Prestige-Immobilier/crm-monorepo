@@ -36,6 +36,7 @@ import 'package:crm_api_client/src/model/campaign_list_dto.dart';
 import 'package:crm_api_client/src/model/campaign_pilotage_dto.dart';
 import 'package:crm_api_client/src/model/campaign_progress_dto.dart';
 import 'package:crm_api_client/src/model/campaign_summary_dto.dart';
+import 'package:crm_api_client/src/model/change_prospect_segment_dto.dart';
 import 'package:crm_api_client/src/model/client_request_dto.dart';
 import 'package:crm_api_client/src/model/client_request_list_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_correction_dto.dart';
@@ -69,6 +70,10 @@ import 'package:crm_api_client/src/model/enrollment_method_count_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method_list_dto.dart';
 import 'package:crm_api_client/src/model/funnel_stage_dto.dart';
 import 'package:crm_api_client/src/model/ief_dto.dart';
+import 'package:crm_api_client/src/model/import_job_dto.dart';
+import 'package:crm_api_client/src/model/import_job_error_dto.dart';
+import 'package:crm_api_client/src/model/import_job_list_dto.dart';
+import 'package:crm_api_client/src/model/import_job_report_dto.dart';
 import 'package:crm_api_client/src/model/import_report_dto.dart';
 import 'package:crm_api_client/src/model/import_row_error_dto.dart';
 import 'package:crm_api_client/src/model/import_row_preview_dto.dart';
@@ -129,6 +134,12 @@ import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
 import 'package:crm_api_client/src/model/representant_productivity_dto.dart';
 import 'package:crm_api_client/src/model/representant_productivity_list_dto.dart';
 import 'package:crm_api_client/src/model/reset_password_dto.dart';
+import 'package:crm_api_client/src/model/segment_change_dto.dart';
+import 'package:crm_api_client/src/model/segment_change_list_dto.dart';
+import 'package:crm_api_client/src/model/segment_conversion_author_dto.dart';
+import 'package:crm_api_client/src/model/segment_conversion_dto.dart';
+import 'package:crm_api_client/src/model/segment_conversion_list_dto.dart';
+import 'package:crm_api_client/src/model/segment_conversion_origin_dto.dart';
 import 'package:crm_api_client/src/model/segment_count_dto.dart';
 import 'package:crm_api_client/src/model/segment_list_dto.dart';
 import 'package:crm_api_client/src/model/set_active_dto.dart';
@@ -300,6 +311,10 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CampaignSummaryDto':
       return CampaignSummaryDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'ChangeProspectSegmentDto':
+      return ChangeProspectSegmentDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'ChangeSource':
     case 'ClientRequestDto':
       return ClientRequestDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -403,6 +418,19 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'IefDto':
       return IefDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ImportJobDto':
+      return ImportJobDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ImportJobErrorDto':
+      return ImportJobErrorDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'ImportJobListDto':
+      return ImportJobListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'ImportJobReportDto':
+      return ImportJobReportDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'ImportKind':
+    case 'ImportMode':
     case 'ImportReportDto':
       return ImportReportDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -412,6 +440,7 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'ImportRowPreviewDto':
       return ImportRowPreviewDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'ImportStatus':
     case 'InboxDto':
       return InboxDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'InboxItemDto':
@@ -592,6 +621,24 @@ ReturnType deserialize<ReturnType, BaseType>(
       return ResetPasswordDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'Role':
+    case 'SegmentChangeDto':
+      return SegmentChangeDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SegmentChangeListDto':
+      return SegmentChangeListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SegmentConversionAuthorDto':
+      return SegmentConversionAuthorDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SegmentConversionDto':
+      return SegmentConversionDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SegmentConversionListDto':
+      return SegmentConversionListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SegmentConversionOriginDto':
+      return SegmentConversionOriginDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'SegmentCountDto':
       return SegmentCountDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
