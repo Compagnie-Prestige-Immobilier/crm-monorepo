@@ -52,7 +52,7 @@ export function ProspectExportMenu({ filters }: { filters: ProspectFilters }) {
 
         <DropdownMenuItem
           className="items-start gap-3 py-2.5"
-          onSelect={() => {
+          onClick={() => {
             void download({
               url: buildExportUrl(filters, 'filtered'),
               fileName: exportFileName(new Date(), 'filtered'),
@@ -73,7 +73,7 @@ export function ProspectExportMenu({ filters }: { filters: ProspectFilters }) {
 
         <DropdownMenuItem
           className="items-start gap-3 py-2.5"
-          onSelect={() => {
+          onClick={() => {
             void download({
               url: buildExportUrl(filters, 'consolidated'),
               fileName: exportFileName(new Date(), 'consolidated'),

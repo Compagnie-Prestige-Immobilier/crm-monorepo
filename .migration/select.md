@@ -53,6 +53,10 @@ Leftover scan: `grep -n "radix-ui\|@radix-ui\|asChild\|focus:bg\|data-\[state=" 
 - `SelectGroup` / `SelectLabel` / `SelectSeparator` / `SelectScrollUpButton` / `SelectScrollDownButton` have no consumers today; migrated for API parity, unexercised.
 - `filter-combobox.tsx` is a Popover + cmdk, not a Select — see `.migration/popover.md`.
 
+## Latent runtime break, fixed pre-emptively
+
+`SelectLabel` rendered `Select.GroupLabel`, which throws `SelectGroupContext is missing` unless wrapped in a `Select.Group` — the same trap as `DropdownMenuLabel`, which did crash three menus (see `.migration/dropdown-menu.md`). `SelectLabel` has no consumers today, so nothing failed; the first screen to use it would have. The wrapper now provides its own `Select.Group`.
+
 ## Behavior changes
 
 - **`Select.Value` no longer derives its text from the selected `SelectItem`.** It reads the Root's `items` table. Every current call site now supplies one, but any NEW `<Select>` whose values differ from their labels must add `items` or it will display the raw value. This is the single most fragile spot in the migration.

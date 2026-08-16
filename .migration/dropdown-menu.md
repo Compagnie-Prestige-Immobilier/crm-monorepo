@@ -25,6 +25,14 @@ Leftover scan: `grep -n "radix-ui\|@radix-ui\|asChild\|data-\[state=\|focus:bg" 
 - `DropdownMenuGroup`, `DropdownMenuCheckboxItem`, `DropdownMenuSub`, `DropdownMenuSubTrigger`, `DropdownMenuSubContent` have **no consumers** today (`grep -rn` across `apps/web/src` → nothing outside the wrapper). They were migrated anyway to keep the exported API intact, but they are unexercised by tests and by the app.
 - `Menu.Separator` is a re-export of the standalone Base UI `Separator`; the wrapper uses it directly rather than the project's `Separator` wrapper, as before.
 
+## Runtime breaks found by Playwright, not by tsc
+
+Two defects survived a clean typecheck, a clean lint and 588 unit tests. Both were caught by the e2e suite and are fixed on this branch.
+
+- **`onSelect` → `onClick`.** Radix's `Menu.Item` ran the action in `onSelect`; Base UI's runs it in `onClick` and declares no `onSelect`. The item renders a `<div>`, and `onSelect` is a legitimate DOM event on a `<div>`, so the prop compiled, landed on the element, and never fired. Fifteen call sites were dead: `prospects/columns.tsx` (4), `commerciaux/commerciaux-view.tsx` (3), `bank/bank-stages-view.tsx` (4), `prospects/export-menu.tsx` (2), `bank/bank-export-menu.tsx` (1), `layout/theme-toggle.tsx` (1), `layout/user-menu.tsx` (1). All converted. `DropdownMenuItemProps`, `DropdownMenuCheckboxItemProps` and `DropdownMenuSubTriggerProps` now intersect `{ onSelect?: never }`, so the same slip is a compile error from now on.
+- **`user-menu.tsx`**: the logout item used `onSelect={(event) => { event.preventDefault(); … }}` — Radix's idiom for "do not close the menu". That became `closeOnClick={false}` plus a plain `onClick`.
+- **`DropdownMenuLabel` threw `MenuGroupContext is missing`.** `Menu.GroupLabel` requires a `Menu.Group` ancestor; Radix's `Label` was a plain `<div>` placeable anywhere. The three menus carrying a label (`prospects/export-menu.tsx`, `bank/bank-export-menu.tsx`, `layout/user-menu.tsx`) crashed on open behind a Next runtime-error overlay. The wrapper now renders its own `Menu.Group` around the `GroupLabel`, so the label stays placeable anywhere. `DropdownMenuGroup` is still exported for real grouping of label + items.
+
 ## Behavior changes
 
 - **Highlight is not focus.** Screen-reader and focus-debugging behaviour differs: `document.activeElement` now stays on the popup while arrowing through items. Styling was moved to `data-highlighted`, but any external tooling that watched focus will see a change.

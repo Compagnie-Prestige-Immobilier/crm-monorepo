@@ -47,7 +47,7 @@ export function BankExportMenu({ filters }: { filters: BankCaseFilters }) {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="items-start gap-3 py-2.5"
-          onSelect={() => {
+          onClick={() => {
             void download({
               url: buildBankExportUrl(filters),
               fileName: bankExportFileName(),

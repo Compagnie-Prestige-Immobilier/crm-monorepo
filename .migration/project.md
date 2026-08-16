@@ -27,8 +27,9 @@ The call-site break surface was much larger than `asChild` alone:
 2. **`Select` label resolution** — 30 selects across 17 files needed an `items` table on the Root. See `.migration/select.md`; this is the largest and most fragile part of the change, and it produces **no type error** when forgotten.
 3. **`onValueChange` widening** — `(value: string)` → `(value: Value | null, eventDetails)`. Every Select handler gained a null guard; seven now-redundant `as` casts were removed.
 4. **`onOpenAutoFocus` → `initialFocus`** — one site (`stats/stat-info.tsx`).
-5. **Class-hook rewrites** — `data-[state=open/closed]` → `data-open`/`data-closed`, `data-[state=active]` → `data-active`, `focus:` → `data-highlighted:` on menu and select items, `data-[disabled]` → `data-disabled`, `--radix-*` CSS vars → `--transform-origin` / `--available-height` / `--anchor-width`, and every `animate-in`/`animate-out` keyframe pair rewritten as a transition with `data-starting-style` / `data-ending-style`.
-6. **`aria-expanded`** dropped from two trigger call sites — Base UI sets it.
+5. **`onSelect` → `onClick`** — 15 menu items. Base UI's `Menu.Item` has no `onSelect`, but the item renders a `<div>` where `onSelect` is a legal DOM event, so the prop compiled and never fired. See the Playwright section below.
+6. **Class-hook rewrites** — `data-[state=open/closed]` → `data-open`/`data-closed`, `data-[state=active]` → `data-active`, `focus:` → `data-highlighted:` on menu and select items, `data-[disabled]` → `data-disabled`, `--radix-*` CSS vars → `--transform-origin` / `--available-height` / `--anchor-width`. The `tw-animate-css` keyframes themselves are kept verbatim; only their selectors moved.
+7. **`aria-expanded`** dropped from two trigger call sites — Base UI sets it.
 
 ### Trap worth recording
 
@@ -46,7 +47,26 @@ The call-site break surface was much larger than `asChild` alone:
 
 Baseline before the migration was identical (clean typecheck, clean lint, 588 passing) once `@crm/api-client` was built — the first baseline run failed only because that workspace package had not been compiled yet. No pre-existing failures were inherited or masked.
 
-**Not run: the Playwright e2e suite** (`pnpm test:e2e`), which needs a live server and database. It includes `e2e/accessibility.spec.ts` (axe over every panel route) and is the natural place to catch the accessibility deltas flagged below. Running it is the recommended next step.
+### Playwright — run, and it earned its keep
+
+The e2e suite was run against a live stack (`docker compose -f infra/docker/docker-compose.yml up -d`, migrations, seed, `pnpm --filter @crm/api dev`), on this branch **and** on `dev`, so failures could be attributed rather than guessed:
+
+| Run                     | passed | failed |
+| ----------------------- | ------ | ------ |
+| `dev` (baseline, Radix) | 11     | 6      |
+| this branch, final      | 11     | 6      |
+
+**Same six failures, same eleven passes: zero regressions.** The six are pre-existing on `dev` and unrelated to this work:
+
+- `accessibility.spec.ts`, `prospects.spec.ts:101`, `roles.anon.spec.ts:177` expect an `<h1>` reading **"Téléconseillers"** on `/commerciaux`. Commit `85f21ec` renamed that nav entry to **"Utilisateurs"** and the specs were never updated.
+- `roles.anon.spec.ts:166`/`:224` and `workspaces.spec.ts:51` need the demo-mode accounts (`demo.banque@cpi.sn`), which a freshly migrated + seeded database does not have.
+
+**Two real regressions were caught here and only here** — both invisible to `tsc` and to all 588 unit tests:
+
+1. **`onSelect` silently died.** Radix's `Menu.Item` took the action in `onSelect`; Base UI takes it in `onClick` and has no `onSelect`. But the item renders a `<div>`, and `onSelect` _is_ a valid DOM event on a `<div>` — so fifteen menu actions compiled, rendered, and did nothing: both Excel exports, "Se déconnecter", every row action on prospects, users and bank stages. Fixed at all fifteen call sites, and `DropdownMenuItem` / `CheckboxItem` / `SubTrigger` now declare `onSelect?: never` so the same mistake is a compile error.
+2. **`DropdownMenuLabel` crashed the page.** `Menu.GroupLabel` throws `MenuGroupContext is missing` unless wrapped in a `Menu.Group`; Radix's `Label` was a plain `<div>` you could put anywhere. The three menus carrying a label (both export menus and the account menu) threw on open. The wrapper now provides its own `Menu.Group`. `SelectLabel` had the identical latent bug (`SelectGroupContext is missing`) and got the same treatment — it has no consumers yet, so nothing had failed.
+
+Both classes of bug share a shape worth remembering: **a Radix prop or composition that Base UI silently accepts and ignores, or accepts and rejects only at runtime.** Type-checking cannot see either.
 
 ## Behaviour deltas — closed
 

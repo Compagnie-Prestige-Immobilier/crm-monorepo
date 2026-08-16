@@ -72,8 +72,13 @@ export function UserMenu({ user }: { user: SessionUser }) {
         <DropdownMenuItem
           variant="destructive"
           disabled={pending}
-          onSelect={(event) => {
-            event.preventDefault();
+          /* Le menu reste OUVERT pendant la déconnexion : `closeOnClick={false}`
+             remplace le `event.preventDefault()` que Radix attendait dans
+             `onSelect`. Refermer tout de suite ferait disparaître l'état
+             `disabled` du bouton, et un second clic partirait sur une session
+             déjà en train de se fermer. */
+          closeOnClick={false}
+          onClick={() => {
             void signOut();
           }}
         >
