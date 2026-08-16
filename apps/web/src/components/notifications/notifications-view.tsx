@@ -99,6 +99,23 @@ const DELIVERY_VARIANT: Record<
 /** « Tous » porte une valeur explicite : un `Select` n'accepte pas `''`. */
 const ALL = 'tous';
 
+/**
+ * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item :
+ * sans ces tables, les gâchettes montreraient « SENT » ou « SYSTEM ».
+ */
+const STATUS_ITEMS = [
+  { value: ALL, label: 'Tous les états' },
+  ...NOTIFICATION_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] })),
+];
+
+const CATEGORY_ITEMS = [
+  { value: ALL, label: 'Toutes les catégories' },
+  ...NOTIFICATION_CATEGORIES.map((category) => ({
+    value: category,
+    label: CATEGORY_LABELS[category],
+  })),
+];
+
 const dateTime = (value: string | null): string =>
   value === null ? '–' : new Date(value).toLocaleString('fr-SN');
 
@@ -218,8 +235,10 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
               <div className="flex w-48 flex-col gap-1.5">
                 <Label htmlFor="statut-envoi">État</Label>
                 <Select
+                  items={STATUS_ITEMS}
                   value={filters.status ?? ALL}
                   onValueChange={(value) => {
+                    if (value === null) return;
                     setFilters({ status: value === ALL ? null : (value as NotificationStatus) });
                   }}
                 >
@@ -227,10 +246,9 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={ALL}>Tous les états</SelectItem>
-                    {NOTIFICATION_STATUSES.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {STATUS_LABELS[status]}
+                    {STATUS_ITEMS.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -240,8 +258,10 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
               <div className="flex w-48 flex-col gap-1.5">
                 <Label htmlFor="categorie-envoi">Catégorie</Label>
                 <Select
+                  items={CATEGORY_ITEMS}
                   value={filters.category ?? ALL}
                   onValueChange={(value) => {
+                    if (value === null) return;
                     setFilters({
                       category: value === ALL ? null : (value as NotificationCategory),
                     });
@@ -251,10 +271,9 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={ALL}>Toutes les catégories</SelectItem>
-                    {NOTIFICATION_CATEGORIES.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {CATEGORY_LABELS[category]}
+                    {CATEGORY_ITEMS.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -30,15 +30,17 @@ export function Topbar({ user }: { user: SessionUser }) {
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-4 backdrop-blur-sm">
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            aria-label="Ouvrir la navigation"
-          >
-            <MenuIcon className="size-5" aria-hidden="true" />
-          </Button>
+        <SheetTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              aria-label="Ouvrir la navigation"
+            />
+          }
+        >
+          <MenuIcon className="size-5" aria-hidden="true" />
         </SheetTrigger>
         <SheetContent
           side="left"

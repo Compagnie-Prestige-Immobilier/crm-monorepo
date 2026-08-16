@@ -45,6 +45,26 @@ import { useDebouncedValue } from '@/lib/use-debounced-value';
  * L'état vit dans l'URL (`useRepresentantFilters`) : la vue filtrée se colle
  * dans un message et se recharge à l'identique.
  */
+/**
+ * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item :
+ * sans ces tables, les gâchettes montreraient « oui », « createdAt » ou
+ * « desc » au lieu des libellés.
+ */
+const PRESENCE_ITEMS = [
+  { value: 'tous', label: 'Tous' },
+  { value: 'oui', label: 'Au moins un' },
+  { value: 'non', label: 'Aucun' },
+];
+
+const SORT_ITEMS: { value: RepresentantSortField; label: string }[] = REPRESENTANT_SORT_FIELDS.map(
+  (field) => ({ value: field, label: REPRESENTANT_SORT_LABELS[field] }),
+);
+
+const DIRECTION_ITEMS: { value: SortDirection; label: string }[] = [
+  { value: 'desc', label: 'Décroissant' },
+  { value: 'asc', label: 'Croissant' },
+];
+
 export function RepresentantsFiltersBar() {
   const { filters, setFilters, resetFilters } = useRepresentantFilters();
   const sortId = useId();
@@ -194,8 +214,10 @@ export function RepresentantsFiltersBar() {
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={presenceId}>Prospects apportés</Label>
             <Select
+              items={PRESENCE_ITEMS}
               value={presenceValue(filters.hasProspects)}
               onValueChange={(value) => {
+                if (value === null) return;
                 setFilters({ hasProspects: presenceFromValue(value) });
               }}
             >
@@ -203,9 +225,11 @@ export function RepresentantsFiltersBar() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="tous">Tous</SelectItem>
-                <SelectItem value="oui">Au moins un</SelectItem>
-                <SelectItem value="non">Aucun</SelectItem>
+                {PRESENCE_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -213,18 +237,20 @@ export function RepresentantsFiltersBar() {
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={sortId}>Trier par</Label>
             <Select
+              items={SORT_ITEMS}
               value={filters.sortBy}
               onValueChange={(value) => {
-                setFilters({ sortBy: value as RepresentantSortField });
+                if (value === null) return;
+                setFilters({ sortBy: value });
               }}
             >
               <SelectTrigger id={sortId} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {REPRESENTANT_SORT_FIELDS.map((field) => (
-                  <SelectItem key={field} value={field}>
-                    {REPRESENTANT_SORT_LABELS[field]}
+                {SORT_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -234,17 +260,22 @@ export function RepresentantsFiltersBar() {
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={orderId}>Sens</Label>
             <Select
+              items={DIRECTION_ITEMS}
               value={filters.sortDir}
               onValueChange={(value) => {
-                setFilters({ sortDir: value as SortDirection });
+                if (value === null) return;
+                setFilters({ sortDir: value });
               }}
             >
               <SelectTrigger id={orderId} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="desc">Décroissant</SelectItem>
-                <SelectItem value="asc">Croissant</SelectItem>
+                {DIRECTION_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

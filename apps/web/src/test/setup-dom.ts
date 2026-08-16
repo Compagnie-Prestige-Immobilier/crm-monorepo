@@ -92,7 +92,7 @@ if (typeof window.matchMedia !== 'function') {
 }
 
 /**
- * `ResizeObserver` manque aussi, et les primitives Radix (Popover, Select,
+ * `ResizeObserver` manque aussi, et les primitives Base UI (Popover, Select,
  * DropdownMenu) l'instancient pour se positionner. Un observateur inerte suffit :
  * jsdom ne fait de toute façon aucune mise en page, donc aucune mesure ne serait
  * juste.

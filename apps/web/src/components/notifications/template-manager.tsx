@@ -51,6 +51,12 @@ import { CATEGORY_LABELS, type NotificationCategory, type NotificationTemplate }
 const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DOSSIER', 'SYSTEME'];
 
 /**
+ * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item :
+ * sans cette table, la gâchette montrerait « SYSTEME » au lieu de « Système ».
+ */
+const CATEGORY_ITEMS = CATEGORIES.map((item) => ({ value: item, label: CATEGORY_LABELS[item] }));
+
+/**
  * Gabarits.
  *
  * La liste des variables n'est JAMAIS saisie : elle est déduite du texte, ici
@@ -254,18 +260,20 @@ function TemplateFormDialog({
             <Field label="Catégorie">
               {(props) => (
                 <Select
+                  items={CATEGORY_ITEMS}
                   value={category}
                   onValueChange={(value) => {
-                    setCategory(value as NotificationCategory);
+                    if (value === null) return;
+                    setCategory(value);
                   }}
                 >
                   <SelectTrigger id={props.id}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((item) => (
-                      <SelectItem key={item} value={item}>
-                        {CATEGORY_LABELS[item]}
+                    {CATEGORY_ITEMS.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

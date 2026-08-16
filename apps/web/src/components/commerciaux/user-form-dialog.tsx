@@ -172,6 +172,20 @@ export function UserFormDialog({
    */
   const role = watch('role') as UserFormInput['role'] | undefined;
 
+  /**
+   * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item :
+   * sans ces tables, les gâchettes montreraient « TELECONSEILLER » ou un UUID de
+   * département.
+   */
+  const roleItems = ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }));
+  const departementItems = [
+    { value: NO_DEPARTEMENT, label: 'Aucun' },
+    ...(reference?.departements ?? []).map((departement) => ({
+      value: departement.id,
+      label: withRetired(departement.name, departement.isActive),
+    })),
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
@@ -254,8 +268,10 @@ export function UserFormDialog({
           >
             {(props) => (
               <Select
+                items={roleItems}
                 value={role ?? ''}
                 onValueChange={(value) => {
+                  if (value === null) return;
                   setValue('role', value as UserFormInput['role'], {
                     shouldDirty: true,
                     // Sans revalidation, le message « Choisissez le rôle du
@@ -268,9 +284,9 @@ export function UserFormDialog({
                   <SelectValue placeholder="Choisir un rôle" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLES.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {ROLE_LABELS[value]}
+                  {roleItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -281,8 +297,10 @@ export function UserFormDialog({
           <Field label="Département" error={formState.errors.departementId?.message}>
             {(props) => (
               <Select
+                items={departementItems}
                 value={departementId}
                 onValueChange={(value) => {
+                  if (value === null) return;
                   setValue('departementId', value, { shouldDirty: true });
                 }}
               >
@@ -290,10 +308,9 @@ export function UserFormDialog({
                   <SelectValue placeholder="Aucun" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_DEPARTEMENT}>Aucun</SelectItem>
-                  {(reference?.departements ?? []).map((departement) => (
-                    <SelectItem key={departement.id} value={departement.id}>
-                      {withRetired(departement.name, departement.isActive)}
+                  {departementItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

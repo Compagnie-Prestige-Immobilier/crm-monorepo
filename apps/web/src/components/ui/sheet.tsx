@@ -1,6 +1,6 @@
 'use client';
 
-import * as SheetPrimitive from '@radix-ui/react-dialog';
+import { Dialog as SheetPrimitive } from '@base-ui/react/dialog';
 import { XIcon } from 'lucide-react';
 import type * as React from 'react';
 
@@ -10,51 +10,64 @@ import { cn } from '@/lib/utils';
  * Panneau latéral. Sous 768 px, la sidebar bordeaux devient un `Sheet` : le
  * contenu garde la même largeur utile qu'en plein écran au lieu d'être
  * comprimé sous une colonne de navigation fixe.
+ *
+ * `Dialog.Root` de Base UI ne rend aucun élément et ses props sont génériques
+ * (`<Payload>`) : on ré-exporte la primitive au lieu de l'envelopper.
  */
-function Sheet(props: React.ComponentProps<typeof SheetPrimitive.Root>) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />;
-}
+const Sheet = SheetPrimitive.Root;
 
-function SheetTrigger(props: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
+type SheetTriggerProps = Omit<SheetPrimitive.Trigger.Props, 'className'> & {
+  className?: string | undefined;
+};
+
+function SheetTrigger(props: SheetTriggerProps) {
   return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
 }
 
-function SheetClose(props: React.ComponentProps<typeof SheetPrimitive.Close>) {
+type SheetCloseProps = Omit<SheetPrimitive.Close.Props, 'className'> & {
+  className?: string | undefined;
+};
+
+function SheetClose(props: SheetCloseProps) {
   return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
 }
 
-function SheetContent({
-  className,
-  children,
-  side = 'right',
-  ...props
-}: React.ComponentProps<typeof SheetPrimitive.Content> & {
+type SheetContentProps = Omit<SheetPrimitive.Popup.Props, 'className'> & {
+  className?: string | undefined;
   side?: 'top' | 'right' | 'bottom' | 'left' | undefined;
-}) {
+};
+
+/**
+ * Le glissement ne passe plus par les keyframes `slide-in-from-*` de
+ * tw-animate : Base UI expose les états d'entrée et de sortie
+ * (`data-starting-style` / `data-ending-style`), et la translation y est
+ * exprimée explicitement, côté par côté.
+ */
+function SheetContent({ className, children, side = 'right', ...props }: SheetContentProps) {
   return (
-    <SheetPrimitive.Portal data-slot="sheet-portal">
-      <SheetPrimitive.Overlay
+    <SheetPrimitive.Portal>
+      <SheetPrimitive.Backdrop
         data-slot="sheet-overlay"
         className={cn(
           'fixed inset-0 z-50 bg-scrim',
-          'data-[state=open]:animate-in data-[state=open]:fade-in-0',
-          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+          'transition-opacity duration-200',
+          'data-starting-style:opacity-0 data-ending-style:opacity-0',
         )}
       />
-      <SheetPrimitive.Content
+      <SheetPrimitive.Popup
         data-slot="sheet-content"
         className={cn(
-          'fixed z-50 flex flex-col gap-0 bg-card shadow-elev-xl transition ease-in-out',
-          'data-[state=open]:animate-in data-[state=open]:duration-300',
-          'data-[state=closed]:animate-out data-[state=closed]:duration-200',
+          'fixed z-50 flex flex-col gap-0 bg-card shadow-elev-xl',
+          'transition-transform ease-in-out',
+          'data-open:duration-300 data-closed:duration-200',
           side === 'right' &&
-            'inset-y-0 right-0 h-full w-3/4 border-l border-border sm:max-w-sm data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
+            'inset-y-0 right-0 h-full w-3/4 border-l border-border sm:max-w-sm data-starting-style:translate-x-full data-ending-style:translate-x-full',
           side === 'left' &&
-            'inset-y-0 left-0 h-full w-[17rem] border-r border-border data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
+            'inset-y-0 left-0 h-full w-[17rem] border-r border-border data-starting-style:-translate-x-full data-ending-style:-translate-x-full',
           side === 'top' &&
-            'inset-x-0 top-0 h-auto border-b border-border data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
+            'inset-x-0 top-0 h-auto border-b border-border data-starting-style:-translate-y-full data-ending-style:-translate-y-full',
           side === 'bottom' &&
-            'inset-x-0 bottom-0 h-auto border-t border-border data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
+            'inset-x-0 bottom-0 h-auto border-t border-border data-starting-style:translate-y-full data-ending-style:translate-y-full',
           className,
         )}
         {...props}
@@ -70,7 +83,7 @@ function SheetContent({
           <XIcon className="size-4" />
           <span className="sr-only">Fermer</span>
         </SheetPrimitive.Close>
-      </SheetPrimitive.Content>
+      </SheetPrimitive.Popup>
     </SheetPrimitive.Portal>
   );
 }
@@ -91,7 +104,11 @@ function SheetFooter({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPrimitive.Title>) {
+type SheetTitleProps = Omit<SheetPrimitive.Title.Props, 'className'> & {
+  className?: string | undefined;
+};
+
+function SheetTitle({ className, ...props }: SheetTitleProps) {
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
@@ -101,10 +118,11 @@ function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPr
   );
 }
 
-function SheetDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof SheetPrimitive.Description>) {
+type SheetDescriptionProps = Omit<SheetPrimitive.Description.Props, 'className'> & {
+  className?: string | undefined;
+};
+
+function SheetDescription({ className, ...props }: SheetDescriptionProps) {
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"

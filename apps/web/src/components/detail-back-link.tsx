@@ -2,7 +2,8 @@ import { ArrowLeftIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 /**
  * Le retour à la liste, sur un écran de détail.
@@ -25,11 +26,12 @@ import { Button } from '@/components/ui/button';
  */
 export function DetailBackLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Button asChild variant="ghost" className="w-fit -ml-2">
-      <Link href={href}>
-        <ArrowLeftIcon aria-hidden="true" />
-        {children}
-      </Link>
-    </Button>
+    /* Un LIEN habillé en bouton, pas un bouton : la primitive `Button` de Base
+       UI poserait `role="button"` sur le `<a>` et lui retirerait sa sémantique
+       de lien. Seule la peau est empruntée. */
+    <Link href={href} className={cn(buttonVariants({ variant: 'ghost' }), 'w-fit -ml-2')}>
+      <ArrowLeftIcon aria-hidden="true" />
+      {children}
+    </Link>
   );
 }

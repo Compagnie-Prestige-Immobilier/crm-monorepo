@@ -31,17 +31,17 @@ export function ThemeToggle() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Changer de thème">
-          {mounted ? (
-            <>
-              <SunIcon className="size-4 dark:hidden" aria-hidden="true" />
-              <MoonIcon className="hidden size-4 dark:block" aria-hidden="true" />
-            </>
-          ) : (
-            <MonitorIcon className="size-4 opacity-0" aria-hidden="true" />
-          )}
-        </Button>
+      <DropdownMenuTrigger
+        render={<Button variant="ghost" size="icon" aria-label="Changer de thème" />}
+      >
+        {mounted ? (
+          <>
+            <SunIcon className="size-4 dark:hidden" aria-hidden="true" />
+            <MoonIcon className="hidden size-4 dark:block" aria-hidden="true" />
+          </>
+        ) : (
+          <MonitorIcon className="size-4 opacity-0" aria-hidden="true" />
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         {OPTIONS.map((option) => {

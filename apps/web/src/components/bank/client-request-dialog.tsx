@@ -242,7 +242,19 @@ export function ClientRequestDialog({
                   *
                 </span>
               </Label>
-              <Select value={banque ?? ''} onValueChange={setBanque}>
+              {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
+                  pas le texte de l'item — ici, l'identifiant de la banque. */}
+              <Select
+                items={(banques.data ?? []).map((item) => ({
+                  value: item.id,
+                  label: `${withRetired(item.shortName, item.isActive)}, ${item.name}`,
+                }))}
+                value={banque ?? ''}
+                onValueChange={(value) => {
+                  if (value === null) return;
+                  setBanque(value);
+                }}
+              >
                 <SelectTrigger id={banqueId} className="w-full">
                   <SelectValue placeholder="Choisir une banque" />
                 </SelectTrigger>

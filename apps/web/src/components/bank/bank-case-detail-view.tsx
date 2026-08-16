@@ -639,9 +639,16 @@ function RejectDialog({
                   *
                 </span>
               </Label>
+              {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
+                  pas le texte de l'item — ici, l'identifiant du motif. */}
               <Select
+                items={(reasons.data ?? []).map((reason) => ({
+                  value: reason.id,
+                  label: reason.label,
+                }))}
                 value={reasonIdValue ?? ''}
                 onValueChange={(value) => {
+                  if (value === null) return;
                   setReasonIdValue(value);
                 }}
               >

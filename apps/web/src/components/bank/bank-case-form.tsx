@@ -17,7 +17,7 @@ import { useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ClientRequestDialog } from '@/components/bank/client-request-dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -387,9 +387,16 @@ export function BankCaseForm() {
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={bankId}>Banque de traitement</Label>
+          {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie, pas
+              le texte de l'item — ici, l'identifiant de la banque. */}
           <Select
+            items={(banques.data ?? []).map((banque) => ({
+              value: banque.id,
+              label: `${withRetired(banque.shortName, banque.isActive)}, ${banque.name}`,
+            }))}
             value={processingBankId ?? ''}
             onValueChange={(value) => {
+              if (value === null) return;
               setProcessingBankId(value);
             }}
           >
@@ -424,9 +431,11 @@ export function BankCaseForm() {
         )}
       >
         <div className="mx-auto flex max-w-2xl items-center justify-end gap-3">
-          <Button asChild type="button" variant="ghost">
-            <Link href="/dossiers">Annuler</Link>
-          </Button>
+          {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
+              poserait `role="button"` sur le `<a>`. */}
+          <Link href="/dossiers" className={buttonVariants({ variant: 'ghost' })}>
+            Annuler
+          </Link>
           <Button
             type="submit"
             size="lg"

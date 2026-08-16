@@ -369,8 +369,15 @@ export function DepartementFormDialog({
           <Field label="Région" required error={formState.errors.regionId?.message}>
             {(props) => (
               <Select
+                // `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
+                // pas le texte de l'item — ici, l'identifiant de la région.
+                items={(regions ?? []).map((region) => ({
+                  value: region.id,
+                  label: region.name,
+                }))}
                 value={regionId}
                 onValueChange={(value) => {
+                  if (value === null) return;
                   setValue('regionId', value, { shouldDirty: true });
                 }}
               >

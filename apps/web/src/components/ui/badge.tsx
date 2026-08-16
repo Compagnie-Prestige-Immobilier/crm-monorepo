@@ -1,4 +1,5 @@
-import { Slot } from '@radix-ui/react-slot';
+import { mergeProps } from '@base-ui/react/merge-props';
+import { useRender } from '@base-ui/react/use-render';
 import { cva, type VariantProps } from 'class-variance-authority';
 import type * as React from 'react';
 
@@ -33,14 +34,23 @@ const badgeVariants = cva(
   },
 );
 
-export type BadgeProps = React.ComponentProps<'span'> &
-  VariantProps<typeof badgeVariants> & { asChild?: boolean | undefined };
+export type BadgeProps = useRender.ComponentProps<'span'> & VariantProps<typeof badgeVariants>;
 
-function Badge({ className, variant, asChild = false, ...props }: BadgeProps) {
-  const Comp = asChild ? Slot : 'span';
-  return (
-    <Comp data-slot="badge" className={cn(badgeVariants({ variant }), className)} {...props} />
-  );
+function Badge({ className, variant, render, ...props }: BadgeProps) {
+  return useRender({
+    defaultTagName: 'span',
+    render,
+    props: mergeProps<'span'>(
+      // Les clés `data-*` ne sont tolérées dans un littéral d'objet que par
+      // JSX : passées à `mergeProps`, elles échouent au contrôle de propriétés
+      // excédentaires. D'où le cast.
+      {
+        'data-slot': 'badge',
+        className: cn(badgeVariants({ variant }), className),
+      } as React.ComponentProps<'span'>,
+      props,
+    ),
+  });
 }
 
 export { Badge, badgeVariants };

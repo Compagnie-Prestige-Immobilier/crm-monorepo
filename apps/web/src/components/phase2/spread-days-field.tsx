@@ -37,6 +37,15 @@ const DAY_OPTIONS: readonly number[] = Array.from(
   (_, index) => MIN_SPREAD_DAYS + index,
 );
 
+/**
+ * `Select.Value` de Base UI affiche la VALEUR, pas le texte de l'item choisi :
+ * sans cette table, la gâchette montrerait « 7 » au lieu de « 7 journées ».
+ */
+const DAY_ITEMS = DAY_OPTIONS.map((days) => ({
+  value: String(days),
+  label: days === 1 ? 'Une seule journée' : `${formatNumber(days)} journées`,
+}));
+
 export function SpreadDaysField({
   value,
   onChange,
@@ -53,9 +62,10 @@ export function SpreadDaysField({
         Étaler sur
       </Label>
       <Select
+        items={DAY_ITEMS}
         value={String(value)}
         onValueChange={(next) => {
-          const parsed = Number.parseInt(next, 10);
+          const parsed = Number.parseInt(next ?? '', 10);
           onChange(Number.isFinite(parsed) ? parsed : MIN_SPREAD_DAYS);
         }}
       >
@@ -63,9 +73,9 @@ export function SpreadDaysField({
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-64">
-          {DAY_OPTIONS.map((days) => (
-            <SelectItem key={days} value={String(days)}>
-              {days === 1 ? 'Une seule journée' : `${formatNumber(days)} journées`}
+          {DAY_ITEMS.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
             </SelectItem>
           ))}
         </SelectContent>

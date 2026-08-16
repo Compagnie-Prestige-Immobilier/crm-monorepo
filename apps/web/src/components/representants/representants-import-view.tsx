@@ -15,7 +15,7 @@ import { useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useFileDownload } from '@/components/exports/download-button';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -119,12 +119,15 @@ export function RepresentantsImportView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Button asChild variant="ghost" className="w-fit -ml-2">
-        <Link href="/representants">
-          <ArrowLeftIcon aria-hidden="true" />
-          Tous les représentants
-        </Link>
-      </Button>
+      {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI poserait
+          `role="button"` sur le `<a>` et lui retirerait sa sémantique de lien. */}
+      <Link
+        href="/representants"
+        className={cn(buttonVariants({ variant: 'ghost' }), 'w-fit -ml-2')}
+      >
+        <ArrowLeftIcon aria-hidden="true" />
+        Tous les représentants
+      </Link>
 
       {/* ─── 1. Le modèle ───────────────────────────────────────────────── */}
       <Card>

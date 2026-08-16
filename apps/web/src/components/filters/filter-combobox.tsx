@@ -111,37 +111,38 @@ export function FilterCombobox({
 
       <div className="relative">
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              id={triggerId}
-              ref={triggerRef}
-              variant="outline"
-              /*
-                `aria-labelledby` liste le libellé PUIS le déclencheur : le nom
-                devient « Téléconseiller Tous les téléconseillers ». Sans le second id,
-                le nom se réduirait au libellé et la valeur choisie ne serait
-                plus annoncée.
-              */
-              role="combobox"
-              aria-labelledby={`${labelId} ${triggerId}`}
-              aria-haspopup="listbox"
-              aria-expanded={open}
-              aria-required={required || undefined}
-              className={cn(
-                'h-11 w-full justify-between gap-2 font-[400]',
-                // Place réservée à la croix : sans elle, le libellé passerait
-                // dessous et se ferait couper à un caractère près.
-                hasValue && 'pr-16',
-              )}
-            >
-              <span className={cn('truncate', selected === undefined && 'text-muted-foreground')}>
-                {selected?.label ?? placeholder}
-              </span>
-              <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" aria-hidden="true" />
-            </Button>
+          <PopoverTrigger
+            render={
+              <Button
+                id={triggerId}
+                ref={triggerRef}
+                variant="outline"
+                /*
+                  `aria-labelledby` liste le libellé PUIS le déclencheur : le nom
+                  devient « Téléconseiller Tous les téléconseillers ». Sans le second id,
+                  le nom se réduirait au libellé et la valeur choisie ne serait
+                  plus annoncée.
+                */
+                role="combobox"
+                aria-labelledby={`${labelId} ${triggerId}`}
+                aria-haspopup="listbox"
+                aria-required={required || undefined}
+                className={cn(
+                  'h-11 w-full justify-between gap-2 font-[400]',
+                  // Place réservée à la croix : sans elle, le libellé passerait
+                  // dessous et se ferait couper à un caractère près.
+                  hasValue && 'pr-16',
+                )}
+              />
+            }
+          >
+            <span className={cn('truncate', selected === undefined && 'text-muted-foreground')}>
+              {selected?.label ?? placeholder}
+            </span>
+            <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" aria-hidden="true" />
           </PopoverTrigger>
 
-          <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
+          <PopoverContent className="w-(--anchor-width) p-0">
             {/*
               `shouldFilter={false}` : cmdk filtre par défaut avec son propre
               score, qui ignore les accents autant qu'il ignore le français.
