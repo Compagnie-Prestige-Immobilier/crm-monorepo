@@ -22,7 +22,12 @@ on:
     # ne peut deviner tant que le portillon n'a pas parlé.
     types: [opened, synchronize, reopened, labeled]
   push:
-    branches: [dev]
+    # `prod` REJOINT LA LISTE, et c'est ce qui rend le déploiement automatique
+    # possible. Jusqu'ici la CI ne tournait sur `prod` qu'AVANT la fusion, via
+    # la PR. Le résultat FUSIONNÉ n'était donc éprouvé par rien, et c'est
+    # pourtant lui qu'on déploie. Le job `deploy` plus bas dépend de tous les
+    # autres : sans exécution sur `prod`, il n'aurait rien à quoi se raccrocher.
+    branches: [dev, prod]
 
 # Aucun job n'écrit dans le dépôt.
 permissions:
@@ -465,3 +470,67 @@ jobs:
           dart run build_runner build --delete-conflicting-outputs
           flutter analyze
           flutter test
+
+  # ---------------------------------------------------------------------------
+  # Déploiement, et il n'a lieu QUE si tout le reste est vert.
+  #
+  # Jusqu'ici, fusionner vers `prod` ne déployait rien : Dokploy est branché en
+  # mode « custom git » (`application.saveGitProvider`, infra/dokploy/deploy.py),
+  # pas via l'intégration GitHub, il ne reçoit donc AUCUN crochet de GitHub. Le
+  # déploiement était un geste manuel que rien dans le dépôt ne rappelait, et
+  # une fusion vers `prod` donnait toutes les apparences d'une mise en ligne
+  # sans en produire une seule.
+  #
+  # POURQUOI CE JOB VIT DANS ci.yml plutôt que dans un fichier séparé déclenché
+  # par `workflow_run`. `needs` est une garantie du moteur : ce job ne peut pas
+  # démarrer avant que les quatre autres aient rendu leur verdict, et son `if`
+  # exige que ce verdict soit « success ». Un `workflow_run` séparé, lui, se
+  # déclenche sur la FIN du workflow et doit relire sa conclusion à la main —
+  # une condition oubliée là-bas déploie une version rouge. Ici, l'oubli est
+  # impossible.
+  #
+  # `sonar` a droit à `skipped` parce qu'il porte `if: vars.SONAR_ENABLED`. Un
+  # portillon volontairement éteint ne doit pas bloquer la mise en ligne ; un
+  # portillon allumé qui ÉCHOUE, si.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: déploiement Dokploy (prod)
+    runs-on: ubuntu-latest
+    needs: [node, sonar, contract, mobile]
+    if: >-
+      !cancelled()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/prod'
+      && needs.node.result == 'success'
+      && needs.contract.result == 'success'
+      && needs.mobile.result == 'success'
+      && (needs.sonar.result == 'success' || needs.sonar.result == 'skipped')
+    # Une seule mise en ligne à la fois, et celle qui est en cours n'est PAS
+    # annulée : interrompre un déploiement à mi-course laisse la pile dans un
+    # état que personne n'a décrit. La suivante attend son tour.
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # Le secret absent doit se voir. Sans ce contrôle, `deploy.py` partirait
+      # avec une clé vide, Dokploy répondrait 401, et le journal parlerait
+      # d'authentification alors que la cause est un secret jamais renseigné.
+      - name: Vérifier le secret
+        env:
+          DOKPLOY_KEY: ${{ secrets.DOKPLOY_KEY }}
+        run: |
+          if [ -z "${DOKPLOY_KEY}" ]; then
+            echo "::error::Le secret DOKPLOY_KEY n'est pas défini sur ce dépôt."
+            echo "::error::Le poser avec : gh secret set DOKPLOY_KEY"
+            exit 1
+          fi
+
+      # `redeploy` et non `deploy` : `deploy` engendrerait des secrets dans le
+      # journal et redémarrerait Postgres à chaque fusion. Voir sa docstring.
+      - name: Redéployer l'API et le panel
+        env:
+          DOKPLOY_KEY: ${{ secrets.DOKPLOY_KEY }}
+          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+        run: python3 infra/dokploy/deploy.py redeploy

@@ -12,6 +12,7 @@ USAGE
     python3 infra/dokploy/deploy.py provision   # Postgres + les 2 applications
     python3 infra/dokploy/deploy.py configure   # dépôt, build, variables, domaines
     python3 infra/dokploy/deploy.py deploy      # démarrage
+    python3 infra/dokploy/deploy.py redeploy    # applications seules, voie automatisée
     python3 infra/dokploy/deploy.py backup      # sauvegarde nocturne hors du VPS
     python3 infra/dokploy/deploy.py status      # état courant
     python3 infra/dokploy/deploy.py all         # les trois premières d'affilée
@@ -50,15 +51,30 @@ from pathlib import Path
 # Réglages
 # ─────────────────────────────────────────────────────────────────────────────
 
-DOKPLOY_URL = os.environ.get("DOKPLOY_URL", "https://dokploy.cpi-chues.com")
-ENVIRONMENT_ID = os.environ.get("ENVIRONMENT_ID", "prUxKulJkxda_0vY9chIi")
-PROJECT_ID = os.environ.get("PROJECT_ID", "cUvJ9T8TmuSc6HIKg8ydW")
-GIT_URL = os.environ.get(
-    "GIT_URL", "git@github.com:Compagnie-Prestige-Immobilier/crm-monorepo.git"
-)
-BRANCH = os.environ.get("BRANCH", "prod")
-API_DOMAIN = os.environ.get("API_DOMAIN", "go.cpi-chues.com")
-WEB_DOMAIN = os.environ.get("WEB_DOMAIN", "go-admin.cpi-chues.com")
+def setting(name: str, default: str) -> str:
+    """Réglage lu dans l'environnement, avec repli sur la valeur du dépôt.
+
+    `os.environ.get(nom, defaut)` NE SUFFIT PAS, et la nuance a des dents : il
+    rend le défaut quand la variable est ABSENTE, mais la chaîne VIDE quand elle
+    est présente et vide. Or c'est exactement ce que produit GitHub Actions pour
+    `${{ vars.X }}` lorsque la variable de dépôt n'a jamais été créée — la ligne
+    `env:` existe, sa valeur est vide. `DOKPLOY_URL` serait alors la chaîne
+    vide, chaque appel partirait sur une URL relative, et le message d'erreur
+    parlerait de requête invalide sans jamais nommer le réglage manquant.
+
+    `or` traite l'absence et le vide de la même façon, qui est la seule lecture
+    utile ici : personne ne veut régler l'une de ces valeurs à « rien ».
+    """
+    return os.environ.get(name) or default
+
+
+DOKPLOY_URL = setting("DOKPLOY_URL", "https://dokploy.cpi-chues.com")
+ENVIRONMENT_ID = setting("ENVIRONMENT_ID", "prUxKulJkxda_0vY9chIi")
+PROJECT_ID = setting("PROJECT_ID", "cUvJ9T8TmuSc6HIKg8ydW")
+GIT_URL = setting("GIT_URL", "git@github.com:Compagnie-Prestige-Immobilier/crm-monorepo.git")
+BRANCH = setting("BRANCH", "prod")
+API_DOMAIN = setting("API_DOMAIN", "go.cpi-chues.com")
+WEB_DOMAIN = setting("WEB_DOMAIN", "go-admin.cpi-chues.com")
 
 PG_NAME = "cpi-go-postgres"
 API_NAME = "cpi-go-api"
@@ -791,6 +807,58 @@ def cmd_deploy() -> None:
     print(_epilogue(secrets_))
 
 
+def cmd_redeploy() -> None:
+    """Redéploie les DEUX APPLICATIONS, et rien d'autre. Voie automatisée.
+
+    ═══════════════════════════════════════════════════════════════════════════
+    POURQUOI CETTE COMMANDE EXISTE, PLUTÔT QUE D'APPELER `deploy`
+    ═══════════════════════════════════════════════════════════════════════════
+
+    `deploy` est écrit pour une PREMIÈRE mise en route conduite par un humain.
+    Trois de ses gestes sont inacceptables sur une fusion vers `prod` :
+
+      1. Il appelle `load_secrets()`, qui ENGENDRE des secrets quand le fichier
+         `.secrets.generated` est absent. Un exécutant d'intégration continue
+         part d'une copie neuve à chaque fois : le fichier n'y est JAMAIS là.
+         Chaque déploiement fabriquerait donc un mot de passe Postgres et deux
+         secrets JWT tout neufs, que `_epilogue` imprime ensuite dans le journal
+         public de l'exécution. Ces valeurs ne sont pas celles de la production
+         — elles ne sont poussées nulle part —, mais un journal qui affiche des
+         chaînes présentées comme les secrets de production est une fuite de
+         plus à instruire, pour rien.
+
+      2. Il redéploie POSTGRES. Sur une première mise en route c'est le geste
+         attendu ; sur chaque fusion, cela redémarre la base de production alors
+         qu'aucune de ses données ni de sa configuration n'a bougé, et coupe le
+         service le temps du redémarrage.
+
+      3. Il dort 45 secondes pour laisser la base se lever. Sans redéploiement
+         de Postgres, cette attente n'a plus d'objet.
+
+    Ce que fait celle-ci : elle relit les identifiants auprès de Dokploy, refuse
+    net si l'une des applications manque, et demande le déploiement des deux.
+    Les migrations, elles, restent jouées par `api-entrypoint.sh` au démarrage
+    de l'API, exactement comme aujourd'hui.
+    """
+    ids = load_ids()
+    ids.update({k: v for k, v in find_existing().items() if v})
+
+    # Même raisonnement que dans `find_existing` : un identifiant manquant se
+    # lit comme « rien à déployer », et un déploiement qui ne déploie rien doit
+    # s'arrêter en rouge, jamais s'annoncer réussi.
+    manquants = [label for key, label in (("API_ID", "API"), ("WEB_ID", "panel web")) if not ids.get(key)]
+    if manquants:
+        fail(f"introuvable sur Dokploy : {', '.join(manquants)}. Lancez d'abord `provision`.")
+        sys.exit(1)
+
+    for key, label in (("API_ID", "API"), ("WEB_ID", "panel web")):
+        step(f"Déploiement, {label}")
+        call("application.deploy", {"applicationId": ids[key]})
+        ok("demandé")
+
+    info("Dokploy construit et bascule de façon asynchrone ; suivez ses journaux.")
+
+
 def _epilogue(s: dict[str, str]) -> str:
     return f"""
 {'─' * 76}
@@ -1199,6 +1267,7 @@ COMMANDS = {
     "provision": cmd_provision,
     "configure": cmd_configure,
     "deploy": cmd_deploy,
+    "redeploy": cmd_redeploy,
     "backup": cmd_backup,
     "status": cmd_status,
 }
