@@ -67,9 +67,45 @@ export const closedAtLateral = (caseAlias: Prisma.Sql): Prisma.Sql => Prisma.sql
 export function bankCaseConditions(filter: BankCaseFilterDto, demoEnabled: boolean): Prisma.Sql {
   const conditions: Prisma.Sql[] = [Prisma.sql`c."deletedAt" IS NULL`];
 
-  // Visibilite de demonstration. Sans elle, un dossier fictif entre dans le
-  // total encaisse affiche a la direction, et le montant devient faux.
-  if (!demoEnabled) conditions.push(Prisma.sql`c."isDemo" = FALSE`);
+  /*
+   * ═══════════════════════════════════════════════════════════════════════════
+   * LE DOSSIER *ET* SON CLIENT. Deux ecrans donnaient deux chiffres.
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Seul `c."isDemo"` etait teste ici. Le tableau de bord, lui, part des
+   * prospects (`PROSPECT_FROM` + `prospectConditions`) puis rejoint les
+   * dossiers : il exige donc que le PROSPECT *et* le dossier soient reels.
+   *
+   * Un dossier marque reel accroche a un prospect marque fictif passait donc le
+   * filtre ici et tombait la-bas. Observe en production : « Banques » annoncait
+   * 1 encaisse pour 12 M FCFA pendant que le tableau de bord affichait 0 FCFA,
+   * sur la meme base, au meme instant.
+   *
+   * ET C'EST L'EXTINCTION DE LA DEMONSTRATION QUI LE REVELE. Mode allume,
+   * `demoScope()` rend `{}` : aucun des deux ecrans ne filtre, les deux regles
+   * coincident, et le desaccord dort. Il n'apparait qu'une fois le mode eteint,
+   * c'est-a-dire au moment ou les chiffres redeviennent ceux qu'on presente a
+   * la direction.
+   *
+   * La regle retenue est la plus stricte des deux, parce que c'est la seule qui
+   * se defend : un dossier accroche a un client fictif est fictif, quoi que
+   * dise sa propre colonne. Le laisser dans un total d'encaissements reels
+   * revient a annoncer de l'argent qui n'existe pas.
+   *
+   * `NOT EXISTS` plutot qu'une jointure : cette fonction sert des requetes qui
+   * ne joignent pas toutes `prospects` (comptages, agregats par banque, par
+   * motif de rejet). Une condition portant sur un alias absent ferait echouer
+   * le SQL au lieu de le cloisonner.
+   */
+  if (!demoEnabled) {
+    conditions.push(Prisma.sql`c."isDemo" = FALSE`);
+    conditions.push(
+      Prisma.sql`NOT EXISTS (
+        SELECT 1 FROM "prospects" dp
+        WHERE dp."id" = c."prospectId" AND dp."isDemo" = TRUE
+      )`,
+    );
+  }
 
   if (filter.stageId) conditions.push(Prisma.sql`c."currentStageId" = ${filter.stageId}`);
   if (filter.stageType) {
