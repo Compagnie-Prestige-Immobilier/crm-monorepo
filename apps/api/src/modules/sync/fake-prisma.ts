@@ -146,7 +146,11 @@ export class FakePrisma {
    * de cohérence du lot ne pourrait pas rougir.
    */
   addUser(id: string, row: { role?: string; isDemo?: boolean } = {}): void {
-    this.users.set(id, { id, isDemo: row.isDemo ?? false, ...(row.role ? { role: row.role } : {}) });
+    this.users.set(id, {
+      id,
+      isDemo: row.isDemo ?? false,
+      ...(row.role ? { role: row.role } : {}),
+    });
   }
 
   /** Compte les tentatives de transaction, pour vérifier une-transaction-par-groupe. */

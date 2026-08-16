@@ -581,7 +581,14 @@ export class NotificationsService {
     }
 
     await this.settleNotification(claim, email.status, pending, now);
-    return { claimed: true, sent, failed, pending, emailed: email.emailed, emailStatus: email.status };
+    return {
+      claimed: true,
+      sent,
+      failed,
+      pending,
+      emailed: email.emailed,
+      emailStatus: email.status,
+    };
   }
 
   /** L'envoi a-t-il dépassé le délai que la plateforme s'accorde ? */

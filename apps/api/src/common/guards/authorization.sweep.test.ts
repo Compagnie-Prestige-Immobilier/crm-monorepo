@@ -133,7 +133,8 @@ const CLASS_LINE = /^export (?:abstract )?class \w+/;
  * d'objets littéraux passées aux décorateurs, qui sont plus profondes. Le
  * constructeur est exclu, il ne porte jamais de route.
  */
-const METHOD_LINE = /^ {2}(?:(?:private|protected|public|readonly|static|async)\s+)*(\w+)\s*(?:<[^>]*>)?\(/;
+const METHOD_LINE =
+  /^ {2}(?:(?:private|protected|public|readonly|static|async)\s+)*(\w+)\s*(?:<[^>]*>)?\(/;
 
 export interface RouteSite {
   /** Nom de la méthode qui porte la route. */
@@ -332,7 +333,8 @@ describe('autorisation, balayage', () => {
   });
 
   it('compte un `@Roles` de CLASSE pour toutes ses routes', () => {
-    const parClasse = ['@Roles(Role.ADMIN)', 'export class TemoinController {'].join('\n') +
+    const parClasse =
+      ['@Roles(Role.ADMIN)', 'export class TemoinController {'].join('\n') +
       "\n\n  @Get('nue')\n  nue(): Promise<void> {\n    return this.service.lire();\n  }\n}";
 
     expect(routeSites(parClasse)).toEqual([{ method: 'nue', line: 5, hasRoles: true }]);

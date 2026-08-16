@@ -605,8 +605,7 @@ describe('cadence du balayage périodique', () => {
     const handler = Object.getOwnPropertyDescriptor(DbDumpService.prototype, 'sweepExpired')
       ?.value as object | undefined;
     const options = Reflect.getMetadata('SCHEDULE_CRON_OPTIONS', handler ?? {}) as
-      | { cronTime: string }
-      | undefined;
+      { cronTime: string } | undefined;
     // Sans planification, le reste du test ne prouverait rien.
     expect(options?.cronTime).toBeTypeOf('string');
 
