@@ -9,6 +9,7 @@ export DOKPLOY_KEY='votre-clé-api'
 python3 infra/dokploy/deploy.py provision   # Postgres + les deux applications
 python3 infra/dokploy/deploy.py configure   # dépôt, build, variables, domaines
 python3 infra/dokploy/deploy.py deploy      # démarrage
+python3 infra/dokploy/deploy.py redeploy    # applications seules, voie automatisée
 python3 infra/dokploy/deploy.py backup      # sauvegarde nocturne, voir plus bas
 python3 infra/dokploy/deploy.py status      # état courant, sauvegardes comprises
 ```
@@ -21,18 +22,44 @@ ferait échouer un déploiement par ailleurs correct.
 La clé n'est **jamais** écrite dans un fichier : elle ne vit que dans la variable
 d'environnement, le temps de la session.
 
-## Pas de workflow GitHub de déploiement
+## Déploiement automatique sur `prod`
 
-Il n'y en a volontairement aucun. Dokploy possède déjà le dépôt, la clé de
-déploiement, les variables et les domaines : un workflow ne ferait que lui
-demander de reconstruire, en dupliquant un secret d'API et des identifiants
-pour rien.
+Ce paragraphe affirmait le contraire, et l'affirmation était fausse dans ses
+conséquences. Le raisonnement — « Dokploy possède déjà le dépôt, un workflow ne
+ferait que dupliquer un secret » — oubliait un fait : Dokploy est branché en
+**custom git** (`application.saveGitProvider`), pas via l'intégration GitHub.
+Il ne reçoit donc AUCUN crochet quand `prod` bouge. Une fusion vers `prod` avait
+toutes les apparences d'une mise en ligne sans en produire une seule, et
+personne ne le voyait avant d'aller regarder la version servie.
 
-Le déploiement se lance d'ici :
+Le job `deploy` de `.github/workflows/ci.yml` s'en charge désormais. Il dépend
+de `node`, `contract`, `mobile` et `sonar`, et son `if` exige que chacun ait
+rendu `success` — `sonar` a droit à `skipped`, parce qu'il porte
+`if: vars.SONAR_ENABLED`. Un portillon éteint volontairement ne bloque pas ; un
+portillon allumé qui échoue, si. `concurrency: deploy-prod` avec
+`cancel-in-progress: false` : une mise en ligne en cours n'est jamais
+interrompue, la suivante attend.
+
+Le job lance `deploy.py redeploy`, et **pas** `deploy` — voir la docstring de
+`cmd_redeploy` : `deploy` engendrerait des secrets dans le journal public de
+l'exécution et redémarrerait Postgres à chaque fusion.
+
+### Le seul réglage à faire
+
+```bash
+gh secret set DOKPLOY_KEY --repo Compagnie-Prestige-Immobilier/crm-monorepo
+```
+
+`DOKPLOY_URL` peut être posée en variable de dépôt pour viser un autre hôte ;
+absente, le script retombe sur sa valeur par défaut. Toutes les autres valeurs
+(`PROJECT_ID`, `ENVIRONMENT_ID`, les domaines) sont dans le script.
+
+### Le lancer à la main reste possible
 
 ```bash
 export DOKPLOY_KEY='…'
-python3 infra/dokploy/deploy.py deploy
+python3 infra/dokploy/deploy.py redeploy   # applications seules
+python3 infra/dokploy/deploy.py deploy     # première mise en route, Postgres compris
 ```
 
 Le script configure aussi le volume Dokploy `cpi-go-apk-releases`, monté sur
