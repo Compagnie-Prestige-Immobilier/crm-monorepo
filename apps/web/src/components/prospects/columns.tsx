@@ -38,11 +38,6 @@ const STATUT_VARIANT: Record<ProspectStatut, 'secondary' | 'info' | 'success' | 
   PERDU: 'destructive',
 };
 
-/**
- * `PENDING` en neutre et non en « attention » : un prospect pas encore appelé
- * n'est pas un problème, c'est l'état normal du début de campagne. Le peindre
- * en or ferait clignoter la moitié du tableau le premier jour.
- */
 const PHASE2_VARIANT: Record<Phase2Status, BadgeVariant> = {
   PENDING: 'secondary',
   METHOD_OBTAINED: 'success',
@@ -51,7 +46,6 @@ const PHASE2_VARIANT: Record<Phase2Status, BadgeVariant> = {
 };
 
 export interface ProspectRowActions {
-  /** `false` pour un COMMERCIAL : l'API refuse fusion et réaffectation. */
   canAdminister: boolean;
   onEdit: (prospect: ProspectRow) => void;
   onMerge: (prospect: ProspectRow) => void;
@@ -59,25 +53,10 @@ export interface ProspectRowActions {
   onDelete: (prospect: ProspectRow) => void;
 }
 
-/** Cellule vide explicite. Une case blanche se lit comme une donnée perdue. */
 function Empty() {
   return <span className="text-muted-foreground">–</span>;
 }
 
-/**
- * Colonnes du tableau des prospects.
- *
- * `id` reprend le nom du champ trié CÔTÉ SERVEUR (`ProspectSortField` du
- * contrat) : le clic sur l'en-tête envoie donc `sortBy` sans table de
- * correspondance. Les colonnes dérivées d'une jointure : représentant,
- * département, téléconseiller : ne sont pas triables : l'API ne le propose pas, et
- * une flèche qui ne trie rien est pire que pas de flèche.
- *
- * Les colonnes de phase 2 répondent à une question qu'on posait jusqu'ici en
- * ouvrant l'export : QUI a obtenu ce résultat, QUAND, et avec quel commentaire.
- * Elles sont groupées à droite du statut de phase 1 pour que la lecture aille
- * du plus ancien au plus récent, comme le parcours réel du prospect.
- */
 export function prospectColumns(actions: ProspectRowActions): ColumnDef<ProspectRow>[] {
   return [
     {
@@ -110,9 +89,6 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       accessorKey: 'segment',
       header: 'Segment',
       cell: ({ row }) => (
-        // Le sigle en cellule, le libellé complet en info-bulle : « BDD1 -
-        // CHUES / CBAO » dans chaque ligne pousserait les colonnes suivantes
-        // hors de l'écran.
         <Badge variant="outline" title={SEGMENT_LABELS[row.original.segment]}>
           {row.original.segment}
         </Badge>
@@ -149,9 +125,6 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
           <div className="min-w-0 max-w-[16rem]">
             <p className="truncate font-[600]">{CALL_OUTCOME_LABELS[lastOutcome]}</p>
             {lastComment !== null && lastComment !== '' ? (
-              // `title` porte le commentaire entier : un motif de refus tient
-              // rarement en une ligne, et le tronquer sans recours ferait
-              // rouvrir la fiche pour rien.
               <p className="truncate text-[0.75rem] text-muted-foreground" title={lastComment}>
                 {lastComment}
               </p>
@@ -225,8 +198,6 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       accessorKey: 'clientCreatedAt',
       header: 'Saisi le',
       cell: ({ row }) => (
-        // `clientCreatedAt` = saisie terrain, pas arrivée en base. Un téléconseiller
-        // resté hors ligne trois jours voit ici la date de sa tournée.
         <time dateTime={row.original.clientCreatedAt} className="whitespace-nowrap tabular-nums">
           {formatDate(row.original.clientCreatedAt)}
         </time>
@@ -241,11 +212,6 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
             render={
               <Button
                 variant="ghost"
-                /* `size="icon"` (44 px) et non `icon-sm` (36 px) : docs/design.md
-                   §6 fixe la cible tactile minimale à 44 px, et le panel est aussi
-                   consulté sur tablette. Un menu de ligne à 36 px se manque une
-                   fois sur trois au doigt : et l'action manquée juste à côté est
-                   « Supprimer ». */
                 size="icon"
                 aria-label={`Actions pour ${row.original.prenom} ${row.original.nom}`}
               />

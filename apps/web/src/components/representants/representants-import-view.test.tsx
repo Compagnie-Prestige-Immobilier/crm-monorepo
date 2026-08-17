@@ -5,26 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ImportModule from '@/lib/data/representants-import';
 import { renderWithQuery } from '@/test/render-query';
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * La simulation n'est pas une précaution décorative, et le rapport non plus.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Un classeur de quatre mille lignes appliqué d'un bloc, c'est quatre mille
- * fiches dont personne ne sait lesquelles sont bonnes, et une déduplication par
- * téléphone qui rattache silencieusement des prospects à la mauvaise personne.
- *
- * Le rapport doit donc distinguer TROIS populations, chacune rendue autrement :
- * les valides, qui s'écriront ; les rejetées, avec leur numéro de ligne DANS le
- * classeur et le motif ; les doublons, qui seront écartés. Un rapport qui les
- * confondrait ferait appliquer les yeux fermés, ce qui est exactement le défaut
- * que les deux temps servent à empêcher.
- *
- * Le test conduit le vrai parcours (dépôt du fichier, puis application) plutôt
- * que de rendre le panneau de rapport à la main : c'est l'enchaînement qui porte
- * la garantie « rien n'est écrit tant que vous n'avez pas confirmé ».
- */
-
 const importRepresentants = vi.fn();
 
 vi.mock('@/lib/data/representants-import', async () => {
@@ -85,7 +65,6 @@ const classeur = (): File =>
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
 
-/** Dépose le classeur par le champ de fichier, seul chemin atteignable au clavier. */
 const deposer = async (): Promise<void> => {
   const input = document.querySelector<HTMLInputElement>('input[type="file"]');
   if (input === null) throw new Error('Aucun champ de fichier sur l’écran d’import.');
@@ -105,8 +84,6 @@ describe('RepresentantsImportView', () => {
     await waitFor(() => {
       expect(importRepresentants).toHaveBeenCalledTimes(1);
     });
-    // Le second argument est `dryRun`. Un `false` ici écrirait quatre mille
-    // fiches sur un simple choix de fichier.
     expect(importRepresentants.mock.calls[0]?.[1]).toBe(true);
   });
 
@@ -121,17 +98,10 @@ describe('RepresentantsImportView', () => {
       ['Doublons', '1'],
     ] as const) {
       const term = await screen.findByText(label);
-      // `<dt>` et `<dd>` frères : le chiffre est le nœud suivant de la paire.
       expect(term.parentElement?.textContent).toContain(value);
     }
   });
 
-  /**
-   * Les deux tableaux sont désignés par leurs EN-TÊTES et non par un titre de
-   * carte : c'est la colonne « Motif » qui fait d'un tableau un tableau de
-   * rejets, et c'est elle qui disparaîtrait si les deux populations venaient à
-   * être fondues en une seule liste.
-   */
   const tableAvecColonne = async (header: string): Promise<HTMLElement> => {
     const cell = await screen.findByRole('columnheader', { name: header });
     const table = cell.closest('table');
@@ -145,14 +115,10 @@ describe('RepresentantsImportView', () => {
 
     const rejets = await tableAvecColonne('Motif');
 
-    // Le numéro renvoie à la ligne du classeur, en-tête compris : sans lui, le
-    // motif ne dit pas OÙ corriger.
     expect(within(rejets).getByText('4')).toBeTruthy();
     expect(within(rejets).getByText('Numéro de téléphone invalide.')).toBeTruthy();
     expect(within(rejets).getByText('7')).toBeTruthy();
     expect(within(rejets).getByText('Département inconnu.')).toBeTruthy();
-    // La valeur fautive est rendue telle quelle : c'est ce qu'on retrouvera dans
-    // la cellule du classeur.
     expect(within(rejets).getByText('Dakr')).toBeTruthy();
   });
 
@@ -165,8 +131,6 @@ describe('RepresentantsImportView', () => {
 
     expect(within(valides).getByText('Ndeye Fall')).toBeTruthy();
     expect(within(valides).getByText('Ousmane Sow')).toBeTruthy();
-    // Aucune ligne rejetée ne se glisse parmi les valides : les confondre est
-    // exactement ce que le rapport doit rendre impossible.
     expect(within(valides).queryByText('Dakr')).toBeNull();
     expect(within(valides).queryByText('Département inconnu.')).toBeNull();
   });

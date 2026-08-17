@@ -67,18 +67,6 @@ const toIef = (row: IefRow): IefDto => ({
 
 const toRegion = (row: Region): RegionDto => ({ id: row.id, code: row.code, name: row.name });
 
-/**
- * Référentiels : banques, syndicats, découpage administratif.
- *
- * Lecture ouverte à tout utilisateur authentifié, ce sont les listes
- * déroulantes du formulaire de saisie, elles ne contiennent aucune donnée
- * personnelle. Écriture réservée à l'ADMIN.
- *
- * Aucune suppression physique n'est exposée : une banque référencée par des
- * prospects existants ne peut pas disparaître sans casser la clé étrangère
- * `Restrict`. On désactive (`isActive = false`), ce qui la retire des listes
- * de saisie tout en préservant l'historique.
- */
 @Injectable()
 export class ReferentielsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -119,13 +107,6 @@ export class ReferentielsService {
     return rows.map(toDepartement);
   }
 
-  /**
-   * Les IEF, éventuellement restreintes à un département.
-   *
-   * Le tri est (département, nom) et non (nom) seul : une liste alphabétique
-   * globale placerait « Bignona 1 » entre deux IEF de Dakar, et le sélecteur
-   * deviendrait illisible dès qu'on cherche par zone.
-   */
   async listIefs(query: ReferentielQueryDto, departementId?: string): Promise<IefDto[]> {
     const rows = await this.prisma.ief.findMany({
       where: {
@@ -164,8 +145,6 @@ export class ReferentielsService {
       ),
     }));
   }
-
-  // ─── Écriture ─────────────────────────────────────────────────────────────
 
   async createBanque(input: CreateBanqueDto): Promise<BanqueDto> {
     return toBanque(await this.prisma.banque.create({ data: input }));
@@ -222,7 +201,6 @@ export class ReferentielsService {
   }
 }
 
-/** `activeOnly` vaut true par défaut : le formulaire de saisie ne propose jamais une entrée retirée. */
 function activeFilter(query: ReferentielQueryDto): { isActive?: boolean } {
   return query.activeOnly === false ? {} : { isActive: true };
 }

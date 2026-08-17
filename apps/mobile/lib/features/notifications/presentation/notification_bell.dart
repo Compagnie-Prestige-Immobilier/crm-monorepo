@@ -8,15 +8,6 @@ import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../notifications_controller.dart';
 
-/// Cloche de l'AppBar, avec le compteur de non-lues.
-///
-/// Calquée sur `SyncBadge` : même géométrie, même cible tactile, même règle de
-/// couleur. Sur le bordeaux de l'AppBar, l'or lisible est `accentOnDark`
-/// (#FFC65A, 8,71:1) ; l'or de surface #C8921A y serait illisible
-/// (docs/design.md §2.3).
-///
-/// Le compteur est plafonné à « 99+ » : au-delà, le chiffre exact n'apprend
-/// plus rien et déforme la barre.
 class NotificationBell extends ConsumerWidget {
   const NotificationBell({super.key});
 
@@ -32,14 +23,9 @@ class NotificationBell extends ConsumerWidget {
           ? '$unread notification${unread > 1 ? 's' : ''} non lue${unread > 1 ? 's' : ''}'
           : 'Notifications',
       child: InkWell(
-        // `push` et non `go` : `go` REMPLACE la pile, et c'est exactement ce
-        // qui rendait le centre d'annonces sans issue : plus rien à dépiler,
-        // donc flèche inerte et geste système qui sort de l'application. Voir
-        // `core/router/back_navigation.dart`.
         onTap: () => context.push(Routes.notifications),
         borderRadius: CpiRadius.brFull,
         child: ConstrainedBox(
-          // 48 dp : l'application sert debout, au soleil, parfois à une main.
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           child: Padding(
             padding: const EdgeInsets.symmetric(

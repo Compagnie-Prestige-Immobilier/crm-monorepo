@@ -8,16 +8,6 @@ import { ImportsCron } from './imports.cron.js';
 import { IMPORT_LEASE_MS } from './imports.job.js';
 import type { ImportsService } from './imports.service.js';
 
-/**
- * LE CHOIX DES TRAVAUX À REPRENDRE, ET LUI SEUL.
- *
- * Ce balayage est le SEUL mécanisme qui ranime un import figé par un
- * redéploiement. Sa clause de sélection est donc la pièce à éprouver : trop
- * large, elle reprend un travail bien vivant sous son propriétaire ; trop
- * étroite, elle laisse une ligne `running` éternelle et un écran qui tourne
- * indéfiniment.
- */
-
 const NOW = new Date('2026-08-16T10:00:00.000Z');
 
 class RecordingRunner {
@@ -29,7 +19,6 @@ class RecordingRunner {
   }
 }
 
-/** L'échéance a son propre test : ici, elle ne doit rien retirer de la file. */
 const idleExpiry = { expireDue: () => Promise.resolve(0) } as unknown as ImportsService;
 
 describe('balayage des imports', () => {
@@ -56,8 +45,6 @@ describe('balayage des imports', () => {
   });
 
   it('ranime un travail EN COURS dont le bail a expiré', async () => {
-    // Le conteneur est mort au milieu du classeur : sans cette reprise, la ligne
-    // reste figée à jamais et l'import est perdu sans que rien ne le dise.
     prisma.jobs.push(
       fakeJob({
         id: 'mort',
@@ -72,14 +59,6 @@ describe('balayage des imports', () => {
     expect(runner.ran).toEqual(['mort']);
   });
 
-  /**
-   * LA FENÊTRE QU'ON OUBLIE.
-   *
-   * Un `queued` PORTANT DÉJÀ un jeton est un travail revendiqué dont le
-   * travailleur est mort avant d'écrire `running`. Le balayage doit le voir, et
-   * la borne de bail est ce qui l'y autorise sans reprendre à deux un travail
-   * qui vient d'être pris.
-   */
   it('ranime aussi un QUEUED déjà revendiqué dont le bail a expiré', async () => {
     prisma.jobs.push(
       fakeJob({
@@ -129,24 +108,18 @@ describe('balayage des imports', () => {
 
     await cron.sweep(NOW);
 
-    // Le reprendre produirait un « fichier illisible » parfaitement trompeur,
-    // là où la vraie cause est l'échéance.
     expect(runner.ran).toEqual([]);
   });
 
   it('sert le plus ancien d’abord, et pas plus de trois par passage', async () => {
     for (let index = 0; index < 5; index += 1) {
       const job = fakeJob({ id: `job-${String(index)}`, status: ImportStatus.queued });
-      // Créés dans le DÉSORDRE : sans tri réel, l'assertion ci-dessous serait
-      // satisfaite par le seul ordre d'insertion.
       job.createdAt = new Date(NOW.getTime() - (index % 2 === 0 ? 10 - index : index) * 60_000);
       prisma.jobs.push(job);
     }
 
     await cron.sweep(NOW);
 
-    // Les trois PLUS ANCIENS (10, 8 et 6 minutes), et pas les trois premiers
-    // insérés : une file chargée ne doit pas affamer le premier arrivé.
     expect(runner.ran).toEqual(['job-0', 'job-2', 'job-4']);
   });
 });

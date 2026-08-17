@@ -33,23 +33,6 @@ import {
 import type { SortDirection } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 
-/**
- * Barre de filtre des représentants.
- *
- * Quatre critères visibles (recherche, département, IEF, téléconseiller) et
- * trois repliés : la période de première saisie et la présence de prospects
- * répondent à une question ponctuelle, « qui dort depuis janvier ? ». Le tri
- * accompagne ces trois-là dans le panneau sans être compté : il ne restreint
- * aucune population, une puce « Tri : Nom » ferait croire à un filtre.
- *
- * L'état vit dans l'URL (`useRepresentantFilters`) : la vue filtrée se colle
- * dans un message et se recharge à l'identique.
- */
-/**
- * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item :
- * sans ces tables, les gâchettes montreraient « oui », « createdAt » ou
- * « desc » au lieu des libellés.
- */
 const PRESENCE_ITEMS = [
   { value: 'tous', label: 'Tous' },
   { value: 'oui', label: 'Au moins un' },
@@ -77,8 +60,6 @@ export function RepresentantsFiltersBar() {
     staleTime: 5 * 60_000,
   });
 
-  // Recherche appliquée après une pause de frappe : écrire directement dans
-  // l'URL relancerait une requête à chaque caractère.
   const [searchDraft, setSearchDraft] = useState(filters.search);
   useEffect(() => {
     setSearchDraft(filters.search);
@@ -91,9 +72,6 @@ export function RepresentantsFiltersBar() {
 
   const removeAdvanced = useCallback(
     (key: RepresentantAdvancedFilterKey) => {
-      // `Record<…, null>` plutôt qu'une clé calculée nue : le littéral
-      // `{ [key]: null }` s'infère en `{ [x: string]: null }`, que
-      // `Partial<RepresentantFilters>` accepterait sans vérifier le nom.
       const patch: Partial<Record<RepresentantAdvancedFilterKey, null>> = { [key]: null };
       setFilters(patch satisfies Partial<RepresentantFilters>);
     },
@@ -130,9 +108,6 @@ export function RepresentantsFiltersBar() {
               label: departement.name,
             }))}
             onChange={(value) => {
-              // L'IEF choisie n'appartient qu'à un département : la garder après
-              // un changement de département donnerait une liste vide sans que
-              // rien à l'écran n'explique pourquoi.
               setFilters({ departementId: value, iefId: null });
             }}
           />
@@ -144,17 +119,12 @@ export function RepresentantsFiltersBar() {
             placeholder="Toutes les IEF"
             value={filters.iefId}
             options={(reference?.iefs ?? [])
-              // Restreintes au département choisi. Proposer les 59 IEF du pays
-              // alors que le département est déjà filtré ferait chercher dans
-              // cinquante-huit entrées hors sujet.
               .filter((ief) =>
                 filters.departementId === null ? true : ief.departementId === filters.departementId,
               )
               .map((ief) => ({
                 value: ief.id,
                 label: ief.name,
-                // Le département en indice : « Bignona 1 » et « Bignona 2 » ne
-                // se distinguent que par lui, et quatre IEF partagent Dakar.
                 hint: ief.departementName,
               }))}
             onChange={(value) => {
@@ -296,13 +266,6 @@ function presenceFromValue(value: string): boolean | null {
   return null;
 }
 
-/**
- * Puces de rappel des critères repliés.
- *
- * Les dates portent une puce CHACUNE plutôt qu'une puce « période » : c'est la
- * seule forme qui permet de retirer une borne sans perdre l'autre, et une
- * période à moitié posée est un cas courant (« depuis janvier », sans fin).
- */
 function buildChips(
   filters: RepresentantFilters,
 ): AdvancedChipItem<RepresentantAdvancedFilterKey>[] {

@@ -9,21 +9,6 @@ import { ROLES_KEY } from '../../common/decorators/roles.decorator.js';
 import { RepresentantsController } from './representants.controller.js';
 import { RepresentantsService } from './representants.service.js';
 
-/**
- * Ce que le lookup par téléphone a le droit de DIRE.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * LE DÉFAUT CORRIGÉ
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `lookup` répondait avec le DTO complet de la fiche d'autrui : nom du
- * représentant, téléphone normalisé, notes de terrain, département, nombre de
- * prospects portés, identifiant du propriétaire. Sa propre documentation
- * annonçait pourtant « seul le nom du propriétaire est divulgué ». La route
- * n'ayant par ailleurs aucun `@Roles`, n'importe quel compte authentifié,
- * BANQUE_FINANCE compris, pouvait énumérer l'annuaire numéro par numéro.
- */
-
 type MockFn = ReturnType<typeof vi.fn>;
 
 interface MockDb {
@@ -48,7 +33,6 @@ const ADMIN: AuthenticatedUser = {
 
 const date = new Date('2026-01-15T09:00:00.000Z');
 
-/** Fiche appartenant à `com-2`, donc à quelqu'un d'autre que `COMMERCIAL`. */
 const foreignRow = (): Record<string, unknown> => ({
   id: 'rep-9',
   fullName: 'Fatou Ndiaye',
@@ -89,26 +73,14 @@ describe('lookup par téléphone', () => {
 
     const result = await service.lookup(COMMERCIAL, '77 123 45 67');
 
-    // Ce que l'appelant doit apprendre : le numéro est pris, et par qui.
     expect(result.found).toBe(true);
     expect(result.phoneE164).toBe('+221771234567');
     expect(result.ownedByCommercialName).toBe('Moussa Sarr');
 
-    // Ce qu'il ne doit PAS apprendre.
     expect(result.representant).toBeNull();
     expect(result.ownedByCommercialId).toBeNull();
   });
 
-  /**
-   * La forme MINIMALE, en extension et non en compréhension.
-   *
-   * Le test ci-dessus nomme ce qui doit être nul. Il ne dit rien d'un champ
-   * AJOUTÉ demain au DTO : `lastProspectAt`, `departementName`, un compteur.
-   * Un champ neuf naît renseigné dans la branche « fiche d'autrui » aussi
-   * sûrement que dans l'autre, et aucune assertion existante ne bouge. On fige
-   * donc l'ensemble EXACT des clés, puis on relit la réponse sérialisée à la
-   * recherche de tout ce que la fiche contenait.
-   */
   it('n’expose RIEN d’autre que found, phoneE164 et le nom du propriétaire', async () => {
     db.representant.findFirst.mockResolvedValue(foreignRow());
 
@@ -118,9 +90,6 @@ describe('lookup par téléphone', () => {
       ['found', 'phoneE164', 'representant', 'ownedByCommercialId', 'ownedByCommercialName'].sort(),
     );
 
-    // Tout ce que porte la ligne d'autrui et qui ne doit pas franchir la
-    // frontière : identité du représentant, notes de terrain, rattachement,
-    // volume de portefeuille, identifiant du propriétaire.
     const charge = JSON.stringify(result);
     for (const secret of [
       'Fatou Ndiaye',
@@ -135,7 +104,6 @@ describe('lookup par téléphone', () => {
       expect(charge, `« ${secret} » a fui hors du lookup`).not.toContain(secret);
     }
 
-    // Garde-fou : une réponse vide satisferait toutes les lignes ci-dessus.
     expect(charge).toContain('Moussa Sarr');
   });
 
@@ -162,8 +130,6 @@ describe('lookup par téléphone', () => {
   });
 
   it('répond « libre » sans erreur quand le numéro n’est pas pris', async () => {
-    // `found: false` et non 404 : « ce numéro est libre » est la réponse
-    // ORDINAIRE sur le chemin de saisie, pas une exception à traiter.
     const result = await service.lookup(COMMERCIAL, '77 123 45 67');
 
     expect(result.found).toBe(false);
@@ -210,12 +176,6 @@ describe('conflit de téléphone à la création', () => {
     expect(body.existing).toMatchObject({ id: 'rep-9', fullName: 'Fatou Ndiaye' });
   });
 
-  /**
-   * L'index unique partiel `representants_phone_e164_active_key` est GLOBAL :
-   * il ne connaît pas le mode démonstration. Filtrer ce contrôle déclarerait
-   * libre un numéro que la base refuse ensuite, et le commercial recevrait un
-   * 409 générique au lieu de ce message-ci.
-   */
   it('cherche le conflit SANS portée de démonstration : l’unicité est globale', async () => {
     await service.create(COMMERCIAL, input).catch(() => undefined);
 
@@ -226,12 +186,6 @@ describe('conflit de téléphone à la création', () => {
 });
 
 describe('cloisonnement de la route', () => {
-  /**
-   * Le rôle est posé SUR LA CLASSE : une route ajoutée demain hérite de la
-   * restriction au lieu de naître ouverte. Sans décorateur, `RolesGuard`
-   * laisse passer toute identité authentifiée, y compris BANQUE_FINANCE, qui
-   * n'a aucun usage de l'annuaire de prospection.
-   */
   it('réserve tout le contrôleur aux commerciaux et aux administrateurs', () => {
     const roles = Reflect.getMetadata(ROLES_KEY, RepresentantsController) as Role[] | undefined;
 
@@ -246,27 +200,10 @@ describe('cloisonnement de la route', () => {
       ?.value as object;
     const roles = Reflect.getMetadata(ROLES_KEY, handler) as Role[];
 
-    // `getAllAndOverride` fait gagner le décorateur de méthode sur celui de la
-    // classe : l'import reste plus fermé que le reste du contrôleur.
     expect(roles).toEqual([Role.ADMIN]);
   });
 });
 
-/**
- * La nature de la fiche, à la création.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * LE DÉFAUT CORRIGÉ
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `create` n'écrivait pas `isDemo`. La colonne prenait son défaut, FALSE, et
- * un représentant saisi pendant une démonstration devenait une VRAIE fiche de
- * l'annuaire : encore listée après l'extinction du mode, comptée dans la
- * productivité, et que rien ne désigne comme fictive.
- *
- * Un représentant est une RACINE : il n'a pas de ligne de rattachement dont
- * hériter, l'interrupteur décide donc seul.
- */
 describe('nature de la fiche créée', () => {
   const saisie = {
     fullName: 'Fatou Ndiaye',

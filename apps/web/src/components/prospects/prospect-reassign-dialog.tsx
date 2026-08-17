@@ -22,15 +22,6 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import type { ProspectRow } from '@/lib/types';
 
-/**
- * Réaffectation d'un prospect.
- *
- * Deux rattachements distincts, et c'est la raison d'être de cet écran séparé :
- * le REPRÉSENTANT (qui a présenté le prospect, donc le département) et le
- * COMMERCIAL propriétaire (qui le voit dans son application). Les confondre
- * ferait disparaître un prospect de la tournée d'un téléconseiller sans qu'il
- * comprenne pourquoi.
- */
 export function ProspectReassignDialog({
   prospect,
   onOpenChange,
@@ -59,9 +50,6 @@ export function ProspectReassignDialog({
       if (prospect === null) throw new Error('Aucun prospect sélectionné.');
       return reassignProspects({
         prospectIds: [prospect.id],
-        // On n'envoie que ce qui change : réaffecter vers la valeur déjà en
-        // place ferait tout de même monter la révision et déclencherait une
-        // synchronisation inutile sur tous les téléphones.
         ...(representantId !== null && representantId !== prospect.representantId
           ? { representantId }
           : {}),

@@ -6,15 +6,6 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 import type { AuthenticatedUser } from '../decorators/current-user.decorator.js';
 import { readEnv } from '../../env.js';
 
-/**
- * Charge utile du jeton d'accès. Volontairement minimale.
- *
- * `typ` est déclaré `string` et non `'access'` : ce qui sort de `verify()` est
- * un JSON quelconque produit par un tiers, pas une valeur dont le compilateur
- * peut garantir la forme. Le typer en littéral ferait disparaître le contrôle
- * ci-dessous comme « toujours vrai » alors qu'il est le seul rempart contre un
- * refresh token présenté à la place d'un jeton d'accès.
- */
 export interface AccessTokenPayload {
   sub: string;
   email: string;
@@ -24,11 +15,6 @@ export interface AccessTokenPayload {
   typ: string;
 }
 
-/**
- * Guard global. Ferme par défaut : une route sans `@Public()` exige un jeton
- * valide. L'inverse (ouvrir par défaut, fermer par décorateur) transforme un
- * oubli en fuite de données ; ici un oubli produit un 401.
- */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
@@ -63,8 +49,6 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Jeton d’accès invalide ou expiré');
     }
 
-    // Un refresh token est signé avec un autre secret, mais un jeton forgé avec
-    // le bon secret et un mauvais `typ` doit tout de même être refusé.
     if (payload.typ !== 'access') {
       throw new UnauthorizedException('Jeton d’accès invalide');
     }

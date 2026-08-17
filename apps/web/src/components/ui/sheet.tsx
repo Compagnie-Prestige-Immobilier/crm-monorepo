@@ -6,14 +6,6 @@ import type * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-/**
- * Panneau latéral. Sous 768 px, la sidebar bordeaux devient un `Sheet` : le
- * contenu garde la même largeur utile qu'en plein écran au lieu d'être
- * comprimé sous une colonne de navigation fixe.
- *
- * `Dialog.Root` de Base UI ne rend aucun élément et ses props sont génériques
- * (`<Payload>`) : on ré-exporte la primitive au lieu de l'envelopper.
- */
 const Sheet = SheetPrimitive.Root;
 
 type SheetTriggerProps = Omit<SheetPrimitive.Trigger.Props, 'className'> & {
@@ -37,12 +29,6 @@ type SheetContentProps = Omit<SheetPrimitive.Popup.Props, 'className'> & {
   side?: 'top' | 'right' | 'bottom' | 'left' | undefined;
 };
 
-/**
- * Les images-clés `slide-in-from-*` / `slide-out-to-*` de tw-animate-css sont
- * conservées telles quelles : seuls les sélecteurs changent,
- * `data-[state=open]` devenant `data-open`. Base UI garde le panneau monté
- * jusqu'à la fin de l'animation de sortie, exactement comme Radix.
- */
 function SheetContent({ className, children, side = 'right', ...props }: SheetContentProps) {
   return (
     <SheetPrimitive.Portal>

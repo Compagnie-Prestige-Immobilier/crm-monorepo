@@ -5,26 +5,6 @@ import { getApiClient } from '@/lib/api/browser';
 import { toFilterQuery } from '@/lib/api/query-params';
 import type { NamedCount, ProspectFilters } from '@/lib/types';
 
-/**
- * Les statistiques ajoutées : pilotage de campagne, délais, vieillissement du
- * portefeuille, cohortes, productivité, qualité de base, rendement, provenance.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Rien n'est recalculé ici. Tout vient du SQL.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Les huit routes prennent le MÊME `ProspectFilterDto` que la liste, l'export
- * et l'entonnoir : `toFilterQuery` les sert donc toutes sans traduction propre.
- * C'est ce qui garantit qu'un chiffre lu ici décrit exactement la population du
- * tableau, et c'est aussi ce que vérifie `filter-consistency.test.ts` côté API.
- *
- * Chaque tuile a sa PROPRE requête plutôt qu'un `Promise.all` unique : ces
- * calculs sont lourds (médianes, cohortes hebdomadaires, ancienneté par étape)
- * et n'ont pas la même fraîcheur utile. Les fondre en un appel ferait attendre
- * la tuile la plus rapide derrière la plus lente, à chaque changement de
- * filtre.
- */
-
 type Schemas = components['schemas'];
 
 export type CampaignPilotage = Schemas['CampaignPilotageDto'];
@@ -120,17 +100,6 @@ export async function fetchOriginBreakdown(
   );
 }
 
-// ─── Dérivations d'affichage ────────────────────────────────────────────────
-
-/**
- * Tâches clôturées par JOUR, tous commerciaux confondus.
- *
- * L'API rend une ligne par (jour, téléconseiller) : c'est la bonne granularité pour
- * répondre à « qui avance », mais le graphique de cadence répond à « est-ce que
- * ça avance ». Le repli est fait ici parce qu'il dépend du graphique affiché,
- * pas de la donnée : servir les deux formes obligerait l'API à connaître la
- * mise en page.
- */
 export function closedPerDayTotals(
   rows: readonly { day: string; done: number }[],
 ): { day: string; done: number }[] {
@@ -141,13 +110,6 @@ export function closedPerDayTotals(
     .sort((a, b) => a.day.localeCompare(b.day));
 }
 
-/**
- * Les commerciaux les plus actifs sur la campagne, du plus au moins avancé.
- *
- * Le classement est calculé sur les tâches CLÔTURÉES et non sur les tentatives :
- * passer trente appels sans issue n'est pas de l'avancement, et un classement
- * qui le compterait récompenserait exactement le mauvais geste.
- */
 export function closedPerCommercial(
   rows: readonly { commercialId: string; commercialName: string; done: number }[],
 ): NamedCount[] {
@@ -164,27 +126,12 @@ export function closedPerCommercial(
     .sort((a, b) => b.value - a.value);
 }
 
-/**
- * Durée en jours, prête à afficher.
- *
- * `null` reste `null` et ne devient JAMAIS `0` : « aucun couple d'horodatages
- * exploitable » n'est pas « instantané ». Les confondre afficherait un délai
- * parfait sur une chaîne qui n'a rien traité du tout.
- */
 export function formatDelayDays(days: number | null): string {
   if (days === null) return 'Aucune mesure';
   if (days < 1) return 'Moins d’un jour';
   return `${String(Math.round(days * 10) / 10)} j`;
 }
 
-/**
- * Reste-t-il de quoi projeter une date de fin ?
- *
- * L'API rend `null` quand la cadence observée est nulle, et c'est le bon
- * comportement : une campagne à l'arrêt n'a pas de date de fin, et en annoncer
- * une serait une division par zéro déguisée en prévision. L'écran doit le dire
- * avec des mots, pas afficher un tiret.
- */
 export function estimatedEndLabel(estimatedEndDate: string | null, remaining: number): string {
   if (remaining <= 0) return 'Tout est traité';
   if (estimatedEndDate === null) return 'Aucune cadence observée';

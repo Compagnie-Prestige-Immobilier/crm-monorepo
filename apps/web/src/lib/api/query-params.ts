@@ -2,27 +2,11 @@ import type { operations } from '@crm/api-client';
 
 import type { Paginated, ProspectFilters } from '@/lib/types';
 
-/**
- * Traduction `ProspectFilters` → paramètres de requête de l'API.
- *
- * Le type de sortie est celui du contrat généré, pas un `Record<string,
- * string>` : ajouter un critère que l'API n'expose pas fait échouer le
- * `typecheck` au lieu de partir dans l'URL et d'être ignoré en silence.
- */
 export type ProspectQuery = NonNullable<operations['listProspects']['parameters']['query']>;
 export type AnalyticsQuery = NonNullable<operations['getAnalyticsTotals']['parameters']['query']>;
 
-/**
- * Borne basse d'une journée locale, en instant ISO.
- *
- * `dateFrom=2026-08-12` seul serait interprété comme minuit pile : correct pour
- * la borne basse, mais la borne haute exclurait toute la journée. Vérifié sur
- * l'API : `dateTo=2026-08-12` renvoie zéro ligne pour un prospect saisi à 10 h
- * ce jour-là. Les deux bornes sont donc explicitées.
- *
- * L'heure métier est `Africa/Dakar`, c'est-à-dire UTC+0 toute l'année (pas de
- * changement d'heure au Sénégal) : `Z` est exact, sans conversion.
- */
+// Bornes explicitees: `dateTo=2026-08-12` nu vaut minuit pile et exclut la journee du 12.
+// L'heure metier est `Africa/Dakar`, UTC+0 toute l'annee: le `Z` est exact, sans conversion.
 function startOfDay(isoDate: string): string {
   return `${isoDate}T00:00:00.000Z`;
 }
@@ -31,11 +15,6 @@ function endOfDay(isoDate: string): string {
   return `${isoDate}T23:59:59.999Z`;
 }
 
-/**
- * Partie commune au tableau, aux graphiques et à l'export : les critères de
- * sélection, sans pagination ni tri. C'est ce qui garantit qu'un fichier Excel
- * décrit exactement la population affichée.
- */
 export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
   const query: AnalyticsQuery = {};
 
@@ -60,7 +39,6 @@ export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
   return query;
 }
 
-/** Les mêmes critères, plus la pagination et le tri du tableau. */
 export function toProspectQuery(filters: ProspectFilters): ProspectQuery {
   return {
     ...toFilterQuery(filters),
@@ -71,7 +49,6 @@ export function toProspectQuery(filters: ProspectFilters): ProspectQuery {
   };
 }
 
-/** `{ items, meta }` du contrat → pagination aplatie du panel. */
 export function flattenPage<T>(payload: {
   items: T[];
   meta: { total: number; page: number; pageSize: number; pageCount: number };
@@ -81,8 +58,6 @@ export function flattenPage<T>(payload: {
     total: payload.meta.total,
     page: payload.meta.page,
     pageSize: payload.meta.pageSize,
-    // L'API renvoie `pageCount: 1` sur un résultat vide ; on garde au moins 1
-    // pour que « page 1 / 1 » s'affiche plutôt que « page 1 / 0 ».
     pageCount: Math.max(1, payload.meta.pageCount),
   };
 }

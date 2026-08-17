@@ -2,30 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 import type { EnrollmentMethod } from '@crm/database';
 import { CallOutcome, Phase2Status } from '@crm/database';
 
-/**
- * Règles de cohérence d'une tentative d'appel, miroir applicatif des
- * contraintes CHECK posées par la migration `20260812141010_phase2_and_bank_finance`.
- *
- * Elles sont écrites DEUX FOIS, ici et en base, et c'est délibéré :
- *
- * - en base, parce qu'un correctif SQL manuel ou un futur chemin d'écriture ne
- *   doit pas pouvoir produire une ligne incohérente ;
- * - ici, parce qu'une violation de CHECK remonte en 500 côté client. Le mobile
- *   ne sait rien faire d'un 500 sinon rejouer indéfiniment un lot voué à
- *   échouer. Il lui faut un code métier et un message.
- *
- * Les tests d'intégration vérifient que les deux définitions coïncident : toute
- * entrée acceptée ici est acceptée par la base.
- */
-
-/** Longueur maximale d'un commentaire, identique à la contrainte CHECK. */
 export const COMMENT_MAX_LENGTH = 2_000;
 
-/**
- * Issues qui CLÔTURENT le dossier du prospect. Les trois autres
- * (`UNREACHABLE`, `CALLBACK`, `OTHER`) enregistrent une trace et laissent la
- * tâche ouverte : le prospect reste à rappeler.
- */
 export const TERMINAL_OUTCOMES = [
   CallOutcome.METHOD_OBTAINED,
   CallOutcome.REFUSED,
@@ -38,7 +16,6 @@ export function isTerminalOutcome(outcome: CallOutcome): outcome is TerminalOutc
   return (TERMINAL_OUTCOMES as readonly CallOutcome[]).includes(outcome);
 }
 
-/** Statut de phase 2 résultant d'une issue terminale. */
 export const PHASE2_STATUS_FOR_OUTCOME: Readonly<Record<TerminalOutcome, Phase2Status>> = {
   [CallOutcome.METHOD_OBTAINED]: Phase2Status.METHOD_OBTAINED,
   [CallOutcome.REFUSED]: Phase2Status.REFUSED,
@@ -53,9 +30,7 @@ export interface RawAttempt {
 
 export interface NormalizedAttempt {
   readonly outcome: CallOutcome;
-  /** Non nulle si et seulement si `outcome = METHOD_OBTAINED`. */
   readonly method: EnrollmentMethod | null;
-  /** Rognée ; nulle plutôt que vide, pour que la contrainte CHECK tienne. */
   readonly comment: string | null;
   readonly terminal: boolean;
 }
@@ -64,15 +39,6 @@ const invalid = (code: string, message: string): never => {
   throw new BadRequestException({ code, message });
 };
 
-/**
- * Valide et normalise le corps d'une tentative.
- *
- * Une méthode envoyée avec une issue qui n'en admet pas est REFUSÉE, pas
- * ignorée silencieusement : côté mobile, cela signifie qu'une case a été cochée
- * dans une branche d'écran incohérente, et la faire disparaître sans rien dire
- * masquerait le bug d'interface jusqu'à ce qu'un prospect se retrouve avec une
- * méthode qu'il n'a jamais donnée.
- */
 export function normalizeAttempt(input: RawAttempt): NormalizedAttempt {
   const terminal = isTerminalOutcome(input.outcome);
   const method = input.method ?? null;

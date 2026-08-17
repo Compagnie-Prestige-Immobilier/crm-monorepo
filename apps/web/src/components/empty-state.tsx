@@ -3,10 +3,6 @@ import type { ReactNode } from 'react';
 
 import { Card } from '@/components/ui/card';
 
-/**
- * État vide. Il dit ce que l'écran contiendra et ce qui manque pour l'obtenir -
- * un cadre vide sans texte laisse croire à une panne.
- */
 export function EmptyState({
   icon: Icon,
   title,

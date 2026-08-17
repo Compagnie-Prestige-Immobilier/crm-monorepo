@@ -76,9 +76,6 @@ function prismaStub(): MockDb {
       findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
-      // L'arbitrage se gagne par une écriture CONDITIONNELLE : elle rend le
-      // nombre de lignes touchées, et zéro signifie « quelqu'un est passé
-      // avant ». Le double doit donc répondre 1 par défaut.
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     prospect: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn() },
@@ -87,7 +84,6 @@ function prismaStub(): MockDb {
     banque: { findUnique: vi.fn().mockResolvedValue({ id: 'banque-1' }) },
     $transaction: vi.fn(),
   };
-  // Le rappel de transaction interactive de Prisma est asynchrone à dessein.
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   db.$transaction.mockImplementation((run: (tx: MockDb) => Promise<unknown>) => run(db));
   return db;
@@ -109,8 +105,6 @@ beforeEach(() => {
 
 describe('dépôt d’une demande', () => {
   it('NORMALISE le téléphone avant tout contrôle', async () => {
-    // « 77 123 45 67 » et « +221771234567 » désignent le même abonné. Sans
-    // normalisation, la demande passerait sur un client pourtant déjà en base.
     db.clientCreationRequest.findFirst.mockResolvedValue(null);
     db.clientCreationRequest.create.mockResolvedValue(requestRow());
 
@@ -131,8 +125,6 @@ describe('dépôt d’une demande', () => {
   });
 
   it('REFUSE quand le prospect existe déjà, en renvoyant son numéro', async () => {
-    // C'est le cas utile : la recherche de l'agent a échoué sur une faute de
-    // frappe du nom. Créer un doublon serait la pire issue.
     db.prospect.findFirst.mockResolvedValue({ id: 'prospect-1' });
 
     const error = await service
@@ -180,8 +172,6 @@ describe('dépôt d’une demande', () => {
   });
 
   it('prévient les ADMIN, et un échec de notification NE PERD PAS la demande', async () => {
-    // La demande est déjà écrite : la perdre parce que le canal d'alerte est
-    // indisponible remettrait l'agent dans l'impasse que ce module lève.
     db.clientCreationRequest.findFirst.mockResolvedValue(null);
     db.clientCreationRequest.create.mockResolvedValue(requestRow());
     notify.create.mockRejectedValue(new Error('transport hors service'));
@@ -207,8 +197,6 @@ describe('dépôt d’une demande', () => {
 
 describe('lecture', () => {
   it('CLOISONNE : un agent bancaire ne voit que ses propres demandes', async () => {
-    // L'identité des clients qu'une autre banque cherche à faire créer est une
-    // fuite entre concurrents, pas une commodité.
     await service.list(BANKER, {});
     const args = (
       db.clientCreationRequest.findMany.mock.calls[0] as [{ where: Record<string, unknown> }]
@@ -225,8 +213,6 @@ describe('lecture', () => {
   });
 
   it('compte les demandes en attente HORS filtre, pour la pastille du menu', async () => {
-    // Filtré, ce compteur retomberait à zéro dès qu'un admin consulte l'onglet
-    // « approuvées », et la pastille cesserait de signaler ce qui reste à faire.
     db.clientCreationRequest.count.mockResolvedValueOnce(12).mockResolvedValueOnce(3);
     const result = await service.list(ADMIN, { status: ClientRequestStatus.APPROVED });
 
@@ -252,8 +238,6 @@ describe('approbation', () => {
   });
 
   it('crée le prospect en METHOD_OBTAINED avec sa provenance', async () => {
-    // METHOD_OBTAINED est la condition EXACTE du filtre de recherche bancaire :
-    // en PENDING, la fiche serait invisible à celui-là même qui l'a demandée.
     await service.approve(ADMIN, 'req-1', body);
 
     const args = (db.prospect.create.mock.calls[0] as [{ data: Record<string, unknown> }])[0];
@@ -270,8 +254,6 @@ describe('approbation', () => {
   });
 
   it('écrit le prospect ET la demande dans la MÊME transaction', async () => {
-    // Un prospect orphelin et une demande éternellement en attente sur un
-    // numéro désormais pris seraient impossibles à rattraper à la main.
     await service.approve(ADMIN, 'req-1', body);
 
     expect(db.$transaction).toHaveBeenCalledTimes(1);
@@ -285,18 +267,9 @@ describe('approbation', () => {
       reviewedById: ADMIN.id,
     });
     expect(update.data.createdProspectId).toEqual(expect.any(String));
-    // Le `status: PENDING` dans le `where` EST la garde de concurrence : sans
-    // lui, deux administrateurs qui arbitrent la même demande écrivent tous
-    // les deux et le second écrase le premier.
     expect(update.where).toMatchObject({ id: 'req-1', status: ClientRequestStatus.PENDING });
   });
 
-  /**
-   * Deux administrateurs devant le même écran d'arbitrage est le cas ORDINAIRE.
-   * `loadPending` lit hors transaction : les deux la franchissent. Seule
-   * l'écriture conditionnelle départage, et le perdant doit faire avorter la
-   * transaction, donc défaire le prospect qu'il venait de créer.
-   */
   it('REFUSE d’approuver une demande qu’un autre administrateur vient d’arbitrer', async () => {
     db.clientCreationRequest.updateMany.mockResolvedValue({ count: 0 });
 
@@ -322,8 +295,6 @@ describe('approbation', () => {
   });
 
   it('relit le téléphone JUSTE AVANT d’écrire', async () => {
-    // Entre le dépôt et l'arbitrage, un commercial a très bien pu saisir la
-    // fiche en tournée.
     db.prospect.findFirst.mockResolvedValue({ id: 'prospect-1' });
     await expect(service.approve(ADMIN, 'req-1', body)).rejects.toBeInstanceOf(ConflictException);
     expect(db.prospect.create).not.toHaveBeenCalled();

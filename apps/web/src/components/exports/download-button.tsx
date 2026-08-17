@@ -6,20 +6,6 @@ import { toast } from 'sonner';
 import { isDemoResponse, withDemoSuffix } from '@/lib/demo-marking';
 import { apiErrorMessage } from '@/lib/utils';
 
-/**
- * Téléchargement d'un fichier produit par un Route Handler.
- *
- * On ne pose JAMAIS un simple `<a download>` : la réponse peut être une erreur
- * JSON (session expirée, rôle refusé, API indisponible), et un lien nu
- * enregistrerait alors un fichier `.xlsx` ou `.pdf` contenant du texte
- * d'erreur : que l'utilisateur transmettrait sans le savoir, et que le
- * destinataire ouvrirait devant sa direction. On récupère donc la réponse, on
- * vérifie le statut, et on ne déclenche l'enregistrement qu'ensuite.
- *
- * Le drapeau `pending` interdit le second clic : deux téléchargements
- * concurrents du même classeur consommeraient deux fois le quota de l'API pour
- * un seul fichier utile.
- */
 export function useFileDownload(): {
   pending: boolean;
   download: (input: { url: string; fileName: string; failureMessage: string }) => Promise<void>;
@@ -38,17 +24,6 @@ export function useFileDownload(): {
           return;
         }
 
-        /**
-         * Le nom ENREGISTRÉ porte la marque de démonstration.
-         *
-         * C'est ici, et nulle part ailleurs, que le nom du fichier se décide :
-         * le téléchargement passe par un blob et `anchor.download`, si bien que
-         * le `Content-Disposition` de la réponse : celui-là même que l'API a
-         * suffixé en `-DEMONSTRATION` : n'est jamais lu par le navigateur.
-         * Sans cette ligne, un classeur de chiffres fictifs arrive dans le
-         * dossier Téléchargements sous le nom d'un vrai export, et repart par
-         * courriel sans qu'aucune marque extérieure ne subsiste.
-         */
         const fileName = withDemoSuffix(input.fileName, isDemoResponse(response.headers));
 
         const blob = await response.blob();
@@ -57,7 +32,6 @@ export function useFileDownload(): {
         anchor.href = objectUrl;
         anchor.download = fileName;
         anchor.click();
-        // Sans révocation, le blob reste en mémoire tant que l'onglet est ouvert.
         URL.revokeObjectURL(objectUrl);
         toast.success('Fichier généré.');
       } catch {

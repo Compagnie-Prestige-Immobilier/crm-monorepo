@@ -3,7 +3,6 @@ import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsIn, IsString, MaxLength } from 
 
 import { PURGE_DOMAIN_KEYS, type PurgeDomainKey } from './purge-plan.js';
 
-/** Catalogue d'un domaine purgeable, tel que l'écran l'affiche. */
 export class PurgeDomainDto {
   @ApiProperty({ enum: PURGE_DOMAIN_KEYS, enumName: 'PurgeDomainKey' })
   key!: PurgeDomainKey;

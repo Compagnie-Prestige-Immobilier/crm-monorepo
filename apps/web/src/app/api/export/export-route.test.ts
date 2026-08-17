@@ -3,19 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '@/lib/api/config';
 import { mockCookies, type FakeCookieStore } from '@/test/cookie-store';
 
-/**
- * `GET /api/export/prospects`.
- *
- * Deux exigences que rien d'autre ne couvre :
- *
- *  - Le fichier doit arriver comme un vrai `.xlsx` : bon `Content-Type`, bon
- *    `Content-Disposition`. Un octet-stream nommé sans extension s'ouvre dans
- *    le navigateur au lieu d'Excel.
- *  - En cas d'échec amont, surtout PAS de fichier de repli. Un `.xlsx`
- *    contenant un message d'erreur serait transmis à la direction sans que
- *    personne ne l'ouvre avant la réunion.
- */
-
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const ACCESS = 'access.jwt';
 const REFRESH = 'refresh.jwt';
@@ -36,7 +23,6 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-/** Réponse imitant le flux binaire du backend. */
 function xlsx(): Response {
   return new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), {
     status: 200,
@@ -82,14 +68,11 @@ describe('export en régime normal', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe(XLSX_MIME);
-    // `attachment` déclenche le téléchargement ; sans lui, Excel n'est jamais
-    // proposé. Le nom est daté pour ne pas empiler dix `prospects.xlsx`.
     expect(response.headers.get('Content-Disposition')).toMatch(
       /^attachment; filename="cpi-prospects-\d{4}-\d{2}-\d{2}\.xlsx"$/,
     );
     expect(response.headers.get('Cache-Control')).toBe('no-store');
 
-    // Le corps est bien le binaire amont (signature ZIP « PK\x03\x04 »).
     const bytes = new Uint8Array(await response.arrayBuffer());
     expect([...bytes.slice(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
   });
@@ -104,21 +87,11 @@ describe('export en régime normal', () => {
     expect(upstream.pathname).toBe('/api/v1/export/prospects.xlsx');
     expect(upstream.searchParams.get('statut')).toBe('CONVERTI');
     expect(upstream.searchParams.get('banqueId')).toBe('b-1');
-    // Un export contient TOUTE la sélection, jamais la page affichée.
     expect(upstream.searchParams.has('page')).toBe(false);
     expect(upstream.searchParams.has('pageSize')).toBe(false);
     expect(upstream.searchParams.has('sortBy')).toBe(false);
   });
 
-  /**
-   * Les marques de démonstration ne se perdent pas au relais.
-   *
-   * L'API pose `X-Demo-Mode` et suffixe le nom en `-DEMONSTRATION` ; ce relais
-   * reconstruit ses en-têtes, et les laissait donc tomber tous les deux. C'est
-   * le SEUL chemin par lequel un utilisateur télécharge un classeur : un
-   * fichier de chiffres fictifs arrivait dans Téléchargements sous le nom d'un
-   * vrai export, puis repartait par courriel sans aucune marque extérieure.
-   */
   it('relaie `X-Demo-Mode` et suffixe le nom du fichier en mode démonstration', async () => {
     fetchMock.mockResolvedValueOnce(json(SESSION_USER)).mockResolvedValueOnce(
       new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), {
@@ -137,8 +110,6 @@ describe('export en régime normal', () => {
   });
 
   it('annonce explicitement l’absence de mode démonstration', async () => {
-    // Toujours posé, `true` comme `false` : un en-tête absent est ambigu, et le
-    // client ne doit pas avoir à deviner.
     fetchMock.mockResolvedValueOnce(json(SESSION_USER)).mockResolvedValueOnce(
       new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), {
         status: 200,
@@ -154,8 +125,6 @@ describe('export en régime normal', () => {
   });
 
   it('n’envoie pas à l’API un paramètre inventé dans l’URL', async () => {
-    // L'URL repasse par le parseur : une valeur bricolée à la main est écartée
-    // plutôt que relayée telle quelle.
     fetchMock.mockResolvedValueOnce(json(SESSION_USER)).mockResolvedValueOnce(xlsx());
     const { GET } = await import('@/app/api/export/prospects/route');
 
@@ -188,12 +157,9 @@ describe('export : échecs', () => {
     const response = await GET(exportRequest());
 
     expect(response.status).toBe(502);
-    // Le point critique : le client ne doit pas recevoir quelque chose qui
-    // ressemble à un classeur.
     expect(response.headers.get('Content-Type')).not.toBe(XLSX_MIME);
     expect(response.headers.get('Content-Disposition')).toBeNull();
     const body = (await response.json()) as { error: string };
-    // Message actionnable, avec le code amont pour le support.
     expect(body.error).toMatch(/500/);
   });
 

@@ -12,15 +12,6 @@ import {
 } from '@/lib/data/demo';
 import type { DemoCounts, DemoStatus } from '@/lib/types';
 
-/**
- * Garde-fous du mode démonstration.
- *
- * La désactivation supprime des milliers de lignes. Ce n'est pas une action
- * qu'on protège par une intention : on la protège par une fonction, et on
- * l'éprouve. Chaque `expect(false)` de ce fichier correspond à un clic qui ne
- * doit PAS partir.
- */
-
 const COUNTS: DemoCounts = {
   users: 4,
   representants: 12,
@@ -33,7 +24,6 @@ const COUNTS: DemoCounts = {
   bankCaseTransitions: 96,
 };
 
-/** Tous les compteurs à un : la seule façon de comparer les DEUX listes. */
 const COUNTS_ALL: DemoCounts = Object.fromEntries(
   Object.keys(COUNTS).map((key) => [key, 1]),
 ) as unknown as DemoCounts;
@@ -56,9 +46,6 @@ describe('la désactivation ne part JAMAIS par accident', () => {
   });
 
   it('bloque le second clic pendant que le premier court', () => {
-    // Sans ce verrou, un double-clic envoie deux suppressions : la seconde ne
-    // détruit rien de plus : l'API ne supprime que ce qu'elle a enregistré -
-    // mais affiche une erreur au moment où la première vient de réussir.
     expect(canSubmitDisable({ status: status(), confirmed: true, pending: true })).toBe(false);
   });
 
@@ -92,8 +79,6 @@ describe('l’activation obéit aux mêmes verrous', () => {
 
 describe('demoControl', () => {
   it('rend la RAISON quand la bascule est interdite, jamais un bouton muet', () => {
-    // Un bouton grisé sans explication envoie ouvrir un ticket. La phrase du
-    // contrat dit quoi faire.
     const control = demoControl(
       status({ canToggle: false, reason: 'DEMO_MODE_ALLOWED ne vaut pas true.' }),
     );
@@ -118,8 +103,6 @@ describe('ce que la confirmation annonce', () => {
   });
 
   it('écarte les catégories à zéro du détail', () => {
-    // « 0 dossier bancaire » à côté de « 4 210 prospects » dilue le seul
-    // chiffre qui compte et allonge une boîte qu'il faut lire d'un coup d'œil.
     const rows = demoBreakdown({ ...COUNTS, bankCases: 0, campaigns: 0 });
     const labels = rows.map((row) => row.label);
     expect(labels).not.toContain('dossiers bancaires');
@@ -138,10 +121,6 @@ describe('ce que la confirmation annonce', () => {
 
 describe('seededAtOrNull', () => {
   it('traite la chaîne vide comme une absence de date', () => {
-    // Constaté sur la pile de développement : l'API renvoie `seededAt: ""` -
-    // et non `null` : quand le mode n'a jamais été activé. Passée à `parseISO`,
-    // cette chaîne produit `Invalid Date`, puis un plantage de rendu dans
-    // `date-fns/format`.
     expect(seededAtOrNull({ seededAt: '' })).toBeNull();
     expect(seededAtOrNull({ seededAt: '   ' })).toBeNull();
     expect(seededAtOrNull({ seededAt: null })).toBeNull();
@@ -155,23 +134,12 @@ describe('seededAtOrNull', () => {
 });
 
 describe('demoBannerState', () => {
-  /**
-   * Le bandeau ne dépend PAS du rôle.
-   *
-   * Le layout du panel n'interrogeait l'état que pour un ADMIN : un agent
-   * BANQUE_FINANCE, qui a pourtant `/dossiers/export` dans sa barre latérale,
-   * ne voyait jamais l'avertissement et pouvait envoyer des chiffres fictifs à
-   * sa direction. L'état affiché ne se lit donc que dans la réponse, et la
-   * fonction n'a plus de paramètre de rôle à oublier.
-   */
   it('n’affiche le bandeau que si le mode est ACTIF', () => {
     expect(demoBannerState(status({ enabled: true })).enabled).toBe(true);
     expect(demoBannerState(status({ enabled: false })).enabled).toBe(false);
   });
 
   it('normalise la date d’ensemencement, chaîne vide comprise', () => {
-    // L'API renvoie `seededAt: ""` quand le mode n'a jamais été activé : passée
-    // telle quelle à `formatDate`, elle plante le rendu du bandeau.
     expect(demoBannerState(status({ seededAt: '' })).seededAt).toBeNull();
     expect(demoBannerState(status({ seededAt: '2026-08-12T09:00:00.000Z' })).seededAt).toBe(
       '2026-08-12T09:00:00.000Z',
@@ -180,13 +148,6 @@ describe('demoBannerState', () => {
 });
 
 describe('les deux confirmations décrivent le MÊME jeu de données', () => {
-  /**
-   * L'activation annonce ce qui va être créé ; la désactivation rechiffre ce
-   * qui va être supprimé. Deux listes divergentes feraient croire qu'on
-   * installe une chose et qu'on en retire une autre : l'administrateur
-   * n'oserait plus retirer, et le jeu de démonstration resterait en place, mêlé
-   * aux vraies données. C'est exactement l'accident que tout ce module vise.
-   */
   it('n’annonce à l’activation que des natures que la suppression sait rendre', () => {
     const removable = new Set(demoBreakdown(COUNTS_ALL).map((row) => row.label));
     for (const kind of DEMO_SEEDED_KINDS) {

@@ -14,30 +14,11 @@ import {
 } from './purge-plan.js';
 import { PURGE_STEPS } from './purge-steps.js';
 
-/**
- * Le plan de purge est la seule pièce du dispositif qui décide de CE QUI est
- * supprimé et DANS QUEL ORDRE. Une erreur ici ne produit pas un écran fautif,
- * elle produit une base incohérente ou une transaction en échec.
- */
-
-/**
- * Le schéma Prisma, seule source de vérité sur les tables existantes.
- *
- * Chemin relatif au fichier de test et non au répertoire de travail : la suite
- * s'exécute depuis `apps/api`, mais un lancement depuis la racine du dépôt ne
- * doit pas transformer ce contrôle en faux vert.
- */
 const SCHEMA_PATH = new URL(
   '../../../../../packages/database/prisma/schema.prisma',
   import.meta.url,
 ).pathname;
 
-/**
- * Tables volontairement HORS purge, chacune pour une raison NOMMÉE.
- *
- * Une dispense sans motif est une table oubliée qui a trouvé où se cacher : la
- * liste reste courte et commentée ligne à ligne.
- */
 const PURGE_EXEMPT = new Map<string, string>([
   [
     'app_settings',
@@ -65,7 +46,6 @@ const PURGE_EXEMPT = new Map<string, string>([
   ],
 ]);
 
-/** Sous-mot : `sequence` apparaît-elle dans `reference`, dans le même ordre ? */
 function isSubsequenceOf(
   sequence: readonly PurgeStepKey[],
   reference: readonly PurgeStepKey[],
@@ -99,19 +79,6 @@ describe('catalogue des domaines', () => {
     expect(covered).toEqual([...PURGE_STEP_ORDER].sort());
   });
 
-  /**
-   * Le contrôle qui compte : la référence est le SCHÉMA, pas nous-mêmes.
-   *
-   * Comparer `PURGE_DOMAINS` à `PURGE_STEP_ORDER`, comme le faisait la version
-   * précédente, ne peut jamais échouer sur le défaut redouté : les deux listes
-   * sont écrites dans le même fichier, par la même personne, dans le même
-   * geste. Une table AJOUTÉE au schéma et oubliée des deux passe inaperçue, et
-   * la purge annoncée comme complète laisse ses lignes derrière elle.
-   *
-   * Ici la source est `schema.prisma`. Un modèle ajouté demain fait rougir ce
-   * test tant qu'il n'a pas soit son étape, soit sa dispense motivée. C'est la
-   * même mécanique que `demo-visibility.sweep.test.ts`.
-   */
   it('couvre toutes les tables du schéma, ou les dispense avec un motif', async () => {
     const schema = await readFile(SCHEMA_PATH, 'utf8');
     const tables = [...schema.matchAll(/@@map\("([a-z_]+)"\)/g)].map((match) => match[1] ?? '');
@@ -139,13 +106,6 @@ describe('catalogue des domaines', () => {
     }
   });
 
-  /**
-   * `motif.length > 10` était vrai de toute phrase française jamais écrite : ce
-   * contrôle ne pouvait pas échouer. Ce qui peut échouer, et ce qui compte, est
-   * que la dispense porte sur une table QUI EXISTE. Une table renommée laisse
-   * derrière elle une dispense orpheline, et le nouveau nom, lui, n'est couvert
-   * par rien : la purge le laisse debout sans que personne ne le voie.
-   */
   it('chaque dispense vise une table du schéma et porte un motif', async () => {
     const schema = await readFile(SCHEMA_PATH, 'utf8');
     const tables = new Set([...schema.matchAll(/@@map\("([a-z_]+)"\)/g)].map((match) => match[1]));
@@ -163,18 +123,6 @@ describe('catalogue des domaines', () => {
     ).toEqual([]);
   });
 
-  /**
-   * `expect(PURGE_STEPS[step]).toBeDefined()` était garanti par le TYPE :
-   * `PURGE_STEPS` est un `Record<PurgeStepKey, PurgeStep>`, une clé manquante
-   * ne compile pas. Le contrôle ne pouvait donc pas plus échouer que le
-   * compilateur ne pouvait mentir. Ce qui n'est PAS garanti par le type, en
-   * revanche :
-   *
-   *  - qu'aucune étape déclarée ne reste hors de `PURGE_STEP_ORDER`, donc
-   *    jamais exécutée ;
-   *  - qu'aucune table ne soit visée par deux étapes, ce qui la ferait compter
-   *    deux fois dans le total annoncé avant validation.
-   */
   it('exécute chaque étape déclarée, exactement une fois par table', () => {
     expect(Object.keys(PURGE_STEPS).sort()).toEqual([...PURGE_STEP_ORDER].sort());
 
@@ -184,8 +132,6 @@ describe('catalogue des domaines', () => {
       parTable.set(table, [...(parTable.get(table) ?? []), step]);
     }
 
-    // `users` est la seule table légitimement visée par plusieurs étapes : un
-    // domaine par rôle, et les rôles ne se recouvrent pas.
     const doublons = [...parTable.entries()].filter(
       ([table, steps]) => steps.length > 1 && table !== 'users',
     );
@@ -208,14 +154,6 @@ describe('catalogue des domaines', () => {
 
 describe('fermeture de la sélection', () => {
   it('entraîne les dépendances transitivement', () => {
-    // Représentants -> Prospects -> Demandes de clients, Dossiers, Tentatives,
-    // File d'appels. Les demandes entrent par les prospects : une demande
-    // approuvée pointe en `Restrict` vers la fiche qu'elle a produite.
-    //
-    // `campagnesRepresentants` entre par les représentants, et en CASCADE :
-    // tâches et tentatives d'appel pendent du représentant. Sans cette arête,
-    // purger les seuls représentants les emportait sans les compter, et le
-    // rapport rendu à l'administrateur sous-estimait ce qui avait disparu.
     expect(expandPurgeSelection(['representants'])).toEqual([
       'representants',
       'prospects',
@@ -244,7 +182,6 @@ describe('fermeture de la sélection', () => {
     expect(expanded).toContain('representants');
     expect(expanded).toContain('campagnes');
     expect(expanded).toContain('dossiers');
-    // Mais PAS les référentiels : ils ne portent aucune clé vers un compte.
     expect(expanded).not.toContain('referentiels');
   });
 
@@ -256,9 +193,6 @@ describe('fermeture de la sélection', () => {
 
 describe('séquence d’étapes', () => {
   it('reste un sous-mot de l’ordre global, quelle que soit la sélection', () => {
-    // La propriété qui garantit le respect des clés étrangères : si la
-    // séquence produite suit toujours l'ordre global, elle supprime toujours
-    // les enfants avant les parents.
     for (const key of PURGE_DOMAIN_KEYS) {
       expect(isSubsequenceOf(purgeSteps([key]), PURGE_STEP_ORDER)).toBe(true);
     }

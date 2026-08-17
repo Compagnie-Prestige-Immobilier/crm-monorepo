@@ -23,18 +23,6 @@ import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../../ui/widgets/referentials_banner.dart';
 
-/// Nouveau représentant.
-///
-/// Trois champs, et un mécanisme qui compte plus que les trois : la **détection
-/// de doublon vivante** sur le téléphone. Un représentant saisi deux fois, c'est
-/// une fusion 409 côté serveur, une attribution à arbitrer et, au bout de la
-/// chaîne, une commission fausse. Le prévenir à la saisie coûte une requête ; le
-/// réparer après coup coûte une conversation avec deux commerciaux.
-///
-/// La détection interroge **d'abord la base locale** : instantanée, disponible
-/// hors ligne : puis le serveur si le réseau répond. L'ordre n'est pas
-/// négociable : le résultat local doit s'afficher sans attendre le réseau, sinon
-/// la fonctionnalité disparaît précisément là où elle sert.
 class RepresentantFormScreen extends ConsumerStatefulWidget {
   const RepresentantFormScreen({
     super.key,
@@ -44,15 +32,10 @@ class RepresentantFormScreen extends ConsumerStatefulWidget {
     this.prefillPhone,
   });
 
-  /// Référence au brouillon, transportée par l'URL (`?draft=<id>`).
   final String? draftId;
 
-  /// Renseigné en modification.
   final String? representantId;
 
-  /// Recherche restée sans résultat dans le sélecteur, reprise telle quelle :
-  /// la retaper est un geste de plus au moment où l'utilisateur en a déjà fait
-  /// un pour rien.
   final String? prefillName;
   final String? prefillPhone;
 
@@ -73,11 +56,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   final FocusNode _departementFocus = FocusNode();
   final FocusNode _iefFocus = FocusNode();
 
-  /// Non `final` : quand un brouillon est retrouvé sous un AUTRE identifiant
-  /// (ouverture depuis un bouton, retour depuis le sélecteur), l'écran l'adopte
-  /// au lieu d'en créer un second. Sans adoption, la reprise écrirait désormais
-  /// sous l'identifiant neuf et laisserait l'ancienne ligne orpheline sept
-  /// jours durant.
   late String _draftId = widget.draftId ?? Ids.newId();
   late final String _entityId = widget.representantId ?? Ids.newId();
 
@@ -86,7 +64,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   bool _saving = false;
   String? _error;
 
-  /// Doublon détecté : localement, ou par le serveur.
   Representant? _localMatch;
   RepresentantLookup? _remoteMatch;
   Timer? _lookupDebounce;
@@ -105,11 +82,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   @override
   DraftRepository get draftRepository => ref.read(draftRepositoryProvider);
 
-  /// Vide veut dire « rien à sauver », et le référentiel choisi COMPTE.
-  ///
-  /// Sélectionner un département dans une liste est le geste le plus lent d'un
-  /// formulaire tactile : ne le considérer comme rien parce que le nom n'est pas
-  /// encore tapé revenait à jeter précisément ce qu'on voulait protéger.
   @override
   bool get draftIsEmpty =>
       _nom.text.trim().isEmpty &&
@@ -117,9 +89,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       _departementId == null &&
       _iefId == null;
 
-  /// En création seulement : en modification, la fiche existe déjà et c'est son
-  /// identifiant : porté par `?id=`, et retrouvé par
-  /// [DraftRepository.forEntity] : qui porte la restauration.
   @override
   String? draftRouteWithId() => widget.draftId == null && widget.representantId == null
       ? Routes.newRepresentantWithDraft(_draftId)
@@ -147,8 +116,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
         _scheduleLookup();
       }
     }
-    // Vider sur perte de focus, en plus de la traîne : quitter un champ est le
-    // moment où l'utilisateur considère sa valeur acquise.
     for (final FocusNode node in <FocusNode>[
       _nomFocus,
       _phoneFocus,
@@ -176,19 +143,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     super.dispose();
   }
 
-  /// Retrouve la saisie inachevée, quel que soit le chemin d'arrivée.
-  ///
-  /// ═══ CE QUE CE MÉCANISME NE FAISAIT PAS ═══
-  ///
-  /// `_draftId` vaut `widget.draftId ?? Ids.newId()` : ouvert depuis un bouton,
-  /// l'écran tire un identifiant NEUF à chaque montage et relit sous cet
-  /// identifiant, qui par construction n'a jamais rien porté. La restauration
-  /// était donc en écriture seule : le brouillon existait bien en base, et
-  /// personne ne savait plus sous quel nom le chercher.
-  ///
-  /// On interroge donc, dans l'ordre : l'identifiant de l'URL s'il y en a un,
-  /// puis : à défaut : le dernier brouillon connu de ce formulaire. Et en
-  /// modification, le brouillon de CETTE fiche, retrouvé par son `entityId`.
   Future<void> _restore() async {
     final DraftRepository drafts = ref.read(draftRepositoryProvider);
 
@@ -206,9 +160,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
         await _labelDepartement(existing.departementId);
         if (existing.iefId != null) await _labelIef(existing.iefId!);
       }
-      // La fiche est chargée ; s'il existe une correction inachevée sur CETTE
-      // fiche, elle est plus récente que la base et prime : c'est ce que
-      // l'utilisateur était en train d'écrire quand le système l'a interrompu.
       final DraftSnapshot? pending = await drafts.forEntity(
         formKey,
         widget.representantId!,
@@ -218,46 +169,14 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     }
 
     DraftSnapshot? snapshot = await drafts.read(_draftId);
-    // Aucun brouillon sous l'identifiant courant, et l'URL n'en imposait pas :
-    // l'écran vient d'être ouvert depuis un bouton. Le dernier brouillon de ce
-    // formulaire est alors la seule piste, et c'est la bonne.
     if (snapshot == null && widget.draftId == null) {
       final DraftSnapshot? latest = await drafts.latestFor(formKey);
-      // **La fiche visée doit être neuve.** Voir [_isCreationDraft] : sans ce
-      // filtre, une correction interrompue remontait dans un formulaire de
-      // création et détruisait la correction qu'elle prétendait reprendre.
       if (latest != null && await _isCreationDraft(latest)) snapshot = latest;
     }
     if (snapshot == null || !mounted) return;
     _offer(snapshot);
   }
 
-  /// Le brouillon décrit-il bien une CRÉATION ?
-  ///
-  /// ═══ LE BROUILLON D'UNE CORRECTION REMONTAIT DANS UN FORMULAIRE NEUF ═══
-  ///
-  /// [DraftRepository.latestFor] ne filtre que sur `formKey`, et la création
-  /// comme la modification écrivent sous `representant.create` : c'est le même
-  /// écran. La séquence tenait en deux gestes ordinaires : sortir d'une
-  /// correction de la fiche R, puis appuyer sur « Nouveau représentant » dans
-  /// la minute. Le brouillon de R était le dernier de ce formulaire, donc
-  /// retrouvé ; à moins de 60 secondes, [DraftAge.crash] l'appliquait **sans
-  /// rien demander**. Le formulaire neuf se remplissait du nom, du numéro et du
-  /// département de R, l'écran ADOPTAIT le `draftId` de R, et l'enregistrement
-  /// appelait `createRepresentant` avec un identifiant neuf ET ce `draftId`.
-  /// Deux dégâts d'un coup : la correction en cours sur R était supprimée dans
-  /// la transaction d'écriture, et une fiche en doublon partait à sa place.
-  ///
-  /// **Ce qui sépare les deux brouillons est l'existence de la fiche visée.**
-  /// Un brouillon de création porte un `entityId` qu'aucune fiche ne réclame :
-  /// la transaction d'enregistrement supprime le brouillon au moment même où la
-  /// fiche apparaît, donc les deux ne coexistent jamais. Un brouillon de
-  /// correction, lui, nomme forcément une fiche présente en base.
-  ///
-  /// C'est la forme du garde `_acceptsParent` de la saisie de prospects, posé
-  /// pour le même genre de confusion. On ne sépare PAS les deux `formKey` :
-  /// changer la clé rendrait invisibles, donc perdus, les brouillons déjà
-  /// écrits sous l'ancienne, jusqu'à sept jours de saisies.
   Future<bool> _isCreationDraft(DraftSnapshot snapshot) async {
     final String? entityId = snapshot.entityId;
     if (entityId == null) return true;
@@ -270,8 +189,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   void _offer(DraftSnapshot snapshot) {
     switch (snapshot.age) {
       case DraftAge.crash:
-        // Moins de 60 s : ce n'est pas un abandon, c'est un plantage ou une
-        // éjection mémoire. On restaure sans rien demander.
         _apply(snapshot);
       case DraftAge.resumable:
         setState(() => _pendingRestore = snapshot);
@@ -281,9 +198,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   }
 
   void _apply(DraftSnapshot snapshot) {
-    // ADOPTION de l'identifiant retrouvé : les écritures suivantes reprennent
-    // la même ligne. Sans elle, la reprise créerait un second brouillon et
-    // laisserait le premier traîner sept jours.
     final bool adopted = snapshot.draftId != _draftId;
     setState(() {
       if (adopted) _draftId = snapshot.draftId;
@@ -311,12 +225,9 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     if (ief != null && mounted) setState(() => _ief.text = ief.name);
   }
 
-  // ── Détection de doublon ───────────────────────────────────────────────────
 
   void _scheduleLookup() {
     _lookupDebounce?.cancel();
-    // 350 ms : assez pour ne pas interroger à chaque chiffre, assez court pour
-    // que la réponse arrive avant que l'utilisateur n'atteigne le champ suivant.
     _lookupDebounce = Timer(const Duration(milliseconds: 350), _runLookup);
   }
 
@@ -338,10 +249,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     if (!mounted) return;
     setState(() => _localMatch = local?.id == _entityId ? null : local);
 
-    // Le serveur est un BONUS. Son échec ne doit rien casser : hors ligne, la
-    // détection locale reste la seule et elle suffit à éviter la plupart des
-    // doublons, puisqu'un commercial ressaisit presque toujours ses propres
-    // fiches.
     try {
       final RepresentantLookup remote = await ref
           .read(apiPortProvider)
@@ -353,7 +260,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     }
   }
 
-  // ── Enregistrement ─────────────────────────────────────────────────────────
 
   bool get _canSave =>
       _nom.text.trim().length >= 2 &&
@@ -403,17 +309,11 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
             );
       }
 
-      // Le brouillon a été supprimé DANS la transaction d'écriture ; réécrire
-      // maintenant le ferait réapparaître, et l'écran proposerait de reprendre
-      // une saisie déjà enregistrée.
       discardDraft();
       await HapticFeedback.mediumImpact();
       ref.read(syncCoordinatorProvider.notifier).nudge();
 
       if (!mounted) return;
-      // On enchaîne directement sur la saisie de prospects : c'est le geste
-      // suivant dans 100 % des cas réels. Renvoyer à l'accueil obligerait à
-      // retrouver le représentant qu'on vient de créer.
       context.pushReplacement(Routes.newProspectFor(_entityId));
     } on Object catch (e) {
       if (!mounted) return;
@@ -426,17 +326,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     }
   }
 
-  /// Un échec d'enregistrement doit être **perçu**, pas seulement affiché.
-  ///
-  /// Deux canaux, parce qu'aucun ne suffit seul : une infobulle qui passe par
-  /// dessus le clavier, et une annonce au lecteur d'écran. Le message rendu en
-  /// bas de la liste défilante ne franchissait ni l'un ni l'autre : l'appui
-  /// paraissait sans effet.
   void _announceFailure(String message) {
-    // `sendAnnouncement` et non `announce` : cette dernière est dépréciée depuis
-    // Flutter 3.35 et ne sait pas de quelle fenêtre elle parle.
-    // `Assertiveness.assertive` : un échec d'enregistrement interrompt la
-    // lecture en cours, il ne se met pas dans la file d'attente.
     unawaited(
       SemanticsService.sendAnnouncement(
         View.of(context),
@@ -458,17 +348,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       );
   }
 
-  /// ═══ ON RECONNAÎT LA COLONNE, PAS LE NOM DE L'INDEX ═══
-  ///
-  /// Le test portait sur `representants_phone_unique`, le nom de l'index.
-  /// SQLite ne le cite jamais : il rend « UNIQUE constraint failed:
-  /// representants.phone_e164 ». La branche lisible n'était donc JAMAIS prise,
-  /// et pour le cas d'échec le plus fréquent de l'application : ressaisir un
-  /// représentant déjà enregistré : le commercial recevait un
-  /// `SqliteException(2067)` complet en pleine barre d'enregistrement.
-  ///
-  /// Les deux formes sont acceptées : le nom de l'index couvre les moteurs qui
-  /// le citent, la colonne couvre celui qu'on embarque.
   static String _humanize(Object error) {
     final String raw = error.toString();
     if (raw.contains('representants.phone_e164') ||
@@ -478,15 +357,11 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     return 'Enregistrement impossible. $raw';
   }
 
-  // ── Rendu ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final List<Departement> departements =
         ref.watch(departementsProvider).value ?? const <Departement>[];
-    // Restreintes au département choisi : proposer les 59 IEF du pays alors que
-    // le département est connu ferait chercher dans cinquante-huit entrées hors
-    // sujet.
     final List<Ief> iefs = ref.watch(iefsProvider(_departementId)).value ?? const <Ief>[];
 
     return CpiPopScope(
@@ -498,9 +373,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                 : 'Modifier le représentant',
           ),
           leading: const CpiBackButton(),
-          // Hors coque de navigation, cet écran n'avait AUCUN signal réseau :
-          // ni cette icône, ni le bandeau d'attente du shell. Or c'est ici que
-          // le commercial passe l'essentiel de son temps.
           actions: const <Widget>[
             OfflineIndicator(),
             SizedBox(width: CpiSpacing.xs),
@@ -509,21 +381,11 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
         body: SafeArea(
           child: Column(
             children: <Widget>[
-              // Sans département, « Enregistrer » ne peut PAS s'activer : c'est
-              // la seule chose à dire, et il faut la dire avant que
-              // l'utilisateur ne conclue que l'application est cassée.
               ReferentialsBanner(missing: departements.isEmpty),
               if (_pendingRestore != null)
                 _ResumeBanner(
                   label: (_pendingRestore!.values['fullName'] as String?)?.trim(),
                   onResume: () => _apply(_pendingRestore!),
-                  // L'identifiant du brouillon RETROUVÉ, pas celui de l'écran.
-                  // L'adoption n'a lieu que dans `_apply` : sur les chemins de
-                  // restauration par `latestFor` et `forEntity`, `_draftId` est
-                  // encore l'identifiant neuf tiré au montage, et la suppression
-                  // ne touchait aucune ligne. La bannière disparaissait, le
-                  // brouillon survivait, et la même saisie périmée était
-                  // reproposée à chaque ouverture pendant sept jours.
                   onDiscard: () async {
                     await ref
                         .read(draftRepositoryProvider)
@@ -594,9 +456,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                           )
                           .toList(growable: false),
                       onChanged: (String _) {
-                        // Retaper invalide la sélection : sans ça, corriger
-                        // « Dakar » en « Dagana » garderait l'identifiant de
-                        // Dakar tout en affichant Dagana.
                         if (_departementId != null) {
                           setState(() => _departementId = null);
                         }
@@ -605,11 +464,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                       onSelected: (TypeaheadOption option) {
                         setState(() {
                           _departementId = option.id;
-                          // Changer de département invalide l'IEF : les IEF
-                          // n'appartiennent qu'à un seul département, et garder
-                          // « Almadies » après être passé à Thiès produirait une
-                          // fiche que le serveur refuserait sans qu'on sache
-                          // pourquoi.
                           _iefId = null;
                           _ief.text = '';
                         });
@@ -660,10 +514,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                 enabled: _canSave,
                 busy: _saving,
                 onPressed: _save,
-                // L'erreur voyage AVEC le bouton. En bas d'une `ListView`, elle
-                // n'était visible que si l'utilisateur se trouvait déjà au bas
-                // du formulaire : dans tous les autres cas, l'appui semblait
-                // n'avoir aucun effet.
                 error: _error,
               ),
             ],
@@ -687,12 +537,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   }
 }
 
-/// Bandeau « ce représentant existe déjà ».
-///
-/// Il ne bloque pas la saisie : le commercial peut avoir une raison de créer
-/// quand même (homonyme, numéro recyclé). Il propose l'action utile : aller
-/// ajouter des prospects à la fiche existante : au lieu de se contenter d'un
-/// avertissement dont on ne peut rien faire.
 class _DuplicateBanner extends StatelessWidget {
   const _DuplicateBanner({required this.name, this.owner, this.onAddProspects});
 
@@ -720,8 +564,6 @@ class _DuplicateBanner extends StatelessWidget {
               Icon(
                 PhosphorIconsRegular.warningCircle,
                 size: 20,
-                // `accentText` (#856011) et jamais `accent` (#C8921A) : l'or de
-                // surface fait 2,77:1 et échoue AA (docs/design.md §2.3).
                 color: cpi.accentText,
               ),
               const SizedBox(width: CpiSpacing.xs),
@@ -760,11 +602,6 @@ class _DuplicateBanner extends StatelessWidget {
   }
 }
 
-/// Bandeau de reprise, **non bloquant**.
-///
-/// Non bloquant : une boîte de dialogue modale au démarrage d'un écran de saisie
-/// est un obstacle avant même d'avoir compris ce qu'on regarde. Le bandeau
-/// laisse commencer à taper et disparaît tout seul.
 class _ResumeBanner extends StatelessWidget {
   const _ResumeBanner({required this.onResume, required this.onDiscard, this.label});
 
@@ -784,12 +621,6 @@ class _ResumeBanner extends StatelessWidget {
         horizontal: CpiSpacing.md,
         vertical: CpiSpacing.xs,
       ),
-      // Même mise en page que le bandeau des référentiels, et pour la même
-      // raison : deux `TextButton` posés dans le `Row` du message réclamaient
-      // ensemble plus que la largeur d'un 320 dp. Ils prenaient leur dû AVANT
-      // l'`Expanded`, qui se repliait alors sur des dizaines de lignes. Les
-      // actions descendent donc sous le message, dans un `Wrap` qui les met
-      // l'une sous l'autre plutôt que de sortir de l'écran.
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -820,10 +651,6 @@ class _ResumeBanner extends StatelessWidget {
   }
 }
 
-/// Barre d'action ancrée en bas.
-///
-/// En bas et pleine largeur : l'app se tient souvent d'une main ; une action
-/// posée en haut d'un écran de 6,5 pouces est hors d'atteinte du pouce.
 class _SaveBar extends StatelessWidget {
   const _SaveBar({
     required this.label,
@@ -838,7 +665,6 @@ class _SaveBar extends StatelessWidget {
   final bool busy;
   final VoidCallback onPressed;
 
-  /// Message d'échec, affiché **au contact du bouton** qui vient d'être appuyé.
   final String? error;
 
   @override

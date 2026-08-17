@@ -4,7 +4,6 @@ import { AdminController } from './admin.controller.js';
 import { PurgeService } from './purge.service.js';
 import { SupervisionService } from './supervision.service.js';
 
-/** Purge de la base et supervision des comptes. ADMIN uniquement. */
 @Module({
   controllers: [AdminController],
   providers: [PurgeService, SupervisionService],

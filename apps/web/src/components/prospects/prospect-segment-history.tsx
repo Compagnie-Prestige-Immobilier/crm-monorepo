@@ -7,23 +7,6 @@ import { fetchProspectSegmentHistory } from '@/lib/data/prospects';
 import { formatDateTime } from '@/lib/format';
 import { SEGMENT_LABELS } from '@/lib/types';
 
-/**
- * L'historique des bascules d'UNE fiche.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI IL EST ICI, SOUS LE FORMULAIRE, ET PAS DANS UN ÉCRAN À PART
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * C'est l'endroit où quelqu'un s'apprête à convertir. Savoir que la fiche a
- * DÉJÀ basculé deux fois ce trimestre, et pour quels motifs, change la décision
- * qu'on est en train de prendre : un aller-retour BDD4 → BDD1 → BDD4 est le
- * signe d'une saisie qui hésite, pas d'une conversion. Rangé dans un écran
- * séparé, personne ne l'ouvrirait avant de cliquer.
- *
- * La clé de cache commence par `prospects` : l'invalidation qui suit une
- * bascule (`queryKeys.prospectsRoot`) emporte donc l'historique avec la liste,
- * et l'encart ne peut pas rester une version en retard sur la fiche.
- */
 export function ProspectSegmentHistory({ prospectId }: { prospectId: string }) {
   const { data, isPending, isError } = useQuery({
     queryKey: ['prospects', 'segment-history', prospectId],
@@ -36,9 +19,6 @@ export function ProspectSegmentHistory({ prospectId }: { prospectId: string }) {
     );
   }
 
-  // Un historique qu'on n'a pas pu lire n'est PAS un historique vide : annoncer
-  // « aucune bascule » sur une requête en échec ferait croire à une fiche
-  // vierge au moment précis où l'on décide d'en écrire une.
   if (isError) {
     return (
       <p role="alert" className="text-[0.75rem] text-destructive">

@@ -17,10 +17,6 @@ import '../../../ui/widgets/sync_badge.dart';
 import '../../auth/auth_state.dart';
 import '../../notifications/presentation/notification_bell.dart';
 
-/// Accueil : trois compteurs, sept jours d'activité, une action.
-///
-/// Le bouton principal est ancré en bas et occupe toute la largeur : une action
-/// posée en haut d'un écran de 6,5 pouces est hors d'atteinte du pouce.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -49,9 +45,6 @@ class HomeScreen extends ConsumerWidget {
         child: Column(
           children: <Widget>[
             Expanded(
-              // Tirer pour synchroniser : le geste attendu partout sur Android,
-              // et le seul retour d'action que l'utilisateur peut déclencher
-              // lui-même depuis l'accueil.
               child: RefreshIndicator(
                 color: theme.colorScheme.primary,
                 onRefresh: () async {
@@ -59,8 +52,6 @@ class HomeScreen extends ConsumerWidget {
                   await ref.read(syncCoordinatorProvider.notifier).run();
                 },
                 child: ListView.builder(
-                  // 12 dp en haut et non 16 : le contenu utile commence plus
-                  // près du bandeau.
                   padding: const EdgeInsets.fromLTRB(
                     CpiSpacing.md,
                     CpiSpacing.sm,
@@ -106,9 +97,6 @@ class HomeScreen extends ConsumerWidget {
                               icon: count == 0
                                   ? PhosphorIconsRegular.checkCircle
                                   : PhosphorIconsRegular.cloudSlash,
-                              // `accentText` (#856011) et jamais `accent`
-                              // (#C8921A) : ce chiffre est du texte, et l'or de
-                              // surface fait 2,77:1.
                               accentColor: count == 0 ? cpi.success : cpi.accentText,
                               surfaceColor: count == 0 ? null : cpi.accentSurface,
                               onTap: () => context.go(Routes.corrections),
@@ -157,10 +145,6 @@ class _Greeting extends StatelessWidget {
   }
 }
 
-/// Sept jours d'activité, en barres.
-///
-/// Aucun appel réseau : le flux vient de drift et se réémet à chaque écriture
-/// locale. Voir `activityLast7DaysProvider`.
 class _ActivityCard extends StatelessWidget {
   const _ActivityCard({required this.days});
 
@@ -182,10 +166,6 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
-/// Entrée vers la phase 2.
-///
-/// Une carte à part et non un quatrième compteur : la phase 2 n'est pas une
-/// mesure de la prospection, c'est un autre travail.
 class _Phase2Entry extends ConsumerWidget {
   const _Phase2Entry();
 
@@ -196,14 +176,10 @@ class _Phase2Entry extends ConsumerWidget {
     final int pending = ref.watch(phase2PendingCountProvider).value ?? 0;
     final int directory = ref.watch(phase2DirectoryCountProvider).value ?? 0;
 
-    // `push` et non `go` : `go` remplace la pile, ce qui rendait inerte la
-    // flèche de retour de l'écran Phase 2.
     void open() => context.pushOnce(Routes.phase2);
 
     return Semantics(
       button: true,
-      // `onTap` EST l'action d'accessibilité, pas une redite du `InkWell` :
-      // `ExcludeSemantics` a supprimé celle-ci.
       onTap: open,
       label:
           'Phase 2, méthodes d\'enrôlement. '
@@ -226,9 +202,6 @@ class _Phase2Entry extends ConsumerWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    // Surface décorative en or : seul usage autorisé de
-                    // `#C8921A`. L'icône posée dessus utilise
-                    // `accentForeground` (6,95:1), jamais l'or lui-même.
                     color: cpi.accent,
                     borderRadius: CpiRadius.brMd,
                   ),
@@ -278,13 +251,6 @@ class _Phase2Entry extends ConsumerWidget {
   }
 }
 
-/// Action principale, ancrée en zone de pouce.
-///
-/// Elle menait droit au formulaire de création, seule route de représentant que
-/// le routeur connaissait. Un commercial qui revenait voir la même concession
-/// n'avait donc, depuis l'accueil, aucune issue autre que ressaisir une fiche
-/// existante. Elle ouvre désormais la sélection, d'où la création reste à un
-/// geste (voir `representant_picker_screen.dart`).
 class _PrimaryAction extends StatelessWidget {
   const _PrimaryAction();
 
@@ -312,16 +278,9 @@ class _PrimaryAction extends StatelessWidget {
               context.pushOnce(Routes.representants);
             },
             icon: const Icon(PhosphorIconsRegular.users, size: 20),
-            // Le libellé DIT OÙ IL MÈNE. « Saisir des prospects » ouvrait
-            // « Choisir un représentant » : la promesse et l'écran ne se
-            // ressemblaient pas, et l'utilisateur croyait s'être trompé de
-            // bouton.
             label: const Text('Choisir un représentant'),
           ),
           const SizedBox(height: CpiSpacing.xs),
-          // La création reste à UN geste depuis l'accueil. Cachée derrière le
-          // sélecteur, elle demandait deux écrans pour la fiche qui naît en
-          // tournée, c'est-à-dire le cas pressé.
           OutlinedButton.icon(
             onPressed: () {
               HapticFeedback.selectionClick();

@@ -8,33 +8,10 @@ import { SidebarNav } from '@/components/layout/sidebar-nav';
 import type { Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-/**
- * La barre latérale fixe, et son repli.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * La préférence voyage en COOKIE, pas en `localStorage`.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * C'est ce qui évite le défaut le plus visible de ce genre de repli : la barre
- * s'affiche déployée, puis saute à sa version réduite une fois le JavaScript
- * exécuté. À chaque chargement, sur chaque page. Un cookie, lui, est lu par le
- * layout SERVEUR : le premier octet de HTML porte déjà la bonne largeur, et
- * rien ne bouge.
- *
- * Ce n'est pas un secret, seulement une largeur : `httpOnly` serait absurde ici
- * puisque c'est le navigateur qui l'écrit, et `SameSite=Lax` suffit.
- *
- * La barre RÉDUITE garde ses onze cibles au-dessus de 44 px et ses libellés
- * dans l'arbre d'accessibilité (voir `SidebarNav`) : on gagne de la largeur,
- * on ne perd aucune fonction.
- */
-
 function persist(collapsed: boolean): void {
   try {
     document.cookie = `${SIDEBAR_COOKIE}=${collapsed ? '1' : '0'};path=/;max-age=${String(SIDEBAR_COOKIE_MAX_AGE)};samesite=lax`;
-  } catch {
-    // Préférence perdue, écran intact : rien à signaler à l'utilisateur.
-  }
+  } catch {}
 }
 
 export function SidebarShell({
@@ -42,7 +19,6 @@ export function SidebarShell({
   defaultCollapsed,
 }: {
   role: Role;
-  /** Lu dans le cookie par le layout serveur : aucun saut de mise en page. */
   defaultCollapsed: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
@@ -72,8 +48,6 @@ export function SidebarShell({
           onClick={toggle}
           aria-expanded={!collapsed}
           aria-controls="navigation-laterale"
-          // Le libellé nomme l'ACTION à venir, pas l'état courant : « Réduire »
-          // sur une barre déployée. Nommer l'état ferait cliquer à l'envers.
           aria-label={collapsed ? 'Déployer la navigation' : 'Réduire la navigation'}
           title={collapsed ? 'Déployer la navigation' : 'Réduire la navigation'}
           className="absolute top-1/2 -right-3 z-40 flex size-6 -translate-y-1/2 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-elev-sm transition-colors duration-(--dur-1) ease-(--ease-out-cpi) hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring"

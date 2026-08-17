@@ -39,8 +39,6 @@ const userRow = (overrides: Record<string, unknown> = {}): Record<string, unknow
   passwordHash: 'remplacé-par-le-test',
   role: Role.COMMERCIAL,
   isActive: true,
-  // Réel par défaut : c'est l'immense majorité des comptes, et les tests de
-  // démonstration passent `isDemo: true` explicitement.
   isDemo: false,
   lastLoginAt: null,
   departementId: null,
@@ -51,14 +49,6 @@ const userRow = (overrides: Record<string, unknown> = {}): Record<string, unknow
   ...overrides,
 });
 
-/**
- * Lit le premier argument d'un appel enregistré.
- *
- * `vi.fn()` type ses appels en `any` ; les traverser directement ferait perdre
- * toute vérification sur ce que le service a réellement transmis à Prisma. Le
- * passage par cette forme ramène l'accès à `unknown`, que les matchers de
- * vitest comparent sans difficulté.
- */
 interface PrismaCallArgs {
   where?: Record<string, unknown>;
   data?: Record<string, unknown>;
@@ -88,15 +78,11 @@ beforeEach(() => {
   );
 });
 
-/** Le service, avec l'interrupteur de démonstration dans l'état demandé. */
 const authWithDemo = (demo: boolean | 'unknown'): AuthService =>
   new AuthService(prisma as unknown as PrismaService, new JwtService({}), fakeDemoVisibility(demo));
 
 describe('paramètres argon2id', () => {
   it('correspondent EXACTEMENT à ceux du seed', () => {
-    // Un écart ici rend le mot de passe de l'administrateur initial
-    // invérifiable : l'unique compte capable d'en créer d'autres devient
-    // inaccessible sur une base fraîchement semée.
     expect(ARGON2_OPTIONS.memoryCost).toBe(19_456);
     expect(ARGON2_OPTIONS.timeCost).toBe(2);
     expect(ARGON2_OPTIONS.parallelism).toBe(1);
@@ -105,9 +91,6 @@ describe('paramètres argon2id', () => {
   it('vérifie un condensat produit avec ces paramètres', async () => {
     const digest = await hashPassword('ChangeMoiEnProd2026');
     expect(digest.startsWith('$argon2id$')).toBe(true);
-    // Les paramètres sont inscrits dans le condensat lui-même : c'est eux que
-    // relit `verify`, et c'est donc la seule preuve fiable qu'ils sont bien ceux
-    // employés par le seed.
     expect(digest).toContain('m=19456,p=1,t=2');
     await expect(verifyPassword(digest, 'ChangeMoiEnProd2026')).resolves.toBe(true);
     await expect(verifyPassword(digest, 'mauvais')).resolves.toBe(false);
@@ -132,8 +115,6 @@ describe('login', () => {
 
     expect(unknownAccount).toBeInstanceOf(UnauthorizedException);
     expect(wrongPassword).toBeInstanceOf(UnauthorizedException);
-    // Aucun moyen de distinguer les deux : le formulaire de connexion ne doit
-    // pas devenir un oracle d'existence de compte.
     expect((unknownAccount as UnauthorizedException).getResponse()).toEqual(
       (wrongPassword as UnauthorizedException).getResponse(),
     );
@@ -176,16 +157,6 @@ describe('login', () => {
   });
 });
 
-/**
- * LE COMPTE DE DÉMONSTRATION NE SURVIT PAS À LA DÉMONSTRATION.
- *
- * Les six comptes semés naissent `isActive: true` et rien ne les refermait :
- * `disable()` ne supprime ni ne désactive quoi que ce soit, c'est sa raison
- * d'être. `isDemo` ne gouvernant que la visibilité des LIGNES et jamais la
- * SESSION, `demo.admin@cpi.sn` (rôle ADMIN) restait connectable une fois la
- * démonstration éteinte, avec `DEMO_PASSWORD`, une constante publiée dans ce
- * dépôt. La session ainsi ouverte lisait et écrivait les données RÉELLES.
- */
 describe('comptes de démonstration, mode éteint', () => {
   const demoRow = async (): Promise<Record<string, unknown>> =>
     userRow({
@@ -206,13 +177,10 @@ describe('comptes de démonstration, mode éteint', () => {
 
     expect(error).toBeInstanceOf(UnauthorizedException);
     expect(error.getResponse()).toMatchObject({ code: 'ACCOUNT_DISABLED' });
-    // Et aucune session n'a été ouverte : pas de trace de connexion écrite.
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
   it('le même compte se connecte NORMALEMENT pendant la démonstration', async () => {
-    // Le refus doit tenir à l'état du mode, pas au compte : sans cela,
-    // l'animateur ne pourrait plus faire sa démonstration.
     prisma.user.findFirst.mockResolvedValue(await demoRow());
 
     const tokens = await authWithDemo(true).login('demo.admin@cpi.sn', 'Demo1-CPI-Sunugal');
@@ -220,9 +188,6 @@ describe('comptes de démonstration, mode éteint', () => {
   });
 
   it('une lecture de réglage EN ÉCHEC refuse, elle ne laisse pas entrer', async () => {
-    // Les deux erreurs ne se valent pas : refuser à tort coûte une connexion
-    // à retenter, accepter à tort ouvre une session ADMIN sur la production
-    // avec un mot de passe public.
     prisma.user.findFirst.mockResolvedValue(await demoRow());
 
     const error = (await authWithDemo('unknown')
@@ -240,8 +205,6 @@ describe('comptes de démonstration, mode éteint', () => {
   });
 
   it('la session DÉJÀ OUVERTE meurt au renouvellement, et sa famille est révoquée', async () => {
-    // `login` seul laisserait vivre l'appareil de l'animateur jusqu'à
-    // l'expiration du refresh token, soit des jours sur les données réelles.
     const token = new JwtService({}).sign(
       { sub: 'demo-admin', jti: 'j1', fam: 'fam-demo', typ: 'refresh' },
       { secret: REFRESH_SECRET, expiresIn: 3600 },
@@ -302,8 +265,6 @@ describe('rotation et détection de rejeu', () => {
 
     const rotated = await auth.refresh(token);
 
-    // L'ancien jeton est révoqué au passage : c'est ce qui permet de détecter
-    // un rejeu au coup d'après.
     expect(prisma.refreshToken.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'rt-1' } }),
     );

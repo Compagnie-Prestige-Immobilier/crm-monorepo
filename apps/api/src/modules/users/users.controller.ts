@@ -32,15 +32,9 @@ import {
   UserListQueryDto,
 } from './dto.js';
 
-/** Administration des comptes. Le rôle est posé sur la CLASSE : aucune route ne peut l'oublier. */
 @ApiTags('users')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
-// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
-// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
-// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
-// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
-// cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'users', version: '1' })
 export class UsersController {

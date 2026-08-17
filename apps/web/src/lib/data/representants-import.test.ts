@@ -7,15 +7,6 @@ import {
 import { toRepresentantQuery } from '@/lib/data/representants';
 import { EMPTY_REPRESENTANT_FILTERS } from '@/lib/representant-filters';
 
-/**
- * L'export des représentants.
- *
- * Une seule règle y est réellement risquée : le fichier doit décrire
- * EXACTEMENT la population affichée. Celui qui l'envoie à sa direction doit
- * pouvoir jurer qu'il contient ce qu'il avait sous les yeux, et la pagination
- * est la seule chose qui ne doit surtout pas suivre.
- */
-
 describe('buildRepresentantsExportUrl', () => {
   it('n’ajoute aucun paramètre quand aucun critère n’est posé', () => {
     expect(buildRepresentantsExportUrl(EMPTY_REPRESENTANT_FILTERS)).toBe(
@@ -23,16 +14,6 @@ describe('buildRepresentantsExportUrl', () => {
     );
   });
 
-  /**
-   * Les critères passent, le TRI non.
-   *
-   * La route d'export ne déclare que les filtres, et la validation globale
-   * tourne en `forbidNonWhitelisted` : un `sortBy` en trop n'est pas ignoré, il
-   * fait échouer l'export en 400. Ce test pinait auparavant l'inverse, et la
-   * panne restait invisible parce que le tri par défaut n'écrit rien dans
-   * l'URL : elle ne se déclenchait qu'une fois l'utilisateur ayant touché à une
-   * colonne, c'est-à-dire jamais en test et toujours en usage réel.
-   */
   it('reprend les critères de l’écran, mais jamais le tri', () => {
     const url = buildRepresentantsExportUrl({
       ...EMPTY_REPRESENTANT_FILTERS,
@@ -48,14 +29,6 @@ describe('buildRepresentantsExportUrl', () => {
     expect(url).not.toContain('sortOrder');
   });
 
-  /**
-   * Le vocabulaire de l'API, jamais celui de l'URL du navigateur.
-   *
-   * `oui` / `non` sont ce que l'écran écrit dans SA barre d'adresse. L'API
-   * attend un booléen et coerce toute chaîne non vide en `true` : envoyer
-   * `hasProspects=non` exportait donc exactement la population INVERSE de celle
-   * affichée, sans le moindre message. Le fichier part ensuite par courriel.
-   */
   it('traduit « aucun prospect » en `false`, jamais en « non »', () => {
     const url = buildRepresentantsExportUrl({
       ...EMPTY_REPRESENTANT_FILTERS,
@@ -74,14 +47,6 @@ describe('buildRepresentantsExportUrl', () => {
     expect(url).not.toContain('hasProspects=oui');
   });
 
-  /**
-   * Les bornes de journée, comme dans le tableau.
-   *
-   * L'API fait `lte: new Date(dateTo)` : une date nue est lue comme minuit
-   * pile, et le DERNIER JOUR de la période disparaît du classeur alors qu'il
-   * est à l'écran. Le tableau borne déjà la journée ; l'export doit borner de
-   * la même façon, sinon les deux ne décrivent pas la même population.
-   */
   it('borne la journée entière, sinon l’export perd le dernier jour', () => {
     const url = buildRepresentantsExportUrl({
       ...EMPTY_REPRESENTANT_FILTERS,
@@ -94,8 +59,6 @@ describe('buildRepresentantsExportUrl', () => {
   });
 
   it('décrit EXACTEMENT la population du tableau, pagination mise à part', () => {
-    // La garantie du module, énoncée en une assertion : les mêmes critères
-    // produisent les mêmes paramètres des deux côtés.
     const filters = {
       ...EMPTY_REPRESENTANT_FILTERS,
       search: 'Diallo',
@@ -123,8 +86,6 @@ describe('buildRepresentantsExportUrl', () => {
   });
 
   it('vise le relais de Next, jamais le backend directement', () => {
-    // Le jeton vit dans un cookie httpOnly : une URL vers NestJS partirait
-    // anonyme et enregistrerait un 401 déguisé en classeur.
     expect(buildRepresentantsExportUrl(EMPTY_REPRESENTANT_FILTERS)).toMatch(/^\/api\/v1\//u);
   });
 });

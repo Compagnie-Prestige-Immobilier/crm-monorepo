@@ -5,25 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as InboxModule from '@/lib/data/inbox';
 import { renderWithQuery } from '@/test/render-query';
 
-/**
- * La cloche est le PREMIER consommateur web de `/notifications/mine`.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Trois promesses, dont deux n'existaient pas avant le correctif.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * 1. le compte de non-lues est ANNONCÉ, pas seulement peint : la pastille est
- *    `aria-hidden`, donc c'est l'intitulé du bouton qui porte l'information ;
- * 2. ouvrir une ligne la marque comme lue ;
- * 3. « Tout voir » mène à la boîte de réception. Ce lien MANQUAIT : le
- *    commentaire du composant le promettait, la vingt-et-unième notification
- *    reçue était pourtant inatteignable, pour tous les rôles.
- *
- * On éprouve la troisième par sa CIBLE et pas seulement par sa présence : un
- * lien vers `/notifications` sans l'onglet « réception » retomberait sur le
- * composeur, réservé à l'ADMIN, ce qui rejouerait exactement le défaut corrigé.
- */
-
 const markNotificationRead = vi.fn((id: string) => Promise.resolve(id));
 const fetchInbox = vi.fn();
 
@@ -52,14 +33,6 @@ const item = (over: Partial<Record<string, unknown>> = {}) => ({
   ...over,
 });
 
-/**
- * La ligne, atteinte par son TITRE puis remontée jusqu'au bouton.
- *
- * `getByRole('button', { name: … })` échoue ici : l'intitulé calculé d'une ligne
- * concatène le titre, la catégorie, le corps et l'horodatage, si bien qu'aucune
- * chaîne stable ne le désigne. Le titre, lui, est ce que l'utilisateur lit et
- * vise ; le bouton est son ancêtre le plus proche.
- */
 const rowButton = async (): Promise<HTMLElement> => {
   const title = await screen.findByText('Demande de création à arbitrer');
   const button = title.closest('button');
@@ -69,9 +42,6 @@ const rowButton = async (): Promise<HTMLElement> => {
 
 describe('NotificationBell', () => {
   beforeEach(() => {
-    // `restoreMocks` rétablit les espions posés par `vi.spyOn`, pas l'historique
-    // d'un `vi.fn()` de module : sans ce nettoyage, « ne remarque pas une ligne
-    // déjà lue » verrait l'appel du test précédent et échouerait à tort.
     markNotificationRead.mockClear();
     fetchInbox.mockReturnValue(
       Promise.resolve({
@@ -93,7 +63,6 @@ describe('NotificationBell', () => {
   it('annonce le nombre de non-lues dans l’intitulé du bouton', async () => {
     renderWithQuery(<NotificationBell />);
 
-    // La pastille rouge est `aria-hidden` : seul l'intitulé porte le compte.
     expect(await screen.findByRole('button', { name: 'Notifications, 3 non lues' })).toBeTruthy();
   });
 
@@ -127,9 +96,6 @@ describe('NotificationBell', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Notifications/ }));
     await userEvent.click(await rowButton());
 
-    // L'identifiant passé est celui de la NOTIFICATION, pas celui de la
-    // livraison : les confondre produit un 404 sur un clic qui a l'air d'avoir
-    // marché.
     await waitFor(() => {
       expect(markNotificationRead).toHaveBeenCalledWith('notif-1');
     });

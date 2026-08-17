@@ -26,8 +26,6 @@ describe('curseur d’annuaire', () => {
   });
 
   it('refuse un curseur illisible plutôt que de repartir de zéro en silence', () => {
-    // Repartir de zéro ferait retélécharger 500 000 lignes sans que personne
-    // ne comprenne pourquoi.
     expect(() => decodeDirectoryCursor('pas-du-base64url-json')).toThrow(BadRequestException);
   });
 
@@ -43,9 +41,6 @@ describe('curseur d’annuaire', () => {
     expect(() => decodeDirectoryCursor(noTime)).toThrow(BadRequestException);
   });
 
-  // Régression : `Number.isFinite` acceptait 1e300, qui devient un
-  // `Invalid Date`. Prisma le refuse avec une erreur SANS code P####, donc un
-  // 500 au lieu du 400 annoncé, et le mobile rejoue le curseur indéfiniment.
   it.each([
     ['hors du domaine des dates', 1e300],
     ['négatif', -1],

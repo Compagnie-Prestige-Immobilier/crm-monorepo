@@ -96,13 +96,8 @@ const DELIVERY_VARIANT: Record<
   READ: 'success',
 };
 
-/** « Tous » porte une valeur explicite : un `Select` n'accepte pas `''`. */
 const ALL = 'tous';
 
-/**
- * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item :
- * sans ces tables, les gâchettes montreraient « SENT » ou « SYSTEM ».
- */
 const STATUS_ITEMS = [
   { value: ALL, label: 'Tous les états' },
   ...NOTIFICATION_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] })),
@@ -119,39 +114,11 @@ const CATEGORY_ITEMS = [
 const dateTime = (value: string | null): string =>
   value === null ? '–' : new Date(value).toLocaleString('fr-SN');
 
-/**
- * Écran Notifications : RECEVOIR et ÉMETTRE, dans le même endroit.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Trois défauts sont corrigés ici, et tous les trois cachaient de la donnée.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * 1. **L'onglet vit dans l'URL.** Il vivait dans un `useState` : recharger la
- *    page ramenait sur l'historique, et « regarde l'onglet Gabarits » n'était
- *    pas un lien qu'on colle. Les campagnes utilisent une route par onglet, les
- *    statistiques un paramètre ; ici le paramètre suffit.
- * 2. **L'historique se pagine et se filtre.** Il était figé sur
- *    `{ page: 1, pageSize: 20 }`, sans aucun contrôle à l'écran, alors que
- *    l'API expose `page`, `status` et `category`. La vingt-et-unième
- *    notification envoyée devenait inatteignable.
- * 3. **La boîte de réception existe.** Elle est le premier onglet, ouverte à
- *    tous les rôles : c'est l'écran complet vers lequel la cloche prétendait
- *    renvoyer.
- */
 export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
   const queryClient = useQueryClient();
   const { filters, setFilters } = useNotificationFilters(isAdmin);
   const [composerOpen, setComposerOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  /**
-   * L'envoi programmé qu'on est sur le point d'ANNULER.
-   *
-   * L'annulation partait auparavant d'un clic unique, sur un bouton nommé
-   * « Annuler » : le même mot que le bouton de fermeture de chaque boîte de
-   * dialogue du produit. Un envoi préparé pour quatre cents personnes
-   * disparaissait donc sur un geste qui, partout ailleurs, ne fait que refermer
-   * une fenêtre.
-   */
   const [cancelling, setCancelling] = useState<NotificationRow | null>(null);
 
   const listQuery = {
@@ -397,11 +364,6 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                /* L'attente ne concerne QUE la ligne visée. Un
-                                   `cancel.isPending` nu grisait et faisait
-                                   tourner le bouton de toutes les lignes
-                                   programmées : l'écran donnait à croire que
-                                   plusieurs envois partaient à l'annulation. */
                                 disabled={cancel.isPending && cancel.variables === row.id}
                                 onClick={() => {
                                   setCancelling(row);
@@ -495,15 +457,6 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-/**
- * Confirmation de l'annulation d'un envoi programmé.
- *
- * Un envoi programmé est un travail déjà fait : le texte a été rédigé, le public
- * choisi, l'heure arrêtée. L'annuler ne se défait pas, et l'action portait le
- * mot « Annuler », c'est-à-dire exactement le mot que porte le bouton de
- * fermeture de chaque dialogue du produit. Le libellé est donc devenu
- * « Annuler l'envoi », et un dialogue nomme la notification visée.
- */
 function CancelSendDialog({
   row,
   pending,
@@ -561,13 +514,6 @@ function CancelSendDialog({
   );
 }
 
-/**
- * Résumé de livraison.
- *
- * Les échecs et les non-remis ne sont montrés que lorsqu'ils existent, mais
- * toujours de façon distincte du total. Un « 340 envoyées » sans mention des 60
- * échecs laisse croire à un envoi complet.
- */
 function DeliverySummary({ row }: { row: NotificationRow }) {
   const { counts } = row;
   return (

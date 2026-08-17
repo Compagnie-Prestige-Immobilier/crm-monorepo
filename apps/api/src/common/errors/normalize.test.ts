@@ -3,14 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { genericCode, normalizeErrorBody } from './normalize.js';
 
-/**
- * Ces essais couvrent les QUATRE formes de corps que le serveur émettait avant
- * la normalisation. C'est leur divergence qui a forcé les deux clients générés
- * à écrire chacun son propre décodeur d'erreur.
- */
 describe('normalisation des corps d’erreur', () => {
-  // Forme 2 : une exception métier posait `code` mais jamais `statusCode`.
-  // Un client qui lisait le seul corps ne savait pas de quel statut il parlait.
   it('complète le statut manquant d’une exception métier, sans rien perdre', () => {
     const body = normalizeErrorBody(HttpStatus.CONFLICT, {
       code: 'BANK_CASE_REFERENCE_TAKEN',
@@ -21,13 +14,9 @@ describe('normalisation des corps d’erreur', () => {
     expect(body.statusCode).toBe(409);
     expect(body.code).toBe('BANK_CASE_REFERENCE_TAKEN');
     expect(body.message).toBe('Cette référence est déjà utilisée.');
-    // Le champ métier supplémentaire survit : c'est lui qui permet à l'écran
-    // de proposer d'ouvrir le dossier déjà existant.
     expect(body.existing).toEqual({ id: 'bc-1', reference: 'REF-A' });
   });
 
-  // Forme 3 : une exception construite avec une simple chaîne n'avait AUCUN
-  // code. Un client qui branchait sur `body.code` recevait `undefined`.
   it('donne un code générique à une exception qui n’en portait aucun', () => {
     const body = normalizeErrorBody(HttpStatus.NOT_FOUND, {
       statusCode: 404,
@@ -37,7 +26,6 @@ describe('normalisation des corps d’erreur', () => {
 
     expect(body.code).toBe('NOT_FOUND');
     expect(body.message).toBe('Aucune version publiée.');
-    // `error` faisait double emploi avec `code`, en moins stable : il part.
     expect(body.error).toBeUndefined();
   });
 
@@ -51,8 +39,6 @@ describe('normalisation des corps d’erreur', () => {
     });
   });
 
-  // Forme 4, la pire : la ValidationPipe mettait un TABLEAU dans `message`.
-  // Un écran qui affichait `body.message` rendait « [object Object] ».
   it('range le tableau de la validation dans details et garde message en CHAÎNE', () => {
     const body = normalizeErrorBody(HttpStatus.BAD_REQUEST, {
       code: 'VALIDATION_FAILED',

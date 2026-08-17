@@ -17,27 +17,12 @@ import {
 } from '@/components/notifications/template';
 import type { NotificationRow } from '@/components/notifications/types';
 
-/**
- * Compositeur de notifications : logique pure.
- *
- * Ces tests portent sur ce qui décide d'un ENVOI NON ANNULABLE : la description
- * du public, le nombre annoncé, et la substitution du texte. Le rendu React
- * n'est pas testé ici : le projet n'embarque ni jsdom ni testing-library, et
- * l'essentiel de ce qui peut mal tourner est de toute façon dans ces fonctions.
- */
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Substitution : doit avoir la MÊME sémantique que le serveur
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('substitution de gabarit (miroir du serveur)', () => {
   it('remplace ce qui est fourni', () => {
     expect(renderTemplate('Bonjour {{nom}}', { nom: 'Awa' }).text).toBe('Bonjour Awa');
   });
 
   it('LAISSE le marqueur visible quand la variable manque, et la signale', () => {
-    // Sémantique identique à `apps/api/src/modules/notifications/template.ts`.
-    // Si les deux divergent, l'aperçu ment sur ce qui partira.
     const result = renderTemplate('Bonjour {{nom}}, {{nombre}} fiches', { nombre: 3 });
     expect(result.text).toBe('Bonjour {{nom}}, 3 fiches');
     expect(result.missing).toEqual(['nom']);
@@ -64,10 +49,6 @@ describe('substitution de gabarit (miroir du serveur)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Aperçu Android
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('troncature de l’aperçu', () => {
   it('laisse un texte court intact', () => {
     expect(previewClamp('Réunion demain', 42)).toEqual({
@@ -77,8 +58,6 @@ describe('troncature de l’aperçu', () => {
   });
 
   it('coupe et SIGNALE la coupure', () => {
-    // L'auteur doit savoir que sa phrase sera coupée. L'apprendre après l'envoi,
-    // sur son propre téléphone, est trop tard.
     const result = previewClamp('a'.repeat(60), 42);
     expect(result.truncated).toBe(true);
     expect(result.text.endsWith('…')).toBe(true);
@@ -89,18 +68,12 @@ describe('troncature de l’aperçu', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Public
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('validation du public', () => {
   it('« tout le monde » est complet en soi', () => {
     expect(audienceProblem(EMPTY_AUDIENCE)).toBeNull();
   });
 
   it('« par rôle » exige un rôle, et le DIT', () => {
-    // Un booléen nu obligerait l'interface à réinventer la raison du refus,
-    // et elle finirait par afficher « formulaire invalide ».
     expect(audienceProblem({ ...EMPTY_AUDIENCE, audience: 'ROLE' })).toBe('Choisissez un rôle.');
     expect(
       audienceProblem({ ...EMPTY_AUDIENCE, audience: 'ROLE', audienceRole: 'COMMERCIAL' }),
@@ -125,8 +98,6 @@ describe('validation du public', () => {
 
 describe('paramètres de l’aperçu', () => {
   it('n’envoie que ce qui concerne le public choisi', () => {
-    // Le filtre de l'aperçu doit être EXACTEMENT celui de l'envoi : c'est ce
-    // qui garantit que le nombre annoncé est celui qui sera servi.
     expect(
       audienceQuery({
         audience: 'ROLE',
@@ -161,8 +132,6 @@ describe('description du public dans l’historique', () => {
   });
 
   it('nomme le rôle plutôt que « par rôle »', () => {
-    // Le rôle porte le nom du MÉTIER. L'application sert des téléconseillers
-    // sur place ; « Commercial » décrivait un métier de terrain inexistant ici.
     expect(describeAudience(row({ audience: 'ROLE', audienceRole: 'COMMERCIAL' }))).toBe(
       'Téléconseiller',
     );
@@ -182,10 +151,6 @@ describe('description du public dans l’historique', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Confirmation
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('phrase de confirmation', () => {
   it('annonce le NOMBRE : sans lui, la confirmation ne protège de rien', () => {
     expect(confirmationSentence(400)).toBe('Cet envoi s’adresse à 400 personnes.');
@@ -195,12 +160,6 @@ describe('phrase de confirmation', () => {
     expect(confirmationSentence(1)).toBe('Cet envoi s’adresse à 1 personne.');
   });
 
-  /**
-   * La nuance « joignables / visés » a disparu du contrat : `AudiencePreviewDto`
-   * ne rend qu'un `recipientCount`, et tout compte visé lit la notification dans
-   * l'application. La phrase ne doit donc plus parler d'appareils enregistrés,
-   * sous peine d'annoncer un manque qui n'existe pas.
-   */
   it('ne parle plus d’appareils enregistrés', () => {
     expect(confirmationSentence(400)).not.toContain('appareil');
   });
@@ -211,10 +170,6 @@ describe('phrase de confirmation', () => {
     );
   });
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Lien profond
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('validation du lien profond', () => {
   it('accepte une route interne', () => {
@@ -229,9 +184,6 @@ describe('validation du lien profond', () => {
   });
 
   it('REFUSE une adresse web', () => {
-    // Une URL dans une notification portant le logo de l'application est un
-    // vecteur d'hameçonnage que l'utilisateur ne peut pas inspecter avant
-    // d'appuyer.
     expect(routeProblem('https://exemple.test/piege')).not.toBeNull();
     expect(routeProblem('http://exemple.test')).not.toBeNull();
   });

@@ -56,15 +56,6 @@ function isSortField(id: string): id is ProspectSortField {
   return (PROSPECT_SORT_FIELDS as readonly string[]).includes(id);
 }
 
-/**
- * Tableau des prospects.
- *
- * `manualPagination` / `manualSorting` / `manualFiltering` sont à `true` :
- * TanStack Table ne fait ici que le rendu. La pagination, le tri et le filtrage
- * sont exécutés par le serveur : la table dépasse déjà le millier de lignes et
- * grossit à chaque tournée ; la rapatrier entière pour trier dans le navigateur
- * bloquerait l'onglet et ferait fuiter des données hors du périmètre filtré.
- */
 export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
   const { filters, setFilters } = useProspectFilters();
   const queryClient = useQueryClient();
@@ -93,8 +84,6 @@ export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
     },
   });
 
-  // Mémorisé : reconstruire le tableau de colonnes à chaque rendu ferait
-  // remonter toutes les cellules et fermerait les menus ouverts.
   const columns = useMemo(
     () =>
       prospectColumns({
@@ -131,10 +120,6 @@ export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
 
   if (isPending) return <ProspectsTableSkeleton />;
 
-  // AVANT ce garde-fou, un échec de chargement tombait sur l'état vide du
-  // corps de tableau : « Aucun prospect ne correspond à ces filtres », qui
-  // envoie l'utilisateur corriger des critères parfaitement valides pendant
-  // que le serveur est en panne.
   if (isError) {
     return (
       <QueryErrorState
@@ -147,8 +132,6 @@ export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
     );
   }
 
-  // Les gardes `isPending` et `isError` ci-dessus ont déjà restreint `data` :
-  // il est ici forcément défini.
   const total = data.total;
   const page = data.page;
   const pageCount = data.pageCount;
@@ -160,9 +143,6 @@ export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
       <div
         className={cn(
           'overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity',
-          // Pendant un rechargement de page, la table précédente reste
-          // affichée en léger retrait plutôt que de disparaître : le contexte
-          // de lecture est conservé.
           isFetching && 'opacity-80',
         )}
       >
@@ -196,12 +176,6 @@ export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
                               <ArrowDownIcon className="size-3.5" aria-hidden="true" />
                             )
                           ) : (
-                            /* `opacity-40` ramenait cette icône à 1,94:1 en
-                               clair, très en dessous des 3:1 exigés d'un
-                               élément graphique porteur de sens : et c'est le
-                               SEUL indice qu'une colonne est triable.
-                               `text-muted-foreground` plein tient 7,70:1 tout
-                               en restant discret face à la flèche active. */
                             <ChevronsUpDownIcon
                               className="size-3.5 text-muted-foreground"
                               aria-hidden="true"

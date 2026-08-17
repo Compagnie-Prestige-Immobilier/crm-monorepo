@@ -23,14 +23,6 @@ import {
   type WorkflowStage,
 } from '../modules/bank-cases/workflow.js';
 
-/**
- * These are deliberately parameterized integration-adjacent unit cases.
- * Each row represents a distinct input shape that can arrive from a real
- * phone keyboard, a real referential combination, a real offline cursor, or
- * a real workflow transition. The count is large because the input space is
- * large, not because the same assertion is copied under different names.
- */
-
 const phoneCases = Array.from({ length: 100 }, (_, index) => {
   const local = `77${String(index).padStart(7, '0')}`;
   const groups = `${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5, 7)} ${local.slice(7)}`;

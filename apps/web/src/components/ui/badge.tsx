@@ -5,11 +5,6 @@ import type * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-/**
- * Chaque variante de statut associe une SURFACE claire à un TEXTE mesuré sur
- * cette surface (docs/design.md §2.4). En particulier `warning` utilise
- * `accent-text` (#856011), jamais l'or décoratif.
- */
 const badgeVariants = cva(
   [
     'inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden',
@@ -41,9 +36,6 @@ function Badge({ className, variant, render, ...props }: BadgeProps) {
     defaultTagName: 'span',
     render,
     props: mergeProps<'span'>(
-      // Les clés `data-*` ne sont tolérées dans un littéral d'objet que par
-      // JSX : passées à `mergeProps`, elles échouent au contrôle de propriétés
-      // excédentaires. D'où le cast.
       {
         'data-slot': 'badge',
         className: cn(badgeVariants({ variant }), className),

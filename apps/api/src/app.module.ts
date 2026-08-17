@@ -43,10 +43,6 @@ const env = readEnv();
       pinoHttp: {
         level: env.LOG_LEVEL,
         ...(env.NODE_ENV === 'development' ? { transport: { target: 'pino-pretty' } } : {}),
-        // Les jokers comptent : `password` seul ne couvre qu'une clé racine,
-        // et un corps ou un en-tête imbriqué passerait à travers. Cette liste
-        // est la dernière ligne de défense, pas la première, les corps de
-        // requête ne sont pas journalisés.
         redact: {
           paths: [
             'req.headers.authorization',
@@ -97,30 +93,11 @@ const env = readEnv();
     ImportsModule,
   ],
   providers: [
-    // L'ordre compte. Le throttler s'applique avant toute lecture de base ;
-    // JwtAuthGuard renseigne `request.user`, que RolesGuard lit ensuite. Les
-    // cinq sont globaux : une route qui oublie un décorateur est refusée,
-    // pas exposée.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
-    // ENTRE les deux, et l'ordre est la correction elle-même. Le jeton PORTE le
-    // rôle : il dit ce qui était vrai à l'émission, et le répète pendant quinze
-    // minutes. `FreshSessionGuard` relit l'autorité en base sur les routes qui
-    // en exigent une, et écrase `request.user` AVANT que `RolesGuard` ne
-    // tranche. Sans lui, rétrograder un ADMIN ne lui retirait rien jusqu'à
-    // l'expiration de son jeton, et un jeton de démonstration survivait à
-    // l'extinction du mode.
     { provide: APP_GUARD, useClass: FreshSessionGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
-    // EN DERNIER, délibérément. Une requête sans jeton doit repartir en 401,
-    // pas en 409 : le mode démonstration n'est pas une raison de renseigner un
-    // anonyme sur l'état interne du serveur. Cette garde suspend les écritures
-    // interactives pendant une démonstration ; la remontée hors ligne du
-    // mobile en est dispensée, voir `DemoWritable`.
     { provide: APP_GUARD, useClass: DemoReadOnlyGuard },
-    // Estampille `X-Demo-Mode` sur toute réponse non détournée : une capture
-    // d'écran de statistiques prise pendant une démonstration circule ensuite
-    // sans la bannière qui l'accompagnait.
     { provide: APP_INTERCEPTOR, useClass: DemoModeInterceptor },
   ],
 })

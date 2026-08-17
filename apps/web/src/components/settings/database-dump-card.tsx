@@ -41,38 +41,6 @@ import { formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
-/**
- * Export intégral de la base.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * CE QUE CE BOUTON PRODUIT, ET POURQUOI LA CONFIRMATION LE DIT EN TOUTES LETTRES
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Une copie de l'entreprise entière dans un fichier : le nom et le numéro de
- * téléphone de chaque prospect, le montant en francs CFA de chaque dossier
- * bancaire, les comptes et leurs empreintes de mots de passe. Des personnes
- * réelles.
- *
- * La confirmation ÉNUMÈRE ce contenu au lieu de dire « un export de la base ».
- * C'est la même règle que la carte du mode démonstration : on ne demande pas à
- * quelqu'un de confirmer une abstraction. Un administrateur qui lit « toutes
- * les fiches, tous les téléphones, tous les montants, les mots de passe » sait
- * ce qu'il tiendra dans son dossier Téléchargements, et ce qu'il ne doit pas
- * transférer.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * IL N'Y A PAS DE LIEN DANS L'E-MAIL, ET LA CARTE LE DIT
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * L'e-mail annonce que l'export est prêt, rien de plus. Le téléchargement se
- * fait ICI, dans la session authentifiée. Une boîte aux lettres compromise ou
- * un message transféré ne donne accès à rien. Sans cette phrase à l'écran,
- * l'administrateur attend un lien qui ne viendra jamais, conclut à une panne,
- * et relance l'export.
- *
- * La carte est placée EN DERNIER dans les paramètres, sans accent visuel : ce
- * n'est pas une commande de tous les jours.
- */
 export function DatabaseDumpCard() {
   const queryClient = useQueryClient();
   const confirmId = useId();
@@ -80,24 +48,11 @@ export function DatabaseDumpCard() {
   const [confirmed, setConfirmed] = useState(false);
   const download = useFileDownload();
 
-  // Sondage nominal, mais UNIQUEMENT tant que l'export court : `useLive`
-  // apporte l'arrêt en arrière-plan et le ralentissement après échec, qui ne
-  // sont pas propres à cette carte, et le prédicat ci-dessous coupe le sondage
-  // dès que le travail est terminé. Un panel laissé ouvert sur les paramètres
-  // n'interroge donc rien.
   const live = useLive();
 
   const dump = useQuery({
     queryKey: queryKeys.databaseDump,
     queryFn: () => fetchDatabaseDump(),
-    /**
-     * Le sondage s'ARRÊTE dès que l'export est terminé.
-     *
-     * `useLive` apporte ce qui n'est pas propre à cette carte : plus aucune
-     * requête quand l'onglet passe en arrière-plan, et ralentissement après un
-     * échec. Le prédicat ajoute ce qui l'est : un panel laissé ouvert sur les
-     * paramètres, sans export en route, n'interroge plus rien du tout.
-     */
     refetchInterval: (query) =>
       isDumpRunning(query.state.data)
         ? live.refetchInterval({ state: { status: query.state.status } })
@@ -114,8 +69,6 @@ export function DatabaseDumpCard() {
     },
     onError: (error) => {
       setConfirming(false);
-      // Le serveur nomme la cause : mode démonstration actif, export déjà en
-      // route, plafond de requêtes. On rend SON message.
       toastApiError(error, 'L’export n’a pas pu être lancé.');
     },
   });
@@ -217,9 +170,6 @@ export function DatabaseDumpCard() {
                       failureMessage: 'Le téléchargement de l’export a échoué.',
                     })
                     .then(() => {
-                      // Le fichier est détruit par le serveur une fois livré :
-                      // l'écran doit cesser de proposer un téléchargement qui
-                      // répondrait désormais 404.
                       void queryClient.invalidateQueries({ queryKey: queryKeys.databaseDump });
                     });
                 }}

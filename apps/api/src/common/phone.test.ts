@@ -6,9 +6,6 @@ import { normalizePhone, tryNormalizePhone } from './phone.js';
 const CANONICAL = '+221771234567';
 
 describe('normalizePhone, déterminisme', () => {
-  // C'est LE test qui protège la clé de déduplication : toutes ces saisies
-  // désignent le même abonné et doivent produire la même chaîne, sinon
-  // l'index unique partiel ne dédoublonne plus rien.
   const equivalents = [
     '771234567',
     '77 123 45 67',
@@ -58,8 +55,6 @@ describe('normalizePhone, déterminisme', () => {
   });
 
   it("n'ampute pas un numéro national qui commence par les chiffres de l'indicatif", () => {
-    // 221… n'est pas un préfixe d'opérateur sénégalais valide sur 9 chiffres :
-    // le dépréfixage ne doit pas transformer un numéro court en abonné fantôme.
     expect(() => normalizePhone('2217712', 'SN')).toThrow(BadRequestException);
   });
 });

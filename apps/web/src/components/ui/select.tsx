@@ -5,16 +5,7 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-/**
- * `Select.Root` de Base UI ne rend aucun élément et ses props sont génériques
- * (`<Value, Multiple>`) : on ré-exporte la primitive plutôt que de l'envelopper,
- * sinon le type de `value` se réduirait à `unknown` chez tous les appelants.
- *
- * ATTENTION : contrairement à Radix, `Select.Value` n'affiche PAS le texte de
- * l'item choisi — il affiche la valeur brute. Le libellé se retrouve via la
- * prop `items` du `Root` (`{ value, label }[]` ou `Record<valeur, libellé>`).
- * Chaque écran la fournit ; sans elle, la gâchette montrerait le code interne.
- */
+/** Sans la prop `items` sur le `Root`, `Select.Value` affiche la valeur brute et non le libelle. */
 const Select = SelectPrimitive.Root;
 
 type SelectGroupProps = Omit<SelectPrimitive.Group.Props, 'className'> & {
@@ -61,12 +52,6 @@ function SelectTrigger({ className, size = 'default', children, ...props }: Sele
   );
 }
 
-/**
- * `position="popper" | "item-aligned"` de Radix devient un booléen porté par le
- * `Positioner`. Le panel restait en mode popper : `alignItemWithTrigger` vaut
- * donc `false` par défaut, sinon Base UI recentrerait la liste sur l'item
- * sélectionné, ce qui déplacerait tous les menus déjà réglés.
- */
 type SelectContentProps = Omit<SelectPrimitive.Popup.Props, 'className'> & {
   className?: string | undefined;
 } & Pick<
@@ -82,7 +67,6 @@ function SelectContent({
   side,
   sideOffset = 4,
   alignItemWithTrigger = false,
-  // Base UI réserve 5 px au bord de la fenêtre, Radix n'en réservait aucun.
   collisionPadding = 0,
   ...props
 }: SelectContentProps) {
@@ -99,14 +83,9 @@ function SelectContent({
         <SelectPrimitive.Popup
           data-slot="select-content"
           className={cn(
-            // La liste ne descend jamais sous la largeur de la gâchette, et ne
-            // se rétrécit pas non plus sous 8 rem quand celle-ci est étroite.
             'relative isolate z-50 max-h-(--available-height) min-w-[max(8rem,var(--anchor-width))]',
             'origin-(--transform-origin) overflow-y-auto overflow-x-hidden',
             'rounded-md border border-border bg-popover text-popover-foreground shadow-elev-lg',
-            // Mêmes images-clés que sous Radix (tw-animate-css), rebranchées sur
-            // les attributs de présence de Base UI : la primitive garde le popup
-            // monté jusqu'à la fin de l'animation de sortie.
             'duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95',
             'data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
             className,
@@ -126,13 +105,6 @@ type SelectLabelProps = Omit<SelectPrimitive.GroupLabel.Props, 'className'> & {
   className?: string | undefined;
 };
 
-/**
- * Le libellé porte SON PROPRE `Select.Group`, pour la même raison que dans
- * `dropdown-menu.tsx` : `Select.GroupLabel` lève « SelectGroupContext is
- * missing » à l'exécution s'il n'est pas enveloppé, là où le `Select.Label` de
- * Radix se posait n'importe où. Aucun écran n'utilise ce composant
- * aujourd'hui ; le premier qui l'essaierait sans le savoir planterait.
- */
 function SelectLabel({ className, ...props }: SelectLabelProps) {
   return (
     <SelectPrimitive.Group>
@@ -156,10 +128,6 @@ function SelectItem({ className, children, ...props }: SelectItemProps) {
       className={cn(
         'relative flex w-full cursor-default select-none items-center gap-2 rounded-sm py-2 pr-8 pl-2',
         'text-[0.875rem] outline-none',
-        // Base UI ne déplace PAS le focus DOM d'un item à l'autre : il marque
-        // `data-highlighted`. L'anneau se raccroche donc à cet attribut.
-        // Le seul fond `secondary` ne fait que 1,16:1 contre `popover` : très
-        // en dessous des 3:1 exigés d'un indicateur de focus (WCAG 1.4.11).
         'data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-ring',
         'data-highlighted:bg-secondary data-highlighted:text-secondary-foreground',
         'data-disabled:pointer-events-none data-disabled:text-muted-foreground',

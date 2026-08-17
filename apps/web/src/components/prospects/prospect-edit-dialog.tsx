@@ -43,39 +43,8 @@ import {
   type UpdateProspectInput,
 } from '@/lib/types';
 
-/** Longueur minimale d'un motif, alignée sur le `@MinLength(5)` de l'API. */
 const MIN_REASON_LENGTH = 5;
 
-/**
- * Modification d'un prospect.
- *
- * Les listes de banques, syndicats et représentants sont chargées SANS filtre
- * d'activité : un prospect saisi en mars peut référencer une banque retirée
- * depuis. Ne proposer que les actives forcerait à changer une donnée correcte
- * pour pouvoir corriger un nom de famille.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * CHANGER DE BANQUE OU DE SYNDICAT N'EST PAS UNE CORRECTION DE SAISIE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Ces deux listes déroulantes sont posées au milieu des autres, entre le
- * téléphone et le représentant, et elles ne ressemblent en rien à ce qu'elles
- * font : le segment BDD1–BDD4 se CALCULE en les croisant. Les toucher fait donc
- * basculer la fiche d'une base à l'autre, et cette bascule est le métier même
- * de CPI, celui dont on rend compte au mois.
- *
- * L'écran devait donc changer sur trois points, faute de quoi la trace écrite
- * en base ne vaudrait rien :
- *
- *  1. le segment COURANT est écrit en clair, avant toute manipulation ;
- *  2. le segment RÉSULTANT s'affiche AVANT la confirmation : personne ne peut
- *     déduire de tête que « CBAO + SAES » vaut BDD3 ;
- *  3. le motif est OBLIGATOIRE, et l'écran dit pourquoi.
- *
- * Et les deux clés ne partent plus dans le `PATCH` ordinaire : elles passent
- * par l'opération dédiée, la seule qui écrive la fiche et son histoire dans la
- * même transaction.
- */
 export function ProspectEditDialog({
   prospect,
   onOpenChange,
@@ -104,15 +73,6 @@ export function ProspectEditDialog({
     },
   });
 
-  /**
-   * Motif tenu HORS du schéma du formulaire.
-   *
-   * `prospectSchema` décrit la fiche, et le motif n'en fait pas partie : il
-   * décrit un GESTE, il n'est exigé que lorsque les clés de segment bougent, et
-   * il n'est jamais renvoyé par l'API. L'ajouter au schéma le rendrait
-   * obligatoire pour la correction d'un nom de famille, ou facultatif pour
-   * tout le monde — deux façons de perdre ce qu'on cherche à obtenir.
-   */
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState<string | undefined>(undefined);
 
@@ -138,10 +98,6 @@ export function ProspectEditDialog({
       const banqueChanged = values.banqueId !== prospect.banqueId;
       const syndicatChanged = values.syndicatId !== prospect.syndicatId;
 
-      // La bascule PASSE EN PREMIER, et seule elle porte les deux clés de
-      // segment. Les glisser en plus dans le `PATCH` rejouerait l'écriture sans
-      // trace juste après celle qui en laisse une, et une révision de retard
-      // suffirait à faire échouer la seconde en laissant la première passée.
       let saved: ProspectRow | undefined;
       if (banqueChanged || syndicatChanged) {
         saved = await changeProspectSegment(prospect.id, {
@@ -170,21 +126,15 @@ export function ProspectEditDialog({
         saved = await updateProspect(prospect.id, patch);
       }
 
-      // Ni bascule ni correction : rien n'a été envoyé, et la fiche affichée
-      // est déjà celle de la base.
       return saved ?? prospect;
     },
     onSuccess: (saved) => {
-      // Les chiffres du tableau de bord dépendent du statut et du référentiel :
-      // les invalider aussi, sinon le total « Converti » reste faux à l'écran.
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardRoot });
       toast.success(`${saved.prenom} ${saved.nom} enregistré.`);
       onOpenChange(false);
     },
     onError: (error) => {
-      // 409 = un autre prospect porte déjà ce numéro. Le message de l'API nomme
-      // la fiche existante ; la fusion est la suite logique.
       toastApiError(error, "L'enregistrement a échoué.");
     },
   });
@@ -194,11 +144,6 @@ export function ProspectEditDialog({
   const representantId = watch('representantId');
   const statut = watch('statut');
 
-  /**
-   * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item.
-   * Sans ces tables, les gâchettes montreraient des identifiants bruts au lieu
-   * du nom de la banque, du sigle du syndicat ou du libellé du statut.
-   */
   const banqueItems = (reference?.banques ?? []).map((banque) => ({
     value: banque.id,
     label: withRetired(banque.shortName, banque.isActive),
@@ -209,15 +154,6 @@ export function ProspectEditDialog({
   }));
   const representantItems = reference?.representants ?? [];
 
-  /*
-   * L'aperçu du segment d'ARRIVÉE.
-   *
-   * Il se calcule sur le `shortName` de la banque et le `sigle` du syndicat, et
-   * non sur leurs identifiants : ce sont ces deux valeurs qui portent les axes
-   * CBAO et CHUES. Tant que le référentiel n'est pas chargé, on ne montre RIEN
-   * plutôt qu'un segment deviné : un aperçu faux ferait valider une conversion
-   * que personne n'a voulue.
-   */
   const selectedBanque = (reference?.banques ?? []).find((banque) => banque.id === banqueId);
   const selectedSyndicat = (reference?.syndicats ?? []).find(
     (syndicat) => syndicat.id === syndicatId,
@@ -251,10 +187,6 @@ export function ProspectEditDialog({
           className="grid gap-4 sm:grid-cols-2"
           onSubmit={(event) => {
             void handleSubmit((values) => {
-              // Le motif est contrôlé ICI et pas seulement par l'API : un 400
-              // renvoyé après coup dirait « reason must be longer than or equal
-              // to 5 characters » sous un formulaire qui ne montre aucun champ
-              // fautif, et l'utilisateur ne saurait pas quoi corriger.
               if (segmentChanged && reason.trim().length < MIN_REASON_LENGTH) {
                 setReasonError(
                   'Expliquez la bascule : elle est enregistrée et rendue à la direction.',

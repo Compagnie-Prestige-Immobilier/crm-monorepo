@@ -1,25 +1,5 @@
 import { ImportKind, ImportMode, ImportStatus, type ImportJob, type Prisma } from '@crm/database';
 
-/**
- * Doublure Prisma en mémoire pour les imports.
- *
- * POURQUOI UNE DOUBLURE QUI *INTERPRÈTE* PLUTÔT QUE DES `vi.fn()` FIGÉS.
- *
- * Les invariants de ce module ne sont pas des appels à Prisma : ce sont des
- * CONSÉQUENCES d'un enchaînement lecture/écriture. Un `updateMany` qui répond
- * `{ count: 1 }` quoi qu'on lui passe ferait passer le test du jeton de fencing
- * ALORS MÊME QUE LE JETON AURAIT ÉTÉ RETIRÉ DU CODE — c'est-à-dire qu'il ne
- * prouverait rien du tout, ce qui est pire que l'absence de test.
- *
- * Cette doublure applique donc réellement le `where` (jeton compris), fait
- * respecter l'unicité du téléphone en levant un P2002 authentique, et ANNULE
- * les écritures d'une transaction qui lève — sans quoi la propriété « un
- * travailleur qui a perdu son bail n'écrit rien » ne serait pas observable.
- *
- * Même doctrine, et même forme, que `bank-cases/fake-prisma.ts`. Le préfixe
- * `fake-` la fait sortir des balayages de source, comme les autres doubles.
- */
-
 export interface FakeRepresentant {
   id: string;
   fullName: string;
@@ -48,7 +28,6 @@ export interface FakeIef {
   isActive: boolean;
 }
 
-/** Erreur d'unicité telle que Prisma la remonte. */
 export class FakeUniqueViolation extends Error {
   readonly code = 'P2002';
   readonly meta = { target: ['phoneE164'], modelName: 'Representant' };
@@ -58,7 +37,6 @@ export class FakeUniqueViolation extends Error {
   }
 }
 
-/** L'instant de référence des doubles, une heure avant le `NOW` des tests. */
 const BASE = new Date('2026-08-16T09:00:00.000Z');
 
 export const DEPARTEMENT_DAKAR: FakeDepartement = {
@@ -120,7 +98,6 @@ export const fakeJob = (seed: FakeJobSeed = {}): ImportJob => ({
 
 type Where = Record<string, unknown>;
 
-/** Un critère élémentaire de Prisma, tel que ce module en écrit. */
 function matchesValue(actual: unknown, expected: unknown): boolean {
   if (expected === null) return actual === null;
   if (expected instanceof Date) {
@@ -164,7 +141,6 @@ function matches(row: object, where: Where | undefined): boolean {
   });
 }
 
-/** Le tri d'un `orderBy` à UNE clé, la seule forme que ce module écrit. */
 function sortBy<T extends object>(
   rows: readonly T[],
   orderBy: Record<string, 'asc' | 'desc'> | undefined,
@@ -190,23 +166,12 @@ export class FakeImportPrisma {
   departements: FakeDepartement[] = [DEPARTEMENT_DAKAR];
   iefs: FakeIef[] = [IEF_ALMADIES];
 
-  /** Appelé AVANT chaque écriture de représentants, pour simuler une course. */
   onBeforeCreateMany?: () => void;
 
-  /** Écritures de tranche réellement VALIDÉES (transaction non annulée). */
   committedChunks = 0;
 
-  /** Transactions ouvertes, validées ou non. */
   transactions = 0;
 
-  /**
-   * Appelé AVANT l'instantané d'une transaction.
-   *
-   * C'est le seul point où un test peut simuler une reprise de bail SANS que
-   * l'annulation ne défasse la reprise elle-même : ce qui est fait ici entre
-   * dans l'instantané, donc survit à l'annulation, exactement comme l'écriture
-   * d'un autre travailleur en base.
-   */
   onBeforeTransaction?: (index: number) => void;
 
   get importJob() {
@@ -225,10 +190,6 @@ export class FakeImportPrisma {
       }): Promise<ImportJob[]> => {
         const found = this.jobs.filter((job) => matches(job, args.where));
 
-        // LE TRI EST APPLIQUÉ POUR DE VRAI. Une doublure qui rendrait les lignes
-        // dans l'ordre d'insertion ferait passer « le plus ancien d'abord » sans
-        // que le `orderBy` existe encore dans le code : le balayage pourrait
-        // affamer indéfiniment le premier arrivé sans qu'aucun test ne bronche.
         const sorted = sortBy(found, args.orderBy);
 
         const from = args.skip ?? 0;
@@ -283,9 +244,6 @@ export class FakeImportPrisma {
         let count = 0;
         for (const row of data) {
           const phone = row.phoneE164 as string;
-          // L'INDEX UNIQUE PARTIEL, appliqué pour de vrai : il ne porte que sur
-          // les fiches vivantes, exactement comme
-          // `representants_phone_e164_active_key`.
           const taken = this.representants.some(
             (existing) => existing.phoneE164 === phone && existing.deletedAt === null,
           );
@@ -330,15 +288,6 @@ export class FakeImportPrisma {
     };
   }
 
-  /**
-   * Une transaction qui ANNULE POUR DE VRAI.
-   *
-   * C'est ce qui rend observable la propriété centrale du moteur : la tranche
-   * d'un travailleur qui a perdu son bail lève depuis l'intérieur, et les lignes
-   * qu'elle venait d'écrire disparaissent avec elle. Une doublure qui se
-   * contenterait d'exécuter le rappel laisserait ces lignes en place et le test
-   * passerait au vert en décrivant l'inverse de la vérité.
-   */
   async $transaction<T>(run: (tx: FakeImportPrisma) => Promise<T>): Promise<T> {
     this.transactions += 1;
     this.onBeforeTransaction?.(this.transactions);

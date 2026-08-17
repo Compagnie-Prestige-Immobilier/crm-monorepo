@@ -38,20 +38,6 @@ import type { BankProspectSearchItem } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
-/**
- * Ouverture d'un dossier bancaire.
- *
- * UNE colonne, pas d'assistant en trois pages. Le formulaire compte trois
- * champs ; le découper en étapes ajouterait deux clics et deux occasions de
- * perdre la saisie, pour aucune décision supplémentaire. Ce qui est guidé, ce
- * n'est pas la navigation, c'est l'ORDRE : on cherche d'abord la personne, on
- * vérifie qu'on a la bonne, puis on saisit la référence.
- *
- * Le premier champ est dominant parce qu'il porte tout le risque : ouvrir un
- * dossier sur le mauvais homonyme se découvre à l'encaissement, quand l'argent
- * est parti. Le résumé qui suit la sélection existe pour cette vérification-là,
- * et il montre le téléphone : le seul champ réellement discriminant.
- */
 export function BankCaseForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -69,10 +55,6 @@ export function BankCaseForm() {
   const [duplicate, setDuplicate] = useState<{ id: string; reference: string } | null>(null);
   const [requesting, setRequesting] = useState(false);
 
-  // Débounce : l'API n'accepte la recherche qu'à partir de deux caractères et
-  // plafonne à 300 requêtes par minute. Une requête par frappe épuiserait le
-  // quota au premier nom un peu long. Le délai est celui de tout le panel :
-  // cet écran en avait pris un autre (300 ms) sans raison énoncée.
   const debounced = useDebouncedValue(term.trim());
 
   const results = useQuery({
@@ -88,18 +70,6 @@ export function BankCaseForm() {
     staleTime: 5 * 60_000,
   });
 
-  /**
-   * Contrôle d'unicité de la référence, au FLOU du champ.
-   *
-   * À chaque frappe, ce serait une requête par caractère pour une information
-   * qui n'a de sens qu'une fois la référence complète. Au flou, l'agent a fini
-   * de saisir et l'information arrive au moment où elle sert : avant qu'il
-   * n'atteigne le bouton d'envoi.
-   *
-   * Ce contrôle ne REMPLACE pas celui du serveur : l'unicité est une contrainte
-   * PostgreSQL, et deux agents peuvent saisir la même référence à la seconde
-   * près. Il évite seulement de découvrir le conflit après avoir tout rempli.
-   */
   const checkReference = useMutation({
     mutationFn: (value: string) =>
       fetchBankCases({
@@ -126,8 +96,6 @@ export function BankCaseForm() {
       setDuplicate(match === undefined ? null : { id: match.id, reference: match.reference });
     },
     onError: () => {
-      // Un contrôle indisponible ne doit pas bloquer la saisie : le serveur
-      // refusera de toute façon un doublon. On efface simplement l'avis.
       setDuplicate(null);
     },
   });
@@ -145,16 +113,10 @@ export function BankCaseForm() {
     onSuccess: (bankCase) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.bankCasesRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.bankAnalyticsRoot });
-      // Le succès n'est annoncé qu'ICI, après la réponse du serveur : jamais au
-      // clic. Un message optimiste sur un POST qui échoue ensuite laisse l'agent
-      // convaincu d'avoir ouvert un dossier qui n'existe pas.
       toast.success(`Dossier ${bankCase.reference} ouvert.`);
       router.push(`/dossiers/${bankCase.id}`);
     },
     onError: (error) => {
-      // Le conflit de référence porte l'identifiant du dossier existant : on
-      // s'en sert pour renvoyer l'agent vers lui plutôt que de le laisser
-      // chercher.
       if (error instanceof ApiError && error.status === 409) {
         const existing = (error.body as { existing?: { id?: string; reference?: string } })
           .existing;
@@ -168,13 +130,8 @@ export function BankCaseForm() {
 
   function selectProspect(prospect: BankProspectSearchItem): void {
     setSelected(prospect);
-    // La banque du prospect est PRÉ-REMPLIE mais reste modifiable : c'est le
-    // cas courant, pas une règle. Un client peut faire traiter son dossier
-    // ailleurs, et forcer la banque d'origine obligerait à corriger après coup.
     setProcessingBankId(prospect.banqueId);
     setDuplicate(null);
-    // Le focus saute à la référence : c'est le champ suivant du geste réel, et
-    // laisser le focus dans la recherche rouvrirait la liste de résultats.
     requestAnimationFrame(() => {
       referenceRef.current?.focus();
     });
@@ -210,8 +167,6 @@ export function BankCaseForm() {
           <Input
             id={searchId}
             type="search"
-            // Champ DOMINANT : 56 px et un texte de 18 px, contre 44 et 15 pour
-            // les autres. La hiérarchie visuelle dit où commencer.
             className="h-14 pl-12 text-[1.125rem]"
             autoComplete="off"
             autoFocus
@@ -254,12 +209,6 @@ export function BankCaseForm() {
                 La recherche a échoué. Réessayez.
               </p>
             ) : results.data.length === 0 ? (
-              /* ─── L'IMPASSE, ET SA SORTIE ────────────────────────────────
-                 Cet état n'affichait que « Aucun client ne correspond. » et
-                 s'arrêtait là. Le rôle BANQUE_FINANCE n'a aucune route de
-                 création de prospect, et rien ne remontait au siège : le
-                 dossier ne se faisait pas, ou se faisait sur un homonyme, ce
-                 qui se découvre à l'encaissement, quand l'argent est parti. */
               <div className="flex flex-col items-start gap-3 p-4">
                 <div>
                   <p className="text-[0.875rem] font-[600]">Aucun client ne correspond.</p>
@@ -436,15 +385,7 @@ export function BankCaseForm() {
           <Link href="/dossiers" className={buttonVariants({ variant: 'ghost' })}>
             Annuler
           </Link>
-          <Button
-            type="submit"
-            size="lg"
-            // Désactivé PENDANT l'envoi : un double-clic créerait deux dossiers,
-            // dont le second échouerait en conflit de référence : et l'agent
-            // verrait une erreur alors que son dossier vient d'être créé.
-            disabled={!canSubmit}
-            className="flex-1 sm:flex-none"
-          >
+          <Button type="submit" size="lg" disabled={!canSubmit} className="flex-1 sm:flex-none">
             {create.isPending ? (
               <>
                 <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />

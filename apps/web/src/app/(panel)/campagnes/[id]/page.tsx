@@ -24,20 +24,13 @@ export default async function CampagnePage({ params }: { params: Promise<{ id: s
   const { id } = await params;
 
   const queryClient = getQueryClient();
-  // Le préchargement n'est PAS `await`é en dehors d'un try : une campagne
-  // introuvable doit se présenter comme une erreur dans la vue : qui sait la
-  // rendre avec un message et un retour : et non comme une exception de rendu
-  // serveur qui ferait tomber l'écran entier.
   try {
     await queryClient.prefetchQuery({
       queryKey: queryKeys.campaign(id),
       queryFn: () => fetchCampaign(id, getServerApiClient()),
     });
   } catch (error) {
-    // `unstable_rethrow` d'abord : un `catch` nu avale aussi les erreurs de
-    // contrôle de Next (redirection, `notFound()`, bascule en rendu dynamique).
     unstable_rethrow(error);
-    /* La vue rejouera la requête côté client et affichera l'état d'erreur. */
   }
 
   return (

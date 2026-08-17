@@ -38,22 +38,6 @@ import { queryKeys } from '@/lib/query-keys';
 import type { BadgeVariant, Role } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 
-/**
- * Arbitrage des demandes de création de client.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * L'écran a une seule raison d'être : que la demande d'une banque aboutisse.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * En cartes et non en tableau : chaque demande porte une identité, un
- * téléphone, une banque, une note libre et deux décisions à prendre. Comprimé
- * en colonnes, tout cela devient illisible, et surtout les deux boutons de
- * décision se retrouveraient dans une cellule de bout de ligne, là où on ne les
- * cherche pas.
- *
- * Le statut par défaut est « en attente » (`client-request-filters.ts`) : c'est
- * la seule liste sur laquelle il y a quelque chose à faire.
- */
 const STATUS_VARIANT: Record<ClientRequestStatus, BadgeVariant> = {
   PENDING: 'warning',
   APPROVED: 'success',
@@ -67,15 +51,6 @@ const STATUS_TABS: readonly { value: string; label: string }[] = [
   { value: ALL_STATUSES, label: 'Toutes' },
 ];
 
-/**
- * Deux lectures du même écran.
- *
- * L'ADMIN arbitre : il voit toutes les banques, cherche par banque demandeuse,
- * approuve et refuse. L'agent BANQUE_FINANCE suit SES demandes : l'API ne lui
- * en renvoie pas d'autres, et l'écran ne lui propose aucun geste qu'il n'a pas
- * le droit d'accomplir. Un bouton qui finit en 403 est un défaut de conception,
- * pas une protection : la vraie protection est côté serveur, et elle y est.
- */
 export function ClientRequestsView({ role }: { role: Role }) {
   const canReview = role === 'ADMIN';
   const { filters, setFilters, resetFilters } = useClientRequestFilters();
@@ -90,9 +65,6 @@ export function ClientRequestsView({ role }: { role: Role }) {
     placeholderData: (previous) => previous,
   });
 
-  // Le lot de référentiels tire `/users` et `/phase2/campaigns`, tous deux
-  // réservés à l'ADMIN : le demander pour un agent bancaire produirait un 403
-  // en boucle pour alimenter une liste déroulante qu'il ne voit même pas.
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,
     queryFn: () => fetchReferenceData(),
@@ -100,8 +72,6 @@ export function ClientRequestsView({ role }: { role: Role }) {
     enabled: canReview,
   });
 
-  // Recherche appliquée après une pause de frappe : écrire directement dans
-  // l'URL relancerait une requête à chaque caractère.
   const [searchDraft, setSearchDraft] = useState(filters.search);
   useEffect(() => {
     setSearchDraft(filters.search);
@@ -287,7 +257,6 @@ export function ClientRequestsView({ role }: { role: Role }) {
   );
 }
 
-/** Une demande : identité, provenance, décision. */
 function RequestCard({
   request,
   canReview,

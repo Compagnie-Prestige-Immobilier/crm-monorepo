@@ -14,16 +14,6 @@ import {
   resumeSkip,
 } from './imports.job.js';
 
-/**
- * Les règles d'âge et de découpage, exercées SANS base, SANS classeur et SANS
- * horloge réelle.
- *
- * Ce sont elles qui décident si un travail est repris, abandonné ou refusé.
- * Écrites en fonctions pures, elles s'éprouvent sur les cas qui font mal —
- * l'horloge qui recule, la suite dont la taille est un multiple exact de la
- * tranche — que le chemin nominal ne rencontre jamais.
- */
-
 const NOW = new Date('2026-08-16T10:00:00.000Z');
 const at = (offsetMs: number): Date => new Date(NOW.getTime() + offsetMs);
 
@@ -39,7 +29,6 @@ describe('découpage en tranches', () => {
   });
 
   it('ne rend AUCUNE tranche sur une suite vide', () => {
-    // Une tranche vide ferait ouvrir une transaction pour n'écrire rien.
     expect(chunkOf([], 500)).toEqual([]);
   });
 
@@ -60,8 +49,6 @@ describe('découpage en tranches', () => {
 
     expect(chunks).toHaveLength(100);
     expect(chunks.every((chunk) => chunk.length === 500)).toBe(true);
-    // Aucune ligne perdue, aucune ligne en double : c'est l'invariant du
-    // découpage, et c'est lui qui garantit qu'un import écrit ce qu'il a lu.
     expect(chunks.flat()).toHaveLength(50_000);
     expect(new Set(chunks.flat()).size).toBe(50_000);
   });
@@ -104,15 +91,6 @@ describe('reprise d’un travail mort', () => {
     expect(isClaimable(job(ImportStatus.running, at(-IMPORT_LEASE_MS - 1_000)), NOW)).toBe(true);
   });
 
-  /**
-   * LA FENÊTRE QUI TUE UNE FONCTIONNALITÉ ENTIÈRE.
-   *
-   * Un conteneur qui meurt entre la revendication et l'écriture de `running`
-   * laisse une ligne `queued` portant déjà un jeton. « Un queued est forcément
-   * libre » la ferait reprendre par deux travailleurs à la fois ; « un queued
-   * n'est jamais mort » la figerait pour toujours. Seule la borne de bail
-   * appliquée à `queued` AUSSI tranche correctement.
-   */
   it('un queued DÉJÀ revendiqué suit la même borne de bail que running', () => {
     expect(isClaimable(job(ImportStatus.queued, at(-1_000)), NOW)).toBe(false);
     expect(isClaimable(job(ImportStatus.queued, at(-IMPORT_LEASE_MS - 1_000)), NOW)).toBe(true);
@@ -125,13 +103,10 @@ describe('reprise d’un travail mort', () => {
   });
 
   it('une horloge qui recule de peu ne tue PAS un travail bien vivant', () => {
-    // Ajustement NTP ordinaire : quelques secondes dans le futur.
     expect(isClaimable(job(ImportStatus.running, at(30_000)), NOW)).toBe(false);
   });
 
   it('une horloge qui recule beaucoup rend le travail prenable plutôt qu’éternel', () => {
-    // Sans cette branche, l'âge reste négatif, ne franchit jamais le bail, et la
-    // ligne « en cours » ne vieillit PLUS JAMAIS.
     expect(
       isClaimable(job(ImportStatus.running, at(IMPORT_CLOCK_SKEW_TOLERANCE_MS + 60_000)), NOW),
     ).toBe(true);
@@ -156,8 +131,6 @@ describe('saut de reprise', () => {
 
 describe('plafond de lignes', () => {
   it('un nombre inconnu ne refuse rien', () => {
-    // L'en-tête de feuille est facultatif dans le format : « inconnu » est le
-    // cas ordinaire, et il ne doit pas faire refuser un classeur valide.
     expect(exceedsCeiling(null, 50_000)).toBe(false);
   });
 
@@ -190,8 +163,6 @@ describe('liste d’erreurs bornée', () => {
   });
 
   it('garde les PREMIÈRES erreurs, celles du haut du fichier', () => {
-    // C'est le haut du fichier que la personne reconnaît : une liste qui
-    // garderait les dernières la ferait chercher au mauvais endroit.
     const bornee = boundErrors([error(1), error(2)], [error(3)], 2);
     expect(bornee.map((entry) => entry.rowNumber)).toEqual([1, 2]);
   });

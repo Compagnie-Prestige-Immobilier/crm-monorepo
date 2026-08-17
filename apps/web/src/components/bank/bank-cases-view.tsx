@@ -56,21 +56,6 @@ function isSortField(id: string): id is BankCaseSortField {
   return (BANK_CASE_SORT_FIELDS as readonly string[]).includes(id);
 }
 
-/**
- * Liste des dossiers bancaires.
- *
- * DEUX rendus, pas un tableau rétréci. Au-delà de `lg`, un tableau à huit
- * colonnes ; en dessous, une CARTE par dossier. Un tableau de huit colonnes
- * comprimé sur un téléphone donne des colonnes de quarante pixels où
- * « 1 200 000 FCFA » se coupe en trois lignes et où la référence devient
- * « CPI-2… » : l'agent doit alors ouvrir chaque fiche pour savoir laquelle il
- * cherchait. La carte affiche les mêmes champs, empilés dans l'ordre de
- * lecture, et tient dans un pouce.
- *
- * Le défilement horizontal reste possible sur le tableau (`overflow-x` du
- * composant `Table`) : c'est une sortie de secours, pas la réponse au petit
- * écran.
- */
 export function BankCasesView() {
   const { filters, setFilters } = useBankFilters();
   const router = useRouter();
@@ -190,11 +175,6 @@ export function BankCasesView() {
               </TableHeader>
               <TableBody>
                 {data.items.map((bankCase) => (
-                  /* Même arrangement que la carte : la ligne entière ouvre le
-                     dossier, mais uniquement si aucun texte n'est sélectionné et
-                     si le clic n'est pas tombé sur le lien de la référence. Le
-                     `<Link>` reste le seul élément atteignable au clavier, et
-                     `focus-within` montre la ligne visée. */
                   <TableRow
                     key={bankCase.id}
                     className="cursor-pointer focus-within:bg-muted/60"
@@ -347,9 +327,6 @@ function SortableHead({
             <ArrowDownIcon className="size-3.5" aria-hidden="true" />
           )
         ) : (
-          /* `text-muted-foreground` plein et non `opacity-40` : c'est le SEUL
-             indice qu'une colonne est triable, et il doit tenir les 3:1 exigés
-             d'un élément graphique porteur de sens. */
           <ChevronsUpDownIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
         )}
       </button>
@@ -357,42 +334,12 @@ function SortableHead({
   );
 }
 
-/**
- * Le même dossier, en carte lisible.
- *
- * L'ordre suit la question qu'on se pose en cherchant un dossier : « c'est
- * lequel ? » (référence, client), « où en est-il ? » (étape, montant), « qui l'a
- * touché en dernier ? ».
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Carte cliquable ET texte sélectionnable : les deux, pas l'un ou l'autre.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Seule la référence était un lien, pour deux raisons valables : garder le
- * texte sélectionnable (on recopie un numéro de téléphone à la souris) et
- * donner au lien un nom accessible utile : « CPI-2026-000142 » et non le
- * contenu entier de la carte, lu d'une traite par un lecteur d'écran. Mais une
- * carte de la hauteur d'un pouce dont seuls quinze caractères réagissent se
- * rate une fois sur deux au doigt.
- *
- * Les deux objectifs tiennent ensemble : le `<Link>` RESTE sur la référence
- * (nom accessible et navigation clavier inchangés, aucun rôle ajouté sur la
- * carte), et la carte porte en plus un `onClick` qui ne navigue QUE si rien
- * n'est sélectionné et si le clic n'est pas déjà tombé sur un élément
- * interactif. Sélectionner du texte à la souris ne déclenche donc rien, et
- * cliquer sur le lien ne navigue pas deux fois.
- */
 function isPlainAreaClick(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
-  // Un clic déjà pris en charge par un lien, un bouton ou un champ : la carte
-  // se tait, sinon elle doublerait l'action ou l'annulerait.
   return target.closest('a, button, input, select, textarea, [role="button"]') === null;
 }
 
 function isTextSelected(): boolean {
-  // La sélection est lue au MOMENT du clic : un glisser qui se termine sur la
-  // carte laisse une sélection non vide, c'est le signal qu'on lisait, pas
-  // qu'on voulait ouvrir la fiche.
   return (window.getSelection()?.toString() ?? '') !== '';
 }
 

@@ -7,18 +7,8 @@ import {
   withDemoSuffix,
 } from '@/lib/demo-marking';
 
-/**
- * Les marques de démonstration portées PAR LE FICHIER.
- *
- * La ligne rouge du classeur ne survit pas à un copier-coller de la plage de
- * données ; le nom du fichier, lui, survit à un transfert. C'est la seule marque
- * qui accompagne encore le classeur quand il arrive au siège par courriel.
- */
-
 describe('isDemoResponse', () => {
   it('ne retient que le `true` explicite', () => {
-    // L'API pose TOUJOURS l'en-tête, `true` comme `false` : un en-tête absent
-    // est ambigu (mode éteint ? proxy qui filtre ?) et ne vaut jamais « oui ».
     expect(isDemoResponse(new Headers({ [DEMO_MODE_HEADER]: 'true' }))).toBe(true);
     expect(isDemoResponse(new Headers({ [DEMO_MODE_HEADER]: 'TRUE' }))).toBe(true);
     expect(isDemoResponse(new Headers({ [DEMO_MODE_HEADER]: 'false' }))).toBe(false);

@@ -10,23 +10,7 @@ import {
   xofToChartNumber,
 } from '@/lib/money';
 
-/**
- * Espace insécable ÉTROIT (U+202F) : le séparateur de milliers du français, et
- * celui qu'`Intl.NumberFormat('fr-SN')` produit ailleurs dans le panel. Les
- * tests l'écrivent explicitement plutôt qu'un espace ordinaire, sinon ils
- * passeraient avec un séparateur qui coupe les nombres en fin de ligne.
- */
 const NB = '\u202f';
-
-/**
- * Le franc CFA voyage en CHAÎNE, du serveur à l'écran.
- *
- * La colonne est un `Decimal(18,0)`. `Number.MAX_SAFE_INTEGER` s'arrête à
- * 9 007 199 254 740 991 : seize chiffres. Un `Number(montant)` sur un
- * portefeuille consolidé perd donc des unités SANS lever la moindre erreur, et
- * le total affiché diverge de celui du classeur Excel. Ces tests fixent le
- * fait qu'aucune conversion flottante n'a lieu sur le chemin d'affichage.
- */
 
 describe('formatXof', () => {
   it('groupe les milliers et suffixe FCFA', () => {
@@ -34,11 +18,8 @@ describe('formatXof', () => {
   });
 
   it('formate un montant qui dépasse la précision d’un nombre JSON', () => {
-    // 18 chiffres : la borne exacte de la colonne. `Number('999999999999999999')`
-    // vaut 1e18 : soit une unité de plus que la réalité, silencieusement.
     const huge = '999999999999999999';
     expect(formatXof(huge)).toBe(`999${NB}999${NB}999${NB}999${NB}999${NB}999 FCFA`);
-    // La preuve du danger, écrite noir sur blanc : la voie flottante ment.
     expect(String(Number(huge))).not.toBe(huge);
   });
 
@@ -48,9 +29,6 @@ describe('formatXof', () => {
   });
 
   it('distingue « pas de montant » de « montant nul »', () => {
-    // Un dossier en instruction n'a AUCUN montant ; un dossier rejeté en a un,
-    // qui vaut zéro. Les confondre effacerait la différence entre « pas encore
-    // décidé » et « décidé, à zéro ».
     expect(formatXof(null)).toBe('–');
     expect(formatXof(undefined)).toBe('–');
     expect(formatXof('')).toBe('–');
@@ -64,9 +42,6 @@ describe('formatXof', () => {
   });
 
   it('affiche une valeur inattendue plutôt que de la masquer', () => {
-    // Repli délibéré : si l'API renvoyait un jour un format que ce module ne
-    // sait pas lire, mieux vaut montrer la donnée brute qu'un tiret qui
-    // laisserait croire à une absence.
     expect(formatXof('1 200,50')).toBe('1 200,50 FCFA');
   });
 });
@@ -89,8 +64,6 @@ describe('parseMoneyInput', () => {
   });
 
   it('rend null sur une saisie sans chiffre, pour ne pas annoncer « 0 FCFA »', () => {
-    // Un aperçu « 0 FCFA » sous un champ vierge se lit comme un montant déjà
-    // validé.
     expect(parseMoneyInput('')).toBeNull();
     expect(parseMoneyInput('   ')).toBeNull();
     expect(parseMoneyInput('abc')).toBeNull();
@@ -104,13 +77,10 @@ describe('parseMoneyInput', () => {
 
 describe('aller-retour saisie → API → affichage', () => {
   it('conserve la valeur exacte à chaque étape', () => {
-    // Le parcours réel d'un encaissement : l'agent tape, on normalise, l'API
-    // renvoie la même chaîne, on la formate. Aucun `Number` sur le chemin.
     const typed = '12 400 000';
     const toApi = parseMoneyInput(typed);
     expect(toApi).toBe('12400000');
     expect(isMoneyString(toApi)).toBe(true);
-    // Ce que l'API renverra, à l'octet près.
     const fromApi = '12400000';
     expect(fromApi).toBe(toApi);
     expect(formatXof(fromApi)).toBe(`12${NB}400${NB}000 FCFA`);
@@ -135,18 +105,6 @@ describe('xofToChartNumber', () => {
   });
 });
 
-/**
- * Le montant ABRÉGÉ des tuiles d'indicateur.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Les cas limites sont TOUS ici, parce que c'est là que l'abrégé ment.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Un abrégé se juge à ses frontières : 999 contre 1 000, 999 999 contre
- * 1 000 000, 999 999 999 contre 1 000 000 000. C'est là qu'un arrondi mal
- * choisi fait sauter une unité entière et annonce un milliard là où il y a
- * 999 999 999 francs.
- */
 describe('formatXofCompact', () => {
   it('laisse les petits montants entiers : l’abrégé serait plus long', () => {
     expect(formatXofCompact('0')).toBe('0 FCFA');
@@ -169,14 +127,11 @@ describe('formatXofCompact', () => {
   it('bascule en MILLIARDS à dix chiffres, avec l’abréviation française', () => {
     expect(formatXofCompact('1000000000')).toBe('1 Mrd FCFA');
     expect(formatXofCompact('1250000000')).toBe(`1,25 Mrd FCFA`);
-    // « B » est l'anglais *billion*, « G » n'est pas du français non plus.
     expect(formatXofCompact('1250000000')).not.toContain('B ');
     expect(formatXofCompact('1250000000')).not.toContain('G ');
   });
 
   it('TRONQUE, il n’arrondit pas : on n’annonce jamais plus que la caisse', () => {
-    // Arrondir donnerait « 1 Mrd » pour un franc de moins qu'un milliard, et
-    // ferait sauter une unité par-dessus le marché.
     expect(formatXofCompact('999999999')).toBe('999 M FCFA');
     expect(formatXofCompact('999999')).toBe('999 k FCFA');
   });
@@ -184,8 +139,6 @@ describe('formatXofCompact', () => {
   it('tient les 18 chiffres de la colonne sans perdre une unité', () => {
     const huge = '999999999999999999';
     expect(formatXofCompact(huge)).toBe(`999${NB}999${NB}999 Mrd FCFA`);
-    // Le montant exact reste juste : c'est lui que l'écran sait rendre à la
-    // demande, et il ne passe jamais par un flottant.
     expect(formatXof(huge)).toBe(`999${NB}999${NB}999${NB}999${NB}999${NB}999 FCFA`);
   });
 
@@ -200,7 +153,6 @@ describe('formatXofCompact', () => {
   });
 
   it('rend le repli sur une valeur absente, et jamais « 0 FCFA »', () => {
-    // Un dossier en cours d'instruction n'a AUCUN montant ; il n'en a pas un nul.
     expect(formatXofCompact(null)).toBe('–');
     expect(formatXofCompact(undefined)).toBe('–');
     expect(formatXofCompact('')).toBe('–');
@@ -212,8 +164,6 @@ describe('formatXofCompact', () => {
   });
 
   it('ne passe par aucun flottant : la preuve par le montant qui casse', () => {
-    // `Number('9007199254740993')` vaut 9007199254740992. La voie flottante
-    // perdrait ce franc ; la voie chaîne le garde jusque dans l'abrégé.
     const beyondSafe = '9007199254740993';
     expect(String(Number(beyondSafe))).not.toBe(beyondSafe);
     expect(formatXof(beyondSafe)).toBe(`9${NB}007${NB}199${NB}254${NB}740${NB}993 FCFA`);

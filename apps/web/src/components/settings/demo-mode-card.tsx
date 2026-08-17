@@ -44,44 +44,11 @@ import { formatDateTime, formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
-/**
- * Bascule du mode démonstration.
- *
- * C'est l'action la plus conséquente du panel, et l'écran est construit autour
- * d'une seule exigence : ELLE NE DOIT JAMAIS PARTIR PAR ACCIDENT.
- *
- * Trois dispositifs, et aucun n'est décoratif :
- *
- * 1. La désactivation passe par une confirmation qui NOMME et CHIFFRE ce qui
- *    sera supprimé, ligne par ligne.
- * 2. Cette même confirmation affirme, en clair, que les données réelles ne sont
- *    pas touchées. C'est le point le plus important de tout l'écran : l'API
- *    tient un registre des lignes qu'elle a créées et ne supprime que
- *    celles-là. Sans cette phrase, un administrateur qui craint de perdre la
- *    base de production n'osera jamais appuyer : et le jeu de démonstration
- *    restera en place, mêlé aux vraies données, ce qui est précisément le
- *    scénario qu'on cherche à éviter.
- * 3. Le bouton est verrouillé pendant l'appel, et aucun succès n'est annoncé
- *    avant la réponse du serveur.
- *
- * Quand `canToggle` est faux, on rend `reason` : un bouton grisé et muet
- * envoie ouvrir un ticket ; la phrase « la bascule est interdite en production
- * tant que DEMO_MODE_ALLOWED ne vaut pas true » dit quoi faire.
- */
 export function DemoModeCard() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  /**
-   * L'ACTIVATION se confirme, elle aussi.
-   *
-   * L'asymétrie précédente était à l'envers : retirer le jeu de démonstration
-   * exigeait une case à cocher, l'installer partait au premier clic. C'est
-   * pourtant l'activation qui pollue les chiffres de TOUT LE MONDE : elle
-   * ensemence des milliers de lignes crédibles qui apparaissent aussitôt dans
-   * les tableaux de bord, les statistiques et les exports de chaque rôle.
-   */
   const [confirmingEnable, setConfirmingEnable] = useState(false);
   const confirmId = useId();
 
@@ -92,13 +59,7 @@ export function DemoModeCard() {
 
   function afterToggle(): void {
     void queryClient.invalidateQueries({ queryKey: queryKeys.demoStatus });
-    // Tout le panel change de contenu : on vide le cache de données plutôt que
-    // d'énumérer les clés : un écran oublié afficherait des chiffres de
-    // démonstration après désactivation, ce qui est exactement le défaut que le
-    // bandeau global sert à empêcher.
     void queryClient.invalidateQueries();
-    // Le bandeau global est rendu par le layout SERVEUR : sans `refresh()`, il
-    // resterait affiché (ou absent) jusqu'à la navigation suivante.
     router.refresh();
   }
 
@@ -215,8 +176,6 @@ export function DemoModeCard() {
           </div>
 
           {control.kind === 'blocked' ? (
-            /* PAS un bouton grisé sans explication : le contrat fournit
-               `reason` précisément pour être affichée ici. */
             <p
               role="status"
               className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.8125rem] text-warning"
@@ -233,8 +192,6 @@ export function DemoModeCard() {
                 type="button"
                 disabled={!canSubmitEnable({ status: data, pending: enable.isPending })}
                 onClick={() => {
-                  // Confirmation AVANT l'ensemencement : ce clic remplit la
-                  // base de milliers de lignes crédibles, visibles par tous.
                   setConfirmingEnable(true);
                 }}
               >
@@ -422,8 +379,6 @@ export function DemoModeCard() {
       <Dialog
         open={confirming}
         onOpenChange={(open) => {
-          // Fermer pendant l'appel laisserait l'utilisateur sans retour sur une
-          // opération qui court encore.
           if (!open && disable.isPending) return;
           setConfirming(open);
           if (!open) setConfirmed(false);
@@ -504,8 +459,6 @@ export function DemoModeCard() {
             <Button
               type="button"
               variant="destructive"
-              // Trois conditions ET l'absence d'appel en cours : la logique
-              // vit dans `canSubmitDisable`, testée à part.
               disabled={!canSubmitDisable({ status: data, confirmed, pending: disable.isPending })}
               onClick={() => {
                 disable.mutate();

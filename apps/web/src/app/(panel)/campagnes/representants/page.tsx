@@ -13,15 +13,6 @@ import { guardRoles } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Campagnes d’appels représentants' };
 
-/**
- * Second onglet de `/campagnes`, servi par une ROUTE et non par un paramètre.
- *
- * Les deux listes sont filtrables et `useUrlFilters` réécrit la chaîne de
- * requête entière : les faire cohabiter dans une seule URL ferait qu'un « Tout
- * effacer » d'un côté emporte les critères de l'autre. Le découpage par route
- * règle le problème à la racine, et permet de ne précharger que la liste
- * réellement demandée.
- */
 export default async function CampagnesRepresentantsPage({
   searchParams,
 }: {

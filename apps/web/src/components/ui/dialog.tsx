@@ -6,12 +6,6 @@ import type * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-/**
- * `Dialog.Root` de Base UI ne rend aucun élément : il n'accepte donc ni
- * `className` ni `data-slot`. Ses props sont génériques (`<Payload>`), ce qui
- * casse le motif `ComponentProps` habituel : on ré-exporte la primitive telle
- * quelle plutôt que de l'envelopper.
- */
 const Dialog = DialogPrimitive.Root;
 
 type DialogTriggerProps = Omit<DialogPrimitive.Trigger.Props, 'className'> & {
@@ -38,13 +32,6 @@ type DialogOverlayProps = Omit<DialogPrimitive.Backdrop.Props, 'className'> & {
   className?: string | undefined;
 };
 
-/**
- * `Overlay` de Radix s'appelle `Backdrop` chez Base UI. Les images-clés
- * `animate-in` / `animate-out` de tw-animate-css sont conservées telles
- * quelles : seuls les sélecteurs changent, `data-[state=open]` devenant
- * `data-open`. Base UI garde le fond monté jusqu'à la fin de l'animation de
- * sortie, exactement comme Radix.
- */
 function DialogOverlay({ className, ...props }: DialogOverlayProps) {
   return (
     <DialogPrimitive.Backdrop

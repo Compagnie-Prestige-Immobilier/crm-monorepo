@@ -44,28 +44,8 @@ import {
 
 const PDF_MIME = 'application/pdf';
 
-/**
- * Phase 2, campagnes d'appels et annuaire.
- *
- * Deux publics, deux régimes d'autorisation :
- *
- * - les campagnes (création, suivi, clôture, programmes PDF) sont réservées à
- *   l'ADMIN. Elles montrent la répartition entre commerciaux, ce qui n'est ni
- *   utile ni sain à exposer aux intéressés ;
- * - l'annuaire est ouvert à tout COMMERCIAL, par construction : sa raison
- *   d'être est justement qu'un commercial puisse consulter un numéro qui ne lui
- *   a pas été attribué.
- *
- * Aucune route n'est ouverte à BANQUE_FINANCE : ce rôle travaille sur des
- * dossiers déjà constitués et n'a aucun besoin métier de la base d'appels.
- */
 @ApiTags('phase2')
 @ApiBearerAuth()
-// Toute route de ce contrôleur peut refuser pour ces trois raisons :
-// jeton absent ou expiré, rôle insuffisant, et entrée refusée par la
-// validation globale (`forbidNonWhitelisted` transforme un paramètre mal
-// orthographié en 400). Les déclarer ici évite de les oublier route par
-// route, ce qui était le cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'phase2', version: '1' })
 export class Phase2Controller {
@@ -73,10 +53,6 @@ export class Phase2Controller {
     private readonly campaigns: Phase2CampaignsService,
     private readonly directory: Phase2DirectoryService,
   ) {}
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Annuaire, déclaré AVANT les routes paramétrées, par lisibilité
-  // ───────────────────────────────────────────────────────────────────────────
 
   @Get('directory')
   @Roles(Role.COMMERCIAL, Role.ADMIN)
@@ -91,10 +67,6 @@ export class Phase2Controller {
   pullDirectory(@Query() query: DirectoryQueryDto): Promise<DirectoryPageDto> {
     return this.directory.pull(query);
   }
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Campagnes
-  // ───────────────────────────────────────────────────────────────────────────
 
   @Get('campaigns')
   @Roles(Role.ADMIN)
@@ -166,10 +138,6 @@ export class Phase2Controller {
     return this.campaigns.close(id);
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Programme PDF
-  // ───────────────────────────────────────────────────────────────────────────
-
   @Get('campaigns/:id/commerciaux/:userId/programme.pdf')
   @Roles(Role.ADMIN)
   @ApiProduces(PDF_MIME)
@@ -184,17 +152,11 @@ export class Phase2Controller {
   @ApiResponse({
     status: 200,
     description: 'Document PDF, en flux.',
-    // Binaire déclaré explicitement : sans cela le générateur Dart fabrique une
-    // méthode qui tente de désérialiser le PDF en JSON.
     content: { [PDF_MIME]: { schema: { type: 'string', format: 'binary' } } },
   })
   @ApiResponse({
     status: 404,
     description: 'PHASE2_CAMPAIGN_COMMERCIAL_NOT_FOUND · PHASE2_CAMPAIGN_DAY_NOT_FOUND.',
-    // `@ApiProduces` s'applique à TOUTES les réponses de la route, y compris
-    // aux erreurs : sans ce `content` explicite, le contrat annonçait un corps
-    // d'erreur servi en PDF, alors qu'une erreur sort toujours en JSON. Les
-    // générateurs en tiraient un désérialiseur incapable de lire le refus.
     content: { 'application/json': { schema: { $ref: getSchemaPath(ApiErrorDto) } } },
   })
   async downloadProgramme(
@@ -206,9 +168,6 @@ export class Phase2Controller {
     const programme = await this.campaigns.programme(id, userId, query.jour);
     const generatedAt = new Date();
 
-    // On écrit dans le flux Node brut : pdfkit pousse les pages au fil de
-    // l'eau, et passer par la sérialisation de Fastify obligerait à tamponner
-    // le document entier avant le premier octet.
     reply.hijack();
     reply.raw.setHeader('Content-Type', PDF_MIME);
     reply.raw.setHeader(
@@ -220,9 +179,6 @@ export class Phase2Controller {
     try {
       await writeProgrammePdf(reply.raw, { ...programme, generatedAt });
     } catch (error) {
-      // Les en-têtes sont déjà partis : impossible de renvoyer un code
-      // d'erreur. On coupe, ce que le client lit comme un téléchargement
-      // incomplet, préférable à un PDF tronqué qui s'ouvrirait normalement.
       reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
       throw error;
     }

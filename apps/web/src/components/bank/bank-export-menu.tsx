@@ -15,18 +15,6 @@ import { DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { countActiveBankFilters, type BankCaseFilters } from '@/lib/bank-filters';
 import { bankExportFileName, buildBankExportUrl } from '@/lib/data/export';
 
-/**
- * Export des dossiers bancaires : un classeur à TROIS feuilles.
- *
- * Le menu les nomme au lieu de dire « Exporter » tout court. Un agent qui
- * cherche l'historique des transitions doit savoir, avant de télécharger, que
- * la deuxième feuille l'attend : sinon il exporte, n'y trouve pas son compte,
- * et redemande le fichier à quelqu'un d'autre.
- *
- * Le classeur suit EXACTEMENT les filtres de l'écran : c'est la même promesse
- * que du côté prospects, et c'est ce qui permet à un agent de justifier un
- * chiffre qu'il vient de lire.
- */
 export function BankExportMenu({ filters }: { filters: BankCaseFilters }) {
   const { pending, download } = useFileDownload();
   const activeCount = countActiveBankFilters(filters);

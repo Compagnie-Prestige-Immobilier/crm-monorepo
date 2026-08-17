@@ -34,37 +34,11 @@ import {
 } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 
-/**
- * La barre de filtre du tableau de bord et du tableau des prospects.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Trois critères visibles, dix repliés : et le repli ne cache jamais un
- * filtre actif.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Les treize champs étaient empilés en permanence : la première chose visible
- * du tableau de bord était un formulaire, et les indicateurs commençaient sous
- * la ligne de flottaison. Restent donc à l'air libre la recherche, la période
- * et le téléconseiller ; les dix autres passent derrière « Filtres avancés ».
- *
- * Replier crée un risque que l'empilement n'avait pas : un critère resté actif
- * restreint la population sans qu'aucun champ visible ne le dise, et le
- * directeur lit un chiffre partiel en croyant lire le total. Le compte, les
- * puces retirables et le démontage du panneau sont tenus par `AdvancedPanel`,
- * partagé avec les dossiers, les représentants et les campagnes ; les puces
- * elles-mêmes sont construites par `advanced-chips.ts`.
- */
-
 const STATUT_OPTIONS: FilterOption[] = PROSPECT_STATUTS.map((statut) => ({
   value: statut,
   label: PROSPECT_STATUT_LABELS[statut],
 }));
 
-/**
- * Le libellé complet (« BDD1 : CHUES / CBAO ») est repris tel quel du
- * référentiel partagé : c'est celui des onglets du classeur consolidé. Le
- * raccourcir ici obligerait à traduire mentalement entre l'écran et Excel.
- */
 const SEGMENT_OPTIONS: FilterOption[] = BDD_SEGMENTS.map((segment) => ({
   value: segment,
   label: SEGMENT_LABELS[segment],
@@ -91,16 +65,10 @@ export function FiltersBar() {
     refetch,
   } = useQuery({
     queryKey: queryKeys.reference,
-    // Fonction fléchée obligatoire : passer `fetchReferenceData` directement
-    // livrerait le QueryFunctionContext de TanStack en premier argument, là où
-    // la couche de données attend un client d'API.
     queryFn: () => fetchReferenceData(),
     staleTime: 5 * 60_000,
   });
 
-  // Le champ texte est piloté localement puis synchronisé à l'URL après une
-  // pause de frappe : écrire directement dans l'URL relancerait une requête à
-  // chaque caractère.
   const [searchDraft, setSearchDraft] = useState(filters.search);
 
   useEffect(() => {
@@ -115,9 +83,6 @@ export function FiltersBar() {
 
   const removeAdvanced = useCallback(
     (key: AdvancedFilterKey) => {
-      // `Record<AdvancedFilterKey, null>` plutôt qu'une clé calculée nue : le
-      // littéral `{ [key]: null }` s'infère en `{ [x: string]: null }`, que
-      // `Partial<ProspectFilters>` accepterait sans vérifier le nom du champ.
       const patch: Partial<Record<AdvancedFilterKey, null>> = { [key]: null };
       setFilters(patch);
     },
@@ -131,9 +96,6 @@ export function FiltersBar() {
   const activeCount = countActiveFilters(filters);
   const chips = buildAdvancedChips(filters, reference);
 
-  // Sans cette branche, un échec du chargement des référentiels laissait la
-  // barre en squelette permanent : les filtres devenaient inatteignables sans
-  // qu'aucun message n'explique pourquoi.
   if (isError) {
     return (
       <QueryErrorState
@@ -203,11 +165,6 @@ export function FiltersBar() {
         onRemove={removeAdvanced}
         onClearAll={clearAdvanced}
         actions={
-          /* Pas de seconde pastille « 3 filtres » à côté de celle du bouton :
-             posées côte à côte, les deux comptes se lisaient comme une
-             répétition, et rien n'indiquait qu'ils portent sur des ensembles
-             différents. Les critères visibles se comptent à l'œil ; seuls les
-             critères repliés méritaient un chiffre. */
           activeCount > 0 ? (
             <Button variant="ghost" onClick={resetFilters}>
               <RotateCcwIcon aria-hidden="true" />

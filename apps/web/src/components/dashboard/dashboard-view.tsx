@@ -24,50 +24,17 @@ import { fetchDashboardStats } from '@/lib/data/stats';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 
-/**
- * Tableau de bord des prospects, rafraîchi en continu.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Trois règles gouvernent le rafraîchissement, et elles ne sont pas
- * cosmétiques : sans elles, un écran « temps réel » devient illisible.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * 1. `keepPreviousData` : les chiffres RESTENT à l'écran pendant le cycle
- *    suivant. Sans cela, le tableau de bord repasserait par son squelette
- *    toutes les dix secondes : l'écran clignoterait en permanence.
- * 2. Les valeurs GLISSENT (voir `AnimatedNumber`), elles ne sautent pas. Un
- *    nombre qui change d'un coup se lit comme un scintillement ; un nombre qui
- *    monte se lit comme une hausse.
- * 3. Un cycle en échec n'efface RIEN. L'indicateur passe à « Interrompu », le
- *    rythme ralentit, et les derniers chiffres connus restent affichés : mieux
- *    vaut une donnée datée et signalée qu'un écran vide.
- *
- * `prefers-reduced-motion` coupe l'interpolation des compteurs comme celle des
- * graphiques : la durée tombe à zéro, la logique ne change pas (§7).
- */
 export function DashboardView() {
   const { filters } = useProspectFilters();
   const live = useLive();
 
   const { data, isPending, isError, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: queryKeys.dashboard(filters),
-    // Les statistiques prennent EXACTEMENT le filtre du tableau : les chiffres
-    // affichés ici décrivent la même population que la liste des prospects.
     queryFn: () => fetchDashboardStats(filters),
     refetchInterval: live.refetchInterval,
     placeholderData: keepPreviousData,
   });
 
-  /**
-   * L'entonnoir et les montants : requête SÉPARÉE, volontairement.
-   *
-   * Elle vise `GET /analytics/funnel`, absente du client engendré, et elle
-   * porte le seul chiffre que la direction vient chercher. La tenir à part
-   * garantit qu'un échec des six agrégats de prospection n'efface pas le
-   * montant encaissé, et réciproquement : deux pannes distinctes, deux zones
-   * d'écran distinctes. Le filtre, lui, reste le même : les montants décrivent
-   * la population des compteurs affichés dessous.
-   */
   const funnelQuery = useQuery({
     queryKey: queryKeys.funnel(filters),
     queryFn: () => fetchFunnel(filters),

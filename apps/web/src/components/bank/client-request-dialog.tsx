@@ -29,26 +29,6 @@ import { withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
-/**
- * « Demander la création du client », depuis l'impasse de la recherche.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Ce dialogue remplace un cul-de-sac, et c'est tout son objet.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * L'écran d'ouverture de dossier affichait « Aucun client ne correspond. » et
- * s'arrêtait là. Le rôle BANQUE_FINANCE n'a aucune route de création de
- * prospect, et rien ne remontait au siège : le dossier ne se faisait pas, ou se
- * faisait sur un homonyme, ce qui se découvre à l'encaissement.
- *
- * PRÉ-REMPLI depuis la recherche saisie : l'agent vient de taper le nom ou le
- * numéro, le lui redemander serait une double saisie et une occasion de
- * divergence entre ce qu'il a cherché et ce qu'il demande.
- *
- * Le téléphone part en SAISIE LIBRE. Le serveur le normalise en E.164 et
- * refuse la demande si le client existe déjà sous une autre présentation du
- * même numéro : c'est le seul endroit où cette comparaison peut être juste.
- */
 export function ClientRequestDialog({
   open,
   onOpenChange,
@@ -56,7 +36,6 @@ export function ClientRequestDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Ce que l'agent avait tapé dans la recherche : un nom, ou un téléphone. */
   initialTerm: string;
 }) {
   const nomId = useId();
@@ -79,14 +58,6 @@ export function ClientRequestDialog({
     enabled: open,
   });
 
-  /**
-   * Répartition de la recherche entre les champs, à chaque ouverture.
-   *
-   * Un terme majoritairement chiffré est un TÉLÉPHONE, sinon c'est un nom : la
-   * recherche accepte les deux, et poser « 77 123 45 67 » dans le champ « Nom »
-   * obligerait l'agent à tout recouper. La règle est délibérément grossière -
-   * elle ne fait que pré-remplir, et tout reste modifiable.
-   */
   useEffect(() => {
     if (!open) return;
     setSent(false);
@@ -103,8 +74,6 @@ export function ClientRequestDialog({
 
     setPhone('');
     const parts = term.split(/\s+/u).filter((part) => part !== '');
-    // Premier mot en prénom, le reste en nom : c'est l'ordre de saisie courant
-    // dans le produit (« Aminata Diallo »).
     setPrenom(parts[0] ?? '');
     setNom(parts.slice(1).join(' '));
   }, [open, initialTerm]);
@@ -123,8 +92,6 @@ export function ClientRequestDialog({
       return createClientRequest(body);
     },
     onSuccess: () => {
-      // Pas de fermeture automatique : l'agent doit LIRE que sa demande attend
-      // une approbation, sinon il recommencerait la même dans la minute.
       setSent(true);
     },
     onError: (error) => {

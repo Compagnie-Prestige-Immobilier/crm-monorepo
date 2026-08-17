@@ -20,29 +20,6 @@ import { formatNumber, formatRateOrNone } from '@/lib/format';
 import { shouldShowError } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 
-/**
- * Vieillissement du portefeuille bancaire.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * L'entonnoir donne un VOLUME. Celui-ci donne une DURÉE.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Savoir que quarante dossiers stationnent à « Vérification » ne dit pas s'ils
- * y sont depuis deux jours ou depuis deux mois. C'est pourtant la seule
- * question qui désigne l'étape qui bloque, et la seule qui justifie de relancer
- * quelqu'un.
- *
- * La population observée est explicitement celle des dossiers NON TERMINÉS : un
- * dossier encaissé ou rejeté est sorti du portefeuille, et son ancienneté ne se
- * pilote plus. La carte le dit, sinon l'écart avec le total des dossiers du
- * volet se lirait comme une erreur de calcul.
- *
- * Le filtre est celui des PROSPECTS (`EMPTY_FILTERS`) et non celui des
- * dossiers : la route partage le `ProspectFilterDto` commun, et le volet
- * bancaire porte son propre objet de filtre, incompatible. Plutôt que de
- * traduire l'un dans l'autre (ce qui donnerait deux populations différentes
- * sous le même écran), la carte s'annonce comme une vue non filtrée.
- */
 export function BankAgingCard() {
   const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: queryKeys.statsVieillissement(EMPTY_FILTERS),
@@ -50,25 +27,6 @@ export function BankAgingCard() {
     placeholderData: keepPreviousData,
   });
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * Une requête EN ÉCHEC ne doit pas se donner pour un calcul EN COURS.
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * La carte ne lisait que `isPending` et `data === undefined`. Or TanStack pose
-   * `isPending` à `false` dès qu'une requête échoue, en laissant `data` à
-   * `undefined` : l'échec passait donc exactement par la branche du chargement.
-   * L'en-tête annonçait « Calcul en cours… » et le corps affichait un squelette,
-   * l'un comme l'autre INDÉFINIMENT, pour un calcul que plus rien ne mène.
-   *
-   * Un utilisateur devant ce squelette attend. Il n'a aucune raison de
-   * soupçonner une panne, et rien ne lui propose de réessayer : c'est la
-   * variante silencieuse du défaut que `QueryErrorState` a été écrit pour
-   * corriger ailleurs, où un 500 s'affichait en « aucun résultat ».
-   *
-   * `shouldShowError` plutôt qu'`isError` nu : un cycle de sondage raté ne doit
-   * pas effacer des chiffres déjà lisibles à l'écran.
-   */
   const hasData = data !== undefined;
   const showError = shouldShowError({ isError, hasData });
 

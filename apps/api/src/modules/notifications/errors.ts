@@ -1,12 +1,5 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 
-/**
- * Erreurs métier du module, toutes portées par un `code` stable.
- *
- * Aucune de ces situations n'est un 500. Un compositeur qui reçoit
- * « erreur interne » ne peut rien corriger ; un compositeur qui reçoit
- * NOTIFICATION_AUDIENCE_EMPTY sait exactement quoi changer.
- */
 export const NotificationError = {
   NOT_FOUND: 'NOTIFICATION_NOT_FOUND',
   NOT_SCHEDULED: 'NOTIFICATION_NOT_SCHEDULED',
@@ -41,11 +34,6 @@ export const templateNameConflict = (name: string): ConflictException =>
     message: `Un gabarit nommé « ${name} » existe déjà.`,
   });
 
-/**
- * Annuler n'a de sens que sur un envoi encore à venir. Une notification déjà
- * partie ne se rappelle pas : le téléphone l'a. Refuser explicitement vaut
- * mieux que marquer CANCELLED une chose que 400 personnes ont déjà lue.
- */
 export const notScheduled = (): ConflictException =>
   new ConflictException({
     code: NotificationError.NOT_SCHEDULED,
@@ -82,11 +70,6 @@ export const scheduleInPast = (): UnprocessableEntityException =>
     message: 'La date de programmation est déjà passée.',
   });
 
-/**
- * Le mobile passe cette chaîne telle quelle à `go_router`. Une valeur qui
- * commence par `http` ouvrirait un navigateur, ou pire, servirait de vecteur
- * d'hameçonnage depuis une notification qui porte le logo de l'application.
- */
 export const routeInvalid = (): UnprocessableEntityException =>
   new UnprocessableEntityException({
     code: NotificationError.ROUTE_INVALID,

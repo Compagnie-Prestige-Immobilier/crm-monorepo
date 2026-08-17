@@ -29,15 +29,6 @@ import {
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
 
-/**
- * Barre de filtre des campagnes d'appels.
- *
- * L'écran n'offrait que trois boutons de statut. Passé la dizaine de
- * campagnes, retrouver « la campagne BDD2 de mars » se faisait à l'œil, page
- * après page. Restent visibles la recherche et le statut ; le périmètre, le
- * créateur et la période partent derrière « Filtres avancés » : ils servent à
- * retrouver une campagne précise, pas à suivre le travail du jour.
- */
 const STATUS_TABS: readonly { value: 'TOUTES' | CampaignStatus; label: string }[] = [
   { value: 'TOUTES', label: 'Toutes' },
   { value: 'ACTIVE', label: 'En cours' },
@@ -47,12 +38,6 @@ const STATUS_TABS: readonly { value: 'TOUTES' | CampaignStatus; label: string }[
 export function CampaignsFiltersBar() {
   const { filters, setFilters, resetFilters } = useCampaignFilters();
 
-  /**
-   * Les créateurs de campagne sont des ADMIN : le tirage leur est réservé côté
-   * API. On interroge donc `/users` sur ce seul rôle plutôt que la liste des
-   * téléconseillers du lot `reference`, qui ne contient précisément pas ceux
-   * qui créent les campagnes.
-   */
   const { data: creators } = useQuery({
     queryKey: queryKeys.commerciaux({ ...EMPTY_USER_FILTERS, role: 'ADMIN', pageSize: 100 }),
     queryFn: () => fetchUsers({ ...EMPTY_USER_FILTERS, role: 'ADMIN', pageSize: 100 }),
@@ -64,8 +49,6 @@ export function CampaignsFiltersBar() {
     label: user.fullName,
   }));
 
-  // Recherche appliquée après une pause de frappe : écrire directement dans
-  // l'URL relancerait une requête à chaque caractère.
   const [searchDraft, setSearchDraft] = useState(filters.search);
   useEffect(() => {
     setSearchDraft(filters.search);
@@ -184,13 +167,6 @@ export function CampaignsFiltersBar() {
   );
 }
 
-/**
- * Puces de rappel des critères repliés.
- *
- * Un créateur supprimé depuis garde sa puce, avec « Valeur inconnue » : la
- * masquer laisserait un filtre actif sans trace à l'écran, c'est-à-dire
- * exactement ce que ces puces existent pour éviter.
- */
 function buildChips(
   filters: CampaignFilters,
   creators: readonly FilterOption[],

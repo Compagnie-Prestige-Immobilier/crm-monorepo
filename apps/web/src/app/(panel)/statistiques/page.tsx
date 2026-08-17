@@ -17,9 +17,6 @@ export default async function StatistiquesPage() {
   }
 
   return (
-    // `useSearchParams` impose une frontière de suspense : l'onglet courant vit
-    // dans l'URL, et sans ce `Suspense` la page entière basculerait en rendu
-    // dynamique au lieu du seul volet.
     <Suspense
       fallback={
         <div className="flex flex-col gap-6">

@@ -6,17 +6,6 @@ import { flattenPage } from '@/lib/api/query-params';
 import type { CreateUserInput, Paginated, Role, UpdateUserInput, UserRow } from '@/lib/types';
 import type { UserFilters } from '@/lib/user-filters';
 
-/**
- * Comptes commerciaux : `GET|POST /users`, `PATCH|DELETE /users/{id}`,
- * `PUT /users/{id}/active`, `PUT /users/{id}/password`.
- *
- * Réservé à l'ADMIN : l'API répond 403 à un COMMERCIAL, et l'écran coupe déjà
- * en amont (`getAdminSession`).
- *
- * Les critères vivent dans `lib/user-filters.ts` : ils sont portés par l'URL,
- * comme sur les prospects et les dossiers.
- */
-
 export async function fetchUsers(
   filters: UserFilters,
   client: ApiClient = getApiClient(),
@@ -54,11 +43,6 @@ export async function updateUser(
   );
 }
 
-/**
- * Endpoint dédié plutôt que `PATCH /users/{id}` : côté API, désactiver révoque
- * aussi les refresh tokens du compte. Passer par le PATCH générique laisserait
- * la session mobile du commercial active jusqu'à expiration.
- */
 export async function setUserActive(
   id: string,
   isActive: boolean,
@@ -72,7 +56,6 @@ export async function setUserActive(
   );
 }
 
-/** Réinitialisation administrateur : 12 caractères minimum côté contrat. */
 export async function resetUserPassword(
   id: string,
   password: string,

@@ -4,11 +4,6 @@ import type * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-/**
- * Base UI n'expose aucune primitive `Label` : un `<label>` natif suffit, la
- * liaison au contrôle passe par `htmlFor` (ou par `Field.Label` dans un
- * formulaire Base UI, que ce panel n'utilise pas).
- */
 function Label({ className, ...props }: React.ComponentProps<'label'>) {
   return (
     <label

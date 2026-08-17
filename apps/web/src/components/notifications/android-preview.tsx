@@ -5,24 +5,6 @@ import { BellIcon, ChevronRightIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { previewClamp } from './template';
 
-/**
- * Aperçu en direct de la notification Android.
- *
- * POURQUOI CET ÉCRAN EXISTE : un compositeur sans aperçu produit des
- * notifications que personne n'a relues. Le titre part sur une ligne, le corps
- * sur deux ; l'auteur qui rédige dans un `<textarea>` de six lignes n'a aucune
- * idée de l'endroit où sa phrase sera coupée, et l'apprend en le lisant sur son
- * propre téléphone, après l'envoi à 400 personnes.
- *
- * L'aperçu reproduit donc la CONTRAINTE, pas seulement le style : mêmes
- * troncatures qu'une notification repliée, même hiérarchie (nom de
- * l'application, titre, corps), même horodatage.
- *
- * Ce n'est pas un rendu fidèle au pixel d'une ROM Android donnée : il n'y en a
- * pas deux identiques. C'est un modèle honnête des limites communes à toutes.
- */
-
-/** Longueurs au-delà desquelles Android replie. Mesurées sur un écran 360 dp. */
 const TITLE_CLAMP = 42;
 const BODY_CLAMP = 96;
 

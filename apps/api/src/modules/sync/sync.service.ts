@@ -95,21 +95,7 @@ const TO_DB_RESULT: Record<SyncOpStatus, OperationResult> = {
   [SyncOpStatus.SKIPPED_DEPENDENCY_FAILED]: OperationResult.SKIPPED_DEPENDENCY_FAILED,
 };
 
-/**
- * Le chemin retour : du verdict stocké vers le statut réémis au téléphone.
- *
- * POURQUOI CETTE TABLE EXISTE
- *
- * Une opération rejouée doit réémettre le verdict qu'elle avait obtenu, et non
- * un `DUPLICATE` uniforme. Répondre `DUPLICATE` à une opération qui avait été
- * REFUSÉE fait croire au client qu'elle a abouti : il classe la ligne « faite »
- * et la saisie du commercial disparaît sans que personne ne le voie. C'est une
- * perte de données silencieuse, pas une imprécision de rapport.
- *
- * `APPLIED` est la seule valeur qui se traduit en `DUPLICATE` : l'écriture a
- * bien eu lieu, on ne la refait pas, et le client peut clore la ligne. Tous les
- * autres verdicts sont réémis tels quels.
- */
+/** Convertit le verdict stocké dans le statut rendu lors d'un rejeu. */
 const FROM_DB_RESULT: Record<OperationResult, SyncOpStatus> = {
   [OperationResult.APPLIED]: SyncOpStatus.DUPLICATE,
   [OperationResult.DUPLICATE]: SyncOpStatus.DUPLICATE,
@@ -119,19 +105,8 @@ const FROM_DB_RESULT: Record<OperationResult, SyncOpStatus> = {
 };
 
 /**
- * Les exceptions Nest portent leur corps typé dans `getResponse()`. On y lit le
- * code métier plutôt que de se fier au message, qui est destiné à l'humain et
- * peut être reformulé sans préavis.
- */
-/**
- * Verdict mémorisé, lu SANS présumer que la base parle la même langue.
- *
- * Le paramètre est volontairement élargi à `string` : le type de colonne promet
- * un membre d'`OperationResult`, mais une migration déployée avant la
- * reconstruction de l'API met dans cette colonne une valeur que ce binaire ne
- * connaît pas. Typé `OperationResult`, l'accès serait réputé total et le
- * compilateur comme le linter effaceraient le seul repli qui compte. La
- * fonction rend donc `undefined` sur un verdict inconnu, et l'appelant refuse.
+ * Lit les anciennes valeurs de base avec prudence : un verdict inconnu ne doit
+ * jamais ressembler à un rejeu réussi.
  */
 function storedStatusOf(result: string): SyncOpStatus | undefined {
   return (FROM_DB_RESULT as Partial<Record<string, SyncOpStatus>>)[result];
@@ -166,9 +141,7 @@ export class SyncService {
     private readonly demo: DemoVisibilityService,
   ) {}
 
-  // ───────────────────────────────────────────────────────────────────────────
   // PUSH
-  // ───────────────────────────────────────────────────────────────────────────
 
   async push(user: AuthenticatedUser, body: SyncPushDto): Promise<SyncPushOutcome> {
     const env = readEnv();
@@ -251,9 +224,7 @@ export class SyncService {
       .map((operations) => [...operations].sort((left, right) => left.seq - right.seq))
       .sort((left, right) => (left[0]?.seq ?? 0) - (right[0]?.seq ?? 0));
 
-    // ═══════════════════════════════════════════════════════════════════════
     // L'AUTORITÉ DU LOT EST LUE UNE FOIS, ET ELLE VAUT POUR TOUT LE LOT
-    // ═══════════════════════════════════════════════════════════════════════
     //
     // ═══ CE QUI N'ALLAIT PAS : UN LOT À DEUX AUTORITÉS ═══
     //
@@ -757,9 +728,7 @@ export class SyncService {
     return applied(row.id, row.rev, row.updatedAt);
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
   // PULL
-  // ───────────────────────────────────────────────────────────────────────────
 
   async pull(user: AuthenticatedUser, query: SyncPullQueryDto): Promise<SyncPullResponseDto> {
     const limit = query.limit ?? 200;
@@ -908,9 +877,7 @@ export class SyncService {
   }
 }
 
-// ───────────────────────────────────────────────────────────────────────────
 // Helpers
-// ───────────────────────────────────────────────────────────────────────────
 
 /**
  * Pagination keyset sur `(updatedAt, id)` + retard de sécurité.

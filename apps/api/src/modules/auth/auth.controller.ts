@@ -14,14 +14,6 @@ import { AuthTokensDto, AuthUserDto, LoginDto, LogoutResponseDto, RefreshDto } f
 import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
 
 @ApiTags('auth')
-// AUCUNE route de ce contrôleur n'écrit de donnée métier : elles ouvrent et
-// ferment une session. Les refuser pendant une démonstration empêcherait de se
-// connecter POUR ÉTEINDRE le mode, et couperait le renouvellement de jeton des
-// téléphones en cours de synchronisation, dont la file partirait en session
-// expirée pour une raison qui n'a rien à voir avec eux.
-//
-// `logout` révoque un refresh token, seule écriture du lot : une session qu'on
-// ferme est un geste de sécurité, jamais une donnée de production à protéger.
 @DemoWritable('ouvrir et fermer une session n’écrit aucune donnée métier')
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
@@ -80,10 +72,6 @@ export class AuthController {
     return { revoked: await this.auth.logout(body.refreshToken) };
   }
 
-  // OUVERT AUX TROIS RÔLES, ET ÉCRIT COMME TEL : cette route rend l'identité
-  // de l'APPELANT, et rien d'autre. Elle est authentifiée, contrairement aux
-  // trois précédentes, et tout porteur de session a besoin d'elle pour savoir
-  // qui il est, à commencer par l'écran qui décide de son menu.
   @Get('me')
   @Roles(...ANY_AUTHENTICATED)
   @ApiBearerAuth()

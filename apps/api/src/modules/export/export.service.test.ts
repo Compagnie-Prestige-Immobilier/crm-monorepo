@@ -22,16 +22,6 @@ const admin: AuthenticatedUser = {
   role: Role.ADMIN,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Une base en mémoire, minuscule mais qui INTERPRÈTE réellement la clause
-// `where` reçue.
-//
-// Un faux qui renverrait toujours les mêmes lignes laisserait passer l'erreur
-// que ces tests existent pour attraper : un onglet « BDD1 » rempli avec la base
-// entière. Ici, la répartition des lignes entre les onglets est bien celle que
-// produit la clause construite par `buildProspectWhere`.
-// ─────────────────────────────────────────────────────────────────────────────
-
 interface Fixture {
   id: string;
   nom: string;
@@ -139,7 +129,6 @@ function row(fixture: Fixture): Record<string, unknown> {
 
 type StringFilter = string | { not?: string; gt?: string };
 
-/** Évalue les formes de `where` que `buildProspectWhere` sait produire. */
 function matches(where: Prisma.ProspectWhereInput, candidate: Record<string, unknown>): boolean {
   const clause = where as Record<string, unknown>;
 
@@ -189,8 +178,6 @@ function makePrisma(fixtures = FIXTURES): { service: PrismaService; queries: () 
     },
     $queryRaw: (): Promise<unknown[]> => {
       rawCalls += 1;
-      // Une seule tentative connue, sur p-01 : de quoi vérifier que les
-      // colonnes « dernier résultat » et « dernier commentaire » se remplissent.
       return Promise.resolve([
         {
           prospectId: 'p-01',
@@ -228,15 +215,6 @@ const stubAnalytics = (): AnalyticsService => {
   } as unknown as AnalyticsService;
 };
 
-/**
- * Produit le classeur et le relit, c'est le FICHIER qui est vérifié, pas les
- * intentions du code.
- *
- * La lecture est branchée AVANT l'écriture : le service pousse le XML au fil de
- * l'eau et le tampon d'un `PassThrough` est borné. Accumuler d'abord puis
- * relire ferait tenir tout le classeur en mémoire, exactement ce que la
- * génération en flux existe pour éviter.
- */
 async function build(
   mode: ExportMode,
   filter: ProspectFilterDto = {},
@@ -262,21 +240,12 @@ async function read(
 const sheetNames = (workbook: ExcelJS.Workbook): string[] =>
   workbook.worksheets.map((sheet) => sheet.name);
 
-/** La feuille attendue, ou un échec explicite plutôt qu'un `undefined` propagé. */
 function sheetOf(workbook: ExcelJS.Workbook, name: string): ExcelJS.Worksheet {
   const found = workbook.getWorksheet(name);
   if (!found) throw new Error(`Feuille « ${name} » absente du classeur.`);
   return found;
 }
 
-/**
- * Texte d'une cellule.
- *
- * Une `CellValue` peut être un objet, texte enrichi, formule, lien, que
- * `String()` rendrait « [object Object] ». Le cas ne se présente pas dans ce
- * classeur, mais le traiter explicitement évite qu'une comparaison échoue un
- * jour sur cette chaîne au lieu de dire ce qui a changé.
- */
 function text(value: ExcelJS.CellValue): string {
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return value.toISOString();
@@ -284,7 +253,6 @@ function text(value: ExcelJS.CellValue): string {
   return String(value);
 }
 
-/** Valeurs d'une colonne, en-tête exclu. */
 function column(sheet: ExcelJS.Worksheet, header: string): string[] {
   const index = PROSPECT_COLUMNS.findIndex((spec) => spec.header === header) + 1;
   const values: string[] = [];
@@ -308,10 +276,7 @@ describe('classeur consolidé', () => {
       const noms = column(sheet, 'Nom');
       const segments = column(sheet, 'Segment');
 
-      // Rien d'un autre segment n'a fuité…
       expect(new Set(segments)).toEqual(new Set(noms.length ? [segment] : []));
-      // …et rien de ce segment ne manque : le contrôle est fait dans les DEUX
-      // sens, car un onglet vide passerait sans peine le premier seul.
       const attendus = FIXTURES.filter(
         (f) =>
           classifySegment({ syndicatSigle: f.sigle, banqueShortName: f.shortName }) === segment,
@@ -333,8 +298,6 @@ describe('classeur consolidé', () => {
   });
 
   it('ignore un `segment` reçu en paramètre : c’est le classeur qui segmente', async () => {
-    // L'honorer viderait trois onglets sur quatre tout en les laissant
-    // s'afficher, ce qui se lit comme une base vide.
     const workbook = await build(ExportMode.CONSOLIDATED, { segment: 'BDD1' });
     expect(column(sheetOf(workbook, 'BDD4'), 'Nom')).not.toHaveLength(0);
     expect(column(sheetOf(workbook, 'Consolidé'), 'Nom')).toHaveLength(FIXTURES.length);
@@ -424,7 +387,6 @@ describe('mise en forme', () => {
       expect(header.font.bold).toBe(true);
       expect(header.font.color?.argb).toBe('FFFFFFFF');
       expect(header.fill).toMatchObject({ fgColor: { argb: 'FF630210' } });
-      // Largeurs calculées, jamais laissées à la valeur par défaut.
       expect(sheet.getColumn(1).width).toBeGreaterThan(0);
     }
   });
@@ -437,8 +399,6 @@ describe('vue filtrée', () => {
   });
 
   it('est le mode par défaut', async () => {
-    // Appelé SANS quatrième argument : c'est la valeur par défaut du service
-    // qui est vérifiée, et non celle que le test aurait passée lui-même.
     const { service } = makePrisma();
     const workbook = await read(
       new ExportService(service, stubAnalytics(), fakeDemoVisibility()),
@@ -463,10 +423,6 @@ describe('coût des requêtes', () => {
 
     await exports.writeProspects(admin, {}, stream, ExportMode.CONSOLIDATED);
 
-    // Cinq feuilles, une page chacune : cinq lectures de tentatives. Une
-    // lecture par ligne en produirait 7 pour le seul onglet Consolidé, et le
-    // compteur grandirait avec le nombre de prospects, c'est exactement ce
-    // que ce contrôle interdit.
     expect(queries()).toBe(5);
   });
 });

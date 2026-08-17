@@ -19,17 +19,6 @@ import '../../../ui/widgets/offline_indicator.dart';
 import 'discard_confirmation.dart';
 import 'ownership_sheet.dart';
 
-/// « À corriger » : la file des opérations en `conflict` ou `failed`.
-///
-/// Un écran dédié et pas un badge dans une liste. Une opération bloquée bloque
-/// **toute sa partition** : le représentant fautif et l'ensemble de ses
-/// prospects cessent de partir (ADR 0001 §2). Sans un endroit où la voir et la
-/// résoudre, l'utilisateur constate seulement que son compteur d'attente ne
-/// descend plus, sans savoir pourquoi ni quoi faire.
-///
-/// Trois actions par ligne, jamais plus : **Réessayer**, **Modifier**,
-/// **Supprimer**. Un quatrième choix sur un écran d'erreur transforme un
-/// problème technique en décision, et l'utilisateur n'en a pas les moyens.
 class CorrectionsScreen extends ConsumerWidget {
   const CorrectionsScreen({super.key});
 
@@ -40,9 +29,6 @@ class CorrectionsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('À corriger'),
-        // Pas de `SyncBadge` ici : il navigue vers cet écran, et un raccourci
-        // vers la page qu'on regarde n'informe personne. L'indicateur hors
-        // ligne, lui, explique pourquoi la file ne descend pas.
         actions: const <Widget>[
           OfflineIndicator(),
           SizedBox(width: CpiSpacing.xs),
@@ -95,14 +81,6 @@ class CorrectionsScreen extends ConsumerWidget {
   }
 }
 
-/// Ce que le dernier cycle a rencontré, en toutes lettres.
-///
-/// `SyncUiState.lastError` portait le code d'échec classifié : lien mort,
-/// serveur en 500, throttling, refus. **Aucun écran ne le lisait.** Sur cette
-/// page, dont le seul rôle est d'expliquer pourquoi la file ne descend pas,
-/// c'était l'information manquante : l'utilisateur voyait des lignes en échec
-/// sans savoir si le problème venait de sa saisie ou de son réseau, et
-/// « Réessayer » ne pouvait rien lui apprendre.
 class _LastCycleFailure extends ConsumerWidget {
   const _LastCycleFailure();
 
@@ -303,20 +281,6 @@ class _CorrectionCard extends ConsumerWidget {
     await showOwnershipSheet(context: context, row: row, lookup: lookup);
   }
 
-  /// ═══ UN BOUTON NE PROMET PAS CE QU'IL NE FAIT PAS ═══
-  ///
-  /// Les deux types d'entité partageaient le libellé « Modifier ». Il est juste
-  /// pour un représentant : le bouton ouvre bien sa fiche en modification. Pour
-  /// un prospect, **il n'existe aucun écran de modification** : la route
-  /// `/prospects/nouveau` ne prend qu'un représentant et un brouillon, jamais un
-  /// identifiant de prospect. Le bouton faisait donc un saut d'onglet vers
-  /// l'historique, et l'utilisateur qui venait d'accepter de corriger sa saisie
-  /// se retrouvait devant une liste où rien ne désignait la ligne fautive, sans
-  /// comprendre ce qu'il avait déclenché ni comment revenir.
-  ///
-  /// On ne fabrique pas l'écran manquant ici. On dit ce que le bouton fait :
-  /// l'historique déplie les prospects sous leur représentant, c'est bien là que
-  /// la saisie se retrouve, et le libellé cesse de promettre autre chose.
   String get _editLabel =>
       row.entityType == 'representant' ? 'Modifier' : 'Voir dans l\'historique';
 
@@ -331,11 +295,6 @@ class _CorrectionCard extends ConsumerWidget {
   }
 
   Future<void> _discard(BuildContext context, WidgetRef ref) async {
-    // On annonce le nombre exact de fiches emportées, compté par le même code
-    // que la suppression ([WriteRepository.previewDiscard]). Abandonner la
-    // création d'un représentant emporte tous ses prospects : sans cette
-    // cascade, ils partiraient vers un parent qui n'existera jamais côté
-    // serveur, qui répondrait `REPRESENTANT_NOT_FOUND` indéfiniment.
     final bool ok = await confirmDiscard(
       context: context,
       ref: ref,
@@ -346,8 +305,6 @@ class _CorrectionCard extends ConsumerWidget {
         .read(writeRepositoryProvider)
         .discardOperation(row.seq);
     if (!context.mounted) return;
-    // Un refus doit se voir. Sans ce retour, l'écran ne bougeait pas et
-    // l'utilisateur rappuyait sur « Supprimer » en croyant à un bouton mort.
     if (result.outcome == DiscardOutcome.claimed) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
