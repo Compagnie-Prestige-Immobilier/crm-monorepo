@@ -17,7 +17,8 @@ import { rotateRefreshTokenDetailed } from '@/lib/api/tokens';
 
 type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
-const FORWARDED_REQUEST_HEADERS = ['content-type', 'accept', 'accept-language'];
+// `idempotency-key` : sans elle, `POST /sync/push` repart en 422 IDEMPOTENCY_KEY_REQUIRED.
+const FORWARDED_REQUEST_HEADERS = ['content-type', 'accept', 'accept-language', 'idempotency-key'];
 
 const FORWARDED_RESPONSE_HEADERS = [
   'content-type',
