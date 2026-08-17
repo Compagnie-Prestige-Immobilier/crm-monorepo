@@ -103,7 +103,7 @@ class SupervisedUserDto {
   @JsonKey(name: r'lastSyncAt', required: true, includeIfNull: true)
   final DateTime? lastSyncAt;
 
-  /// Dernière écriture métier : tentative d’appel ou transition de dossier.
+  /// Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.
   @JsonKey(name: r'lastWriteAt', required: true, includeIfNull: true)
   final DateTime? lastWriteAt;
 

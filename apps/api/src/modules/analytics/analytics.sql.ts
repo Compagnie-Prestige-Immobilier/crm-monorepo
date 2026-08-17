@@ -61,13 +61,20 @@ export function prospectConditions(
     conditions.push(Prisma.sql`p."enrollmentCapturedById" = ${filter.enrollmentCapturedById}`);
   }
   if (filter.segment) conditions.push(segmentCondition(filter.segment));
-  if (filter.campaignId) {
+  if (filter.campaignId ?? filter.assignedToId) {
+    const campagne = filter.campaignId
+      ? Prisma.sql`AND ct."campaignId" = ${filter.campaignId}`
+      : Prisma.empty;
+    const attribuee = filter.assignedToId
+      ? Prisma.sql`AND ct."assignedToId" = ${filter.assignedToId}`
+      : Prisma.empty;
     // `call_tasks` porte son propre `isDemo` : le `p."isDemo"` posé plus haut ne le couvre pas.
     conditions.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "call_tasks" ct
         WHERE ct."prospectId" = p."id"
-          AND ct."campaignId" = ${filter.campaignId}
+          ${campagne}
+          ${attribuee}
           AND ${demoScopeOn(TASK, demoEnabled)}
       )`,
     );

@@ -145,7 +145,10 @@ import 'package:crm_api_client/src/model/segment_list_dto.dart';
 import 'package:crm_api_client/src/model/set_active_dto.dart';
 import 'package:crm_api_client/src/model/set_bank_case_stage_active_dto.dart';
 import 'package:crm_api_client/src/model/supervised_user_dto.dart';
+import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
+import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
 import 'package:crm_api_client/src/model/supervision_dto.dart';
+import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
 import 'package:crm_api_client/src/model/sync_changes_dto.dart';
 import 'package:crm_api_client/src/model/sync_deletion_dto.dart';
 import 'package:crm_api_client/src/model/sync_entity_data_dto.dart';
@@ -654,8 +657,20 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'SupervisedUserDto':
       return SupervisedUserDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'SupervisionActivityDto':
+      return SupervisionActivityDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SupervisionActivityRowDto':
+      return SupervisionActivityRowDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'SupervisionDto':
       return SupervisionDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SupervisionGranularity':
+    case 'SupervisionTeleconseillerDto':
+      return SupervisionTeleconseillerDto.fromJson(
+            value as Map<String, dynamic>,
+          )
           as ReturnType;
     case 'SyncChangesDto':
       return SyncChangesDto.fromJson(value as Map<String, dynamic>)

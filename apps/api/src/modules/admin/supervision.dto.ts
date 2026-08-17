@@ -49,7 +49,9 @@ export class SupervisedUserDto {
     type: String,
     format: 'date-time',
     nullable: true,
-    description: 'Dernière écriture métier : tentative d’appel ou transition de dossier.',
+    description:
+      'Dernière écriture métier : tentative d’appel ou transition de dossier. ' +
+      'Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.',
   })
   lastWriteAt!: string | null;
 }

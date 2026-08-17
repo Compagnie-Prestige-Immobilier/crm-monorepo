@@ -29,6 +29,9 @@ import { demoScope } from '../../prisma/demo-visibility.js';
 /** Les deux rôles supervisés. L'ADMIN se supervise dans le miroir. */
 const SUPERVISED_ROLES: readonly Role[] = [Role.COMMERCIAL, Role.BANQUE_FINANCE];
 
+/** Durée de vie d'une famille de jetons : au-delà, un compte est dormant quoi qu'il arrive. */
+const ACTIVITY_WINDOW_DAYS = 31;
+
 /** `{ userId → date }`, à partir d'un `groupBy` Prisma. */
 function toDateMap<K extends string>(
   rows: readonly ({ [key in K]: string } & { _max: { [key: string]: Date | null } })[],
@@ -59,6 +62,7 @@ export class SupervisionService {
 
   async overview(): Promise<SupervisionDto> {
     const now = new Date();
+    const since = new Date(now.getTime() - ACTIVITY_WINDOW_DAYS * 86_400_000);
 
     const [users, sessions, syncs, calls, transitions] = await Promise.all([
       this.prisma.user.findMany({
@@ -108,14 +112,22 @@ export class SupervisionService {
        * toujours » un vrai compte dont la dernière action porte, elle, sur une
        * fiche de démonstration, ce qui est un contresens sur un écran dont le
        * seul objet est de repérer les comptes dormants.
+       *
+       * Bornés à trente et un jours : au-delà, la date ne change plus rien à
+       * l'affichage, la présence se joue sur vingt-quatre heures et une famille
+       * de jetons meurt à trente et un jours. Sans cette borne, l'écran
+       * parcourait tout l'historique des appels toutes les dix secondes et par
+       * onglet ouvert.
        */
       this.prisma.callAttempt.groupBy({
         by: ['performedById'],
+        where: { createdAt: { gte: since } },
         _max: { createdAt: true },
       }),
 
       this.prisma.bankCaseTransition.groupBy({
         by: ['performedById'],
+        where: { createdAt: { gte: since } },
         _max: { createdAt: true },
       }),
     ]);

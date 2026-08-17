@@ -91,6 +91,36 @@ describe('filtres de phase 2', () => {
   });
 });
 
+describe('filtre par attribution de la tâche d’appel', () => {
+  it('borne la campagne à la file d’UN téléconseiller', () => {
+    const where = buildProspectWhere(
+      admin,
+      { campaignId: 'camp-1', assignedToId: 'com-bob' },
+      false,
+    );
+
+    expect(where.AND).toEqual([
+      { callTasks: { some: { campaignId: 'camp-1', assignedToId: 'com-bob' } } },
+    ]);
+  });
+
+  it('sans campagne, retient les fiches attribuées à ce téléconseiller', () => {
+    const where = buildProspectWhere(admin, { assignedToId: 'com-bob' }, false);
+    expect(where.AND).toEqual([{ callTasks: { some: { assignedToId: 'com-bob' } } }]);
+  });
+
+  it('ne se confond pas avec l’auteur de la saisie', () => {
+    const where = buildProspectWhere(
+      admin,
+      { commercialId: 'com-alice', assignedToId: 'com-bob' },
+      false,
+    );
+
+    expect(where.createdById).toBe('com-alice');
+    expect(where.AND).toEqual([{ callTasks: { some: { assignedToId: 'com-bob' } } }]);
+  });
+});
+
 describe('recherche, la clause téléphone ne doit jamais tout matcher', () => {
   const clauses = (search: string) =>
     (buildProspectWhere(admin, { search }, false).OR ?? []) as Record<string, unknown>[];

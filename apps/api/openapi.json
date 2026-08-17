@@ -2306,6 +2306,16 @@
             }
           },
           {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -7760,6 +7770,16 @@
             }
           },
           {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -7967,6 +7987,16 @@
             }
           },
           {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -8168,6 +8198,16 @@
             "required": false,
             "in": "query",
             "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -8383,6 +8423,16 @@
             "required": false,
             "in": "query",
             "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -8607,6 +8657,16 @@
             }
           },
           {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -8814,6 +8874,16 @@
             }
           },
           {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -9015,6 +9085,16 @@
             "required": false,
             "in": "query",
             "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -9229,6 +9309,16 @@
             }
           },
           {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -9431,6 +9521,16 @@
             "required": false,
             "in": "query",
             "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -9645,6 +9745,16 @@
             }
           },
           {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -9846,6 +9956,16 @@
             "required": false,
             "in": "query",
             "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -10071,6 +10191,16 @@
             }
           },
           {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -10273,6 +10403,16 @@
             "required": false,
             "in": "query",
             "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -10487,6 +10627,16 @@
             }
           },
           {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -10689,6 +10839,16 @@
             "required": false,
             "in": "query",
             "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -10902,6 +11062,16 @@
             }
           },
           {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -11104,6 +11274,16 @@
             "required": false,
             "in": "query",
             "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -11335,6 +11515,16 @@
             "required": false,
             "in": "query",
             "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -11675,6 +11865,16 @@
             }
           },
           {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -11774,6 +11974,91 @@
         ],
         "summary": "Provenance des fiches, avec le détail lisible en second niveau.",
         "tags": ["analytics"]
+      }
+    },
+    "/api/v1/supervision/activite": {
+      "get": {
+        "description": "La fenêtre porte sur la date de l’ACTE, pas sur celle de la fiche : un téléconseiller resté hors ligne trois semaines verrait sinon ses appels du lundi comptés le jeudi de la synchronisation. Les lignes n’existent qu’aux périodes où il s’est passé quelque chose ; `teleconseillers` porte la liste complète et le reste à faire, qu’aucune date ne borne.",
+        "operationId": "getSupervisionActivite",
+        "parameters": [
+          {
+            "name": "actFrom",
+            "required": false,
+            "in": "query",
+            "description": "Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "actTo",
+            "required": false,
+            "in": "query",
+            "description": "Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SupervisionGranularity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisionActivityDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activité des téléconseillers sur la fenêtre demandée.",
+        "tags": ["supervision"]
       }
     },
     "/api/v1/export/prospects.xlsx": {
@@ -11877,6 +12162,16 @@
             "required": false,
             "in": "query",
             "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -17688,7 +17983,7 @@
             "type": "string",
             "format": "date-time",
             "nullable": true,
-            "description": "Dernière écriture métier : tentative d’appel ou transition de dossier."
+            "description": "Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null."
           }
         },
         "required": [
@@ -18853,6 +19148,144 @@
           }
         },
         "required": ["items", "byLabel", "total"]
+      },
+      "SupervisionGranularity": {
+        "type": "string",
+        "enum": ["day", "week"]
+      },
+      "SupervisionActivityRowDto": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "description": "Début de la journée ou de la semaine, en AAAA-MM-JJ."
+          },
+          "teleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teleconseillerName": {
+            "type": "string"
+          },
+          "calls": {
+            "type": "number",
+            "description": "Appels passés à des prospects."
+          },
+          "unreachable": {
+            "type": "number",
+            "description": "Issue UNREACHABLE : NRP ou injoignable."
+          },
+          "wrongNumber": {
+            "type": "number",
+            "description": "Issue WRONG_NUMBER : faux numéro."
+          },
+          "refused": {
+            "type": "number",
+            "description": "Issue REFUSED : refus."
+          },
+          "other": {
+            "type": "number",
+            "description": "Issue OTHER."
+          },
+          "methodObtained": {
+            "type": "number",
+            "description": "Issue METHOD_OBTAINED."
+          },
+          "callback": {
+            "type": "number",
+            "description": "Issue CALLBACK : à rappeler."
+          },
+          "reachRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Part des appels dont le numéro s’est révélé exploitable, en pourcentage. `null` sans aucun appel : « personne appelé » n’est pas « personne joint »."
+          },
+          "prospectsCreated": {
+            "type": "number",
+            "description": "Fiches prospect saisies sur la période."
+          },
+          "representantsContacted": {
+            "type": "number",
+            "description": "Représentants distincts appelés sur la période."
+          },
+          "tasksClosed": {
+            "type": "number",
+            "description": "Tâches d’appel clôturées sur la période."
+          }
+        },
+        "required": [
+          "bucket",
+          "teleconseillerId",
+          "teleconseillerName",
+          "calls",
+          "unreachable",
+          "wrongNumber",
+          "refused",
+          "other",
+          "methodObtained",
+          "callback",
+          "reachRate",
+          "prospectsCreated",
+          "representantsContacted",
+          "tasksClosed"
+        ]
+      },
+      "SupervisionTeleconseillerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "openTasks": {
+            "type": "number",
+            "description": "Tâches d’appel encore OUVERTES. Instantané : la fenêtre ne le borne pas."
+          }
+        },
+        "required": ["id", "fullName", "isActive", "openTasks"]
+      },
+      "SupervisionActivityDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "granularity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SupervisionGranularity"
+              }
+            ]
+          },
+          "items": {
+            "description": "Une ligne par téléconseiller et par période, seulement là où il s’est passé quelque chose.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionActivityRowDto"
+            }
+          },
+          "teleconseillers": {
+            "description": "Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionTeleconseillerDto"
+            }
+          }
+        },
+        "required": ["from", "to", "granularity", "items", "teleconseillers"]
       },
       "ExportMode": {
         "type": "string",
