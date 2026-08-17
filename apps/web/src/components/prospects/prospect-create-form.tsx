@@ -1,0 +1,309 @@
+'use client';
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangleIcon, LoaderIcon } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { toast } from 'sonner';
+
+import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { Field } from '@/components/forms/field';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  createProspect,
+  prospectPhoneConflict,
+  type CreateProspectInput,
+  type ProspectPhoneConflict,
+} from '@/lib/data/prospects';
+import { fetchReferenceData } from '@/lib/data/reference';
+import { formatDateTime } from '@/lib/format';
+import { toastApiError } from '@/lib/mutation-feedback';
+import { queryKeys } from '@/lib/query-keys';
+
+const NATIONAL_LENGTH = 9;
+
+function toE164Senegal(raw: string): string | null {
+  if (/\p{Letter}/u.test(raw)) return null;
+  let digits = raw.replace(/\D/gu, '').replace(/^00/u, '');
+  if (digits.startsWith('221') && digits.length > NATIONAL_LENGTH) digits = digits.slice(3);
+  return digits.length === NATIONAL_LENGTH ? `+221${digits}` : null;
+}
+
+type FieldName = 'prenom' | 'nom' | 'phone' | 'banqueId' | 'syndicatId' | 'representantId';
+
+type Errors = Partial<Record<FieldName, string>>;
+
+interface SaveVariables {
+  input: CreateProspectInput;
+  andNext: boolean;
+}
+
+function ChoiceError({ message }: { message: string | undefined }): ReactNode {
+  if (message === undefined) return null;
+  return (
+    <p role="alert" className="text-[0.75rem] text-destructive">
+      {message}
+    </p>
+  );
+}
+
+export function ProspectCreateForm({ representantId }: { representantId: string | null }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const prenomRef = useRef<HTMLInputElement>(null);
+
+  const [prenom, setPrenom] = useState('');
+  const [nom, setNom] = useState('');
+  const [phone, setPhone] = useState('');
+  const [banqueId, setBanqueId] = useState<string | null>(null);
+  const [syndicatId, setSyndicatId] = useState<string | null>(null);
+  const [repId, setRepId] = useState<string | null>(representantId);
+  const [errors, setErrors] = useState<Errors>({});
+  const [conflict, setConflict] = useState<ProspectPhoneConflict | null>(null);
+  const [saved, setSaved] = useState<string[]>([]);
+
+  const reference = useQuery({
+    queryKey: queryKeys.reference,
+    queryFn: () => fetchReferenceData(),
+    staleTime: 5 * 60_000,
+  });
+
+  const save = useMutation({
+    mutationFn: (variables: SaveVariables) => createProspect(variables.input),
+    onSuccess: (prospect, variables) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardRoot });
+      setSaved((previous) => [...previous, `${prospect.prenom} ${prospect.nom}`]);
+      toast.success(`${prospect.prenom} ${prospect.nom} enregistré.`);
+
+      if (!variables.andNext) {
+        router.push(`/prospects?search=${encodeURIComponent(prospect.phoneE164)}`);
+        return;
+      }
+
+      // La rafale : seule l'identité repart de zéro. La banque et le syndicat
+      // sont les mêmes pour toute une tournée chez le même représentant.
+      setPrenom('');
+      setNom('');
+      setPhone('');
+      setErrors({});
+      prenomRef.current?.focus();
+    },
+    onError: (error) => {
+      const existing = prospectPhoneConflict(error);
+      if (existing !== null) {
+        setConflict(existing);
+        return;
+      }
+      toastApiError(error, 'Le prospect n’a pas pu être enregistré.');
+    },
+  });
+
+  function submit(andNext: boolean): void {
+    if (save.isPending) return;
+
+    const e164 = toE164Senegal(phone);
+    const found: Errors = {};
+    if (prenom.trim() === '') found.prenom = 'Le prénom est obligatoire.';
+    if (nom.trim() === '') found.nom = 'Le nom est obligatoire.';
+    if (phone.trim() === '') found.phone = 'Le numéro est obligatoire.';
+    else if (e164 === null) found.phone = 'Numéro invalide : 9 chiffres attendus.';
+    if (banqueId === null) found.banqueId = 'Choisissez une banque.';
+    if (syndicatId === null) found.syndicatId = 'Choisissez un syndicat.';
+    if (repId === null) found.representantId = 'Choisissez un représentant.';
+
+    setErrors(found);
+    if (e164 === null || banqueId === null || syndicatId === null || repId === null) return;
+    if (Object.keys(found).length > 0) return;
+
+    setConflict(null);
+    save.mutate({
+      input: {
+        prenom: prenom.trim(),
+        nom: nom.trim(),
+        phone: e164,
+        banqueId,
+        syndicatId,
+        representantId: repId,
+      },
+      andNext,
+    });
+  }
+
+  const last = saved.at(-1);
+  const plural = saved.length > 1 ? 's' : '';
+
+  return (
+    <form
+      className="mx-auto flex w-full max-w-2xl flex-col gap-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit(true);
+      }}
+      onKeyDown={(event: KeyboardEvent<HTMLFormElement>) => {
+        if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey)) return;
+        event.preventDefault();
+        submit(true);
+      }}
+    >
+      {representantId === null ? (
+        <div className="flex flex-col gap-1.5">
+          <FilterCombobox
+            label="Représentant"
+            placeholder="Choisir un représentant"
+            required
+            value={repId}
+            options={reference.data?.representants ?? []}
+            onChange={setRepId}
+          />
+          <ChoiceError message={errors.representantId} />
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Prénom" required error={errors.prenom}>
+          {(props) => (
+            <Input
+              {...props}
+              ref={prenomRef}
+              value={prenom}
+              maxLength={120}
+              autoComplete="off"
+              autoFocus
+              onChange={(event) => {
+                setPrenom(event.target.value);
+              }}
+            />
+          )}
+        </Field>
+
+        <Field label="Nom" required error={errors.nom}>
+          {(props) => (
+            <Input
+              {...props}
+              value={nom}
+              maxLength={120}
+              autoComplete="off"
+              onChange={(event) => {
+                setNom(event.target.value);
+              }}
+            />
+          )}
+        </Field>
+      </div>
+
+      <Field
+        label="Téléphone"
+        required
+        error={errors.phone}
+        description="Neuf chiffres, enregistrés au format +221."
+      >
+        {(props) => (
+          <Input
+            {...props}
+            value={phone}
+            maxLength={40}
+            inputMode="tel"
+            autoComplete="off"
+            placeholder="77 123 45 67"
+            onChange={(event) => {
+              setPhone(event.target.value);
+              setConflict(null);
+            }}
+          />
+        )}
+      </Field>
+
+      {conflict !== null ? (
+        <Card className="border-destructive/40">
+          <CardContent className="flex items-start gap-3">
+            <AlertTriangleIcon
+              className="mt-0.5 size-5 shrink-0 text-destructive"
+              aria-hidden="true"
+            />
+            <div role="alert" className="flex min-w-0 flex-col gap-1">
+              <p className="font-[600]">
+                Ce numéro est déjà celui de {conflict.prenom} {conflict.nom}.
+              </p>
+              <p className="text-[0.8125rem] text-muted-foreground">
+                Rattaché à {conflict.representantName}, saisi par le téléconseiller{' '}
+                {conflict.ownedByCommercialName} le {formatDateTime(conflict.createdAt)}.
+              </p>
+              <Link
+                href={`/prospects?search=${encodeURIComponent(toE164Senegal(phone) ?? phone)}`}
+                className="w-fit rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                Ouvrir la fiche existante
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <FilterCombobox
+            label="Banque"
+            placeholder="Choisir une banque"
+            required
+            value={banqueId}
+            options={(reference.data?.banques ?? [])
+              .filter((banque) => banque.isActive)
+              .map((banque) => ({ value: banque.id, label: banque.name, hint: banque.shortName }))}
+            onChange={setBanqueId}
+          />
+          <ChoiceError message={errors.banqueId} />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <FilterCombobox
+            label="Syndicat"
+            placeholder="Choisir un syndicat"
+            required
+            value={syndicatId}
+            options={(reference.data?.syndicats ?? [])
+              .filter((syndicat) => syndicat.isActive)
+              .map((syndicat) => ({
+                value: syndicat.id,
+                label: syndicat.name,
+                hint: syndicat.sigle,
+              }))}
+            onChange={setSyndicatId}
+          />
+          <ChoiceError message={errors.syndicatId} />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <p aria-live="polite" className="mr-auto text-[0.8125rem] text-muted-foreground">
+          {last === undefined
+            ? 'Ctrl + Entrée enregistre et enchaîne. La banque et le syndicat restent en place.'
+            : `${String(saved.length)} prospect${plural} enregistré${plural}. Dernier : ${last}.`}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={save.isPending}
+          onClick={() => {
+            submit(false);
+          }}
+        >
+          Enregistrer et terminer
+        </Button>
+        <Button type="submit" disabled={save.isPending}>
+          {save.isPending ? (
+            <>
+              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+              Enregistrement…
+            </>
+          ) : (
+            'Enregistrer et suivant'
+          )}
+        </Button>
+      </div>
+    </form>
+  );
+}
