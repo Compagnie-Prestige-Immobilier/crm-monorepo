@@ -1781,6 +1781,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/export/prospects-modele.xlsx': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Modèle vide pour l’import de prospects.
+     * @description En-têtes figés, une ligne d’exemple grisée, un onglet Instructions, et des listes déroulantes alimentées depuis les référentiels VIVANTS. Banque et Syndicat sont des listes et non du texte libre : leur croisement détermine le segment BDD, et une valeur saisie à la main range la fiche dans le mauvais segment.
+     */
+    get: operations['downloadProspectsTemplateXlsx'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/export/representants-modele.xlsx': {
     parameters: {
       query?: never;
@@ -1950,6 +1970,26 @@ export interface paths {
      * @description NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail court en arrière-plan ; l’écran sonde `GET /imports/{id}`, dont `processedRows` sur `totalRows` donne l’avancement. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Le modèle de classeur se télécharge par `GET /export/representants-template.xlsx`.
      */
     post: operations['createRepresentantsImport'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/imports/prospects': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Dépose un classeur de prospects et inscrit le travail. Rend immédiatement.
+     * @description NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail court en arrière-plan ; l’écran sonde `GET /imports/{id}`, dont `processedRows` sur `totalRows` donne l’avancement. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Le modèle de classeur se télécharge par `GET /export/prospects-modele.xlsx`, dont les colonnes Banque et Syndicat sont des listes déroulantes tirées des référentiels vivants. CET IMPORT NE CRÉE AUCUN REPRÉSENTANT : chaque ligne doit désigner, par son numéro, un représentant déjà en base.
+     */
+    post: operations['createProspectsImport'];
     delete?: never;
     options?: never;
     head?: never;
@@ -10946,6 +10986,53 @@ export interface operations {
       };
     };
   };
+  downloadProspectsTemplateXlsx: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Classeur Excel à trois feuilles : Prospects, Instructions, Listes (masquée). */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': string;
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   downloadRepresentantsTemplateXlsx: {
     parameters: {
       query?: never;
@@ -11392,6 +11479,86 @@ export interface operations {
     };
   };
   createRepresentantsImport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** Format: binary */
+          file: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportJobDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille. */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Trop de requêtes : réessayez plus tard. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createProspectsImport: {
     parameters: {
       query?: never;
       header?: never;

@@ -18,29 +18,21 @@ import { CONSOLIDATED_SHEET, ExportMode } from './dto.js';
 import { markWorkbook, writeDemoWarningRow } from './demo-marking.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { CPI_BURGUNDY_ARGB } from '../../common/brand.js';
+import {
+  ENROLLMENT_METHOD_TOKENS,
+  PROSPECTS_IMPORT_COLUMNS,
+  PROSPECTS_IMPORT_SHEET_NAME,
+} from '../imports/prospects-import-template.js';
+import { COMMON_TEMPLATE_RULES, writeImportTemplate } from './import-template.workbook.js';
 
-/**
- * Bordeaux CPI, ARGB sans le dièse : exceljs n'accepte pas la notation CSS.
- * Dérivé de la constante partagée plutôt que réécrit : la couleur vivait en
- * double, ici et nulle part ailleurs, si bien que le PDF et le classeur sortis
- * le même jour n'avaient pas la même identité.
- */
+/** ARGB sans le dièse : exceljs n'accepte pas la notation CSS. */
 const CPI_BURGUNDY = CPI_BURGUNDY_ARGB;
 
-/** Taille de page de lecture. Borne la mémoire quel que soit le volume exporté. */
 const PAGE_SIZE = 500;
 
-/** Au-delà, une colonne devient illisible ; le texte est simplement tronqué à l'affichage. */
 const MAX_COLUMN_WIDTH = 50;
 
-/**
- * Format de date imposé aux colonnes d'horodatage.
- *
- * Sans lui, Excel applique la locale du poste : le même fichier se lit
- * `08/12/2026` à Dakar et `12/08/2026` ailleurs, sur des dates que l'équipe
- * commerciale compare à la main. Les valeurs, elles, sont déjà ramenées à
- * l'heure murale de Dakar par `toDakarCell`.
- */
+/** Impose au tableur un format explicite : sans lui Excel applique la locale du poste. */
 const DATE_FORMAT = 'dd/mm/yyyy hh:mm';
 
 interface RepresentantTally {
@@ -65,27 +57,49 @@ export class ExportService {
     private readonly demo: DemoVisibilityService,
   ) {}
 
-  /**
-   * Écrit le classeur DIRECTEMENT dans le flux de réponse.
-   *
-   * `WorkbookWriter` émet le XML au fil de l'eau : le fichier complet n'est
-   * jamais matérialisé en mémoire. Sur un export de plusieurs centaines de
-   * milliers de prospects, la variante `Workbook` classique tiendrait tout le
-   * classeur en RAM et ferait tomber le conteneur.
-   *
-   * La lecture est paginée par keyset sur l'identifiant, pour la même raison :
-   * à aucun instant plus de `PAGE_SIZE` lignes ne coexistent côté Node.
-   */
+  /** Banque et Syndicat sont des listes, pas du texte libre : leur croisement est le segment BDD. */
+  async writeProspectsImportTemplate(stream: Writable): Promise<void> {
+    const [banques, syndicats] = await Promise.all([
+      this.prisma.banque.findMany({
+        where: { isActive: true },
+        select: { shortName: true },
+        // Même ordre que `ProspectsImportAdapter.prepare`, qui énumère les valeurs admises.
+        orderBy: [{ sortOrder: 'asc' }, { shortName: 'asc' }],
+      }),
+      this.prisma.syndicat.findMany({
+        where: { isActive: true },
+        select: { sigle: true },
+        orderBy: [{ sortOrder: 'asc' }, { sigle: 'asc' }],
+      }),
+    ]);
+
+    await writeImportTemplate(stream, {
+      sheetName: PROSPECTS_IMPORT_SHEET_NAME,
+      columns: PROSPECTS_IMPORT_COLUMNS,
+      // Rangs dans `PROSPECTS_IMPORT_COLUMNS`.
+      dropdowns: [
+        { column: 5, label: 'Banques', values: banques.map((row) => row.shortName) },
+        { column: 6, label: 'Syndicats', values: syndicats.map((row) => row.sigle) },
+        { column: 7, label: 'Méthodes d’enrôlement', values: [...ENROLLMENT_METHOD_TOKENS] },
+      ],
+      rules: [
+        ...COMMON_TEMPLATE_RULES,
+        'Le téléphone du prospect est la clé de déduplication : un numéro déjà en base, ou répété dans le fichier, est signalé et non écrit.',
+        'Ce fichier ne crée AUCUN représentant. Chaque « Téléphone du représentant » doit déjà exister : importez les représentants d’abord.',
+        'Banque et Syndicat se choisissent dans la liste déroulante. Leur croisement détermine le segment BDD de la fiche : une valeur saisie à la main range la ligne dans le mauvais segment, ou la fait refuser.',
+      ],
+    });
+  }
+
+  /** `WorkbookWriter` + pagination keyset : le classeur n'est jamais materialise en memoire. */
   async writeProspects(
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
     stream: Writable,
     mode: ExportMode = ExportMode.FILTERED,
   ): Promise<void> {
-    // Lu UNE fois pour tout le classeur, et non par feuille : une bascule
-    // survenue en cours d'export produirait sinon un fichier dont une feuille
-    // porte l'avertissement et pas l'autre, ce que personne ne saurait
-    // expliquer en le relisant.
+    // Lu UNE fois pour tout le classeur : une bascule en cours d'export marquerait
+    // une feuille et pas l'autre.
     const demoEnabled = await this.demo.enabled();
 
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
@@ -100,10 +114,6 @@ export class ExportService {
     await workbook.commit();
   }
 
-  /**
-   * Vue filtrée : une feuille de prospects correspondant EXACTEMENT au filtre
-   * reçu, plus les deux feuilles d'accompagnement historiques.
-   */
   private async writeFiltered(
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
@@ -118,7 +128,6 @@ export class ExportService {
       demoEnabled,
     );
 
-    // ─ Feuille Représentants ─
     const repSheet = workbook.addWorksheet('Représentants', {
       views: [{ state: 'frozen', ySplit: 1 }],
     });
@@ -149,7 +158,6 @@ export class ExportService {
     }
     repSheet.commit();
 
-    // ─ Feuille Synthèse ─
     const [totals, byBanque, bySyndicat, byDepartement, bySegment, byStatus, byMethod] =
       await Promise.all([
         this.analytics.totals(user, filter),
@@ -222,19 +230,10 @@ export class ExportService {
   }
 
   /**
-   * Classeur consolidé : EXACTEMENT cinq feuilles.
-   *
-   * Chaque feuille de segment est produite par une passe distincte dont le
-   * `where` sort de `buildProspectWhere`, donc de `segmentWhere`. Aucune
-   * répartition des lignes n'est faite en mémoire : trier côté Node imposerait
-   * de retenir les quatre populations à la fois, ce que 500 000 lignes
-   * interdisent, et surtout ferait exister une SECONDE implémentation de la
-   * segmentation, qui divergerait de la première au premier ajustement.
-   *
-   * Un `segment` reçu en paramètre est délibérément ignoré : c'est le classeur
-   * qui porte la segmentation. L'honorer viderait trois onglets sur quatre tout
-   * en les laissant s'afficher, ce qui se lit comme une base vide.
+   * EXACTEMENT cinq feuilles : Consolidé, puis un onglet par segment, BDD1 à BDD4, chacun
+   * repasse par `buildProspectWhere` pour rester la population du graphique de meme nom.
    */
+  // Le `segment` du filtre est ignore ici : c'est le classeur qui porte la segmentation.
   private async writeConsolidated(
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
@@ -258,16 +257,14 @@ export class ExportService {
     }
   }
 
-  /** Une feuille de prospects, écrite au fil de l'eau. */
   private async writeProspectSheet(
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
     name: string,
     where: Prisma.ProspectWhereInput,
     demoEnabled: boolean,
   ): Promise<SheetResult> {
-    // Première page lue AVANT de créer la feuille : les largeurs de colonnes
-    // font partie de l'en-tête du XML et ne peuvent plus être ajustées une fois
-    // les lignes émises. On les calibre donc sur un échantillon réel.
+    // Page lue AVANT de creer la feuille : les largeurs tiennent dans l'en-tete du XML et
+    // ne sont plus ajustables une fois des lignes emises.
     let page = await this.page(where, undefined);
     let attempts = await this.attempts(page);
     const widths = computeWidths(page, attempts);
@@ -319,7 +316,7 @@ export class ExportService {
     return { rows, representants };
   }
 
-  /** Pagination keyset sur l'identifiant : stable même si des lignes changent pendant l'export. */
+  /** Keyset sur l'identifiant : stable meme si des lignes changent pendant l'export. */
   private page(
     where: Prisma.ProspectWhereInput,
     afterId: string | undefined,
@@ -332,12 +329,7 @@ export class ExportService {
     });
   }
 
-  /**
-   * Dernière tentative d'appel de toute la page, en une requête.
-   *
-   * Une lecture par ligne coûterait ici un aller-retour par prospect exporté :
-   * sur 500 000 lignes, l'export ne se terminerait jamais.
-   */
+  /** Toute la page en UNE requete : une lecture par ligne ne finirait jamais sur 500 000 lignes. */
   private attempts(page: readonly ExportRow[]): Promise<Map<string, LastAttempt>> {
     return lastAttemptsByProspect(
       this.prisma,
@@ -346,14 +338,7 @@ export class ExportService {
   }
 }
 
-/**
- * Le filtre reçu, réécrit sur un segment donné, ou débarrassé du sien.
- *
- * `Object.assign` plutôt que l'opérateur de diffusion : le filtre est une
- * instance de classe, et la diffuser en perdrait le prototype. Sans conséquence
- * ici puisque le DTO ne porte aucune méthode, mais une copie explicite dit
- * mieux ce qui se passe qu'un `...` qui ressemble à une copie de valeur.
- */
+// `Object.assign` et non la diffusion : le filtre est une instance de classe, `...` perdrait son prototype.
 function filterForSegment(
   filter: ProspectFilterDto,
   segment: BddSegment | undefined,
@@ -373,7 +358,6 @@ function styleHeader(sheet: ExcelJS.Worksheet): void {
   header.commit();
 }
 
-/** Largeur = le plus long entre l'en-tête et l'échantillon, avec une marge de 2. */
 function computeWidths(sample: readonly ExportRow[], attempts: Map<string, LastAttempt>): number[] {
   return PROSPECT_COLUMNS.map((column) => {
     let longest = column.header.length;
