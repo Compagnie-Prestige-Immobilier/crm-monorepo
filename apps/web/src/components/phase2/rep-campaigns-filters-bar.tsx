@@ -23,14 +23,6 @@ import type { CampaignStatus, FilterOption } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
 
-/**
- * Barre de filtre des campagnes représentants.
- *
- * Même découpage que les campagnes prospects, volontairement : ce sont deux
- * listes du même écran, et deux ergonomies pour la même tâche obligeraient à
- * réapprendre l'une en passant de l'autre. Restent visibles la recherche et le
- * statut ; le créateur et la période partent derrière « Filtres avancés ».
- */
 const STATUS_TABS: readonly { value: 'TOUTES' | CampaignStatus; label: string }[] = [
   { value: 'TOUTES', label: 'Toutes' },
   { value: 'ACTIVE', label: 'En cours' },
@@ -40,8 +32,6 @@ const STATUS_TABS: readonly { value: 'TOUTES' | CampaignStatus; label: string }[
 export function RepCampaignsFiltersBar() {
   const { filters, setFilters, resetFilters } = useRepCampaignFilters();
 
-  // Le tirage est réservé à l'ADMIN côté API : ce sont donc les seuls
-  // créateurs possibles, et la liste des téléconseillers ne conviendrait pas.
   const { data: creators } = useQuery({
     queryKey: queryKeys.commerciaux({ ...EMPTY_USER_FILTERS, role: 'ADMIN', pageSize: 100 }),
     queryFn: () => fetchUsers({ ...EMPTY_USER_FILTERS, role: 'ADMIN', pageSize: 100 }),
@@ -156,7 +146,6 @@ export function RepCampaignsFiltersBar() {
   );
 }
 
-/** Puces de rappel des critères repliés. Un créateur inconnu garde sa puce. */
 function buildChips(
   filters: RepCampaignFilters,
   creators: readonly FilterOption[],

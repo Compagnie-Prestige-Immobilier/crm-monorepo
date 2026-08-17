@@ -14,23 +14,8 @@ import type {
   UpdateBankCaseStageDto,
 } from './dto.js';
 
-/** Réservées aux étapes système « Encaissé » (100) et « Rejeté » (101). */
 const MAX_OPEN_POSITION = 99;
 
-/**
- * Configuration du workflow, réservée à l'ADMIN.
- *
- * Deux invariants gouvernent ce service :
- *
- *  - une étape SYSTÈME est intouchable dans sa nature. Les trois étapes
- *    système portent des règles financières, point d'entrée, encaissement,
- *    rejet, dont dépend tout le reste du module. Les désactiver reviendrait à
- *    rendre le workflow inexploitable sans le moindre message d'erreur ;
- *  - réordonner n'affecte QUE les transitions futures. Les positions ne sont
- *    lues qu'au moment de calculer l'étape suivante ; l'historique référence
- *    des étapes par identifiant et reste lisible des années après un
- *    remaniement du flux.
- */
 @Injectable()
 export class BankCaseStagesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -43,12 +28,6 @@ export class BankCaseStagesService {
     return { items: rows.map(toStageDto) };
   }
 
-  /**
-   * Crée une étape OUVERTE intermédiaire. Le type n'est pas un paramètre :
-   * une seconde étape d'encaissement ou de rejet violerait les index partiels
-   * `bank_case_stages_single_cashed` / `_single_rejected`, et surtout rendrait
-   * la règle financière ambiguë.
-   */
   async create(input: CreateBankCaseStageDto): Promise<BankCaseStageDto> {
     const code = input.code.trim().toUpperCase();
     const clash = await this.prisma.bankCaseStage.findUnique({ where: { code } });
@@ -70,9 +49,6 @@ export class BankCaseStagesService {
 
     try {
       const created = await this.prisma.$transaction(async (tx) => {
-        // Insertion au milieu du flux : on décale les suivantes plutôt que de
-        // laisser deux étapes partager une position, ce qui rendrait « l'étape
-        // suivante » non déterministe.
         const shifted = open.filter((stage) => stage.position >= position);
         for (const stage of shifted) {
           await tx.bankCaseStage.update({
@@ -105,11 +81,6 @@ export class BankCaseStagesService {
     }
   }
 
-  /**
-   * Renommage et recoloriage seulement. Ni le code, ni le type, ni le drapeau
-   * initial : une étape déjà inscrite dans l'historique d'un dossier clos ne
-   * doit pas changer de nature rétroactivement.
-   */
   async update(id: string, input: UpdateBankCaseStageDto): Promise<BankCaseStageDto> {
     const existing = await this.prisma.bankCaseStage.findUnique({ where: { id } });
     if (!existing) throw stageNotFound();
@@ -124,14 +95,6 @@ export class BankCaseStagesService {
     return toStageDto(updated);
   }
 
-  /**
-   * Réordonne les étapes OUVERTES.
-   *
-   * La liste doit être exhaustive, toutes les étapes ouvertes, actives ou
-   * non. Un réordonnancement partiel laisserait des positions en doublon ou en
-   * trou, et « l'étape suivante » deviendrait indéterminée pour les dossiers
-   * qui stationnent dans la partie non transmise.
-   */
   async reorder(input: ReorderBankCaseStagesDto): Promise<BankCaseStageListDto> {
     const open = await this.prisma.bankCaseStage.findMany({
       where: { type: BankStageType.OPEN },
@@ -153,8 +116,6 @@ export class BankCaseStagesService {
       });
     }
 
-    // L'étape initiale reste en tête : un dossier naît sur elle, et la placer
-    // au milieu du flux rendrait inaccessibles les étapes qui la précèdent.
     const initial = open.find((stage) => stage.isInitial);
     if (initial && input.stageIds[0] !== initial.id) {
       throw new BadRequestException({
@@ -172,16 +133,6 @@ export class BankCaseStagesService {
     return this.list(true);
   }
 
-  /**
-   * Active ou désactive une étape.
-   *
-   * Deux refus, tous deux typés :
-   *  - une étape système n'est jamais désactivable, sinon le workflow perd son
-   *    point d'entrée ou l'une de ses issues financières ;
-   *  - une étape qui porte encore des dossiers ne l'est pas non plus. Les
-   *    dossiers concernés deviendraient invisibles du flux, sans que personne
-   *    ne soit averti qu'ils existent toujours.
-   */
   async setActive(id: string, input: SetBankCaseStageActiveDto): Promise<BankCaseStageDto> {
     const stage = await this.prisma.bankCaseStage.findUnique({ where: { id } });
     if (!stage) throw stageNotFound();

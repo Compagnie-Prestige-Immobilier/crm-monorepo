@@ -8,36 +8,8 @@ import {
 } from '@/lib/search-params';
 import type { SortDirection } from '@/lib/types';
 
-/**
- * Filtre des représentants : traduction URL ⇄ objet, sur le modèle de
- * `lib/filters.ts` (prospects) et `lib/bank-filters.ts` (dossiers).
- *
- * L'écran gardait ses critères dans un `useState` : la vue filtrée n'était ni
- * partageable, ni restaurée au rechargement. « Les représentants de Ziguinchor
- * qui n'ont apporté aucun prospect » est maintenant une URL, comme partout
- * ailleurs dans le panel.
- *
- * Analyse TOLÉRANTE : une valeur inconnue est écartée, jamais propagée vers
- * l'API. Une URL bricolée à la main ne doit pas produire un 400 côté serveur
- * sur un écran que l'utilisateur n'a fait qu'ouvrir depuis un lien.
- */
-
 export const REPRESENTANT_PAGE_SIZE = 25;
 
-/**
- * Champs de tri proposés.
- *
- * Les trois seules questions qu'on se pose sur cette liste : qui a été saisi en
- * dernier, qui apporte le plus de prospects, et où se trouve tel nom. Le tri
- * n'est PAS un critère de filtre : il ne restreint aucune population, il ne
- * compte donc pas dans les puces du panneau avancé.
- */
-/**
- * Les valeurs sont celles de `RepresentantSortField` côté API, au caractère
- * près : le tri part dans la chaîne de requête, et un libellé maison
- * (`prospectCount` au lieu de `prospects`) produirait un 400 sur un écran que
- * l'utilisateur n'a fait qu'ouvrir depuis un lien.
- */
 export const REPRESENTANT_SORT_FIELDS = ['clientCreatedAt', 'fullName', 'prospects'] as const;
 
 export type RepresentantSortField = (typeof REPRESENTANT_SORT_FIELDS)[number];
@@ -53,10 +25,8 @@ export interface RepresentantFilters {
   departementId: string | null;
   iefId: string | null;
   commercialId: string | null;
-  /** Bornes incluses, `YYYY-MM-DD`, sur la première saisie de la fiche. */
   dateFrom: string | null;
   dateTo: string | null;
-  /** `true` : au moins un prospect. `false` : aucun. `null` : indifférent. */
   hasProspects: boolean | null;
   sortBy: RepresentantSortField;
   sortDir: SortDirection;
@@ -100,7 +70,6 @@ export function parseRepresentantFilters(
   };
 }
 
-/** Sérialisation canonique : défauts omis, ordre de clés fixe, donc clé de cache. */
 export function serializeRepresentantFilters(filters: RepresentantFilters): URLSearchParams {
   const params = new URLSearchParams();
   const put = (key: string, value: string | null): void => {
@@ -127,16 +96,6 @@ export function representantFiltersQueryKey(filters: RepresentantFilters): strin
   return serializeRepresentantFilters(filters).toString();
 }
 
-// ─── Filtrage simple / filtrage avancé ───────────────────────────────────────
-
-/**
- * Les critères rangés derrière « Filtres avancés ».
- *
- * Restent visibles la recherche, le département, l'IEF et le téléconseiller :
- * ce sont ceux qu'on touche à chaque session. La période de première saisie et
- * la présence de prospects répondent à une question ponctuelle (« qui dort
- * depuis janvier ? »), et le tri les accompagne sans être compté.
- */
 export const REPRESENTANT_ADVANCED_FILTER_KEYS = ['dateFrom', 'dateTo', 'hasProspects'] as const;
 
 export type RepresentantAdvancedFilterKey = (typeof REPRESENTANT_ADVANCED_FILTER_KEYS)[number];
@@ -149,7 +108,6 @@ export function clearRepresentantAdvancedFilters(): Partial<RepresentantFilters>
   } satisfies Record<RepresentantAdvancedFilterKey, null>;
 }
 
-/** Ce qui compte comme « filtre actif » pour l'affichage du bouton de remise à zéro. */
 export function countActiveRepresentantFilters(filters: RepresentantFilters): number {
   let count = 0;
   if (filters.search.trim() !== '') count += 1;

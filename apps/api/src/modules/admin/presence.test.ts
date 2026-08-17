@@ -64,7 +64,6 @@ describe('état de présence', () => {
   });
 
   it('n’annonce pas connecté sans session vivante, même sur une trace fraîche', () => {
-    // Compte déconnecté à l'instant : la trace est fraîche, la session est morte.
     expect(presenceOf(signals({ hasLiveSession: false, lastWriteAt: minutesAgo(2) }), NOW)).toBe(
       'RECENT',
     );
@@ -77,8 +76,6 @@ describe('état de présence', () => {
   });
 
   it('n’annonce pas connecté une session dormante sans trace fraîche', () => {
-    // Un onglet fermé garde un jeton valable trente jours : la session vit,
-    // l'utilisateur non.
     expect(presenceOf(signals({ lastTokenAt: minutesAgo(180) }), NOW)).toBe('RECENT');
   });
 
@@ -93,9 +90,6 @@ describe('état de présence', () => {
   });
 
   it('ne prend pas une horloge en avance pour une présence', () => {
-    // Trace « dans le futur » : horloge d'un appareil décalée. On ne la compte
-    // pas comme une présence, sans quoi un téléphone mal réglé afficherait son
-    // porteur connecté en permanence.
     const future = new Date(NOW.getTime() + 30 * 60_000);
     expect(presenceOf(signals({ lastTokenAt: future }), NOW)).toBe('RECENT');
   });

@@ -64,7 +64,9 @@ test('un identifiant refusé ne révèle pas si le compte existe', async ({ page
   await page.getByLabel('Mot de passe').fill('mauvaisMotDePasse');
   await page.getByRole('button', { name: 'Se connecter' }).click();
 
-  const alert = page.getByRole('alert').first();
+  // Dans le `<form>` : `getByRole('alert')` seul attraperait aussi le
+  // route-announcer de Next, qui annonce le titre à chaque navigation.
+  const alert = page.locator('form').getByRole('alert').first();
   await expect(alert).toBeVisible();
   // Message générique : ni « compte inconnu », ni « mot de passe incorrect ».
   await expect(alert).toContainText(/incorrects ou compte non autorisé/i);

@@ -2,36 +2,13 @@ import type { ServerResponse } from 'node:http';
 
 import type ExcelJS from 'exceljs';
 
-/**
- * Marquage des exports produits en MODE DÉMONSTRATION.
- *
- * Le mode démonstration est une bascule d'AFFICHAGE : allumé, les écrans et les
- * exports mêlent des lignes fictives à des lignes réelles. L'interface porte une
- * bannière, mais le fichier téléchargé, lui, lui survit : il part par courriel,
- * il est ouvert trois semaines plus tard, il est extrait feuille par feuille.
- * Il doit donc porter SA PROPRE mise en garde, et à quatre endroits, parce
- * qu'aucun d'eux ne survit à tous les usages :
- *
- *  1. le NOM DU FICHIER, seule marque lisible sans ouvrir le classeur ;
- *  2. les MÉTADONNÉES du classeur, qui survivent à la suppression d'une
- *     feuille ;
- *  3. une LIGNE D'AVERTISSEMENT en tête de CHAQUE feuille, parce qu'une feuille
- *     extraite du classeur perd tout le reste ;
- *  4. un EN-TÊTE HTTP, pour que le client sache ce qu'il vient de recevoir.
- *
- * Rien de tout cela n'est écrit quand le mode est éteint : un classeur de
- * plateforme en service ne doit porter aucune trace de cette mécanique.
- */
+// Un export de demo melange lignes fictives et reelles et survit a la banniere de l'interface :
+// il est marque a quatre endroits (nom de fichier, metadonnees, ligne 2 de chaque feuille, en-tete HTTP)
+// car aucun ne survit seul a un renommage, une extraction de feuille ou un envoi par courriel.
 
-/**
- * En-tête porté par TOUTE réponse d'export, dans les deux états.
- *
- * Un en-tête absent serait ambigu : mode éteint ? proxy qui l'a filtré ?
- * version d'API antérieure ? Un en-tête explicite se lit sans hypothèse.
- */
+/** Pose dans LES DEUX etats : un en-tete absent ne distingue pas mode eteint et proxy filtrant. */
 export const DEMO_MODE_HEADER = 'X-Demo-Mode';
 
-/** Suffixe ajouté au nom de fichier. Volontairement long et en capitales. */
 export const DEMO_FILENAME_SUFFIX = '-DEMONSTRATION';
 
 const WARNING_TEXT =
@@ -40,24 +17,17 @@ const WARNING_TEXT =
 const WARNING_RED = 'FFB00020';
 const WARNING_BACKGROUND = 'FFFDECEE';
 
-/** Auteur ordinaire du classeur, hors mode démonstration. */
 const CREATOR = 'CPI GO';
 const CREATOR_DEMO = 'CPI GO (mode démonstration)';
 
 export const demoFilenameSuffix = (demoEnabled: boolean): string =>
   demoEnabled ? DEMO_FILENAME_SUFFIX : '';
 
-/** Pose l'en-tête, dans LES DEUX cas. Voir `DEMO_MODE_HEADER`. */
 export function setDemoHeader(response: ServerResponse, demoEnabled: boolean): void {
   response.setHeader(DEMO_MODE_HEADER, demoEnabled ? 'true' : 'false');
 }
 
-/**
- * Renseigne les métadonnées du classeur.
- *
- * Elles survivent à la suppression d'une feuille et au renommage du fichier :
- * c'est la marque la plus difficile à effacer par inadvertance.
- */
+/** Les metadonnees survivent a la suppression d'une feuille et au renommage du fichier. */
 export function markWorkbook(
   workbook: ExcelJS.Workbook | ExcelJS.stream.xlsx.WorkbookWriter,
   demoEnabled: boolean,
@@ -69,17 +39,7 @@ export function markWorkbook(
   if (demoEnabled) workbook.description = WARNING_TEXT;
 }
 
-/**
- * Écrit la ligne d'avertissement, JUSTE APRÈS l'en-tête de colonnes.
- *
- * En ligne 2 et non en ligne 1 : l'en-tête doit rester la première ligne, sans
- * quoi le tri d'Excel et le volet figé prennent l'avertissement pour un nom de
- * colonne, et le classeur devient inutilisable pour ce qu'on en attend.
- *
- * À appeler sur CHAQUE feuille. Une feuille extraite du classeur perd les
- * métadonnées, le nom du fichier et l'en-tête HTTP d'un seul coup : il ne lui
- * reste que cette ligne.
- */
+/** En ligne 2, jamais 1 : le tri et le volet fige d'Excel prendraient la ligne 1 pour l'en-tete. */
 export function writeDemoWarningRow(
   sheet: ExcelJS.Worksheet,
   demoEnabled: boolean,
@@ -93,15 +53,13 @@ export function writeDemoWarningRow(
   row.alignment = { vertical: 'middle', horizontal: 'left' };
   row.height = 24;
 
-  // La fusion est TENTÉE, pas exigée : `WorkbookWriter` la refuse sur certaines
-  // formes de feuille, et un avertissement affiché sur une seule colonne reste
-  // un avertissement. Le perdre parce que la fusion a échoué serait un mauvais
-  // échange.
+  // Fusion tentee, pas exigee : WorkbookWriter la refuse sur certaines feuilles, et
+  // l'avertissement sur une seule colonne vaut mieux que pas d'avertissement.
   if (columnCount > 1) {
     try {
       sheet.mergeCells(row.number, 1, row.number, columnCount);
     } catch {
-      // Sans fusion, le texte déborde sur les cellules voisines vides : lisible.
+      // Sans fusion le texte deborde sur les cellules vides voisines : lisible.
     }
   }
 

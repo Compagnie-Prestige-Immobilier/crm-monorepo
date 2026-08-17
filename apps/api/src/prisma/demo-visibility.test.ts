@@ -2,14 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { demoScope, demoScopeSql, withDemoScope } from './demo-visibility.js';
 
-/**
- * Le mode démonstration est une bascule d'AFFICHAGE.
- *
- * Le test qui compte est le premier : mode éteint, une ligne de démonstration
- * doit être invisible pour toute lecture, y compris celle qui alimente un
- * export Excel transmis au siège. C'est la seule faute que cette mécanique
- * puisse commettre.
- */
 describe('demoScope', () => {
   it('mode ÉTEINT : les lignes de démonstration sont exclues', () => {
     expect(demoScope(false)).toEqual({ isDemo: false });
@@ -20,8 +12,6 @@ describe('demoScope', () => {
   });
 
   it('le défaut protégé est « pas de démonstration »', () => {
-    // Le sens de la condition compte : on filtre quand le mode est éteint. Une
-    // inversion rendrait la démonstration visible sur une plateforme réelle.
     expect(demoScope(false)).toHaveProperty('isDemo', false);
     expect(demoScope(true)).not.toHaveProperty('isDemo');
   });
@@ -51,8 +41,6 @@ describe('demoScopeSql', () => {
   });
 
   it('mode allumé : TRUE, jamais une chaîne vide', () => {
-    // Une chaîne vide produirait « WHERE ... AND  » et un SQL bancal chez
-    // l'appelant. `TRUE` se compose sans condition.
     expect(demoScopeSql(true)).toBe('TRUE');
     expect(demoScopeSql(true)).not.toBe('');
   });

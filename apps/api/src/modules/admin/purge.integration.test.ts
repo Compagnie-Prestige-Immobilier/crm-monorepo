@@ -1,34 +1,3 @@
-/**
- * La purge complète, exécutée pour de vrai contre PostgreSQL.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI L'ÉPREUVE UNITAIRE NE POUVAIT PAS SUFFIRE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `purge.service.test.ts` monte une doublure de Prisma. Elle exécute donc les
- * étapes dans l'ordre déclaré et les compte, ce qui vérifie le PLAN, jamais son
- * exécution : une doublure n'a pas de clé étrangère. Or ce qui a réellement
- * cassé, c'est exactement cela. Les tables des campagnes de représentants et
- * des demandes de création pointent vers `users`, `prospects` et `banques` en
- * `Restrict`. Tant qu'aucune étape ne les vidait AVANT leurs parents, la
- * transaction avortait sur une violation de contrainte, et la purge ne
- * supprimait rien du tout. Le test unitaire restait vert, parce qu'il
- * s'éprouvait lui-même.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * COMMENT ON PURGE UNE BASE PARTAGÉE SANS LA DÉTRUIRE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * La purge est par nature irréversible, et cette base sert aux autres suites.
- * On l'exécute donc À L'INTÉRIEUR d'une transaction que l'on fait AVORTER à la
- * fin. `PurgeService` reçoit un client dont `$transaction` se contente de
- * passer le client de la transaction ENGLOBANTE : toutes ses suppressions
- * partent vraiment vers PostgreSQL, les clés étrangères sont vraiment
- * vérifiées, et rien ne survit au `ROLLBACK`.
- *
- * Ce n'est pas une simplification : c'est même la seule façon d'exercer la
- * purge sur une base RÉELLEMENT peuplée, jeu de démonstration compris.
- */
 process.env.NODE_ENV ??= 'test';
 process.env.DATABASE_URL ??= 'postgresql://crm:crm@localhost:5434/crm?schema=public';
 process.env.JWT_ACCESS_SECRET ??= 'integration-access-secret-32-characters';
@@ -59,25 +28,14 @@ const prisma = new PrismaClient({
 
 const TAG = 'ITPG';
 
-/** Marqueur d'avortement : il ne doit jamais remonter comme une vraie erreur. */
 const ROLLBACK = 'ROLLBACK_VOLONTAIRE';
 
 let firstAdmin: { id: string; username: string; email: string };
 let actor: AuthenticatedUser;
 
-/**
- * Exécute `run` dans une transaction TOUJOURS annulée.
- *
- * Le client remis à `PurgeService` est un mandataire : son `$transaction`
- * n'ouvre rien, il rend la transaction déjà ouverte. Le service croit donc
- * travailler en transaction (c'est le cas), et nous gardons la main sur le
- * `ROLLBACK`.
- */
 async function dansUneTransactionAnnulee<T>(
   run: (service: PurgeService, tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
-  // Boîte plutôt que variable nue : le compilateur ne sait pas que le `throw`
-  // qui provoque le ROLLBACK vient forcément APRÈS l'affectation.
   const boite: { valeur?: T } = {};
 
   const erreur = await prisma
@@ -105,14 +63,6 @@ async function dansUneTransactionAnnulee<T>(
   return boite.valeur;
 }
 
-/**
- * Sème une ligne dans CHACUNE des tables arrivées avec les deux derniers lots.
- *
- * C'est le point de l'épreuve. Une base vide de campagnes de représentants et
- * de demandes de création se purge sans difficulté, et c'est très exactement
- * pourquoi le défaut a pu vivre : il ne se manifestait que sur une base qui
- * s'était servie des fonctionnalités récentes.
- */
 async function semer(tx: Prisma.TransactionClient): Promise<void> {
   const departement = await tx.departement.findFirstOrThrow({ select: { id: true } });
   const ief = await tx.ief.findFirstOrThrow({ select: { id: true } });
@@ -172,7 +122,6 @@ async function semer(tx: Prisma.TransactionClient): Promise<void> {
     select: { id: true },
   });
 
-  // ── Campagne de représentants : les quatre tables du lot ──────────────────
   const campagne = await tx.repCallCampaign.create({
     data: {
       id: uuidv7(),
@@ -217,8 +166,6 @@ async function semer(tx: Prisma.TransactionClient): Promise<void> {
     },
   });
 
-  // ── Demande de création de client, APPROUVÉE : elle pointe en Restrict vers
-  //    le prospect, la banque et deux comptes à la fois.
   await tx.clientCreationRequest.create({
     data: {
       id: uuidv7(),
@@ -234,8 +181,6 @@ async function semer(tx: Prisma.TransactionClient): Promise<void> {
     },
   });
 
-  // ── Une demande EN ATTENTE aussi : le statut change la ligne, pas la clé,
-  //    mais l'index partiel de la file d'attente ne doit pas gêner la purge.
   await tx.clientCreationRequest.create({
     data: {
       id: uuidv7(),
@@ -271,13 +216,6 @@ afterAll(async () => {
 });
 
 describe('purge complète sur une base qui utilise TOUTES les tables', () => {
-  /**
-   * L'épreuve centrale. Elle sème une ligne dans chacune des tables des deux
-   * derniers lots, coche TOUS les domaines, et exige simplement que la purge
-   * ARRIVE AU BOUT. C'est la seule chose qu'il fallait démontrer : la version
-   * précédente avortait sur `rep_call_tasks_assignedToId_fkey` avant d'avoir
-   * supprimé quoi que ce soit.
-   */
   it('va jusqu’au bout, IEF et campagnes de représentants comprises', async () => {
     const resultat = await dansUneTransactionAnnulee(async (service, tx) => {
       await semer(tx);
@@ -287,19 +225,11 @@ describe('purge complète sur une base qui utilise TOUTES les tables', () => {
       });
     });
 
-    // Elle a supprimé, et pas qu'un peu : les référentiels seuls comptent
-    // plusieurs dizaines de lignes.
     expect(resultat.total).toBeGreaterThan(0);
     expect(resultat.deleted.length).toBeGreaterThan(0);
     expect(new Date(resultat.purgedAt).getTime()).toBeGreaterThan(0);
   });
 
-  /**
-   * Le domaine « téléconseillers » à lui seul entraîne, par fermeture
-   * transitive, les prospects, les représentants et les DEUX familles de
-   * campagnes. C'est la sélection qui a le plus de chances d'être cochée
-   * seule dans l'écran, et celle qui traverse le plus de clés `Restrict`.
-   */
   it('le domaine des téléconseillers emporte ses dépendances sans avorter', async () => {
     const resultat = await dansUneTransactionAnnulee(async (service, tx) => {
       await semer(tx);
@@ -310,17 +240,10 @@ describe('purge complète sur une base qui utilise TOUTES les tables', () => {
     });
 
     const parDomaine = new Map(resultat.deleted.map((row) => [row.key, row.rows]));
-    // Les référentiels ne portent aucune clé vers un compte : ils RESTENT.
     expect(parDomaine.has('referentiels')).toBe(false);
     expect(resultat.total).toBeGreaterThan(0);
   });
 
-  /**
-   * Un décompte qui ment est pire qu'un décompte absent : l'écran annonce le
-   * nombre de lignes AVANT que l'administrateur ne valide une action
-   * irréversible. Le catalogue et la purge doivent donc porter la même clause,
-   * ce que seule une vraie base peut établir.
-   */
   it('le catalogue annonce ce que la purge supprime réellement', async () => {
     const { annonce, supprime } = await dansUneTransactionAnnulee(async (service, tx) => {
       await semer(tx);
@@ -335,8 +258,6 @@ describe('purge complète sur une base qui utilise TOUTES les tables', () => {
       };
     });
 
-    // Le compte du catalogue exclut l'administrateur qui agit, la suppression
-    // aussi : les deux nombres portent sur le MÊME ensemble.
     expect(supprime).toBe(annonce);
   });
 
@@ -351,7 +272,6 @@ describe('purge complète sur une base qui utilise TOUTES les tables', () => {
         .then(() => null)
         .catch((caught: unknown) => (caught as { response?: { code?: string } }).response?.code);
 
-      // Rien n'a bougé : le représentant semé est toujours là.
       expect(
         await tx.representant.count({
           where: { fullName: { startsWith: TAG } },

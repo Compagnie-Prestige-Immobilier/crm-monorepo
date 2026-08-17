@@ -16,7 +16,9 @@ export default [
             'next/**',
             '@crm/**',
             'chart.js/**',
-            '@radix-ui/**',
+            // Base UI n'expose QUE des sous-chemins : `@base-ui/react` seul
+            // n'est pas un point d'entrée.
+            '@base-ui/react/**',
             '@hookform/resolvers/**',
             '@tanstack/**',
             'date-fns/**',

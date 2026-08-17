@@ -77,15 +77,6 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
 
   if (isPending) return <CampaignDetailSkeleton />;
 
-  /**
-   * Le retour à la liste est rendu AVANT l'état d'erreur, pas après.
-   *
-   * Un identifiant périmé (un signet, un lien collé dans un message, une
-   * campagne purgée) produit un 404, que `QueryErrorState` ne propose pas de
-   * rejouer : recliquer ne fera pas réapparaître la campagne. Sans ce lien,
-   * l'écran n'avait plus aucune issue, et le bouton « Précédent » du
-   * navigateur n'est pas une réponse de conception.
-   */
   if (isError) {
     return (
       <div className="flex flex-col gap-6">
@@ -243,8 +234,6 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                       </time>
                       {attempt.assignedToId !== null &&
                       attempt.assignedToId !== attempt.performedById ? (
-                        // Cas réel et déroutant s'il n'est pas signalé : un
-                        // téléconseiller peut appeler un numéro affecté à un autre.
                         <p className="mt-0.5">Tâche d’un autre téléconseiller</p>
                       ) : null}
                     </div>
@@ -290,9 +279,6 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
             <Button
               type="button"
               variant="destructive"
-              // Bloque le double-clic : deux clôtures concurrentes ne
-              // détruiraient rien de plus, mais la seconde afficherait une
-              // erreur au moment où la première vient de réussir.
               disabled={close.isPending}
               onClick={() => {
                 close.mutate();
@@ -314,7 +300,6 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
   );
 }
 
-/** Une carte par téléconseiller : avancement, position au tourniquet, programme PDF. */
 function CommercialCard({
   campaignId,
   campaignName,
@@ -328,15 +313,6 @@ function CommercialCard({
 }) {
   const { pending, download } = useFileDownload();
 
-  /**
-   * UN BOUTON PAR JOURNÉE dès que la campagne est étalée.
-   *
-   * Le bouton unique reste servi quand `spreadDays` vaut 1 : c'est le cas
-   * courant, et le remplacer par « Jour 1 » ferait poser une question là où il
-   * n'y en a pas. Au-delà, un seul bouton rendrait la liasse entière : soit
-   * plusieurs centaines de pages, ce que l'étalement existe précisément pour
-   * éviter. Le téléconseiller ne doit pas avoir à trier son propre programme.
-   */
   const days = spreadDays > 1 ? commercial.perDay : [];
 
   const downloadDay = (day?: number): void => {

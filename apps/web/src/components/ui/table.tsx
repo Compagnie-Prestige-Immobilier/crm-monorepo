@@ -23,8 +23,6 @@ function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
   return (
     <thead
       data-slot="table-header"
-      // Un filet franc sous l'en-tête, pas la même hairline que les lignes :
-      // c'est ce qui sépare l'étiquette de la donnée.
       className={cn('[&_tr]:border-b-2 [&_tr]:border-border', className)}
       {...props}
     />
@@ -70,9 +68,6 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     <th
       data-slot="table-head"
       className={cn(
-        // `eyebrow` : les en-têtes de colonne parlent la même langue que les
-        // surtitres de section. Un seul style de nommage dans tout le panel.
-        // `.eyebrow` ne porte que la forme ; la couleur se déclare ici.
         'eyebrow h-11 px-3 text-left align-middle whitespace-nowrap text-muted-foreground',
         className,
       )}

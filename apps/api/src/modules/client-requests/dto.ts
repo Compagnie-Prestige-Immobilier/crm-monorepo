@@ -16,18 +16,8 @@ import { ClientRequestStatus, EnrollmentMethod } from '@crm/database';
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 
-/** Longueur maximale d'une note libre, alignée sur les autres champs de texte. */
 const NOTE_MAX_LENGTH = 2_000;
 
-/**
- * Demande d'un agent Banque & Finance : « ce client n'existe pas, créez-le ».
- *
- * Le corps ne porte que l'identité, et c'est délibéré. Un agent bancaire ne
- * voit ni le représentant, ni le syndicat, ni le commercial propriétaire : lui
- * demander ces champs produirait des valeurs inventées, qui feraient ensuite
- * mentir toutes les statistiques par département et par apporteur. C'est
- * l'administrateur qui les complète au moment d'approuver.
- */
 export class CreateClientRequestDto {
   @ApiProperty({ maxLength: 120 })
   @IsString()
@@ -70,15 +60,8 @@ export class CreateClientRequestDto {
   note?: string;
 }
 
-/**
- * Champs que SEUL l'administrateur peut renseigner.
- *
- * `representantId` et `syndicatId` sont obligatoires en base sur `Prospect` :
- * la demande ne peut donc pas aboutir sans eux. `enrollmentMethod` l'est tout
- * autant, parce que le prospect naît en `METHOD_OBTAINED` (sans quoi aucun
- * dossier ne pourrait s'y rattacher, voir la recherche banque) et qu'une
- * contrainte CHECK lie les deux colonnes.
- */
+// `representantId` et `syndicatId` sont obligatoires en base sur `Prospect`, et `enrollmentMethod`
+// l'est parce que le prospect naît en `METHOD_OBTAINED` et qu'une contrainte CHECK lie les deux.
 export class ApproveClientRequestDto {
   @ApiProperty({ format: 'uuid', description: 'Représentant de rattachement du prospect créé.' })
   @IsUUID()

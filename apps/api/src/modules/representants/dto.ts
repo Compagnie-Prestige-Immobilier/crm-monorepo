@@ -101,7 +101,6 @@ export class RepresentantListDto {
   @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
 }
 
-/** Colonnes de tri admises. Fermée : un nom de colonne libre serait une injection. */
 export enum RepresentantSortField {
   CLIENT_CREATED_AT = 'clientCreatedAt',
   CREATED_AT = 'createdAt',
@@ -109,28 +108,6 @@ export enum RepresentantSortField {
   PROSPECTS = 'prospects',
 }
 
-/**
- * Filtres de la liste des représentants.
- *
- * Les cinq critères ajoutés (dates, tri, présence de prospects) portent
- * exactement les noms attendus par le panneau « Filtres avancés » du web, dont
- * l'état est porté par l'URL : un écart de nommage rendrait une URL partagée
- * impossible à reconstituer dans un autre onglet.
- */
-/**
- * Filtres d'un listing de représentants, SANS pagination ni tri.
- *
- * Séparé de `RepresentantQueryDto` parce que l'export Excel n'a ni page ni
- * tri : `representants-export.service.ts` parcourt la table en keyset sur
- * `id asc` pour rendre la totalité du périmètre en flux, et ne lit donc ni
- * `page`, ni `pageSize`, ni `sortBy`, ni `sortOrder`.
- *
- * Tant que l'export réutilisait le DTO complet, le contrat ANNONÇAIT ces
- * quatre paramètres sur `/export/representants.xlsx`. Un client qui demandait
- * `?page=3&sortBy=prospects` recevait le classeur entier, trié par
- * identifiant, sans le moindre avertissement : le contrat promettait un
- * comportement que le serveur n'a jamais eu.
- */
 export class RepresentantExportQueryDto {
   @ApiPropertyOptional({ maxLength: 120 })
   @IsOptional()
@@ -169,15 +146,6 @@ export class RepresentantExportQueryDto {
   @IsISO8601()
   dateTo?: string;
 
-  /**
-   * Présence de prospects rattachés.
-   *
-   * `true` : au moins un prospect vivant. `false` : aucun, c'est-à-dire le
-   * représentant DORMANT, la population que vise la campagne de relance. Le
-   * filtre ne compte que les prospects non supprimés : un représentant dont
-   * toutes les fiches ont été effacées est redevenu dormant, et le voir compté
-   * comme actif ferait manquer exactement les cas à rappeler.
-   */
   @ApiPropertyOptional({
     type: Boolean,
     description: 'true : au moins un prospect vivant. false : aucun (représentant dormant).',
@@ -188,25 +156,12 @@ export class RepresentantExportQueryDto {
   hasProspects?: boolean;
 }
 
-/**
- * Les mêmes filtres, plus la pagination et le tri du listing paginé.
- *
- * L'héritage garantit qu'un filtre ajouté un jour au listing arrive
- * automatiquement dans l'export, et qu'il n'existe jamais deux définitions
- * d'un même critère susceptibles de diverger.
- */
 export class RepresentantQueryDto extends RepresentantExportQueryDto {
   @ApiPropertyOptional({ enum: RepresentantSortField, enumName: 'RepresentantSortField' })
   @IsOptional()
   @IsEnum(RepresentantSortField)
   sortBy?: RepresentantSortField;
 
-  /**
-   * `SortOrder` (commun) et non une énumération propre au module : « asc / desc »
-   * ne dépend pas de ce qu'on trie. Le doublon `RepresentantSortOrder`, de
-   * valeurs identiques, faisait porter à chaque client engendré deux types pour
-   * le même choix, et rendait possible une divergence sans aucun sens.
-   */
   @ApiPropertyOptional({ enum: SortOrder, enumName: 'SortOrder' })
   @IsOptional()
   @IsEnum(SortOrder)
@@ -239,13 +194,6 @@ export class RepresentantLookupQueryDto {
   phone!: string;
 }
 
-/**
- * Réponse du lookup par téléphone.
- *
- * `found: false` plutôt qu'un 404 : « ce numéro est libre » est une réponse
- * métier normale sur le chemin de saisie, pas une erreur. Un 404 obligerait
- * l'app mobile à traiter comme exception le cas le plus fréquent.
- */
 export class RepresentantLookupDto {
   @ApiProperty({ type: Boolean }) found!: boolean;
 
@@ -279,17 +227,6 @@ export class DeleteQueryDto {
   cascade?: boolean;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Import de masse
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Une ligne du classeur qui n'a PAS pu être retenue.
- *
- * Le numéro de ligne est celui du FICHIER, en-tête compris : c'est ce que la
- * personne voit dans Excel. Renvoyer un index de tableau la ferait chercher au
- * mauvais endroit, sur un fichier de mille lignes.
- */
 export class ImportRowErrorDto {
   @ApiProperty({ type: Number, description: 'Numéro de ligne dans le fichier, en-tête compris.' })
   line!: number;
@@ -303,7 +240,6 @@ export class ImportRowErrorDto {
   value!: string | null;
 }
 
-/** Une ligne retenue, telle qu'elle sera écrite. Sert au tableau de prévisualisation. */
 export class ImportRowPreviewDto {
   @ApiProperty({ type: Number }) line!: number;
   @ApiProperty() fullName!: string;

@@ -31,19 +31,13 @@ export default async function CampagneRepresentantsPage({
   const { id } = await params;
 
   const queryClient = getQueryClient();
-  // Comme sur le détail des campagnes prospects : une campagne introuvable
-  // doit se présenter comme une erreur DANS la vue, avec un message et un
-  // retour, et non comme une exception de rendu serveur qui emporte l'écran.
   try {
     await queryClient.prefetchQuery({
       queryKey: queryKeys.repCampaign(id),
       queryFn: () => fetchRepCampaign(id, getServerApiClient()),
     });
   } catch (error) {
-    // `unstable_rethrow` d'abord : un `catch` nu avale aussi les erreurs de
-    // contrôle de Next (redirection, `notFound()`, bascule en rendu dynamique).
     unstable_rethrow(error);
-    /* La vue rejouera la requête côté client et affichera l'état d'erreur. */
   }
 
   return (

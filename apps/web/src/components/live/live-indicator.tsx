@@ -6,18 +6,6 @@ import { Button } from '@/components/ui/button';
 import { formatDateTime } from '@/lib/format';
 import type { LiveState } from '@/lib/live';
 
-/**
- * Indicateur de rafraîchissement.
- *
- * Ce qu'il ne fait PAS, et pourquoi : il n'explique ni le sondage, ni son
- * intervalle, ni la mise en cache. L'utilisateur n'a rien à en faire. Il lui
- * faut deux informations et une commande : l'écran est-il vivant, de quand
- * datent les chiffres, et comment l'arrêter le temps de lire une ligne.
- *
- * La pastille ne clignote pas. Un point qui pulse en permanence dans un coin de
- * l'écran capte l'attention toutes les secondes, pour une information qui ne
- * change pas.
- */
 export function LiveIndicator({
   state,
   label,
@@ -26,7 +14,6 @@ export function LiveIndicator({
 }: {
   state: LiveState;
   label: string;
-  /** Horodatage de la dernière réponse reçue. */
   updatedAt: number | null;
   onTogglePause: () => void;
 }) {

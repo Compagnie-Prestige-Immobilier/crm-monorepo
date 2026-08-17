@@ -37,14 +37,6 @@ import {
   REP_CALL_OUTCOME_VARIANTS,
 } from '@/lib/types';
 
-/**
- * Détail d'une campagne représentants.
- *
- * Structure calquée sur le détail des campagnes prospects, à dessein : le même
- * administrateur suit les deux le même matin, et deux mises en page pour la
- * même information l'obligeraient à réapprendre l'écran à chaque bascule. Le
- * squelette de chargement est d'ailleurs LE MÊME composant, pas une copie.
- */
 export function RepCampaignDetailView({ campaignId }: { campaignId: string }) {
   const queryClient = useQueryClient();
   const [closing, setClosing] = useState(false);
@@ -72,15 +64,6 @@ export function RepCampaignDetailView({ campaignId }: { campaignId: string }) {
 
   if (isPending) return <CampaignDetailSkeleton />;
 
-  /**
-   * Le retour à la liste est rendu AVANT l'état d'erreur, pas après.
-   *
-   * Un identifiant périmé (un signet, un lien collé dans un message, une
-   * campagne purgée) produit un 404, que `QueryErrorState` ne propose pas de
-   * rejouer : recliquer ne fera pas réapparaître la campagne. Sans ce lien,
-   * l'écran n'avait plus aucune issue, et le bouton « Précédent » du
-   * navigateur n'est pas une réponse de conception.
-   */
   if (isError) {
     return (
       <div className="flex flex-col gap-6">
@@ -296,7 +279,6 @@ export function RepCampaignDetailView({ campaignId }: { campaignId: string }) {
   );
 }
 
-/** Une carte par téléconseiller : avancement, position, et UN programme PAR JOUR. */
 function RepCommercialCard({
   campaignId,
   campaignName,

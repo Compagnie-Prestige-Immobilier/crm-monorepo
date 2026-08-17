@@ -4,7 +4,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
 
-/// Une option de complétion, réduite à ce dont l'affichage a besoin.
 @immutable
 class TypeaheadOption {
   const TypeaheadOption({
@@ -18,9 +17,6 @@ class TypeaheadOption {
   final String label;
   final String? secondary;
 
-  /// Termes supplémentaires sur lesquels la recherche doit mordre : le sigle
-  /// d'un syndicat, le nom court d'une banque. Sans eux, chercher « SUDES » ne
-  /// trouve rien alors que c'est le seul nom que l'utilisateur connaisse.
   final List<String> keywords;
 
   bool matches(String query) {
@@ -32,12 +28,6 @@ class TypeaheadOption {
   }
 }
 
-/// Table de repli des diacritiques présents dans les référentiels : noms de
-/// départements, de banques et de syndicats sénégalais.
-///
-/// Dart n'expose pas de normalisation Unicode (pas d'équivalent de
-/// `String.normalize('NFD')`), et tirer une dépendance entière pour une
-/// vingtaine de caractères serait disproportionné.
 const Map<String, String> _diacritics = <String, String>{
   'à': 'a',
   'á': 'a',
@@ -68,15 +58,6 @@ const Map<String, String> _diacritics = <String, String>{
   'ÿ': 'y',
 };
 
-/// Réduit une chaîne à sa forme comparable : minuscules ET sans accents.
-///
-/// Sans le repli des accents, chercher « Thies » ne trouve pas « Thiès », et
-/// « Kedougou » ne trouve pas « Kédougou ». Or personne ne pose les accents en
-/// tapant vite sur un clavier de téléphone : le commercial conclut que le
-/// département n'existe pas, et ne peut plus enregistrer sa fiche.
-///
-/// Le repli s'applique des DEUX côtés de la comparaison, si bien que la saisie
-/// accentuée continue de fonctionner aussi.
 String foldSearch(String input) {
   final StringBuffer out = StringBuffer();
   for (final int rune in input.toLowerCase().runes) {
@@ -86,32 +67,6 @@ String foldSearch(String input) {
   return out.toString();
 }
 
-/// Complétion **sur données locales uniquement**.
-///
-/// C'est le point de conception, pas un raccourci : la liste vient de la base
-/// SQLite, donc elle répond en moins d'une frame et fonctionne sans réseau. Une
-/// complétion adossée au serveur mettrait plusieurs secondes à répondre sur un
-/// lien EDGE, et rendrait une liste vide dans un village : c'est-à-dire
-/// exactement là où l'app sert.
-///
-/// `RawAutocomplete` plutôt que `Autocomplete` : ce dernier impose son propre
-/// `TextEditingController`, ce qui empêche le formulaire de piloter la valeur
-/// (pré-remplissage entre deux prospects, restauration d'un brouillon).
-///
-/// ## Pourquoi [emptyHint] s'affiche SOUS le champ et non dans le panneau
-///
-/// Il était rendu dans `optionsViewBuilder`, et **ne s'est jamais affiché une
-/// seule fois**. Flutter conditionne l'ouverture du panneau à
-/// `_canShowOptionsView => hasFocus && _options.isNotEmpty`
-/// (`autocomplete.dart`) : quand la liste est vide : c'est-à-dire exactement
-/// quand ce message a quelque chose à dire : le panneau n'est jamais construit,
-/// donc le message non plus.
-///
-/// Conséquence sur une installation neuve, avant la première synchronisation :
-/// les listes déroulantes ne réagissaient pas, « Enregistrer » restait grisé
-/// pour toujours, et **rien à l'écran n'expliquait pourquoi**. Le message vit
-/// donc maintenant dans l'arbre du champ, où rien ne peut l'empêcher de
-/// paraître.
 class LocalTypeahead extends StatefulWidget {
   const LocalTypeahead({
     super.key,
@@ -164,21 +119,11 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
     super.dispose();
   }
 
-  /// Revenir sur un champ déjà rempli SÉLECTIONNE tout.
-  ///
-  /// Sans ça, le curseur atterrit là où le doigt a touché : au milieu du mot :
-  /// et corriger « Dakar » en « Diourbel » demande d'effacer caractère par
-  /// caractère. Tout sélectionner rend les deux gestes naturels : une frappe
-  /// remplace, une suppression vide.
   void _onFocusChange() {
-    // Le message sous le champ dépend du focus : on redessine.
     if (mounted) setState(() {});
     if (!widget.focusNode.hasFocus) return;
     final String text = widget.controller.text;
     if (text.isEmpty) return;
-    // Reporté d'une frame : la plateforme repositionne le curseur elle-même
-    // quand le champ prend le focus, et écrire la sélection avant elle serait
-    // écrasé.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !widget.focusNode.hasFocus) return;
       widget.controller.selection = TextSelection(
@@ -194,14 +139,7 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
     widget.focusNode.requestFocus();
   }
 
-  /// Ce qu'il y a à dire sous le champ, ou `null` s'il n'y a rien à dire.
-  ///
-  /// Deux situations, deux messages, et il faut les distinguer : « le
-  /// référentiel n'est pas là » se répare par une synchronisation, « ta
-  /// recherche ne donne rien » se répare en tapant autre chose.
   String? _inlineMessage(String text) {
-    // Référentiel absent : le message est PERMANENT, focus ou pas. C'est le cas
-    // d'une installation neuve, et c'est celui où l'écran ne disait rien.
     if (widget.options.isEmpty) return widget.emptyHint;
     if (!widget.focusNode.hasFocus) return null;
     if (widget.selectedId != null) return null;
@@ -237,9 +175,6 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                   Icon(
                     PhosphorIconsRegular.info,
                     size: 16,
-                    // `accentText` (#856011) et jamais `accent` (#C8921A) :
-                    // l'or de surface fait 2,77:1 et échoue AA
-                    // (docs/design.md §2.3).
                     color: context.cpi.accentText,
                   ),
                   const SizedBox(width: CpiSpacing.xxs),
@@ -266,11 +201,6 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
       focusNode: widget.focusNode,
       displayStringForOption: (TypeaheadOption o) => o.label,
       optionsBuilder: (TextEditingValue value) {
-        // Une valeur DÉJÀ choisie n'est pas un filtre.
-        //
-        // Sinon rouvrir la liste sur « Dakar » ne proposait plus que « Dakar » :
-        // le texte du champ servait de filtre à lui-même, et il devenait
-        // impossible de parcourir les voisins sans tout effacer d'abord.
         if (widget.selectedId != null &&
             value.text.trim().isNotEmpty &&
             widget.options.any(
@@ -278,9 +208,6 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
             )) {
           return widget.options;
         }
-        // Plus de troncature à 8 : le panneau est borné en hauteur et
-        // **défile**. Tronquer cachait des entrées sans le dire, et personne ne
-        // devine qu'une liste s'arrête.
         return widget.options.where((TypeaheadOption o) => o.matches(value.text));
       },
       onSelected: widget.onSelected,
@@ -305,10 +232,6 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                     labelText: widget.label,
                     hintText: widget.hint,
                     suffixIcon: hasText
-                        // Bouton d'effacement dès qu'il y a quelque chose à
-                        // effacer : c'est le geste que réclame un champ à
-                        // complétion, et il vaut mieux qu'un appui long sur la
-                        // touche de retour arrière.
                         ? IconButton(
                             onPressed: _clear,
                             tooltip: 'Effacer',
@@ -323,9 +246,6 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                             size: 20,
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
-                    // La coche de validité passe en préfixe : elle disait
-                    // « c'est bon », le bouton d'effacement dit « on peut
-                    // recommencer », et les deux doivent tenir ensemble.
                     prefixIcon: widget.selectedId == null
                         ? null
                         : Icon(
@@ -356,15 +276,6 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                 clipBehavior: Clip.antiAlias,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 280, maxWidth: 480),
-                  // Pas de branche « liste vide » ici : Flutter n'ouvre le
-                  // panneau que si `_options.isNotEmpty`, donc ce cas est
-                  // inatteignable. Le message vit sous le champ (voir
-                  // `_inlineMessage`).
-                  //
-                  // `shrinkWrap` avec une hauteur bornée : le panneau prend la
-                  // place de son contenu tant qu'il tient, et **défile**
-                  // au-delà. C'est ce défilement qui rend la liste entière
-                  // parcourable maintenant qu'elle n'est plus tronquée.
                   child: Scrollbar(
                     child: ListView.builder(
                       padding: EdgeInsets.zero,
@@ -374,8 +285,6 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                         final TypeaheadOption option = results.elementAt(index);
                         final bool current = option.id == widget.selectedId;
                         return ListTile(
-                          // 44 px minimum de cible tactile
-                          // (docs/design.md §1).
                           minVerticalPadding: CpiSpacing.sm,
                           selected: current,
                           selectedTileColor: theme.colorScheme.secondaryContainer,

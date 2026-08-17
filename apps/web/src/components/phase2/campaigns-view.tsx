@@ -22,15 +22,6 @@ import { formatDate, formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import { CAMPAIGN_STATUS_LABELS, campaignScopeLabel } from '@/lib/types';
 
-/**
- * Liste des campagnes d'appels.
- *
- * En cartes plutôt qu'en tableau, et ce n'est pas un choix esthétique : chaque
- * ligne porte une BARRE d'avancement à trois segments, un périmètre en toutes
- * lettres et deux dates. Comprimées en colonnes, ces trois informations
- * deviennent illisibles sous 1 200 px, alors que le suivi d'une campagne se
- * fait souvent depuis une tablette en réunion.
- */
 export function CampaignsView() {
   const { filters, setFilters } = useCampaignFilters();
   const [creating, setCreating] = useState(false);

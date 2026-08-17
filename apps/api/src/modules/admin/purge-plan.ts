@@ -1,37 +1,5 @@
-/**
- * Plan de purge, la partie DÉCISIONNELLE, sans Prisma.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Deux notions distinctes vivent ici, et les confondre est le piège du sujet.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * 1. Le DOMAINE est ce que l'administrateur coche. Il parle métier :
- *    « Prospects », « Dossiers bancaires », « Comptes téléconseillers ».
- *
- * 2. L'ÉTAPE est une suppression sur UNE table. `PURGE_STEP_ORDER` fixe l'ordre
- *    de toutes les étapes du système, enfants avant parents. Une purge n'est
- *    jamais qu'un SOUS-ENSEMBLE de cette séquence, parcouru dans le même sens.
- *
- * L'ordre est donc décidé une seule fois, globalement, et non recalculé par
- * combinaison de cases cochées. C'est ce qui rend la propriété testable : quelle
- * que soit la sélection, la séquence produite reste un sous-mot de
- * `PURGE_STEP_ORDER`, donc reste compatible avec les clés étrangères.
- *
- * `requires` ne recopie PAS le graphe complet des relations : il ne porte que
- * les arêtes `onDelete: Restrict`, les seules qui font échouer une suppression.
- * Les arêtes `Cascade` sont assurées par PostgreSQL et les arêtes `SetNull` ne
- * bloquent rien. Élargir `requires` au-delà de ces arêtes reviendrait à
- * supprimer des données que l'administrateur n'a pas demandées, ce qui est le
- * seul défaut irrattrapable d'un écran comme celui-ci.
- */
-
-/**
- * Toutes les suppressions du système, enfants d'abord.
- *
- * Relire le schéma avant d'y toucher : une étape déplacée au-dessus de son
- * parent produit une violation de clé étrangère, donc un retour arrière complet
- * de la transaction.
- */
+// ORDRE GLOBAL, enfants avant parents ; toute purge en est un sous-mot. Déplacer une étape
+// au-dessus de son parent viole une clé étrangère et annule la transaction entière.
 export const PURGE_STEP_ORDER = [
   'bankCaseTransitions',
   'bankCases',
@@ -39,18 +7,10 @@ export const PURGE_STEP_ORDER = [
   'callTasks',
   'campaignMembers',
   'campaigns',
-  // Campagnes de représentants, dans le même ordre que leurs homologues
-  // prospects. Elles pointent vers `users` en `Restrict` (créateur, membre du
-  // tourniquet, affectataire, auteur de la tentative) : sans ces quatre étapes,
-  // la suppression des comptes téléconseillers échoue et emporte toute la
-  // transaction avec elle.
   'repCallAttempts',
   'repCallTasks',
   'repCampaignMembers',
   'repCampaigns',
-  // Les demandes de création pointent en `Restrict` vers `prospects` (le
-  // prospect issu de l'approbation), `banques` et `users`. Elles doivent donc
-  // partir avant ces trois-là, et non après.
   'clientRequests',
   'prospects',
   'representants',
@@ -66,8 +26,6 @@ export const PURGE_STEP_ORDER = [
   'bankRejectionReasons',
   'banques',
   'syndicats',
-  // Les IEF pointent en `Restrict` vers les départements, et les représentants
-  // pointent en `Restrict` vers les IEF : elles se placent donc entre les deux.
   'iefs',
   'departements',
   'regions',
@@ -96,16 +54,11 @@ export type PurgeDomainKey = (typeof PURGE_DOMAIN_KEYS)[number];
 
 export interface PurgeDomain {
   readonly key: PurgeDomainKey;
-  /** Ce que l'administrateur lit sur la case à cocher. Il nomme, il n'explique pas. */
   readonly label: string;
-  /** Une phrase, au plus, quand le libellé seul laisserait un doute sur le périmètre. */
   readonly hint: string;
-  /** Étapes portées par ce domaine, dans l'ordre global. */
   readonly steps: readonly PurgeStepKey[];
-  /**
-   * Domaines entraînés, parce qu'ils portent une clé étrangère `Restrict` vers
-   * celui-ci. Cocher l'un coche les autres : la transaction échouerait sinon.
-   */
+  // Ne porte QUE les arêtes `onDelete: Restrict`, seules à faire échouer une suppression.
+  // L'élargir supprimerait des données que l'administrateur n'a pas cochées.
   readonly requires: readonly PurgeDomainKey[];
 }
 
@@ -157,9 +110,6 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     label: 'Prospects',
     hint: 'Fiches prospects, y compris l’annuaire répliqué sur mobile.',
     steps: ['prospects'],
-    // `demandesClients` : une demande approuvée pointe en `Restrict` vers le
-    // prospect qu'elle a produit. La laisser derrière ferait échouer toute la
-    // transaction sur la première fiche née d'une demande bancaire.
     requires: ['dossiers', 'tentatives', 'fileAppels', 'demandesClients'],
   },
   {
@@ -167,13 +117,8 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     label: 'Représentants',
     hint: 'Fiches représentants.',
     steps: ['representants'],
-    // `campagnesRepresentants` en plus de `prospects` : les tâches et les
-    // tentatives d'appel pendent du représentant en CASCADE. Sans cette
-    // dépendance, purger les seuls représentants les emportait silencieusement,
-    // sans qu'ils soient comptés dans le rapport rendu à l'administrateur, et
-    // en laissant des campagnes représentants aux files vidées. Le domaine
-    // `prospects` déclare déjà ses propres enfants en cascade pour la même
-    // raison : c'est la symétrie qui manquait.
+    // `campagnesRepresentants` : tâches et tentatives pendent du représentant en CASCADE,
+    // et partiraient sans être comptées dans le rapport rendu à l'administrateur.
     requires: ['prospects', 'campagnesRepresentants'],
   },
   {
@@ -202,9 +147,6 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     label: 'Comptes téléconseillers',
     hint: 'Comptes et tout ce qu’ils ont saisi.',
     steps: ['commercialAccounts'],
-    // `campagnesRepresentants` : le membre du tourniquet, l'affectataire d'une
-    // tâche et l'auteur d'une tentative pointent tous vers `users` en
-    // `Restrict`, exactement comme du côté prospects.
     requires: [
       'dossiers',
       'tentatives',
@@ -220,8 +162,6 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     label: 'Comptes Finances générales',
     hint: 'Comptes du pôle, dossiers qu’ils ont ouverts et demandes qu’ils ont déposées.',
     steps: ['financeAccounts'],
-    // `demandesClients` : `requestedById` pointe en `Restrict` vers le compte
-    // bancaire qui a déposé la demande.
     requires: ['dossiers', 'demandesClients'],
   },
   {
@@ -237,8 +177,6 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
       'departements',
       'regions',
     ],
-    // `demandesClients` : `banqueId` pointe en `Restrict` vers la banque
-    // demandeuse, qui ne peut donc pas partir avant elle.
     requires: ['dossiers', 'prospects', 'representants', 'demandesClients'],
   },
 ];
@@ -249,7 +187,6 @@ const BY_KEY = new Map<PurgeDomainKey, PurgeDomain>(
 
 export function purgeDomain(key: PurgeDomainKey): PurgeDomain {
   const domain = BY_KEY.get(key);
-  // Impossible via le contrôleur : le DTO valide les clés contre l'énumération.
   if (!domain) throw new Error(`Domaine de purge inconnu : ${key}`);
   return domain;
 }
@@ -258,19 +195,6 @@ export function isPurgeDomainKey(value: string): value is PurgeDomainKey {
   return BY_KEY.has(value as PurgeDomainKey);
 }
 
-/**
- * Ferme la sélection sur ses dépendances, transitivement.
- *
- * Cocher « Représentants » entraîne « Prospects », qui entraîne à son tour
- * « Dossiers bancaires », « Tentatives d'appel » et « File d'appels ». L'écran
- * affiche exactement cette fermeture AVANT la validation : une case qui
- * s'allume toute seule au moment de la suppression serait vécue comme une
- * dérive, et à raison.
- *
- * Le résultat est trié dans l'ordre de `PURGE_DOMAIN_KEYS` pour que deux
- * sélections équivalentes produisent la même réponse, sans quoi le récapitulatif
- * changerait d'ordre selon celui des cases cochées.
- */
 export function expandPurgeSelection(
   selection: readonly PurgeDomainKey[],
 ): readonly PurgeDomainKey[] {
@@ -287,13 +211,6 @@ export function expandPurgeSelection(
   return PURGE_DOMAIN_KEYS.filter((key) => resolved.has(key));
 }
 
-/**
- * Étapes à exécuter, dans l'ordre global.
- *
- * Le filtre part de `PURGE_STEP_ORDER` et non des domaines : c'est ce qui
- * garantit que l'ordre des clés étrangères ne dépend jamais de l'ordre dans
- * lequel l'administrateur a coché ses cases.
- */
 export function purgeSteps(selection: readonly PurgeDomainKey[]): readonly PurgeStepKey[] {
   const wanted = new Set<PurgeStepKey>(
     expandPurgeSelection(selection).flatMap((key) => [...purgeDomain(key).steps]),

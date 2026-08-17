@@ -65,11 +65,6 @@ class AppUpdateScreen extends ConsumerWidget {
                       label: const Text('Installer la mise à jour'),
                     ),
                   ] else if (state.blocker == AppUpdateBlocker.meteredLink) ...<Widget>[
-                    // Le téléchargement partait tout seul, sur n'importe quelle
-                    // interface, et se réarmait à chaque bascule Wi-Fi ↔ mobile :
-                    // plusieurs mégaoctets prélevés en silence sur le forfait
-                    // personnel du commercial. Il attend désormais le Wi-Fi ou
-                    // ce tap.
                     Text(
                       'Vous êtes sur des données mobiles. '
                       '${_megabytes(release.fileSize)} seront téléchargés.',
@@ -124,8 +119,6 @@ class AppUpdateScreen extends ConsumerWidget {
   }
 }
 
-/// Taille lisible : le commercial paie sa data au mégaoctet, il a le droit de
-/// savoir combien avant de dire oui.
 String _megabytes(int bytes) {
   if (bytes <= 0) return 'Plusieurs mégaoctets';
   final double mb = bytes / (1024 * 1024);

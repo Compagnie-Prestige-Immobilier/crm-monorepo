@@ -14,37 +14,12 @@ import {
 import { formatNumber } from '@/lib/format';
 import type { UserRow } from '@/lib/types';
 
-/**
- * Confirmation de désactivation d'un compte.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Pourquoi ce dialogue existe.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * La désactivation partait directement d'une entrée de menu déroulant : un
- * `onSelect`, et l'accès mobile d'un téléconseiller était fermé. En pleine
- * tournée, il perd sa file d'appels et ne peut plus rien saisir, et rien à
- * l'écran ne l'avait annoncé à celui qui a cliqué. C'est la seule action
- * destructrice du panel qui n'était pas confirmée : la désactivation d'un
- * référentiel l'est (`referentiels/deactivate-dialog.tsx`), la clôture d'une
- * campagne l'est, le retrait du mode démonstration l'est deux fois.
- *
- * Il reprend la forme du dialogue de référentiel, et pour la même raison :
- * lever la confusion entre « désactiver » et « supprimer ». Le NOM du compte et
- * son NOMBRE DE PROSPECTS sont sous les yeux au moment du clic, parce que c'est
- * ce chiffre qui dit ce qu'on est en train de toucher, et parce qu'il affirme
- * en même temps que rien n'est perdu.
- *
- * La RÉACTIVATION, elle, ne demande rien : elle ne coupe l'accès de personne, et
- * confirmer un geste réparateur ne fait que ralentir la réparation.
- */
 export function DeactivateUserDialog({
   user,
   onOpenChange,
   pending,
   onConfirm,
 }: {
-  /** Le compte visé, ou `null` quand le dialogue est fermé. */
   user: UserRow | null;
   onOpenChange: (open: boolean) => void;
   pending: boolean;
@@ -54,8 +29,6 @@ export function DeactivateUserDialog({
     <Dialog
       open={user !== null}
       onOpenChange={(open) => {
-        // Fermer pendant l'appel laisserait l'utilisateur sans retour sur une
-        // opération qui court encore.
         if (!open && pending) return;
         onOpenChange(open);
       }}

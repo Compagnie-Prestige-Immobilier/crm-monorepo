@@ -6,21 +6,6 @@ import { BankAgingCard } from '@/components/stats/bank-aging-card';
 import type * as StatsModule from '@/lib/data/advanced-stats';
 import { renderWithQuery } from '@/test/render-query';
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * Un CALCUL QUI A ÉCHOUÉ ne doit pas se présenter comme un calcul EN COURS.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * TanStack pose `isPending` à `false` dès qu'une requête échoue, en laissant
- * `data` à `undefined`. La carte ne testait que ces deux valeurs : l'échec
- * empruntait donc exactement la branche du chargement, et l'écran affichait
- * « Calcul en cours… » au-dessus d'un squelette, indéfiniment.
- *
- * C'est la variante silencieuse du défaut que `QueryErrorState` corrige
- * ailleurs : l'utilisateur attend un résultat qui ne viendra jamais, sans
- * qu'aucun texte ne nomme la panne ni ne propose de réessayer.
- */
-
 vi.mock('@/lib/data/advanced-stats', async () => {
   const actual = await vi.importActual<typeof StatsModule>('@/lib/data/advanced-stats');
   return { ...actual, fetchBankAging: fetchMock };
@@ -39,7 +24,6 @@ describe('la carte d’ancienneté face à une requête en échec', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeTruthy();
     });
-    // Le coeur du défaut : cette phrase promettait un résultat imminent.
     expect(screen.queryByText(/Calcul en cours/u)).toBeNull();
   });
 
@@ -56,8 +40,6 @@ describe('la carte d’ancienneté face à une requête en échec', () => {
   });
 
   it('rend les chiffres, et aucune erreur, quand la requête aboutit', async () => {
-    // Le pendant indispensable : une carte qui afficherait TOUJOURS l'erreur
-    // passerait les deux tests ci-dessus sans rien corriger.
     fetchMock.mockResolvedValue({
       total: 3,
       buckets: [{ bucket: '0-7', label: '0 à 7 jours', dossiers: 3, share: 1 }],

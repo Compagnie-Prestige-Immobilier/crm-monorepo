@@ -6,21 +6,11 @@ import Link from 'next/link';
 import { BankFiltersBar } from '@/components/bank/bank-filters-bar';
 import { useBankFilters } from '@/components/bank/use-bank-filters';
 import { useFileDownload } from '@/components/exports/download-button';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { countActiveBankFilters } from '@/lib/bank-filters';
 import { bankExportFileName, buildBankExportUrl } from '@/lib/data/export';
 
-/**
- * Écran d'export dédié.
- *
- * Il ne double PAS le menu d'export de la liste : il porte la même barre de
- * filtre, écrit dans la même URL, et produit le même fichier. Sa raison d'être
- * est qu'un agent qui vient chercher « le classeur du mois » n'a pas à savoir
- * qu'il se cache derrière un menu de la page « Dossiers » : et qu'il puisse
- * régler ses critères en voyant, écrit noir sur blanc, ce que chaque feuille
- * contiendra.
- */
 const SHEETS: readonly { name: string; description: string }[] = [
   {
     name: 'Dossiers',
@@ -95,9 +85,11 @@ export function BankExportView() {
                 </>
               )}
             </Button>
-            <Button asChild variant="ghost">
-              <Link href="/dossiers">Voir la liste</Link>
-            </Button>
+            {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
+                poserait `role="button"` sur le `<a>`. */}
+            <Link href="/dossiers" className={buttonVariants({ variant: 'ghost' })}>
+              Voir la liste
+            </Link>
           </div>
         </CardContent>
       </Card>

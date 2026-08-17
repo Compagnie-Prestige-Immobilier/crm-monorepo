@@ -3,16 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '@/lib/api/config';
 import { mockCookies, type FakeCookieStore } from '@/test/cookie-store';
 
-/**
- * Route Handlers d'authentification.
- *
- * Ce qui est vérifié ici n'est pas « le login marche » : c'est la frontière de
- * sécurité : aucun jeton ne doit franchir la limite serveur → navigateur
- * autrement que dans un cookie `httpOnly`. Un JWT dans le corps de la réponse
- * atterrit dans le JavaScript de la page, donc à portée de la première XSS, et
- * l'attaquant repart avec la base de prospects entière.
- */
-
 const ACCESS_JWT = 'header.eyJzdWIiOiJ1MSJ9.sig';
 const REFRESH_JWT = 'header.eyJzdWIiOiJ1MSIsInR5cCI6InJlZnJlc2gifQ.sig';
 
@@ -76,7 +66,6 @@ describe('POST /api/auth/login', () => {
 
     expect(response.status).toBe(200);
 
-    // 1. Les cookies portent bien les jetons, et sont hors de portée de JS.
     const access = store.raw(ACCESS_COOKIE);
     const refresh = store.raw(REFRESH_COOKIE);
     expect(access?.value).toBe(ACCESS_JWT);
@@ -86,9 +75,6 @@ describe('POST /api/auth/login', () => {
     expect(access?.sameSite).toBe('lax');
     expect(refresh?.sameSite).toBe('lax');
 
-    // 2. Le corps ne contient que le profil public. Assertion faite sur la
-    //    sérialisation entière : une clé imbriquée ne peut pas passer entre
-    //    les mailles d'un `expect(body.accessToken).toBeUndefined()`.
     const serialized = JSON.stringify(body);
     expect(serialized).not.toContain(ACCESS_JWT);
     expect(serialized).not.toContain(REFRESH_JWT);
@@ -120,8 +106,6 @@ describe('POST /api/auth/login', () => {
   });
 
   it('signale explicitement une limitation de débit (429), pas un mot de passe faux', async () => {
-    // Dire « identifiants incorrects » à quelqu'un qui vient d'être limité
-    // l'envoie réessayer en boucle et aggrave la limitation.
     fetchMock.mockResolvedValue(json({ statusCode: 429, message: 'Too Many Requests' }, 429));
     const { POST } = await import('@/app/api/auth/login/route');
 
@@ -150,10 +134,6 @@ describe('POST /api/auth/login', () => {
 
 describe('cloisonnement des rôles à la connexion', () => {
   it('refuse un COMMERCIAL avec EXACTEMENT le message d’un mot de passe faux', async () => {
-    // Anti-énumération : si le refus de rôle avait son propre message, un
-    // attaquant distinguerait « ce compte existe mais n'est pas admin » de
-    // « ce compte n'existe pas ». La comparaison porte sur le corps complet ET
-    // sur le code HTTP.
     const { POST } = await import('@/app/api/auth/login/route');
 
     fetchMock.mockResolvedValue(json({ statusCode: 401, message: 'Unauthorized' }, 401));
@@ -180,9 +160,6 @@ describe('cloisonnement des rôles à la connexion', () => {
   });
 
   it('ne pose aucun cookie pour un COMMERCIAL dont le mot de passe est pourtant bon', async () => {
-    // L'API a répondu 200 avec des jetons valides : sans le contrôle de rôle,
-    // le commercial entrerait dans le panel avec la liste complète des
-    // prospects.
     fetchMock.mockResolvedValue(
       json({
         accessToken: ACCESS_JWT,
@@ -198,7 +175,6 @@ describe('cloisonnement des rôles à la connexion', () => {
     expect(response.status).toBe(401);
     expect(store.raw(ACCESS_COOKIE)).toBeUndefined();
     expect(store.raw(REFRESH_COOKIE)).toBeUndefined();
-    // Et surtout : les jetons du commercial ne fuitent pas dans la réponse.
     expect(await response.text()).not.toContain(ACCESS_JWT);
   });
 });
@@ -216,16 +192,12 @@ describe('POST /api/auth/logout', () => {
     expect(store.isCleared(ACCESS_COOKIE)).toBe(true);
     expect(store.isCleared(REFRESH_COOKIE)).toBe(true);
 
-    // La révocation serveur tue toute la famille : les rotations en vol
-    // meurent avec.
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url] = fetchMock.mock.calls[0] as [string | URL | Request];
     expect(String(url instanceof Request ? url.url : url)).toContain('/auth/logout');
   });
 
   it('efface les cookies MÊME si la révocation serveur échoue', async () => {
-    // Un utilisateur qui clique « Déconnexion » doit être déconnecté de ce
-    // navigateur, quoi qu'il arrive sur le réseau.
     store.seed(ACCESS_COOKIE, ACCESS_JWT);
     store.seed(REFRESH_COOKIE, REFRESH_JWT);
     fetchMock.mockRejectedValue(new Error('réseau coupé'));

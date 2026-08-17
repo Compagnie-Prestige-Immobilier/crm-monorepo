@@ -16,24 +16,9 @@ import {
   UpdateBankCaseStageDto,
 } from './dto.js';
 
-/**
- * Configuration du workflow bancaire.
- *
- * La LECTURE est ouverte à l'agent Banque & Finance, il lui faut la liste des
- * étapes pour afficher un dossier et proposer la suivante. Toute ÉCRITURE est
- * réservée à l'ADMIN : le workflow est une décision d'organisation, pas un
- * réglage d'agent. Le décorateur de classe pose la règle stricte et seule la
- * lecture l'élargit, si bien qu'une route ajoutée sans décorateur reste
- * fermée.
- */
 @ApiTags('bank-case-stages')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
-// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
-// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
-// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
-// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
-// cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'bank-case-stages', version: '1' })
 export class BankCaseStagesController {
@@ -63,7 +48,6 @@ export class BankCaseStagesController {
     return this.stages.create(body);
   }
 
-  /** Déclarée avant `:id` : segment littéral, il ne doit pas être pris pour un identifiant. */
   @Post('reorder')
   @ApiOperation({
     operationId: 'reorderBankCaseStages',

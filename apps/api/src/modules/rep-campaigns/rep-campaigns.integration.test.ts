@@ -1,25 +1,3 @@
-/**
- * Le tirage des campagnes de représentants, contre un VRAI PostgreSQL.
- *
- * Deux mécanismes de ce module ne vivent PAS dans le code applicatif, et
- * aucune doublure ne peut donc les éprouver :
- *
- *  1. le MÉLANGE. Il est exécuté par PostgreSQL (`setseed` puis
- *     `ORDER BY random()`), sur la connexion de la transaction. La graine est
- *     conservée dans la campagne parce qu'elle est censée rendre le tirage
- *     REJOUABLE : c'est une promesse d'audit, et une promesse qu'on ne peut
- *     tenir qu'en la vérifiant sur le moteur lui-même. Une doublure qui rend la
- *     liste inchangée, comme le font les tests unitaires, ne prouve rien du
- *     tout ;
- *  2. l'index unique PARTIEL `rep_call_tasks_one_active_per_representant`. Le
- *     service pose bien un pré-contrôle applicatif
- *     (`repCallTasks: { none: { isActive: true } }`), mais un pré-contrôle LIT
- *     puis ÉCRIT : deux campagnes créées à la même seconde le franchissent
- *     toutes les deux. C'est l'index qui arbitre pour de bon, et c'est lui
- *     qu'il faut mettre à l'épreuve.
- *
- * Lancée par `pnpm test:integration`.
- */
 process.env.NODE_ENV ??= 'test';
 process.env.DATABASE_URL ??= 'postgresql://crm:crm@localhost:5434/crm?schema=public';
 process.env.JWT_ACCESS_SECRET ??= 'integration-access-secret-32-characters';
@@ -38,7 +16,6 @@ const prisma = new PrismaClient({
 
 const TAG = 'ITRC';
 
-/** Deux graines distinctes, écrites en dur : le rejeu doit être REPRODUCTIBLE. */
 const SEED_A = '0f1e2d3c4b5a69788796a5b4c3d2e1f0';
 const SEED_B = 'ffeeddccbbaa99887766554433221100';
 
@@ -96,8 +73,6 @@ beforeAll(async () => {
   adminId = admin.id;
   commercialId = commercial.id;
 
-  // Une population assez grande pour qu'un ordre identique par HASARD soit
-  // hors de portée : 40! est un nombre à cinquante chiffres.
   representantIds = [];
   for (let index = 0; index < 40; index += 1) {
     const row = await prisma.representant.create({
@@ -124,7 +99,6 @@ beforeEach(async () => {
   await cleanupCampagnes();
 });
 
-/** Crée une campagne et rend l'ORDRE dans lequel le tirage a rangé les fiches. */
 async function tirage(nom: string, seed: string): Promise<string[]> {
   return prisma.$transaction(async (tx) => {
     const campagne = await tx.repCallCampaign.create({
@@ -151,8 +125,6 @@ async function tirage(nom: string, seed: string): Promise<string[]> {
         position: index + 1,
         dayIndex: 0,
         status: CallTaskStatus.OPEN,
-        // Inactif : ces campagnes-ci ne servent qu'à comparer des ORDRES, et
-        // l'index d'unicité les ferait s'exclure entre elles.
         isActive: false,
       })),
     });
@@ -161,41 +133,24 @@ async function tirage(nom: string, seed: string): Promise<string[]> {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. Le rejeu à graine égale
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('mélange ensemencé : deux campagnes, même graine, même ordre', () => {
-  /**
-   * La promesse tenue par la graine conservée en base : à population égale, le
-   * tirage se REJOUE. C'est ce qui permet, six mois plus tard, de démontrer
-   * qu'une campagne n'a pas été arrangée en faveur de tel commercial.
-   */
   it('même graine et même population donnent un ordre IDENTIQUE', async () => {
     const premier = await tirage('Campagne 1', SEED_A);
     const second = await tirage('Campagne 2', SEED_A);
 
     expect(second).toEqual(premier);
-    // Garde-fou : sans lui, deux listes vides seraient « identiques ».
     expect(premier).toHaveLength(representantIds.length);
   });
 
-  /**
-   * Le témoin négatif, sans lequel le précédent ne prouverait rien : un mélange
-   * qui ne mélangerait PAS rendrait aussi deux ordres identiques.
-   */
   it('deux graines DIFFÉRENTES donnent un ordre différent', async () => {
     const avecA = await tirage('Campagne A', SEED_A);
     const avecB = await tirage('Campagne B', SEED_B);
 
     expect(avecB).not.toEqual(avecA);
-    // Ce sont bien les MÊMES fiches, rangées autrement.
     expect([...avecB].sort()).toEqual([...avecA].sort());
   });
 
   it('le mélange bouscule réellement l’ordre d’entrée', async () => {
-    // Un `ORDER BY random()` que PostgreSQL optimiserait en no-op rendrait la
-    // liste telle quelle, et le rejeu ci-dessus resterait vert.
     const ordonnes = await tirage('Campagne mélangée', SEED_A);
     expect(ordonnes).not.toEqual(representantIds);
     expect([...ordonnes].sort()).toEqual([...representantIds].sort());
@@ -209,12 +164,7 @@ describe('mélange ensemencé : deux campagnes, même graine, même ordre', () =
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 2. L'index, et non le pré-contrôle
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('index rep_call_tasks_one_active_per_representant', () => {
-  /** Écrit UNE tâche active sur un représentant, hors de tout pré-contrôle. */
   const tacheActive = async (nom: string, representantId: string): Promise<void> => {
     const campagne = await prisma.repCallCampaign.create({
       data: {
@@ -243,15 +193,6 @@ describe('index rep_call_tasks_one_active_per_representant', () => {
     });
   };
 
-  /**
-   * LE POINT DE L'ÉPREUVE : le refus vient de la BASE, pas du service.
-   *
-   * On écrit ici directement, en contournant délibérément le pré-contrôle
-   * applicatif, exactement comme le ferait une seconde transaction concurrente
-   * qui l'aurait franchi avant que la première ne valide. Le code de l'erreur
-   * doit être P2002, celui que le filtre global traduit en 409 typé, et non une
-   * exception métier levée par le service.
-   */
   it('REFUSE une deuxième tâche ACTIVE sur le même représentant', async () => {
     const cible = representantIds[0] ?? '';
     await tacheActive('Première', cible);
@@ -266,12 +207,6 @@ describe('index rep_call_tasks_one_active_per_representant', () => {
     ).toBe(1);
   });
 
-  /**
-   * L'index est PARTIEL sur `isActive = true`, et c'est tout son intérêt : un
-   * représentant déjà appelé garde l'HISTORIQUE de ses anciennes tâches, closes
-   * donc inactives, et doit pouvoir entrer dans une nouvelle campagne. Un index
-   * total interdirait toute relance, ce qui viderait le module de son objet.
-   */
   it('AUTORISE une nouvelle tâche quand la précédente n’est plus active', async () => {
     const cible = representantIds[1] ?? '';
     await tacheActive('Ancienne', cible);

@@ -2,20 +2,6 @@ import type { components } from '@crm/api-client';
 
 import { readPositiveInt, readString, type RawSearchParams } from '@/lib/search-params';
 
-/**
- * Filtre des demandes de création de client : traduction URL ⇄ objet, sur le
- * modèle de `lib/representant-filters.ts`.
- *
- * L'écran d'arbitrage se partage : « les demandes en attente de la CBAO » doit
- * être un lien qu'un administrateur colle à un collègue, pas un état perdu au
- * rechargement. Le statut vit donc dans l'URL comme les autres critères, et non
- * dans un `useState` d'onglet.
- *
- * Analyse TOLÉRANTE : une valeur inconnue est écartée plutôt que propagée vers
- * l'API. Une URL bricolée à la main ne doit pas produire un 400 sur un écran
- * que l'utilisateur n'a fait qu'ouvrir.
- */
-
 export type ClientRequestStatus = components['schemas']['ClientRequestStatus'];
 
 export const CLIENT_REQUEST_STATUSES: readonly ClientRequestStatus[] = [
@@ -33,7 +19,6 @@ export const CLIENT_REQUEST_STATUS_LABELS: Record<ClientRequestStatus, string> =
 export const CLIENT_REQUEST_PAGE_SIZE = 25;
 
 export interface ClientRequestFilters {
-  /** `null` : tous les statuts confondus. */
   status: ClientRequestStatus | null;
   search: string;
   banqueId: string | null;
@@ -41,14 +26,6 @@ export interface ClientRequestFilters {
   pageSize: number;
 }
 
-/**
- * Défaut : les demandes EN ATTENTE.
- *
- * L'écran existe pour arbitrer, pas pour consulter un historique. Ouvrir sur
- * « tous statuts » noierait les trois demandes à traiter au milieu de deux
- * cents demandes déjà tranchées, et c'est le tri manuel que ce module doit
- * éviter.
- */
 export const DEFAULT_CLIENT_REQUEST_FILTERS: ClientRequestFilters = {
   status: 'PENDING',
   search: '',
@@ -59,11 +36,6 @@ export const DEFAULT_CLIENT_REQUEST_FILTERS: ClientRequestFilters = {
 
 export type { RawSearchParams };
 
-/**
- * `statut=tous` est une valeur EXPLICITE et non l'absence de paramètre : le
- * défaut de l'écran étant « en attente », il faut pouvoir demander l'ensemble
- * dans une URL, ce qu'une clé absente ne permettrait pas d'exprimer.
- */
 export const ALL_STATUSES = 'tous';
 
 export function parseClientRequestFilters(
@@ -85,7 +57,6 @@ export function parseClientRequestFilters(
   };
 }
 
-/** Sérialisation canonique : défauts omis, ordre de clés fixe, donc clé de cache. */
 export function serializeClientRequestFilters(filters: ClientRequestFilters): URLSearchParams {
   const params = new URLSearchParams();
 

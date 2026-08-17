@@ -6,16 +6,6 @@ import { toFilterQuery } from '@/lib/api/query-params';
 import { EMPTY_FILTERS } from '@/lib/filters';
 import type { Banque, Departement, Syndicat } from '@/lib/types';
 
-/**
- * Mutations des référentiels.
- *
- * Point métier que l'écran doit rendre explicite : DÉSACTIVER N'EST PAS
- * SUPPRIMER. Les prospects qui référencent une banque retirée la gardent, et
- * c'est indispensable : un export de mars doit rester lisible en décembre.
- * `usageCounts` sert précisément à afficher combien de fiches sont concernées
- * AVANT de laisser cliquer.
- */
-
 export type CreateBanqueInput = components['schemas']['CreateBanqueDto'];
 export type UpdateBanqueInput = components['schemas']['UpdateBanqueDto'];
 export type CreateSyndicatInput = components['schemas']['CreateSyndicatDto'];
@@ -83,7 +73,6 @@ export async function updateDepartement(
   );
 }
 
-/** Nombre de prospects rattachés, par identifiant de référentiel. */
 export type UsageCounts = Readonly<Record<string, number>>;
 
 export interface ReferentielUsage {
@@ -101,13 +90,6 @@ function tally(items: readonly { id?: string | null; prospects: number }[]): Usa
   return counts;
 }
 
-/**
- * Usage réel des référentiels, sans aucun filtre.
- *
- * Les compteurs servent à répondre à « qu'est-ce que je casse si je désactive
- * ça ? ». La réponse ne doit pas dépendre de la période affichée ailleurs dans
- * le panel : on interroge donc l'analytique sur la totalité de la base.
- */
 export async function fetchReferentielUsage(
   client: ApiClient = getApiClient(),
 ): Promise<ReferentielUsage> {

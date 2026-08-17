@@ -15,14 +15,6 @@ import { loginSchema, type LoginInput } from '@/lib/schemas';
 import { ROLE_LABELS, type Role } from '@/lib/types';
 import { apiErrorMessage } from '@/lib/utils';
 
-/**
- * Rôle lu dans `{ user: { role } }`, sans faire confiance à la forme.
- *
- * La réponse peut être un 502 d'un proxy ou un corps vide : on ne parse pas un
- * `unknown` en `SessionUser` par assertion. Un rôle illisible retombe sur
- * ADMIN, dont l'écran d'accueil est celui que le layout serveur autorisera ou
- * refusera de toute façon : il n'y a donc pas d'escalade de droits ici.
- */
 function roleOf(payload: unknown): Role {
   if (typeof payload !== 'object' || payload === null || !('user' in payload)) return 'ADMIN';
   const { user } = payload as { user?: unknown };
@@ -31,18 +23,10 @@ function roleOf(payload: unknown): Role {
   return typeof role === 'string' && role in ROLE_LABELS ? (role as Role) : 'ADMIN';
 }
 
-/**
- * `next` : écran d'où l'utilisateur a été éjecté par une session expirée. Déjà
- * validé comme chemin interne par la page serveur : ne jamais y injecter une
- * URL absolue, ce qui ferait de cet écran une redirection ouverte.
- */
 export function LoginForm({ next }: { next?: string | null }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
-  // L'utilisateur est de retour sur le formulaire : la garde anti-boucle de
-  // `redirectToLogin()` doit être relâchée, sinon une seconde expiration dans
-  // le même onglet ne redirigerait plus.
   useEffect(() => {
     resetSessionExpiryGuard();
   }, []);
@@ -59,8 +43,6 @@ export function LoginForm({ next }: { next?: string | null }) {
   async function onSubmit(values: LoginInput): Promise<void> {
     setServerError(null);
     try {
-      // Le corps part vers le Route Handler, PAS vers le backend. La réponse ne
-      // contient aucun jeton : ils sont posés en cookies httpOnly côté serveur.
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -73,20 +55,8 @@ export function LoginForm({ next }: { next?: string | null }) {
         return;
       }
 
-      /**
-       * L'écran d'arrivée dépend du RÔLE.
-       *
-       * Un agent Banque & Finance envoyé sur `/tableau-de-bord` verrait le
-       * tableau de bord des prospects, auquel l'API lui répond 403 : sa
-       * première impression du panel serait un refus de droits. Il atterrit
-       * donc sur ses dossiers. Le rôle est lu dans la réponse du Route
-       * Handler : jamais dans un jeton, que ce code n'a pas et ne doit pas
-       * avoir.
-       */
       const payload: unknown = await response.json().catch(() => null);
       router.replace(next != null && next !== '' ? next : homePathForRole(roleOf(payload)));
-      // Sans `refresh()`, le layout serveur du panel resterait celui rendu
-      // avant la pose du cookie, et renverrait vers la page de connexion.
       router.refresh();
     } catch {
       setServerError('Le serveur est injoignable. Vérifiez votre connexion.');

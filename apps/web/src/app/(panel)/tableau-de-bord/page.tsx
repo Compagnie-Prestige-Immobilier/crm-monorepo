@@ -19,9 +19,6 @@ export default async function TableauDeBordPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  // Les agrégats de prospection sont fermés à un BANQUE_FINANCE : son tableau
-  // de bord à lui est `/banque`. On l'aiguille par un refus explicite plutôt
-  // que par une redirection, qui se lirait comme un lien mort.
   const guard = await guardRoles(['ADMIN']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
@@ -30,14 +27,8 @@ export default async function TableauDeBordPage({
 
   const filters = parseProspectFilters(await searchParams);
 
-  // Le client SERVEUR est passé explicitement : il porte le jeton lu dans le
-  // cookie `httpOnly`, que le client navigateur ne peut pas voir. Sans cet
-  // argument, `src/lib/data/*` retomberait sur le client navigateur, dont
-  // l'URL de base est relative : donc invalide côté serveur.
   const client = getServerApiClient();
 
-  // QueryClient dédié à CETTE requête (voir lib/query-client.ts). Le préchargement
-  // évite l'aller-retour vide → squelette → données au premier affichage.
   const queryClient = getQueryClient();
   await Promise.all([
     queryClient.prefetchQuery({

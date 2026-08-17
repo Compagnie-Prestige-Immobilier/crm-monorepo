@@ -22,26 +22,23 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // Le thème résolu n'est connu qu'après hydratation : le rendu serveur ignore
-  // la préférence système et `localStorage`. Afficher une icône avant ce point
-  // garantit une divergence d'hydratation à chaque chargement en mode sombre.
   useEffect(() => {
     setMounted(true);
   }, []);
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Changer de thème">
-          {mounted ? (
-            <>
-              <SunIcon className="size-4 dark:hidden" aria-hidden="true" />
-              <MoonIcon className="hidden size-4 dark:block" aria-hidden="true" />
-            </>
-          ) : (
-            <MonitorIcon className="size-4 opacity-0" aria-hidden="true" />
-          )}
-        </Button>
+      <DropdownMenuTrigger
+        render={<Button variant="ghost" size="icon" aria-label="Changer de thème" />}
+      >
+        {mounted ? (
+          <>
+            <SunIcon className="size-4 dark:hidden" aria-hidden="true" />
+            <MoonIcon className="hidden size-4 dark:block" aria-hidden="true" />
+          </>
+        ) : (
+          <MonitorIcon className="size-4 opacity-0" aria-hidden="true" />
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         {OPTIONS.map((option) => {
@@ -49,7 +46,7 @@ export function ThemeToggle() {
           return (
             <DropdownMenuItem
               key={option.value}
-              onSelect={() => {
+              onClick={() => {
                 setTheme(option.value);
               }}
               className={theme === option.value ? 'bg-secondary' : undefined}

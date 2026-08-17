@@ -27,14 +27,6 @@ import type {
 } from './dto.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
-/**
- * Agrégats du tableau de bord.
- *
- * Tout est calculé en SQL et rien ne quitte la base à la ligne : le navigateur
- * reçoit des compteurs, jamais des prospects. Le filtre est celui de la liste,
- * si bien qu'un chiffre affiché correspond toujours exactement au contenu du
- * tableau et du fichier exporté.
- */
 @Injectable()
 export class AnalyticsService {
   constructor(
@@ -90,9 +82,8 @@ export class AnalyticsService {
 
   async overTime(user: AuthenticatedUser, query: TimeSeriesQueryDto): Promise<AnalyticsSeriesDto> {
     const where = prospectConditions(user, query, await this.demo.enabled());
-    // `date_trunc` prend un littéral, jamais un paramètre : la valeur vient
-    // d'une énumération fermée et non de la chaîne reçue, ce qui interdit toute
-    // injection par ce chemin.
+    // `date_trunc` exige un littéral, jamais un paramètre : l'unité vient d'une
+    // énumération fermée, toute autre valeur retombant sur 'day'.
     const unit =
       query.granularity === TimeGranularity.MONTH
         ? Prisma.sql`'month'`
@@ -171,9 +162,6 @@ export class AnalyticsService {
     );
   }
 
-  // `banques` et `syndicats` sont déjà joints par PROSPECT_FROM pour le calcul
-  // du segment : on réutilise les alias plutôt que de rejoindre les mêmes tables
-  // une seconde fois sous un autre nom.
   byBanque(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<NamedCountListDto> {
     return this.groupBy(
       user,
@@ -188,14 +176,7 @@ export class AnalyticsService {
     return this.groupBy(user, filter, Prisma.empty, Prisma.sql`sy."id"`, Prisma.sql`sy."sigle"`);
   }
 
-  /**
-   * Avancement de la phase 2, tous statuts représentés.
-   *
-   * Les quatre statuts sont émis même à zéro : un histogramme qui perd une barre
-   * dès que le compteur tombe à zéro change de forme sans raison, et l'absence
-   * de « Refus » se lit alors comme une panne de la série plutôt que comme une
-   * bonne nouvelle.
-   */
+  /** Les quatre statuts sont émis même à zéro : un histogramme qui perd une barre change de forme sans raison. */
   async byPhase2Status(
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
@@ -225,14 +206,7 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Répartition des méthodes d'enrôlement obtenues.
-   *
-   * Les prospects sans méthode sont hors de cette série : `null` n'est pas une
-   * méthode. Leur nombre se lit dans `by-phase2-status`, où ils forment les
-   * statuts autres que « Méthode obtenue », et le `total` renvoyé ici est donc
-   * délibérément celui des seuls porteurs d'une méthode.
-   */
+  /** `null` n'est pas une méthode : `total` est celui des seuls porteurs d'une méthode, pas de la population. */
   async byEnrollmentMethod(
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
@@ -262,13 +236,6 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Répartition BDD1–BDD4.
-   *
-   * Le segment est calculé en SQL par `SEGMENT_EXPR`, construit à partir des
-   * mêmes axes que `segmentWhere` : le chiffre du graphique et le contenu de
-   * l'onglet du classeur sortent donc littéralement de la même définition.
-   */
   async bySegment(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<SegmentListDto> {
     const where = prospectConditions(user, filter, await this.demo.enabled());
     const rows = await this.prisma.$queryRaw<
@@ -376,6 +343,5 @@ export class AnalyticsService {
   }
 }
 
-/** Part en pourcentage, arrondie au dixième. Zéro plutôt qu'une division par zéro. */
 const share = (value: number, total: number): number =>
   total === 0 ? 0 : Math.round((value / total) * 1000) / 10;

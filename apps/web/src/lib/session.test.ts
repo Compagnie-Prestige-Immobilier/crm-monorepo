@@ -3,20 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '@/lib/api/config';
 import { mockCookies, type FakeCookieStore } from '@/test/cookie-store';
 
-/**
- * Lecture de session : distinguer « jeton refusé » de « API indisponible ».
- *
- * Régression constatée en conditions réelles, journaux à l'appui :
- *
- *   GET /api/v1/referentiels  429   (limiteur de débit de l'API)
- *   GET /tableau-de-bord      307 → /connexion
- *
- * ...alors que `cpi_at` et `cpi_rt` étaient tous deux valides. La cause : un
- * `catch` qui renvoyait `null` pour n'importe quelle exception. L'utilisateur
- * était déconnecté par une pointe de charge, se reconnectait : consommant le
- * quota de connexion, 10/min : et se faisait éjecter de nouveau.
- */
-
 const ACCESS = 'access.jwt';
 const REFRESH = 'refresh.jwt';
 
@@ -63,7 +49,6 @@ describe('readSession', () => {
   });
 
   it('rend « anonymous » sur un refus formel (401)', async () => {
-    // Un 401 qui survit à la rotation : la famille de jetons est morte.
     fetchMock
       .mockResolvedValueOnce(json({ statusCode: 401 }, 401))
       .mockResolvedValueOnce(json({ statusCode: 401 }, 401)); // refresh refusé
@@ -81,15 +66,12 @@ describe('readSession', () => {
   });
 
   it('rend « unavailable » : PAS « anonymous » : sur un 429', async () => {
-    // LE test de non-régression. Auparavant : `null`, donc redirection vers
-    // /connexion malgré une session parfaitement valide.
     fetchMock.mockResolvedValue(json({ statusCode: 429, message: 'Too Many Requests' }, 429));
     const { readSession } = await import('@/lib/session');
 
     const result = await readSession();
 
     expect(result.status).toBe('unavailable');
-    // Et les cookies restent en place : rien n'est détruit.
     expect(store.raw(ACCESS_COOKIE)?.value).toBe(ACCESS);
     expect(store.raw(REFRESH_COOKIE)?.value).toBe(REFRESH);
   });
@@ -123,8 +105,6 @@ describe('getSession', () => {
     fetchMock.mockResolvedValue(json({ statusCode: 429 }, 429));
     const { getSession } = await import('@/lib/session');
 
-    // La forme binaire est conservée pour l'écran de connexion, qui n'a qu'un
-    // « déjà connecté ou non » à trancher.
     expect(await getSession()).toBeNull();
   });
 

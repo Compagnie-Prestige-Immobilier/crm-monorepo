@@ -21,25 +21,6 @@ import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../../ui/widgets/referentials_banner.dart';
 
-/// Saisie de prospects : l'écran le plus utilisé de l'app.
-///
-/// ## Ce que « rapide » veut dire ici
-///
-/// Un téléconseiller saisit une liste de dix à quarante personnes d'affilée,
-/// pendant qu'un délégué syndical lui dicte des noms. Les trois quarts de ces
-/// personnes partagent la même banque et le même syndicat.
-///
-/// D'où **« Enregistrer et suivant »** : représentant, banque et syndicat restent
-/// pré-remplis d'un prospect au suivant, le focus revient sur « Nom », et il ne
-/// reste que trois champs à taper. Repartir d'un formulaire vierge à chaque fois
-/// multiplierait par deux le nombre de gestes, et surtout obligerait à
-/// re-sélectionner deux listes déroulantes : le geste le plus lent d'un
-/// formulaire tactile.
-///
-/// Le **compteur** et le **retour haptique** ne sont pas décoratifs : sans
-/// confirmation perceptible, l'utilisateur regarde l'écran après chaque
-/// enregistrement pour vérifier qu'il est parti, et c'est ce coup d'œil qui
-/// casse le rythme de la dictée.
 class ProspectEntryScreen extends ConsumerStatefulWidget {
   const ProspectEntryScreen({super.key, this.representantId, this.draftId});
 
@@ -66,8 +47,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   final FocusNode _banqueFocus = FocusNode();
   final FocusNode _syndicatFocus = FocusNode();
 
-  /// Non `final` : l'écran ADOPTE l'identifiant d'un brouillon retrouvé, au lieu
-  /// d'en ouvrir un second et de laisser le premier orphelin.
   late String _draftId = widget.draftId ?? Ids.newId();
 
   String? _representantId;
@@ -93,11 +72,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   @override
   DraftRepository get draftRepository => ref.read(draftRepositoryProvider);
 
-  /// Vide veut dire « rien à sauver », et **choisir une banque et un syndicat
-  /// n'est pas rien** : ce sont les deux gestes les plus coûteux de l'écran, ceux
-  /// que « Enregistrer et suivant » conserve exprès d'un prospect au suivant. Ne
-  /// tester que les trois champs texte faisait jeter en silence exactement la
-  /// partie du formulaire qu'on cherche à protéger.
   @override
   bool get draftIsEmpty =>
       _nom.text.trim().isEmpty &&
@@ -106,9 +80,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
       _banqueId == null &&
       _syndicatId == null;
 
-  /// Le représentant parent voyage déjà dans `?rep=` ; on lui adjoint la
-  /// référence au brouillon, sans quoi un redémarrage rouvre bien le bon parent
-  /// mais avec un formulaire vide.
   @override
   String? draftRouteWithId() => widget.draftId == null && widget.representantId != null
       ? Routes.newProspectFor(widget.representantId!, draftId: _draftId)
@@ -168,28 +139,17 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     super.dispose();
   }
 
-  /// Retrouve la saisie inachevée, quel que soit le chemin d'arrivée.
-  ///
-  /// `_draftId` vaut `widget.draftId ?? Ids.newId()` : ouvert depuis le
-  /// sélecteur de représentant, l'écran tirait un identifiant NEUF et relisait
-  /// sous cet identifiant, qui n'avait par construction jamais rien porté. La
-  /// restauration était en écriture seule. On retombe donc sur le dernier
-  /// brouillon connu de ce formulaire quand l'URL n'en impose aucun.
   Future<void> _restore() async {
     final DraftRepository drafts = ref.read(draftRepositoryProvider);
     DraftSnapshot? snapshot = await drafts.read(_draftId);
     if (snapshot == null && widget.draftId == null) {
       final DraftSnapshot? latest = await drafts.latestFor(formKey);
-      // **Le parent doit correspondre.** Un brouillon saisi pour un autre
-      // représentant remonté ici rattacherait ses prospects à la mauvaise
-      // fiche : c'est-à-dire, au bout de la chaîne, à la mauvaise commission.
       if (latest != null && _acceptsParent(latest)) snapshot = latest;
     }
     if (snapshot != null && mounted) _offer(snapshot);
     await _loadRepresentant();
   }
 
-  /// Le brouillon vise-t-il le représentant courant ?
   bool _acceptsParent(DraftSnapshot snapshot) {
     final String? mine = widget.representantId;
     if (mine == null) return true;
@@ -243,10 +203,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         if (mounted) setState(() => _duplicateName = null);
         return;
       }
-      // Doublon **local uniquement** : ici la vitesse prime, et le serveur
-      // tranchera de toute façon sur son index unique. Une requête réseau par
-      // prospect ralentirait la dictée sans rien apporter que le 409 ne dise
-      // déjà.
       final Prospect? match = await ref
           .read(referenceRepositoryProvider)
           .findProspectByPhone(e164);
@@ -298,18 +254,12 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
           );
 
       discardDraft();
-      // Retour haptique : la confirmation que l'utilisateur perçoit sans
-      // regarder l'écran. C'est ce qui lui permet de garder les yeux sur la
-      // liste qu'on lui dicte.
       await HapticFeedback.mediumImpact();
       ref.read(syncCoordinatorProvider.notifier).nudge();
 
       if (!mounted) return;
       if (andNext) {
         setState(() {
-          // On vide UNIQUEMENT les trois champs propres à la personne.
-          // Représentant, banque et syndicat restent : ce sont eux qui coûtent
-          // le plus cher à re-sélectionner.
           _nom.clear();
           _prenom.clear();
           _phone.clear();
@@ -318,9 +268,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         });
         _nomFocus.requestFocus();
       } else {
-        // Retour à l'écran d'où l'on vient plutôt qu'un saut d'onglet : la
-        // saisie de prospects s'ouvre depuis l'historique comme depuis un
-        // formulaire de représentant.
         popOrHome(context, fallback: Routes.historique);
       }
     } on Object catch (e) {
@@ -334,13 +281,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     }
   }
 
-  /// ═══ ON RECONNAÎT LA COLONNE, PAS LE NOM DE L'INDEX ═══
-  ///
-  /// Le test portait sur `prospects_phone_unique`, le nom de l'index. SQLite ne
-  /// le cite jamais : il rend « UNIQUE constraint failed:
-  /// prospects.phone_e164 ». La phrase lisible était donc morte, et un prospect
-  /// dicté deux fois : ce qui arrive plusieurs fois par liste : renvoyait un
-  /// `SqliteException(2067)` brut au milieu de la dictée.
   static String _humanize(Object error) {
     final String raw = error.toString();
     if (raw.contains('prospects.phone_e164') || raw.contains('prospects_phone_unique')) {
@@ -349,12 +289,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     return 'Enregistrement impossible. $raw';
   }
 
-  /// Un échec d'enregistrement doit être **perçu**, pas seulement affiché.
-  ///
-  /// Pendant une dictée de quarante prospects, les yeux sont sur la liste et pas
-  /// sur l'écran. Le message rendu tout en bas d'une `ListView` défilante ne
-  /// franchissait ni le regard ni le lecteur d'écran : l'appui paraissait sans
-  /// effet, et le commercial passait au suivant en croyant avoir enregistré.
   void _announceFailure(String message) {
     unawaited(
       SemanticsService.sendAnnouncement(
@@ -394,9 +328,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         appBar: AppBar(
           title: const Text('Saisie de prospects'),
           leading: const CpiBackButton(fallback: Routes.historique),
-          // Une dictée de quarante prospects se fait entièrement sur cet écran,
-          // hors coque de navigation : sans cette icône, le commercial n'avait
-          // aucun signal réseau pendant tout ce temps.
           actions: const <Widget>[
             OfflineIndicator(),
             SizedBox(width: CpiSpacing.xs),
@@ -411,27 +342,12 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
             style: theme.textTheme.bodySmall?.copyWith(color: cpi.accentOnDark),
           ),
         ),
-        // ═══ UN SEUL ÉLÉMENT NON DÉFILANT : LA BARRE D'ENREGISTREMENT ═══
-        //
-        // Les deux bandeaux étaient des enfants NON flexibles de cette colonne,
-        // au même titre que la barre. Au plafond réellement atteignable
-        // (Android à 1,3 × « Très grand » à 1,35, soit 1,755), le bandeau des
-        // référentiels réclamait à lui seul 367 px sur un 320 dp : avec les
-        // 302 px de la barre, la colonne débordait de son écran avant même
-        // d'avoir posé un champ.
-        //
-        // Tout ce qui n'est pas la barre entre donc dans le défilement. La
-        // barre reste épinglée, parce que c'est elle qui porte le message
-        // d'échec : le rendre défilant est précisément le défaut qu'on a
-        // corrigé ailleurs.
         body: SafeArea(
           child: Column(
             children: <Widget>[
               Expanded(
                 child: CustomScrollView(
                   slivers: <Widget>[
-                    // Sans banque NI syndicat, « Enregistrer » ne peut pas
-                    // s'activer.
                     SliverToBoxAdapter(
                       child: ReferentialsBanner(
                         missing: banques.isEmpty || syndicats.isEmpty,
@@ -441,14 +357,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
                       SliverToBoxAdapter(
                         child: _ResumeStrip(
                           onResume: () => _apply(_pendingRestore!),
-                          // L'identifiant du brouillon RETROUVÉ, pas celui de
-                          // l'écran. L'adoption n'a lieu que dans `_apply` :
-                          // arrivé par `latestFor`, `_draftId` est encore
-                          // l'identifiant neuf tiré au montage, et la
-                          // suppression ne touchait aucune ligne. La bannière
-                          // disparaissait, le brouillon survivait, et la même
-                          // saisie périmée revenait à chaque ouverture pendant
-                          // sept jours.
                           onDiscard: () async {
                             await ref
                                 .read(draftRepositoryProvider)
@@ -458,9 +366,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
                         ),
                       ),
                     if (_representantId == null)
-                      // `SliverFillRemaining` et non un simple bloc : l'état
-                      // vide reste centré tant qu'il y a de la place, et se met
-                      // à défiler quand il n'y en a plus, au lieu de déborder.
                       const SliverFillRemaining(
                         hasScrollBody: false,
                         child: _MissingRepresentant(),
@@ -622,9 +527,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
                   ),
                   child: Column(
                     children: <Widget>[
-                      // L'échec voyage AVEC les boutons. Rendu en bas d'une
-                      // liste défilante, il n'était visible que si l'on s'y
-                      // trouvait déjà : ailleurs, l'appui semblait sans effet.
                       if (_error != null) ...<Widget>[
                         Semantics(
                           liveRegion: true,
@@ -671,24 +573,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   }
 }
 
-/// Le bandeau de contexte sous le titre : représentant courant et compteur.
-///
-/// ═══ POURQUOI SA HAUTEUR EST MESURÉE ET NON FIXÉE ═══
-///
-/// C'était un `PreferredSize(Size.fromHeight(28))`. 28 px, c'est une ligne de
-/// `bodySmall` à la taille de texte 1,0 : à « Très grand » (1,8), la même ligne
-/// en réclame 39 et la barre débordait de 11 px. Un `PreferredSize` ne
-/// s'adapte pas tout seul : sa hauteur est une constante que `Scaffold` réserve
-/// pour la barre entière, et le texte qu'on lui confie, lui, grandit.
-///
-/// La hauteur est donc MESURÉE par un `TextPainter` réglé exactement comme le
-/// `Text` rendu ensuite : même style, même échelle, même largeur utile, même
-/// `maxLines`. On la calcule ici, dans le `build` de l'écran, parce que c'est
-/// le seul endroit où l'on dispose à la fois du contexte et du texte.
-///
-/// Deux lignes autorisées : un nom long suivi du compteur ne tient pas sur une
-/// seule à 320 dp, et tronquer ferait disparaître le compteur, or c'est lui qui
-/// dit au commercial où il en est dans sa dictée.
 PreferredSizeWidget _contextStrip(
   BuildContext context, {
   required String text,
@@ -732,11 +616,6 @@ class _MissingRepresentant extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    // `Center` + `MainAxisSize.min` plutôt qu'`Expanded` : cet état vide vit
-    // maintenant dans un `SliverFillRemaining`, qui lui donne au moins la
-    // hauteur restante et le laisse grandir au-delà. Un `Expanded` y serait une
-    // erreur de contrat, et une colonne `max` déborderait dès que le texte
-    // grandit plus vite que l'écran.
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(CpiSpacing.xl),
@@ -756,10 +635,6 @@ class _MissingRepresentant extends StatelessWidget {
             ),
             const SizedBox(height: CpiSpacing.lg),
             FilledButton(
-              // Repli sur le SÉLECTEUR de représentants, pas sur l'historique :
-              // le bouton dit « Voir mes représentants », et l'historique est
-              // une liste de saisies. Le libellé promettait un écran, le repli
-              // en ouvrait un autre.
               onPressed: () => popOrHome(context, fallback: Routes.representants),
               child: const Text('Voir mes représentants'),
             ),
@@ -786,10 +661,6 @@ class _ResumeStrip extends StatelessWidget {
         horizontal: CpiSpacing.md,
         vertical: CpiSpacing.xxs,
       ),
-      // Les deux actions sous le message, dans un `Wrap` : côte à côte dans le
-      // `Row` du message, elles réclamaient leur largeur intrinsèque avant
-      // l'`Expanded` et ne laissaient au texte que quelques dizaines de pixels,
-      // sur lesquels il se repliait jusqu'à faire déborder l'écran.
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

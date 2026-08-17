@@ -2,19 +2,13 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { DEMO_EXEMPTIONS_SENTENCE } from '../../common/decorators/demo-writable.decorator.js';
 
-/** Décompte de ce que le mode démonstration a réellement créé. */
 export class DemoCountsDto {
   @ApiProperty() users!: number;
   @ApiProperty() representants!: number;
   @ApiProperty() prospects!: number;
   @ApiProperty() campaigns!: number;
-  /**
-   * Rattachements commercial↔campagne. Sans intérêt pour l'interface, mais
-   * compté quand même : l'invariant « le registre compte exactement autant de
-   * lignes que la somme des compteurs » est ce qui garantit qu'aucune entité
-   * n'a été créée sans être tracée, donc qu'aucune ne survivra à la
-   * désactivation.
-   */
+  // Sans intérêt pour l'interface, compté pour que la somme des compteurs égale le registre :
+  // c'est ce qui prouve qu'aucune entité n'a été créée sans être tracée.
   @ApiProperty() campaignCommerciaux!: number;
   @ApiProperty() callTasks!: number;
   @ApiProperty() callAttempts!: number;
@@ -22,24 +16,6 @@ export class DemoCountsDto {
   @ApiProperty() bankCaseTransitions!: number;
 }
 
-/**
- * État du mode démonstration.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * ALLUMER LE MODE SUSPEND LES ÉCRITURES DE TOUTE LA PLATEFORME
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Ce n'est plus une bascule d'affichage seulement, et l'interface DOIT le dire
- * avant la confirmation, pas après. `demo_mode` est UN SEUL réglage, global au
- * serveur : il n'a ni portée par utilisateur ni portée par session. Quand un
- * administrateur l'allume pour une réunion, il l'allume pour tout le monde.
- *
- * La règle précédente coloriait chaque création en `isDemo` selon l'état de
- * l'interrupteur. Sur un interrupteur global, elle faisait DISPARAÎTRE le
- * travail réel des commerciaux qui synchronisaient pendant la fenêtre : leurs
- * fiches devenaient invisibles à l'extinction, et la purge ne savait pas les
- * reprendre. Suspendre les écritures est la réponse retenue.
- */
 export class DemoStatusDto {
   @ApiProperty({
     description:

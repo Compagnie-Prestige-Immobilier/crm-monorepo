@@ -6,23 +6,6 @@ import type * as InboxModule from '@/lib/data/inbox';
 import { INBOX_SCREEN_PAGE_SIZE } from '@/lib/data/inbox';
 import { renderWithQuery } from '@/test/render-query';
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * La vingt-et-unième notification devait redevenir ATTEIGNABLE.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Le panneau de la cloche ne montre que les vingt dernières lignes, et son code
- * annonçait « au-delà, un lien vers l'écran complet ». Ce lien n'existait pas,
- * et `/notifications` était le COMPOSEUR, réservé à l'ADMIN. Une notification
- * tombée en vingt-et-unième position était donc définitivement hors de portée,
- * pour un téléconseiller comme pour un agent bancaire.
- *
- * Le test ne se contente pas de constater qu'un bouton « Page suivante »
- * existe : il vérifie que le CONTENU de la seconde page arrive, et que la
- * requête part bien avec `page: 2`. Un bouton qui n'incrémenterait rien aurait
- * exactement la même allure.
- */
-
 const fetchInboxPage = vi.fn();
 
 vi.mock('@/lib/data/inbox', async () => {
@@ -71,12 +54,6 @@ const page = (n: number) => ({
   },
 });
 
-/**
- * L'écran est PILOTÉ par son parent : `page` est une prop, pas un état interne,
- * parce que la page vit dans l'URL. On éprouve donc les deux moitiés
- * séparément : que l'activation demande bien la page suivante, et que la page
- * demandée soit bien rendue.
- */
 describe('InboxView, pagination', () => {
   beforeEach(() => {
     fetchInboxPage.mockImplementation(
@@ -90,8 +67,6 @@ describe('InboxView, pagination', () => {
     );
 
     expect(await screen.findByText('Annonce numéro 1')).toBeTruthy();
-    // La vingt-et-unième n'est PAS sur la première page : c'est précisément le
-    // cas que la cloche seule ne savait pas montrer.
     expect(screen.queryByText(`Annonce numéro ${String(TOTAL)}`)).toBeNull();
     expect(screen.getByText(new RegExp(`${String(TOTAL)} notifications`))).toBeTruthy();
   });

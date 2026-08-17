@@ -1,13 +1,5 @@
 import { z } from 'zod';
 
-/**
- * Contrat d'environnement de l'API. Le fichier `.env.example` à la racine du
- * dépôt documente chacune de ces clés ; les deux doivent rester synchronisés.
- *
- * Toute anomalie fait échouer le démarrage. Un secret trop court n'est pas une
- * dégradation acceptable : c'est une clé de signature connue mise en ligne.
- */
-
 const originList = z
   .string()
   .default('http://localhost:3000')
@@ -35,8 +27,6 @@ const originList = z
     return origins;
   });
 
-// z.coerce.boolean() transforme la chaîne "false" en true, ce qui inverse
-// silencieusement tout drapeau d'opt-out. On analyse le littéral.
 const booleanFlag = (fallback: boolean) =>
   z
     .enum(['true', 'false'])
@@ -45,29 +35,19 @@ const booleanFlag = (fallback: boolean) =>
 
 export const envSchema = z
   .object({
-    // Volontairement requis : un NODE_ENV absent doit faire échouer le
-    // démarrage plutôt que de dégrader silencieusement une production.
     NODE_ENV: z.enum(['development', 'test', 'production']),
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .default('info'),
 
-    // --- API ---
     PORT: z.coerce.number().int().positive().default(3001),
     PUBLIC_WEB_URL: z.url().default('http://localhost:3000'),
     API_CORS_ORIGINS: originList,
     API_DOCS_ENABLED: booleanFlag(false),
-    // À n'activer que derrière un proxy qui réécrit X-Forwarded-For : sinon
-    // l'IP utilisée par le throttler devient falsifiable.
     API_TRUST_PROXY_HEADERS: booleanFlag(false),
 
-    // --- Données ---
     DATABASE_URL: z.url(),
 
-    // --- Authentification ---
-    // 32 caractères minimum. Les valeurs d'exemple sont plus courtes exprès :
-    // une copie non éditée de .env.example échoue ici au lieu d'expédier une
-    // clé de signature publiquement connue.
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
     JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
     JWT_ACCESS_TTL: z.string().min(1).default('15m'),
@@ -75,11 +55,7 @@ export const envSchema = z
     AUTH_LOGIN_RATE_LIMIT: z.coerce.number().int().positive().default(10),
     API_GLOBAL_RATE_LIMIT: z.coerce.number().int().positive().default(300),
 
-    // --- Règles métier ---
     BUSINESS_TIME_ZONE: z.string().min(1).default('Africa/Dakar'),
-    // Région utilisée pour interpréter un numéro saisi au format local. C'est
-    // la clé de déduplication : elle doit correspondre à la valeur compilée
-    // dans l'app mobile.
     PHONE_DEFAULT_REGION: z
       .string()
       .regex(/^[A-Z]{2}$/, 'PHONE_DEFAULT_REGION must be an ISO 3166-1 alpha-2 code')
@@ -87,41 +63,13 @@ export const envSchema = z
     SYNC_MAX_BATCH_SIZE: z.coerce.number().int().positive().max(2000).default(200),
     IDEMPOTENCY_TTL_DAYS: z.coerce.number().int().positive().default(7),
 
-    // APK Android servi depuis le volume persistant du VPS. Le chemin doit
-    // être monté hors de l'image : un redeploy ne doit jamais effacer la
-    // dernière release disponible.
     APK_RELEASE_DIR: z.string().min(1).default('./storage/releases'),
     APK_MAX_SIZE_BYTES: z.coerce.number().int().positive().max(1_073_741_824).default(524_288_000),
 
-    // Export intégral de la base, servi depuis un volume persistant, EXACTEMENT
-    // comme les APK ci-dessus et pour la même raison : le fichier survit à
-    // l'image. Il ne survit pas longtemps pour autant, `db-dump.job.ts` le
-    // détruit à l'échéance ou au premier téléchargement.
     DB_DUMP_DIR: z.string().min(1).default('./storage/db-dumps'),
 
-    // Interrupteur de la fonctionnalité elle-même, ÉTEINT PAR DÉFAUT, dans le
-    // même esprit que DEMO_MODE_ALLOWED plus bas : une clé d'environnement,
-    // hors de portée de l'interface, sans laquelle les routes n'existent pas.
-    //
-    // Ce n'est pas un réglage de confort. La fonctionnalité produit un second
-    // exemplaire complet de la clientèle sur un volume ; tant que la chaîne
-    // entière (unicité du travail, unicité de la livraison, borne de vie du
-    // fichier à travers les redémarrages) n'est pas jugée sûre pour un parc
-    // donné, la bonne posture est qu'elle soit INACCESSIBLE, et non simplement
-    // réservée aux ADMIN. Un déploiement qui ne pose pas cette variable rend
-    // 404 sur les trois routes, ce qui est l'état par défaut voulu.
-    //
-    // La garde `DbDumpEnabledGuard` l'applique à l'exécution. Le contrat
-    // OpenAPI, lui, décrit les routes en permanence : le désenregistrement du
-    // module les ferait disparaître du contrat généré (le générateur tourne
-    // sans cette variable), et le client web ne compilerait plus.
     DB_DUMP_ENABLED: booleanFlag(false),
 
-    // Garde-fou du mode démonstration. L'interrupteur lui-même vit en base
-    // (table app_settings) et se manœuvre depuis le panel admin ; cette
-    // variable est distincte et volontairement hors de portée de l'interface :
-    // en production, activer la démonstration reste refusé tant qu'elle ne vaut
-    // pas true. Des prospects fictifs dans un export réel seraient un incident.
     DEMO_MODE_ALLOWED: z
       .enum(['true', 'false'])
       .default('false')
@@ -161,10 +109,4 @@ export type ApiEnv = z.infer<typeof envSchema>;
 
 export const readEnv = (source: NodeJS.ProcessEnv = process.env): ApiEnv => envSchema.parse(source);
 
-/**
- * Vrai pendant `pnpm openapi:generate`. Le générateur instancie le conteneur
- * Nest complet pour lire les métadonnées Swagger, mais ne doit jamais ouvrir de
- * connexion : avec Prisma 7 + @prisma/adapter-pg le pool pg est créé
- * immédiatement, et la génération se bloquerait sans base joignable.
- */
 export const isOpenApiGeneration = (): boolean => process.env.OPENAPI_GENERATION === '1';

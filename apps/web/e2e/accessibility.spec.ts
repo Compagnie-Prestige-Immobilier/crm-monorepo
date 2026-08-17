@@ -32,7 +32,7 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   ['/demandes-clients', 'Demandes clients', null],
   ['/representants', 'Représentants', null],
   ['/representants/import', 'Représentants', 'Partir du modèle'],
-  ['/commerciaux', 'Téléconseillers', null],
+  ['/commerciaux', 'Utilisateurs', null],
   ['/supervision', 'Supervision', null],
   ['/referentiels', 'Référentiels', null],
   ['/parametres', 'Paramètres', null],

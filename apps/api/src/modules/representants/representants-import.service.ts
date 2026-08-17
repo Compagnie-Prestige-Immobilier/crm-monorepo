@@ -16,56 +16,22 @@ import type {
   ImportRowPreviewDto,
 } from './dto.js';
 
-/**
- * Import de masse des représentants, depuis un classeur Excel.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * DEUX TEMPS, ET LE PREMIER EST OBLIGATOIRE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `dryRun` vaut VRAI par défaut. Ce n'est pas une précaution décorative : un
- * classeur de 4 000 lignes rempli à la main contient toujours des numéros
- * malformés, des départements mal orthographiés et des doublons internes. Les
- * appliquer sans les avoir vus produit 4 000 fiches dont personne ne sait
- * lesquelles sont bonnes, et la suppression logique ne les fait pas disparaître
- * des index d'unicité du téléphone. Le premier temps RAPPORTE, le second écrit.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * TROIS FAMILLES DE DOUBLONS, TOUTES SUR LE TÉLÉPHONE NORMALISÉ
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * 1. le fichier contre LUI-MÊME : deux lignes du même classeur, souvent avec
- *    deux orthographes du même nom ;
- * 2. le fichier contre la BASE : la fiche existe déjà, saisie en tournée ;
- * 3. la base contre elle-même, qui est impossible, parce que l'index unique
- *    partiel `representants_phone_e164_active_key` l'interdit.
- *
- * Les deux premières sont détectées ICI, sur la forme E.164, et non sur la
- * chaîne saisie : « 77 123 45 67 » et « +221771234567 » sont le même abonné.
- * Les compter comme deux personnes distinctes est précisément l'erreur que la
- * normalisation existe pour empêcher.
- */
+/** Import Excel avec simulation préalable et dédoublonnage du téléphone normalisé. */
 
-/** Plafond de lignes. Au-delà, le classeur relève d'une reprise de données, pas d'un import. */
+/** Au-delà, utiliser un outil de reprise plutôt qu'un import. */
 export const IMPORT_MAX_ROWS = 5_000;
 
-/** Plafond de taille du fichier. Un classeur de représentants légitime pèse quelques centaines de Ko. */
+/** Refuse les classeurs trop volumineux avant leur lecture. */
 export const IMPORT_MAX_BYTES = 10 * 1_024 * 1_024;
 
-/**
- * Délais de la transaction d'écriture.
- *
- * Prisma applique 5 s / 2 s par défaut, ce qu'une insertion de 5 000 lignes
- * dépasse sur une base chargée. Les autres chemins de masse du dépôt (tirage
- * de campagne, purge administrative) relèvent déjà ces bornes.
- */
+/** Bornes de la transaction d'écriture massive. */
 const IMPORT_TRANSACTION_TIMEOUT_MS = 60_000;
 const IMPORT_TRANSACTION_MAX_WAIT_MS = 15_000;
 
-/** Nombre d'erreurs détaillées renvoyées. Au-delà, la liste cesse d'être lisible. */
+/** Limite la liste d'erreurs renvoyée à l'utilisateur. */
 const MAX_REPORTED_ERRORS = 200;
 
-/** Nombre de lignes valides renvoyées pour la prévisualisation. */
+/** Cap preview rows returned to the user. */
 const MAX_PREVIEW_ROWS = 50;
 
 /**

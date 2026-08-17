@@ -17,9 +17,6 @@ export function ChartCard({
   const chartRegion = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Chart.js marks canvas as role=img but has no knowledge of the chart
-    // title. The surrounding labelled region is the accessible name; the
-    // canvas itself is presentation so axe does not report a missing alt.
     chartRegion.current?.querySelector('canvas')?.setAttribute('role', 'presentation');
   }, []);
 

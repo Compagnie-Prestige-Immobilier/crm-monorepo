@@ -10,47 +10,23 @@ import { readEnv } from '../../env.js';
 import { hashPassword, verifyPassword } from './password.js';
 import type { AuthTokensDto, AuthUserDto } from './dto.js';
 
-/**
- * Condensat SHA-256 du refresh token.
- *
- * La table `refresh_tokens` ne contient JAMAIS le jeton en clair : une fuite de
- * la base ne livre donc aucune session utilisable. SHA-256 nu (et non argon2)
- * suffit ici, contrairement à un mot de passe, le jeton est une valeur
- * aléatoire de haute entropie, insensible aux attaques par dictionnaire, et la
- * vérification doit rester assez rapide pour tenir sur le chemin de refresh.
- */
+// `refresh_tokens` ne stocke JAMAIS le jeton en clair. SHA-256 nu et non argon2 :
+// le jeton est déjà une valeur aléatoire de haute entropie, et le refresh doit rester rapide.
 export const hashRefreshToken = (token: string): string =>
   createHash('sha256').update(token).digest('hex');
 
-/**
- * Condensat argon2 factice, utilisé quand l'identifiant est inconnu.
- *
- * Sans lui, une requête sur un compte inexistant répondrait beaucoup plus vite
- * qu'une requête sur un compte existant avec un mauvais mot de passe : l'écart
- * suffit à énumérer les comptes valides. On paie donc toujours le coût d'une
- * vérification argon2.
- */
+// Condensat factice payé quand l'identifiant est inconnu : sans lui, un compte
+// inexistant répondrait plus vite qu'un mauvais mot de passe, et se laisserait énumérer.
 let decoyDigest: string | undefined;
 async function decoy(): Promise<string> {
   decoyDigest ??= await hashPassword(randomUUID());
   return decoyDigest;
 }
 
-/**
- * Phrase rendue quand un compte de démonstration se présente hors démonstration.
- *
- * Elle nomme la cause ET le remède : « ce compte est désactivé » enverrait
- * l'animateur vers un administrateur qui ne trouverait rien à réactiver.
- */
 export const DEMO_SESSION_REFUSED =
   'Ce compte de démonstration n’est utilisable que pendant une démonstration. ' +
   'Demandez à un administrateur d’activer le mode démonstration.';
 
-/**
- * `typ` est déclaré `string` : le contenu d'un jeton vérifié reste une donnée
- * externe. Le typer en littéral ferait considérer le contrôle de `typ` comme
- * mort alors qu'il empêche un jeton d'accès de passer pour un refresh token.
- */
 interface RefreshTokenPayload {
   sub: string;
   jti: string;
@@ -68,63 +44,10 @@ export class AuthService {
     private readonly demo: DemoVisibilityService,
   ) {}
 
-  /**
-   * UN COMPTE DE DÉMONSTRATION NE VIT QUE PENDANT LA DÉMONSTRATION.
-   *
-   * ═══════════════════════════════════════════════════════════════════════════
-   * LA PORTE QUI N'EXISTAIT PAS
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * Les six comptes semés sont créés `isActive: true`, et RIEN ne remettait
-   * jamais ce drapeau à `false` : `disable()` ne supprime rien et ne désactive
-   * rien, c'est même sa raison d'être. Or `isDemo` ne gouverne que la
-   * VISIBILITÉ DES LIGNES, jamais la SESSION. Conséquence : une fois la
-   * démonstration éteinte, `demo.admin@cpi.sn` restait connectable avec
-   * `DEMO_PASSWORD`, une constante publiée dans ce dépôt, et la session ADMIN
-   * ainsi ouverte lisait et écrivait les données RÉELLES de production.
-   *
-   * ═══════════════════════════════════════════════════════════════════════════
-   * POURQUOI ICI, ET NON EN BASCULANT `isActive`
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * Éteindre les comptes dans `disable()` et les rallumer dans `enable()` était
-   * l'autre forme possible. Elle est refusée pour trois raisons :
-   *
-   *   · elle crée une SECONDE source de vérité, qui peut diverger du réglage.
-   *     Un processus tué entre les deux écritures, une purge, une restauration
-   *     de sauvegarde, et les comptes restent ouverts sans que rien ne le dise ;
-   *   · elle DÉTRUIT de l'information : un administrateur qui a désactivé à la
-   *     main un compte de démonstration le verrait réactivé au rallumage
-   *     suivant, sans trace de sa décision ;
-   *   · elle ne ferme QUE la connexion, pas les sessions déjà ouvertes.
-   *
-   * Décider au moment où une session est ÉMISE ne peut pas diverger : la
-   * réponse est toujours celle du réglage courant. `isActive` garde son sens
-   * d'origine, une décision d'administrateur.
-   *
-   * ═══════════════════════════════════════════════════════════════════════════
-   * `unknown` REFUSE
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * `state()` et non `enabled()` : une lecture de réglage en échec ne doit pas
-   * rendre `false` et laisser croire le mode éteint... ni l'inverse. Ici le
-   * doute REFUSE, parce que les deux erreurs ne se valent pas. Refuser à tort
-   * coûte une connexion de démonstration à retenter ; accepter à tort ouvre une
-   * session ADMIN sur la production avec un mot de passe public.
-   *
-   * CE QUE CELA NE COUVRE PAS, et c'est assumé : un jeton d'accès déjà émis
-   * reste valable jusqu'à son expiration, quinze minutes par défaut
-   * (`JWT_ACCESS_TTL`). Le refresh, lui, est refusé ET révoque la famille, si
-   * bien qu'un appareil resté ouvert pendant l'extinction est débranché au
-   * premier renouvellement.
-   */
   private async assertDemoSessionAllowed(user: { isDemo: boolean }): Promise<void> {
     if (!user.isDemo) return;
     if ((await this.demo.state()) === 'on') return;
 
-    // MÊME CODE que le compte désactivé : le client a déjà le bon
-    // comportement pour ce code, et un code neuf n'apprendrait rien à
-    // l'utilisateur tout en élargissant le contrat.
     throw new UnauthorizedException({
       code: 'ACCOUNT_DISABLED',
       message: DEMO_SESSION_REFUSED,
@@ -143,9 +66,6 @@ export class AuthService {
       },
     });
 
-    // Message strictement identique pour « compte inconnu » et « mot de passe
-    // faux » : le distinguer transformerait le formulaire de connexion en
-    // oracle d'existence de compte.
     const digest = user?.passwordHash ?? (await decoy());
     const ok = await verifyPassword(digest, password);
     if (!user || !ok) {
@@ -155,9 +75,6 @@ export class AuthService {
       });
     }
 
-    // Le compte désactivé est distingué : ce n'est pas une information sur
-    // l'existence d'un compte, elle n'est délivrée qu'après authentification
-    // réussie, et l'utilisateur doit comprendre qu'il doit appeler l'admin.
     if (!user.isActive) {
       throw new UnauthorizedException({
         code: 'ACCOUNT_DISABLED',
@@ -165,8 +82,6 @@ export class AuthService {
       });
     }
 
-    // APRÈS la vérification du mot de passe, comme le contrôle ci-dessus : le
-    // refus ne doit rien apprendre à qui ne connaît pas déjà le secret.
     await this.assertDemoSessionAllowed(user);
 
     await this.prisma.user.update({
@@ -177,15 +92,8 @@ export class AuthService {
     return this.issue(user, randomUUID(), userAgent);
   }
 
-  /**
-   * Rotation du refresh token, avec détection de rejeu par famille.
-   *
-   * Chaque rotation crée un jeton dans la MÊME famille. Représenter un jeton
-   * déjà consommé signifie qu'il a été copié : on ne sait pas si c'est le
-   * client légitime ou le voleur qui se présente, donc on révoque toute la
-   * famille. Le pire cas est une reconnexion ; l'alternative serait de laisser
-   * une session volée vivre indéfiniment.
-   */
+  // Rotation dans la MÊME famille. Un jeton déjà consommé qui se represente est un
+  // rejeu : on ne sait pas qui du client ou du voleur parle, donc toute la famille tombe.
   async refresh(presented: string, userAgent?: string): Promise<AuthTokensDto> {
     const env = readEnv();
     let payload: RefreshTokenPayload;
@@ -245,10 +153,6 @@ export class AuthService {
       });
     }
 
-    // La famille est révoquée AVANT le refus : l'appareil resté ouvert pendant
-    // l'extinction ne doit pas pouvoir retenter indéfiniment avec le même
-    // jeton. C'est ce qui fait mourir les sessions de démonstration déjà
-    // émises, que le seul contrôle de `login` laisserait vivre.
     if (stored.user.isDemo && (await this.demo.state()) !== 'on') {
       await this.revokeFamily(stored.familyId);
       throw new UnauthorizedException({
@@ -265,13 +169,10 @@ export class AuthService {
     return this.issue(stored.user, stored.familyId, userAgent);
   }
 
-  /** Révoque la famille du jeton présenté : la déconnexion vaut pour l'appareil entier. */
   async logout(presented: string): Promise<boolean> {
     const stored = await this.prisma.refreshToken.findUnique({
       where: { tokenHash: hashRefreshToken(presented) },
     });
-    // Idempotent et muet : un jeton inconnu ne renseigne pas l'appelant sur
-    // les sessions actives.
     if (!stored) return false;
     await this.revokeFamily(stored.familyId);
     return true;
@@ -306,8 +207,6 @@ export class AuthService {
         role: user.role,
         typ: 'access',
       },
-      // Durée exprimée en secondes plutôt qu'en « 15m » : jsonwebtoken accepte
-      // les deux, mais le nombre évite de dépendre du type littéral de `ms`.
       { secret: env.JWT_ACCESS_SECRET, expiresIn: ttlToSeconds(env.JWT_ACCESS_TTL) },
     );
 
@@ -337,7 +236,6 @@ export class AuthService {
   }
 }
 
-/** Convertit `15m`, `3600`, `2h`, `7d` en secondes, pour l'exposer au client. */
 export function ttlToSeconds(ttl: string): number {
   const match = /^(\d+)\s*([smhd]?)$/.exec(ttl.trim());
   if (!match) return 900;

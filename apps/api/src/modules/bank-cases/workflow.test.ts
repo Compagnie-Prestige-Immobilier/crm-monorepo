@@ -12,16 +12,6 @@ import {
 } from './workflow.js';
 import type { WorkflowStage } from './workflow.js';
 
-/**
- * Les règles financières, éprouvées SANS base de données.
- *
- * C'est le seul endroit du module où l'on peut passer en revue toutes les
- * combinaisons d'étape, de montant et de motif : ce sont des fonctions pures.
- * Un test qui passerait par HTTP et Postgres pour vérifier « un rejet force le
- * montant à zéro » couvrirait la même règle dix fois plus lentement et
- * échouerait pour dix raisons étrangères à la règle.
- */
-
 const stage = (over: Partial<WorkflowStage> & { id: string }): WorkflowStage => ({
   code: over.id.toUpperCase(),
   label: over.id,
@@ -47,7 +37,6 @@ const STAGES = [aTraiter, enTraitement, encaisse, rejete];
 const codeOf = (error: unknown): unknown =>
   (((error as { response?: unknown }).response ?? {}) as { code?: unknown }).code;
 
-/** Capture l'exception et rend son code métier, ou échoue si rien n'est levé. */
 function refusalCode(run: () => unknown): unknown {
   try {
     run();
@@ -124,18 +113,12 @@ describe('atteignabilité', () => {
     ).toBe(BankCaseError.STAGE_NOT_NEXT);
   });
 
-  /**
-   * Le réordonnancement ne touche QUE le futur : `nextOpenStage` relit les
-   * positions à chaque appel et ne consulte jamais l'historique, qui référence
-   * les étapes par identifiant.
-   */
   it('réordonner change l’étape suivante SANS toucher aux transitions déjà écrites', () => {
     const instruction = stage({ id: 'instruction', position: 2 });
     const validation = stage({ id: 'validation', position: 3 });
     const avant = [aTraiter, instruction, validation, encaisse, rejete];
     expect(nextOpenStage(avant, aTraiter)?.id).toBe('instruction');
 
-    // Même étapes, positions permutées : c'est tout ce que fait `reorder`.
     const apres = [
       aTraiter,
       { ...validation, position: 2 },
@@ -145,8 +128,6 @@ describe('atteignabilité', () => {
     ];
     expect(nextOpenStage(apres, aTraiter)?.id).toBe('validation');
 
-    // Une transition déjà écrite porte des identifiants d'étape, jamais des
-    // positions : la relire après permutation donne exactement le même sens.
     const historique = { fromStageId: aTraiter.id, toStageId: instruction.id };
     expect(apres.find((item) => item.id === historique.toStageId)?.label).toBe('instruction');
   });
@@ -190,11 +171,6 @@ describe('règles financières', () => {
     );
   });
 
-  /**
-   * Le cœur de la règle : le montant d'un rejet n'est jamais lu depuis le
-   * client. Sans ce forçage, « rejeté, 1 200 000 » entrerait dans la somme
-   * encaissée du tableau de bord.
-   */
   it('REJETE force le montant à zéro côté serveur, même si le client en envoie un', () => {
     const effect = planTransitionEffect(
       rejete,
@@ -210,7 +186,6 @@ describe('règles financières', () => {
       refusalCode(() => planTransitionEffect(rejete, { rejectionReasonId: 'r-autre' }, 'AUTRE')),
     ).toBe(BankCaseError.REJECTION_DETAIL_REQUIRED);
 
-    // Une précision faite d'espaces ne renseigne personne : elle est refusée aussi.
     expect(
       refusalCode(() =>
         planTransitionEffect(

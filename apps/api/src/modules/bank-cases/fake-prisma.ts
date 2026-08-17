@@ -3,30 +3,6 @@ import { BankStageType, Phase2Status, Role } from '@crm/database';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 
-/**
- * Doublure Prisma en mémoire pour Banque & Finance.
- *
- * POURQUOI UNE DOUBLURE QUI *INTERPRÈTE* PLUTÔT QUE DES `vi.fn()` FIGÉS.
- *
- * Les invariants de ce module, unicité de la référence, garde de révision,
- * verrou terminal, copie d'identité, ne sont pas des appels à Prisma : ce sont
- * des CONSÉQUENCES d'un enchaînement lecture/écriture. Une doublure qui rendrait
- * toujours la même ligne les vérifierait tous « vrais » sans rien démontrer :
- * un `updateMany` qui répond `{count: 1}` quoi qu'on lui passe fait passer le
- * test de conflit de révision alors même que la garde aurait été supprimée du
- * code.
- *
- * Cette doublure applique donc réellement le `where` sur un petit magasin
- * mémoire, fait respecter l'unicité de `referenceKey` en levant un P2002
- * authentique, et hydrate les `include` comme le ferait Prisma.
- *
- * Ce qu'elle ne peut PAS faire, et qu'on ne lui demande pas : exécuter le SQL
- * brut de la liste, des agrégats et de l'export. Ces chemins-là sont couverts
- * par `bank-cases.integration.test.ts`, contre un vrai PostgreSQL, c'est le
- * seul moyen honnête de prouver que le tableau de bord et la liste comptent le
- * même ensemble.
- */
-
 export interface FakeStage {
   id: string;
   code: string;
@@ -122,7 +98,6 @@ const stage = (
   updatedAt: BASE,
 });
 
-/** Les quatre étapes réellement semées en base de développement. */
 export const STAGE_A_TRAITER = stage(
   'stg-a-traiter',
   'A_TRAITER',
@@ -195,7 +170,6 @@ export const ADMIN: FakeUser = {
 
 type Where = Record<string, unknown>;
 
-/** Erreur d'unicité telle que Prisma la remonte. `isPrismaKnownError` la reconnaît. */
 export class FakeUniqueViolation extends Error {
   readonly code = 'P2002';
   readonly meta = { target: ['referenceKey'], modelName: 'BankCase' };
@@ -222,11 +196,6 @@ export class FakePrisma {
   cases: FakeCase[] = [];
   transitions: FakeTransition[] = [];
 
-  /**
-   * Simule l'insertion concurrente d'un autre agent : appelée juste avant que
-   * `bankCase.create` ne contrôle l'unicité, elle reproduit exactement la
-   * fenêtre entre le pré-contrôle du service et l'écriture réelle.
-   */
   onBeforeCaseCreate: (() => void) | undefined;
 
   private sequence = 0;
@@ -279,8 +248,6 @@ export class FakePrisma {
     return row;
   }
 
-  // ─── Hydratation des `include` ────────────────────────────────────────────
-
   private hydrateCase(row: FakeCase): unknown {
     return {
       ...row,
@@ -302,7 +269,6 @@ export class FakePrisma {
     };
   }
 
-  /** Applique les formes de `where` que ce module produit réellement. */
   private matchesCase(row: FakeCase, where: Where): boolean {
     for (const [key, expected] of Object.entries(where)) {
       if (expected === undefined) continue;
@@ -319,8 +285,6 @@ export class FakePrisma {
     }
     return true;
   }
-
-  // ─── Surface Prisma consommée par le module ───────────────────────────────
 
   readonly bankCase = {
     findFirst: ({ where, include }: { where: Where; include?: unknown }): Promise<unknown> => {
@@ -346,8 +310,6 @@ export class FakePrisma {
     }): Promise<unknown> => {
       this.onBeforeCaseCreate?.();
       const referenceKey = data.referenceKey as string;
-      // Contrainte d'unicité réelle : c'est elle qui produit le P2002 que le
-      // service doit rattraper, et non un `mockRejectedValue` posé à la main.
       if (
         this.cases.some((item) => item.referenceKey === referenceKey && item.deletedAt === null)
       ) {
@@ -396,7 +358,6 @@ export class FakePrisma {
         }
         row.updatedAt = this.clock();
       }
-      // Unicité contrôlée après coup, comme le ferait la base sur un UPDATE.
       const keys = this.cases
         .filter((item) => item.deletedAt === null)
         .map((item) => item.referenceKey);
@@ -425,9 +386,6 @@ export class FakePrisma {
     },
 
     findMany: ({ where }: { where: Where }): Promise<unknown[]> => {
-      // `caseId` arrive soit en égalité simple (détail d'un dossier), soit en
-      // `{ in: [...] }` (export par lots) : les deux formes sont produites par
-      // le module et doivent donc être interprétées ici.
       const wanted = where.caseId;
       const keeps =
         typeof wanted === 'object' && wanted !== null && 'in' in wanted
@@ -460,10 +418,6 @@ export class FakePrisma {
       return Promise.resolve(rows.map((row) => ({ ...row })));
     },
 
-    // `orderBy` est HONORÉ ici, et pas seulement accepté. Le service s'appuie
-    // dessus pour départager deux étapes initiales actives : un double qui
-    // rendrait toujours la première de son tableau ferait passer un test que
-    // PostgreSQL, libre de choisir son plan, n'aurait aucune raison de tenir.
     findFirst: ({
       where,
       orderBy,
@@ -572,18 +526,11 @@ export class FakePrisma {
     },
   };
 
-  /**
-   * `$transaction` séquentiel. Il ne rejoue PAS d'annulation : aucun test de ce
-   * fichier n'en dépend, et une fausse atomicité donnerait l'illusion d'avoir
-   * prouvé quelque chose que seule la vraie base peut démontrer, c'est le rôle
-   * de la suite d'intégration.
-   */
   $transaction<T>(work: ((tx: FakePrisma) => Promise<T>) | Promise<unknown>[]): Promise<T> {
     if (Array.isArray(work)) return Promise.all(work) as Promise<T>;
     return work(this);
   }
 
-  /** Aucun chemin testé ici ne passe par le SQL brut : voir l'en-tête du fichier. */
   $queryRaw(): Promise<never[]> {
     throw new Error(
       '$queryRaw n’est pas simulé : les chemins SQL sont couverts par bank-cases.integration.test.ts',

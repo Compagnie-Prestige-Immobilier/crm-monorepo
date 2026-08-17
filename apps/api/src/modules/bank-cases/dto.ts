@@ -23,24 +23,8 @@ import { PageMetaDto, SortOrder } from '../../common/dto/prospect-filter.dto.js'
 import { queryBoolean } from '../../common/dto/query-boolean.js';
 import { MONEY_PATTERN } from './money.js';
 
-/**
- * Contrat Banque & Finance.
- *
- * Deux disciplines gouvernent ce fichier, parce que des clients TypeScript et
- * Dart sont générés à partir du document OpenAPI :
- *
- *  - toute propriété tableau porte `type: () => [Dto]`. Sans elle, le
- *    générateur Dart produit `List<dynamic>` et toute la sécurité de type
- *    disparaît côté mobile ;
- *  - tout montant est une CHAÎNE. Voir `money.ts`.
- */
-
 const MONEY_DESCRIPTION =
   'Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53.';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Référentiels
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class BankCaseStageDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -74,10 +58,6 @@ export class BankRejectionReasonDto {
 export class BankRejectionReasonListDto {
   @ApiProperty({ type: () => [BankRejectionReasonDto] }) items!: BankRejectionReasonDto[];
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Dossier
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class BankCaseDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -167,10 +147,6 @@ export class BankCaseTransitionDto {
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
 }
 
-/**
- * `bankCase` plutôt que `case` : `case` est un mot réservé en Dart et le client
- * généré ne compilerait pas.
- */
 export class BankCaseDetailDto {
   @ApiProperty({ type: () => BankCaseDto }) bankCase!: BankCaseDto;
   @ApiProperty({
@@ -184,10 +160,6 @@ export class BankCaseListDto {
   @ApiProperty({ type: () => [BankCaseDto] }) items!: BankCaseDto[];
   @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Écritures
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class CreateBankCaseDto {
   @ApiProperty({
@@ -293,10 +265,6 @@ export class CreateBankCaseCorrectionDto extends CreateBankCaseTransitionDto {
   reason!: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Filtres et liste
-// ─────────────────────────────────────────────────────────────────────────────
-
 export enum BankCaseSortField {
   CREATED_AT = 'createdAt',
   UPDATED_AT = 'updatedAt',
@@ -305,13 +273,6 @@ export enum BankCaseSortField {
   AMOUNT = 'amountXof',
 }
 
-/**
- * Filtre commun à la liste, aux agrégats et à l'export.
- *
- * Un DTO unique, comme pour les prospects : trois définitions séparées
- * finiraient par diverger et l'utilisateur exporterait autre chose que ce qu'il
- * voit à l'écran.
- */
 export class BankCaseFilterDto {
   @ApiPropertyOptional({
     maxLength: 120,
@@ -332,12 +293,6 @@ export class BankCaseFilterDto {
   @IsEnum(BankStageType)
   stageType?: BankStageType;
 
-  /**
-   * `banqueId` et non `bankId` : c'est le nom porté par la clé étrangère Banque
-   * partout ailleurs dans le contrat (prospects, demandes clients, recherche
-   * d'autocomplétion). Deux noms pour la même entité obligent chaque client à
-   * se souvenir duquel dépend l'écran qu'il construit.
-   */
   @ApiPropertyOptional({ format: 'uuid', description: 'Banque de traitement du dossier.' })
   @IsOptional()
   @IsUUID()
@@ -412,17 +367,7 @@ export class BankCaseQueryDto extends BankCaseFilterDto {
   sortOrder?: SortOrder;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Autocomplétion prospect
-// ─────────────────────────────────────────────────────────────────────────────
-
 export class ProspectSearchQueryDto {
-  /**
-   * `search` et non `q` : c'est le nom de TOUS les autres paramètres de
-   * recherche libre du contrat. Il reste OBLIGATOIRE ici, contrairement aux
-   * autres, parce que cet endpoint est une autocomplétion : sans terme il
-   * remonterait la base entière des prospects enrôlés.
-   */
   @ApiProperty({
     maxLength: 120,
     description:
@@ -450,13 +395,6 @@ export class ProspectSearchQueryDto {
   pageSize?: number;
 }
 
-/**
- * Projection VOLONTAIREMENT étroite : identité, téléphone, banque courante.
- *
- * Un agent Banque & Finance n'a pas à connaître le commercial propriétaire, le
- * syndicat, le représentant ni le statut de prospection. Cet endpoint sert à
- * retrouver une personne pour ouvrir son dossier, pas à consulter le CRM.
- */
 export class ProspectSearchItemDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() nom!: string;
@@ -472,10 +410,6 @@ export class ProspectSearchListDto {
   @ApiProperty({ type: () => [ProspectSearchItemDto] }) items!: ProspectSearchItemDto[];
   @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Configuration des étapes
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class CreateBankCaseStageDto {
   @ApiProperty({
@@ -518,10 +452,6 @@ export class CreateBankCaseStageDto {
   position?: number;
 }
 
-/**
- * Ni `code`, ni `type`, ni `isInitial` : une étape déjà présente dans
- * l'historique d'un dossier clos ne doit pas changer de nature.
- */
 export class UpdateBankCaseStageDto {
   @ApiPropertyOptional({ maxLength: 80 })
   @IsOptional()

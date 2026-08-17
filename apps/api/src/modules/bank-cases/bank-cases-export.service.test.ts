@@ -18,28 +18,9 @@ import {
 } from './fake-prisma.js';
 import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
-/**
- * Le CLASSEUR est vérifié, pas les intentions du code.
- *
- * Ce qui se démontre ici : la structure à trois feuilles, le contenu de chaque
- * ligne, les types de cellules (date et montant restent calculables) et le fait
- * que seules les lignes du filtre sortent.
- *
- * Ce qui NE se démontre pas ici, et qui est couvert par
- * `bank-cases.integration.test.ts` : que le filtre SQL de l'export est bien le
- * même que celui de la liste et des agrégats. Ce point ne peut s'établir que
- * contre un vrai PostgreSQL, puisque c'est justement le SQL qui est en jeu.
- */
-
-/**
- * Doublure Prisma pour l'export : elle simule `$queryRaw` en RELISANT le filtre
- * reçu, mais uniquement sur les critères que ce test exerce. La sélection des
- * identifiants reste donc pilotée par un vrai prédicat, pas par une liste figée.
- */
 class ExportFakePrisma extends FakePrisma {
   lastAfter: string | undefined;
 
-  /** Filtre courant, posé par le test avant l'appel. */
   filterPredicate: (row: { id: string }) => boolean = () => true;
 
   override $queryRaw(...args: unknown[]): Promise<never[]> {
@@ -115,7 +96,6 @@ let db: ExportFakePrisma;
 beforeEach(() => {
   db = new ExportFakePrisma();
 
-  // Trois dossiers : un ouvert, un en instruction chez BHS, un encaissé.
   db.addCase({
     id: 'case-001',
     reference: 'BNK 2026-001',
@@ -188,12 +168,6 @@ beforeEach(() => {
   );
 });
 
-/**
- * Produit puis relit le classeur. La lecture est branchée AVANT l'écriture : le
- * service pousse le XML au fil de l'eau et le tampon d'un `PassThrough` est
- * borné, accumuler d'abord ferait tenir tout le fichier en mémoire, ce que la
- * génération en flux existe précisément pour éviter.
- */
 async function build(
   filter: BankCaseFilterDto = {},
   predicate?: (row: { id: string }) => boolean,
@@ -221,7 +195,6 @@ const text = (value: ExcelJS.CellValue): string => {
   return String(value);
 };
 
-/** Valeurs d'une colonne, en-tête exclu. */
 function column(sheet: ExcelJS.Worksheet, header: string): string[] {
   const headers = sheet.getRow(1).values as ExcelJS.CellValue[];
   const index = headers.findIndex((value) => text(value) === header);
@@ -272,11 +245,6 @@ describe('feuille Dossiers', () => {
     expect(column(sheet, 'Dernier agent')).toEqual(['', 'Ibrahima Fall', 'Fatou Ndiaye']);
   });
 
-  /**
-   * Dans une feuille de calcul, un montant est un NOMBRE : l'utilisateur y
-   * applique des sommes et des tris. La chaîne de l'API est le contrat réseau,
-   * pas le contrat Excel.
-   */
   it('écrit le montant en cellule numérique, avec le format FCFA', async () => {
     const sheet = sheetOf(await build(), 'Dossiers');
     const headers = sheet.getRow(1).values as ExcelJS.CellValue[];
@@ -284,9 +252,6 @@ describe('feuille Dossiers', () => {
 
     expect(sheet.getRow(4).getCell(index).value).toBe(1200000);
     expect(sheet.getColumn(index).style.numFmt).toBe('#,##0" FCFA"');
-    // Un dossier ouvert n'a pas de montant : la cellule reste vide, elle ne
-    // vaut pas zéro, sans quoi la somme de la colonne resterait juste mais la
-    // moyenne deviendrait fausse.
     expect(sheet.getRow(2).getCell(index).value).toBeNull();
   });
 
@@ -305,13 +270,10 @@ describe('feuille Historique', () => {
     const sheet = sheetOf(await build(), 'Historique');
 
     expect(column(sheet, 'Référence')).toEqual(['BNK 2026-001', 'BNK 2026-003', 'BNK 2026-003']);
-    // « Ouverture » plutôt qu'une cellule vide : la transition de création n'a
-    // pas d'étape source, et un blanc se lirait comme une donnée manquante.
     expect(column(sheet, 'Étape source')).toEqual(['À traiter', 'Ouverture', 'À traiter']);
     expect(column(sheet, 'Commentaire')).toEqual(['', '', 'Virement reçu']);
   });
 
-  /** Une correction reste visible pour toujours : elle n'efface pas ce qu'elle corrige. */
   it('expose la justification des corrections dans sa propre colonne', async () => {
     const sheet = sheetOf(await build(), 'Historique');
     expect(column(sheet, 'Justification de correction')).toEqual([
@@ -335,7 +297,6 @@ describe('feuille Synthèse', () => {
     expect(at('Montant encaissé')).toBe('1200000');
     expect(at('Délai moyen de traitement (h)')).toBe('12.5');
 
-    // Les sections attendues sont présentes.
     for (const section of [
       'Vue d’ensemble',
       'Par étape',
@@ -345,7 +306,6 @@ describe('feuille Synthèse', () => {
     ]) {
       expect(libelles).toContain(section);
     }
-    // Aucun rejet dans le jeu : la section le dit au lieu de rester vide.
     expect(libelles).toContain('Aucun rejet');
   });
 
@@ -380,7 +340,6 @@ describe('filtrage', () => {
     const workbook = await build({ banqueId: 'bnq-bhs' }, (row) => row.id === 'case-002');
 
     expect(column(sheetOf(workbook, 'Dossiers'), 'Référence')).toEqual(['BNK 2026-002']);
-    // L'historique suit : aucune transition d'un dossier hors filtre ne fuit.
     expect(column(sheetOf(workbook, 'Historique'), 'Référence')).toEqual([]);
   });
 

@@ -1,33 +1,9 @@
-/**
- * Motif de façade : l'élément signature du panneau de marque.
- *
- * Il n'est pas inventé : c'est la géométrie du logotype CPI lui-même. Le
- * `favicon.svg` du patrimoine de marque est une grille 3×3 de blocs arrondis
- * (90×72, rayon 5) inclinée de `skewX(-14)`, autrement dit une façade vue en
- * perspective. On la prolonge ici en une trame qui déborde du coin bas-droit.
- *
- * Pourquoi ce motif plutôt qu'un aplat : le volet de connexion était vide, et
- * le remplir de texte aurait été un argumentaire. Un immeuble est ce que
- * l'entreprise vend ; la trame le dit sans une phrase de plus.
- *
- * Il reste DISCRET, et c'est une décision, pas une timidité : le premier essai
- * à 13 % d'opacité sur toute la hauteur transformait le volet en papier peint
- * et passait devant le titre. Un motif de fond qui se remarque avant le nom du
- * produit a échoué. Deux blocs seulement passent à l'or.
- *
- * L'or occupe ici une SURFACE, usage autorisé par docs/design.md §2.3 qui ne
- * l'interdit que comme couleur de TEXTE. Aucune information n'est portée par le
- * motif, qui est `aria-hidden`.
- */
-
-/** Pas de la trame, repris des proportions du logotype (90×72 + gouttière). */
 const CELL_W = 90;
 const CELL_H = 72;
 const GAP = 14;
 const COLS = 6;
 const ROWS = 8;
 
-/** Les deux fenêtres allumées. Décalées, jamais alignées. */
 const LIT = new Set(['1-2', '4-5']);
 
 export function Facade() {

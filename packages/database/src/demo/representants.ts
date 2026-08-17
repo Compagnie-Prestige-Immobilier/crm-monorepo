@@ -1,20 +1,6 @@
-/**
- * Représentants de démonstration : 15 délégués répartis sur 12 départements de
- * 6 régions.
- *
- * Le département est désigné par `Departement.code` (voir `seed-data/geo.ts`),
- * jamais par son identifiant. La couverture est volontairement inégale : Dakar
- * concentre 5 délégués, Kaolack un seul. Une répartition parfaitement uniforme
- * rendrait la carte et le regroupement « par département » sans intérêt.
- *
- * Les représentants sont datés de 120 à 165 jours, tous antérieurs au plus
- * ancien de leurs prospects (118 jours) : on n'enrôle pas un prospect avant le
- * représentant qui l'a présenté.
- */
 import type { DemoRepresentant } from './types.js';
 
 export const DEMO_REPRESENTANTS: DemoRepresentant[] = [
-  // ── Awa (Dakar) ────────────────────────────────────────────────────────────
   {
     key: 'r01',
     fullName: 'Mamadou Diagne',
@@ -61,7 +47,6 @@ export const DEMO_REPRESENTANTS: DemoRepresentant[] = [
     daysAgo: 148,
   },
 
-  // ── Moussa (Thiès) ─────────────────────────────────────────────────────────
   {
     key: 'r06',
     fullName: 'Abdoulaye Thiam',
@@ -99,7 +84,6 @@ export const DEMO_REPRESENTANTS: DemoRepresentant[] = [
     daysAgo: 133,
   },
 
-  // ── Fatou (Saint-Louis) ────────────────────────────────────────────────────
   {
     key: 'r10',
     fullName: 'Cheikh Tidiane Ba',
@@ -128,7 +112,6 @@ export const DEMO_REPRESENTANTS: DemoRepresentant[] = [
     daysAgo: 124,
   },
 
-  // ── Ibrahima (Kaolack, Diourbel) ───────────────────────────────────────────
   {
     key: 'r13',
     fullName: 'Adama Touré',

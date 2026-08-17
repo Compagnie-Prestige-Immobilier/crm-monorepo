@@ -6,11 +6,6 @@ import { Providers } from '@/components/providers';
 
 import './globals.css';
 
-/**
- * Polices de docs/design.md §4. `next/font` les auto-héberge et les injecte en
- * `font-display: swap` : aucune requête vers Google au chargement, et donc
- * aucune fuite de l'IP des utilisateurs vers un tiers.
- */
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700'],
@@ -50,9 +45,6 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    // `suppressHydrationWarning` est exigé par next-themes : il pose la classe
-    // de thème sur <html> avant l'hydratation pour éviter le flash de thème
-    // clair, ce que React signalerait sinon comme une divergence.
     <html
       lang="fr"
       suppressHydrationWarning

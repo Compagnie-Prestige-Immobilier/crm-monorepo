@@ -1,46 +1,89 @@
 'use client';
 
-import * as PopoverPrimitive from '@radix-ui/react-popover';
-import type * as React from 'react';
+import { Popover as PopoverPrimitive } from '@base-ui/react/popover';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
-function Popover(props: React.ComponentProps<typeof PopoverPrimitive.Root>) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />;
+const PopoverAnchorContext = createContext<{
+  anchor: Element | null;
+  setAnchor: (element: Element | null) => void;
+} | null>(null);
+
+function Popover({ children, ...props }: PopoverPrimitive.Root.Props) {
+  const [anchor, setAnchor] = useState<Element | null>(null);
+  return (
+    <PopoverAnchorContext.Provider value={{ anchor, setAnchor }}>
+      <PopoverPrimitive.Root {...props}>{children as ReactNode}</PopoverPrimitive.Root>
+    </PopoverAnchorContext.Provider>
+  );
 }
 
-function PopoverTrigger(props: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {
+function PopoverAnchor({ children, ...props }: React.ComponentProps<'span'>) {
+  const context = useContext(PopoverAnchorContext);
+  return (
+    <span
+      data-slot="popover-anchor"
+      style={{ display: 'contents' }}
+      ref={(element) => {
+        context?.setAnchor(element);
+      }}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+}
+
+type PopoverTriggerProps = Omit<PopoverPrimitive.Trigger.Props, 'className'> & {
+  className?: string | undefined;
+};
+
+function PopoverTrigger(props: PopoverTriggerProps) {
   return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
 }
 
-function PopoverAnchor(props: React.ComponentProps<typeof PopoverPrimitive.Anchor>) {
-  return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />;
-}
+type PopoverContentProps = Omit<PopoverPrimitive.Popup.Props, 'className'> & {
+  className?: string | undefined;
+} & Pick<
+    PopoverPrimitive.Positioner.Props,
+    'align' | 'alignOffset' | 'side' | 'sideOffset' | 'collisionPadding'
+  >;
 
 function PopoverContent({
   className,
   align = 'start',
+  alignOffset,
+  side,
   sideOffset = 4,
+  collisionPadding = 0,
   ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+}: PopoverContentProps) {
+  const anchor = useContext(PopoverAnchorContext)?.anchor ?? undefined;
   return (
     <PopoverPrimitive.Portal>
-      <PopoverPrimitive.Content
-        data-slot="popover-content"
+      <PopoverPrimitive.Positioner
+        className="isolate z-50"
         align={align}
+        alignOffset={alignOffset}
+        side={side}
         sideOffset={sideOffset}
-        className={cn(
-          'z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-md',
-          'border border-border bg-popover p-1 text-popover-foreground shadow-elev-lg',
-          // Le conteneur reçoit le focus à l'ouverture : sans anneau de
-          // remplacement, l'utilisateur au clavier ne voit pas où il a atterri.
-          'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
-          'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
-          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
-          className,
-        )}
-        {...props}
-      />
+        collisionPadding={collisionPadding}
+        anchor={anchor}
+      >
+        <PopoverPrimitive.Popup
+          data-slot="popover-content"
+          className={cn(
+            'z-50 w-72 origin-(--transform-origin) rounded-md',
+            'border border-border bg-popover p-1 text-popover-foreground shadow-elev-lg',
+            'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+            'duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95',
+            'data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+            className,
+          )}
+          {...props}
+        />
+      </PopoverPrimitive.Positioner>
     </PopoverPrimitive.Portal>
   );
 }

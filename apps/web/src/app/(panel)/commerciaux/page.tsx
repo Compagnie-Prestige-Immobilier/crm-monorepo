@@ -14,26 +14,6 @@ import { parseUserFilters, type RawSearchParams } from '@/lib/user-filters';
 
 export const metadata: Metadata = { title: 'Téléconseillers' };
 
-/**
- * Comptes de connexion. ADMIN seul : `GET /users` répond 403 aux autres.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Un refus de droits n'est pas un état vide.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Cet écran rendait un `EmptyState` « Accès réservé aux administrateurs ». Trois
- * défauts, tous les trois portés par les quatorze autres pages gardées du panel
- * et par `PermissionDenied` :
- *
- *  1. Le rôle en cours n'était pas nommé : l'utilisateur ne pouvait pas savoir
- *     quoi demander à son administrateur ;
- *  2. Aucune sortie n'était proposée : l'écran était un cul-de-sac ;
- *  3. Une session ABSENTE et un rôle insuffisant étaient confondus : un
- *     utilisateur déconnecté voyait « réservé aux administrateurs » au lieu
- *     d'être renvoyé se connecter.
- *
- * `guardRoles` distingue les trois issues, et `PermissionDenied` les rend.
- */
 export default async function CommerciauxPage({
   searchParams,
 }: {
@@ -45,8 +25,6 @@ export default async function CommerciauxPage({
     return <PermissionDenied role={guard.user.role} what="La gestion des comptes" />;
   }
 
-  // Filtres lus dans l'URL côté serveur : un lien partagé s'ouvre directement
-  // sur la bonne liste, sans état vide intermédiaire.
   const filters = parseUserFilters(await searchParams);
   const client = getServerApiClient();
   const queryClient = getQueryClient();

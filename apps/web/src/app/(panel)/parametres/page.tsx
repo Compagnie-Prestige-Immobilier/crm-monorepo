@@ -29,10 +29,7 @@ export default async function ParametresPage() {
       queryFn: () => fetchDemoStatus(getServerApiClient()),
     });
   } catch (error) {
-    // `unstable_rethrow` d'abord : un `catch` nu avale aussi les erreurs de
-    // contrôle de Next (redirection, `notFound()`, bascule en rendu dynamique).
     unstable_rethrow(error);
-    // La carte rejouera la requête et affichera son état d'erreur.
   }
 
   return (
