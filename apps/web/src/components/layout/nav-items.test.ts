@@ -8,15 +8,6 @@ import {
   navTitle,
 } from '@/components/layout/nav-items';
 
-/**
- * Navigation dépendante du rôle.
- *
- * L'exigence n'est pas cosmétique : l'API répond 403 à un BANQUE_FINANCE sur
- * `/prospects`, `/representants`, `/users`, `/referentiels` et `/phase2/*`. Une
- * entrée de menu qui mène à un refus de droits est un défaut de conception. Ces
- * tests fixent la liste exacte de ce que chaque rôle voit.
- */
-
 const hrefs = (role: Parameters<typeof navItems>[0]): string[] =>
   navItems(role).map((item) => item.href);
 
@@ -81,9 +72,6 @@ describe('navigation d’un ADMIN', () => {
   });
 
   it('propose les deux écrans qui n’étaient joignables qu’en tapant leur URL', () => {
-    // `/notifications` (composeur) existait sans entrée de menu ; l'arbitrage
-    // des demandes de création de client venait de naître au même endroit. Un
-    // écran sans entrée de menu est un écran que personne n'ouvre.
     const visible = hrefs('ADMIN');
     expect(visible).toContain('/notifications');
     expect(visible).toContain('/demandes-clients');
@@ -94,11 +82,6 @@ describe('navigation d’un ADMIN', () => {
   });
 
   it('propose à l’agent bancaire le SUIVI de ses demandes, sous son propre libellé', () => {
-    // Le même chemin, deux métiers : l'ADMIN arbitre (« Demandes clients »),
-    // l'agent suit les siennes (« Mes demandes »). Sans cette entrée, l'écran
-    // n'était joignable que par la notification de refus, et il n'existait
-    // aucun moyen d'y revenir : l'API restreint pourtant déjà la liste à
-    // `requestedById = user.id`.
     const entry = navItems('BANQUE_FINANCE').find((item) => item.href === '/demandes-clients');
     expect(entry?.label).toBe('Mes demandes');
     expect(navItems('ADMIN').find((item) => item.href === '/demandes-clients')?.label).toBe(
@@ -107,8 +90,6 @@ describe('navigation d’un ADMIN', () => {
   });
 
   it('ne voit PAS le tableau de bord bancaire en doublon de son propre tableau de bord', () => {
-    // Deux entrées « Tableau de bord » dans la même barre seraient
-    // indiscernables l'une de l'autre.
     expect(navItems('ADMIN').filter((item) => item.label === 'Tableau de bord')).toHaveLength(1);
     expect(hrefs('ADMIN')).not.toContain('/banque');
   });
@@ -130,36 +111,19 @@ describe('écran d’atterrissage après connexion', () => {
   it('mène chaque rôle là où l’API ne lui répondra pas 403', () => {
     expect(homePathForRole('ADMIN')).toBe('/tableau-de-bord');
     expect(homePathForRole('BANQUE_FINANCE')).toBe('/dossiers');
-    // Le COMMERCIAL est refusé à la porte du panel : son outil est le mobile.
     expect(homePathForRole('COMMERCIAL')).toBe('/connexion');
   });
 });
 
 describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
   it('distingue « Nouveau dossier » de « Dossiers »', () => {
-    // `/dossiers/nouveau` commence par `/dossiers/` : une correspondance
-    // naïve par ordre de déclaration afficherait « Dossiers » sur le
-    // formulaire de création, et surlignerait la mauvaise entrée.
     expect(navTitle('BANQUE_FINANCE', '/dossiers/nouveau')).toBe('Nouveau dossier');
     expect(navTitle('BANQUE_FINANCE', '/dossiers/export')).toBe('Export');
     expect(navTitle('ADMIN', '/dossiers/etapes')).toBe('Étapes bancaires');
   });
 
   it('nomme l’écran des comptes par ce qu’il contient VRAIMENT', () => {
-    /*
-     * Deux renommages successifs, et le second corrige le premier.
-     *
-     * « Commerciaux » décrivait un métier de terrain qui n'existe pas ici : le
-     * produit sert des téléconseillers sur place. D'où « Téléconseillers ».
-     *
-     * Mais l'écran gère TOUS les comptes — il sait déjà filtrer par rôle, et le
-     * formulaire crée désormais les trois. L'appeler « Téléconseillers » faisait
-     * chercher ailleurs un endroit pour créer un accès « Banque & Finance », qui
-     * n'existait nulle part : c'est ce qui a fait conclure que la fonction
-     * manquait, alors que seule l'étiquette manquait de vérité.
-     */
     expect(navTitle('ADMIN', '/commerciaux')).toBe('Utilisateurs');
-    // L'interdit d'origine tient toujours : pas de « Commerciaux ».
     expect(navTitle('ADMIN', '/commerciaux')).not.toContain('Commerciaux');
     expect(navTitle('ADMIN', '/supervision')).toBe('Supervision');
     expect(navTitle('ADMIN', '/statistiques')).toBe('Statistiques');

@@ -16,22 +16,6 @@ import type {
   BrevoTransport,
 } from './brevo.transport.js';
 
-/**
- * Doublure Prisma en mémoire, réservée aux tests de notification.
- *
- * Elle n'imite pas PostgreSQL. Elle reproduit exactement les trois
- * comportements dont dépend la logique du module, et rien d'autre :
- *
- *  1. les contraintes UNIQUE lèvent une `PrismaClientKnownRequestError` P2002 :
- *     c'est sur elle que repose TOUTE l'idempotence des rappels ;
- *  2. `updateMany` renvoie un compte, ce qui permet de vérifier la prise en
- *     charge atomique d'un envoi programmé par une seule instance ;
- *  3. `groupBy` agrège, parce que les compteurs de livraison en dépendent.
- *
- * Les garanties réelles sous concurrence ne se démontrent que contre un vrai
- * serveur ; c'est l'objet des tests d'intégration.
- */
-
 let sequence = 0;
 const nextId = (prefix: string): string => `${prefix}-${String(++sequence).padStart(4, '0')}`;
 
@@ -39,14 +23,10 @@ export interface UserRow {
   id: string;
   fullName: string;
   role: Role;
-  /** Le schéma la rend obligatoire. La chaîne vide tient lieu d'« aucune
-   *  adresse » : c'est le seul cas que la branche e-mail doit écarter. */
   email: string;
   isActive: boolean;
   deletedAt: Date | null;
   departementId: string | null;
-  /** Présent parce que le schéma le porte : sans lui, `where: { isDemo: false }`
-   *  ne correspondrait à aucune ligne et la doublure validerait un faux. */
   isDemo: boolean;
 }
 
@@ -70,27 +50,8 @@ export interface NotificationRow {
   reminderKey: string | null;
   period: string | null;
   createdAt: Date;
-  /**
-   * Horodatage `@updatedAt`, rafraîchi par la doublure à CHAQUE écriture.
-   *
-   * Il ne décore pas la ligne : c'est lui qui date le BAIL posé par
-   * `dispatchDue` sur une notification prise en charge. Une doublure qui le
-   * laisserait figé ferait passer la reprise des expéditions abandonnées pour
-   * correcte quel que soit le code, et le renouvellement du bail, qui interdit
-   * à deux repreneurs de gagner ensemble, ne serait plus exercé du tout.
-   */
   updatedAt: Date;
-  /**
-   * Jeton du détenteur du bail, `null` quand personne ne tient l'envoi.
-   *
-   * La doublure DOIT le porter : c'est lui qui distingue « une notification que
-   * personne n'a réclamée » de « une notification tenue par un vivant », et
-   * c'est sur lui que se referme toute écriture d'expédition. Sans la colonne,
-   * `dispatchClaim: null` ne correspondrait à rien et la prise en charge
-   * passerait toujours, quel que soit le code.
-   */
   dispatchClaim: string | null;
-  /** Même raison que sur `UserRow` : le schéma le porte, la doublure aussi. */
   isDemo: boolean;
 }
 
@@ -107,7 +68,6 @@ export interface DeliveryRow {
   reminderKey: string | null;
   period: string | null;
   createdAt: Date;
-  /** Même raison que sur `UserRow` : le schéma le porte, la doublure aussi. */
   isDemo: boolean;
 }
 
@@ -117,20 +77,15 @@ export interface CallTaskRow {
   status: string;
   isActive: boolean;
   campaignStatus: string;
-  /** Même raison que sur `UserRow` : le schéma le porte, la doublure aussi. */
   isDemo: boolean;
 }
 
-/** Dossier bancaire, réduit à ce que les rappels du pôle banque interrogent. */
 export interface BankCaseRow {
   id: string;
-  /** Type de l'étape COURANTE, dénormalisé : la doublure ne porte pas d'étapes. */
   stageType: BankStageType;
   createdAt: Date;
-  /** Date de la dernière transition, ou `null` si le dossier n'a jamais bougé. */
   lastTransitionAt: Date | null;
   deletedAt: Date | null;
-  /** Même raison que sur `UserRow` : le schéma le porte, la doublure aussi. */
   isDemo: boolean;
 }
 
@@ -152,7 +107,6 @@ const uniqueViolation = (target: string[]): Prisma.PrismaClientKnownRequestError
     meta: { target },
   });
 
-/** Égalité, `null`, `{ in }`, `{ lte }`, `{ gt }`, et le `where` imbriqué `user`/`notification`. */
 const matches = (
   row: Record<string, unknown>,
   where: Record<string, unknown> | undefined,
@@ -163,10 +117,6 @@ const matches = (
     if (expected === undefined) continue;
 
     if (key === 'OR') {
-      // Une seule branche suffit, et les autres clauses du même `where`
-      // continuent de s'appliquer : c'est la sémantique de Prisma, et c'est
-      // celle dont dépend la prise en charge d'une notification « ou bien
-      // programmée, ou bien abandonnée en cours d'envoi ».
       const branches = expected as Record<string, unknown>[];
       if (!branches.some((branch) => matches(row, branch, db))) return false;
       continue;
@@ -203,17 +153,6 @@ const matches = (
       continue;
     }
     if (key === 'deliveries') {
-      // ═══ LE SOUS-SELECT DE LA CLÔTURE, ET RIEN D'AUTRE ═══
-      //
-      // `settleNotification` referme un envoi par une écriture CONDITIONNELLE :
-      // « passe SENT s'il ne reste AUCUNE livraison en attente ». La condition
-      // vit dans l'`UPDATE`, sous le verrou de la ligne, précisément pour qu'il
-      // n'y ait plus d'intervalle entre le décompte et la conclusion. Une
-      // doublure qui ignorerait ce `none` refermerait tous les envois sans
-      // condition, et le défaut qu'il répare passerait au vert.
-      //
-      // Seule la forme `none` est reconnue : accepter n'importe quel filtre
-      // relationnel donnerait une assurance sur des requêtes jamais écrites.
       const clause = expected as { none?: Record<string, unknown> };
       if (clause.none !== undefined) {
         const id = row.id;
@@ -237,10 +176,6 @@ const matches = (
       continue;
     }
     if (key === 'transitions') {
-      // Seule la forme employée par le rappel « sans mouvement » est reconnue :
-      // `none` sur une date. Une doublure qui accepterait n'importe quel filtre
-      // relationnel donnerait une fausse assurance sur des requêtes jamais
-      // écrites.
       const clause = expected as { none?: { createdAt?: { gt?: Date } } };
       const after = clause.none?.createdAt?.gt;
       if (after !== undefined) {
@@ -285,41 +220,14 @@ const matches = (
 };
 
 export class FakePrisma {
-  /**
-   * Horloge des écritures, remplaçable par un test.
-   *
-   * `dispatchDue` compare `updatedAt` à l'instant qu'ON LUI PASSE. Si la
-   * doublure horodatait toujours sur l'horloge réelle, les deux dates
-   * appartiendraient à deux échelles de temps sans rapport, et le bail
-   * paraîtrait expiré ou frais au hasard de l'heure à laquelle la suite tourne.
-   * Un test qui pilote le temps doit donc pouvoir piloter les deux bouts de la
-   * comparaison.
-   */
   clock: () => Date = () => new Date();
 
-  /**
-   * PANNES INJECTÉES, par délégué et par méthode.
-   *
-   * ═══ POURQUOI LA DOUBLURE DOIT SAVOIR TOMBER ═══
-   *
-   * Une doublure qui répond toujours n'exerce qu'une moitié du service : celle
-   * où la base tient. L'autre moitié, le `catch` qui rattrape une lecture
-   * interrompue, restait donc entièrement non couverte, et un défaut y a vécu
-   * jusqu'à la quatrième relecture (voir `sendByEmail`) : un délai d'attente
-   * du pool sur la lecture des comptes refermait l'envoi sur SENT sans qu'un
-   * seul e-mail soit parti. Un transport qui lève ne le reproduisait pas, il
-   * échoue APRÈS la lecture des comptes.
-   *
-   * La clé est `délégué.méthode`, la valeur l'erreur à rejeter.
-   */
   readonly faults = new Map<string, Error>();
 
-  /** Arme une panne sur un appel précis. Elle vaut pour tous les suivants. */
   breakOn(operation: 'user.findMany' | 'notificationDelivery.updateMany', error: Error): void {
     this.faults.set(operation, error);
   }
 
-  /** Rend la panne armée, ou `null`. Les délégués s'en servent en première ligne. */
   private fault(operation: string): Promise<never> | null {
     const armed = this.faults.get(operation);
     return armed ? Promise.reject(armed) : null;
@@ -329,11 +237,8 @@ export class FakePrisma {
   readonly notifications: NotificationRow[] = [];
   readonly deliveries: DeliveryRow[] = [];
   readonly callTasks: CallTaskRow[] = [];
-  /** Même forme que `callTasks` : les campagnes représentants ont leur propre table. */
   readonly repCallTasks: CallTaskRow[] = [];
   readonly bankCases: BankCaseRow[] = [];
-
-  // ── Amorces ───────────────────────────────────────────────────────────────
 
   addUser(row: Partial<UserRow> & { id: string }): UserRow {
     const user: UserRow = {
@@ -389,8 +294,6 @@ export class FakePrisma {
     return bankCase;
   }
 
-  // ── Délégués ──────────────────────────────────────────────────────────────
-
   get user() {
     return {
       findMany: (args: { where?: Record<string, unknown> }) =>
@@ -439,12 +342,7 @@ export class FakePrisma {
           period,
           createdAt: this.clock(),
           updatedAt: this.clock(),
-          // Personne ne tient un envoi qui vient d'être écrit, et c'est ce qui
-          // le rend immédiatement prenable par l'expédition qui suit.
           dispatchClaim: (data.dispatchClaim as string | null | undefined) ?? null,
-          // Pas de valeur par défaut « fausse » cachée ici : la doublure
-          // écrit CE QUE LE SERVICE LUI DONNE. Un `?? false` masquerait
-          // l'omission même que les tests de propagation cherchent.
           isDemo: data.isDemo === true,
         };
 
@@ -453,9 +351,6 @@ export class FakePrisma {
           | undefined;
         const seeds = nested?.createMany?.data ?? nested?.create ?? [];
 
-        // Les livraisons sont préparées AVANT d'être publiées : une contrainte
-        // violée sur l'une d'elles doit annuler la notification entière, comme
-        // le ferait la transaction implicite d'une écriture imbriquée.
         const prepared: DeliveryRow[] = [];
         for (const seed of seeds) {
           const delivery: DeliveryRow = {
@@ -494,15 +389,9 @@ export class FakePrisma {
         return Promise.resolve(row);
       },
 
-      // L'expédition résout par clé primaire, sans visibilité : elle sert la
-      // notification qu'on lui a désignée.
       findUnique: (args: { where: { id: string } }) =>
         Promise.resolve(this.decorate(this.notifications.find((row) => row.id === args.where.id))),
 
-      // Les LECTURES d'administration passent par `findFirst` : le service y
-      // compose la visibilité de démonstration, ce que `findUnique` n'accepte
-      // pas. La doublure suit, sans quoi elle rendrait la ligne masquée et le
-      // test de cloisonnement ne pourrait pas échouer.
       findFirst: (args: { where?: Record<string, unknown> }) =>
         Promise.resolve(
           this.decorate(
@@ -541,11 +430,6 @@ export class FakePrisma {
         return Promise.resolve(this.decorate(row));
       },
 
-      // `@updatedAt` est posé par Prisma sur TOUTE écriture, même quand aucune
-      // valeur ne change. C'est ce qui renouvelle le bail d'une notification
-      // reprise, et donc ce qui empêche un second repreneur de gagner derrière
-      // le premier. La doublure doit le reproduire, sinon la reprise
-      // concurrente serait validée sans avoir été exercée.
       updateMany: (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
         const rows = this.notifications.filter((row) =>
           matches(row as unknown as Record<string, unknown>, args.where, this),
@@ -625,7 +509,6 @@ export class FakePrisma {
     };
   }
 
-  /** Regroupement par destinataire, commun aux deux tables de tâches. */
   private groupTasksBy(source: CallTaskRow[], where?: Record<string, unknown>) {
     const rows = source.filter((row) =>
       matches(row as unknown as Record<string, unknown>, where, this),
@@ -673,39 +556,21 @@ export class FakePrisma {
     };
   }
 
-  /** Ajoute la relation `createdBy` attendue par la projection du service. */
   private decorate(row: NotificationRow | undefined): unknown {
     if (!row) return null;
     const createdBy = this.users.find((user) => user.id === row.createdById);
     return { ...row, createdBy: createdBy ? { fullName: createdBy.fullName } : null };
   }
 
-  /** Le service attend un `PrismaService` ; il n'utilise que les délégués ci-dessus. */
   asService(): PrismaService {
     return this as unknown as PrismaService;
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Transports de test
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Transport e-mail enregistreur.
- *
- * `configured = false` par DÉFAUT, et c'est délibéré : le dépôt tourne sans
- * clé Brevo, et les tests qui ne parlent pas d'e-mail doivent exercer cet
- * état-là. Un test qui veut la seconde voie l'allume explicitement.
- */
 export class FakeBrevoTransport implements BrevoTransport {
   readonly sent: BrevoMessage[] = [];
   configured = false;
 
-  /**
-   * `outcomeFor` décide, ADRESSE PAR ADRESSE, du sort de chaque destinataire.
-   * C'est ce qui permet de composer un envoi où une seule adresse échoue, et de
-   * vérifier que les autres passent quand même.
-   */
   constructor(
     private readonly outcomeFor: (recipient: string) => BrevoSendOutcome = (email) => ({
       email,
@@ -734,14 +599,6 @@ export class FakeBrevoTransport implements BrevoTransport {
       message.recipients.map((recipient) => this.outcomeFor(recipient.email)),
     );
 
-    // ═══ LA MÊME RÈGLE D'ÉTAT QUE LE VRAI TRANSPORT ═══
-    //
-    // `BrevoHttpTransport` annonce `TRANSPORT_ERROR` dès que rien n'est passé
-    // alors qu'un appel a été tenté (`attempted > 0 && delivered === 0`), quelle
-    // que soit la NATURE des refus. La doublure rendait `SENT` sans condition :
-    // le service ne voyait donc jamais l'état que produit le cas le plus
-    // banal du produit, un public de moins de cent adresses refusé en bloc sur
-    // une clé invalide. Le défaut correspondant a survécu à toute la suite.
     const delivered = outcomes.filter((outcome) => outcome.ok).length;
     const failed = outcomes.find((outcome) => !outcome.ok);
 
@@ -752,17 +609,11 @@ export class FakeBrevoTransport implements BrevoTransport {
     });
   }
 
-  /** Toutes les adresses servies, tous messages confondus. */
   get allAddresses(): string[] {
     return this.sent.flatMap((message) => message.recipients.map((recipient) => recipient.email));
   }
 }
 
-/**
- * Transport e-mail qui échoue EN BLOC. Il est CONFIGURÉ : c'est la panne du
- * service, pas son absence. Aucune ligne de livraison ne doit être enterrée
- * pour autant.
- */
 export class BrokenBrevoTransport implements BrevoTransport {
   isConfigured(): boolean {
     return true;
@@ -781,7 +632,6 @@ export class BrokenBrevoTransport implements BrevoTransport {
   }
 }
 
-/** Transport e-mail qui LÈVE. La branche e-mail doit l'absorber, pas le propager. */
 export class ThrowingBrevoTransport implements BrevoTransport {
   isConfigured(): boolean {
     return true;

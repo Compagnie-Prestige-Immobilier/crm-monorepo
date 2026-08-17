@@ -67,11 +67,6 @@ export class CreateUserDto {
   phone?: string;
 }
 
-/**
- * Tous les champs de création sauf le mot de passe : le réinitialiser passe par
- * `PUT /users/:id/password`, pour qu'un PATCH de profil ne puisse pas changer
- * un mot de passe par inadvertance.
- */
 export class UpdateUserDto extends PartialType(OmitType(CreateUserDto, ['password'] as const)) {
   @ApiPropertyOptional({ type: Boolean })
   @IsOptional()
@@ -144,9 +139,6 @@ export class UserListQueryDto {
 }
 
 export class UserListDto {
-  // `type: () => [UserDto]` est obligatoire : la réflexion TypeScript ne voit
-  // pas le type des éléments d'un tableau, et sans cette annotation le client
-  // Dart généré reçoit une List<dynamic>.
   @ApiProperty({ type: () => [UserDto] })
   items!: UserDto[];
 

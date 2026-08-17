@@ -31,27 +31,11 @@ import {
 
 @ApiTags('referentiels')
 @ApiBearerAuth()
-// Toute route de ce contrôleur peut refuser pour ces trois raisons :
-// jeton absent ou expiré, rôle insuffisant, et entrée refusée par la
-// validation globale (`forbidNonWhitelisted` transforme un paramètre mal
-// orthographié en 400). Les déclarer ici évite de les oublier route par
-// route, ce qui était le cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'referentiels', version: '1' })
 export class ReferentielsController {
   constructor(private readonly referentiels: ReferentielsService) {}
 
-  // ═══ LECTURES OUVERTES À TOUS LES RÔLES, ET C'EST UNE DÉCISION ═══
-  //
-  // Ces sept lectures sont les valeurs des menus déroulants de TOUS les
-  // formulaires du produit, mobile compris : les fermer à un rôle fermerait la
-  // saisie de ce rôle, y compris celle d'un dossier bancaire. Aucune ne porte
-  // de donnée de client, ce sont des nomenclatures.
-  //
-  // Elles ne portaient AUCUN décorateur, ce qui produisait le même effet mais
-  // ne le disait pas : impossible de distinguer « ouvert à dessein » de
-  // « personne n'y a pensé ». Les ÉCRITURES du même contrôleur, elles, sont
-  // toutes `@Roles(ADMIN)` : la frontière est là, entre lire et modifier.
   @Get()
   @Roles(...ANY_AUTHENTICATED)
   @ApiOperation({
@@ -126,8 +110,6 @@ export class ReferentielsController {
   ): Promise<RegionWithDepartementsDto[]> {
     return this.referentiels.listRegionsWithDepartements(query);
   }
-
-  // ─── Écriture, ADMIN uniquement ───────────────────────────────────────────
 
   @Roles(Role.ADMIN)
   @Post('banques')

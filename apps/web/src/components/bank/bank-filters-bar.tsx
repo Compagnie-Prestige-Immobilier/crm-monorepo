@@ -34,22 +34,7 @@ import type { FilterOption } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
-/**
- * Barre de filtre des dossiers bancaires.
- *
- * Les vues rapides ne sont PAS un second système de filtre : chacune écrit dans
- * le même objet, donc dans la même URL, et l'export les suit. « À traiter »
- * vise l'étape initiale : configurable, donc lue dans la configuration plutôt
- * que devinée d'un code en dur.
- *
- * Trois critères restent visibles (recherche, étape, période) et cinq passent
- * derrière « Filtres avancés » : les huit champs dépliés en permanence
- * repoussaient les dossiers, et sur le tableau de bord les chiffres, sous la
- * ligne de flottaison. Le compte, les puces et le démontage du panneau sont
- * tenus par `AdvancedPanel`, comme sur les prospects.
- */
 export function BankFiltersBar({
-  /** Options d'agent, dérivées des agrégats : `GET /users` est réservé à l'ADMIN. */
   agentOptions = [],
 }: {
   agentOptions?: readonly FilterOption[] | undefined;
@@ -74,9 +59,6 @@ export function BankFiltersBar({
     staleTime: 5 * 60_000,
   });
 
-  // Champ texte piloté localement puis synchronisé à l'URL après une pause de
-  // frappe : écrire directement dans l'URL relancerait une requête à chaque
-  // caractère, et l'API plafonne à 300 requêtes par minute.
   const [searchDraft, setSearchDraft] = useState(filters.search);
   useEffect(() => {
     setSearchDraft(filters.search);
@@ -89,9 +71,6 @@ export function BankFiltersBar({
 
   const removeAdvanced = useCallback(
     (key: BankAdvancedFilterKey) => {
-      // `Record<BankAdvancedFilterKey, null>` plutôt qu'une clé calculée nue :
-      // le littéral `{ [key]: null }` s'infère en `{ [x: string]: null }`, que
-      // `Partial<BankCaseFilters>` accepterait sans vérifier le nom du champ.
       const patch: Partial<Record<BankAdvancedFilterKey, null>> = { [key]: null };
       setFilters(patch satisfies Partial<BankCaseFilters>);
     },
@@ -187,9 +166,6 @@ export function BankFiltersBar({
             }))}
             value={filters.stageId}
             onChange={(value) => {
-              // Étape précise et type d'étape se contredisent : choisir l'une
-              // efface l'autre, sinon « Encaissés » + « À traiter » renverrait
-              // zéro ligne sans que rien n'explique pourquoi.
               setFilters({ stageId: value, stageType: null });
             }}
           />

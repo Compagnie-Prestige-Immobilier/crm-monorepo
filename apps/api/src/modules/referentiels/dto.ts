@@ -14,8 +14,6 @@ import {
 
 import { queryBoolean } from '../../common/dto/query-boolean.js';
 
-// ─── Lecture ────────────────────────────────────────────────────────────────
-
 export class RegionDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() code!: string;
@@ -32,13 +30,6 @@ export class DepartementDto {
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
 
-/**
- * Une IEF, Inspection de l'Éducation et de la Formation.
- *
- * `departementName` accompagne l'identifiant parce que le libellé seul est
- * ambigu à l'écran : « Bignona 1 » et « Bignona 2 » ne se distinguent qu'au
- * département, et il y a quatre IEF dans le seul département de Dakar.
- */
 export class IefDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() code!: string;
@@ -74,11 +65,6 @@ export class RegionWithDepartementsDto extends RegionDto {
   departements!: DepartementDto[];
 }
 
-/**
- * Tous les référentiels en un appel. Le mobile en a besoin d'un bloc au premier
- * démarrage ; trois requêtes séparées multiplient les états intermédiaires à
- * gérer hors ligne.
- */
 export class ReferentielsBundleDto {
   @ApiProperty({ type: () => [BanqueDto] }) banques!: BanqueDto[];
   @ApiProperty({ type: () => [SyndicatDto] }) syndicats!: SyndicatDto[];
@@ -97,8 +83,6 @@ export class ReferentielQueryDto {
   @IsBoolean()
   activeOnly?: boolean;
 }
-
-// ─── Écriture (ADMIN) ───────────────────────────────────────────────────────
 
 export class CreateBanqueDto {
   @ApiProperty({ maxLength: 160 })

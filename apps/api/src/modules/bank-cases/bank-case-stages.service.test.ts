@@ -74,14 +74,9 @@ describe('création', () => {
     expect(created.type).toBe(BankStageType.OPEN);
     expect(created.isSystem).toBe(false);
     expect(created.isInitial).toBe(false);
-    // Après la dernière étape OUVERTE (position 2), pas après REJETE (101).
     expect(created.position).toBe(3);
   });
 
-  /**
-   * Insérer au milieu DÉCALE les suivantes plutôt que de laisser deux étapes
-   * partager une position : « l'étape suivante » deviendrait non déterministe.
-   */
   it('insérer au milieu décale les étapes ouvertes suivantes', async () => {
     const created = await service.create({
       code: 'CONTROLE',
@@ -93,7 +88,6 @@ describe('création', () => {
     expect(created.position).toBe(2);
     const apres = db.stages.find((row) => row.id === STAGE_EN_TRAITEMENT.id);
     expect(apres?.position).toBe(3);
-    // Les étapes système ne sont pas décalées : elles ne sont pas de type OPEN.
     expect(db.stages.find((row) => row.id === STAGE_ENCAISSE.id)?.position).toBe(100);
   });
 
@@ -127,13 +121,6 @@ describe('modification', () => {
     expect(updated.code).toBe('EN_TRAITEMENT_BANQUE');
   });
 
-  /**
-   * La NATURE d'une étape n'est pas modifiable, et ce n'est pas une garde
-   * d'exécution : le DTO ne porte tout simplement ni `code`, ni `type`, ni
-   * `isInitial`, et `forbidNonWhitelisted` rejette tout champ inconnu. Une étape
-   * déjà inscrite dans l'historique d'un dossier clos ne peut donc pas changer
-   * de sens rétroactivement.
-   */
   it('le contrat d’écriture n’expose NI code, NI type, NI isInitial', () => {
     const champs = Object.getOwnPropertyNames(new UpdateBankCaseStageDto());
     expect(champs).not.toContain('code');
@@ -150,11 +137,6 @@ describe('modification', () => {
 });
 
 describe('activation', () => {
-  /**
-   * Les étapes système portent les règles financières du module, point
-   * d'entrée, encaissement, rejet. Les désactiver rendrait le workflow
-   * inexploitable sans le moindre message d'erreur.
-   */
   it('une étape SYSTÈME n’est jamais désactivable', async () => {
     for (const systeme of [STAGE_A_TRAITER, STAGE_ENCAISSE, STAGE_REJETE]) {
       const error = await refusal(() => service.setActive(systeme.id, { isActive: false }));
@@ -168,10 +150,6 @@ describe('activation', () => {
     expect(bodyOf(error).code).toBe(BankCaseError.STAGE_SYSTEM_IMMUTABLE);
   });
 
-  /**
-   * Les dossiers qui stationnent sur l'étape deviendraient invisibles du flux,
-   * sans que personne ne soit averti qu'ils existent toujours.
-   */
   it('une étape qui porte encore des dossiers n’est pas désactivable, et le refus les COMPTE', async () => {
     db.addCase({
       id: 'case-1',
@@ -239,11 +217,6 @@ describe('réordonnancement', () => {
     expect(ouvertes()).toEqual(['A_TRAITER', 'VALIDATION', 'EN_TRAITEMENT_BANQUE']);
   });
 
-  /**
-   * Le réordonnancement n'affecte QUE les transitions futures. Les positions ne
-   * sont lues qu'au moment de calculer l'étape suivante ; l'historique référence
-   * des étapes par IDENTIFIANT et reste lisible des années après un remaniement.
-   */
   it('ne touche pas aux transitions déjà écrites', async () => {
     const troisieme = await service.create({
       code: 'VALIDATION',
@@ -271,7 +244,6 @@ describe('réordonnancement', () => {
     });
 
     expect(db.transitions[0]).toEqual(avant);
-    // L'étape référencée existe toujours et n'a changé QUE de position.
     const cible = db.stages.find((row) => row.id === STAGE_EN_TRAITEMENT.id);
     expect(cible?.code).toBe('EN_TRAITEMENT_BANQUE');
     expect(cible?.position).toBe(3);
@@ -298,16 +270,11 @@ describe('réordonnancement', () => {
     expect(bodyOf(error).unknown).toEqual([STAGE_ENCAISSE.id]);
   });
 
-  /**
-   * Un dossier NAÎT sur l'étape initiale : la placer au milieu du flux rendrait
-   * inaccessibles les étapes qui la précèdent.
-   */
   it('l’étape initiale doit rester en première position', async () => {
     const error = await refusal(() =>
       service.reorder({ stageIds: [STAGE_EN_TRAITEMENT.id, STAGE_A_TRAITER.id] }),
     );
     expect(bodyOf(error).code).toBe(BankCaseError.STAGE_INITIAL_MUST_BE_FIRST);
-    // Rien n'a bougé.
     expect(ouvertes()).toEqual(['A_TRAITER', 'EN_TRAITEMENT_BANQUE']);
   });
 });

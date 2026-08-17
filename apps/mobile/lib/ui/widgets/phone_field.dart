@@ -6,14 +6,6 @@ import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
 import '../../core/utils/phone.dart';
 
-/// Masque `XX XXX XX XX` appliqué à la frappe.
-///
-/// Le formateur ne travaille que sur les **chiffres** : il les extrait, les
-/// regroupe, puis replace le curseur en comptant les chiffres à gauche de la
-/// position d'origine. Repositionner le curseur à `text.length` : la solution
-/// qu'on voit partout : renverrait le curseur en fin de champ à chaque
-/// correction au milieu du numéro, ce qui rend impossible de rattraper une
-/// faute de frappe sans tout effacer.
 class SenegalPhoneFormatter extends TextInputFormatter {
   const SenegalPhoneFormatter();
 
@@ -53,12 +45,6 @@ class SenegalPhoneFormatter extends TextInputFormatter {
   }
 }
 
-/// Champ téléphone : indicatif fixe, masque, validation vivante.
-///
-/// L'indicatif `+221` est un **préfixe non éditable** et pas du texte dans le
-/// champ. Éditable, il finit toujours par être effacé par mégarde : et un
-/// numéro sans indicatif produit une clé de déduplication différente, donc un
-/// doublon que rien ne rattrape.
 class PhoneField extends StatelessWidget {
   const PhoneField({
     super.key,
@@ -79,7 +65,6 @@ class PhoneField extends StatelessWidget {
   final FocusNode? focusNode;
   final bool autofocus;
 
-  /// Message secondaire affiché sous le champ quand la saisie est valide.
   final String? helper;
 
   final TextInputAction textInputAction;
@@ -90,9 +75,6 @@ class PhoneField extends StatelessWidget {
       valueListenable: controller,
       builder: (BuildContext context, TextEditingValue value, Widget? _) {
         final PhoneResult parsed = Phone.parse(value.text);
-        // Une saisie incomplète n'est pas une erreur : afficher « numéro
-        // incomplet » dès le premier chiffre transforme un champ vide en champ
-        // en faute, et donne l'impression de se tromper avant même d'avoir tapé.
         final bool partial =
             parsed is PhoneInvalid &&
             (parsed.reason == PhoneProblem.tooShort ||
@@ -100,11 +82,6 @@ class PhoneField extends StatelessWidget {
         final String? error = partial
             ? null
             : (parsed is PhoneInvalid ? parsed.message : null);
-        // Réserve non bloquante : le champ reste valide, le bouton reste actif,
-        // et l'utilisateur est simplement prévenu. Un préfixe hors de la liste
-        // embarquée est le plus souvent une faute de frappe, parfois une
-        // nouvelle tranche ARTP : dans les deux cas c'est le serveur, qui tient
-        // `libphonenumber-js` à jour, qui tranche.
         final String? warning = parsed is PhoneValid ? parsed.warningMessage : null;
 
         return TextField(

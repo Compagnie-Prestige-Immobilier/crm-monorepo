@@ -27,31 +27,9 @@ import {
   UpdateBankCaseDto,
 } from './dto.js';
 
-/**
- * Dossiers bancaires.
- *
- * DEUX POINTS D'ATTENTION, tous deux structurels.
- *
- * 1. L'ORDRE DE DÉCLARATION EST SIGNIFIANT. Nest apparie les routes dans
- *    l'ordre où elles sont déclarées : `analytics`, `prospect-search` et
- *    `rejection-reasons` DOIVENT précéder `:id`, sinon le paramètre les avale
- *    et `GET /bank-cases/analytics` répond « dossier introuvable », ou pire,
- *    échoue sur le `ParseUUIDPipe` avec un message qui n'oriente personne.
- *
- * 2. Le rôle est posé sur la CLASSE, et surchargé sur la seule route de
- *    correction. `RolesGuard` lit `getAllAndOverride([handler, class])` : le
- *    décorateur de méthode remplace celui de classe, il ne s'y ajoute pas.
- *    Un COMMERCIAL n'a de place nulle part ici, il ne voit ni ne touche un
- *    dossier bancaire.
- */
 @ApiTags('bank-cases')
 @ApiBearerAuth()
 @Roles(Role.BANQUE_FINANCE, Role.ADMIN)
-// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
-// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
-// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
-// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
-// cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'bank-cases', version: '1' })
 export class BankCasesController {
@@ -97,8 +75,6 @@ export class BankCasesController {
     return this.cases.create(user, body);
   }
 
-  // ─── Routes littérales : AVANT `:id`, voir l'en-tête de classe ─────────────
-
   @Get('analytics')
   @ApiOperation({
     operationId: 'getBankCaseAnalytics',
@@ -132,8 +108,6 @@ export class BankCasesController {
   rejectionReasons(@Query() query: IncludeInactiveQueryDto): Promise<BankRejectionReasonListDto> {
     return this.cases.listRejectionReasons(query.includeInactive ?? false);
   }
-
-  // ─── Routes paramétrées ───────────────────────────────────────────────────
 
   @Get(':id')
   @ApiOperation({
@@ -198,10 +172,6 @@ export class BankCasesController {
     return this.cases.transition(user, id, body);
   }
 
-  /**
-   * ADMIN seul. Le décorateur de méthode REMPLACE celui de la classe : un agent
-   * BANQUE_FINANCE est refusé ici, y compris sur ses propres dossiers.
-   */
   @Roles(Role.ADMIN)
   @Post(':id/corrections')
   @ApiOperation({

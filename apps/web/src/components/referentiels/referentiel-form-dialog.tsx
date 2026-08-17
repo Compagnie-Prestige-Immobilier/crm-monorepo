@@ -46,16 +46,6 @@ import {
 } from '@/lib/schemas';
 import type { Banque, Departement, Syndicat } from '@/lib/types';
 
-/**
- * Création et renommage d'un référentiel.
- *
- * Trois formulaires distincts plutôt qu'un formulaire générique : les champs
- * n'ont rien en commun (une banque a une abréviation, un syndicat un secteur,
- * un département une région et un code administratif unique), et un composant
- * paramétré par un objet de configuration serait plus long que les trois
- * réunis, tout en perdant le typage des corps de requête.
- */
-
 export function BanqueFormDialog({
   open,
   onOpenChange,
@@ -203,8 +193,6 @@ export function SyndicatFormDialog({
         name: values.name,
         sigle: values.sigle,
         sortOrder: values.sortOrder,
-        // Champ facultatif : une chaîne vide vaut « non renseigné », et l'API
-        // refuserait `secteur: ''` comme une valeur.
         ...(values.secteur === '' ? {} : { secteur: values.secteur }),
       };
       return isEdit
@@ -369,8 +357,6 @@ export function DepartementFormDialog({
           <Field label="Région" required error={formState.errors.regionId?.message}>
             {(props) => (
               <Select
-                // `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
-                // pas le texte de l'item — ici, l'identifiant de la région.
                 items={(regions ?? []).map((region) => ({
                   value: region.id,
                   label: region.name,

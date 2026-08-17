@@ -1,20 +1,3 @@
-/**
- * Banque & Finance contre un VRAI PostgreSQL.
- *
- * Les suites unitaires du module éprouvent les règles ; celle-ci éprouve ce
- * qu'aucune doublure ne peut démontrer :
- *
- *  - que la liste, les agrégats et l'export décrivent RÉELLEMENT le même
- *    ensemble, puisque c'est le SQL lui-même qui est en jeu ;
- *  - que la contrainte d'unicité arbitre bien deux créations simultanées, et
- *    que le P2002 qui en résulte ressort en 409 typé ;
- *  - que la recherche de prospects retrouve un nom accentué et un numéro écrit
- *    de quatre façons, ce qui dépend de `unaccent` et de la normalisation
- *    téléphonique, non du code applicatif seul.
- *
- * Lancée par `pnpm test:integration`, jamais par `pnpm test` : elle exige la
- * base de développement sur localhost:5434.
- */
 process.env.NODE_ENV ??= 'test';
 process.env.DATABASE_URL ??= 'postgresql://crm:crm@localhost:5434/crm?schema=public';
 process.env.JWT_ACCESS_SECRET ??= 'integration-access-secret-32-characters';
@@ -45,7 +28,6 @@ const analytics = new BankCaseAnalyticsService(
 );
 const stages = new BankCaseStagesService(prisma as unknown as PrismaService);
 
-/** Préfixe unique : la base est partagée, on ne touche QUE nos propres lignes. */
 const TAG = 'ITBC';
 
 interface ErrorBody {
@@ -76,14 +58,6 @@ let banqueA: string;
 let banqueB: string;
 let prospects: string[] = [];
 
-/**
- * Efface les données d'un test, et rien d'autre : la base est partagée avec le
- * reste du dépôt et tout est préfixé par `TAG`.
- *
- * L'ORDRE suit les clés étrangères en `Restrict`, transitions, dossiers,
- * prospects, étapes. Un `deleteMany` dans le désordre échouerait sur une
- * contrainte au lieu de nettoyer.
- */
 async function cleanupData(): Promise<void> {
   await prisma.bankCaseTransition.deleteMany({
     where: { case: { referenceKey: { startsWith: TAG } } },
@@ -94,11 +68,6 @@ async function cleanupData(): Promise<void> {
   await prisma.bankCaseStage.deleteMany({ where: { code: { startsWith: TAG } } });
 }
 
-/**
- * Nettoyage complet, l'agent compris. Réservé aux bornes de la SUITE : appelé
- * entre deux tests, il supprimerait l'utilisateur créé par `beforeAll` et toute
- * création ultérieure échouerait sur `bank_cases_createdById_fkey`.
- */
 async function cleanupAll(): Promise<void> {
   await cleanupData();
   await prisma.user.deleteMany({ where: { username: { startsWith: TAG.toLowerCase() } } });
@@ -124,7 +93,6 @@ beforeAll(async () => {
   reasonId = reasons.find((row) => row.code !== 'AUTRE')?.id ?? '';
   reasonAutreId = reasons.find((row) => row.code === 'AUTRE')?.id ?? '';
 
-  // L'agent Banque & Finance n'existe pas dans le jeu de départ : on le crée.
   const agentRow = await prisma.user.create({
     data: {
       email: `${TAG.toLowerCase()}.agent@cpi.sn`,
@@ -157,16 +125,10 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-/**
- * Quatre prospects enrôlés, dont deux dont l'identité sert aux tests
- * d'autocomplétion (accents, et un numéro écrit de plusieurs manières).
- */
 beforeEach(async () => {
   await cleanupData();
 
   let representant = await prisma.representant.findFirst({ where: { deletedAt: null } });
-  // La CI part d'une base vide hors référentiels : ne pas rendre le test
-  // dépendant d'un prospect métier absent du seed.
   if (!representant) {
     const departement = await prisma.departement.findFirstOrThrow();
     representant = await prisma.representant.create({
@@ -195,9 +157,6 @@ beforeEach(async () => {
     },
   });
 
-  // La base impose `enrollmentMethod IS NOT NULL` exactement quand
-  // `phase2Status = METHOD_OBTAINED` : la contrainte `prospects_enrollment_
-  // method_matches_status` refuse toute autre combinaison.
   const base = {
     banqueId: banqueA,
     syndicatId: modele.syndicatId,
@@ -210,8 +169,6 @@ beforeEach(async () => {
     clientCreatedAt: new Date('2026-07-01T08:00:00.000Z'),
   };
 
-  // L'identifiant d'un prospect est produit par le CLIENT (saisie hors ligne),
-  // jamais par la base : il faut donc le fournir explicitement.
   const created = await Promise.all([
     prisma.prospect.create({
       data: {
@@ -258,7 +215,6 @@ beforeEach(async () => {
   prospects = created.map((row) => row.id);
 });
 
-/** Ouvre un dossier et le mène jusqu'à l'étape demandée. */
 async function scenario(
   reference: string,
   prospectIndex: number,
@@ -295,14 +251,8 @@ async function scenario(
   return created.id;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('unicité de la référence, arbitrée par la base', () => {
   it('la contrainte tranche deux créations SIMULTANÉES, et le perdant reçoit un 409 typé', async () => {
-    // Lancées ensemble : le pré-contrôle des deux appels s'exécute avant que
-    // l'un ou l'autre n'ait inséré. Seule la contrainte PostgreSQL peut
-    // départager, et c'est exactement la course que le rattrapage P2002 existe
-    // pour rendre lisible.
     const resultats = await Promise.allSettled([
       service.create(agent, { prospectId: prospects[0] ?? '', reference: `${TAG}-RACE-1` }),
       service.create(agent, { prospectId: prospects[1] ?? '', reference: `${TAG}-race-1` }),
@@ -315,7 +265,6 @@ describe('unicité de la référence, arbitrée par la base', () => {
 
     const erreur = (perdants[0] as PromiseRejectedResult).reason as unknown;
     expect(bodyOf(erreur).code).toBe(BankCaseError.REFERENCE_CONFLICT);
-    // Le corps DÉSIGNE le dossier gagnant, jamais un message nu.
     expect(bodyOf(erreur).existing?.id).toBeDefined();
 
     const enBase = await prisma.bankCase.count({ where: { referenceKey: `${TAG}-RACE-1` } });
@@ -365,26 +314,16 @@ describe('liste et filtres, en SQL', () => {
 
   it('la recherche libre porte sur la référence, le nom et le téléphone', async () => {
     expect((await service.list({ search: `${TAG}-L3` })).meta.total).toBe(1);
-    // Nom du client, accents et casse indifférents.
     expect((await service.list({ search: 'aissatou' })).meta.total).toBeGreaterThanOrEqual(2);
-    // Téléphone en saisie partielle.
     expect((await service.list({ search: '770000003' })).meta.total).toBe(1);
     expect((await service.list({ search: '77 123 45 67' })).meta.total).toBe(2);
   });
 
-  /**
-   * NON-RÉGRESSION. Une référence alphanumérique laisse un résidu de chiffres :
-   * « ITBC-L3 » se réduit à « 3 ». Tant que le seuil du filtre téléphonique
-   * était d'un seul chiffre, cette recherche joignait TOUS les numéros contenant
-   * un 3 et rendait trois dossiers là où l'agent en cherchait un.
-   */
   it('un chiffre isolé dans une référence ne devient PAS un joker sur les téléphones', async () => {
     const page = await service.list({ search: `${TAG}-L3` });
     expect(page.meta.total).toBe(1);
     expect(page.items[0]?.reference).toBe(`${TAG}-L3`);
 
-    // Contrôle : les numéros du jeu contiennent bien un « 3 », donc l'ancien
-    // comportement aurait effectivement ramené plusieurs lignes.
     const avecUn3 = await prisma.bankCase.count({
       where: { referenceKey: { startsWith: TAG }, customerPhoneE164: { contains: '3' } },
     });
@@ -403,10 +342,6 @@ describe('liste et filtres, en SQL', () => {
     expect((await service.list({ ...mine, agentId: admin.id })).meta.total).toBe(0);
   });
 
-  /**
-   * Un dossier ouvert a un montant NULL, et NULL n'est ni supérieur ni
-   * inférieur à une borne : le filtre de montant ne peut donc jamais le retenir.
-   */
   it('le filtre de montant exclut les dossiers sans montant', async () => {
     const page = await service.list({ ...mine, amountMin: '1' });
     expect(page.meta.total).toBe(1);
@@ -437,8 +372,6 @@ describe('liste et filtres, en SQL', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('les KPI sont les agrégats de la MÊME liste filtrée', () => {
   beforeEach(async () => {
     await scenario(`${TAG}-K1`, 0, 'open');
@@ -448,12 +381,6 @@ describe('les KPI sont les agrégats de la MÊME liste filtrée', () => {
     await scenario(`${TAG}-K5`, 1, 'rejected');
   });
 
-  /**
-   * LA propriété qui justifie que le filtre n'ait qu'une seule définition : un
-   * compteur affiché doit être exactement le décompte du tableau en dessous.
-   * On la vérifie en RECOMPTANT depuis la liste, sans jamais réutiliser le SQL
-   * des agrégats.
-   */
   it('total, répartition et somme encaissée coïncident avec la liste', async () => {
     const filtre = { search: TAG };
     const liste = await service.list({ ...filtre, pageSize: 200 });
@@ -477,8 +404,6 @@ describe('les KPI sont les agrégats de la MÊME liste filtrée', () => {
       .reduce((total, row) => total + BigInt(row.amountXof ?? '0'), 0n);
     expect(totaux.totalAmountCashed).toBe(somme.toString());
 
-    // Le taux de rejet se rapporte aux dossiers CLOS, pas au total : rapporté au
-    // total, il baisserait à chaque nouveau dossier ouvert.
     expect(totaux.rejectionRate).toBeCloseTo(
       (totaux.rejetes / (totaux.encaisses + totaux.rejetes)) * 100,
       1,
@@ -549,14 +474,11 @@ describe('les KPI sont les agrégats de la MÊME liste filtrée', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('autocomplétion des prospects', () => {
   it('retrouve un nom accentué écrit SANS accents, et l’inverse', async () => {
     expect((await service.prospectSearch({ search: 'Aissatou' })).items).toHaveLength(1);
     expect((await service.prospectSearch({ search: 'aïssatou' })).items).toHaveLength(1);
     expect((await service.prospectSearch({ search: 'AISSATOU' })).items).toHaveLength(1);
-    // Nom de famille seul, et ordre prénom/nom indifférent.
     expect((await service.prospectSearch({ search: `${TAG}Ndiaye` })).items).toHaveLength(1);
     expect((await service.prospectSearch({ search: `Aissatou ${TAG}Ndiaye` })).items).toHaveLength(
       1,
@@ -579,7 +501,6 @@ describe('autocomplétion des prospects', () => {
     expect(tous.items.map((row) => row.nom)).not.toContain(`${TAG}Fall`);
   });
 
-  /** La projection EST la mesure de confidentialité : rien d'autre n'est lu. */
   it('ne renvoie que l’identité, le téléphone et la banque courante', async () => {
     const item = (await service.prospectSearch({ search: `${TAG}Ndiaye` })).items[0];
     expect(Object.keys(item ?? {}).sort()).toEqual([
@@ -601,8 +522,6 @@ describe('autocomplétion des prospects', () => {
     expect((await service.prospectSearch({ search: `${TAG}Ndiaye` })).items).toHaveLength(0);
   });
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('concurrence et verrou terminal, en base', () => {
   it('deux transitions simultanées : une seule passe, l’autre reçoit REV_CONFLICT', async () => {
@@ -628,7 +547,6 @@ describe('concurrence et verrou terminal, en base', () => {
     expect(bodyOf(perdu.reason).code).toBe(BankCaseError.REV_CONFLICT);
     expect(bodyOf(perdu.reason).currentRev).toBe(2);
 
-    // Une transition écrite, une seule : le dossier n'a pas avancé deux fois.
     const historique = await prisma.bankCaseTransition.count({ where: { caseId: created.id } });
     expect(historique).toBe(2);
   });
@@ -663,7 +581,6 @@ describe('concurrence et verrou terminal, en base', () => {
     expect(enBase).toHaveLength(4);
     expect(enBase.at(-1)?.correctionReason).toBe('Erreur de rapprochement bancaire');
     expect(enBase.at(-1)?.performedById).toBe(admin.id);
-    // L'encaissement corrigé reste inscrit : l'historique est append-only.
     expect(enBase.at(-2)?.amountXof?.toFixed(0)).toBe('900000');
   });
 
@@ -678,8 +595,6 @@ describe('concurrence et verrou terminal, en base', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('sûreté du workflow, en base', () => {
   it('une étape qui porte des dossiers n’est pas désactivable', async () => {
     const nouvelle = await stages.create({
@@ -687,8 +602,6 @@ describe('sûreté du workflow, en base', () => {
       label: 'Contrôle intégration',
       color: 'info',
     });
-    // On y place un dossier par correction ADMIN, seul moyen d'y arriver
-    // directement depuis l'étape initiale.
     const created = await service.create(agent, {
       prospectId: prospects[0] ?? '',
       reference: `${TAG}-STG`,
@@ -702,7 +615,6 @@ describe('sûreté du workflow, en base', () => {
     const erreur = await refusal(() => stages.setActive(nouvelle.id, { isActive: false }));
     expect(bodyOf(erreur).code).toBe(BankCaseError.STAGE_HAS_OPEN_CASES);
 
-    // Une fois le dossier reparti, la désactivation passe.
     const courant = await service.get(created.id);
     await service.correct(admin, created.id, {
       targetStageId: stageATraiter,
@@ -719,11 +631,6 @@ describe('sûreté du workflow, en base', () => {
     }
   });
 
-  /**
-   * Réordonner ne réécrit RIEN de l'historique : les transitions référencent les
-   * étapes par identifiant. On le vérifie en comparant l'historique octet pour
-   * octet avant et après un réordonnancement réel.
-   */
   it('réordonner n’affecte que les transitions futures', async () => {
     const nouvelle = await stages.create({
       code: `${TAG}_VALIDATION`,
@@ -751,15 +658,12 @@ describe('sûreté du workflow, en base', () => {
     });
     expect(apres).toEqual(avant);
 
-    // …mais l'étape suivante d'un NOUVEAU dossier a bien changé.
     const suivante = await prisma.bankCaseStage.findFirstOrThrow({
       where: { type: 'OPEN', isActive: true, position: { gt: initiale?.position ?? 1 } },
       orderBy: { position: 'asc' },
     });
     expect(suivante.id).toBe(nouvelle.id);
 
-    // On remet le flux dans son ordre d'origine pour ne pas laisser la base
-    // altérée pour les autres suites.
     await stages.reorder({ stageIds: [initiale?.id ?? '', ...autres] });
   });
 });

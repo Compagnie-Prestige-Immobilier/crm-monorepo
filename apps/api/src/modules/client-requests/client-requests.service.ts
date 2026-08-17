@@ -34,43 +34,8 @@ import type {
   RejectClientRequestDto,
 } from './dto.js';
 
-/**
- * Demande de création de client, de la banque vers l'administrateur.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI CE MODULE EXISTE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Un agent Banque & Finance qui saisit un dossier pour un client absent de la
- * base était dans une impasse totale : « Aucun client ne correspond », et rien
- * ne remontait à personne. Le dossier ne se faisait pas, ou se faisait sur une
- * autre fiche, au hasard.
- *
- * La solution évidente (ouvrir la création de prospect au rôle
- * BANQUE_FINANCE) a été écartée. Un agent bancaire ne voit ni le
- * représentant, ni le syndicat, ni le commercial propriétaire : les fiches
- * qu'il créerait seraient sans paternité et sans département, et toutes les
- * statistiques par apporteur se mettraient à mentir sans que personne ne sache
- * pourquoi. L'arbitrage explicite coûte une journée d'attente ; l'alternative
- * coûte la confiance dans la base.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * L'APPROBATION EST UNE SEULE TRANSACTION
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Créer le prospect puis marquer la demande approuvée en deux temps laisserait,
- * au premier redémarrage mal placé, un prospect orphelin que personne ne
- * rattacherait jamais à sa demande, et une demande éternellement en attente sur
- * un numéro désormais pris. Les deux écritures partagent donc la même
- * transaction, et la contrainte CHECK
- * `client_creation_requests_approved_has_prospect` interdit en base l'état
- * intermédiaire.
- */
-
-/** Route applicative de l'écran d'arbitrage, ouverte au tap de la notification. */
 const REVIEW_ROUTE = '/demandes-clients';
 
-/** Route du tableau de bord bancaire, où le demandeur retrouve son dossier. */
 const BANK_ROUTE = '/dossiers';
 
 const INCLUDE = {
@@ -113,18 +78,10 @@ export class ClientRequestsService {
     private readonly demo: DemoVisibilityService,
   ) {}
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Dépôt
-  // ───────────────────────────────────────────────────────────────────────────
-
   async create(user: AuthenticatedUser, body: CreateClientRequestDto): Promise<ClientRequestDto> {
-    // Normalisé avec la MÊME fonction que partout ailleurs : c'est la seule
-    // façon de reconnaître qu'un client « absent » est en réalité déjà en base
-    // sous une autre présentation du même numéro.
     const phoneE164 = normalizePhone(body.phone);
-    // `enabledForWrite` : cette valeur est ÉCRITE dans `isDemo`, et l'approbation
-    // la recopie sur le prospect. Un repli `false` sur panne de lecture ferait
-    // d'une demande d'exercice une VRAIE demande, arbitrée pour de bon.
+    // `enabledForWrite` et non `enabled` : cette valeur est écrite dans `isDemo`, et un repli
+    // `false` sur panne de lecture ferait d'une demande d'exercice une vraie demande.
     const demoEnabled = await this.demo.enabledForWrite();
 
     const banque = await this.prisma.banque.findUnique({
@@ -154,26 +111,16 @@ export class ClientRequestsService {
           note: body.note?.trim() || null,
           banqueId: body.banqueId,
           requestedById: user.id,
-          // Une demande déposée en mode démonstration produit, à l'approbation,
-          // un prospect de démonstration (`approve` recopie ce drapeau). Sans
-          // cette propagation, l'agent qui s'exerce fabrique une VRAIE demande,
-          // qu'un administrateur arbitre pour de bon et qui devient une fiche
-          // réelle qu'éteindre le mode ne fera pas disparaître.
           isDemo: demoEnabled,
         },
         include: INCLUDE,
       })
       .catch(async (error: unknown) => {
-        // Le pré-contrôle ci-dessus lit puis écrit : deux agents qui déposent
-        // le même numéro à la même seconde le franchissent tous les deux.
-        // L'index partiel `client_creation_requests_pending_phone_key` tranche
-        // en base ; on retraduit son refus dans le MÊME message métier, faute
-        // de quoi le perdant reçoit un 409 « cette valeur existe déjà » qui ne
-        // désigne ni le numéro ni la demande à consulter.
+        // Le pré-contrôle ci-dessus lit puis écrit : c'est l'index partiel
+        // `client_creation_requests_pending_phone_key` qui tranche deux dépôts simultanés.
         if (!isUniqueViolation(error)) throw error;
-        // LECTURE GLOBALE délibérée : on relit la demande que l'index partiel
-        // GLOBAL vient de faire gagner. Filtrée, la relecture ne trouverait
-        // rien et le message perdrait l'identifiant qu'il doit désigner.
+        // LECTURE GLOBALE : on relit la demande que cet index partiel global vient de faire
+        // gagner ; filtrée, la relecture ne trouverait rien et le message perdrait son identifiant.
         const rival = await this.prisma.clientCreationRequest.findFirst({
           where: { phoneE164, status: ClientRequestStatus.PENDING },
           select: { id: true },
@@ -185,18 +132,13 @@ export class ClientRequestsService {
     return toClientRequestDto(created);
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Lecture
-  // ───────────────────────────────────────────────────────────────────────────
-
   async list(user: AuthenticatedUser, query: ClientRequestQueryDto): Promise<ClientRequestListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
     const demoEnabled = await this.demo.enabled();
 
-    // Un agent bancaire ne voit QUE ses propres demandes. Rien ne justifie de
-    // lui montrer l'identité des clients qu'une autre banque cherche à faire
-    // créer : ce serait une fuite entre concurrents, pas une commodité.
+    // Un agent bancaire ne voit que ses propres demandes : les autres révéleraient à une banque
+    // les clients qu'une concurrente cherche à faire créer.
     const scope: Prisma.ClientCreationRequestWhereInput =
       user.role === Role.ADMIN ? {} : { requestedById: user.id };
 
@@ -251,17 +193,9 @@ export class ClientRequestsService {
     return toClientRequestDto(row);
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Arbitrage
-  // ───────────────────────────────────────────────────────────────────────────
-
   /**
-   * Approuve la demande et crée le prospect, dans une seule transaction.
-   *
-   * Le prospect naît en `METHOD_OBTAINED` : c'est la condition EXACTE du filtre
-   * de recherche de la banque (`bank-cases.service.ts`, `prospectSearch`).
-   * Le créer en `PENDING` produirait une fiche invisible à celui-là même qui
-   * l'a demandée, et la demande paraîtrait approuvée sans rien débloquer.
+   * Le prospect naît en `METHOD_OBTAINED` : c'est la condition exacte du filtre de recherche de
+   * la banque (`bank-cases.service.ts`, `prospectSearch`), sans quoi il lui resterait invisible.
    */
   async approve(
     user: AuthenticatedUser,
@@ -293,14 +227,8 @@ export class ClientRequestsService {
       if (!banque) throw banqueNotFound();
     }
 
-    // Relu juste avant d'écrire : entre le dépôt de la demande et son
-    // arbitrage, un commercial a très bien pu saisir la fiche sur le terrain.
-    //
-    // LECTURE GLOBALE délibérée : l'unicité du téléphone d'un prospect est
-    // portée par un index partiel GLOBAL. Filtré, ce contrôle laisserait
-    // l'approbation créer un prospect que la base refuse, et la transaction
-    // échouerait sur un message que l'administrateur ne peut pas relier à la
-    // demande qu'il vient d'approuver.
+    // LECTURE GLOBALE : l'unicité du téléphone d'un prospect est portée par un index partiel
+    // global ; filtré, ce contrôle laisserait l'approbation créer un prospect que la base refuse.
     const clash = await this.prisma.prospect.findFirst({
       where: { phoneE164: request.phoneE164, deletedAt: null },
       select: { id: true },
@@ -321,10 +249,8 @@ export class ClientRequestsService {
           syndicatId: body.syndicatId,
           representantId: body.representantId,
           createdById: user.id,
-          // Provenance tracée : c'est ce qui permet de mesurer ce qui entre
-          // hors base au lieu de le deviner. Le libellé recopie le nom de la
-          // banque plutôt que sa clé, pour survivre à un renommage du
-          // référentiel, exactement comme l'identité figée d'un dossier.
+          // Le libellé recopie le nom de la banque plutôt que sa clé, pour survivre à un
+          // renommage du référentiel.
           origin: 'BANQUE',
           originLabel: request.banque.name,
           phase2Status: Phase2Status.METHOD_OBTAINED,
@@ -334,28 +260,14 @@ export class ClientRequestsService {
           clientCreatedAt: body.clientCreatedAt
             ? new Date(body.clientCreatedAt)
             : request.createdAt,
-          // La demande de démonstration produit un prospect de démonstration :
-          // sans cette propagation, éteindre le mode laisserait une fiche
-          // fictive visible dans un export réel.
           isDemo: request.isDemo,
         },
       });
 
-      // L'ARBITRAGE SE GAGNE ICI, pas dans la lecture faite plus haut.
-      //
-      // `loadPending` lit HORS transaction : deux administrateurs qui ouvrent
-      // le même écran la franchissent tous les deux. Écrire ensuite sans
-      // condition laissait le second écraser le premier, d'où une demande
-      // REJECTED portant un `createdProspectId`, un prospect réellement créé
-      // que plus rien ne désigne, et deux notifications contradictoires
-      // envoyées à la banque. L'écriture CONDITIONNELLE fait gagner le premier :
-      // sous READ COMMITTED, la seconde transaction se bloque sur le verrou de
-      // ligne, réévalue son `where` après le commit et ne met rien à jour.
-      //
-      // Elle vient APRÈS la création du prospect, et non avant : la clé
-      // étrangère `createdProspectId` est vérifiée immédiatement, désigner une
-      // ligne pas encore écrite échouerait. Le perdant fait avorter la
-      // transaction, ce qui défait le prospect avec elle.
+      // L'arbitrage se gagne par cette écriture CONDITIONNELLE, pas par le `loadPending` hors
+      // transaction : sur `status: PENDING` dans le `where`, le second arbitre ne met rien à jour.
+      // Elle vient après la création du prospect car la clé étrangère `createdProspectId` est
+      // vérifiée immédiatement ; le perdant fait avorter la transaction, qui défait le prospect.
       const claimed = await tx.clientCreationRequest.updateMany({
         where: { id, status: ClientRequestStatus.PENDING },
         data: {
@@ -382,12 +294,8 @@ export class ClientRequestsService {
   ): Promise<ClientRequestDto> {
     await this.loadPending(id);
 
-    // Même garde que l'approbation, et pour la même raison : la lecture
-    // ci-dessus ne verrouille rien. Sans le `status: PENDING` dans le `where`,
-    // un refus arrivé une seconde après une approbation repasserait la demande
-    // en REJECTED tout en lui laissant son `createdProspectId` et son prospect
-    // bien réel, état que la contrainte CHECK n'interdit pas et que l'écran
-    // d'arbitrage affiche comme un refus ayant créé un client.
+    // Même écriture conditionnelle qu'à l'approbation : sans `status: PENDING`, un refus arrivé
+    // après une approbation laisserait une demande REJECTED portant un `createdProspectId`.
     const claimed = await this.prisma.clientCreationRequest.updateMany({
       where: { id, status: ClientRequestStatus.PENDING },
       data: {
@@ -403,8 +311,6 @@ export class ClientRequestsService {
     await this.notifyRequester(user, updated, false);
     return toClientRequestDto(updated);
   }
-
-  // ───────────────────────────────────────────────────────────────────────────
 
   private async loadPending(id: string): Promise<RequestRow> {
     const row = await this.prisma.clientCreationRequest.findFirst({
@@ -427,14 +333,6 @@ export class ClientRequestsService {
     return row;
   }
 
-  /**
-   * Prévient les administrateurs qu'une demande attend.
-   *
-   * L'échec de la notification n'annule PAS la demande : elle est déjà écrite,
-   * et la perdre parce que le canal d'alerte est indisponible remettrait
-   * l'agent bancaire dans l'impasse que ce module lève. L'écran d'arbitrage
-   * reste consultable sans notification.
-   */
   private async notifyAdmins(user: AuthenticatedUser, request: RequestRow): Promise<void> {
     await this.safely('dépôt', () =>
       this.notifications.create(user, {
@@ -467,6 +365,8 @@ export class ClientRequestsService {
     );
   }
 
+  // L'échec d'une notification n'annule pas la demande, déjà écrite : la perdre sur une panne du
+  // canal d'alerte remettrait l'agent bancaire dans l'impasse que ce module lève.
   private async safely(step: string, run: () => Promise<unknown>): Promise<void> {
     try {
       await run();
@@ -478,6 +378,5 @@ export class ClientRequestsService {
   }
 }
 
-/** Violation d'unicité PostgreSQL, telle que Prisma la remonte. */
 const isUniqueViolation = (error: unknown): boolean =>
   isPrismaKnownError(error) && error.code === 'P2002';

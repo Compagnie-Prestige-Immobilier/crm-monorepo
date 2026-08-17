@@ -38,29 +38,9 @@ import {
 import { SegmentConversionsService } from './segment-conversions.service.js';
 import { SegmentConversionListDto, SegmentConversionsQueryDto } from './segment-conversions.dto.js';
 
-/**
- * Tableau de bord. Tous les endpoints acceptent le filtre de la liste des
- * prospects, et le cloisonnement par commercial s'y applique à l'identique :
- * un COMMERCIAL voit ses propres chiffres, jamais ceux de ses collègues.
- *
- * POURQUOI UN `@Roles` EXPLICITE ALORS QUE LE CLOISONNEMENT SUFFIT
- *
- * `prospectConditions` épingle `p."createdById"` pour tout non-ADMIN, donc un
- * compte BANQUE_FINANCE, qui ne crée aucun prospect, ne lisait déjà que des
- * ensembles vides. La protection tenait au fait que CHAQUE requête passe par ce
- * helper : elle était une propriété de l'implémentation, pas une règle du
- * contrôleur. La première route d'analyse écrite sans lui aurait ouvert les
- * dix-neuf autres. Le garde-fou est ici pour que l'oubli devienne impossible
- * plutôt qu'improbable.
- */
 @ApiTags('analytics')
 @ApiBearerAuth()
 @Roles(Role.ADMIN, Role.COMMERCIAL)
-// Toute route de ce contrôleur peut refuser pour ces trois raisons :
-// jeton absent ou expiré, rôle insuffisant, et entrée refusée par la
-// validation globale (`forbidNonWhitelisted` transforme un paramètre mal
-// orthographié en 400). Les déclarer ici évite de les oublier route par
-// route, ce qui était le cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'analytics', version: '1' })
 export class AnalyticsController {
@@ -214,12 +194,6 @@ export class AnalyticsController {
     return this.analytics.topRepresentants(user, query);
   }
 
-  // ── Pilotage, délais, portefeuille ─────────────────────────────────────────
-  //
-  // Ces routes prennent le MÊME filtre que les précédentes. C'est ce qui permet
-  // à un écran de campagne de recouper ses chiffres avec la liste des prospects
-  // sans avoir à expliquer pourquoi les deux ne disent pas la même chose.
-
   @Get('campaign-pilotage')
   @ApiOperation({
     operationId: 'getCampaignPilotage',
@@ -334,14 +308,6 @@ export class AnalyticsController {
     return this.quality.dataQuality(user, query);
   }
 
-  /**
-   * MÊMES rôles que le reste du contrôleur, écrits une seconde fois.
-   *
-   * Cette route ne lit pas des prospects mais l'HISTOIRE de leurs conversions,
-   * une table que le cloisonnement de `prospectConditions` ne protège pas : la
-   * garde qui vaut pour les dix-neuf autres ne vaudrait ici que par héritage,
-   * et l'héritage se perd le jour où quelqu'un déplace la route.
-   */
   @Get('segment-conversions')
   @Roles(Role.ADMIN, Role.COMMERCIAL)
   @ApiOperation({

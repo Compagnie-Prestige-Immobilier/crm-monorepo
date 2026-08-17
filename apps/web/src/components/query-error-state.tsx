@@ -15,34 +15,7 @@ import { isConfigurationError } from '@/lib/api/config';
 import { apiErrorText } from '@/lib/mutation-feedback';
 import { ApiError } from '@crm/api-client/query';
 
-/**
- * État d'ERREUR d'une requête. Il manquait à TOUS les écrans du panel.
- *
- * Le défaut corrigé ici : aucune vue ne lisait `isError`. Comme
- * `unwrap()` fait bien rejeter la requête, `data` restait `undefined` et le
- * rendu tombait sur l'état VIDE. Un 500 du serveur s'affichait donc en
- * « Aucun prospect ne correspond à ces filtres. Élargissez la période ou
- * retirez un critère. » : un message qui accuse l'utilisateur d'avoir mal
- * filtré alors que le serveur est en panne, et qui l'envoie tripoter ses
- * critères pendant que la vraie cause reste invisible.
- *
- * Deux exigences de docs/design.md sont tenues ici :
- *  - jamais un « Erreur » nu : `apiErrorText` traduit le statut en une phrase
- *    qui dit quoi faire ensuite ;
- *  - un 403 n'est pas une panne mais un refus de permission, et il se présente
- *    autrement : proposer « Réessayer » sur un refus de droits ferait recliquer
- *    dans le vide.
- */
-
 function presentation(error: unknown): { icon: LucideIcon; title: string; retryable: boolean } {
-  /**
-   * Configuration incomplète : ni une panne réseau, ni un refus de droits.
-   *
-   * Non rejouable, et c'est le point : « Réessayer » sur une variable
-   * d'environnement absente fait recliquer dans le vide jusqu'à ce que
-   * quelqu'un redéploie. Le titre nomme la nature du défaut, le message nomme
-   * la variable.
-   */
   if (isConfigurationError(error)) {
     return { icon: ServerCogIcon, title: 'Configuration incomplète', retryable: false };
   }
@@ -58,26 +31,6 @@ function presentation(error: unknown): { icon: LucideIcon; title: string; retrya
     if (error.status === 404) {
       return { icon: AlertTriangleIcon, title: 'Introuvable', retryable: false };
     }
-    /**
-     * 400 et 422 : la REQUÊTE est refusée, et la rejouer la refera refuser.
-     *
-     * C'est la même règle que pour le 403 ci-dessus, appliquée là où elle
-     * manquait. Ces deux statuts tombaient dans le repli « Chargement
-     * impossible », qui est rejouable : l'écran offrait donc un bouton
-     * « Réessayer » qui renvoie la MÊME requête, reçoit le MÊME refus, et
-     * n'aboutira jamais. C'est exactement le « recliquer dans le vide » que
-     * l'en-tête de ce fichier dit éviter.
-     *
-     * Le cas n'est pas théorique depuis que l'état des filtres vit dans l'URL :
-     * toutes les listes déclarent un 400 de validation de leurs paramètres, et
-     * une URL partagée, mise en signet ou retouchée à la main porte une valeur
-     * hors bornes jusqu'au chargement suivant. Le vrai remède est la barre de
-     * filtres, restée à l'écran ; le bouton en détournait.
-     *
-     * Le titre nomme ce qui est en cause. « Chargement impossible » décrit une
-     * panne et laisse chercher du côté du réseau, alors que la correction est
-     * dans les critères.
-     */
     if (error.status === 400 || error.status === 422) {
       return { icon: AlertTriangleIcon, title: 'Requête refusée', retryable: false };
     }
@@ -90,7 +43,6 @@ function presentation(error: unknown): { icon: LucideIcon; title: string; retrya
     }
     return { icon: AlertTriangleIcon, title: 'Chargement impossible', retryable: true };
   }
-  // Pas d'`ApiError` : le réseau n'a pas abouti du tout.
   return { icon: WifiOffIcon, title: 'Serveur injoignable', retryable: true };
 }
 
@@ -108,9 +60,6 @@ export function QueryErrorState({
   const { icon: Icon, title, retryable } = presentation(error);
 
   return (
-    /* `role="alert"` : l'échec survient APRÈS le chargement, donc hors du flux
-       de lecture. Sans annonce, un utilisateur de lecteur d'écran attend
-       indéfiniment des données qui ne viendront pas. */
     <Card
       role="alert"
       aria-live="assertive"
@@ -138,11 +87,6 @@ export function QueryErrorState({
   );
 }
 
-/**
- * Variante compacte, pour un bloc qui vit à l'intérieur d'une carte (un
- * graphique du tableau de bord, par exemple) et ne peut pas s'offrir un pavé
- * de seize unités de hauteur.
- */
 export function QueryErrorInline({
   error,
   onRetry,

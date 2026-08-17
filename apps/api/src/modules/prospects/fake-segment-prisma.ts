@@ -3,28 +3,6 @@ import type { BddSegment, ChangeSource } from '@crm/database';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 
-/**
- * Doublure Prisma en mémoire pour la MIGRATION DE SEGMENT.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI UNE DOUBLURE QUI *INTERPRÈTE* PLUTÔT QUE DES `vi.fn()` FIGÉS
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * C'est la leçon de `bank-cases/fake-prisma.ts`, et elle s'applique mot pour
- * mot ici. Les deux invariants de ce chemin, « la trace part avec la mise à
- * jour » et « une révision périmée n'écrit rien », ne sont pas des appels à
- * Prisma : ce sont des CONSÉQUENCES d'un enchaînement. Un `updateMany` qui
- * répondrait `{ count: 1 }` quoi qu'on lui passe ferait passer le test de
- * conflit de révision alors même que la garde aurait été retirée du service :
- * le test vert prouverait alors exactement le contraire de ce qu'il annonce.
- *
- * Cette doublure applique donc réellement le `where` sur un petit magasin
- * mémoire : `rev` comprise, `deletedAt` comprise. Et son `$transaction`
- * ANNULE : le magasin est photographié à l'entrée et restauré si le travail
- * lève, ce qui est le seul moyen de montrer qu'une trace n'est jamais écrite
- * seule.
- */
-
 export interface FakeBanque {
   id: string;
   name: string;
@@ -75,7 +53,6 @@ export interface FakeSegmentChange {
 
 const BASE = new Date('2026-08-01T08:00:00.000Z');
 
-/** Les deux axes de la matrice, en quatre lignes de référentiel. */
 export const BANQUE_CBAO: FakeBanque = { id: 'bnq-cbao', name: 'CBAO Sénégal', shortName: 'CBAO' };
 export const BANQUE_BHS: FakeBanque = {
   id: 'bnq-bhs',
@@ -97,13 +74,6 @@ export class FakeSegmentPrisma {
   prospects: FakeProspect[] = [];
   segmentChanges: FakeSegmentChange[] = [];
 
-  /**
-   * Panne provoquée à l'écriture de la trace.
-   *
-   * C'est le seul moyen de montrer que la mise à jour du prospect ne survit
-   * PAS à une trace qui n'a pas pu s'écrire : sans elle, « même transaction »
-   * resterait une affirmation de commentaire.
-   */
   onSegmentChangeCreate: (() => void) | undefined;
 
   private sequence = 0;
@@ -137,7 +107,6 @@ export class FakeSegmentPrisma {
     return row;
   }
 
-  /** Les jointures d'affichage attendues par `PROSPECT_INCLUDE`. */
   private hydrateProspect(row: FakeProspect): unknown {
     const banque = this.banques.find((item) => item.id === row.banqueId);
     const syndicat = this.syndicats.find((item) => item.id === row.syndicatId);
@@ -166,12 +135,6 @@ export class FakeSegmentPrisma {
     };
   }
 
-  /**
-   * Le `where` est APPLIQUÉ, champ par champ.
-   *
-   * `rev` en particulier : c'est la clause qui décide du conflit, et une
-   * doublure qui l'ignorerait rendrait le test correspondant décoratif.
-   */
   private matchesProspect(row: FakeProspect, where: Where): boolean {
     for (const [key, expected] of Object.entries(where)) {
       if (expected === undefined) continue;
@@ -271,15 +234,6 @@ export class FakeSegmentPrisma {
     },
   };
 
-  /**
-   * `$transaction` qui ANNULE, contrairement à celui de Banque & Financement.
-   *
-   * Il ne rejoue pas le verrouillage de PostgreSQL, et ne le prétend pas. Mais
-   * l'énoncé « la fiche et sa trace partent ensemble » n'a de sens que si une
-   * panne au milieu laisse les DEUX en arrière : une doublure qui se contente
-   * d'exécuter la fonction ferait passer ce test avec un `$transaction`
-   * remplacé par deux écritures indépendantes.
-   */
   async $transaction<T>(work: (tx: FakeSegmentPrisma) => Promise<T>): Promise<T> {
     const prospects = this.prospects.map((row) => ({ ...row }));
     const changes = this.segmentChanges.map((row) => ({ ...row }));
@@ -292,7 +246,6 @@ export class FakeSegmentPrisma {
     }
   }
 
-  /** Les dernières tentatives d'appel : aucun test de ce fichier n'en pose. */
   $queryRaw(): Promise<never[]> {
     return Promise.resolve([]);
   }

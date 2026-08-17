@@ -9,18 +9,8 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AppUpdatesModule } from './app-updates.module.js';
 
-/** Même clé que le service : la doublure doit répondre à celle-là et pas une autre. */
 const SETTING_KEY = 'mobile.android.release';
 
-/**
- * Doublure de la seule table touchée par le module : `app_settings`.
- *
- * Elle STOCKE réellement ce qu'on lui écrit, au lieu de rendre une valeur figée
- * par `vi.fn()`. C'est indispensable ici : le test qui prouve qu'une note trop
- * longue est refusée doit ensuite interroger `GET android/current` et constater
- * qu'elle n'y est PAS. Une doublure qui rendrait toujours la même ligne ne
- * saurait pas distinguer « refusé » de « enregistré puis relu ».
- */
 export class FakeReleaseStore {
   private value: string | null = null;
 
@@ -35,7 +25,6 @@ export class FakeReleaseStore {
     },
   };
 
-  /** Écrit la release directement, sans passer par la route d'envoi. */
   seed(release: Record<string, unknown>): void {
     this.value = JSON.stringify(release);
   }
@@ -49,7 +38,6 @@ export class FakeReleaseStore {
   }
 }
 
-/** Administrateur injecté à la place du JwtAuthGuard, absent de ce montage. */
 export const FAKE_ADMIN: AuthenticatedUser = {
   id: 'adm-1',
   email: 'admin@cpi.sn',
@@ -58,16 +46,6 @@ export const FAKE_ADMIN: AuthenticatedUser = {
   role: Role.ADMIN,
 };
 
-/**
- * Monte l'application RÉELLE, sur l'adaptateur Fastify, avec le préfixe et la
- * version de production.
- *
- * Rien de moins ne prouverait quoi que ce soit sur les reprises de
- * téléchargement : l'analyse de `Range`, la réponse 206, le 416 et l'`ETag`
- * sont produits par le greffon Fastify et par la couche HTTP, pas par du code
- * appelable directement. Un test qui appellerait `service.download()` avec un
- * faux objet `reply` ne verrait jamais un seul de ces en-têtes.
- */
 export async function createAppUpdatesApp(
   store: FakeReleaseStore,
 ): Promise<NestFastifyApplication> {
@@ -87,8 +65,6 @@ export async function createAppUpdatesApp(
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1', prefix: 'v' });
   await app.register(multipart, { limits: { fileSize: 10_000_000, files: 1, fields: 8 } });
 
-  // Le montage n'embarque pas les gardes globales : sans cette identité,
-  // `@CurrentUser()` lèverait avant même d'atteindre le service.
   const instance: FastifyInstance = app.getHttpAdapter().getInstance();
   instance.addHook(
     'onRequest',
@@ -103,15 +79,6 @@ export async function createAppUpdatesApp(
   return app;
 }
 
-/**
- * Corps multipart minimal : `app.inject` n'en fabrique pas.
- *
- * `trailingFields` place des champs APRÈS la partie fichier. Rien n'impose
- * l'ordre des parties d'un envoi multipart, et le service lisait les champs au
- * moment où la partie fichier lui parvenait : tout ce qui suivait était ignoré
- * en silence. Une aide de test qui n'émet QUE l'ordre commode ne peut pas faire
- * apparaître ce défaut, elle le cache.
- */
 export function multipartBody(
   fields: Record<string, string>,
   file: { name: string; content: Buffer },

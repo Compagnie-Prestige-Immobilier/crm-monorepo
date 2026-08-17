@@ -1,20 +1,3 @@
-/**
- * Syndicats, centrales syndicales et coopératives d'habitat du Sénégal.
- *
- * C'est une liste de DÉPART, pas un référentiel figé : le panel admin permet
- * d'ajouter, renommer et désactiver des entrées, et le mobile les récupère à la
- * synchronisation suivante. Elle couvre les structures les plus représentatives,
- * pas l'exhaustivité : laquelle n'existe nulle part sous forme publiable.
- *
- * Le G7 est l'intersyndicale des sept syndicats d'enseignants les plus
- * représentatifs, créée le 1er mai 2019.
- *
- * CHUES et UES ne sont pas des syndicats mais des coopératives d'habitat
- * partenaires de CPI. Elles figurent ici parce que le champ « syndicat » du
- * formulaire désigne en pratique la structure d'appartenance du prospect, et
- * que ces deux-là sont le cœur de cible historique.
- */
-
 export interface SyndicatSeed {
   name: string;
   sigle: string;
@@ -23,8 +6,6 @@ export interface SyndicatSeed {
 }
 
 export const SYNDICATS_SENEGAL: readonly SyndicatSeed[] = [
-  // Coopératives d'habitat partenaires : en tête parce que ce sont les plus
-  // saisies sur le terrain.
   {
     name: "Coopérative d'Habitat de l'Union des Enseignants du Sénégal",
     sigle: 'CHUES',
@@ -38,7 +19,6 @@ export const SYNDICATS_SENEGAL: readonly SyndicatSeed[] = [
     sortOrder: 2,
   },
 
-  // G7 : intersyndicale enseignante
   {
     name: 'Syndicat Autonome des Enseignants du Moyen Secondaire du Sénégal',
     sigle: 'SAEMSS',
@@ -82,7 +62,6 @@ export const SYNDICATS_SENEGAL: readonly SyndicatSeed[] = [
     sortOrder: 16,
   },
 
-  // Enseignement supérieur
   {
     name: "Syndicat Autonome de l'Enseignement Supérieur",
     sigle: 'SAES',
@@ -90,7 +69,6 @@ export const SYNDICATS_SENEGAL: readonly SyndicatSeed[] = [
     sortOrder: 20,
   },
 
-  // Santé
   {
     name: 'Syndicat Unique des Travailleurs de la Santé et de l’Action Sociale',
     sigle: 'SUTSAS',
@@ -110,7 +88,6 @@ export const SYNDICATS_SENEGAL: readonly SyndicatSeed[] = [
     sortOrder: 32,
   },
 
-  // Centrales syndicales
   {
     name: 'Confédération Nationale des Travailleurs du Sénégal',
     sigle: 'CNTS',
@@ -142,7 +119,6 @@ export const SYNDICATS_SENEGAL: readonly SyndicatSeed[] = [
     sortOrder: 44,
   },
 
-  // Autres secteurs
   {
     name: 'Syndicat des Travailleurs de la Justice',
     sigle: 'SYTJUST',

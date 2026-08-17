@@ -8,15 +8,6 @@ import type { ImportFileStore, StoredImportFile } from './import-file.store.js';
 import type { ImportRunnerService } from './import-runner.service.js';
 import { ImportsService } from './imports.service.js';
 
-/**
- * La face visible : appliquer, et laisser mourir.
- *
- * Les deux transitions éprouvées ici sont des ÉCRITURES CONDITIONNELLES, jamais
- * une lecture suivie d'une écriture. Une doublure qui répondrait toujours
- * `{ count: 1 }` les ferait passer même si la condition avait disparu du code ;
- * celle-ci applique le `where` pour de vrai.
- */
-
 class FakeFileStore implements ImportFileStore {
   removed: string[] = [];
 
@@ -30,7 +21,6 @@ class FakeFileStore implements ImportFileStore {
   }
 }
 
-/** Le moteur n'est pas exercé ici : le départ immédiat est une politesse, pas un contrat. */
 const idleRunner = {
   run: () => Promise.resolve({ result: 'busy' as const }),
 } as unknown as ImportRunnerService;
@@ -71,12 +61,7 @@ describe('service d’import', () => {
       expect(dto.processedRows).toBe(0);
       expect(dto.createdRows).toBe(0);
       expect(dto.errorRows).toBe(0);
-      // Le jeton de la simulation est RELÂCHÉ : sans cela, le travail resterait
-      // sous un bail que plus personne ne tient, et le balayage l'attendrait
-      // dix minutes pour rien.
       expect(prisma.jobs[0]?.claimToken).toBeNull();
-      // UN SEUL travail, un seul fichier. Deux lignes sur le même classeur
-      // feraient détruire le fichier de l'une par l'échéance de l'autre.
       expect(prisma.jobs).toHaveLength(1);
     });
 
@@ -117,9 +102,6 @@ describe('service d’import', () => {
       expect(closed).toBe(1);
       expect(files.removed).toEqual(['/tmp/imports/job-1.xlsx']);
       expect(prisma.jobs[0]?.status).toBe(ImportStatus.expired);
-      // LE JETON PART AVEC LE FICHIER. Un travailleur encore en vol écrira
-      // ensuite sur zéro ligne et s'arrêtera de lui-même, au lieu de continuer à
-      // écrire des fiches à partir d'un classeur qui n'existe plus.
       expect(prisma.jobs[0]?.claimToken).toBeNull();
     });
 

@@ -5,25 +5,6 @@ import { BddSegment, ChangeSource } from '@crm/database';
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 
-/**
- * Les conversions de segment, vues d'en haut.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * LES TROIS QUESTIONS, ET LES TROIS INDEX QUI LES SERVENT
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `SegmentChange` porte trois index composites, et ce ne sont pas des index de
- * confort : chacun répond à une question que la direction pose réellement.
- *
- *   `(toSegment, changedAt)`  → combien de bascules vers BDD1 sur la période ;
- *   `(changedById, changedAt)`→ qui a converti, et combien ;
- *   `(prospectId, changedAt)` → l'histoire d'une fiche, servie ailleurs par
- *                               `GET /prospects/:id/segment-history`.
- *
- * Les deux premières se répondent ICI, dans une seule opération : les séparer
- * en trois endpoints obligerait l'écran à trois appels dont rien ne
- * garantirait qu'ils décrivent la même période.
- */
 export class SegmentConversionsQueryDto {
   @ApiPropertyOptional({
     format: 'date-time',
@@ -83,7 +64,6 @@ export class SegmentConversionsQueryDto {
   pageSize?: number;
 }
 
-/** Une bascule, avec de quoi la lire sans second appel. */
 export class SegmentConversionDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ format: 'uuid' }) prospectId!: string;
@@ -102,19 +82,18 @@ export class SegmentConversionDto {
   @ApiProperty({ type: String, format: 'date-time' }) changedAt!: string;
 }
 
-/** Décompte par segment de départ : la question « d'où viennent-elles ». */
 export class SegmentConversionOriginDto {
   @ApiProperty({ enum: BddSegment, enumName: 'BddSegment' }) segment!: BddSegment;
   @ApiProperty({ type: Number }) conversions!: number;
 }
 
-/** Décompte par auteur : la question « par qui ». */
 export class SegmentConversionAuthorDto {
   @ApiProperty({ format: 'uuid' }) userId!: string;
   @ApiProperty() fullName!: string;
   @ApiProperty({ type: Number }) conversions!: number;
 }
 
+/** Les deux décomptes portent sur TOUTE la période filtrée, jamais sur la page affichée. */
 export class SegmentConversionListDto {
   @ApiProperty({
     type: () => [SegmentConversionDto],
@@ -124,12 +103,6 @@ export class SegmentConversionListDto {
 
   @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
 
-  /*
-   * Les deux décomptes portent sur TOUTE la période filtrée, jamais sur la
-   * page affichée. Les calculer sur la page ferait varier « 12 conversions
-   * depuis BDD3 » d'un clic de pagination à l'autre, sur des données
-   * strictement identiques.
-   */
   @ApiProperty({ type: () => [SegmentConversionOriginDto] })
   byOriginSegment!: SegmentConversionOriginDto[];
 

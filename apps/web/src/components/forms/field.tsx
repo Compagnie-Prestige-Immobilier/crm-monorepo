@@ -4,18 +4,6 @@ import { useId, type ReactNode } from 'react';
 
 import { Label } from '@/components/ui/label';
 
-/**
- * Champ de formulaire : libellé RÉEL, message d'erreur annoncé, description
- * facultative.
- *
- * Le libellé n'est jamais un `placeholder`. Un placeholder disparaît dès la
- * première frappe : l'utilisateur qui revient sur un formulaire à moitié rempli
- * ne sait plus ce qu'il est en train de saisir, et un lecteur d'écran n'annonce
- * rien du tout.
- *
- * `aria-describedby` relie l'erreur au champ ; `role="alert"` la fait annoncer
- * au moment où elle apparaît, sans attendre que le focus revienne.
- */
 export function Field({
   label,
   error,

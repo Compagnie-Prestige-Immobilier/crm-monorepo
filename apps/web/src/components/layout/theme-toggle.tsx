@@ -22,9 +22,6 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // Le thème résolu n'est connu qu'après hydratation : le rendu serveur ignore
-  // la préférence système et `localStorage`. Afficher une icône avant ce point
-  // garantit une divergence d'hydratation à chaque chargement en mode sombre.
   useEffect(() => {
     setMounted(true);
   }, []);

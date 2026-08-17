@@ -16,30 +16,13 @@ import { PROSPECT_COLUMNS } from '../export/columns.js';
 import { ProspectsService } from './prospects.service.js';
 import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
-/**
- * Un seul filtre, quatre surfaces, sur un VRAI PostgreSQL.
- *
- * Les tests unitaires vérifient que chaque surface traduit correctement le
- * filtre ; ils ne peuvent pas vérifier que les traductions décrivent la même
- * population, parce que l'une produit un objet Prisma et l'autre du SQL brut.
- * Seule une base réelle peut répondre à la question qui compte : le total
- * affiché sur le tableau de bord, le nombre de lignes de la liste et le nombre
- * de lignes du fichier exporté sont-ils LE MÊME nombre ?
- *
- * Les fixtures sont rattachées à un commercial créé pour l'occasion. Le
- * cloisonnement en fait un univers clos : rien de ce qui existe déjà en base ne
- * peut entrer dans les compteurs, et le test reste juste sur une base peuplée.
- */
-
 const RUN = uuidv7().slice(0, 8);
 const DATABASE_URL = process.env.DATABASE_URL ?? readRootEnv();
 
 function readRootEnv(): string {
   try {
     process.loadEnvFile(new URL('../../../../../.env', import.meta.url).pathname);
-  } catch {
-    /* Le contrôle d'existence ci-dessous produira un message plus utile. */
-  }
+  } catch {}
   return process.env.DATABASE_URL ?? '';
 }
 
@@ -50,16 +33,10 @@ const prospects = new ProspectsService(service, fakeDemoVisibility());
 const analytics = new AnalyticsService(service, fakeDemoVisibility());
 const exports = new ExportService(service, analytics, fakeDemoVisibility());
 
-/** Le commercial propriétaire des fixtures : sa portée EST l'univers du test. */
 let commercial: AuthenticatedUser;
 let autreCommercial: AuthenticatedUser;
 let campaignId: string;
 
-/**
- * Population de contrôle : les quatre cases de la matrice, chacune peuplée
- * différemment, plus deux fiches d'un AUTRE commercial qui ne doivent jamais
- * apparaître nulle part.
- */
 interface Attendu {
   id: string;
   nom: string;
@@ -70,18 +47,14 @@ interface Attendu {
 }
 
 const PLAN: readonly Omit<Attendu, 'id' | 'segment'>[] = [
-  // BDD1, CHUES × CBAO
   { nom: 'B1Obtenu', sigle: 'CHUES', shortName: 'CBAO', obtenu: true },
   { nom: 'B1Obtenu2', sigle: 'CHUES', shortName: 'CBAO', obtenu: true },
   { nom: 'B1Attente', sigle: 'CHUES', shortName: 'CBAO', obtenu: false },
-  // BDD2, CHUES × autre banque
   { nom: 'B2Obtenu', sigle: 'CHUES', shortName: 'BHS', obtenu: true },
   { nom: 'B2Attente', sigle: 'CHUES', shortName: 'BHS', obtenu: false },
-  // BDD3, autre syndicat × CBAO
   { nom: 'B3Obtenu', sigle: 'SAES', shortName: 'CBAO', obtenu: true },
   { nom: 'B3Attente', sigle: 'SAES', shortName: 'CBAO', obtenu: false },
   { nom: 'B3Attente2', sigle: 'UDEN', shortName: 'CBAO', obtenu: false },
-  // BDD4, autre syndicat × autre banque
   { nom: 'B4Obtenu', sigle: 'SAES', shortName: 'BHS', obtenu: true },
   { nom: 'B4Attente', sigle: 'UDEN', shortName: 'Ecobank', obtenu: false },
 ];
@@ -189,23 +162,16 @@ beforeAll(async () => {
               phase2Status: 'METHOD_OBTAINED' as const,
               enrollmentMethod: 'PLATFORM' as const,
               enrollmentCapturedAt: new Date('2026-08-03T11:30:00.000Z'),
-              // L'auteur de la MÉTHODE est l'autre commercial : c'est ce qui
-              // permet de vérifier qu'il n'est pas confondu avec l'auteur de
-              // la saisie de phase 1.
               enrollmentCapturedById: other.id,
             }
           : {}),
       },
     });
 
-    // Une tâche de campagne sur toutes les fiches, pour que le filtre
-    // `campaignId` porte sur une population connue.
     await prisma.callTask.create({
       data: { campaignId: campaign.id, prospectId: id, assignedToId: owner.id, position: index },
     });
 
-    // Deux tentatives sur les fiches abouties : la DERNIÈRE seule doit
-    // apparaître, ce qui distingue un vrai « dernier » d'un « premier trouvé ».
     if (entry.obtenu) {
       await prisma.callAttempt.create({
         data: {
@@ -245,8 +211,6 @@ beforeAll(async () => {
     });
   }
 
-  // Deux fiches d'un AUTRE commercial, dans deux segments différents : elles
-  // ne doivent apparaître dans aucun compteur ni dans aucune feuille.
   for (const [suffix, sigle, shortName] of [
     ['X1', 'CHUES', 'CBAO'],
     ['X2', 'SAES', 'BHS'],
@@ -268,8 +232,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Nettoyage dans l'ordre des dépendances : les tentatives et les tâches
-  // référencent les prospects, qui référencent le représentant et les users.
   const ids = (
     await prisma.prospect.findMany({
       where: { createdById: { in: [commercial.id, autreCommercial.id] } },
@@ -288,14 +250,6 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-/**
- * Produit le classeur et le relit, c'est le FICHIER qui est jugé.
- *
- * La lecture est branchée AVANT l'écriture : le service pousse le XML au fil de
- * l'eau et le tampon d'un `PassThrough` est borné. Tout accumuler d'abord
- * ferait tenir le classeur entier en mémoire, ce que la génération en flux
- * existe précisément pour éviter.
- */
 async function workbook(filter: ProspectFilterDto, mode: ExportMode): Promise<ExcelJS.Workbook> {
   const stream = new PassThrough();
   const book = new ExcelJS.Workbook();
@@ -305,14 +259,12 @@ async function workbook(filter: ProspectFilterDto, mode: ExportMode): Promise<Ex
   return reading;
 }
 
-/** La feuille attendue, ou un échec explicite plutôt qu'un `undefined` propagé. */
 function sheetOf(book: ExcelJS.Workbook, name: string): ExcelJS.Worksheet {
   const found = book.getWorksheet(name);
   if (!found) throw new Error(`Feuille « ${name} » absente du classeur.`);
   return found;
 }
 
-/** Texte d'une cellule : une `CellValue` peut être un objet que `String()` masquerait. */
 function text(value: ExcelJS.CellValue): string {
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return value.toISOString();
@@ -320,7 +272,6 @@ function text(value: ExcelJS.CellValue): string {
   return String(value);
 }
 
-/** Valeurs d'une colonne d'une feuille, en-tête exclu. */
 function column(sheet: ExcelJS.Worksheet, header: string): string[] {
   const index = PROSPECT_COLUMNS.findIndex((spec) => spec.header === header) + 1;
   const values: string[] = [];
@@ -339,8 +290,6 @@ describe('la matrice BDD1–BDD4 sur données réelles', () => {
       const item = page.items.find((row) => row.id === attendu.id);
       expect(item?.segment, attendu.nom).toBe(attendu.segment);
     }
-    // Les quatre cases sont peuplées : un test où trois segments seraient vides
-    // passerait sans rien prouver.
     for (const segment of ['BDD1', 'BDD2', 'BDD3', 'BDD4'] as const) {
       expect(bySegment(segment).length, segment).toBeGreaterThan(0);
     }
@@ -394,9 +343,7 @@ describe('la phase 2 remonte jusqu’à la liste', () => {
       expect(item.enrollmentMethod).toBe('PLATFORM');
       expect(item.enrollmentCapturedByName).toBe('Omar Ba');
       expect(item.enrollmentCapturedById).toBe(autreCommercial.id);
-      // L'auteur de la saisie de phase 1 reste distinct.
       expect(item.ownedByCommercialId).toBe(commercial.id);
-      // Deux tentatives existent ; c'est la plus récente qui doit sortir.
       expect(item.lastOutcome).toBe('METHOD_OBTAINED');
       expect(item.lastComment).toBe(`Accepte la plateforme (${item.nom})`);
     }
@@ -409,8 +356,6 @@ describe('la phase 2 remonte jusqu’à la liste', () => {
     });
     expect(parAuteur.meta.total).toBe(attendus.filter((row) => row.obtenu).length);
 
-    // Le même identifiant passé comme AUTEUR DE SAISIE ne rend rien : le
-    // cloisonnement borne la liste au commercial courant.
     const parSaisie = await prospects.list(commercial, {
       commercialId: autreCommercial.id,
       pageSize: 200,
@@ -431,11 +376,6 @@ describe('la phase 2 remonte jusqu’à la liste', () => {
 });
 
 describe('un filtre unique, des comptes identiques sur les trois surfaces', () => {
-  /**
-   * Le filtre est délibérément composite : segment, statut de phase 2 et
-   * campagne à la fois. C'est la combinaison, pas chaque clause isolée, qui
-   * révèle une clause écrasée par une autre.
-   */
   const FILTRES: readonly ProspectFilterDto[] = [
     {},
     { segment: 'BDD1' },
@@ -449,8 +389,6 @@ describe('un filtre unique, des comptes identiques sur les trois surfaces', () =
   it.each(FILTRES.map((filter) => [JSON.stringify(filter), filter] as const))(
     'liste, agrégats et export filtré comptent pareil pour %s',
     async (_titre, filtre) => {
-      // `Object.assign` plutôt qu'une diffusion : le filtre est une instance
-      // de classe, et la diffuser en perdrait le prototype.
       const filter: ProspectFilterDto = Object.assign({}, filtre, { campaignId });
 
       const page = await prospects.list(commercial, Object.assign({}, filter, { pageSize: 200 }));
@@ -467,7 +405,6 @@ describe('un filtre unique, des comptes identiques sur les trois surfaces', () =
       expect(statuts.total, 'analytics.byPhase2Status').toBe(attendu);
       expect(column(feuille, 'Nom'), 'export filtré').toHaveLength(attendu);
 
-      // Et ce sont bien les MÊMES lignes, pas seulement le même nombre.
       expect(column(feuille, 'Nom').toSorted()).toEqual(
         page.items.map((row) => row.nom).toSorted(),
       );
@@ -491,7 +428,6 @@ describe('un filtre unique, des comptes identiques sur les trois surfaces', () =
       const feuille = sheetOf(book, item.segment);
       const noms = column(feuille, 'Nom');
       expect(noms, item.segment).toHaveLength(item.prospects);
-      // Rien d'un autre segment n'a fuité dans l'onglet.
       expect(new Set(column(feuille, 'Segment'))).toEqual(
         new Set(noms.length ? [item.segment] : []),
       );
@@ -529,7 +465,6 @@ describe('un filtre unique, des comptes identiques sur les trois surfaces', () =
       column(feuille, 'Dernier commentaire').every((value) => value.startsWith('Accepte')),
     ).toBe(true);
     expect(column(feuille, 'Commercial').every((value) => value === 'Awa Sy')).toBe(true);
-    // La date d'obtention est une vraie cellule date, pas du texte.
     expect(
       feuille
         .getRow(2)
@@ -548,7 +483,6 @@ describe('un filtre unique, des comptes identiques sur les trois surfaces', () =
     expect(statuts.items.find((item) => item.status === 'METHOD_OBTAINED')?.prospects).toBe(
       obtenus,
     );
-    // Les statuts, eux, couvrent toute la population.
     expect(statuts.total).toBe(PLAN.length);
   });
 });

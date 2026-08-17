@@ -13,25 +13,6 @@ import '../../../data/local/database.dart';
 import '../notification_inbox.dart';
 import '../notifications_controller.dart';
 
-/// Centre d'annonces.
-///
-/// ═══ IL N'Y A PLUS RIEN À AUTORISER, DONC PLUS RIEN À DEMANDER ═══
-///
-/// Cet écran demandait `POST_NOTIFICATIONS` et affichait, quand le transport
-/// manquait, « Notifications indisponibles sur cet appareil ». Firebase ayant
-/// été abandonné, ce bandeau était devenu l'état permanent : l'application
-/// annonçait sa propre panne à chaque ouverture, pour une fonctionnalité qui
-/// marche. Il a disparu, ainsi que la demande d'autorisation et l'intent
-/// `APP_NOTIFICATION_SETTINGS` qui codait en dur le nom du paquet.
-///
-/// Ce qui reste est la seule chose vraie : la liste, servie depuis SQLite (donc
-/// hors ligne), et complétée par `/notifications/mine` à chaque ouverture et à
-/// chaque retour au premier plan.
-///
-/// **Le retour arrière est explicite** (`CpiBackButton` + `CpiPopScope`) : c'est
-/// une route de premier niveau, hors coque de navigation, et sans les deux la
-/// flèche comme le geste système sortent de l'application. Voir
-/// `core/router/back_navigation.dart`.
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -45,17 +26,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    // Après le premier cadre : le rapatriement touche le réseau, et le lancer
-    // pendant `initState` retarderait la construction pour rien. La liste
-    // locale, elle, s'affiche immédiatement.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _refresh();
     });
-    // Le coordinateur de session rafraîchit déjà au retour au premier plan ;
-    // l'écran le refait pour lui-même parce qu'il peut être ouvert alors que le
-    // coordinateur n'existe pas (test, aperçu). Le plancher et le verrou de
-    // `NotificationInbox` empêchent la requête en double.
     _lifecycle = AppLifecycleListener(onResume: _refresh);
   }
 
@@ -66,8 +40,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   void _refresh() {
-    // `force` : l'utilisateur a lui-même ouvert cet écran, il attend la liste
-    // d'aujourd'hui, pas celle d'il y a deux minutes.
     ref.read(notificationInboxProvider).refresh(force: true).ignore();
   }
 
@@ -97,12 +69,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ),
         body: Column(
           children: <Widget>[
-            // Bandeau d'actualité de la liste.
-            //
-            // « Aucune annonce » recouvrait TROIS situations différentes : la
-            // boîte est vraiment vide, le rapatriement n'a pas encore eu lieu,
-            // ou il a échoué. L'utilisateur en concluait que le siège n'avait
-            // rien envoyé, et le message le lui confirmait.
             ValueListenableBuilder<InboxStatus>(
               valueListenable: ref.read(notificationInboxProvider).status,
               builder: (BuildContext context, InboxStatus status, Widget? _) {
@@ -123,11 +89,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       'être lues.',
                   color: cpi.syncFailed,
                 ),
-                // Tirer pour rafraîchir enveloppe MAINTENANT les deux branches.
-                // Il ne couvrait que la liste non vide : sur un état vide : et
-                // c'est précisément l'état d'un premier lancement raté : il n'y
-                // avait aucun moyen de redemander la liste, aucun geste, aucun
-                // bouton.
                 data: (List<StoredNotification> rows) => RefreshIndicator(
                   color: theme.colorScheme.primary,
                   onRefresh: () async {
@@ -135,25 +96,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     await ref.read(notificationInboxProvider).refresh(force: true);
                   },
                   child: rows.isEmpty
-                      // ═══ UNE HAUTEUR MINIMALE, PAS UNE HAUTEUR FIXE ═══
-                      //
-                      // L'état vide était enfermé dans un `SizedBox` de 70 % de
-                      // la hauteur d'écran. Une fraction fixe ne grandit pas
-                      // avec le texte : l'icône de 56 px, le titre et les trois
-                      // lignes du message tenaient à 1,0× et débordaient dès
-                      // 1,3×, c'est-à-dire chez tout utilisateur ayant poussé la
-                      // taille de texte d'Android.
-                      //
-                      // `LayoutBuilder` + `minHeight` donne la même chose en
-                      // mieux : l'état vide occupe au moins la fenêtre, donc
-                      // reste centré, et pousse le défilement au lieu de
-                      // déborder quand il ne rentre plus.
                       ? LayoutBuilder(
                           builder: (BuildContext context, BoxConstraints box) {
                             return SingleChildScrollView(
-                              // `AlwaysScrollableScrollPhysics` : sans elle, un
-                              // contenu plus court que l'écran ne défile pas,
-                              // donc le geste « tirer » ne part jamais.
                               physics: const AlwaysScrollableScrollPhysics(),
                               child: ConstrainedBox(
                                 constraints: BoxConstraints(
@@ -197,10 +142,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 }
 
-/// « Ce que vous voyez date d'avant. »
-///
-/// Le bandeau nomme la dernière synchronisation réussie : une liste vieille de
-/// dix minutes et une liste jamais rapatriée n'appellent pas la même réaction.
 class _StaleStrip extends StatelessWidget {
   const _StaleStrip({this.lastSuccessAt});
 
@@ -251,19 +192,9 @@ class _NotificationTile extends ConsumerWidget {
 
     return InkWell(
       onTap: () async {
-        // La lecture est enregistrée AVANT la navigation : partir d'abord
-        // laisserait une notification lue marquée non lue si l'écran de
-        // destination remplaçait celui-ci pendant l'écriture.
         await ref.read(pushInboxStoreProvider).markRead(data.id);
-        // Remontée au serveur, en tâche de fond : c'est ce qui permet au siège
-        // de savoir qu'une annonce a été lue. Son échec ne change rien ici, la
-        // lecture locale est déjà écrite.
         ref.read(notificationInboxProvider).markRead(data.id).ignore();
         if (!context.mounted) return;
-        // `push` et non `go` : `go` REMPLACE toute la pile, si bien que l'écran
-        // de destination n'avait plus rien derrière lui : le retour ne ramenait
-        // jamais à la boîte de réception, et sur une route de premier niveau il
-        // sortait de l'application. Voir `core/router/back_navigation.dart`.
         if (hasRoute) context.push(data.route!);
       },
       child: ConstrainedBox(
@@ -276,9 +207,6 @@ class _NotificationTile extends ConsumerWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              // Pastille de non-lu. Elle porte aussi une étiquette de
-              // sémantique : la couleur seule ne peut pas être la seule
-              // porteuse d'information (WCAG 1.4.1).
               Semantics(
                 label: isUnread ? 'Non lue' : 'Lue',
                 child: Container(
@@ -381,7 +309,6 @@ class _Empty extends StatelessWidget {
   }
 }
 
-/// Date lisible. `intl` avec la locale française, comme partout ailleurs.
 String _formatDate(DateTime value) {
   final DateTime local = value.toLocal();
   final DateTime now = DateTime.now();

@@ -29,28 +29,11 @@ import {
   RejectClientRequestDto,
 } from './dto.js';
 
-/**
- * Demandes de création de client.
- *
- * DEUX PUBLICS, DEUX DROITS, et la frontière est portée par les décorateurs de
- * méthode : `RolesGuard` lit `getAllAndOverride([handler, class])`, donc un
- * décorateur de méthode REMPLACE celui de classe au lieu de s'y ajouter. C'est
- * pourquoi chaque route énumère ses rôles au complet.
- *
- * - BANQUE_FINANCE dépose et consulte SES demandes ;
- * - ADMIN voit tout et arbitre.
- *
- * Le cloisonnement de lecture est posé dans le service, pas ici : dans le
- * contrôleur, il dépendrait de la discipline de chaque route ajoutée ensuite.
- */
 @ApiTags('client-requests')
 @ApiBearerAuth()
+// `RolesGuard` lit `getAllAndOverride([handler, class])` : un `@Roles` de méthode REMPLACE celui
+// de la classe au lieu de s'y ajouter, d'où l'énumération complète des rôles sur chaque route.
 @Roles(Role.ADMIN)
-// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
-// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
-// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
-// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
-// cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'client-requests', version: '1' })
 export class ClientRequestsController {

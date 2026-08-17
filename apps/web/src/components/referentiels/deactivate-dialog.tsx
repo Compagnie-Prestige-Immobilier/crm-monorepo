@@ -14,17 +14,6 @@ import {
 import { formatNumber } from '@/lib/format';
 import { RETIRED_SUFFIX } from '@/lib/types';
 
-/**
- * Confirmation de désactivation d'un référentiel.
- *
- * Ce dialogue existe pour une seule raison : lever la confusion entre
- * « désactiver » et « supprimer ». Les deux mots se ressemblent, les
- * conséquences pas du tout. Il annonce donc, avec le nombre de fiches
- * concernées sous les yeux, que RIEN n'est supprimé : les prospects gardent
- * leur valeur et l'affichent suivie de « {RETIRED_SUFFIX} ». Sans ce compteur,
- * un administrateur désactive une banque en croyant nettoyer une liste, et
- * découvre 400 prospects marqués « retiré » le lendemain.
- */
 export function DeactivateReferentielDialog({
   open,
   onOpenChange,
@@ -38,7 +27,6 @@ export function DeactivateReferentielDialog({
   onOpenChange: (open: boolean) => void;
   label: string;
   kind: 'banque' | 'syndicat' | 'département';
-  /** Nombre de prospects qui référencent cette valeur. */
   usageCount: number;
   pending: boolean;
   onConfirm: () => void;

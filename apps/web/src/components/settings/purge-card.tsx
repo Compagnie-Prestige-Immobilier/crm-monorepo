@@ -34,24 +34,6 @@ import { formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
-/**
- * Purge de la base.
- *
- * C'est l'action la plus destructrice de toute la plateforme : elle ne se
- * rattrape pas. L'écran est construit autour d'une seule exigence, ELLE NE DOIT
- * JAMAIS PARTIR PAR ACCIDENT.
- *
- * Quatre dispositifs, aucun décoratif :
- *
- * 1. La commande n'est PROPOSÉE qu'au premier administrateur. Le serveur la
- *    refuse aux autres, l'écran ne la leur montre pas. Les deux, pas l'un.
- * 2. Les domaines entraînés sont affichés AVANT la validation. Une case qui
- *    s'allume au moment de la suppression se vit comme une dérive.
- * 3. La confirmation exige la ressaisie de l'identifiant de connexion. Une case
- *    à cocher se coche par réflexe ; un identifiant se tape en conscience.
- * 4. Le bouton est verrouillé pendant l'appel, et aucun succès n'est annoncé
- *    avant la réponse du serveur.
- */
 export function PurgeCard() {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -76,8 +58,6 @@ export function PurgeCard() {
       setConfirming(false);
       setConfirmation('');
       setSelected([]);
-      // Toute la plateforme change de contenu : on vide le cache plutôt que
-      // d'énumérer les clés. Un écran oublié afficherait des lignes disparues.
       void queryClient.invalidateQueries();
       router.refresh();
       toast.success(`${formatNumber(result.total)} lignes supprimées.`);
@@ -130,8 +110,6 @@ export function PurgeCard() {
 
         <CardContent className="flex flex-col gap-5">
           {!data.allowed ? (
-            /* Pas un bouton grisé et muet : la raison est nommée, sinon le
-               second administrateur conclut à une panne et ouvre un ticket. */
             <p
               role="status"
               className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.8125rem] text-warning"

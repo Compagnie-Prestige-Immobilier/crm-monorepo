@@ -20,25 +20,6 @@ import {
   SYNDICAT_SAES,
 } from './fake-segment-prisma.js';
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * CE QUE CE FICHIER ÉPROUVE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Quatre énoncés, et aucun n'est vérifiable en lisant le service :
- *
- *   1. les deux segments sont ceux de la DÉFINITION PARTAGÉE, des deux côtés
- *      de la bascule et pour les quatre cases de la matrice ;
- *   2. la fiche et sa trace partent ENSEMBLE, ou ne partent pas ;
- *   3. un geste qui ne change aucune clé est REFUSÉ, plutôt que d'écrire une
- *      ligne d'histoire vide ;
- *   4. une révision périmée n'écrit rien et le dit.
- *
- * Les quatre passent par une doublure qui INTERPRÈTE le `where` : voir
- * l'en-tête de `fake-segment-prisma.ts` pour la raison, qui est la même que
- * dans Banque & Financement.
- */
-
 const alice: AuthenticatedUser = {
   id: ALICE.id,
   email: 'alice@cpi.sn',
@@ -54,7 +35,6 @@ const service = (prisma: FakeSegmentPrisma): SegmentChangeService =>
 const codeOf = (error: unknown): unknown =>
   (((error as { response?: unknown }).response ?? {}) as { code?: unknown }).code;
 
-/** Le CORPS du refus, celui que le client lit réellement. */
 async function bodyOf(promise: Promise<unknown>): Promise<Record<string, unknown>> {
   try {
     await promise;
@@ -64,7 +44,6 @@ async function bodyOf(promise: Promise<unknown>): Promise<Record<string, unknown
   throw new Error('aucune exception levée alors qu’un refus était attendu');
 }
 
-/** Les quatre cases de la matrice, chacune par son couple de clés. */
 const COMBOS = [
   { segment: 'BDD1', banqueId: BANQUE_CBAO.id, syndicatId: SYNDICAT_CHUES.id },
   { segment: 'BDD2', banqueId: BANQUE_BHS.id, syndicatId: SYNDICAT_CHUES.id },
@@ -73,14 +52,6 @@ const COMBOS = [
 ] as const satisfies readonly { segment: BddSegment; banqueId: string; syndicatId: string }[];
 
 describe('segment calculé des DEUX côtés de la bascule', () => {
-  /**
-   * Les douze migrations possibles entre les quatre cases.
-   *
-   * Éprouver une seule bascule, la seule qui intéresse le métier (BDD3 → BDD1),
-   * laisserait passer une inversion d'axe : `classifySegment` appelé avec le
-   * sigle à la place du nom court rangerait toutes les fiches du même côté, et
-   * un test unique tomberait juste une fois sur deux.
-   */
   for (const from of COMBOS) {
     for (const to of COMBOS) {
       if (from.segment === to.segment) continue;
@@ -99,9 +70,6 @@ describe('segment calculé des DEUX côtés de la bascule', () => {
         const [trace] = prisma.segmentChanges;
         expect(trace?.fromSegment).toBe(from.segment);
         expect(trace?.toSegment).toBe(to.segment);
-        // Les clés d'AVANT sont conservées telles qu'elles étaient : sans
-        // elles, la ligne dit d'où la fiche vient en segment mais pas en
-        // référentiel, et l'écart ne se rattrape plus.
         expect(trace?.fromBanqueId).toBe(from.banqueId);
         expect(trace?.fromSyndicatId).toBe(from.syndicatId);
         expect(trace?.toBanqueId).toBe(to.banqueId);
@@ -151,14 +119,6 @@ describe('la fiche et sa trace partent ENSEMBLE', () => {
     });
   });
 
-  /**
-   * LE TEST QUI JUSTIFIE LA TRANSACTION.
-   *
-   * Sans elle, la fiche resterait basculée et l'histoire, muette : exactement
-   * l'état que cette table existe pour rendre impossible. Ce n'est pas une
-   * hypothèse d'école, c'est ce que produit toute coupure entre deux écritures
-   * indépendantes.
-   */
   it('une trace qui ne peut pas s’écrire ANNULE la bascule', async () => {
     const prisma = new FakeSegmentPrisma();
     prisma.addProspect({ id: 'p-1', banqueId: BANQUE_BHS.id, syndicatId: SYNDICAT_SAES.id });
@@ -191,8 +151,6 @@ describe('la fiche et sa trace partent ENSEMBLE', () => {
       expectedRev: 1,
     });
 
-    // Une trace réelle posée sur une fiche fictive entrerait dans le décompte
-    // des conversions du mois, et survivrait à l'extinction du mode.
     expect(prisma.segmentChanges[0]?.isDemo).toBe(true);
   });
 });
@@ -227,12 +185,6 @@ describe('refus', () => {
     expect(prisma.segmentChanges).toEqual([]);
   });
 
-  /**
-   * Deux utilisateurs sur la même fiche : le second doit être arrêté par la
-   * BASE, pas par une relecture qu'il aurait faite juste avant. La doublure
-   * applique réellement `rev` dans le `where`, sans quoi ce test resterait vert
-   * la garde retirée.
-   */
   it('une révision périmée n’écrit rien et rend la révision RÉELLE', async () => {
     const prisma = new FakeSegmentPrisma();
     prisma.addProspect({ id: 'p-1', rev: 4, banqueId: BANQUE_BHS.id });
@@ -246,8 +198,6 @@ describe('refus', () => {
     await expect(promise).rejects.toThrow(ConflictException);
     const body = await bodyOf(promise);
     expect(body.code).toBe(ProspectSegmentError.REV_CONFLICT);
-    // L'écran a besoin de la révision COURANTE pour proposer un rechargement
-    // qui aboutira, au lieu de renvoyer l'utilisateur au même échec.
     expect(body.currentRev).toBe(4);
 
     expect(prisma.prospects[0]?.banqueId).toBe(BANQUE_BHS.id);

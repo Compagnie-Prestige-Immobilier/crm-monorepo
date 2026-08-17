@@ -14,24 +14,9 @@ import { PurgeService } from './purge.service.js';
 import { SupervisionDto } from './supervision.dto.js';
 import { SupervisionService } from './supervision.service.js';
 
-/**
- * Administration de la plateforme : purge de la base et supervision des
- * comptes.
- *
- * `@Roles(ADMIN)` est posé sur la CLASSE : une route ajoutée sans décorateur
- * reste fermée plutôt que d'être ouverte par oubli. La purge ajoute un second
- * verrou, le premier administrateur, vérifié dans le service, et non ici :
- * un contrôle de garde se contourne en appelant le service d'ailleurs, un
- * contrôle dans le service ne se contourne pas.
- */
 @ApiTags('admin')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
-// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
-// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
-// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
-// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
-// cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'admin', version: '1' })
 export class AdminController {

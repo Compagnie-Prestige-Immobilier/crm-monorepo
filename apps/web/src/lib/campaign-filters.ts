@@ -7,20 +7,6 @@ import {
 } from '@/lib/search-params';
 import { CAMPAIGN_SCOPES, type CampaignScope, type CampaignStatus } from '@/lib/types';
 
-/**
- * Filtre des campagnes d'appels : traduction URL ⇄ objet, sur le modèle de
- * `lib/filters.ts` (prospects) et `lib/bank-filters.ts` (dossiers).
- *
- * L'écran n'offrait que trois boutons de statut, dans un `useState` : au-delà
- * d'une dizaine de campagnes, retrouver « la campagne BDD2 de mars créée par
- * untel » se faisait à l'œil, page après page, sans possibilité de partager le
- * résultat.
- *
- * Analyse TOLÉRANTE : une valeur inconnue est écartée, jamais propagée vers
- * l'API. Une URL bricolée à la main ne doit pas produire un 400 sur un écran
- * que l'utilisateur n'a fait qu'ouvrir depuis un lien.
- */
-
 export const CAMPAIGN_PAGE_SIZE = 25;
 
 const CAMPAIGN_STATUSES: readonly CampaignStatus[] = ['ACTIVE', 'CLOSED'];
@@ -29,9 +15,7 @@ export interface CampaignFilters {
   search: string;
   status: CampaignStatus | null;
   scope: CampaignScope | null;
-  /** Identifiant de l'administrateur qui a lancé le tirage (`createdById` côté API). */
   createdBy: string | null;
-  /** Bornes incluses, `YYYY-MM-DD`, sur la date de création. */
   dateFrom: string | null;
   dateTo: string | null;
   page: number;
@@ -64,7 +48,6 @@ export function parseCampaignFilters(params: RawSearchParams | URLSearchParams):
   };
 }
 
-/** Sérialisation canonique : défauts omis, ordre de clés fixe, donc clé de cache. */
 export function serializeCampaignFilters(filters: CampaignFilters): URLSearchParams {
   const params = new URLSearchParams();
   const put = (key: string, value: string | null): void => {
@@ -86,16 +69,6 @@ export function campaignFiltersQueryKey(filters: CampaignFilters): string {
   return serializeCampaignFilters(filters).toString();
 }
 
-// ─── Filtrage simple / filtrage avancé ───────────────────────────────────────
-
-/**
- * Les critères rangés derrière « Filtres avancés ».
- *
- * Restent visibles la recherche et le statut : ce sont les deux gestes de
- * chaque session (« où en sont les campagnes en cours ? »). Le périmètre, le
- * créateur et la période servent à retrouver une campagne précise, quelques
- * fois par mois.
- */
 export const CAMPAIGN_ADVANCED_FILTER_KEYS = ['scope', 'createdBy', 'dateFrom', 'dateTo'] as const;
 
 export type CampaignAdvancedFilterKey = (typeof CAMPAIGN_ADVANCED_FILTER_KEYS)[number];
@@ -109,7 +82,6 @@ export function clearCampaignAdvancedFilters(): Partial<CampaignFilters> {
   } satisfies Record<CampaignAdvancedFilterKey, null>;
 }
 
-/** Ce qui compte comme « filtre actif » pour l'affichage du bouton de remise à zéro. */
 export function countActiveCampaignFilters(filters: CampaignFilters): number {
   let count = 0;
   if (filters.search.trim() !== '') count += 1;

@@ -5,15 +5,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { DeactivateUserDialog } from '@/components/commerciaux/deactivate-user-dialog';
 import type { UserRow } from '@/lib/types';
 
-/**
- * Ce qu'on éprouve ici, c'est la RAISON D'ÊTRE du dialogue.
- *
- * La désactivation partait auparavant d'un `onSelect` de menu, sans confirmation.
- * Le correctif ne vaut que si trois choses tiennent : le compte visé est nommé,
- * son poids en prospects est sous les yeux, et « Annuler » n'appelle PAS la
- * mutation. La troisième est la plus facile à casser sans s'en apercevoir : un
- * `onClick={onConfirm}` recopié sur le mauvais bouton passerait la revue.
- */
 const user = (over: Partial<UserRow> = {}): UserRow =>
   ({
     id: 'u-1',
@@ -44,7 +35,6 @@ describe('DeactivateUserDialog', () => {
     expect(
       screen.getByRole('heading', { name: /Désactiver le compte de Aminata Diallo/ }),
     ).toBeTruthy();
-    // `128` formaté par `formatNumber` : espace insécable étroit en fr-FR.
     expect(screen.getByText('128')).toBeTruthy();
     expect(screen.getByText(/prospects sont rattachés/)).toBeTruthy();
   });

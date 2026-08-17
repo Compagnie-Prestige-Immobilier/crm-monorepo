@@ -1,17 +1,3 @@
-/**
- * Substitution `{{variable}}` : PORT EXACT de
- * `apps/api/src/modules/notifications/template.ts`.
- *
- * Dupliqué délibérément, et la duplication est le point : l'aperçu du
- * compositeur doit se mettre à jour à CHAQUE frappe, ce qu'un aller-retour
- * réseau ne peut pas faire sans saccade ni condition de course entre réponses.
- *
- * La contrainte qui en découle : les deux implémentations doivent avoir la même
- * sémantique, en particulier sur la variable manquante : marqueur laissé
- * visible, nom remonté dans `missing`. `template.test.ts` fixe cette sémantique
- * des deux côtés avec les mêmes cas.
- */
-
 const PLACEHOLDER = /\{\{\s*([A-Za-z0-9_.]+)\s*\}\}/g;
 
 export interface TemplateRenderResult {
@@ -19,7 +5,6 @@ export interface TemplateRenderResult {
   readonly missing: readonly string[];
 }
 
-/** Liste les variables citées par un gabarit, dans l'ordre, sans doublon. */
 export function extractVariables(template: string): string[] {
   const found: string[] = [];
   for (const match of template.matchAll(PLACEHOLDER)) {
@@ -29,10 +14,6 @@ export function extractVariables(template: string): string[] {
   return found;
 }
 
-/**
- * Rend un gabarit. Une variable manquante laisse son marqueur EN PLACE et son
- * nom est signalé : voir l'en-tête du fichier serveur pour le raisonnement.
- */
 export function renderTemplate(
   template: string,
   variables: Readonly<Record<string, string | number | null | undefined>>,
@@ -57,7 +38,6 @@ export interface RenderedNotification {
   readonly missing: readonly string[];
 }
 
-/** Rend titre et corps ensemble, en fusionnant les variables manquantes. */
 export function renderNotification(
   titleTemplate: string,
   bodyTemplate: string,
@@ -70,10 +50,6 @@ export function renderNotification(
   return { title: title.text, body: body.text, missing };
 }
 
-/**
- * Union ordonnée des variables du titre puis du corps.
- * Miroir de `mergedVariables` côté API.
- */
 export function mergedVariables(titleTemplate: string, bodyTemplate: string): string[] {
   const names = extractVariables(titleTemplate);
   for (const name of extractVariables(bodyTemplate)) {
@@ -82,15 +58,6 @@ export function mergedVariables(titleTemplate: string, bodyTemplate: string): st
   return names;
 }
 
-/**
- * Troncature d'aperçu.
- *
- * Android replie une notification sur UNE ligne de titre et deux de corps tant
- * qu'elle n'est pas dépliée. L'aperçu doit donc montrer le texte tel qu'il sera
- * REELLEMENT lu : un aperçu qui affiche cinq lignes confortables laisse
- * l'auteur croire que sa phrase passe en entier, alors qu'elle sera coupée au
- * milieu sur le téléphone.
- */
 export function previewClamp(text: string, limit: number): { text: string; truncated: boolean } {
   const flat = text.replace(/\s+/g, ' ').trim();
   if (flat.length <= limit) return { text: flat, truncated: false };

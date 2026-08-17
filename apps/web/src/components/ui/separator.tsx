@@ -9,19 +9,6 @@ type SeparatorProps = Omit<SeparatorPrimitive.Props, 'className'> & {
   decorative?: boolean | undefined;
 };
 
-/**
- * `decorative` n'est plus une prop de la primitive : Base UI expose TOUJOURS
- * un `role="separator"`. On la garde ici, avec la même valeur par défaut
- * qu'avant, et on la traduit en `role="none"`.
- *
- * Sans cela, chaque filet du panel deviendrait une annonce : un menu
- * déroulant de six entrées et deux traits se lit « séparateur » deux fois de
- * plus qu'avant, et un pied de carte annonce une frontière que rien ne
- * traverse. Un trait posé pour aérer une mise en page n'est pas une
- * information : c'est du décor, et WAI-ARIA a `role="none"` pour le dire.
- * Passer `decorative={false}` reste possible quand le trait sépare vraiment
- * deux groupes de sens.
- */
 function Separator({
   className,
   orientation = 'horizontal',

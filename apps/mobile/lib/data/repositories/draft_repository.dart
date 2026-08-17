@@ -6,31 +6,16 @@ import 'package:drift/drift.dart';
 import '../../core/sync/clock.dart';
 import '../local/database.dart';
 
-/// Version du format des payloads de brouillon.
-///
-/// À incrémenter dès qu'un formulaire change la forme de ce qu'il enregistre.
-/// Un brouillon d'une version antérieure est **jeté**, pas migré : écrire un
-/// migrateur de brouillon coûterait plus cher que la saisie qu'il sauverait.
 const int kDraftSchemaVersion = 1;
 
-/// Politique de reprise, dérivée de l'âge du brouillon.
 enum DraftAge {
-  /// Moins de 60 s : ce n'est pas un abandon, c'est un plantage ou une
-  /// éjection mémoire. On restaure **en silence** : demander « voulez-vous
-  /// reprendre ? » à quelqu'un qui tapait il y a quinze secondes est une
-  /// question absurde qui coûte un aller-retour d'attention.
   crash,
 
-  /// De 60 s à 7 jours : l'utilisateur est peut-être passé à autre chose. On
-  /// propose, sans bloquer.
   resumable,
 
-  /// Plus de 7 jours : les référentiels ont pu changer, le représentant peut
-  /// avoir été supprimé. On supprime.
   stale,
 }
 
-/// Ce qu'on rend à un écran qui demande son brouillon.
 class DraftSnapshot {
   const DraftSnapshot({
     required this.draftId,
@@ -53,12 +38,6 @@ class DraftSnapshot {
   final String? parentId;
 }
 
-/// Persistance des saisies inachevées : **Dart pur**.
-///
-/// Un brouillon n'est PAS une intention d'écriture : il ne part jamais au
-/// serveur, il n'a pas de place dans l'outbox. C'est une saisie en cours qu'on
-/// refuse de perdre si le système tue l'app au milieu d'un formulaire : ce que
-/// les ROM Transsion et Xiaomi font volontiers, sans prévenir.
 class DraftRepository {
   DraftRepository(this._db, {Clock clock = const SystemClock()}) : _clock = clock;
 
@@ -106,8 +85,6 @@ class DraftRepository {
     return _decode(row);
   }
 
-  /// Le brouillon le plus récent d'un formulaire, tous identifiants confondus.
-  /// Sert à proposer « Reprendre la saisie de X ? » à l'ouverture d'un écran.
   Future<DraftSnapshot?> latestFor(String formKey) async {
     final List<FormDraft> rows =
         await (_db.select(_db.formDrafts)
@@ -124,14 +101,6 @@ class DraftRepository {
     return null;
   }
 
-  /// Le brouillon d'une entité **en cours de modification**.
-  ///
-  /// La création se repère par son `draftId` (transporté dans l'URL) ; la
-  /// modification, elle, n'a pas de `draftId` dans l'adresse : elle porte
-  /// `?id=<entityId>`. Sans cette lecture, un écran de modification écrivait
-  /// bien un brouillon à chaque frappe et n'en relisait jamais aucun : une mort
-  /// de processus au milieu d'une correction perdait les modifications ET
-  /// laissait la ligne en base pour sept jours.
   Future<DraftSnapshot?> forEntity(String formKey, String entityId) async {
     final List<FormDraft> rows =
         await (_db.select(_db.formDrafts)
@@ -151,11 +120,6 @@ class DraftRepository {
     return null;
   }
 
-  /// Vrai s'il reste une saisie inachevée sous cet identifiant.
-  ///
-  /// Lu par la mémoire de route : elle refuse d'écraser l'adresse d'un
-  /// formulaire par celle de l'écran qui le précède tant que le brouillon
-  /// existe.
   Future<bool> exists(String draftId) async {
     final FormDraft? row = await (_db.select(
       _db.formDrafts,
@@ -163,7 +127,6 @@ class DraftRepository {
     return row != null;
   }
 
-  /// Purge les brouillons trop vieux. Appelée au démarrage.
   Future<int> purgeStale() async {
     final DateTime cutoff = _clock.now().subtract(keepFor);
     final List<FormDraft> all = await _db.select(_db.formDrafts).get();
@@ -181,14 +144,6 @@ class DraftRepository {
     return doomed.length;
   }
 
-  /// Décode, ou **jette et journalise**.
-  ///
-  /// Un brouillon indécodable (version de schéma changée, JSON tronqué par une
-  /// coupure d'alimentation au milieu d'un `write`) ne doit surtout pas remonter
-  /// en exception : l'écran qui le lit planterait à chaque ouverture, et comme
-  /// le brouillon est relu à chaque fois, l'app serait **définitivement
-  /// inutilisable pour cet utilisateur**, sans aucun moyen de s'en sortir. On le
-  /// supprime et on continue.
   Future<DraftSnapshot?> _decode(FormDraft row) async {
     if (row.schemaVersion != kDraftSchemaVersion) {
       developer.log(

@@ -66,7 +66,6 @@ export class LogoutResponseDto {
   @ApiProperty({ type: Boolean }) revoked!: boolean;
 }
 
-/** Utilisé par le contrôleur d'administration des rôles. */
 export class RoleFilterDto {
   @ApiPropertyOptional({ enum: Role, enumName: 'Role' })
   @IsOptional()

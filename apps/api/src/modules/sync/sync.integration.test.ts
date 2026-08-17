@@ -1,15 +1,3 @@
-/**
- * Tests de synchronisation contre un VRAI PostgreSQL.
- *
- * Les tests unitaires (`sync.service.test.ts`) vérifient la logique ; ceux-ci
- * vérifient ce qu'aucune doublure ne peut démontrer : l'atomicité réelle de
- * `INSERT ... ON CONFLICT DO NOTHING`, l'annulation effective d'une transaction,
- * et le comportement de la pagination keyset sur des lignes qui partagent
- * réellement le même horodatage.
- *
- * Lancés par `pnpm test:integration`, jamais par `pnpm test` : ils exigent la
- * base de développement sur localhost:5434.
- */
 process.env.NODE_ENV ??= 'test';
 process.env.DATABASE_URL ??= 'postgresql://crm:crm@localhost:5434/crm?schema=public';
 process.env.JWT_ACCESS_SECRET ??= 'integration-access-secret-32-characters';
@@ -40,7 +28,6 @@ const sync = new SyncService(
   fakeDemoVisibility(),
 );
 
-/** Marqueur porté par toutes les lignes créées ici, pour un nettoyage sûr. */
 const TAG = 'it-sync';
 
 let alice: AuthenticatedUser;
@@ -48,7 +35,6 @@ let bob: AuthenticatedUser;
 let departementId: string;
 let banqueId: string;
 let syndicatId: string;
-/** Base de numérotation, décalée à chaque suite pour éviter les collisions. */
 let phoneSeed = 0;
 
 const nextPhone = (): string => `+22177${String(1_000_000 + ++phoneSeed).slice(-7)}`;
@@ -102,8 +88,6 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-// ─── Fabriques ──────────────────────────────────────────────────────────────
-
 const repOp = (entityId: string, phone: string, seq = 0): SyncOperationDto => ({
   opId: randomUUID(),
   seq,
@@ -138,17 +122,10 @@ const push = (operations: SyncOperationDto[], clientBatchId = randomUUID()): Syn
 const statuses = (results: { status: SyncOpStatus }[]): SyncOpStatus[] =>
   results.map((result) => result.status);
 
-/**
- * Recule `updatedAt` pour sortir les lignes du retard de sécurité de 2 s sans
- * faire attendre la suite. On passe par du SQL brut : `@updatedAt` réécrirait
- * la valeur à chaque `update` Prisma.
- */
 async function backdate(): Promise<void> {
   await prisma.$executeRaw`UPDATE "representants" SET "updatedAt" = now() - interval '10 seconds'`;
   await prisma.$executeRaw`UPDATE "prospects" SET "updatedAt" = now() - interval '10 seconds'`;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('idempotence contre PostgreSQL', () => {
   it('le même lot envoyé deux fois ne produit QU’UNE ligne', async () => {
@@ -178,8 +155,6 @@ describe('idempotence contre PostgreSQL', () => {
     const applied = outcomes.filter(
       (outcome) => outcome.status === 'fulfilled' && !outcome.value.replayed,
     );
-    // ON CONFLICT DO NOTHING est atomique : un seul appel obtient le marqueur,
-    // les autres rejouent ou reçoivent IDEMPOTENCY_IN_PROGRESS.
     expect(applied).toHaveLength(1);
     expect(await prisma.representant.count({ where: { createdById: alice.id } })).toBe(1);
   });
@@ -203,8 +178,6 @@ describe('isolation transactionnelle par groupe', () => {
       repOp(repA, nextPhone(), 0),
       prospectOp(randomUUID(), repA, nextPhone(), 1),
       repOp(repB, nextPhone(), 2),
-      // Banque inexistante : la clé étrangère fait réellement échouer la
-      // transaction du second groupe, côté serveur.
       {
         opId: randomUUID(),
         seq: 3,
@@ -234,10 +207,8 @@ describe('isolation transactionnelle par groupe', () => {
       SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
     ]);
 
-    // Le premier groupe survit intégralement.
     expect(await prisma.representant.findUnique({ where: { id: repA } })).not.toBeNull();
     expect(await prisma.prospect.count({ where: { representantId: repA } })).toBe(1);
-    // Le second est intégralement annulé, y compris son marqueur d'opération.
     expect(await prisma.representant.findUnique({ where: { id: repB } })).toBeNull();
     expect(await prisma.syncOperation.count({ where: { opId: operations[2]?.opId ?? '' } })).toBe(
       0,
@@ -272,8 +243,6 @@ describe('pull, pagination keyset', () => {
     const ids = Array.from({ length: 9 }, () => randomUUID());
     await sync.push(alice, push(ids.map((id, index) => prospectOp(id, repId, nextPhone(), index))));
 
-    // Toutes les lignes portent exactement le même updatedAt : c'est le cas qui
-    // fait silencieusement disparaître une ligne avec un curseur horodaté nu.
     await prisma.$executeRaw`
       UPDATE "prospects" SET "updatedAt" = now() - interval '10 seconds'
       WHERE "createdById" = ${alice.id}
@@ -320,7 +289,6 @@ describe('pull, pagination keyset', () => {
     expect(first.changes.banques.length).toBeGreaterThan(0);
 
     const second = await sync.pull(alice, { limit: 3, since: first.nextCursor });
-    // La deuxième page ne rejoue pas la première.
     const firstIds = new Set(first.changes.banques.map((row) => row.id));
     expect(second.changes.banques.some((row) => firstIds.has(row.id))).toBe(false);
   });
@@ -380,8 +348,6 @@ describe('index unique partiel sur le téléphone', () => {
       ],
     });
 
-    // Le commercial ressaisit le même numéro : sans index PARTIEL, la
-    // contrainte le lui refuserait à vie.
     const again = await sync.push(alice, push([prospectOp(randomUUID(), repId, phone, 0)]));
     expect(statuses(again.body.results)).toEqual([SyncOpStatus.APPLIED]);
   });

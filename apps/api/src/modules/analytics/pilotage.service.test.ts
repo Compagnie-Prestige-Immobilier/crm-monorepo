@@ -20,7 +20,6 @@ const alice: AuthenticatedUser = {
   role: Role.COMMERCIAL,
 };
 
-/** Ligne d'agrégat complète, pour n'écrire dans chaque test que ce qu'il exerce. */
 const totals = (over: Record<string, number> = {}): Record<string, number> => ({
   taches: 0,
   contactees: 0,
@@ -37,8 +36,6 @@ describe('pilotage de campagne', () => {
     const { service, sql } = makeAnalyticsPrisma();
     await new PilotageService(service, fakeDemoVisibility()).campaignPilotage(admin, {});
 
-    // Le prospect ne suffit pas : une tâche ou une tentative fictive accrochée
-    // à un prospect réel fausserait le taux de contact.
     expect(sql()).toContain('p."isDemo" = FALSE');
     expect(sql()).toContain('ct."isDemo" = FALSE');
     expect(sql()).toContain('ca."isDemo" = FALSE');
@@ -79,8 +76,6 @@ describe('pilotage de campagne', () => {
     expect(sql()).toContain('p."createdById" = "com-alice"');
   });
 
-  // Un taux sur zéro observation n'est pas « 0 % », il n'existe pas. Le rendre
-  // à 0 le rendait indistinguable d'une vraie contre-performance.
   it('base vide : charge utile complète, aucun taux inventé', async () => {
     const { service, calls } = makeAnalyticsPrisma();
     const result = await new PilotageService(service, fakeDemoVisibility()).campaignPilotage(
@@ -95,8 +90,6 @@ describe('pilotage de campagne', () => {
     expect(result.attemptsPerMethodObtained).toBe(0);
     expect(result.closedPerDay).toEqual([]);
     expect(result.observedPace).toBe(0);
-    // Cadence nulle : pas de date de fin plutôt qu'une date lointaine qui
-    // laisserait croire que la campagne avance.
     expect(result.estimatedEndDate).toBeNull();
   });
 
@@ -137,7 +130,6 @@ describe('pilotage de campagne', () => {
     expect(result.closedPerDay).toEqual([
       { day: '2026-08-10', commercialId: 'com-alice', commercialName: 'Alice Diop', done: 12 },
     ]);
-    // 50 restantes à 10 par jour : cinq jours.
     const attendu = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
     expect(result.estimatedEndDate).toBe(attendu);
   });
@@ -170,7 +162,6 @@ describe('délais de la chaîne', () => {
     const result = await new PilotageService(service, fakeDemoVisibility()).delays(admin, {});
 
     for (const leg of result.legs) {
-      // 0 se lirait « franchi le jour même », ce qui n'est pas « aucune mesure ».
       expect(leg.medianDays).toBeNull();
       expect(leg.p90Days).toBeNull();
       expect(leg.sample).toBe(0);
@@ -192,8 +183,6 @@ describe('délais de la chaîne', () => {
 
     expect(sql()).toContain('percentile_cont(0.5)');
     expect(sql()).toContain('percentile_cont(0.9)');
-    // L'horloge du téléphone peut avancer sur celle du serveur : une durée
-    // négative n'est pas un délai court, c'est une mesure à jeter.
     expect(sql()).toContain('>=');
     expect(sql()).toContain('bc."isDemo" = FALSE');
     expect(sql()).toContain('tr."isDemo" = FALSE');

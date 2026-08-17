@@ -15,23 +15,8 @@ import type { ProspectImportRow } from './prospects-import.adapter.js';
 import { ProspectImportError } from './prospects-import.errors.js';
 import { PROSPECTS_IMPORT_COLUMNS, PROSPECT_IMPORT_HEADERS } from './prospects-import-template.js';
 
-/**
- * L'analyse de ligne et les quatre familles de doublons, éprouvées SANS base.
- *
- * Ce sont les seules règles de l'import qui décident quelque chose : tout le
- * reste (lire un classeur, découper en tranches, écrire un rapport) appartient
- * au moteur générique. Les faire passer par HTTP et PostgreSQL couvrirait les
- * mêmes règles dix fois plus lentement, et un test rouge ne dirait plus si
- * c'est la règle ou l'environnement qui a lâché.
- *
- * La doublure applique elle-même le CHECK de phase 2 et l'index unique
- * partiel : un adaptateur qui produirait une ligne invalide fait donc échouer
- * le test ICI, pas en production à la première tranche.
- */
-
 const H = PROSPECT_IMPORT_HEADERS;
 
-/** Ligne valide, dont chaque test ne dérange qu'une cellule. */
 function cells(over: Partial<Record<string, string>> = {}): Record<string, string> {
   return {
     [H.nom]: 'Ndiaye',
@@ -98,8 +83,6 @@ describe('analyse d’une ligne', () => {
       rowNumber: 3,
       nom: 'Ndiaye',
       prenom: 'Aminata',
-      // Le téléphone est rendu SOUS SA FORME E.164 : c'est la clé de
-      // déduplication, pas la chaîne saisie.
       phoneE164: '+221771234567',
       representantId: 'rep-1',
       banqueId: 'ban-cbao',
@@ -128,8 +111,6 @@ describe('analyse d’une ligne', () => {
 
   it('accepte toutes les présentations du même abonné', async () => {
     const local = accepted(adapter.parseRow(cells({ [H.phone]: '77 123 45 67' }), 3));
-    // Deuxième instance : la mémoire des doublons internes de la première
-    // refuserait la ligne, or ce qu'on éprouve ici est la normalisation.
     const other = new ProspectsImportAdapter();
     await other.prepare(fakeImportContext(store));
 
@@ -180,8 +161,6 @@ describe('banque et syndicat : rapprochement exact', () => {
   });
 
   it('ne rapproche PAS un libellé voisin, parce que le segment BDD en dépend', async () => {
-    // « CBAO Attijari » ressemble à « CBAO » à l'œil : un rapprochement flou
-    // basculerait la ligne de BDD2 vers BDD1 sans que rien ne le signale.
     for (const proche of ['CBAO Attijari', 'CBA', 'CBAOO', 'C.B.A.O.']) {
       const parser = new ProspectsImportAdapter();
       await parser.prepare(fakeImportContext(store));
@@ -203,7 +182,6 @@ describe('banque et syndicat : rapprochement exact', () => {
   it('la clé de rapprochement n’efface que la casse et les espaces', () => {
     expect(referentialKey('  cbao  ')).toBe('CBAO');
     expect(referentialKey('Banque   Atlantique')).toBe('BANQUE ATLANTIQUE');
-    // Accents et ponctuation SURVIVENT : ce sont des sigles, pas des libellés.
     expect(referentialKey('B.N.D.E.')).not.toBe('BNDE');
     expect(referentialKey('SÉNÉGAL')).toBe('SÉNÉGAL');
   });
@@ -264,9 +242,6 @@ describe('doublon interne au fichier', () => {
   });
 
   it('ne confond PAS deux imports concurrents servis par la même instance', async () => {
-    // L'adaptateur est injecté en liste, donc en singleton : une mémoire
-    // portée par l'instance ferait passer la ligne du second fichier pour un
-    // doublon du premier.
     const autreStore = createFakeImportStore();
     const autre = fakeImportContext(autreStore, { jobId: 'job-2' });
     await adapter.prepare(autre);
@@ -281,8 +256,6 @@ describe('doublon interne au fichier', () => {
   it('signale d’abord la vraie faute d’une ligne, pas le doublon', () => {
     expect(adapter.parseRow(cells(), 3).ok).toBe(true);
 
-    // Même numéro ET banque inconnue : c'est la banque qu'il faut corriger,
-    // pas la ligne qu'il faut supprimer.
     const error = refusal(adapter.parseRow(cells({ [H.banque]: 'INCONNUE' }), 4));
     expect(error.code).toBe(ProspectImportError.BANQUE_UNKNOWN);
   });
@@ -291,9 +264,6 @@ describe('doublon interne au fichier', () => {
     const ctx = fakeImportContext(store);
     await adapter.writeChunk([accepted(adapter.parseRow(cells(), 3))], ctx);
 
-    // Une reprise saute les lignes déjà comptées : leurs téléphones ne doivent
-    // plus figurer en mémoire, sans quoi la reprise refuserait des lignes
-    // qu'elle n'a jamais lues.
     await adapter.prepare(ctx);
     store.prospects.length = 0;
 
@@ -323,7 +293,6 @@ describe('écriture d’une tranche', () => {
       syndicatId: 'syn-chues',
       representantId: 'rep-1',
       createdById: 'user-admin',
-      // Explicite, jamais emprunté au mode démonstration.
       isDemo: false,
       phase2Status: Phase2Status.PENDING,
       enrollmentMethod: null,
@@ -338,8 +307,6 @@ describe('écriture d’une tranche', () => {
       adapter.parseRow(cells({ [H.enrollmentMethod]: EnrollmentMethod.PHYSICAL }), 3),
     );
 
-    // La doublure lève si le couple statut/méthode est incohérent : ce test
-    // échouerait avant même l'assertion.
     await adapter.writeChunk([row], ctx);
 
     expect(store.prospects[0]).toMatchObject({
@@ -386,15 +353,11 @@ describe('écriture d’une tranche', () => {
     expect(error?.code).toBe(ProspectImportError.ATTACHED_TO_OTHER_REPRESENTANT);
     expect(error?.column).toBe(H.representantPhone);
     expect(error?.rowNumber).toBe(3);
-    // LE RATTACHEMENT N'A PAS BOUGÉ : c'est tout l'enjeu de cette famille.
     expect(store.prospects).toHaveLength(1);
     expect(store.prospects[0]?.representantId).toBe('rep-2');
   });
 
   it('compte en `skipped`, et non en erreur, ce que l’index unique écarte', async () => {
-    // Le numéro est saisi sur le terrain ENTRE notre relecture et notre
-    // écriture : personne n'a rien fait de mal, la ligne existe simplement
-    // déjà. La rapporter en erreur ferait chercher une faute inexistante.
     store.racingPhones.push('+221771234567');
     const ctx = fakeImportContext(store);
     const row = accepted(adapter.parseRow(cells(), 3));

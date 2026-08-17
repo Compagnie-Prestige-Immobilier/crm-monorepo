@@ -8,19 +8,6 @@ import {
   serializeNotificationFilters,
 } from '@/lib/notification-filters';
 
-/**
- * Le filtre de l'écran Notifications.
- *
- * Deux défauts sont réparés ici, et les deux rendaient de la donnée
- * INATTEIGNABLE :
- *
- *  - l'historique était figé sur la page 1, sans pagination ni filtre à
- *    l'écran, alors que l'API expose `page`, `status` et `category`. La
- *    vingt-et-unième notification envoyée disparaissait ;
- *  - l'onglet vivait dans un `useState` : perdu au rechargement, impossible à
- *    partager, contrairement aux onglets des campagnes et des statistiques.
- */
-
 describe('onglet porté par l’URL', () => {
   it('atterrit sur l’émission pour un ADMIN, sur la réception pour les autres', () => {
     expect(defaultNotificationTab(true)).toBe('historique');
@@ -37,8 +24,6 @@ describe('onglet porté par l’URL', () => {
   });
 
   it('ramène un rôle non-ADMIN sur SA boîte, même si l’URL demande l’émission', () => {
-    // `?onglet=gabarits` collé à un agent bancaire lancerait six requêtes qui
-    // finiraient toutes en 403, sur un écran qu'il n'a fait qu'ouvrir.
     expect(parseNotificationFilters({ onglet: 'gabarits' }, false).tab).toBe('reception');
     expect(parseNotificationFilters({ onglet: 'historique' }, false).tab).toBe('reception');
     expect(parseNotificationFilters({ onglet: 'reception' }, false).tab).toBe('reception');
@@ -63,8 +48,6 @@ describe('pagination et critères de l’historique', () => {
   });
 
   it('pagine la boîte de réception SÉPARÉMENT de l’historique', () => {
-    // Deux listes dans le même écran : partager une clé `page` ferait sauter
-    // l'une quand on tourne l'autre.
     const filters = parseNotificationFilters({ page: '3', pageRecue: '7' }, true);
     expect(filters.page).toBe(3);
     expect(filters.inboxPage).toBe(7);

@@ -16,31 +16,6 @@ import {
   multipartBody,
 } from './fake-release-store.js';
 
-/**
- * Publication d'une release : champs du formulaire ET version lue dans l'APK.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI CE FICHIER EXISTE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Deux défauts distincts sont gardés ici.
- *
- * 1. Les champs d'un envoi multipart n'entrent pas dans le `ValidationPipe`
- *    global : le corps est un flux, le contrôleur reçoit la requête brute, et
- *    Nest ne construit jamais le DTO. Les `@MaxLength` d'`AppUpdateUploadDto`
- *    étaient donc de la décoration pure, et la valeur non contrôlée ressortait
- *    par `GET android/current`, route PUBLIQUE que chaque installation
- *    interroge au démarrage.
- *
- * 2. `versionName` et `versionCode` étaient SAISIS À LA MAIN. Ils sont
- *    désormais lus dans le manifeste de l'APK. Les tests de la seconde moitié
- *    de ce fichier vérifient que c'est bien le FICHIER qui décide, et que
- *    chaque refus laisse le répertoire des releases propre.
- *
- * Les APK utilisés sont RÉELS (produits par `aapt2`, moins de 700 octets
- * chacun) : voir `apk-manifest.test.ts` pour ce que contient chacun.
- */
-
 const UPLOAD_URL = '/api/v1/app-updates/android';
 const CURRENT_URL = '/api/v1/app-updates/android/current?versionCode=0';
 
@@ -50,7 +25,6 @@ const fixturePath = (name: string): string =>
 let app: NestFastifyApplication;
 let store: FakeReleaseStore;
 let releaseDir: string;
-/** `sn.cpi.go`, versionCode 7, versionName 1.4.2. */
 let cpiGoV7: Buffer;
 
 beforeAll(async () => {
@@ -92,7 +66,6 @@ const uploadFile = (fields: Record<string, string>, apk: Buffer, name = 'cpi-go.
 
 const upload = (fields: Record<string, string>) => uploadFile(fields, cpiGoV7);
 
-/** Le MÊME envoi, mais avec les champs placés après la partie fichier. */
 const uploadTrailing = (fields: Record<string, string>) =>
   app.inject({
     method: 'POST',
@@ -100,16 +73,9 @@ const uploadTrailing = (fields: Record<string, string>) =>
     ...multipartBody({}, { name: 'cpi-go.apk', content: cpiGoV7 }, fields),
   });
 
-/** APK réellement présents dans le répertoire des releases, `.part` compris. */
 const releaseFiles = async (): Promise<string[]> => readdir(releaseDir);
 
 describe('POST android (champs multipart)', () => {
-  /**
-   * Le test le plus important de la section : il vérifie le REFUS, puis que la
-   * valeur refusée n'est pas devenue lisible publiquement. La seconde moitié
-   * est celle qui aurait échoué même si le service avait répondu 400 tout en
-   * enregistrant quand même.
-   */
   it('refuse une note plus longue que la limite du DTO et ne la publie pas', async () => {
     const response = await upload({ forceUpdate: 'false', notes: 'a'.repeat(2_001) });
 
@@ -126,12 +92,6 @@ describe('POST android (champs multipart)', () => {
     expect((await upload({ forceUpdate: 'oui' })).statusCode).toBe(400);
   });
 
-  /**
-   * `versionName` et `versionCode` ne sont plus des champs du formulaire. Un
-   * panel resté sur l'ancienne version les enverrait encore : il doit
-   * l'APPRENDRE par un 400, et non les voir ignorés en silence tout en
-   * continuant d'afficher deux formulaires que plus personne ne lit.
-   */
   it('refuse un formulaire qui envoie encore versionName et versionCode', async () => {
     const response = await upload({
       forceUpdate: 'false',
@@ -140,26 +100,10 @@ describe('POST android (champs multipart)', () => {
     });
 
     expect(response.statusCode).toBe(400);
-    // Et surtout : la valeur tapée n'est PAS devenue la version publiée.
     const current = await app.inject({ method: 'GET', url: CURRENT_URL });
     expect(current.json<{ versionCode: number }>().versionCode).toBe(1);
   });
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * LE REFUS NE DOIT PAS DÉPENDRE DE L'ORDRE DES PARTIES
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * Rien n'impose l'ordre des parties d'un envoi multipart. Le service lisait
-   * pourtant les champs au moment où la partie FICHIER lui parvenait : tout
-   * champ arrivant après elle était ignoré en silence. Un panel resté sur
-   * l'ancienne version, qui envoie son fichier en premier, publiait donc sans
-   * rien apprendre, alors que la description publiée dans `openapi.json` et
-   * recopiée dans les deux clients générés promet un 400.
-   *
-   * Le test précédent n'exerçait que l'ordre commode, le seul que fabriquait
-   * l'aide de test.
-   */
   it('refuse ces mêmes champs quand ils arrivent APRÈS le fichier', async () => {
     const response = await uploadTrailing({
       forceUpdate: 'false',
@@ -173,8 +117,6 @@ describe('POST android (champs multipart)', () => {
   });
 
   it('et accepte un formulaire conforme dont les champs suivent le fichier', async () => {
-    // Contre-épreuve : le refus ci-dessus doit venir des champs de trop, pas de
-    // l'ordre lui-même.
     const response = await uploadTrailing({ forceUpdate: 'true', notes: 'Champs après fichier.' });
 
     expect(response.statusCode).toBe(201);
@@ -183,29 +125,8 @@ describe('POST android (champs multipart)', () => {
     expect(current.json<{ notes: string | null }>().notes).toBe('Champs après fichier.');
   });
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * LE CORPS ARRIVE EN PLUSIEURS MORCEAUX, ET LES DEUX TESTS CI-DESSUS NE LE
-   * MONTRENT PAS
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * `app.inject` écrit tout le corps d'un coup, et les APK de test pèsent moins
-   * d'un kilo-octet : busboy analyse donc le message ENTIER avant que le
-   * service n'ait vu la première partie, si bien que l'objet `fields` de la
-   * partie fichier est déjà complet, quel que soit l'ordre. Les deux tests
-   * précédents décrivent le contrat, ils ne peuvent pas faire apparaître le
-   * défaut.
-   *
-   * Sur un vrai téléversement de 70 Mo, c'est l'inverse : le flux du fichier se
-   * remplit, l'analyse se met en attente, et `fields` ne contient à cet instant
-   * QUE ce qui précédait le fichier. Le service lisait là. Cette doublure
-   * reproduit exactement cela : `fields` est un objet VIVANT, vide tant que le
-   * flux n'est pas consommé, rempli ensuite.
-   */
   it('N’UTILISE PAS `fields` AVANT D’AVOIR CONSOMMÉ LE FLUX', async () => {
-    /** Partie fichier suivie de ses champs, comme busboy les délivre. */
     class LateFieldsRequest {
-      /** Partagé par toutes les parties, et rempli au fil de l'analyse. */
       readonly fields: Record<string, unknown> = {};
 
       constructor(
@@ -214,9 +135,6 @@ describe('POST android (champs multipart)', () => {
       ) {}
 
       async *parts(): AsyncGenerator {
-        // Le `await` n'a rien d'ornemental : il place la reprise du générateur
-        // après le tour de boucle du consommateur, donc après la consommation
-        // du flux, exactement comme l'analyse d'un vrai corps multipart.
         await Promise.resolve();
         yield {
           type: 'file',
@@ -225,15 +143,12 @@ describe('POST android (champs multipart)', () => {
           file: Readable.from([this.apk]),
           fields: this.fields,
         };
-        // Reprise APRÈS consommation du flux : c'est seulement ici que le
-        // reste du corps est analysé, et donc que les champs existent.
         for (const [fieldname, value] of Object.entries(this.trailing)) {
           this.fields[fieldname] = { type: 'field', fieldname, value };
           yield { type: 'field', fieldname, value, fields: this.fields };
         }
       }
 
-      /** Ce que consommait l'ancienne implémentation. */
       async file(): Promise<unknown> {
         const iterator = this.parts();
         return (await iterator.next()).value;
@@ -248,16 +163,11 @@ describe('POST android (champs multipart)', () => {
 
     const published = await isolated.upload(request as unknown as FastifyRequest, FAKE_ADMIN);
 
-    // Les champs qui suivaient le fichier ont bel et bien été pris en compte.
     expect(published.forceUpdate).toBe(true);
     expect(published.notes).toBe('Champs analysés après le fichier.');
     expect(published.versionCode).toBe(7);
   });
 
-  /**
-   * Contre-épreuve : sans elle, un service qui refuserait TOUT ferait passer
-   * les tests ci-dessus sans rien prouver.
-   */
   it('accepte une release conforme et la publie', async () => {
     const response = await upload({
       forceUpdate: 'true',
@@ -274,10 +184,6 @@ describe('POST android (champs multipart)', () => {
 });
 
 describe('POST android (version lue dans l’APK)', () => {
-  /**
-   * LE test de la fonctionnalité. La version publiée vient du manifeste, et de
-   * nulle part ailleurs : aucun champ du formulaire ne la porte plus.
-   */
   it('publie la version lue dans le manifeste, sans qu’aucun champ ne la porte', async () => {
     const response = await upload({ forceUpdate: 'false' });
 
@@ -292,10 +198,6 @@ describe('POST android (version lue dans l’APK)', () => {
     expect(body.versionName).toBe('1.4.2');
   });
 
-  /**
-   * Contre-épreuve du test précédent : un second APK doit donner une AUTRE
-   * version. Sans elle, une implémentation qui écrirait « 7 » en dur passerait.
-   */
   it('publie une version DIFFÉRENTE pour un APK différent', async () => {
     const response = await uploadFile(
       { forceUpdate: 'false' },
@@ -307,11 +209,6 @@ describe('POST android (version lue dans l’APK)', () => {
     expect(response.json<{ versionName: string }>().versionName).toBe('1.9.0');
   });
 
-  /**
-   * Le nom du fichier n'a AUCUNE influence : c'est le manifeste qui parle.
-   * Sans ce test, une implémentation qui lirait le nom du téléversement
-   * (`cpi-go-42.apk`) passerait tous les autres.
-   */
   it('ignore le nom du fichier téléversé et lit le manifeste', async () => {
     const response = await uploadFile({ forceUpdate: 'false' }, cpiGoV7, 'cpi-go-999-final.apk');
 
@@ -339,7 +236,6 @@ describe('POST android (version lue dans l’APK)', () => {
     expect(message).toContain('7');
     expect(message).toContain('12');
 
-    // Et la release en ligne n'a pas bougé : le refus n'a rien réécrit.
     const current = await app.inject({ method: 'GET', url: CURRENT_URL });
     expect(current.json<{ versionCode: number }>().versionCode).toBe(12);
   });
@@ -371,13 +267,6 @@ describe('POST android (version lue dans l’APK)', () => {
     expect(current.json<{ versionCode: number }>().versionCode).toBe(1);
   });
 
-  /**
-   * L'APK ne peut être analysé qu'une fois ÉCRIT : le répertoire central d'un
-   * ZIP se trouve à la fin de l'archive. Chaque refus laisse donc, l'espace
-   * d'un instant, un fichier de la taille de l'APK sur le volume monté. S'il
-   * n'était pas effacé, une poignée de tentatives ratées par mois suffirait à
-   * saturer le disque avec des APK que rien ne sert et que rien ne balaie.
-   */
   it('n’abandonne aucun fichier sur le volume après un refus', async () => {
     const before = await releaseFiles();
 

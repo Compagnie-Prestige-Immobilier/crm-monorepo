@@ -2,20 +2,6 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-/**
- * Le contrat des exports, relu sur le document RÉELLEMENT publié.
- *
- * Même convention que `modules/bank-cases/openapi-contract.test.ts` : c'est ce
- * fichier que consomment les générateurs TypeScript et Dart, et lui seul. Le
- * contrôle de dérive en intégration continue le régénère et compare octet à
- * octet, si bien qu'un décorateur oublié se voit ici.
- *
- * Ces essais existent parce que les trois routes d'export s'étaient mises à
- * diverger sans que rien ne le signale : deux annonçaient leur type de contenu,
- * la troisième non, et l'une d'elles publiait quatre paramètres qu'elle n'a
- * jamais lus.
- */
-
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 interface Parameter {
@@ -53,9 +39,6 @@ const XLSX_ROUTES = [
 ];
 
 describe('contrat des exports Excel', () => {
-  // Régression : `prospects.xlsx` était la seule des trois routes sans
-  // `@ApiProduces`. Le générateur Dart en tirait une méthode qui tentait de
-  // désérialiser le classeur en JSON.
   it('les trois routes déclarent le classeur en binaire, pas en JSON', () => {
     for (const path of XLSX_ROUTES) {
       const ok = get(path).responses?.['200'];
@@ -64,11 +47,7 @@ describe('contrat des exports Excel', () => {
     }
   });
 
-  // Régression : la route réutilisait `RepresentantQueryDto`, si bien que le
-  // contrat ANNONÇAIT `page`, `pageSize`, `sortBy` et `sortOrder`.
   // `representants-export.service.ts` parcourt la table en keyset sur `id asc`
-  // et n'en lit aucun : un client qui demandait `?page=3&sortBy=prospects`
-  // recevait le classeur entier, trié par identifiant, sans avertissement.
   it('l’export des représentants n’annonce ni pagination ni tri', () => {
     const names = queryNames('/api/v1/export/representants.xlsx');
 

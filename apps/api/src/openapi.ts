@@ -1,24 +1,6 @@
 import 'reflect-metadata';
 import { writeFile } from 'node:fs/promises';
 
-/**
- * Génération hors ligne du document OpenAPI.
- *
- * DEUX PRÉCAUTIONS, ET L'ORDRE COMPTE.
- *
- * 1. Les valeurs d'environnement sont posées AVANT le premier import de
- *    `bootstrap.js`. Un `import` statique serait hissé au-dessus de ces
- *    affectations : `env.ts` serait évalué en premier et lèverait sur les
- *    secrets manquants avant que la moindre ligne de ce fichier ne s'exécute.
- *    D'où l'import dynamique, plus bas.
- *
- * 2. `OPENAPI_GENERATION=1` désarme la connexion Prisma. Avec Prisma 7 et
- *    `@prisma/adapter-pg`, le pool pg est créé dès l'instanciation du client :
- *    sans cette variable, générer le contrat exigerait un PostgreSQL joignable
- *    et la commande resterait bloquée dès que Docker est arrêté. Le document
- *    produit ne dépend d'aucune donnée : il n'y a aucune raison d'exiger une
- *    base.
- */
 process.env.OPENAPI_GENERATION = '1';
 process.env.NODE_ENV ??= 'development';
 process.env.API_DOCS_ENABLED = 'true';

@@ -47,29 +47,9 @@ import {
   UpdateRepresentantDto,
 } from './dto.js';
 
-/**
- * Le rôle est posé SUR LA CLASSE, et non route par route.
- *
- * Un représentant est une personne physique identifiée : nom, téléphone en
- * E.164, notes de terrain, département. Rien de tout cela ne concerne le pôle
- * Banque & Finance, qui travaille sur des dossiers déjà ouverts et n'a aucun
- * usage de l'annuaire de prospection. Sans décorateur, `RolesGuard` laisse
- * passer TOUTE identité authentifiée : `lookup` en particulier répondait à un
- * agent bancaire avec la fiche complète d'un représentant qu'il n'a aucune
- * raison de connaître.
- *
- * Sur la classe plutôt que sur chaque méthode : une route ajoutée demain hérite
- * de la restriction au lieu de naître ouverte. `import` la resserre encore, à
- * ADMIN seul, et `getAllAndOverride` fait gagner le décorateur de méthode.
- */
 @ApiTags('representants')
 @ApiBearerAuth()
 @Roles(Role.COMMERCIAL, Role.ADMIN)
-// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
-// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
-// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
-// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
-// cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'representants', version: '1' })
 export class RepresentantsController {
@@ -91,11 +71,6 @@ export class RepresentantsController {
     return this.representants.list(user, query);
   }
 
-  /**
-   * Déclaré AVANT `:id` : Fastify n'ordonne pas les routes par déclaration,
-   * mais la lisibilité l'exige et cela protège d'une régression si l'adaptateur
-   * change.
-   */
   @Get('lookup')
   @ApiOperation({
     operationId: 'lookupRepresentantByPhone',

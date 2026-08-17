@@ -28,45 +28,6 @@ import { COMMENT_MAX_LENGTH } from './attempt-rules.js';
 import { MAX_SPREAD_DAYS, MIN_SPREAD_DAYS } from './distribution.js';
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 
-/**
- * Contrat HTTP de la phase 2.
- *
- * Trois règles gouvernent ce fichier, parce que le client Dart en est engendré :
- *
- * 1. Toute propriété de type tableau déclare `type: () => [X]`. Sans cela le
- *    générateur produit `List<dynamic>` : le code compile, l'application
- *    plante à l'exécution sur le premier accès à un champ.
- * 2. `nullable: true` et « facultatif » sont deux choses différentes et sont
- *    distingués ici. Un champ nullable est TOUJOURS présent et peut valoir
- *    null ; un champ facultatif peut être absent.
- * 3. Rien de non déterministe : le document engendré est comparé octet à octet
- *    en intégration continue.
- */
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Pagination
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * La pagination de la phase 2 est `PageMetaDto`, celle du reste du contrat.
- *
- * Il a existé ici un `Phase2PageMetaDto` identique champ pour champ, justifié
- * par le fait que deux schémas OpenAPI ne peuvent pas porter le même nom. C'est
- * vrai et sans rapport : deux modules IMPORTENT très bien la même classe, ce
- * que fait l'import en tête de fichier. Le doublon ne protégeait donc rien et
- * coûtait, dans chaque client engendré, une seconde classe de pagination que le
- * web et le mobile devaient traiter à part.
- *
- * La forme d'une page (total, page, taille, nombre de pages) n'est pas un choix
- * de module : c'est la même question posée à toutes les listes du produit. Le
- * jour où la phase 2 aurait besoin d'un champ supplémentaire, elle déclarera
- * son propre type à ce moment-là, avec une raison à écrire ici.
- */
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Campagnes, création
-// ─────────────────────────────────────────────────────────────────────────────
-
 export class CreateCampaignDto {
   @ApiProperty({ maxLength: 120, example: 'Campagne CHUES, avril' })
   @IsString()
@@ -113,10 +74,6 @@ export class CreateCampaignDto {
   spreadDays?: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Campagnes, lecture
-// ─────────────────────────────────────────────────────────────────────────────
-
 export class CampaignProgressDto {
   @ApiProperty({ type: Number, description: 'Nombre total de tâches affectées.' })
   total!: number;
@@ -141,26 +98,10 @@ export class CampaignCommercialDto {
 
   @ApiProperty({ type: () => CampaignProgressDto }) progress!: CampaignProgressDto;
 
-  /**
-   * Nombre de lignes par journée d'étalement, jour 1 en tête.
-   *
-   * Toujours présent, avec une seule entrée quand la campagne n'est pas
-   * étalée : c'est cette liste qui dit à l'interface combien de boutons PDF
-   * afficher, et un tableau vide l'obligerait à recalculer une répartition que
-   * le serveur seul connaît.
-   */
   @ApiProperty({ type: () => [Number], description: 'Lignes par journée, jour 1 en tête.' })
   perDay!: number[];
 }
 
-/**
- * Tentative récente, telle qu'affichée dans le panneau d'administration.
- *
- * Le prospect y est désigné par son téléphone et son code court, jamais par son
- * nom : le suivi d'une campagne consiste à savoir QUI a appelé QUEL numéro et
- * avec quel résultat. Un administrateur qui a besoin de l'identité passe par la
- * fiche prospect, où l'accès est tracé.
- */
 export class CampaignAttemptDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ format: 'uuid' }) prospectId!: string;
@@ -260,14 +201,6 @@ export class CampaignListDto {
   @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
 }
 
-/**
- * Filtres de la liste des campagnes.
- *
- * Les quatre critères ajoutés (recherche, périmètre, créateur, dates) portent
- * exactement les mêmes noms que ceux du panneau « Filtres avancés » du web :
- * l'état de ce panneau est porté par l'URL, et un écart de nommage rendrait une
- * URL partagée impossible à reconstituer.
- */
 export class CampaignQueryDto {
   @ApiPropertyOptional({ enum: CampaignStatus, enumName: 'CampaignStatus' })
   @IsOptional()
@@ -329,13 +262,6 @@ export class CampaignQueryDto {
   pageSize?: number;
 }
 
-/**
- * Paramètres du programme PDF.
- *
- * `jour` est FACULTATIF et sans valeur par défaut : son absence rend le
- * programme entier, exactement comme avant l'étalement. Un défaut à 1
- * amputerait silencieusement toutes les liasses déjà en circulation.
- */
 export class ProgrammeQueryDto {
   @ApiPropertyOptional({
     type: Number,
@@ -351,23 +277,6 @@ export class ProgrammeQueryDto {
   jour?: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Annuaire hors ligne
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * UNE ENTRÉE D'ANNUAIRE NE PORTE QUE SIX CHAMPS. C'est une frontière de
- * confidentialité, pas une commodité.
- *
- * L'annuaire est répliqué sur des téléphones personnels, hors ligne, chez tous
- * les commerciaux : y ajouter le nom, la banque ou le syndicat reviendrait à
- * distribuer la base nominative complète à chaque terminal, et une seule perte
- * d'appareil suffirait à la faire fuiter. Le commercial n'a besoin que de
- * savoir quel numéro appeler et si le dossier est déjà réglé.
- *
- * Un test vérifie que l'objet renvoyé possède EXACTEMENT ces clés. Ajouter un
- * champ ici doit donc être un acte délibéré qui casse ce test.
- */
 export class DirectoryEntryDto {
   @ApiProperty({ format: 'uuid' }) prospectId!: string;
   @ApiProperty({ description: 'Numéro normalisé E.164.' }) phoneE164!: string;
@@ -422,17 +331,6 @@ export class DirectoryQueryDto {
   limit?: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tentatives d'appel, contrat consommé par le module de synchronisation
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Charge utile d'une opération `call_attempt` du push de synchronisation.
- *
- * L'identifiant est engendré PAR LE MOBILE (UUID v7) et sert de clé
- * d'idempotence : un lot rejoué après une coupure réseau ne compte pas deux
- * appels.
- */
 export class CallAttemptOpDto {
   @ApiProperty({
     format: 'uuid',
@@ -477,7 +375,6 @@ export class CallAttemptOpDto {
   clientCreatedAt!: string;
 }
 
-/** État de phase 2 d'un prospect, tel que le serveur le connaît. */
 export class ProspectPhase2StateDto {
   @ApiProperty({ format: 'uuid' }) prospectId!: string;
   @ApiProperty({ enum: Phase2Status, enumName: 'Phase2Status' }) phase2Status!: Phase2Status;
@@ -501,7 +398,6 @@ export class ProspectPhase2StateDto {
 
 export enum CallAttemptApplyStatus {
   APPLIED = 'applied',
-  /** L'identifiant de tentative était déjà connu : rejeu, rien n'a été réécrit. */
   DUPLICATE = 'duplicate',
 }
 
@@ -530,14 +426,6 @@ export class CallAttemptResultDto {
   @ApiProperty({ type: () => ProspectPhase2StateDto }) state!: ProspectPhase2StateDto;
 }
 
-/**
- * Corps renvoyé quand une transition terminale arrive trop tard.
- *
- * Il embarque l'état serveur COURANT : sans lui, le client ne pourrait
- * qu'effacer sa saisie ou la rejouer indéfiniment. Avec lui, il garde son
- * entrée locale comme conflit visible et la rapproche de ce que le serveur
- * connaît. Seul un ADMIN peut corriger ensuite depuis le web.
- */
 export class Phase2ConflictDto {
   @ApiProperty({ enum: ['PHASE2_ALREADY_COMPLETED'] }) code!: 'PHASE2_ALREADY_COMPLETED';
   @ApiProperty() message!: string;

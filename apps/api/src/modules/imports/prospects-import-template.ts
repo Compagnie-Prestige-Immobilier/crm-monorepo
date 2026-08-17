@@ -2,37 +2,6 @@ import { EnrollmentMethod } from '@crm/database';
 
 import type { ImportColumn } from './import-adapter.js';
 
-/**
- * Colonnes du modèle d'import prospects, définies UNE SEULE FOIS.
- *
- * Le générateur de classeur et l'analyseur de ligne lisent cette liste : c'est
- * ce qui garantit qu'un fichier téléchargé le matin est relu correctement
- * l'après-midi. Deux listes séparées finiraient par diverger d'une colonne, et
- * l'erreur ne se verrait qu'au moment où quelqu'un a déjà rempli cent mille
- * lignes.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * LE NOM ET LE PRÉNOM SONT DEUX COLONNES, ET CE N'EST PAS NÉGOCIABLE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Le modèle représentants n'a qu'une colonne « Nom complet », parce que le
- * modèle `Representant` ne porte qu'un `fullName`. `Prospect` porte `nom` et
- * `prenom` séparément, et découper une chaîne unique pour les remplir serait
- * une décision arbitraire prise cent cinquante mille fois : « Ndiaye Fatou
- * Bintou » se coupe autant en « Ndiaye » / « Fatou Bintou » qu'en « Ndiaye
- * Fatou » / « Bintou », et les deux sont plausibles au Sénégal, où le nom
- * précède souvent le prénom et où les prénoms composés sont ordinaires. Le
- * fichier tranche, jamais le serveur.
- */
-
-/**
- * En-têtes, isolés des colonnes.
- *
- * `parseRow` reçoit les cellules INDEXÉES PAR EN-TÊTE : la chaîne écrite ici
- * est donc la clé de lecture autant que le libellé affiché. Les recopier à la
- * main dans l'analyseur ferait qu'un accent corrigé dans le modèle laisserait
- * l'analyseur lire une colonne vide, sur toutes les lignes, sans erreur.
- */
 export const PROSPECT_IMPORT_HEADERS = {
   nom: 'Nom',
   prenom: 'Prénom',
@@ -43,16 +12,6 @@ export const PROSPECT_IMPORT_HEADERS = {
   enrollmentMethod: 'Méthode d’enrôlement',
 } as const;
 
-/**
- * Jetons admis dans la colonne « Méthode d'enrôlement ».
- *
- * Ce sont les valeurs de l'énumération PostgreSQL telles quelles, et non des
- * libellés français traduits : la colonne est facultative et rarement remplie,
- * elle sert aux reprises de données où la méthode est déjà connue. Un libellé
- * traduit ajouterait une table de correspondance à maintenir en double, et le
- * jour où l'énumération gagne une valeur, le classeur en refuserait une que la
- * base accepte.
- */
 export const ENROLLMENT_METHOD_TOKENS: readonly EnrollmentMethod[] = [
   EnrollmentMethod.PLATFORM,
   EnrollmentMethod.PHYSICAL,
@@ -111,5 +70,4 @@ export const PROSPECTS_IMPORT_COLUMNS: readonly ImportColumn[] = [
   },
 ];
 
-/** Nom de la feuille de saisie. Le lecteur prend la PREMIÈRE feuille, pas celle-ci par son nom. */
 export const PROSPECTS_IMPORT_SHEET_NAME = 'Prospects';

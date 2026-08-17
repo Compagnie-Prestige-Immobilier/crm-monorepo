@@ -20,12 +20,6 @@ import {
   type SortDirection,
 } from '@/lib/types';
 
-/**
- * Traduction URL ⇄ filtre. L'URL est l'état ; il n'y a pas de copie dans un
- * store React. Un filtre appliqué est donc partageable, rechargeable et
- * navigable au bouton « précédent » sans travail supplémentaire.
- */
-
 export const DEFAULT_PAGE_SIZE = 25;
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
@@ -50,7 +44,6 @@ export const EMPTY_FILTERS: ProspectFilters = {
   sortDir: 'desc',
 };
 
-/** Ce que Next passe à une page serveur, et ce que `URLSearchParams` sait lire. */
 export type { RawSearchParams };
 
 function readStatut(params: RawSearchParams | URLSearchParams): ProspectStatut | null {
@@ -67,10 +60,6 @@ function readSortDir(params: RawSearchParams | URLSearchParams): SortDirection {
   return readString(params, 'sortDir') === 'asc' ? 'asc' : 'desc';
 }
 
-/**
- * Analyse tolérante : une valeur inconnue est écartée, jamais propagée vers
- * l'API. Une URL bricolée à la main ne doit pas produire un 400 côté serveur.
- */
 export function parseProspectFilters(params: RawSearchParams | URLSearchParams): ProspectFilters {
   const pageSize = readPositiveInt(params, 'pageSize', DEFAULT_PAGE_SIZE);
   return {
@@ -97,11 +86,6 @@ export function parseProspectFilters(params: RawSearchParams | URLSearchParams):
   };
 }
 
-/**
- * Sérialisation canonique : les valeurs par défaut sont omises, et les clés
- * sont écrites dans un ordre fixe. Deux filtres égaux produisent donc la même
- * chaîne : ce qui en fait une clé de cache React Query utilisable telle quelle.
- */
 export function serializeProspectFilters(filters: ProspectFilters): URLSearchParams {
   const params = new URLSearchParams();
   const put = (key: string, value: string | null): void => {
@@ -130,30 +114,10 @@ export function serializeProspectFilters(filters: ProspectFilters): URLSearchPar
   return params;
 }
 
-/** Clé de requête React Query, stable et sérialisable. */
 export function filtersQueryKey(filters: ProspectFilters): string {
   return serializeProspectFilters(filters).toString();
 }
 
-// ─── Filtrage simple / filtrage avancé ───────────────────────────────────────
-
-/**
- * Les critères rangés derrière « Filtres avancés ».
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Pourquoi ce partage, et pourquoi CETTE liste.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Treize champs empilés en permanence poussaient les indicateurs sous la ligne
- * de flottaison : la première chose visible du tableau de bord était un
- * formulaire, pas un chiffre. Restent visibles les trois critères qu'on touche
- * à chaque session : la recherche, la période, le téléconseiller. Les dix
- * autres servent à une question précise, quelques fois par mois.
- *
- * La liste est ORDONNÉE comme les champs à l'écran : les puces de rappel
- * suivent l'ordre du panneau, si bien qu'une puce se retrouve à l'œil sans
- * avoir à parcourir dix listes déroulantes.
- */
 export const ADVANCED_FILTER_KEYS = [
   'representantId',
   'departementId',
@@ -169,7 +133,6 @@ export const ADVANCED_FILTER_KEYS = [
 
 export type AdvancedFilterKey = (typeof ADVANCED_FILTER_KEYS)[number];
 
-/** Les critères avancés RÉELLEMENT renseignés, dans l'ordre des champs. */
 export function activeAdvancedKeys(filters: ProspectFilters): AdvancedFilterKey[] {
   return ADVANCED_FILTER_KEYS.filter((key) => filters[key] !== null);
 }
@@ -182,15 +145,6 @@ export function hasAdvancedFilters(filters: ProspectFilters): boolean {
   return ADVANCED_FILTER_KEYS.some((key) => filters[key] !== null);
 }
 
-/**
- * Remise à zéro des SEULS critères avancés. La recherche, la période et le
- * téléconseiller restent : ce sont ceux que l'utilisateur voit, et effacer un
- * champ visible depuis un bouton rangé ailleurs se lit comme un défaut.
- *
- * Écrit champ par champ plutôt qu'en `Object.fromEntries` : la forme littérale
- * est vérifiée par le compilateur, si bien qu'un critère renommé dans
- * `ProspectFilters` casse ici au lieu d'être silencieusement oublié.
- */
 export function clearAdvancedFilters(): Partial<ProspectFilters> {
   return {
     representantId: null,
@@ -206,41 +160,15 @@ export function clearAdvancedFilters(): Partial<ProspectFilters> {
   } satisfies Record<AdvancedFilterKey, null>;
 }
 
-/**
- * État initial du panneau « Filtres avancés ».
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * L'URL l'emporte sur la préférence enregistrée, et ce n'est pas négociable.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Un lien filtré se colle dans un message : c'est le principe de cet écran
- * (voir `useProspectFilters`). Ouvrir ce lien avec le panneau replié parce que
- * le destinataire l'avait fermé la veille afficherait un tableau restreint sans
- * qu'aucun champ visible n'explique pourquoi. Il lirait un chiffre faux en
- * croyant lire le total.
- *
- * `stored` vaut `null` tant que rien n'a été enregistré, et pendant le rendu
- * serveur : où `localStorage` n'existe pas.
- */
 export function initialAdvancedOpen(filters: ProspectFilters, stored: boolean | null): boolean {
   return advancedOpenFrom(hasAdvancedFilters(filters), stored);
 }
 
-/**
- * La même règle, débarrassée du type des prospects.
- *
- * Le panneau avancé sert maintenant six écrans (prospects, dossiers, export,
- * représentants, campagnes) dont les objets de filtre n'ont rien en commun.
- * Seule cette arbitrage-là est commun, et il ne doit exister qu'une fois :
- * un écran où l'URL ne l'emporterait pas sur la préférence enregistrée
- * afficherait une population restreinte sans le dire.
- */
 export function advancedOpenFrom(hasAdvanced: boolean, stored: boolean | null): boolean {
   if (hasAdvanced) return true;
   return stored ?? false;
 }
 
-/** Ce qui compte comme « filtre actif » pour l'affichage du bouton de remise à zéro. */
 export function countActiveFilters(filters: ProspectFilters): number {
   let count = 0;
   if (filters.search.trim() !== '') count += 1;

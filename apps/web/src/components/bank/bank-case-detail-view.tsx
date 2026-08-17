@@ -50,7 +50,6 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import type { BankCaseTransition, BankRejectionReason, Role } from '@/lib/types';
 
-/** Code du motif « Autre » : le seul qui exige une précision libre (API). */
 const OTHER_REASON_CODE = 'AUTRE';
 
 export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Role }) {
@@ -71,15 +70,6 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
 
   if (detail.isPending || stages.isPending) return <BankCaseDetailSkeleton />;
 
-  /**
-   * Le retour à la liste est rendu AVANT l'état d'erreur, pas après.
-   *
-   * Une référence périmée (un signet, un lien collé dans un message) produit un
-   * 404, que `QueryErrorState` ne propose pas de rejouer : recliquer ne fera pas
-   * réapparaître un dossier supprimé. Sans ce lien, l'écran n'avait donc plus
-   * aucune issue, et le bouton « Précédent » du navigateur n'est pas une
-   * réponse de conception.
-   */
   if (detail.isError) {
     return (
       <div className="flex flex-col gap-6">
@@ -266,17 +256,6 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
   );
 }
 
-// ─── Chronologie ────────────────────────────────────────────────────────────
-
-/**
- * Chronologie verticale, du plus ancien au plus récent : l'ordre dans lequel
- * l'API renvoie l'historique, et l'ordre dans lequel les faits se sont produits.
- *
- * Une `<ol>` et non une pile de `<div>` : c'est une séquence ordonnée, et un
- * lecteur d'écran doit l'annoncer comme telle (« liste de 5 éléments,
- * élément 3 sur 5 »). Le trait vertical et les pastilles sont purement
- * décoratifs, donc `aria-hidden`.
- */
 function Timeline({ history }: { history: readonly BankCaseTransition[] }) {
   if (history.length === 0) {
     return (
@@ -309,10 +288,6 @@ function Timeline({ history }: { history: readonly BankCaseTransition[] }) {
                     : `${transition.fromStage.label} → ${transition.toStage.label}`}
                 </p>
                 {transition.correctionReason !== null ? (
-                  // La présence d'un motif de correction distingue une
-                  // rectification d'administrateur d'une avancée normale. Sans
-                  // marque, l'historique laisserait croire à un parcours
-                  // ordinaire là où quelqu'un est revenu en arrière.
                   <Badge variant="warning">Correction administrateur</Badge>
                 ) : null}
               </div>
@@ -358,8 +333,6 @@ function Timeline({ history }: { history: readonly BankCaseTransition[] }) {
   );
 }
 
-// ─── Dialogue d'avancement / d'encaissement ─────────────────────────────────
-
 function AdvanceDialog({
   open,
   onOpenChange,
@@ -388,16 +361,12 @@ function AdvanceDialog({
       return createBankCaseTransition(caseId, {
         targetStageId: target.id,
         expectedRev,
-        // Le montant n'est envoyé QUE vers l'encaissement : posté vers une
-        // étape ouverte, l'API répondrait BANK_CASE_AMOUNT_NOT_ALLOWED.
         ...(isCashing && amount !== null ? { amountXof: amount } : {}),
         ...(comment.trim() !== '' ? { comment } : {}),
       });
     },
     onSuccess: (result) => {
       onDone();
-      // Le succès n'est annoncé qu'après la réponse du serveur, et il reprend
-      // l'étape RÉELLEMENT atteinte plutôt que celle demandée.
       toast.success(`Dossier passé à « ${result.bankCase.currentStage.label} ».`);
       reset();
       onOpenChange(false);
@@ -446,10 +415,6 @@ function AdvanceDialog({
               </Label>
               <Input
                 id={amountId}
-                // `inputMode` et non `type="number"` : un champ numérique HTML
-                // convertit la valeur en `number` côté DOM, ce qui perdrait de
-                // la précision au-delà de 2^53 : exactement ce que le contrat
-                // évite en exposant les montants en chaîne.
                 inputMode="numeric"
                 autoComplete="off"
                 autoFocus
@@ -506,9 +471,6 @@ function AdvanceDialog({
           </Button>
           <Button
             type="button"
-            // Verrouillé pendant l'envoi : deux clics enverraient deux
-            // transitions, et la seconde échouerait en conflit de révision : ce
-            // que l'agent lirait comme un échec alors que la première a réussi.
             disabled={advance.isPending || !amountValid}
             onClick={() => {
               advance.mutate();
@@ -530,8 +492,6 @@ function AdvanceDialog({
     </Dialog>
   );
 }
-
-// ─── Dialogue de rejet ──────────────────────────────────────────────────────
 
 function RejectDialog({
   open,

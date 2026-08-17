@@ -17,20 +17,6 @@ import type {
 
 const DEFAULT_PAGE_SIZE = 25;
 
-/**
- * Lecture des conversions de segment.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI PRISMA ET NON DU SQL BRUT, CONTRAIREMENT AUX AUTRES AGRÉGATS
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Les agrégats de prospection composent leur `WHERE` à la main parce qu'ils
- * croisent quatre tables et que le segment, lui, n'existe nulle part : il faut
- * le RECALCULER à chaque ligne. Ici, rien de tel : les deux segments sont
- * STOCKÉS, la période est une simple borne sur `changedAt`, et les trois index
- * composites du modèle servent exactement ces clauses. Écrire du SQL brut
- * ajouterait une seconde définition du filtre sans rien gagner.
- */
 @Injectable()
 export class SegmentConversionsService {
   constructor(
@@ -54,9 +40,8 @@ export class SegmentConversionsService {
           changedBy: { select: { id: true, fullName: true } },
           prospect: { select: { nom: true, prenom: true } },
         },
-        // `id` en second critère : sans lui, deux bascules de la même
-        // milliseconde peuvent s'échanger entre deux pages, et l'une disparaît
-        // de la pagination.
+        // `id` en second critère : sans lui, deux bascules de la même milliseconde
+        // s'échangent entre deux pages et l'une disparaît.
         orderBy: [{ changedAt: 'desc' }, { id: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -73,9 +58,6 @@ export class SegmentConversionsService {
       }),
     ]);
 
-    // UNE seule lecture d'annuaire pour tout le décompte par auteur : la
-    // variante évidente, lire l'utilisateur ligne par ligne, produirait un
-    // aller-retour par personne apparaissant dans la période.
     const authorIds = byAuthor.map((group) => group.changedById);
     const authors = authorIds.length
       ? await this.prisma.user.findMany({
@@ -108,9 +90,8 @@ export class SegmentConversionsService {
       byAuthor: byAuthor
         .map((group): SegmentConversionAuthorDto => ({
           userId: group.changedById,
-          // Un auteur désactivé puis supprimé logiquement reste l'auteur de
-          // sa bascule : rendre une chaîne vide effacerait l'attribution que
-          // cette table existe pour porter.
+          // Un auteur supprimé reste l'auteur de sa bascule : effacer le nom
+          // effacerait l'attribution que cette table existe pour porter.
           fullName: nameById.get(group.changedById) ?? 'Compte supprimé',
           conversions: group._count._all,
         }))
@@ -118,12 +99,7 @@ export class SegmentConversionsService {
     };
   }
 
-  /**
-   * Le filtre, écrit UNE fois et partagé par la page, le total et les deux
-   * décomptes. Trois définitions séparées finiraient par décrire trois
-   * populations, et l'écran additionnerait des chiffres qui ne se rapportent
-   * pas au même ensemble.
-   */
+  /** Prisma et non SQL brut : les deux segments sont stockés et les trois index composites de `SegmentChange` servent ces clauses. */
   private buildWhere(
     user: AuthenticatedUser,
     query: SegmentConversionsQueryDto,
@@ -133,10 +109,8 @@ export class SegmentConversionsService {
     if (query.dateFrom !== undefined) changedAt.gte = inclusiveDateFrom(query.dateFrom);
     if (query.dateTo !== undefined) changedAt.lte = inclusiveDateTo(query.dateTo);
 
-    // Cloisonnement : un COMMERCIAL ne lit que les bascules QU'IL A FAITES.
-    // L'appliquer par écrasement, et non par fusion, est délibéré : un
-    // `changedById` reçu du client ne doit jamais élargir la portée, seulement
-    // la restreindre à l'intérieur de ce que l'appelant peut déjà voir.
+    // Écrasement et non fusion : un `changedById` reçu du client ne doit jamais
+    // élargir la portée, seulement la restreindre.
     const author = isAdmin(user) ? query.changedById : user.id;
 
     return {

@@ -2,14 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LOGIN_PATH, redirectToLogin, resetSessionExpiryGuard } from '@/lib/api/session-expiry';
 
-/**
- * Redirection de secours après expiration définitive de la session.
- *
- * Le comportement corrigé : avant, un 401 terminal laissait l'écran en place
- * sur des données périmées. On vérifie ici les trois pièges de ce genre de
- * redirection : la boucle, la rafale, et la redirection ouverte.
- */
-
 const replace = vi.fn();
 
 function stubLocation(pathname: string, search = ''): void {
@@ -36,8 +28,6 @@ describe('redirectToLogin', () => {
   });
 
   it('mémorise l’écran quitté AVEC ses filtres', () => {
-    // Les filtres vivent dans l'URL : les conserver rend la reconnexion
-    // transparente au lieu de renvoyer sur un tableau non filtré.
     stubLocation('/prospects', '?statut=CONVERTI&banqueId=b-1');
 
     redirectToLogin();
@@ -54,8 +44,6 @@ describe('redirectToLogin', () => {
   });
 
   it('ne redirige QU’UNE fois quand sept requêtes échouent ensemble', () => {
-    // Le tableau de bord lance sept appels en parallèle : ils expirent tous au
-    // même instant.
     stubLocation('/tableau-de-bord');
 
     const results = Array.from({ length: 7 }, () => redirectToLogin());
@@ -65,8 +53,6 @@ describe('redirectToLogin', () => {
   });
 
   it('ne fait rien côté serveur', () => {
-    // `window` absent : appelé pendant un rendu serveur, la fonction doit
-    // s'abstenir plutôt que lever.
     expect(redirectToLogin()).toBe(false);
   });
 

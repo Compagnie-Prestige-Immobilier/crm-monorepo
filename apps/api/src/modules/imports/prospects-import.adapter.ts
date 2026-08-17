@@ -23,68 +23,11 @@ import {
   rowError,
 } from './prospects-import.errors.js';
 
-/**
- * Import de masse des prospects.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI CE CHEMIN EXISTE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Jusqu'ici un prospect n'entrait que d'une fiche à la fois : saisie web, ou
- * synchronisation depuis le mobile. Une reprise de données, un fichier remis
- * par un syndicat ou par une banque partenaire, n'avait aucune porte. Elle se
- * faisait donc en SQL manuel, hors de toute règle applicative : sans
- * normalisation du téléphone, donc sans déduplication réelle, et sans le
- * contrôle des trois clés étrangères obligatoires.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * L'ÉTAT DE FICHIER EST INDEXÉ PAR TRAVAIL, PAS PORTÉ PAR L'INSTANCE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * L'adaptateur est injecté en LISTE (`IMPORT_ADAPTERS`), donc en singleton : la
- * même instance peut servir deux imports. Une mémoire des téléphones déjà vus
- * posée directement sur l'instance ferait que deux fichiers se voleraient des
- * lignes en se déclarant doublons internes l'un de l'autre, sur des données
- * qu'ils n'ont jamais partagées.
- *
- * `parseRow` ne recevant pas le contexte, elle est tenue PURE : la
- * déduplication interne au fichier appartient donc à `writeChunk`, seule à
- * connaître `ctx.jobId`. C'est la discipline que le contrat prescrit et que
- * l'adaptateur représentants applique déjà.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * QUATRE FAMILLES DE DOUBLONS, TOUTES SUR LE TÉLÉPHONE NORMALISÉ
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * 1. le fichier contre LUI-MÊME : deux lignes du même classeur. Comparées sur
- *    la forme E.164 et non sur la chaîne saisie, sinon « 77 123 45 67 » et
- *    « +221771234567 » comptent pour deux personnes ;
- * 2. le fichier contre la BASE, même représentant : la fiche existe déjà,
- *    saisie en tournée. Refusée en erreur nommée ;
- * 3. la course contre l'index unique partiel
- *    `prospects_phone_e164_active_key` : entre notre lecture et notre
- *    écriture, un commercial a pu saisir la même fiche sur le terrain.
- *    `skipDuplicates` l'écarte, et l'écart est COMPTÉ EN `skipped`, pas en
- *    erreur : personne n'a rien fait de mal, la ligne existe simplement déjà ;
- * 4. la fiche existe déjà sous un AUTRE représentant. Refusée, nommée, et
- *    surtout jamais rerattachée en silence : le rattachement décide de qui
- *    touche la commission et de quel commercial suit l'appel. Le déplacer sur
- *    la foi d'un classeur, sans que personne ne l'ait décidé, se découvre des
- *    semaines plus tard, quand deux représentants revendiquent la même fiche.
- */
+/** Import massif de prospects, dédoublonné par travail et téléphone normalisé. */
 export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> {
   readonly kind = ImportKind.PROSPECTS;
 
-  /**
-   * Plafond de lignes.
-   *
-   * Trente fois celui des représentants, parce que les deux populations n'ont
-   * pas le même ordre de grandeur : un département compte quelques centaines
-   * de représentants, chacun apportant des dizaines de prospects. Un fichier
-   * de reprise couvrant une région entière tient dans ce plafond ; au-delà,
-   * c'est une migration de base, qui relève d'un autre outil et d'une
-   * fenêtre de maintenance.
-   */
+  /** Au-delà, utiliser une migration plutôt qu'un import. */
   readonly maxRows = 150_000;
 
   readonly templateColumns: readonly ImportColumn[] = PROSPECTS_IMPORT_COLUMNS;
@@ -237,9 +180,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
       };
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
     // BANQUE ET SYNDICAT : RAPPROCHEMENT EXACT, JAMAIS APPROCHANT
-    // ═══════════════════════════════════════════════════════════════════════
     //
     // Ces deux colonnes ne sont pas deux libellés parmi d'autres : leur
     // croisement EST le segment BDD1..BDD4 (`packages/database/src/segment.ts`),
@@ -405,9 +346,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
       );
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
     // LA SIMULATION N'ÉCRIT RIEN, ET NE LE DEVINE PAS
-    // ═══════════════════════════════════════════════════════════════════════
     //
     // Le mode est porté par le contexte, donc l'adaptateur le respecte
     // lui-même au lieu de compter sur une annulation de transaction faite
@@ -437,9 +376,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
         syndicatId: row.syndicatId,
         representantId: row.representantId,
         createdById: ctx.requestedById,
-        // ═══════════════════════════════════════════════════════════════════
         // PHASE 2 : LA CONTRAINTE CHECK DÉCIDE, PAS UNE PRÉFÉRENCE
-        // ═══════════════════════════════════════════════════════════════════
         //
         // `prospects_enrollment_method_matches_status` impose la méthode SI ET
         // SEULEMENT SI le statut vaut METHOD_OBTAINED. Les deux colonnes se

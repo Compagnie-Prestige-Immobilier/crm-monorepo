@@ -8,27 +8,6 @@ import type * as ReferenceModule from '@/lib/data/reference';
 import { renderWithQuery } from '@/test/render-query';
 import type { ProspectRow } from '@/lib/types';
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * CE QUE CET ÉCRAN DOIT RENDRE IMPOSSIBLE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Deux listes déroulantes anodines, « Banque » et « Syndicat », décident du
- * segment BDD1–BDD4 par croisement. Les changer fait basculer la fiche d'une
- * base à l'autre, et c'est l'acte que la direction compte au mois.
- *
- * Trois choses doivent donc tenir, et aucune ne se voit à la relecture du JSX :
- *
- *  1. le segment COURANT est écrit en clair, avant toute manipulation ;
- *  2. changer une clé affiche le segment RÉSULTANT et réclame un motif ;
- *  3. sans motif, RIEN n'est envoyé : ni la bascule, ni la correction.
- *
- * Le troisième est le plus facile à casser sans s'en apercevoir : il suffit
- * d'oublier le `return` dans le garde de soumission pour que la bascule parte
- * quand même, l'API la refuse en 400, et l'utilisateur lit un message anglais
- * sous un formulaire qui ne signale aucun champ fautif.
- */
-
 const changeSegment = vi.hoisted(() => vi.fn());
 const update = vi.hoisted(() => vi.fn());
 const history = vi.hoisted(() => vi.fn());
@@ -109,7 +88,6 @@ function mount(over: Partial<ProspectRow> = {}) {
   return renderWithQuery(<ProspectEditDialog prospect={prospect(over)} onOpenChange={vi.fn()} />);
 }
 
-/** Choisit une option dans une liste déroulante Base UI, par son intitulé. */
 async function choose(field: string, option: string): Promise<void> {
   const user = userEvent.setup();
   await user.click(screen.getByRole('combobox', { name: new RegExp(field, 'u') }));
@@ -121,8 +99,6 @@ describe('le segment, avant et après', () => {
     mount();
 
     expect(await screen.findByText(/Segment actuel/u)).toBeTruthy();
-    // Le libellé complet, et pas le seul sigle « BDD4 » : personne ne retient
-    // que BDD4 vaut « autre syndicat / autre banque ».
     expect(screen.getAllByText(/BDD4 : autre syndicat \/ autre banque/u).length).toBeGreaterThan(0);
   });
 
@@ -139,8 +115,6 @@ describe('le segment, avant et après', () => {
 
     await choose('Banque', 'CBAO');
 
-    // BHS + SAES = BDD4 ; CBAO + SAES = BDD3. L'utilisateur ne peut pas le
-    // déduire de tête, c'est tout l'objet de cet affichage.
     await waitFor(() => {
       expect(screen.getByText(/BDD3 : autre syndicat \/ CBAO/u)).toBeTruthy();
     });
@@ -163,15 +137,6 @@ describe('le segment, avant et après', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  /**
-   * LE CONTRAT ENVOYÉ À L'API, ÉPINGLÉ.
-   *
-   * `expectedRev` est la révision LUE à l'affichage : sans elle, deux
-   * utilisateurs convertissent la même fiche l'un sur l'autre et la dernière
-   * écriture gagne en silence. Et les deux clés de segment ne doivent PAS
-   * repartir dans le `PATCH` ordinaire, qui les écrirait une seconde fois sans
-   * laisser de trace.
-   */
   it('envoie la bascule avec son motif et la révision lue, et rien d’autre', async () => {
     const user = userEvent.setup();
     changeSegment.mockResolvedValue(prospect({ segment: 'BDD3', banqueId: 'bnq-cbao', rev: 4 }));
@@ -192,8 +157,6 @@ describe('le segment, avant et après', () => {
         expectedRev: 3,
       });
     });
-    // Aucune identité n'a changé : la modification ordinaire n'a rien à écrire,
-    // et une révision de plus pour rien ferait échouer la bascule suivante.
     expect(update).not.toHaveBeenCalled();
   });
 });

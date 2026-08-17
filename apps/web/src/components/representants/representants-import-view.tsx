@@ -36,31 +36,6 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 
-/**
- * Import de masse des représentants.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Trois temps, et aucun n'est décoratif.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * 1. **Le modèle.** Les listes déroulantes du classeur sont alimentées depuis
- *    les référentiels VIVANTS : un département désactivé ce matin n'y figure
- *    pas cet après-midi. Sans modèle, chaque fichier arrive avec ses propres
- *    intitulés de colonnes, et l'import échoue sur la première ligne.
- * 2. **La simulation.** Rien n'est écrit. Le rapport classe les lignes en
- *    valides, en erreur (avec leur numéro DANS le fichier et le motif) et
- *    doublons. Appliquer quatre mille lignes sans les avoir vues ne se
- *    rattrape pas : la déduplication porte sur le téléphone, donc une erreur
- *    rattache silencieusement des prospects à la mauvaise personne.
- * 3. **L'application**, en une transaction : tout ou rien. Un import à moitié
- *    passé laisserait une base dont personne ne connaît l'état.
- *
- * L'écran ne propose l'application QU'APRÈS une simulation aboutie, et le
- * rapport reste affiché : le chiffre sur lequel on clique est celui qu'on
- * vient de lire.
- */
-
-/** Aligné sur le plafond de l'API. Refuser ici évite un aller-retour inutile. */
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 const ACCEPTED = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -213,9 +188,6 @@ export function RepresentantsImportView() {
               className="sr-only"
               onChange={(event) => {
                 accept(event.target.files?.item(0) ?? null);
-                // Le champ est vidé pour que redéposer LE MÊME fichier corrigé
-                // déclenche bien un nouvel événement : sans cela, `change` ne
-                // se produit pas et l'écran semble figé.
                 event.target.value = '';
               }}
             />
@@ -377,13 +349,7 @@ function ImportReportPanel({
           </Button>
         ) : (
           <>
-            <Button
-              type="button"
-              // Rien à appliquer : le bouton reste visible mais inerte, plutôt
-              // que de disparaître et laisser croire à un écran cassé.
-              disabled={applying || report.valid === 0}
-              onClick={onApply}
-            >
+            <Button type="button" disabled={applying || report.valid === 0} onClick={onApply}>
               {applying ? (
                 <>
                   <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />

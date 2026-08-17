@@ -11,47 +11,6 @@ import { breakingStageIndex, type Funnel, type FunnelStage } from '@/lib/data/fu
 import { formatNumber, formatRate, formatRateOrNone } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-/**
- * L'argent et la chaîne qui le produit, en tête du tableau de bord.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Ce que cet écran corrige.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Le tableau de bord ne montrait que l'EFFORT : prospects saisis,
- * représentants, téléconseillers, départements couverts. Jamais le résultat.
- * Une direction qui ne voit que le haut de l'entonnoir peut féliciter une
- * équipe qui saisit beaucoup et ne convertit rien, puis découvrir l'écart au
- * moment du bilan, quand il n'est plus rattrapable.
- *
- * Deux décisions de présentation en découlent :
- *
- *  1. Le montant encaissé est la PREMIÈRE chose lisible de la page, en gros.
- *     C'est le seul chiffre de la chaîne qui rapporte ; le reste le prépare.
- *  2. La colonne mise en avant est le taux de l'ÉTAPE PRÉCÉDENTE, pas le taux
- *     global. Sur 100 / 43,2 / 6,3 / 100, le taux global affiche 2,7 % pour les
- *     deux dernières marches et masque le fait que la collecte de méthode tient
- *     pendant que l'ouverture de dossier s'effondre. Le taux global dit COMBIEN
- *     on perd, celui de l'étape précédente dit OÙ.
- *
- * Aucun montant n'est converti en nombre : `formatXof` travaille sur la chaîne
- * renvoyée par l'API (voir `lib/money.ts`). Un `parseFloat` sur un
- * `Decimal(18,0)` perdrait des unités en silence.
- */
-
-// ─── L'argent ────────────────────────────────────────────────────────────────
-
-/**
- * La taille et la couleur vivent sur DEUX éléments, et ce n'est pas un caprice.
- *
- * `cn()` passe par `tailwind-merge`, qui range `text-display` et
- * `text-primary-text` dans le même groupe : il ne connaît que l'échelle de
- * tailles par défaut, et classe donc notre `text-display` comme une COULEUR.
- * Réunies sur un même élément, la dernière écrase la première : le chiffre de
- * tête sortait à la taille du corps de texte, plus petit que les tuiles
- * secondaires posées à côté de lui. Le défaut est silencieux : aucune erreur,
- * juste une hiérarchie inversée : et il ne se voit qu'à l'écran.
- */
 function MoneyHeadline({ finance }: { finance: Funnel['finance'] }) {
   return (
     <Card className="animate-rise border-primary/25">
@@ -101,13 +60,6 @@ function MoneyHeadline({ finance }: { finance: Funnel['finance'] }) {
   );
 }
 
-/**
- * Le chiffre de tête occupe SA PROPRE ligne, pleine largeur.
- *
- * Serré dans une colonne à côté des trois tuiles, il tombait à la même taille
- * qu'elles et « 7,6 M FCFA » passait à la ligne au milieu des cartes : le
- * montant le plus important de l'écran devenait le moins lisible.
- */
 export function MoneyBand({ finance }: { finance: Funnel['finance'] }) {
   return (
     <div className="flex flex-col gap-4">
@@ -143,22 +95,8 @@ export function MoneyBand({ finance }: { finance: Funnel['finance'] }) {
   );
 }
 
-// ─── La chaîne ───────────────────────────────────────────────────────────────
-
-/**
- * Largeur de la barre, en pourcentage du sommet.
- *
- * Plancher à 1,5 % : une marche à 0,2 % du total produirait une barre d'un
- * pixel, indistinguable d'une absence de barre. La barre ne porte aucune
- * information à elle seule : les trois colonnes chiffrées la doublent (WCAG
- * 1.4.1) : mais elle doit rester visible pour que la forme de l'entonnoir se
- * lise d'un coup d'œil.
- */
 function barWidth(stage: FunnelStage): string {
   if (stage.count === 0) return '0%';
-  // `tauxGlobal` est nul quand le sommet de l'entonnoir est vide. Il n'y a alors
-  // aucune proportion à dessiner : une barre pleine mentirait, une barre au
-  // plancher laisserait croire à une marche minuscule.
   if (stage.tauxGlobal === null) return '0%';
   return `${String(Math.max(1.5, Math.min(100, stage.tauxGlobal)))}%`;
 }
@@ -236,8 +174,6 @@ export function FunnelCard({ stages }: { stages: readonly FunnelStage[] }) {
 
                   <td className={cn(CELL, 'text-right')}>
                     {index === 0 ? (
-                      // Première marche : elle vaut 100 % par construction. Un
-                      // « 100 % » écrit ici se lirait comme un résultat.
                       <span className="text-[0.8125rem] text-muted-foreground">Origine</span>
                     ) : (
                       <span className="flex items-center justify-end gap-2">
@@ -275,8 +211,6 @@ export function FunnelCard({ stages }: { stages: readonly FunnelStage[] }) {
     </Card>
   );
 }
-
-// ─── Assemblage ──────────────────────────────────────────────────────────────
 
 export function FunnelPanel({ funnel }: { funnel: Funnel }) {
   return (

@@ -16,21 +16,6 @@ import { buildExportUrl, exportFileName } from '@/lib/data/export';
 import { countActiveFilters } from '@/lib/filters';
 import type { ProspectFilters } from '@/lib/types';
 
-/**
- * Menu d'export des prospects. Deux fichiers, deux usages, et la différence
- * est écrite dans le menu plutôt que devinée.
- *
- * : « Exporter la vue filtrée » suit EXACTEMENT les critères de l'écran. C'est
- *   ce qu'un administrateur envoie pour justifier un chiffre qu'il vient de
- *   lire.
- * : « Classeur consolidé BDD1–BDD4 » produit toujours les cinq mêmes feuilles.
- *   C'est le document de référence mensuel : sa forme ne doit pas dépendre de
- *   ce qui était filtré à l'écran, sinon deux exports du même mois ne se
- *   comparent plus. Le critère de segment y est donc retiré, et le menu le dit.
- *
- * Un seul bouton qui aurait fait « l'un ou l'autre selon le contexte » aurait
- * produit, un jour, un classeur consolidé amputé de trois feuilles.
- */
 export function ProspectExportMenu({ filters }: { filters: ProspectFilters }) {
   const { pending, download } = useFileDownload();
   const activeCount = countActiveFilters(filters);

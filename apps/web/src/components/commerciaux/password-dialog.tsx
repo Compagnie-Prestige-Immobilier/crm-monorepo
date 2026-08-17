@@ -23,14 +23,6 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { resetPasswordSchema, type ResetPasswordFormInput } from '@/lib/schemas';
 import type { UserRow } from '@/lib/types';
 
-/**
- * Réinitialisation administrateur du mot de passe.
- *
- * L'ancien mot de passe n'est PAS demandé : c'est le point de cette
- * fonctionnalité : un commercial qui a perdu le sien ne peut rien fournir. La
- * contrepartie est que l'opération est journalisée côté API et révoque les
- * sessions du compte : le téléphone du commercial redemandera une connexion.
- */
 export function PasswordDialog({
   open,
   onOpenChange,

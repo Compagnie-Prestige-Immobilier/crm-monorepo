@@ -55,21 +55,6 @@ import {
   type Role,
 } from './types';
 
-/**
- * Compositeur.
- *
- * DEUX ÉTAPES, ET LA SECONDE N'EST PAS DÉCORATIVE. Envoyer à 400 personnes ne
- * s'annule pas : la notification est sur les téléphones. L'étape de
- * confirmation existe pour qu'un nombre de destinataires : calculé par le
- * SERVEUR, avec exactement le filtre de l'envoi : soit lu avant que le geste
- * ne devienne irréversible. Le bouton d'envoi reste bloqué tant que ce nombre
- * n'a pas abouti : confirmer sans l'avoir vu annulerait tout l'intérêt de
- * l'étape.
- *
- * L'aperçu Android, lui, vit dans la PREMIÈRE étape, à côté du texte : c'est là
- * qu'on corrige une phrase, pas au moment de confirmer.
- */
-
 type Step = 'redaction' | 'confirmation';
 type When = 'now' | 'later';
 
@@ -77,11 +62,6 @@ const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DO
 const AUDIENCES: NotificationAudience[] = ['ALL', 'ROLE', 'DEPARTEMENT', 'USERS'];
 const ROLES: Role[] = ['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE'];
 
-/**
- * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item :
- * sans ces tables, les gâchettes montreraient « SYSTEME », « DEPARTEMENT » ou
- * « BANQUE_FINANCE » au lieu des libellés.
- */
 const CATEGORY_ITEMS = CATEGORIES.map((item) => ({ value: item, label: CATEGORY_LABELS[item] }));
 const AUDIENCE_ITEMS = AUDIENCES.map((item) => ({ value: item, label: AUDIENCE_LABELS[item] }));
 const ROLE_ITEMS = ROLES.map((item) => ({ value: item, label: ROLE_LABELS[item] }));
@@ -112,8 +92,6 @@ export function NotificationComposer({
 
   useEffect(() => {
     if (open) return;
-    // Remise à zéro à la FERMETURE et non à l'ouverture : rouvrir après une
-    // erreur réseau doit retrouver le texte, pas un formulaire vide.
     setStep('redaction');
   }, [open]);
 
@@ -133,8 +111,6 @@ export function NotificationComposer({
 
   const template = templates.data?.items.find((item) => item.id === templateId);
 
-  // Le texte affiché : et envoyé : est le texte SUBSTITUÉ. L'aperçu montre donc
-  // exactement ce qui partira, gabarit compris.
   const rendered = useMemo(
     () => renderNotification(title, body, variables),
     [title, body, variables],
@@ -142,15 +118,6 @@ export function NotificationComposer({
 
   const audienceIssue = audienceProblem(selection);
   const routeIssue = routeProblem(route);
-  /**
-   * L'heure saisie est lue à DAKAR, pas dans le fuseau du poste.
-   *
-   * `<input type="datetime-local">` rend une chaîne sans fuseau. `new Date()`
-   * l'interprétait donc localement : un administrateur en déplacement à Paris
-   * qui programmait « 9 h » envoyait à 7 h, heure de Dakar, à quatre cents
-   * personnes, et rien à l'écran ne le disait. `dakarLocalToIso` fixe le
-   * décalage (UTC+00:00 toute l'année, pas d'heure d'été au Sénégal).
-   */
   const scheduledIso = when === 'later' ? dakarLocalToIso(scheduledFor) : null;
   const scheduleIssue =
     when === 'later' && (scheduledIso === null || Date.parse(scheduledIso) <= Date.now())
@@ -166,8 +133,6 @@ export function NotificationComposer({
   const preview = useQuery({
     queryKey: notificationKeys.preview(previewQuery),
     queryFn: () => fetchAudiencePreview(previewQuery),
-    // Le nombre n'est demandé qu'à l'étape de confirmation : le calculer à
-    // chaque frappe interrogerait le serveur pour rien.
     enabled: open && step === 'confirmation' && audienceIssue === null,
     staleTime: 15_000,
   });
@@ -196,17 +161,6 @@ export function NotificationComposer({
       if (created.status === 'SCHEDULED') {
         toast.success('Notification programmée. Annulable jusqu’au départ.');
       } else if (created.transportStatus === 'NOT_CONFIGURED') {
-        /*
-          Le pire message possible serait « Envoyée » alors que rien n'est parti
-          par le canal sortant. On le dit, et on dit quoi.
-
-          Le canal est le COURRIEL, plus le push mobile : `transportStatus` vaut
-          NOT_CONFIGURED quand aucune clé Brevo n'est fournie. La notification
-          est bien enregistrée et chaque destinataire la lira dans
-          l'application ; c'est seulement l'e-mail qui ne part pas. Le message
-          citait Firebase, qui n'existe plus, et laissait croire que rien
-          n'avait été remis.
-        */
         toast.warning(
           `Enregistrée pour ${String(created.counts.total)} destinataire(s), et lisible dans l’application. Aucun e-mail remis : le service d’envoi n’est pas configuré.`,
           { duration: 12_000 },
@@ -620,8 +574,6 @@ export function NotificationComposer({
               </Button>
               <Button
                 type="button"
-                // Bloqué tant que le nombre n'a pas abouti : confirmer sans
-                // l'avoir lu viderait l'étape de son seul contenu utile.
                 disabled={
                   send.isPending ||
                   preview.isPending ||

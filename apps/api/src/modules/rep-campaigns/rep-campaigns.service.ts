@@ -45,43 +45,13 @@ import type {
 } from './dto.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 
-/**
- * Campagnes d'appels aux REPRÉSENTANTS.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI UN MODULE SÉPARÉ ET PAS UN `kind` SUR CallCampaign
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * La mécanique est la même (graine persistée, tourniquet, tâche par cible,
- * journal en ajout seul) mais le métier ne l'est pas : la cible est une autre
- * table, les issues d'appel sont différentes, et surtout la campagne prospects
- * porte l'invariant « une seule tâche active par prospect » dont dépend
- * l'éligibilité de toute la phase 2. Greffer les représentants dessus mettrait
- * cet invariant en jeu à chaque évolution du nouveau besoin, sur la
- * fonctionnalité qui porte aujourd'hui la collecte complète des méthodes.
- *
- * Ce qui est PARTAGÉ, en revanche, l'est réellement et pas par copie :
- * `distribution.ts` (tirage, tourniquet, étalement) et `programme-pdf.ts`
- * (maquette imprimée). Le même commercial reçoit les deux liasses le même
- * matin : elles doivent se ressembler au point près.
- */
-
 const CAMPAIGN_TRANSACTION_TIMEOUT_MS = 120_000;
 const CAMPAIGN_TRANSACTION_MAX_WAIT_MS = 15_000;
 
-/** Taille des lots d'insertion. Même raison que côté prospects : la taille de requête. */
 const TASK_INSERT_CHUNK = 5_000;
 
-/** Nombre de tentatives affichées dans le détail d'une campagne. */
 const RECENT_ATTEMPTS = 20;
 
-/**
- * Issues qui CLÔTURENT la tâche.
- *
- * `CALLBACK` et `UNREACHABLE` la laissent ouverte, par construction : elles
- * décrivent un appel à refaire. `OTHER` la laisse ouverte aussi, parce qu'elle
- * ne dit rien de l'aboutissement, seulement qu'il s'est passé quelque chose.
- */
 const TERMINAL_OUTCOMES: readonly RepCallOutcome[] = [
   RepCallOutcome.REACHED,
   RepCallOutcome.PROSPECTS_PROMISED,
@@ -89,12 +59,6 @@ const TERMINAL_OUTCOMES: readonly RepCallOutcome[] = [
   RepCallOutcome.WRONG_NUMBER,
 ];
 
-/**
- * Cases du programme papier des représentants.
- *
- * Deux rangées comme du côté prospects, pour que la liasse se remplisse avec le
- * même geste : ce que l'appel a donné, puis pourquoi il n'a rien donné.
- */
 export const REP_CHECKBOX_GROUPS: readonly CheckboxGroup[] = [
   { caption: 'Résultat', options: ['Échange fait', 'Fiches promises'] },
   { caption: 'Autre', options: ['Injoignable', 'Rappeler', 'Refus', 'Faux numéro', 'Autre'] },
@@ -134,25 +98,10 @@ export class RepCampaignsService {
     private readonly demo: DemoVisibilityService,
   ) {}
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Création
-  // ───────────────────────────────────────────────────────────────────────────
-
-  /**
-   * Crée une campagne, tire l'ensemble éligible et MATÉRIALISE la répartition.
-   *
-   * Tout tient dans une seule transaction, pour la même raison que côté
-   * prospects : une campagne sans tâches paraît valide à l'écran, ses
-   * programmes sortent vides, et les représentants concernés restent éligibles
-   * pour une deuxième campagne qui les distribuerait à quelqu'un d'autre.
-   */
   async create(user: AuthenticatedUser, body: CreateRepCampaignDto): Promise<RepCampaignDetailDto> {
     const commerciaux = await this.resolveCommerciaux(body.commercialIds);
     const seed = newCampaignSeed();
     const spreadDays = body.spreadDays ?? MIN_SPREAD_DAYS;
-    // `enabledForWrite` : cette valeur est ÉCRITE sur la campagne, puis héritée
-    // par ses tâches. Un repli `false` sur panne de lecture laisserait une
-    // campagne fictive dans la liste réelle, programmes imprimables compris.
     const demoEnabled = await this.demo.enabledForWrite();
 
     const campaignId = await this.prisma
@@ -167,18 +116,11 @@ export class RepCampaignsService {
               iefId: body.iefId ?? null,
               onlyWithoutProspects: body.onlyWithoutProspects ?? false,
               createdById: user.id,
-              // Une campagne créée pendant une démonstration EST de
-              // démonstration. Sans ce drapeau, éteindre le mode laisse une
-              // campagne fictive dans la liste réelle, avec ses tâches et ses
-              // programmes imprimables.
               isDemo: demoEnabled,
             },
           });
 
           await tx.repCallCampaignCommercial.createMany({
-            // L'ordre reçu EST le rang du tourniquet : c'est lui qui fige le
-            // contenu de chaque programme, indépendamment de l'ordre de lecture
-            // en base.
             data: commerciaux.map((commercial, index) => ({
               campaignId: campaign.id,
               userId: commercial.id,
@@ -189,8 +131,6 @@ export class RepCampaignsService {
           const eligible = await tx.representant.findMany({
             where: eligibleWhere(body, demoEnabled),
             select: { id: true },
-            // Ordre d'entrée déterministe : sans lui, le mélange partirait d'une
-            // permutation arbitraire et la graine ne rejouerait plus rien.
             orderBy: { id: 'asc' },
           });
 
@@ -222,9 +162,6 @@ export class RepCampaignsService {
                   queueSize[assignment.bucket] ?? 0,
                   spreadDays,
                 ),
-                // La tâche suit sa campagne. `eligibleWhere` ne mélange jamais
-                // les deux populations, et la recopie garde la file d'appels
-                // invisible en même temps que la campagne qui l'a produite.
                 isDemo: demoEnabled,
               },
             ];
@@ -248,13 +185,6 @@ export class RepCampaignsService {
     return this.get(campaignId);
   }
 
-  /**
-   * Contrôle la liste de commerciaux AVANT d'ouvrir la transaction.
-   *
-   * Un compte désactivé ou d'un autre rôle recevrait un programme que personne
-   * n'appellerait : les représentants seraient marqués « affectés », donc
-   * exclus de toute campagne ultérieure, et dormiraient indéfiniment.
-   */
   private async resolveCommerciaux(
     ids: readonly string[],
   ): Promise<{ id: string; fullName: string; username: string }[]> {
@@ -274,7 +204,6 @@ export class RepCampaignsService {
     const inactive = ids.filter((id) => byId.get(id)?.isActive !== true);
     if (inactive.length > 0) throw commercialInactive(inactive);
 
-    // On respecte l'ordre demandé, pas celui de la base.
     return ids.flatMap((id) => {
       const row = byId.get(id);
       if (!row) return [];
@@ -282,19 +211,12 @@ export class RepCampaignsService {
     });
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Aperçu
-  // ───────────────────────────────────────────────────────────────────────────
-
   async preview(query: RepCampaignPreviewQueryDto): Promise<RepCampaignPreviewDto> {
     const eligible = await this.prisma.representant.count({
       where: eligibleWhere(query, await this.demo.enabled()),
     });
 
     const commercialCount = Math.max(1, query.commercialCount ?? 1);
-    // Le plus gros lot, pas la moyenne : le tourniquet garantit un écart d'au
-    // plus une ligne, et c'est le commercial le plus chargé qui décide si la
-    // journée est tenable.
     const perCommercial = Math.ceil(eligible / commercialCount);
 
     return {
@@ -304,10 +226,6 @@ export class RepCampaignsService {
       scopeLabel: await this.scopeLabel(query),
     };
   }
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Lecture
-  // ───────────────────────────────────────────────────────────────────────────
 
   async list(query: RepCampaignQueryDto): Promise<RepCampaignListDto> {
     const page = query.page ?? 1;
@@ -389,9 +307,6 @@ export class RepCampaignsService {
 
     if (!campaign) throw repCampaignNotFound();
 
-    // La campagne est déjà cloisonnée par la lecture ci-dessus, mais le filtre
-    // est reposé sur chaque agrégat : une tâche de démonstration accrochée à
-    // une campagne réelle gonflerait autrement l'avancement affiché.
     const demoWhere = demoScope(await this.demo.enabled());
 
     const grouped = await this.prisma.repCallTask.groupBy({
@@ -479,7 +394,6 @@ export class RepCampaignsService {
     return index;
   }
 
-  /** Lignes par journée, globalement et par commercial. Voir le service de phase 2. */
   private async dayCounts(
     campaignId: string,
     spreadDays: number,
@@ -494,11 +408,6 @@ export class RepCampaignsService {
     const byUser = new Map<string, number[]>();
 
     for (const row of grouped) {
-      // Même règle et même garde-fou que la phase 2 : on écarte l'indice hors
-      // bornes (réduction légitime de `spreadDays`) mais on le JOURNALISE. La
-      // contrainte en base ne borne que `dayIndex >= 0`, donc un indice absurde
-      // passe à l'écriture et disparaît ici, en laissant un total par journée
-      // inférieur au nombre de tâches sans le moindre signal.
       if (row.dayIndex < 0 || row.dayIndex >= overall.length) {
         this.logger.warn(
           `Campagne représentants ${campaignId} : ${String(row._count._all)} tâche(s) au ` +
@@ -517,19 +426,6 @@ export class RepCampaignsService {
     return { overall, byUser };
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Clôture
-  // ───────────────────────────────────────────────────────────────────────────
-
-  /**
-   * Clôt la campagne et ANNULE toutes les tâches encore ouvertes.
-   *
-   * `isActive` retombe à faux : c'est cette colonne qui porte l'index unique
-   * partiel. Sans cette remise à zéro, les représentants non appelés
-   * resteraient inéligibles à toute campagne future, pour toujours.
-   *
-   * Idempotent : un bouton « Clôturer » cliqué deux fois est un geste banal.
-   */
   async close(id: string): Promise<RepCampaignDetailDto> {
     const demoEnabled = await this.demo.enabled();
     await this.prisma.$transaction(async (tx) => {
@@ -553,18 +449,6 @@ export class RepCampaignsService {
     return this.get(id);
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Programme d'un commercial
-  // ───────────────────────────────────────────────────────────────────────────
-
-  /**
-   * Lignes du programme d'un commercial, DANS L'ORDRE PERSISTÉ.
-   *
-   * AUCUN NOM DE REPRÉSENTANT n'en sort, comme du côté prospects et pour la
-   * même raison : une liasse imprimée circule, et un numéro accompagné d'un nom
-   * constitue un fichier nominatif exploitable tel quel par qui le ramasse. Le
-   * commercial rapproche la ligne de sa fiche par le code court.
-   */
   async programme(
     campaignId: string,
     userId: string,
@@ -593,20 +477,11 @@ export class RepCampaignsService {
       },
     });
 
-    // On ne distingue pas « campagne inexistante » de « ce commercial n'en fait
-    // pas partie » : les deux appellent la même correction, et les séparer
-    // révélerait l'existence de campagnes.
     if (!membership) throw programmeNotFound();
 
     const spreadDays = membership.campaign.spreadDays;
     const demoWhere = demoScope(await this.demo.enabled());
 
-    // La borne est l'étalement EFFECTIF DE CE COMMERCIAL, pas `spreadDays`.
-    // `dayIndexFor` plafonne l'indice à `min(spreadDays, taille de file) - 1` :
-    // un commercial qui n'a reçu que 3 fiches dans une campagne étalée sur 7
-    // jours n'a que trois journées. Comparer à `spreadDays` laissait passer
-    // `?jour=5` et rendait le PDF vide que ce refus existe pour empêcher, un
-    // document qui se lit comme « rien à faire aujourd'hui ».
     const taskCount = await this.prisma.repCallTask.count({
       where: { campaignId, assignedToId: userId, ...demoWhere },
     });
@@ -638,25 +513,10 @@ export class RepCampaignsService {
         shortCode: shortCode(task.representant.id),
         phoneE164: task.representant.phoneE164,
       })),
-      // `effectiveDays`, et non `spreadDays` : voir le même choix, expliqué, du
-      // côté des campagnes prospects. Le pied de page doit annoncer les
-      // journées de CE commercial, celles que le refus ci-dessus lui oppose.
       ...(jour === undefined ? {} : { dayNumber: jour, dayCount: effectiveDays }),
     };
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Tentatives
-  // ───────────────────────────────────────────────────────────────────────────
-
-  /**
-   * Enregistre un appel et clôt la tâche si l'issue est terminale.
-   *
-   * L'IDEMPOTENCE EST PORTÉE PAR L'IDENTIFIANT CLIENT. Un réseau qui coupe
-   * après l'écriture mais avant la réponse fait rejouer l'envoi : sans cette
-   * garde, le même appel compterait deux fois et le taux de joignabilité
-   * deviendrait faux sans que personne ne s'en aperçoive.
-   */
   async recordAttempt(
     user: AuthenticatedUser,
     body: CreateRepCallAttemptDto,
@@ -687,21 +547,10 @@ export class RepCampaignsService {
     const demoEnabled = await this.demo.enabled();
     const representant = await this.prisma.representant.findFirst({
       where: { id: body.representantId, deletedAt: null, ...demoScope(demoEnabled) },
-      // `isDemo` est lu ICI, sur la fiche appelée, et n'est jamais rendu au
-      // client : le DTO de résultat ne porte pas la nature de la ligne. Il ne
-      // sert qu'à l'écriture de la tentative, juste en dessous.
       select: { id: true, isDemo: true },
     });
     if (!representant) throw representantNotFound();
 
-    // Une tentative SANS tâche reste enregistrée : un commercial peut rappeler
-    // un représentant hors campagne, et perdre cette trace priverait les
-    // statistiques de qualité de la base de la moitié de leur matière.
-    //
-    // `orderBy: createdAt` : l'index unique partiel n'admet qu'une tâche active
-    // par représentant, mais l'ordre rend la lecture déterministe si cet index
-    // venait à tomber, plutôt que de dépendre du plan de PostgreSQL. Miroir du
-    // chemin prospects (`phase2-sync.service.ts`).
     const task = await this.prisma.repCallTask.findFirst({
       where: { representantId: body.representantId, isActive: true, ...demoScope(demoEnabled) },
       select: { id: true, campaignId: true },
@@ -711,13 +560,6 @@ export class RepCampaignsService {
     const terminal = TERMINAL_OUTCOMES.includes(body.outcome);
 
     const applied = await this.prisma.$transaction(async (tx) => {
-      // `createMany({ skipDuplicates })` et non `create` : la lecture
-      // d'idempotence ci-dessus n'est qu'un raccourci, deux envois simultanés
-      // du même identifiant la franchissent tous les deux. `create` faisait
-      // alors remonter un P2002 que rien ne traduit, donc un 500 sur un rejeu
-      // réseau, c'est-à-dire sur le cas le plus banal du terrain. La variante
-      // « ne rien faire en cas de conflit » tranche en base et rend le compte
-      // écrit. Miroir exact du chemin prospects.
       const inserted = await tx.repCallAttempt.createMany({
         data: [
           {
@@ -730,25 +572,6 @@ export class RepCampaignsService {
             promisedProspects: body.promisedProspects ?? null,
             comment,
             clientCreatedAt: new Date(body.clientCreatedAt),
-            // LA FICHE APPELÉE, ET NON L'INTERRUPTEUR. Le commentaire disait
-            // déjà « la tentative suit le représentant » pendant que le code
-            // recopiait l'état global : un appel RÉEL passé pendant qu'un
-            // administrateur montrait la plateforme partait donc en
-            // `isDemo: true`, et deux dégâts s'ensuivaient.
-            //
-            // Le premier est la disparition : mode éteint, la tentative n'est
-            // plus lue nulle part, et l'historique de l'appel est perdu pour
-            // le commercial qui l'a passé.
-            //
-            // Le second est pire, parce qu'il est DURABLE. `eligibleWhere`
-            // exclut définitivement un représentant porteur d'une issue
-            // terminale, et cette clause-là n'est PAS bornée par `isDemo` : la
-            // fiche restait donc inéligible à toute campagne future, sans
-            // qu'aucun écran ne montre plus pourquoi. Refus invisible et
-            // exclusion perpétuelle, sur un appel parfaitement légitime.
-            //
-            // Miroir exact du chemin prospects, `phase2-sync.service.ts`, qui
-            // écrit `isDemo: prospect.isDemo`.
             isDemo: representant.isDemo,
           },
         ],
@@ -758,12 +581,6 @@ export class RepCampaignsService {
       if (inserted.count === 0) return false;
 
       if (task && terminal) {
-        // `updateMany` sur TOUTES les tâches actives, et non `update` sur la
-        // seule qui a été lue : si l'index unique partiel venait à manquer, une
-        // seconde tâche active resterait ouverte pour toujours et son
-        // représentant serait inéligible à vie. `isActive: true` dans le
-        // `where` interdit en prime de rouvrir une tâche qu'une clôture de
-        // campagne concurrente vient d'annuler.
         await tx.repCallTask.updateMany({
           where: { representantId: body.representantId, isActive: true },
           data: {
@@ -794,8 +611,6 @@ export class RepCampaignsService {
     };
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
-
   private async scopeLabel(scope: ScopeInput): Promise<string> {
     const [departement, ief] = await Promise.all([
       scope.departementId
@@ -817,56 +632,18 @@ export class RepCampaignsService {
   }
 }
 
-/**
- * Représentants éligibles à une campagne.
- *
- * `repCallTasks: { none: { isActive: true } }` est la condition qui interdit de
- * distribuer deux fois le même numéro. Elle double l'index unique partiel :
- * l'index protège la base, cette clause évite d'écrire 40 000 lignes pour se
- * heurter au conflit sur la dernière.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * UNE ISSUE TERMINALE SORT LE REPRÉSENTANT DE LA POPULATION, DÉFINITIVEMENT
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `isActive` ne suffit pas : la tâche retombe à faux DÈS que l'appel aboutit,
- * qu'il ait donné « refus » ou « faux numéro ». Sans cette seconde condition,
- * la personne qui a dit non redevient éligible le lendemain, entre dans la
- * campagne suivante, redit non, et recommence indéfiniment. C'est la campagne
- * de relance qui se transforme en harcèlement, et le faux numéro qui se fait
- * recomposer à chaque tirage.
- *
- * Les issues NON terminales (`CALLBACK`, `UNREACHABLE`, `OTHER`) ne ferment
- * rien, par construction : elles décrivent un appel à refaire, et c'est
- * exactement la population qu'une relance doit retrouver.
- */
 function eligibleWhere(scope: ScopeInput, demoPopulation: boolean): Prisma.RepresentantWhereInput {
   return {
     deletedAt: null,
-    // UNE SEULE POPULATION, et non `demoScope`, qui ÉLARGIT quand le mode est
-    // allumé. Voir l'explication complète dans `eligibleForCampaignWhere`
-    // (packages/database/src/segment.ts) : un tirage matérialise des tâches
-    // durables et exclut les fiches retenues des campagnes suivantes. Mêler
-    // les deux populations laissait des représentants réels bloqués par une
-    // tâche de démonstration invisible, que la purge ne sait pas reprendre.
     isDemo: demoPopulation,
     ...(scope.departementId ? { departementId: scope.departementId } : {}),
     ...(scope.iefId ? { iefId: scope.iefId } : {}),
     ...(scope.onlyWithoutProspects ? { prospects: { none: { deletedAt: null } } } : {}),
-    // VOLONTAIREMENT NON BORNÉS PAR `isDemo`, contrairement au filtre de
-    // population ci-dessus. `rep_call_tasks_one_active_per_representant` est
-    // partiel sur `isActive = true` et ignore `isDemo` : la base n'admet
-    // qu'une tâche active par représentant, toutes populations confondues.
-    // Une clause plus étroite que cet index laisserait passer un représentant
-    // porteur d'une tâche active de l'autre population, et le tirage se
-    // heurterait au conflit d'unicité au lieu de l'éviter. Voir la même
-    // décision, expliquée, dans `eligibleForCampaignWhere`.
     repCallTasks: { none: { isActive: true } },
     repCallAttempts: { none: { outcome: { in: [...TERMINAL_OUTCOMES] } } },
   };
 }
 
-/** Libellé lisible du périmètre, composé une seule fois pour l'écran et le PDF. */
 function composeScopeLabel(
   departement: string | null,
   ief: string | null,

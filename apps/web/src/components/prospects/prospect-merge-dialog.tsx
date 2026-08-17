@@ -27,21 +27,10 @@ import { PROSPECT_STATUT_LABELS, type ProspectRow } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
-/**
- * Fusion de deux doublons.
- *
- * L'opération n'est PAS réversible : la fiche absorbée part en suppression
- * logique et son historique suit la survivante. L'écran est donc construit
- * autour d'une seule question : LAQUELLE SURVIT : posée avant tout le reste,
- * avec les deux fiches côte à côte et la valeur retenue mise en évidence
- * champ par champ. Un simple « Confirmer ? » ne suffit pas quand on ne peut
- * pas revenir en arrière.
- */
 export function ProspectMergeDialog({
   prospect,
   onOpenChange,
 }: {
-  /** Fiche d'où part la fusion. `null` = dialogue fermé. */
   prospect: ProspectRow | null;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -51,7 +40,6 @@ export function ProspectMergeDialog({
   const [searchDraft, setSearchDraft] = useState('');
   const [search, setSearch] = useState('');
   const [duplicate, setDuplicate] = useState<ProspectRow | null>(null);
-  /** `true` : la fiche d'origine survit. `false` : c'est le doublon choisi. */
   const [keepOriginal, setKeepOriginal] = useState(true);
 
   useEffect(() => {
@@ -86,8 +74,6 @@ export function ProspectMergeDialog({
       return mergeProspects({
         targetId: survivor.id,
         sourceId: absorbed.id,
-        // La cible garde ses propres champs : l'utilisateur a désigné la
-        // survivante, il n'a pas demandé à recopier ceux de l'autre.
         preferSource: false,
       });
     },
@@ -273,13 +259,6 @@ export function ProspectMergeDialog({
   );
 }
 
-/**
- * Une fiche, présentée comme un choix radio réel.
- *
- * L'input natif est conservé (visuellement masqué) plutôt que remplacé par un
- * `div` cliquable : il apporte gratuitement la navigation aux flèches entre les
- * deux options et l'annonce « option 1 sur 2 » du lecteur d'écran.
- */
 function ProspectCard({
   prospect,
   selected,

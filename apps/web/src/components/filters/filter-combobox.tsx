@@ -18,39 +18,6 @@ import { matchesSearch } from '@/lib/search';
 import type { FilterOption } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-/**
- * Combobox de filtre : bouton + liste cherchable.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Le libellé est rattaché au déclencheur par `aria-labelledby`, PAS par le
- * seul `<label for>`.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * La nuance est décisive et l'erreur était bien réelle : le nom accessible d'un
- * `<button>` se calcule par `aria-labelledby`, puis `aria-label`, puis son
- * propre contenu : un `<label for>` n'entre nulle part dans cette chaîne
- * (contrairement à `input`, `select` ou `textarea`). Le `<label>` rendait donc
- * le clic pratique, et rien de plus : un lecteur d'écran annonçait « Tous les
- * téléconseillers, bouton » sans jamais prononcer « Téléconseiller ». Avec
- * `aria-labelledby`, il annonce « Téléconseiller, Tous les téléconseillers ».
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Trois gestes économisés, pour quelqu'un qui filtre vingt fois par jour.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * 1. **Effacer se fait sur place.** Une croix apparaît dès qu'un critère porte
- *    une valeur. Sans elle, retirer un filtre demandait d'ouvrir la liste, de
- *    remonter jusqu'à « Tous les… », puis de cliquer : trois gestes pour
- *    défaire ce qu'un seul avait fait.
- * 2. **La recherche repart de zéro à chaque ouverture.** Le texte tapé la fois
- *    précédente filtrerait la liste avant même qu'on l'ait vue : on ouvrirait
- *    sur « Aucun résultat » alors qu'une valeur est sélectionnée. La liste
- *    ouverte montre TOUJOURS la valeur courante et ses voisines, et elle défile.
- * 3. **Les accents ne bloquent plus.** « thies » trouve « Thiès » (voir
- *    `lib/search.ts`). Le rapprochement littéral ne ratait pas une frappe : il
- *    ratait une donnée qui existe, et l'utilisateur en concluait que le
- *    département manquait au référentiel.
- */
 export function FilterCombobox({
   label,
   placeholder,
@@ -66,16 +33,6 @@ export function FilterCombobox({
   value: string | null;
   onChange: (value: string | null) => void;
   className?: string | undefined;
-  /**
-   * Champ OBLIGATOIRE : ajoute l'astérisque et `aria-required`.
-   *
-   * Le composant sert d'abord de filtre, où rien n'est obligatoire, d'où le
-   * défaut à `false`. Mais il sert aussi de champ de formulaire, et il y était
-   * alors le SEUL des trois à ne rien signaler : sur le dialogue d'approbation
-   * d'une demande client, « Représentant de rattachement » bloquait l'envoi
-   * exactement comme « Syndicat » et « Méthode d'enrôlement », sans porter leur
-   * astérisque. L'agent cherchait ce qui manquait dans les deux champs marqués.
-   */
   required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -84,13 +41,6 @@ export function FilterCombobox({
   const labelId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  /**
-   * La recherche est vidée à CHAQUE ouverture.
-   *
-   * `PopoverContent` démonte son contenu à la fermeture, mais l'état vit ici et
-   * survivrait donc au cycle. Rouvrir sur un texte oublié afficherait une liste
-   * déjà filtrée, parfois vide, sans que rien à l'écran n'explique pourquoi.
-   */
   useEffect(() => {
     if (open) setSearch('');
   }, [open]);
@@ -117,22 +67,11 @@ export function FilterCombobox({
                 id={triggerId}
                 ref={triggerRef}
                 variant="outline"
-                /*
-                  `aria-labelledby` liste le libellé PUIS le déclencheur : le nom
-                  devient « Téléconseiller Tous les téléconseillers ». Sans le second id,
-                  le nom se réduirait au libellé et la valeur choisie ne serait
-                  plus annoncée.
-                */
                 role="combobox"
                 aria-labelledby={`${labelId} ${triggerId}`}
                 aria-haspopup="listbox"
                 aria-required={required || undefined}
-                className={cn(
-                  'h-11 w-full justify-between gap-2 font-[400]',
-                  // Place réservée à la croix : sans elle, le libellé passerait
-                  // dessous et se ferait couper à un caractère près.
-                  hasValue && 'pr-16',
-                )}
+                className={cn('h-11 w-full justify-between gap-2 font-[400]', hasValue && 'pr-16')}
               />
             }
           >
@@ -175,9 +114,6 @@ export function FilterCombobox({
                     .map((option) => (
                       <CommandItem
                         key={option.value}
-                        // Le libellé et non l'UUID : cmdk s'en sert pour la
-                        // navigation clavier, et un identifiant y serait
-                        // illisible autant qu'inutile.
                         value={`${option.label} ${option.hint ?? ''}`}
                         onSelect={() => {
                           onChange(option.value === value ? null : option.value);
@@ -216,8 +152,6 @@ export function FilterCombobox({
             aria-label={`Effacer le filtre ${label}`}
             onClick={() => {
               onChange(null);
-              // Le focus revient au déclencheur : sans cela, il retomberait sur
-              // le `<body>` et le `Tab` suivant repartirait du haut de la page.
               triggerRef.current?.focus();
             }}
             className="absolute top-1/2 right-8 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors duration-(--dur-1) ease-(--ease-out-cpi) hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"

@@ -33,13 +33,6 @@ import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 import type { NamedCount } from '@/lib/types';
 
-/**
- * Volet téléconseil.
- *
- * Il prend le MÊME objet de filtre que la liste des prospects : un chiffre lu
- * ici décrit exactement la population du tableau. Deux jeux de critères
- * finiraient toujours par afficher deux totaux différents pour la même chose.
- */
 export function TeleconseilPanel() {
   const { filters } = useProspectFilters();
   const live = useLive();

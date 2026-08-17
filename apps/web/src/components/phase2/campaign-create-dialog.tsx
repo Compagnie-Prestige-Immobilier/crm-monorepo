@@ -33,24 +33,6 @@ import {
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-/**
- * Création guidée d'une campagne d'appels prospects : nom → périmètre →
- * téléconseillers → APERÇU.
- *
- * L'aperçu est la raison d'être de cet écran, pas un ornement final. Le tirage
- * est IRRÉVERSIBLE : il matérialise une tâche par prospect, exclut ces
- * prospects de toute campagne ultérieure, et la seule façon d'annuler est de
- * clôturer la campagne : ce qui annule aussi les tâches déjà en cours chez les
- * téléconseillers. Un administrateur qui découvre après coup qu'il vient de
- * distribuer huit cents fiches à trois personnes au lieu de quatre-vingts à
- * dix n'a aucun moyen simple de revenir en arrière.
- *
- * Les trois étapes vivent dans UNE boîte de dialogue et non dans trois écrans :
- * la décision se prend en regardant simultanément le périmètre, les
- * destinataires et le nombre. Les séparer obligerait à mémoriser le chiffre
- * d'une page à l'autre.
- */
-
 type Step = 'saisie' | 'apercu';
 
 export function CampaignCreateDialog({
@@ -79,12 +61,6 @@ export function CampaignCreateDialog({
 
   const commerciaux: readonly FilterOption[] = reference.data?.commerciaux ?? [];
 
-  /**
-   * L'aperçu n'est demandé QU'À l'étape 2. Le charger dès l'ouverture
-   * relancerait deux requêtes à chaque coche d'un téléconseiller : or le décompte
-   * de prospects ne dépend pas de QUI reçoit, seulement du périmètre. Seule la
-   * répartition change, et elle est calculée localement.
-   */
   const preview = useQuery({
     queryKey: queryKeys.campaignPreview(scope, selected.length, spreadDays),
     queryFn: () => fetchCampaignPreview(scope, selected.length, spreadDays),
@@ -328,8 +304,6 @@ export function CampaignCreateDialog({
               </Button>
               <Button
                 type="button"
-                // Bloqué tant que l'aperçu n'a pas abouti : confirmer sans avoir
-                // vu le nombre annulerait tout l'intérêt de cette étape.
                 disabled={create.isPending || preview.isPending || preview.isError}
                 onClick={() => {
                   create.mutate();
@@ -355,7 +329,6 @@ export function CampaignCreateDialog({
   );
 }
 
-/** Le chiffre, sa décomposition, et la répartition nominative. */
 function CampaignPreviewPanel({
   scope,
   selectedNames,

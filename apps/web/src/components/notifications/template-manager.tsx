@@ -50,21 +50,8 @@ import { CATEGORY_LABELS, type NotificationCategory, type NotificationTemplate }
 
 const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DOSSIER', 'SYSTEME'];
 
-/**
- * `Select.Value` de Base UI affiche la VALEUR choisie, pas le texte de l'item :
- * sans cette table, la gâchette montrerait « SYSTEME » au lieu de « Système ».
- */
 const CATEGORY_ITEMS = CATEGORIES.map((item) => ({ value: item, label: CATEGORY_LABELS[item] }));
 
-/**
- * Gabarits.
- *
- * La liste des variables n'est JAMAIS saisie : elle est déduite du texte, ici
- * comme sur le serveur. Un champ « variables » à remplir à la main diverge du
- * gabarit dès la première correction : l'auteur ajoute `{{campagne}}` au corps,
- * oublie la liste, et le compositeur cesse de proposer le champ. La variable
- * reste alors éternellement non substituée.
- */
 export function TemplateManager() {
   const [editing, setEditing] = useState<NotificationTemplate | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -198,9 +185,6 @@ function TemplateFormDialog({
 
   const variables = mergedVariables(titleTemplate, bodyTemplate);
 
-  // L'aperçu montre le gabarit avec des valeurs d'EXEMPLE nommées d'après la
-  // variable. Un aperçu rempli de `{{nom}}` ne dit rien de la longueur réelle
-  // de la phrase, qui est justement ce qu'on vient vérifier.
   const sample = Object.fromEntries(variables.map((variable) => [variable, `«${variable}»`]));
   const preview = renderNotification(titleTemplate, bodyTemplate, sample);
 

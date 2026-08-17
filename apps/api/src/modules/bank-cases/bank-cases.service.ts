@@ -59,15 +59,8 @@ export class BankCasesService {
     private readonly demo: DemoVisibilityService,
   ) {}
 
-  /**
-   * Liste paginée.
-   *
-   * Les identifiants sont sélectionnés par la MÊME requête SQL que les
-   * agrégats, puis hydratés par Prisma. C'est un aller-retour de plus, et c'est
-   * délibéré : il n'existe ainsi qu'une seule définition du filtre, donc aucune
-   * possibilité que le tableau et le tableau de bord décrivent des ensembles
-   * différents.
-   */
+  // Les identifiants viennent de la MÊME requête SQL que les agrégats, puis sont
+  // hydratés : un aller-retour de plus, mais une seule définition du filtre.
   async list(query: BankCaseQueryDto): Promise<BankCaseListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
@@ -102,10 +95,8 @@ export class BankCasesService {
 
   async get(id: string): Promise<BankCaseDetailDto> {
     const row = await this.loadCase(id);
-    // LECTURE GLOBALE : l'historique d'un dossier DÉJÀ résolu par sa clé
-    // primaire juste au-dessus. Le cloisonnement s'est joué sur le dossier ;
-    // le rejouer ici rendrait une fiche sans son historique, ce qui se lirait
-    // à l'écran comme un dossier jamais traité.
+    // LECTURE GLOBALE : le cloisonnement s'est joué sur le dossier, déjà
+    // résolu ci-dessus. Le rejouer ici rendrait une fiche sans son historique.
     const history = await this.prisma.bankCaseTransition.findMany({
       where: { caseId: id },
       include: BANK_TRANSITION_INCLUDE,
@@ -114,23 +105,14 @@ export class BankCasesService {
     return { bankCase: toBankCaseDto(row), history: history.map(toTransitionDto) };
   }
 
-  /**
-   * Ouvre un dossier depuis un prospect enrôlé.
-   *
-   * L'identité du client est COPIÉE ici, et plus jamais réécrite. Un dossier
-   * bancaire est une pièce à valeur historique : si un administrateur corrige
-   * demain l'orthographe du prospect, le dossier doit continuer de refléter ce
-   * qui a été transmis à la banque ce jour-là. C'est ce qui rend le rapport
-   * opposable.
-   */
+  // L'identité du client est COPIÉE ici et plus jamais réécrite : le dossier doit
+  // refléter ce qui a été transmis à la banque ce jour-là, c'est ce qui le rend opposable.
   async create(user: AuthenticatedUser, input: CreateBankCaseDto): Promise<BankCaseDto> {
     const reference = normalizeReferenceDisplay(input.reference);
     const referenceKey = normalizeReferenceKey(input.reference);
 
-    // Pré-contrôle : il donne un message exploitable et pointe le dossier
-    // existant. Il ne suffit PAS, deux créations simultanées le franchissent
-    // toutes les deux, d'où le rattrapage de P2002 plus bas. Le pré-contrôle
-    // est pour l'ergonomie, la contrainte est pour la vérité.
+    // Pré-contrôle pour l'ergonomie, contrainte pour la vérité : deux créations
+    // simultanées le franchissent toutes les deux, d'où le rattrapage P2002 plus bas.
     await this.assertReferenceFree(referenceKey);
 
     const prospect = await this.prisma.prospect.findFirst({
@@ -157,17 +139,8 @@ export class BankCasesService {
     });
     if (!bank) throw bankNotFound(processingBankId);
 
-    // `isActive: true` est indispensable, pas décoratif. Sans lui, une étape
-    // initiale DÉSACTIVÉE continuait de recevoir tous les nouveaux dossiers :
-    // l'administrateur qui la retire du workflow croit l'avoir sortie du
-    // circuit, et les dossiers s'y accumulent à une étape qui n'apparaît plus
-    // nulle part. Désactiver l'étape initiale sans en désigner une autre est
-    // une configuration incomplète, et doit se dire comme telle.
-    //
-    // `orderBy` sur la position : rien n'interdit en base deux étapes
-    // initiales actives. Sans ordre explicite, PostgreSQL est libre de rendre
-    // l'une ou l'autre selon le plan retenu, et deux dossiers créés à la suite
-    // pouvaient démarrer à des étapes différentes.
+    // `isActive` : une étape initiale désactivée ne doit plus rien recevoir.
+    // `orderBy` : rien n'interdit deux étapes initiales actives, il faut les départager.
     const initial = await this.prisma.bankCaseStage.findFirst({
       where: { isInitial: true, isActive: true },
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
@@ -193,21 +166,15 @@ export class BankCasesService {
             processingBankId,
             currentStageId: initial.id,
             createdById: user.id,
-            // Le dossier hérite du PROSPECT sur lequel il porte, et non du mode
-            // en vigueur à la seconde de l'ouverture. Un dossier ouvert sur une
-            // fiche de démonstration atterrissait sinon dans le tableau de bord
-            // réel et dans l'export transmis au siège, avec un montant inventé
-            // qui s'ajoutait aux vrais encaissements.
+            // Hérité du PROSPECT, jamais du mode en vigueur à l'ouverture : sinon un
+            // dossier de démonstration entre dans les encaissements réels.
             isDemo: prospect.isDemo,
           },
           include: BANK_CASE_INCLUDE,
         });
-        // L'ouverture est elle-même une transition : sans elle, la timeline
-        // commencerait au premier changement d'étape et personne ne saurait
-        // qui a ouvert le dossier ni quand.
+        // L'ouverture est elle-même une transition, sans quoi la timeline ne dirait
+        // pas qui a ouvert le dossier ni quand.
         await tx.bankCaseTransition.create({
-          // L'historique suit son dossier : une transition réelle sur un
-          // dossier de démonstration fausserait les délais de traitement.
           data: {
             caseId: row.id,
             toStageId: initial.id,
@@ -232,10 +199,8 @@ export class BankCasesService {
     const existing = await this.loadCase(id);
     if (isTerminalStage(existing.currentStage)) throw terminalCase(existing.currentStage.label);
 
-    // `Unchecked` et non `UpdateManyMutationInput` : la variante « vérifiée »
-    // n'expose que les colonnes non relationnelles, or on écrit ici deux clés
-    // étrangères (`updatedById`, `processingBankId`) que `updateMany` ne peut
-    // pas atteindre par une relation imbriquée.
+    // `Unchecked` : la variante vérifiée n'expose pas les clés étrangères
+    // (`updatedById`, `processingBankId`) qu'on écrit ici.
     const data: Prisma.BankCaseUncheckedUpdateManyInput = {
       updatedById: user.id,
       rev: { increment: 1 },
@@ -283,16 +248,8 @@ export class BankCasesService {
     return this.applyTransition(user, id, input, undefined);
   }
 
-  /**
-   * Correction administrateur.
-   *
-   * Elle contourne l'atteignabilité et le verrou terminal, c'est sa raison
-   * d'être, mais rien d'autre : les règles financières de l'étape visée
-   * s'appliquent à l'identique, et la justification est obligatoire. Elle
-   * s'inscrit dans le MÊME historique append-only, marquée par
-   * `correctionReason` : une correction reste visible pour toujours, elle
-   * n'efface pas ce qu'elle corrige.
-   */
+  // Contourne l'atteignabilité et le verrou terminal, RIEN d'autre : les règles
+  // financières s'appliquent à l'identique et l'historique reste append-only.
   correct(
     user: AuthenticatedUser,
     id: string,
@@ -335,9 +292,8 @@ export class BankCasesService {
     const comment = input.comment?.trim();
 
     const outcome = await this.prisma.$transaction(async (tx) => {
-      // Le garde de révision est DANS la mise à jour, pas avant : une lecture
-      // suivie d'une écriture laisserait une fenêtre où deux agents passent
-      // tous les deux le contrôle. Ici c'est PostgreSQL qui arbitre.
+      // Le garde de révision est DANS la mise à jour : lire puis écrire laisserait
+      // une fenêtre où deux agents passent tous les deux le contrôle.
       const updated = await tx.bankCase.updateMany({
         where: { id, rev: input.expectedRev, deletedAt: null },
         data: {
@@ -351,8 +307,8 @@ export class BankCasesService {
       });
       if (updated.count === 0) return REV_MISMATCH;
 
-      // Même transaction, toujours : un dossier ne peut pas avancer sans
-      // laisser de trace, ni laisser une trace sans avoir avancé.
+      // Même transaction : un dossier n'avance pas sans trace, ni ne laisse de
+      // trace sans avoir avancé.
       await tx.bankCaseTransition.create({
         data: {
           caseId: id,
@@ -364,9 +320,7 @@ export class BankCasesService {
           rejectionDetail: effect.rejectionDetail,
           comment: comment === undefined || comment === '' ? null : comment,
           correctionReason: correctionReason ?? null,
-          // L'historique suit SON DOSSIER, pas le mode en vigueur à la seconde
-          // du changement d'étape : une transition non marquée sur un dossier
-          // de démonstration ressortirait dans les délais de traitement réels.
+          // L'historique suit SON DOSSIER, pas le mode en vigueur à la transition.
           isDemo: existing.isDemo,
         },
       });
@@ -379,25 +333,16 @@ export class BankCasesService {
     return this.get(id);
   }
 
-  /**
-   * Autocomplétion pour l'ouverture d'un dossier.
-   *
-   * Restreinte aux prospects enrôlés, les seuls sur lesquels un dossier peut
-   * être ouvert, et à quatre champs : identité, téléphone, banque. Un agent
-   * Banque & Finance n'a aucune raison de voir le commercial propriétaire, le
-   * syndicat ou l'historique d'appels ; la projection est la mesure de
-   * confidentialité, pas un filtre côté client.
-   */
+  // Restreinte aux prospects enrôlés. La PROJECTION est la mesure de
+  // confidentialité, pas un filtre côté client : rien d'autre n'est lu.
   async prospectSearch(query: ProspectSearchQueryDto): Promise<ProspectSearchListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? DEFAULT_SEARCH_PAGE_SIZE;
     const term = query.search.trim();
     const like = `%${term.toLowerCase()}%`;
 
-    // Le téléphone est cherché sous sa forme NORMALISÉE : « 77 123 45 67 »,
-    // « +221771234567 », « 00221 77 123 45 67 » et « 221-77-123-45-67 »
-    // désignent le même abonné et doivent tous répondre. Une saisie partielle
-    // retombe sur les chiffres bruts.
+    // Téléphone cherché sous sa forme NORMALISÉE : les quatre écritures d'un même
+    // abonné doivent répondre. Une saisie partielle retombe sur les chiffres bruts.
     const digits = term.replace(/\D/gu, '');
     const normalized = tryNormalizePhone(term);
     const phone: Prisma.Sql =
@@ -468,7 +413,6 @@ export class BankCasesService {
     return { items: rows.map(toReasonDto) };
   }
 
-  /** Chargement commun, avec les jointures d'affichage. 404 typé si absent. */
   private async loadCase(id: string): Promise<BankCaseRow> {
     const row = await this.prisma.bankCase.findFirst({
       where: { id, deletedAt: null },

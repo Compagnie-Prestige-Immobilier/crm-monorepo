@@ -5,27 +5,6 @@ import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 
-/**
- * Le contrat des imports de masse.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI CES NOMS-LÀ ET PAS `ImportReportDto`
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `representants/dto.ts` publie déjà `ImportReportDto`, `ImportRowErrorDto` et
- * `ImportRowPreviewDto`, qui décrivent l'import SYNCHRONE. Deux classes de même
- * nom produisent UN SEUL schéma dans le document OpenAPI, celui que Swagger
- * enregistre en dernier : les clients engendrés recevraient alors un type dont
- * les champs viennent de l'autre import. Le préfixe `ImportJob` sépare les deux
- * contrats tant que l'ancien vit encore.
- *
- * TOUS les champs facultatifs sont `nullable` et NON optionnels : le serveur
- * envoie toujours la clé. Un champ optionnel ferait engendrer côté Dart un type
- * non-nullable, et la désérialisation échouerait sur le premier `null` reçu,
- * c'est-à-dire immédiatement — un travail qui vient d'être créé n'a ni
- * `totalRows`, ni rapport, ni date de fin.
- */
-
 export class ImportJobErrorDto {
   @ApiProperty({
     type: Number,

@@ -33,34 +33,6 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 
-/**
- * La cloche de notification de la barre supérieure.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Elle est le PREMIER consommateur web de `/notifications/mine`.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Sans elle, une demande de création de client déposée par une banque
- * n'apparaissait nulle part : l'administrateur devait connaître l'URL de
- * l'écran d'arbitrage et penser à l'ouvrir. Le back-end notifiait dans le vide.
- *
- * Trois décisions, et chacune a une raison :
- *
- * 1. **Sondage, pas websocket.** Le dépôt n'a aucun transport temps réel et
- *    n'en a pas besoin ici : l'arbitrage d'une demande se compte en heures. Le
- *    mécanisme réutilisé est celui des autres écrans (`useLive`), qui suspend
- *    déjà le rafraîchissement quand l'onglet passe en arrière-plan : une cloche
- *    laissée ouverte la nuit n'émet plus rien.
- * 2. **Deux mouvements distincts** (§7) : la pastille PULSE tant qu'il reste du
- *    non-lu (un état), la cloche OSCILLE une fois à l'arrivée (un événement).
- *    Les deux sont posés en `motion-safe:` : sous `prefers-reduced-motion`, il
- *    ne reste que la pastille et son compte, qui portent toute l'information.
- * 3. **Navigation prudente.** Le champ `route` est partagé avec le mobile et
- *    désigne parfois un écran qui n'existe pas ici (`/phase2`, `/a-corriger`).
- *    Une ligne dont la route n'est pas servie par le panel reste lisible mais
- *    n'est pas un lien : mieux vaut ne pas proposer un geste que de mener à un
- *    404 depuis une notification légitime.
- */
 export function NotificationBell() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -73,21 +45,11 @@ export function NotificationBell() {
     queryKey: queryKeys.inbox,
     queryFn: () => fetchInbox(),
     refetchInterval: live.refetchInterval,
-    // La boîte de réception n'est jamais préchargée côté serveur : elle dépend
-    // de l'utilisateur, pas de la route, et la barre supérieure est rendue sur
-    // chaque page du panel.
     staleTime: 10_000,
   });
 
   const unreadCount = data?.unreadCount ?? 0;
 
-  /**
-   * Déclenchement de l'oscillation sur ARRIVÉE, jamais sur simple sondage.
-   *
-   * La signature précédente est gardée dans une ref plutôt que dans un état :
-   * la comparer déclencherait sinon un rendu supplémentaire à chaque cycle, y
-   * compris quand rien n'a changé.
-   */
   const previous = useRef<{ topId: string | null; unreadCount: number } | null>(null);
   useEffect(() => {
     const next = inboxSignature(data);
@@ -109,20 +71,8 @@ export function NotificationBell() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.inboxRoot });
     },
-    // Volontairement SILENCIEUX en cas d'échec : le marquage est un effet de
-    // bord d'un clic dont l'intention réelle est la navigation. Une bulle
-    // d'erreur rouge sur une notification qu'on vient d'ouvrir décrirait un
-    // problème que l'utilisateur ne peut ni comprendre ni corriger.
   });
 
-  /**
-   * « Tout marquer comme lu », ici PARLANT au contraire.
-   *
-   * Ce clic-ci n'a pas d'autre intention que le marquage : son échec doit donc
-   * se dire, et son succès se chiffrer. L'API n'expose pas de marquage global :
-   * `markAllNotificationsRead` compose l'opération et rend le nombre
-   * réellement traité.
-   */
   const markAll = useMutation({
     mutationFn: () => markAllNotificationsRead(),
     onSuccess: (count) => {
@@ -266,14 +216,6 @@ export function NotificationBell() {
   );
 }
 
-/**
- * Une ligne de la boîte de réception.
- *
- * Toujours un `<button>`, même quand la route n'est pas servie par le panel :
- * le clic garde alors son second effet, le marquage en lu. Une ligne inerte
- * resterait éternellement en gras dans la liste de quelqu'un qui l'a pourtant
- * lue.
- */
 function InboxRow({ item, onActivate }: { item: InboxItem; onActivate: () => void }) {
   const navigable = webRouteFor(item.route) !== null;
 

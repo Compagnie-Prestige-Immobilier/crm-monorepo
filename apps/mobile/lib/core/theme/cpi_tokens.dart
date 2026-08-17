@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'cpi_colors.dart';
 
-/// Grille 4 pt (docs/design.md §5). Une valeur d'espacement qui n'est pas dans
-/// cette liste est un bug de mise en page, pas une nuance.
 abstract final class CpiSpacing {
   static const double xxs = 4;
   static const double xs = 8;
@@ -18,7 +16,6 @@ abstract final class CpiSpacing {
   static const double colossal = 80;
 }
 
-/// Rayons (docs/design.md §5).
 abstract final class CpiRadius {
   static const double xs = 6;
   static const double sm = 8;
@@ -37,10 +34,6 @@ abstract final class CpiRadius {
   static const BorderRadius brFull = BorderRadius.all(Radius.circular(full));
 }
 
-/// Élévations : ombres teintées prune `rgba(28,8,16,·)`, jamais du noir pur.
-///
-/// Sur mobile bas de gamme on ne dépasse **pas** [sm] à l'intérieur d'une liste
-/// défilante : chaque ombre coûte une passe de rendu par élément.
 abstract final class CpiElevation {
   static const Color _tint = Color(0xFF1C0810);
 
@@ -71,7 +64,6 @@ abstract final class CpiElevation {
   static Color get shadowTint => _tint;
 }
 
-/// Opacités d'état Material 3 (docs/design.md §6).
 abstract final class CpiStateOpacity {
   static const double hover = 0.08;
   static const double focus = 0.10;
@@ -82,15 +74,8 @@ abstract final class CpiStateOpacity {
   static const double disabledContainer = 0.12;
 }
 
-/// Cible tactile minimale (docs/design.md §1). Le plancher, jamais la cible :
-/// un contrôle qui porte une décision se dimensionne bien au-delà.
 const double kCpiMinTouchTarget = 44;
 
-/// Tokens de mouvement (docs/design.md §7).
-///
-/// Exposés en [ThemeExtension] pour que [CpiMotion.of] puisse les ramener à zéro
-/// quand `MediaQuery.disableAnimations` est actif, sans qu'aucun appelant n'ait
-/// à connaître la règle.
 @immutable
 class CpiMotion extends ThemeExtension<CpiMotion> {
   const CpiMotion({
@@ -117,23 +102,16 @@ class CpiMotion extends ThemeExtension<CpiMotion> {
     easeSpring: Cubic(0.34, 1.56, 0.64, 1),
   );
 
-  /// 150 ms : micro-retours (coche de sync, pression de bouton).
   final Duration micro;
 
-  /// 220 ms : transitions de composant (ouverture de champ, snackbar).
   final Duration component;
 
-  /// 300 ms : transitions d'écran.
   final Duration screen;
 
-  /// `cubic-bezier(0.22, 1, 0.36, 1)` : entrées et sorties.
   final Curve easeOut;
 
-  /// `cubic-bezier(0.34, 1.56, 0.64, 1)` : confirmations (rebond léger).
   final Curve easeSpring;
 
-  /// Les durées tombent à zéro si l'utilisateur a désactivé les animations ;
-  /// la logique, elle, ne change pas.
   static CpiMotion of(BuildContext context) {
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return none;
     return Theme.of(context).extension<CpiMotion>() ?? standard;
@@ -161,10 +139,6 @@ class CpiMotion extends ThemeExtension<CpiMotion> {
       t < 0.5 ? this : (other ?? this);
 }
 
-/// Rendu d'un statut de synchronisation : icône + couleur + libellé.
-///
-/// Les icônes de sync sont les seules qui portent du sens métier
-/// (docs/design.md §8) ; elles sont donc figées ici, pas choisies par écran.
 extension CpiSyncPalette on CpiColors {
   Color colorForSyncStatus(String status) => switch (status) {
     'draft' => syncDraft,

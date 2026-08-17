@@ -11,39 +11,11 @@ import '../../core/push/push_message.dart';
 import '../../data/local/database.dart';
 import 'notifications_controller.dart';
 
-/// Rapatriement de la boîte de réception depuis l'API.
-///
-/// ═══ CE SERVICE EST LE CANAL D'ANNONCES, PAS UN COMPLÉMENT ═══
-///
-/// Firebase est abandonné : plus rien ne pousse. Une annonce composée au siège
-/// n'atteint le commercial que si quelqu'un appelle [refresh]. La promesse
-/// « les annonces restent consultables ici » n'est donc tenue que par ses
-/// appelants, et il y en a quatre : l'ouverture de l'écran, le retour au
-/// premier plan, la fin de chaque cycle de synchronisation (les trois branchés
-/// dans `NotificationsCoordinator`), et l'ouverture d'une session.
-///
-/// Tout passe par le client généré, jamais par `Dio` en direct : un
-/// `dio.get('/api/v1/notifications/mine')` compilerait encore le jour où le
-/// serveur renomme un champ, et échouerait à l'exécution chez un commercial,
-/// sans personne pour lire l'erreur. Avec `NotificationsApi`, un changement de
-/// contrat casse le build.
-///
-/// Aucune méthode ne lève : hors ligne, la liste locale reste servie, et c'est
-/// tout l'intérêt de l'avoir persistée.
-/// Ce que le dernier rapatriement a donné.
-///
-/// Sans cette information, l'écran affichait « Aucune annonce » dans trois
-/// situations qui n'ont rien à voir : la boîte est vraiment vide, le
-/// rapatriement n'a pas encore eu lieu, ou il a échoué. L'utilisateur en
-/// concluait que le siège n'avait rien envoyé.
 enum InboxSync {
-  /// Aucun rapatriement n'a encore abouti sur cet appareil.
   never,
 
-  /// La liste affichée est celle du serveur.
   ok,
 
-  /// Le serveur n'a pas répondu : la liste est celle de la dernière fois.
   offline,
 }
 
@@ -55,7 +27,6 @@ class InboxStatus {
 
   final InboxSync state;
 
-  /// Dernier rapatriement RÉUSSI, tous appels confondus.
   final DateTime? lastSuccessAt;
 
   @override
@@ -74,11 +45,6 @@ class NotificationInbox {
     : _api = api,
       _store = store;
 
-  /// Plancher entre deux rafraîchissements NON forcés.
-  ///
-  /// Le cycle de synchronisation tourne toutes les 60 s tant que l'application
-  /// est visible. Sans plancher, ouvrir l'app et la poser sur une table
-  /// produirait une requête par minute toute la journée, sur un forfait mobile.
   static const Duration minimumInterval = Duration(minutes: 2);
 
   final NotificationsApi _api;
@@ -91,18 +57,8 @@ class NotificationInbox {
     const InboxStatus.never(),
   );
 
-  /// Verdict du dernier rapatriement, observable par l'écran.
   ValueListenable<InboxStatus> get status => _status;
 
-  /// Rapatrie la boîte de réception. Renvoie le nombre de lignes fusionnées.
-  ///
-  /// [force] ignore le plancher : quand l'utilisateur ouvre lui-même l'écran, il
-  /// attend la liste d'aujourd'hui, pas celle d'il y a deux minutes.
-  ///
-  /// Les appels concurrents partagent la même requête : les déclencheurs
-  /// peuvent tomber dans la même seconde (retour au premier plan, puis cycle de
-  /// synchronisation, puis ouverture de l'écran) et trois requêtes écriraient
-  /// trois fois les mêmes lignes.
   Future<int> refresh({bool force = false, int pageSize = 50}) {
     final Future<int>? running = _inFlight;
     if (running != null) return running;
@@ -140,9 +96,6 @@ class NotificationInbox {
             title: item.title,
             body: item.body,
             category: item.category.name,
-            // Dernier rempart avant `go_router`. Le serveur applique déjà la
-            // règle ; la refaire ici n'est pas redondant, le client ne doit
-            // jamais dépendre du seul bon comportement de l'émetteur.
             route: PushMessage.isSafeRoute(route) ? route : null,
             sentAt: item.createdAt.toUtc(),
           ),
@@ -150,32 +103,16 @@ class NotificationInbox {
         readStates[item.notificationId] = item.readAt?.toUtc();
       }
 
-      // Les lectures faites hors ligne AVANT la fusion : le serveur ne les
-      // connaît pas encore, et c'est le seul moment où on peut le savoir.
       final List<String> unreported = await _unreportedReads(readStates);
 
       await _store.upsertAll(messages, readStates: readStates);
       _status.value = InboxStatus(state: InboxSync.ok, lastSuccessAt: DateTime.now());
 
-      // ═══ REJEU DES ACCUSÉS DE LECTURE ═══
-      //
-      // `markRead` était un « tire et oublie » sans rejeu : une annonce lue dans
-      // un village sans réseau n'était JAMAIS remontée, et le siège la comptait
-      // non lue indéfiniment.
-      //
-      // La file d'outbox n'est pas le bon endroit : elle ne transporte que des
-      // opérations de `/sync/push`, dont le contrat ne connaît que
-      // `representant` et `prospect` ; une opération `notification` y serait
-      // sérialisée comme un prospect. La réconciliation ci-dessous est
-      // équivalente et **s'auto-répare** : à chaque rapatriement, tout ce que le
-      // serveur ignore encore repart, sans état supplémentaire à tenir à jour et
-      // sans migration de schéma.
       for (final String id in unreported) {
         await markRead(id);
       }
       return messages.length;
     } on Object catch (error) {
-      // Hors ligne : la liste locale reste servie.
       developer.log(
         'Rafraîchissement de la boîte de réception échoué : $error',
         name: 'cpi.notifications',
@@ -188,7 +125,6 @@ class NotificationInbox {
     }
   }
 
-  /// Les notifications lues ICI que le serveur croit encore non lues.
   Future<List<String>> _unreportedReads(Map<String, DateTime?> serverReads) async {
     final List<String> pending = <String>[];
     for (final MapEntry<String, DateTime?> entry in serverReads.entries) {
@@ -199,11 +135,6 @@ class NotificationInbox {
     return pending;
   }
 
-  /// Remonte la lecture au serveur, pour que le siège la voie.
-  ///
-  /// La lecture LOCALE a déjà été écrite par l'appelant : cet appel est un
-  /// bonus, et son échec ne doit rien changer à l'écran. Il n'est plus perdu
-  /// pour autant : le rapatriement suivant le rejouera (voir [_refresh]).
   Future<void> markRead(String notificationId) async {
     try {
       await _api.markNotificationRead(id: notificationId);

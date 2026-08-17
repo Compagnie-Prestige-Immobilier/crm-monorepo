@@ -52,17 +52,6 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
     start: startOfWeek(startOfMonth(month), { weekStartsOn: 1 }),
     end: endOfWeek(endOfMonth(month), { weekStartsOn: 1 }),
   });
-  /**
-   * Les jours sont regroupés en SEMAINES, et ce découpage est ce qui rend la
-   * grille lisible par un lecteur d'écran.
-   *
-   * `role="grid"` n'admet pas de `gridcell` en enfant direct : la spécification
-   * ARIA impose un `row` entre les deux. La grille rendait ses quarante-deux
-   * boutons à plat, si bien qu'aucune position de ligne ou de colonne n'était
-   * calculable : le lecteur annonçait quarante-deux boutons de suite, sans
-   * jamais dire « lundi » ni « semaine 3 ». L'intervalle va d'un début à une fin
-   * de semaine, la longueur est donc toujours un multiple de sept.
-   */
   const weeks = Array.from({ length: days.length / 7 }, (_, index) =>
     days.slice(index * 7, index * 7 + 7),
   );
@@ -105,9 +94,6 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-1">
               <Select
-                /* `Select.Value` de Base UI affiche la VALEUR, pas le texte de
-                   l'item : sans `items`, la gâchette montrerait « 0 » au lieu
-                   de « janvier ». */
                 items={MONTHS}
                 value={String(month.getMonth())}
                 onValueChange={(value) => {

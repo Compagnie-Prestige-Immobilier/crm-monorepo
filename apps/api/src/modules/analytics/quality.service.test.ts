@@ -76,16 +76,11 @@ describe('productivité des représentants', () => {
     expect(result.items[0]?.conversionRate).toBe(75);
     expect(result.items[0]?.lastProspectAt).toBe('2026-08-01T10:00:00.000Z');
     expect(result.items[0]?.dormant).toBe(false);
-    // Aucun apport : 0 plutôt qu'une division par zéro.
     expect(result.items[1]?.conversionRate).toBe(0);
     expect(result.items[1]?.lastProspectAt).toBeNull();
     expect(result.total).toBe(52);
   });
 
-  // Régression : `total` sommait les lignes RENDUES, donc les dix premières.
-  // Avec 400 représentants il annonçait les prospects du haut de classement
-  // sous un nom qui se lit « total ». Le total vient désormais d'une fonction
-  // de fenêtre, évaluée avant le LIMIT, donc sur toute la population.
   it('rend le total de la population, pas celui du haut de classement', async () => {
     const { service, sql } = makeAnalyticsPrisma([
       {
@@ -127,12 +122,10 @@ describe('qualité de la base', () => {
     const result = await new QualityService(service, fakeDemoVisibility()).dataQuality(admin, {});
 
     expect(queries()).toHaveLength(2);
-    // Deux axes, une seule population : les totaux doivent coïncider.
     expect(result.representants[0]?.badRate).toBe(50);
     expect(result.departements[0]?.badRate).toBe(50);
     expect(result.attempts).toBe(10);
     expect(result.badRate).toBe(50);
-    // Le second axe passe par le département du représentant.
     expect(queries()[1]).toContain('"departements"');
   });
 
@@ -186,7 +179,6 @@ describe('provenance des fiches', () => {
     expect(result.items[1]?.label).toBe('Banque');
     expect(result.byLabel[1]?.originLabel).toBe('CBAO Thiès');
     expect(result.byLabel[1]?.label).toBe('CBAO Thiès');
-    // Le second niveau se rapporte au MÊME total que le premier.
     expect(result.byLabel[0]?.share).toBe(90);
     expect(result.total).toBe(1000);
   });
@@ -197,7 +189,6 @@ describe('provenance des fiches', () => {
       admin,
       {},
     );
-    // Remplacer par « Inconnu » masquerait l'apparition d'un nouveau canal.
     expect(result.items[0]?.label).toBe('PARTENAIRE');
   });
 
