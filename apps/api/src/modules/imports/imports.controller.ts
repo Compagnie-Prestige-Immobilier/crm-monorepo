@@ -51,10 +51,11 @@ import { ImportsService } from './imports.service.js';
  * qui est correct. Un travail en cours a nécessairement été déposé alors que
  * l'interrupteur était éteint.
  *
- * LE MODÈLE DE CLASSEUR n'est PAS servi ici : il l'est déjà par
- * `GET /export/representants-template.xlsx`, dans le module d'export, qui est le
- * seul endroit à savoir écrire un classeur. Le dupliquer ferait exister deux
- * modèles capables de diverger d'une colonne, ce que `import-template.ts` existe
+ * LES MODÈLES DE CLASSEUR ne sont PAS servis ici : ils le sont par
+ * `GET /export/representants-modele.xlsx` et `GET /export/prospects-modele.xlsx`,
+ * dans le module d'export, qui est le seul endroit à savoir écrire un classeur.
+ * Les dupliquer ferait exister deux modèles capables de diverger d'une colonne,
+ * ce que `import-template.ts` et `prospects-import-template.ts` existent
  * précisément pour empêcher.
  */
 @ApiTags('imports')
@@ -116,6 +117,49 @@ export class ImportsController {
     @Req() request: FastifyRequest,
   ): Promise<ImportJobDto> {
     return this.imports.create(user, request, ImportKind.REPRESENTANTS);
+  }
+
+  /**
+   * Une route par entité plutôt qu'un `{kind}` : `createRepresentantsImport` est
+   * déjà engendré chez les deux clients, et les plafonds, modèles et
+   * préconditions diffèrent d'une entité à l'autre.
+   */
+  @Post('prospects')
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    operationId: 'createProspectsImport',
+    summary: 'Dépose un classeur de prospects et inscrit le travail. Rend immédiatement.',
+    description:
+      'NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, ' +
+      'et la réponse part. Le travail court en arrière-plan ; l’écran sonde ' +
+      '`GET /imports/{id}`, dont `processedRows` sur `totalRows` donne l’avancement. ' +
+      'Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que ' +
+      '`POST /imports/{id}/apply` n’a pas été appelé. Le modèle de classeur se ' +
+      'télécharge par `GET /export/prospects-modele.xlsx`, dont les colonnes Banque et ' +
+      'Syndicat sont des listes déroulantes tirées des référentiels vivants. ' +
+      'CET IMPORT NE CRÉE AUCUN REPRÉSENTANT : chaque ligne doit désigner, par son ' +
+      'numéro, un représentant déjà en base.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiResponse({ status: 201, type: ImportJobDto })
+  @ApiErrors({
+    409: 'DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé.',
+    413: 'IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.',
+    429: true,
+  })
+  createProspects(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: FastifyRequest,
+  ): Promise<ImportJobDto> {
+    return this.imports.create(user, request, ImportKind.PROSPECTS);
   }
 
   @Get(':id')

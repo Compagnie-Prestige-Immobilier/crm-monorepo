@@ -12003,6 +12003,63 @@
         "tags": ["export"]
       }
     },
+    "/api/v1/export/prospects-modele.xlsx": {
+      "get": {
+        "description": "En-têtes figés, une ligne d’exemple grisée, un onglet Instructions, et des listes déroulantes alimentées depuis les référentiels VIVANTS. Banque et Syndicat sont des listes et non du texte libre : leur croisement détermine le segment BDD, et une valeur saisie à la main range la fiche dans le mauvais segment.",
+        "operationId": "downloadProspectsTemplateXlsx",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Classeur Excel à trois feuilles : Prospects, Instructions, Listes (masquée).",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modèle vide pour l’import de prospects.",
+        "tags": ["export"]
+      }
+    },
     "/api/v1/export/representants-modele.xlsx": {
       "get": {
         "description": "En-têtes figés, une ligne d’exemple grisée, un onglet Instructions, et des listes déroulantes alimentées depuis les référentiels VIVANTS : un département désactivé ce matin ne figure pas dans le modèle téléchargé cet après-midi.",
@@ -12736,6 +12793,109 @@
           }
         ],
         "summary": "Dépose un classeur de représentants et inscrit le travail. Rend immédiatement.",
+        "tags": ["imports"]
+      }
+    },
+    "/api/v1/imports/prospects": {
+      "post": {
+        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail court en arrière-plan ; l’écran sonde `GET /imports/{id}`, dont `processedRows` sur `totalRows` donne l’avancement. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Le modèle de classeur se télécharge par `GET /export/prospects-modele.xlsx`, dont les colonnes Banque et Syndicat sont des listes déroulantes tirées des référentiels vivants. CET IMPORT NE CRÉE AUCUN REPRÉSENTANT : chaque ligne doit désigner, par son numéro, un représentant déjà en base.",
+        "operationId": "createProspectsImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dépose un classeur de prospects et inscrit le travail. Rend immédiatement.",
         "tags": ["imports"]
       }
     },
