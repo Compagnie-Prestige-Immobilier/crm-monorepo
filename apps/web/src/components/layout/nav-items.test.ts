@@ -107,11 +107,74 @@ describe('navigation d’un ADMIN', () => {
   });
 });
 
+describe('navigation d’un téléconseiller', () => {
+  it('ne montre QUE la section Terrain', () => {
+    expect(navSections('COMMERCIAL').map((section) => section.title)).toEqual(['Terrain']);
+    expect(hrefs('COMMERCIAL')).toEqual(['/console', '/representants', '/prospects/nouveau']);
+  });
+
+  it('masque entièrement le pilotage et l’administration', () => {
+    const visible = hrefs('COMMERCIAL');
+    for (const forbidden of [
+      '/tableau-de-bord',
+      '/banque',
+      '/statistiques',
+      '/prospects',
+      '/campagnes',
+      '/dossiers',
+      '/dossiers/nouveau',
+      '/dossiers/export',
+      '/dossiers/etapes',
+      '/demandes-clients',
+      '/notifications',
+      '/commerciaux',
+      '/supervision',
+      '/referentiels',
+      '/imports',
+      '/parametres',
+    ]) {
+      expect(visible, `« ${forbidden} » ne doit pas être proposé`).not.toContain(forbidden);
+    }
+  });
+
+  it('donne à l’ADMIN les mêmes écrans de terrain, sans doublon de « Représentants »', () => {
+    for (const shared of ['/console', '/representants', '/prospects/nouveau']) {
+      expect(hrefs('ADMIN')).toContain(shared);
+    }
+    expect(hrefs('ADMIN').filter((href) => href === '/representants')).toHaveLength(1);
+  });
+
+  it('n’ouvre le terrain à aucun agent bancaire', () => {
+    const visible = hrefs('BANQUE_FINANCE');
+    for (const forbidden of ['/console', '/prospects/nouveau', '/representants']) {
+      expect(visible).not.toContain(forbidden);
+    }
+  });
+
+  it('nomme sa console sans employer le mot proscrit', () => {
+    const labels = navItems('COMMERCIAL').map((item) => `${item.label} ${item.description}`);
+    for (const text of labels) expect(text.toLowerCase()).not.toContain('commercial');
+    expect(navTitle('COMMERCIAL', '/console')).toBe('Console d’appel');
+  });
+});
+
 describe('écran d’atterrissage après connexion', () => {
   it('mène chaque rôle là où l’API ne lui répondra pas 403', () => {
     expect(homePathForRole('ADMIN')).toBe('/tableau-de-bord');
     expect(homePathForRole('BANQUE_FINANCE')).toBe('/dossiers');
-    expect(homePathForRole('COMMERCIAL')).toBe('/connexion');
+    expect(homePathForRole('COMMERCIAL')).toBe('/console');
+  });
+
+  it('ne renvoie personne vers « /connexion », qui l’y renverrait en boucle', () => {
+    for (const role of ['ADMIN', 'BANQUE_FINANCE', 'COMMERCIAL'] as const) {
+      expect(homePathForRole(role)).not.toBe('/connexion');
+    }
+  });
+
+  it('mène chaque rôle sur un écran que sa propre navigation lui propose', () => {
+    for (const role of ['ADMIN', 'BANQUE_FINANCE', 'COMMERCIAL'] as const) {
+      expect(hrefs(role)).toContain(homePathForRole(role));
+    }
   });
 });
 

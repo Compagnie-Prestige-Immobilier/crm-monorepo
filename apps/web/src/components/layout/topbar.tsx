@@ -52,11 +52,11 @@ export function Topbar({ user }: { user: SessionUser }) {
         {title}
       </h1>
 
-      {/* La cloche n'est montée que pour les rôles qui reçoivent réellement des
-          notifications dans le panel : l'ADMIN (demandes de création de client,
-          rappels système) et l'agent BANQUE_FINANCE (réponse à ses demandes,
-          dossiers sans mouvement). Un COMMERCIAL n'entre pas dans le panel, et
-          poser une cloche toujours vide serait une promesse non tenue. */}
+      {/* La cloche n'est montée que pour les rôles dont les notifications
+          pointent vers un écran du panel : l'ADMIN (demandes de création de
+          client, rappels système) et l'agent BANQUE_FINANCE (réponse à ses
+          demandes, dossiers sans mouvement). Celles d'un téléconseiller visent
+          l'application mobile, et sa console n'en affiche aucune. */}
       {user.role === 'ADMIN' || user.role === 'BANQUE_FINANCE' ? <NotificationBell /> : null}
       <ThemeToggle />
       <UserMenu user={user} />

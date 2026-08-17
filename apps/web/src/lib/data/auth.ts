@@ -4,7 +4,7 @@ import { unwrap } from '@crm/api-client/query';
 import { getApiClient } from '@/lib/api/browser';
 import type { Role, SessionUser } from '@/lib/types';
 
-export const PANEL_ROLES: readonly Role[] = ['ADMIN', 'BANQUE_FINANCE'];
+export const PANEL_ROLES: readonly Role[] = ['ADMIN', 'BANQUE_FINANCE', 'COMMERCIAL'];
 
 export interface AuthTokens {
   accessToken: string;
