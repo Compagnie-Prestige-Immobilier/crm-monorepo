@@ -42,7 +42,7 @@ import { cn } from '@/lib/utils';
 
 const NO_VALUE = '–';
 
-export function RepresentantsView() {
+export function RepresentantsView({ canAdminister }: { canAdminister: boolean }) {
   const { filters, setFilters } = useRepresentantFilters();
   const exporter = useFileDownload();
   const [editing, setEditing] = useState<{ representant: RepresentantRow | null } | null>(null);
@@ -79,12 +79,14 @@ export function RepresentantsView() {
             Nouveau représentant
           </Button>
 
-          {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
-              poserait `role="button"` sur le `<a>`. */}
-          <Link href="/representants/import" className={buttonVariants({ variant: 'outline' })}>
-            <UploadIcon aria-hidden="true" />
-            Import Excel
-          </Link>
+          {canAdminister ? (
+            // Un LIEN habillé en bouton : la primitive `Button` de Base UI
+            // poserait `role="button"` sur le `<a>`.
+            <Link href="/representants/import" className={buttonVariants({ variant: 'outline' })}>
+              <UploadIcon aria-hidden="true" />
+              Import Excel
+            </Link>
+          ) : null}
 
           {/* L'export part des filtres de l'URL, pas de la page affichée :
               celui qui envoie le fichier doit pouvoir jurer qu'il contient ce

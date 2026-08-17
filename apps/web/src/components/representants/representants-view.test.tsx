@@ -56,7 +56,7 @@ describe('RepresentantsView, état vide', () => {
 
   it('sans aucun critère, ne renvoie PAS retirer un filtre inexistant', async () => {
     setUrl('/representants');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
     expect(await screen.findByText('Aucun représentant enregistré.')).toBeTruthy();
     expect(screen.queryByText(/retirez un filtre/)).toBeNull();
@@ -64,14 +64,14 @@ describe('RepresentantsView, état vide', () => {
 
   it('sans aucun critère, dit d’où viennent les fiches', async () => {
     setUrl('/representants');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
     expect(await screen.findByText(/saisies en tournée depuis le mobile/)).toBeTruthy();
   });
 
   it('rend son état vide en dehors du tableau, pour qu’il survive au petit écran', async () => {
     setUrl('/representants');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
     const message = await screen.findByText('Aucun représentant enregistré.');
     expect(message.closest('table')).toBeNull();
@@ -79,13 +79,21 @@ describe('RepresentantsView, état vide', () => {
 
   it('avec un critère actif, invite bien à l’élargir', async () => {
     setUrl('/representants?search=Ndeye');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
     expect(
       await screen.findByText('Aucun représentant ne correspond à ces critères.'),
     ).toBeTruthy();
     expect(screen.getByText(/Élargissez la recherche ou retirez un filtre/)).toBeTruthy();
     expect(screen.queryByText('Aucun représentant enregistré.')).toBeNull();
+  });
+
+  it('ne propose l’import Excel qu’aux administrateurs', async () => {
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister={false} />);
+
+    expect(await screen.findByText('Aucun représentant enregistré.')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Import Excel' })).toBeNull();
   });
 });
 
@@ -96,7 +104,7 @@ describe('RepresentantsView, repli en carte', () => {
 
   it('rend chaque représentant DEUX fois : en ligne de tableau et en carte', async () => {
     setUrl('/representants');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
     const noms = await screen.findAllByText('Ndeye Fall');
     expect(noms).toHaveLength(2);
@@ -106,7 +114,7 @@ describe('RepresentantsView, repli en carte', () => {
 
   it('la carte porte les mêmes champs que la ligne, sans en perdre un seul', async () => {
     setUrl('/representants');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
     await screen.findAllByText('Ndeye Fall');
     const carte = screen.getAllByRole('article')[0];

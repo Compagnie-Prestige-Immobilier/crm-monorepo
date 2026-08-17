@@ -8,6 +8,12 @@ import { homePathForRole, isNavItemActive, navSections } from '@/components/layo
 import type { Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
+const PANEL_LABELS: Record<Role, string> = {
+  ADMIN: 'Panneau d’administration',
+  BANQUE_FINANCE: 'Espace Banque & Finance',
+  COMMERCIAL: 'Espace téléconseiller',
+};
+
 export function SidebarNav({
   role,
   onNavigate = () => undefined,
@@ -122,9 +128,7 @@ export function SidebarNav({
           {/* Token explicite, plus d'`opacity`. Une opacité posée sur une couleur
               déjà atténuée ne se mesure dans aucun tableau de tokens : c'est
               précisément le défaut qui a délavé le panel. 7,07:1 en clair. */}
-          <p className="text-caption text-sidebar-muted-foreground">
-            {role === 'BANQUE_FINANCE' ? 'Espace Banque & Finance' : 'Panneau d’administration'}
-          </p>
+          <p className="text-caption text-sidebar-muted-foreground">{PANEL_LABELS[role]}</p>
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import {
   ChartColumnIcon,
   FileSpreadsheetIcon,
   FolderOpenIcon,
+  HeadsetIcon,
   LayoutDashboardIcon,
   LibraryIcon,
   ListOrderedIcon,
@@ -73,6 +74,32 @@ const SECTIONS: readonly NavSection[] = [
         icon: MegaphoneIcon,
         description: 'Campagnes d’appels prospects et représentants',
         roles: ['ADMIN'],
+      },
+    ],
+  },
+  {
+    title: 'Terrain',
+    items: [
+      {
+        href: '/console',
+        label: 'Console d’appel',
+        icon: HeadsetIcon,
+        description: 'File d’appels et qualification',
+        roles: ['ADMIN', 'COMMERCIAL'],
+      },
+      {
+        href: '/representants',
+        label: 'Représentants',
+        icon: UsersRoundIcon,
+        description: 'Fiches et coordonnées',
+        roles: ['ADMIN', 'COMMERCIAL'],
+      },
+      {
+        href: '/prospects/nouveau',
+        label: 'Nouveau prospect',
+        icon: PlusCircleIcon,
+        description: 'Saisie d’un contact',
+        roles: ['ADMIN', 'COMMERCIAL'],
       },
     ],
   },
@@ -149,13 +176,6 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN'],
       },
       {
-        href: '/representants',
-        label: 'Représentants',
-        icon: UsersRoundIcon,
-        description: 'Fiches et coordonnées',
-        roles: ['ADMIN'],
-      },
-      {
         href: '/commerciaux',
         label: 'Utilisateurs',
         icon: UsersIcon,
@@ -212,10 +232,9 @@ export function navItems(role: Role): NavItem[] {
 /**
  * Écran d'atterrissage après connexion.
  *
- * COMMERCIAL n'a pas de panel : il est refusé à la porte (voir
- * `lib/data/auth.ts`). La fonction lui renvoie tout de même la connexion plutôt
- * qu'une exception : un rôle ajouté demain au contrat ne doit pas faire tomber
- * l'écran de login.
+ * Un rôle sans écran d'accueil retombe sur la connexion, que `/connexion`
+ * renvoie aussitôt ici : la valeur par défaut n'existe que pour un rôle ajouté
+ * demain au contrat, jamais pour un rôle admis dans le panel.
  */
 export function homePathForRole(role: Role): string {
   switch (role) {
@@ -223,6 +242,8 @@ export function homePathForRole(role: Role): string {
       return '/tableau-de-bord';
     case 'BANQUE_FINANCE':
       return '/dossiers';
+    case 'COMMERCIAL':
+      return '/console';
     default:
       return '/connexion';
   }
