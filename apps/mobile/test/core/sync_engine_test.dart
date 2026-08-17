@@ -1225,6 +1225,92 @@ void main() {
     });
   });
 
+  group('champs facultatifs vidés', () {
+    late AppDatabase db;
+    late FakeApi api;
+    late SyncEngine engine;
+
+    setUp(() async {
+      db = await openTestDatabase();
+      api = FakeApi();
+      engine = SyncEngine(
+        database: db,
+        api: api,
+        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        clock: FakeClock(t0),
+        random: Random(7),
+      );
+    });
+    tearDown(() => db.close());
+
+    Future<SyncOperationDto> sendUpdate(Map<String, Object?> payload) async {
+      await insertRepresentant(
+        db,
+        id: 'repA',
+        phone: '+221770000001',
+        serverUpdatedAt: t0,
+      );
+      await queueOp(
+        db,
+        id: 'A1',
+        entityType: 'representant',
+        entityId: 'repA',
+        op: 'update',
+        baseRev: 1,
+        payload: payload,
+      );
+      await engine.drain();
+      return api.calls.single.operations.single;
+    }
+
+    test('vider l\'IEF et les notes se dit au serveur', () async {
+      // Sans `clearedFields`, la sérialisation supprime les nuls : le serveur
+      // lit « champ absent », donc « inchangé », et la valeur effacée revient
+      // au pull suivant.
+      final SyncOperationDto sent = await sendUpdate(<String, Object?>{
+        'fullName': 'Awa Sy',
+        'phone': '+221770000001',
+        'departementId': 'dep-1',
+        'iefId': null,
+        'notes': null,
+      });
+
+      expect(sent.clearedFields, <String>['iefId', 'notes']);
+      expect(sent.data?.iefId, isNull);
+      expect(sent.data?.notes, isNull);
+    });
+
+    test('un champ que le formulaire ne porte pas n\'efface rien', () async {
+      final SyncOperationDto sent = await sendUpdate(<String, Object?>{
+        'fullName': 'Awa Sy',
+        'phone': '+221770000001',
+        'departementId': 'dep-1',
+        'notes': 'à rappeler lundi',
+      });
+
+      expect(sent.clearedFields, isNull);
+    });
+
+    test('une création ne réclame aucun effacement', () async {
+      await insertRepresentant(db, id: 'repB', phone: '+221770000002');
+      await queueOp(
+        db,
+        id: 'B1',
+        entityType: 'representant',
+        entityId: 'repB',
+        payload: <String, Object?>{
+          'fullName': 'Awa Sy',
+          'phone': '+221770000002',
+          'departementId': 'dep-1',
+          'iefId': null,
+        },
+      );
+      await engine.drain();
+
+      expect(api.calls.single.operations.single.clearedFields, isNull);
+    });
+  });
+
   group('pull', () {
     late AppDatabase db;
     late FakeApi api;

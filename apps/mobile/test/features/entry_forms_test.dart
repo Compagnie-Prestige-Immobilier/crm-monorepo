@@ -8,6 +8,8 @@ import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/sync/token_store.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/data/local/database.dart';
+import 'package:cpi_go/features/auth/auth_controller.dart';
+import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/prospect/presentation/prospect_entry_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_form_screen.dart';
 // `Column` est masqué : celui de drift décrit une colonne SQL, et les finders
@@ -19,6 +21,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import '../support/db_fixture.dart';
 import '../support/fake_api.dart';
@@ -69,9 +72,11 @@ void main() {
     });
   }
 
-  Widget host(Widget screen) {
+  Widget host(Widget screen, {AuthState? session}) {
     return ProviderScope(
       overrides: [
+        if (session != null)
+          authControllerProvider.overrideWith(() => _FixedSession(session)),
         appDatabaseProvider.overrideWithValue(db),
         apiPortProvider.overrideWithValue(api),
         tokenStoreProvider.overrideWithValue(
@@ -85,6 +90,41 @@ void main() {
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         supportedLocales: const <Locale>[Locale('fr')],
         home: screen,
+      ),
+    );
+  }
+
+  /// Le même hôte, mais routé : un enregistrement qui aboutit enchaîne sur la
+  /// saisie de prospects, et `pushReplacement` exige un routeur.
+  Widget hostRouted(Widget screen) {
+    return ProviderScope(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        apiPortProvider.overrideWithValue(api),
+        tokenStoreProvider.overrideWithValue(
+          InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        ),
+        syncCoordinatorProvider.overrideWith(_IdleSyncCoordinator.new),
+      ],
+      child: MaterialApp.router(
+        theme: AppTheme.light,
+        locale: const Locale('fr'),
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        supportedLocales: const <Locale>[Locale('fr')],
+        routerConfig: GoRouter(
+          initialLocation: Routes.newRepresentant,
+          routes: <RouteBase>[
+            GoRoute(
+              path: Routes.newRepresentant,
+              builder: (BuildContext context, GoRouterState state) => screen,
+            ),
+            GoRoute(
+              path: Routes.newProspect,
+              builder: (BuildContext context, GoRouterState state) =>
+                  const Scaffold(body: Text('prospects')),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -451,6 +491,72 @@ void main() {
   });
 
   // ───────────────────────────────────────────────────────────────────────────
+  group('ce que le système sait déjà, le téléconseiller ne le tape pas', () {
+    formTestWidgets('le département de la session est déjà posé', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          const RepresentantFormScreen(),
+          session: const AuthState(
+            status: AuthStatus.authenticated,
+            userId: 'me',
+            fullName: 'Awa Sy',
+            departementId: 'dep-1',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.widgetWithText(TextField, 'Département'),
+          matching: find.text('Dakar'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    formTestWidgets('les notes saisies suivent le représentant', (
+      WidgetTester tester,
+    ) async {
+      // Le champ manquait à l'application : la colonne existait, le panneau web
+      // l'affichait, et aucun écran mobile ne pouvait l'écrire.
+      await tester.pumpWidget(hostRouted(const RepresentantFormScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Nom complet'),
+        'Ousmane Fall',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextField, 'Département'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dakar').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Téléphone'), '77 123 45 67');
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Notes (facultatif)'),
+        'Absent le vendredi',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Enregistrer et saisir des prospects'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final Representant row = await db.select(db.representants).getSingle();
+      expect(row.notes, 'Absent le vendredi');
+      final OutboxData op = await db.select(db.outbox).getSingle();
+      expect(
+        (jsonDecode(op.payload) as Map<String, Object?>)['notes'],
+        'Absent le vendredi',
+      );
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
   group('échec d\'enregistrement : le message doit être ATTEIGNABLE', () {
     /// Un numéro déjà pris sur l'appareil.
     ///
@@ -759,6 +865,15 @@ void main() {
 
 /// Coordinateur à l'arrêt : le vrai branche un minuteur de 60 s et un écouteur
 /// de connectivité, et ne se stabilise jamais dans un test de widget.
+class _FixedSession extends AuthController {
+  _FixedSession(this._state);
+
+  final AuthState _state;
+
+  @override
+  AuthState build() => _state;
+}
+
 class _IdleSyncCoordinator extends SyncCoordinator {
   @override
   SyncUiState build() => const SyncUiState();

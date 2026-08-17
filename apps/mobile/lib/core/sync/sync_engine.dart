@@ -409,6 +409,19 @@ class SyncEngine {
     }
   }
 
+  /// Champs que le serveur accepte de mettre à NULL sur demande explicite.
+  static const List<String> _clearableFields = <String>['iefId', 'notes'];
+
+  /// Un champ ABSENT du payload reste inchangé côté serveur ; seul un champ
+  /// présent et nul est un effacement voulu, et il faut le nommer pour que la
+  /// sérialisation ne le confonde pas avec le silence d'une version ancienne.
+  static List<String>? _clearedFields(Map<String, dynamic> decoded) {
+    final List<String> cleared = _clearableFields
+        .where((String f) => decoded.containsKey(f) && decoded[f] == null)
+        .toList(growable: false);
+    return cleared.isEmpty ? null : cleared;
+  }
+
   SyncOperationDto _toOperation(OutboxData row) {
     final Object? decoded = jsonDecode(row.payload);
     if (decoded is! Map<String, dynamic>) {
@@ -432,6 +445,7 @@ class SyncEngine {
       clientUpdatedAt: row.createdAt,
       baseRev: row.baseRev,
       data: row.op == 'delete' ? null : SyncEntityDataDto.fromJson(decoded),
+      clearedFields: row.op == 'update' ? _clearedFields(decoded) : null,
     );
   }
 
