@@ -1761,6 +1761,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supervision/activite': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Activité des téléconseillers sur la fenêtre demandée.
+     * @description La fenêtre porte sur la date de l’ACTE, pas sur celle de la fiche : un téléconseiller resté hors ligne trois semaines verrait sinon ses appels du lundi comptés le jeudi de la synchronisation. Les lignes n’existent qu’aux périodes où il s’est passé quelque chose ; `teleconseillers` porte la liste complète et le reste à faire, qu’aucune date ne borne.
+     */
+    get: operations['getSupervisionActivite'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/export/prospects.xlsx': {
     parameters: {
       query?: never;
@@ -3759,7 +3779,7 @@ export interface components {
       lastSyncAt: string | null;
       /**
        * Format: date-time
-       * @description Dernière écriture métier : tentative d’appel ou transition de dossier.
+       * @description Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.
        */
       lastWriteAt: string | null;
     };
@@ -4176,6 +4196,56 @@ export interface components {
       /** @description Second niveau : le détail lisible, à provenance égale. */
       byLabel: components['schemas']['OriginLabelCountDto'][];
       total: number;
+    };
+    /** @enum {string} */
+    SupervisionGranularity: 'day' | 'week';
+    SupervisionActivityRowDto: {
+      /** @description Début de la journée ou de la semaine, en AAAA-MM-JJ. */
+      bucket: string;
+      /** Format: uuid */
+      teleconseillerId: string;
+      teleconseillerName: string;
+      /** @description Appels passés à des prospects. */
+      calls: number;
+      /** @description Issue UNREACHABLE : NRP ou injoignable. */
+      unreachable: number;
+      /** @description Issue WRONG_NUMBER : faux numéro. */
+      wrongNumber: number;
+      /** @description Issue REFUSED : refus. */
+      refused: number;
+      /** @description Issue OTHER. */
+      other: number;
+      /** @description Issue METHOD_OBTAINED. */
+      methodObtained: number;
+      /** @description Issue CALLBACK : à rappeler. */
+      callback: number;
+      /** @description Part des appels dont le numéro s’est révélé exploitable, en pourcentage. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ». */
+      reachRate: number | null;
+      /** @description Fiches prospect saisies sur la période. */
+      prospectsCreated: number;
+      /** @description Représentants distincts appelés sur la période. */
+      representantsContacted: number;
+      /** @description Tâches d’appel clôturées sur la période. */
+      tasksClosed: number;
+    };
+    SupervisionTeleconseillerDto: {
+      /** Format: uuid */
+      id: string;
+      fullName: string;
+      isActive: boolean;
+      /** @description Tâches d’appel encore OUVERTES. Instantané : la fenêtre ne le borne pas. */
+      openTasks: number;
+    };
+    SupervisionActivityDto: {
+      /** Format: date-time */
+      from: string | null;
+      /** Format: date-time */
+      to: string | null;
+      granularity: components['schemas']['SupervisionGranularity'];
+      /** @description Une ligne par téléconseiller et par période, seulement là où il s’est passé quelque chose. */
+      items: components['schemas']['SupervisionActivityRowDto'][];
+      /** @description Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre. */
+      teleconseillers: components['schemas']['SupervisionTeleconseillerDto'][];
     };
     /** @enum {string} */
     ExportMode: 'filtered' | 'consolidated';
@@ -5854,6 +5924,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -9456,6 +9528,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -9530,6 +9604,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -9604,6 +9680,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -9679,6 +9757,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -9754,6 +9834,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -9828,6 +9910,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -9902,6 +9986,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -9976,6 +10062,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10050,6 +10138,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10124,6 +10214,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10198,6 +10290,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10273,6 +10367,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10347,6 +10443,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10421,6 +10519,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10495,6 +10595,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10569,6 +10671,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10643,6 +10747,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10720,6 +10826,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10853,6 +10961,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -10907,6 +11017,58 @@ export interface operations {
       };
     };
   };
+  getSupervisionActivite: {
+    parameters: {
+      query?: {
+        /** @description Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar. */
+        actFrom?: string;
+        /** @description Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999. */
+        actTo?: string;
+        granularity?: components['schemas']['SupervisionGranularity'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SupervisionActivityDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   exportProspectsXlsx: {
     parameters: {
       query?: {
@@ -10927,6 +11089,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */

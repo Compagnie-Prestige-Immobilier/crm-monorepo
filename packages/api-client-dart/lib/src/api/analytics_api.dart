@@ -54,6 +54,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -80,6 +81,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -117,6 +119,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -182,6 +185,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -208,6 +212,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -245,6 +250,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -310,6 +316,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -336,6 +343,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -373,6 +381,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -438,6 +447,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -464,6 +474,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -501,6 +512,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -566,6 +578,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -592,6 +605,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -629,6 +643,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -694,6 +709,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -720,6 +736,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -757,6 +774,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -822,6 +840,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -848,6 +867,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -885,6 +905,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -950,6 +971,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -976,6 +998,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1013,6 +1036,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1078,6 +1102,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1104,6 +1129,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1141,6 +1167,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1206,6 +1233,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1232,6 +1260,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1269,6 +1298,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1334,6 +1364,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1360,6 +1391,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1397,6 +1429,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1462,6 +1495,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1488,6 +1522,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1525,6 +1560,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1590,6 +1626,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1616,6 +1653,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1653,6 +1691,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1718,6 +1757,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1744,6 +1784,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1781,6 +1822,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1846,6 +1888,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1873,6 +1916,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1911,6 +1955,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1977,6 +2022,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -2006,6 +2052,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -2045,6 +2092,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -2211,6 +2259,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -2238,6 +2287,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -2276,6 +2326,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -2342,6 +2393,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -2369,6 +2421,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -2407,6 +2460,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -2473,6 +2527,7 @@ class AnalyticsApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
+  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -2499,6 +2554,7 @@ class AnalyticsApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? campaignId,
+    String? assignedToId,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -2536,6 +2592,7 @@ class AnalyticsApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (campaignId != null) r'campaignId': campaignId,
+      if (assignedToId != null) r'assignedToId': assignedToId,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,

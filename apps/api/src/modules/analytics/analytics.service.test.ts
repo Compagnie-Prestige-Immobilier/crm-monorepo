@@ -125,6 +125,20 @@ describe('conditions communes', () => {
     expect(sql).toContain('ct."campaignId" = "camp-1"');
   });
 
+  it('borne la sous-requête à la file d’un seul téléconseiller', () => {
+    const sql = rendered(
+      prospectConditions(admin, { campaignId: 'camp-1', assignedToId: 'com-bob' }, false),
+    );
+    expect(sql).toContain('ct."campaignId" = "camp-1"');
+    expect(sql).toContain('ct."assignedToId" = "com-bob"');
+  });
+
+  it('l’attribution filtre même sans campagne', () => {
+    const sql = rendered(prospectConditions(admin, { assignedToId: 'com-bob' }, false));
+    expect(sql).toContain('ct."assignedToId" = "com-bob"');
+    expect(sql).not.toContain('ct."campaignId"');
+  });
+
   it('CLOISONNE la sous-requête de campagne, mode éteint', () => {
     const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }, false));
     expect(sql).toContain('ct."isDemo" = FALSE');

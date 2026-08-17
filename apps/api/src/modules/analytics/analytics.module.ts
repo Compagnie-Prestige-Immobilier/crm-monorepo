@@ -7,9 +7,11 @@ import { PilotageService } from './pilotage.service.js';
 import { PortfolioService } from './portfolio.service.js';
 import { QualityService } from './quality.service.js';
 import { SegmentConversionsService } from './segment-conversions.service.js';
+import { SupervisionController } from './supervision.controller.js';
+import { SupervisionActivityService } from './supervision.service.js';
 
 @Module({
-  controllers: [AnalyticsController],
+  controllers: [AnalyticsController, SupervisionController],
   providers: [
     AnalyticsService,
     FunnelService,
@@ -17,6 +19,7 @@ import { SegmentConversionsService } from './segment-conversions.service.js';
     PortfolioService,
     QualityService,
     SegmentConversionsService,
+    SupervisionActivityService,
   ],
   exports: [
     AnalyticsService,
@@ -25,6 +28,7 @@ import { SegmentConversionsService } from './segment-conversions.service.js';
     PortfolioService,
     QualityService,
     SegmentConversionsService,
+    SupervisionActivityService,
   ],
 })
 export class AnalyticsModule {}

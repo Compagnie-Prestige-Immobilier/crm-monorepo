@@ -48,8 +48,15 @@ export function buildProspectWhere(
 
   if (filter.segment) and.push(segmentWhere(filter.segment));
 
-  if (filter.campaignId) {
-    and.push({ callTasks: { some: { campaignId: filter.campaignId } } });
+  if (filter.campaignId ?? filter.assignedToId) {
+    and.push({
+      callTasks: {
+        some: {
+          ...(filter.campaignId ? { campaignId: filter.campaignId } : {}),
+          ...(filter.assignedToId ? { assignedToId: filter.assignedToId } : {}),
+        },
+      },
+    });
   }
 
   if (and.length) where.AND = and;

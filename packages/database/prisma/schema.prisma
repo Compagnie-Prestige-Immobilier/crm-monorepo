@@ -410,6 +410,7 @@ model Representant {
 
   @@index([phoneE164])
   @@index([createdById])
+  @@index([createdById, clientCreatedAt])
   @@index([departementId])
   // Le périmètre d'une campagne de représentants se borne par IEF : sans cet
   // index, le tirage parcourt séquentiellement toute la table à chaque aperçu.
@@ -501,6 +502,8 @@ model Prospect {
   // un index complet porterait les centaines de milliers de lignes sans
   // provenance pour ne jamais servir. Voir `prospects_origin_idx`.
   @@index([createdById])
+  // Activite d'un teleconseiller sur une journee de travail, saisie terrain.
+  @@index([createdById, clientCreatedAt])
   @@index([banqueId])
   @@index([syndicatId])
   @@index([statut])
@@ -722,6 +725,7 @@ model CallTask {
   @@unique([campaignId, prospectId])
   @@unique([campaignId, assignedToId, position])
   @@index([assignedToId, status])
+  @@index([assignedToId, completedAt])
   @@index([prospectId])
   // Le PDF « jour N » d'un commercial lit exactement cette clé.
   @@index([campaignId, assignedToId, dayIndex])
@@ -767,6 +771,8 @@ model CallAttempt {
 
   @@index([prospectId, createdAt])
   @@index([performedById, createdAt])
+  // La journee de travail se lit sur `clientCreatedAt`, l'heure de l'appel.
+  @@index([performedById, clientCreatedAt])
   @@index([campaignId])
   @@index([isDemo])
   @@map("call_attempts")
@@ -907,6 +913,7 @@ model RepCallAttempt {
 
   @@index([representantId, createdAt])
   @@index([performedById, createdAt])
+  @@index([performedById, clientCreatedAt])
   @@index([campaignId])
   @@index([isDemo])
   @@map("rep_call_attempts")

@@ -42,6 +42,7 @@ const CHAMPS: Readonly<Record<keyof ProspectFilterDto, ProspectFilterDto>> = {
   phase2Status: { phase2Status: 'METHOD_OBTAINED' },
   enrollmentMethod: { enrollmentMethod: 'PLATFORM' },
   campaignId: { campaignId: 'camp-1' },
+  assignedToId: { assignedToId: 'com-bob' },
   enrollmentCapturedById: { enrollmentCapturedById: 'com-omar' },
   dateFrom: { dateFrom: '2026-01-01T00:00:00.000Z' },
   dateTo: { dateTo: '2026-12-31T23:59:59.000Z' },
@@ -62,6 +63,7 @@ describe('un filtre, la même population sur les trois surfaces', () => {
   it('couvre tous les champs du DTO, sans exception silencieuse', () => {
     const declares = Object.keys(CHAMPS).toSorted();
     const attendus = [
+      'assignedToId',
       'banqueId',
       'campaignId',
       'commercialId',
