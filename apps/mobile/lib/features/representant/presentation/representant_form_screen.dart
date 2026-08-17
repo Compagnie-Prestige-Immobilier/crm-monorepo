@@ -51,15 +51,18 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   final TextEditingController _phone = TextEditingController();
   final TextEditingController _departement = TextEditingController();
   final TextEditingController _ief = TextEditingController();
+  final TextEditingController _notes = TextEditingController();
   final FocusNode _nomFocus = FocusNode();
   final FocusNode _phoneFocus = FocusNode();
   final FocusNode _departementFocus = FocusNode();
   final FocusNode _iefFocus = FocusNode();
+  final FocusNode _notesFocus = FocusNode();
 
   late String _draftId = widget.draftId ?? Ids.newId();
   late final String _entityId = widget.representantId ?? Ids.newId();
 
   String? _departementId;
+  String? _defaultDepartementId;
   String? _iefId;
   bool _saving = false;
   String? _error;
@@ -86,7 +89,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   bool get draftIsEmpty =>
       _nom.text.trim().isEmpty &&
       _phone.text.trim().isEmpty &&
-      _departementId == null &&
+      _notes.text.trim().isEmpty &&
+      _departementId == _defaultDepartementId &&
       _iefId == null;
 
   @override
@@ -102,6 +106,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     'departementLabel': _departement.text,
     'iefId': _iefId,
     'iefLabel': _ief.text,
+    'notes': _notes.text,
   };
 
   @override
@@ -115,12 +120,18 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
         _phone.text = Phone.groupNational(Phone.digitsOf(phone));
         _scheduleLookup();
       }
+      _defaultDepartementId = ref.read(authControllerProvider).departementId;
+      if (_defaultDepartementId != null) {
+        _departementId = _defaultDepartementId;
+        unawaited(_labelDepartement(_defaultDepartementId!));
+      }
     }
     for (final FocusNode node in <FocusNode>[
       _nomFocus,
       _phoneFocus,
       _departementFocus,
       _iefFocus,
+      _notesFocus,
     ]) {
       node.addListener(() {
         if (!node.hasFocus) unawaited(flushDraft());
@@ -136,10 +147,12 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     _phone.dispose();
     _departement.dispose();
     _ief.dispose();
+    _notes.dispose();
     _nomFocus.dispose();
     _phoneFocus.dispose();
     _departementFocus.dispose();
     _iefFocus.dispose();
+    _notesFocus.dispose();
     super.dispose();
   }
 
@@ -156,6 +169,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
           _phone.text = Phone.groupNational(Phone.digitsOf(existing.phoneE164));
           _departementId = existing.departementId;
           _iefId = existing.iefId;
+          _notes.text = existing.notes ?? '';
         });
         await _labelDepartement(existing.departementId);
         if (existing.iefId != null) await _labelIef(existing.iefId!);
@@ -207,6 +221,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       _departement.text = (snapshot.values['departementLabel'] as String?) ?? '';
       _iefId = snapshot.values['iefId'] as String?;
       _ief.text = (snapshot.values['iefLabel'] as String?) ?? '';
+      _notes.text = (snapshot.values['notes'] as String?) ?? '';
       _pendingRestore = null;
     });
     if (adopted) republishDraftRoute();
@@ -283,6 +298,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
         return;
       }
       final String phoneE164 = Phone.toE164(_phone.text)!;
+      final String notes = _notes.text.trim();
 
       if (widget.representantId != null) {
         await ref
@@ -293,6 +309,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
               phoneE164: phoneE164,
               departementId: _departementId!,
               iefId: _iefId,
+              notes: notes.isEmpty ? null : notes,
               draftId: _draftId,
             );
       } else {
@@ -304,6 +321,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
               phoneE164: phoneE164,
               departementId: _departementId!,
               iefId: _iefId,
+              notes: notes.isEmpty ? null : notes,
               createdById: userId,
               draftId: _draftId,
             );
@@ -503,6 +521,17 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                         markDraftDirty();
                         unawaited(flushDraft());
                       },
+                    ),
+                    const SizedBox(height: CpiSpacing.md),
+                    TextField(
+                      controller: _notes,
+                      focusNode: _notesFocus,
+                      minLines: 2,
+                      maxLines: 5,
+                      maxLength: 2000,
+                      textCapitalization: TextCapitalization.sentences,
+                      onChanged: (String _) => markDraftDirty(),
+                      decoration: const InputDecoration(labelText: 'Notes (facultatif)'),
                     ),
                   ],
                 ),
