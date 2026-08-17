@@ -13,14 +13,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber } from '@/lib/format';
 import { PROSPECT_STATUT_LABELS, type DashboardKpis, type ProspectStatut } from '@/lib/types';
 
-/**
- * Indicateurs de tête.
- *
- * Chaque valeur vient telle quelle de `GET /analytics/totals`. Le panel ne
- * recalcule RIEN : un total dérivé côté écran finit toujours par diverger de la
- * liste affichée juste en dessous, et c'est le genre d'écart qu'un directeur
- * remarque avant nous.
- */
 function KpiCard({
   label,
   value,
@@ -35,13 +27,7 @@ function KpiCard({
   index: number;
 }) {
   return (
-    <Card
-      className="animate-rise"
-      // Entrée échelonnée. `animation-fill-mode: backwards` est posé dans
-      // globals.css : sans lui, chaque carte apparaît en clair une frame avant
-      // le début de son délai.
-      style={{ animationDelay: `${String(index * 60)}ms` }}
-    >
+    <Card className="animate-rise" style={{ animationDelay: `${String(index * 60)}ms` }}>
       <CardContent className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">

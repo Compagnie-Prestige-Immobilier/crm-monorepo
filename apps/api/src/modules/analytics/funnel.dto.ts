@@ -1,30 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-/**
- * L'entonnoir complet, du prospect à l'argent encaissé.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI CET OBJET EXISTE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Le tableau de bord ne montrait que la prospection : combien de prospects,
- * combien de représentants, combien de téléconseillers. Autrement dit l'effort,
- * jamais le résultat.
- *
- * Or la chaîne ne s'arrête pas là. Elle va :
- *
- *   prospect saisi
- *     → méthode d'enrôlement obtenue        (phase 2)
- *       → dossier bancaire ouvert           (Banque & Finance)
- *         → dossier ENCAISSÉ                ← la seule étape qui rapporte
- *
- * Une direction qui ne voit que le haut de l'entonnoir pilote à l'aveugle :
- * elle peut féliciter une équipe qui saisit beaucoup et ne convertit rien.
- *
- * Les montants sont exposés en CHAÎNE : XOF est stocké en `Decimal(18,0)` et
- * un entier JSON perd de la précision au-delà de 2^53. Six milliards de francs
- * passent encore, mais le format ne doit pas dépendre de la taille du chiffre.
- */
 export class FunnelStageDto {
   @ApiProperty({ description: 'Nom de l’étape, prêt à afficher.' })
   label!: string;
@@ -52,9 +27,8 @@ export class FunnelStageDto {
   tauxGlobal!: number | null;
 }
 
+/** Montants en CHAÎNE : XOF est stocké en `Decimal(18,0)` et un entier JSON perd la précision au-delà de 2^53. */
 export class AnalyticsFinanceDto {
-  // ── Argent ────────────────────────────────────────────────────────────────
-
   @ApiProperty({
     type: String,
     description: 'Total encaissé, en francs CFA. Chaîne : XOF est un Decimal(18,0).',
@@ -82,8 +56,6 @@ export class AnalyticsFinanceDto {
     example: '8500000',
   })
   montantEncaisse30Jours!: string;
-
-  // ── Dossiers ──────────────────────────────────────────────────────────────
 
   @ApiProperty({ type: Number }) dossiers!: number;
   @ApiProperty({ type: Number, description: 'Dossiers encore ouverts.' }) dossiersOuverts!: number;

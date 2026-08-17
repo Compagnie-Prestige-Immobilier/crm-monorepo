@@ -6,16 +6,6 @@ import { getAnonymousApiClient, setSessionCookies } from '@/lib/api/server';
 import { authenticate } from '@/lib/data/auth';
 import { loginSchema } from '@/lib/schemas';
 
-/**
- * `POST /api/auth/login`
- *
- * Le navigateur ne parle jamais au backend NestJS directement. Il poste ici,
- * ce handler relaie, et les jetons repartent en cookies `httpOnly` : jamais
- * dans le corps de la réponse. C'est la seule façon d'empêcher qu'un JWT
- * atterrisse dans du JavaScript, donc à portée d'une XSS.
- *
- * La réponse ne contient que le profil public de l'utilisateur.
- */
 export async function POST(request: Request): Promise<NextResponse> {
   let body: unknown;
   try {
@@ -31,24 +21,15 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let result;
   try {
-    // Client ANONYME : le login est le seul appel qui ne doit porter aucun
-    // jeton. Passer par le client de session déclencherait une rotation sur le
-    // 401 d'un mot de passe faux, et brûlerait le refresh token de la session
-    // précédente pour rien.
     result = await authenticate(
       parsed.data.identifier,
       parsed.data.password,
       getAnonymousApiClient(),
     );
   } catch (error) {
-    // `API_URL` absent : le panel n'a aucun backend à joindre. C'est la
-    // PREMIÈRE branche, avant le repli « injoignable » : sans elle, un panel
-    // mal déployé envoyait l'administrateur vérifier sa connexion.
     if (error instanceof ApiConfigurationError) {
       return NextResponse.json(configErrorBody(error), { status: 500 });
     }
-    // 429 : le limiteur de débit de l'API. Le dire, sinon l'utilisateur
-    // réessaie en boucle en croyant s'être trompé de mot de passe.
     if (error instanceof ApiError && error.status === 429) {
       return NextResponse.json(
         { error: 'Trop de tentatives. Patientez une minute avant de réessayer.' },
@@ -61,8 +42,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  // Message unique quel que soit le motif : ne pas laisser deviner si un compte
-  // existe, s'il est désactivé, ou si le rôle est refusé.
   if (result === null) {
     return NextResponse.json(
       { error: 'Identifiants incorrects ou compte non autorisé.' },

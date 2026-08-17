@@ -4,14 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { liveInterval, liveLabel, type LiveState } from '@/lib/live';
 
-/**
- * Visibilité de l'onglet.
- *
- * Le sondage s'arrête quand la page passe en arrière-plan. Sans cela, un panel
- * laissé ouvert la nuit émettrait des milliers de requêtes pour un écran que
- * personne ne regarde, et entamerait le quota de l'API au petit matin, à
- * l'heure exacte où les téléconseillers se connectent.
- */
 function useDocumentHidden(): boolean {
   const [hidden, setHidden] = useState(
     () => typeof document !== 'undefined' && document.visibilityState === 'hidden',
@@ -32,35 +24,13 @@ function useDocumentHidden(): boolean {
 }
 
 export interface Live {
-  /**
-   * À passer tel quel à `refetchInterval`.
-   *
-   * Une FONCTION et non un nombre : l'état d'échec appartient à la requête, et
-   * une valeur calculée avant l'appel de `useQuery` ne pourrait pas le lire.
-   * TanStack évalue cette fonction à chaque planification, ce qui fait aussi
-   * que la mise en pause prend effet sans attendre le cycle en cours.
-   */
   readonly refetchInterval: (query: { state: { status: string } }) => number | false;
-  /** État courant, pour l'indicateur. `failing` vient de l'appelant. */
   readonly stateOf: (failing: boolean) => LiveState;
   readonly labelOf: (failing: boolean) => string;
   readonly paused: boolean;
   readonly togglePause: () => void;
 }
 
-/**
- * Pilotage du rafraîchissement continu.
- *
- * La pause manuelle existe pour une raison précise : un écran qui se réordonne
- * pendant qu'on lit une ligne est inutilisable. Elle est offerte, jamais
- * imposée.
- *
- * `intervalMs` sert aux consommateurs qui ne regardent pas un flux de saisies :
- * le bandeau du mode démonstration suit un interrupteur basculé quelques fois
- * par jour et sonde donc à `LIVE_SLOW_INTERVAL_MS`. Le rythme change ; l'arrêt
- * en arrière-plan et le ralentissement après échec, non : ce sont eux qui
- * rendent le sondage supportable, et les redéfinir ailleurs les ferait diverger.
- */
 export function useLive(options?: { intervalMs?: number }): Live {
   const intervalMs = options?.intervalMs;
   const hidden = useDocumentHidden();

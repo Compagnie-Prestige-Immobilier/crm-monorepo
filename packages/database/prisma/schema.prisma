@@ -229,6 +229,9 @@ model User {
   @@index([deletedAt])
   @@index([isDemo])
   @@map("users")
+
+  importJobs     ImportJob[]     @relation("ImportJobRequestedBy")
+  segmentChanges SegmentChange[] @relation("SegmentChangeChangedBy")
 }
 
 // Un refresh token n'est jamais stocké en clair : seul son SHA-256 l'est. Une
@@ -512,6 +515,8 @@ model Prospect {
   @@index([enrollmentMethod])
   @@index([isDemo])
   @@map("prospects")
+
+  segmentChanges SegmentChange[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1454,4 +1459,166 @@ model NotificationDelivery {
   @@index([notificationId, status])
   @@index([isDemo])
   @@map("notification_deliveries")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// IMPORTS DE MASSE
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// UN TRAVAIL LONG NE VIT PAS DANS UNE REQUÊTE HTTP.
+//
+// L'import des représentants tenait dans un appel : lecture du classeur en
+// mémoire, écriture dans une transaction de soixante secondes, plafond à cinq
+// mille lignes. À douze mille neuf cent vingt-neuf représentants — un seul
+// dépôt attendu — ce chemin ne tient plus, et à cent cinquante mille prospects
+// il n'en est plus question.
+//
+// L'état vit donc ici, le processus le réclame par bail, et un balayage ramasse
+// ce qu'un conteneur mort a laissé en plan. C'est le raisonnement déjà tenu par
+// l'export intégral de la base : une minuterie en mémoire ne survit pas au
+// redémarrage, l'état en base si.
+//
+// UNE SEULE TABLE, UN DISCRIMINANT. Représentants et prospects partagent le
+// moteur — lecture en flux, tranches, reprise, rapport — et ne divergent que
+// sur la validation d'une ligne. Une table par entité aurait dupliqué la
+// machinerie, donc les corrections de la machinerie.
+
+enum ImportKind {
+  REPRESENTANTS
+  PROSPECTS
+}
+
+/// `expired` n'est PAS un échec : le fichier et le rapport ont simplement passé
+/// leur échéance. L'écran ne doit pas le présenter comme une erreur.
+enum ImportStatus {
+  queued
+  running
+  succeeded
+  failed
+  expired
+}
+
+/// `DRY_RUN` est le défaut côté service, comme pour l'import représentants
+/// d'origine : un import qui écrit sans qu'on l'ait demandé est un incident.
+enum ImportMode {
+  DRY_RUN
+  APPLY
+}
+
+model ImportJob {
+  id     String       @id @default(uuid(7))
+  kind   ImportKind
+  status ImportStatus @default(queued)
+  mode   ImportMode
+
+  requestedById String
+  requestedBy   User   @relation("ImportJobRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  fileName  String
+  fileBytes Int
+
+  /// Chemin sur disque, JAMAIS le contenu.
+  ///
+  /// Cent cinquante mille lignes en `bytea` entreraient dans chaque sauvegarde
+  /// de la base et dans chaque export intégral, pour un fichier dont la durée
+  /// de vie utile se compte en heures.
+  storagePath String
+
+  /// Connu après lecture de l'en-tête, donc nul tant que le travail n'a pas
+  /// commencé. C'est le dénominateur de l'avancement.
+  totalRows     Int?
+  processedRows Int  @default(0)
+  createdRows   Int  @default(0)
+  skippedRows   Int  @default(0)
+  errorRows     Int  @default(0)
+
+  /// Erreurs bornées et aperçu, dans la forme que l'écran sait déjà lire.
+  report      Json?
+  failureCode String?
+  failureMsg  String?
+
+  /// Bail et jeton de fencing.
+  ///
+  /// Toute écriture du travailleur porte `claimToken` dans son `where` : une
+  /// instance qui a perdu son bail ne peut plus rien écrire, même si elle
+  /// l'ignore encore. C'est le motif de la revendication d'envoi des
+  /// notifications, et il est repris tel quel.
+  claimToken String?
+  claimedAt  DateTime?
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  /// Échéance du fichier déposé ET du rapport.
+  expiresAt DateTime
+
+  isDemo    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind, status, createdAt])
+  @@index([requestedById, createdAt])
+  /// Reprise des travaux morts : `queued` compte autant que `running`, la
+  /// fenêtre entre les deux est étroite mais un conteneur peut y mourir.
+  @@index([status, claimedAt])
+  @@index([isDemo])
+  @@map("import_jobs")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// MIGRATION DE SEGMENT
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// LE SEGMENT N'EST PAS STOCKÉ, DONC SON CHANGEMENT NE LAISSE AUCUNE TRACE.
+//
+// BDD1..BDD4 se calculent par croisement du syndicat et de la banque. Faire
+// passer un prospect de BDD3 à BDD1 revient donc à changer deux clés
+// étrangères — deux `UPDATE`, et plus rien ensuite ne distingue une fiche
+// convertie d'une fiche née en BDD1.
+//
+// Or convertir est le métier. Sans cette table, la question « combien de BDD3
+// avons-nous fait basculer ce mois, et par qui » n'a pas de réponse, et elle
+// n'en aura jamais rétroactivement.
+//
+// Écrite DANS LA MÊME TRANSACTION que la modification du prospect, comme les
+// transitions de dossier bancaire : une trace écrite à côté finit un jour par
+// mentir sur ce qu'elle prétend décrire.
+
+enum ChangeSource {
+  WEB
+  MOBILE
+}
+
+model SegmentChange {
+  id         String   @id @default(uuid(7))
+  prospectId String
+  prospect   Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  /// Calculés de part et d'autre du changement. Stockés et non recalculés : la
+  /// fonction de segmentation peut évoluer, l'histoire non.
+  fromSegment BddSegment
+  toSegment   BddSegment
+
+  fromBanqueId   String
+  toBanqueId     String
+  fromSyndicatId String
+  toSyndicatId   String
+
+  /// Pourquoi, en clair. Une bascule de segment n'est pas une correction de
+  /// faute de frappe.
+  reason String?
+
+  changedById String
+  changedBy   User         @relation("SegmentChangeChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  source      ChangeSource
+
+  changedAt DateTime @default(now())
+  isDemo    Boolean  @default(false)
+
+  @@index([prospectId, changedAt])
+  /// « Combien de conversions vers BDD1 sur la période. »
+  @@index([toSegment, changedAt])
+  /// Attribution : qui a converti quoi.
+  @@index([changedById, changedAt])
+  @@index([isDemo])
+  @@map("segment_changes")
 }

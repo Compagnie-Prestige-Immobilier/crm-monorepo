@@ -1,30 +1,3 @@
-/**
- * Les IEF : Inspections de l'Éducation et de la Formation.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI CE RÉFÉRENTIEL EXISTE, À CÔTÉ DES DÉPARTEMENTS
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Le département est un découpage administratif. L'IEF est le découpage
- * SCOLAIRE, et c'est celui sur lequel les feuilles de route CHUES sont bâties :
- * un téléconseiller reçoit « IEF Almadies », jamais « Dakar ».
- *
- * Les deux ne coïncident pas. 59 IEF pour 46 départements : dix départements en
- * portent plusieurs, et Dakar en porte quatre à lui seul :
- *
- *     Dakar     → Almadies, Dakar Plateau, Grand Dakar, Parcelles Assainies
- *     Rufisque  → Rufisque Commune, Diamniadio, Sangalkam
- *     Pikine    → Pikine, Thiaroye
- *
- * Sans ce référentiel, ces quatre IEF de Dakar se saisissent toutes comme
- * « Dakar » et se confondent dans le même chiffre. L'information est perdue à
- * la saisie : aucun traitement ultérieur ne peut la reconstituer.
- *
- * Source : `Matrice_Finale_Nationale.xlsx`, onglet « Matrice par IEF ».
- * Rattachement au département par le code, jamais par le libellé : la matrice
- * écrit « Birkilane » là où la feuille de route régionale et l'orthographe
- * officielle écrivent « Birkelane ».
- */
 export interface IefSeed {
   readonly code: string;
   readonly name: string;

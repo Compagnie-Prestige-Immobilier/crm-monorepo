@@ -66,10 +66,45 @@ en silence, un `toBeDefined` sur une fonction sans valeur de retour.
 
 ## Commentaires
 
-Ils expliquent POURQUOI, jamais QUOI. La densite de ce depot est un choix:
-un commentaire porte la raison d'etre d'une decision, ce qui casserait sans
-elle, et l'incident qui l'a motivee.
+Rares. Le code se lit d'abord.
 
-Un commentaire qui surestime sa garantie est un piege. Plusieurs defauts ont
-survecu a des relectures ici parce qu'un commentaire affirmait une propriete
-que le code n'avait pas.
+Un commentaire ne se justifie que si le code ne PEUT pas porter l'information:
+une contrainte externe, un choix contre-intuitif, un piege que le prochain
+lecteur reproduirait. Une ligne, deux au maximum.
+
+Interdit:
+
+- redire ce que la ligne fait deja
+- expliquer une fonction que son nom explique
+- s'adresser au lecteur, raconter un incident, argumenter
+- les bandeaux, separateurs en caracteres graphiques, titres de section
+- les paragraphes. Un commentaire qui depasse trois lignes est un mauvais nom
+  de variable ou une fonction a extraire
+
+Avant d'ecrire un commentaire: renommer, ou decouper. Ces deux gestes rendent
+inutile la majorite des commentaires qu'on s'apprete a ecrire.
+
+Un fichier ou le commentaire depasse 15% des lignes est a reecrire, pas a
+completer. Ce depot a heberge des fichiers a 70%: illisibles, et le code y
+devenait invisible.
+
+Ce qui doit etre conserve va dans `docs/`, pas dans le code.
+
+## Simplicite
+
+La solution la plus simple qui marche. Pas la plus generale, pas la plus
+extensible, pas celle qui prevoit un besoin qui n'existe pas.
+
+- Pas d'abstraction sans DEUX appelants reels. Une interface a une seule
+  implementation est un fichier de trop.
+- Pas de couche d'indirection "au cas ou".
+- Moins de fichiers. Un module qui en compte quinze pour ce qu'un fichier de
+  200 lignes ferait est plus dur a suivre, pas mieux concu.
+- Complexite cyclomatique basse: sortir tot, aplatir les conditions, pas de
+  ternaires imbriques.
+- Preferer une fonction longue et lineaire a six petites fonctions qui se
+  renvoient la balle sur trois fichiers.
+- Reutiliser ce qui existe avant d'ecrire.
+
+Le critere est la maintenance: quelqu'un qui ouvre ce fichier dans six mois
+doit comprendre en une lecture, sans sauter entre les fichiers.

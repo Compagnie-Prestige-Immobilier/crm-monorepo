@@ -2,13 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { cubicBezier, easeOut, easeSpring, interpolateCount } from '@/lib/motion';
 
-/**
- * Les courbes de `docs/design.md` §7 pilotent le seul mouvement que le CSS ne
- * sait pas produire : celui d'un compteur qui change de valeur. Une erreur ici
- * ne casse rien, elle fabrique un mouvement qui ne ressemble à aucun autre de
- * l'interface : ce qui se voit immédiatement et ne s'explique jamais.
- */
-
 describe('cubic-bezier', () => {
   it('reste borné aux extrémités', () => {
     expect(easeOut(0)).toBe(0);
@@ -25,7 +18,6 @@ describe('cubic-bezier', () => {
   });
 
   it('freine à la fin, comme un ease-out', () => {
-    // 22 % du temps ont déjà couvert plus de la moitié du chemin.
     expect(easeOut(0.22)).toBeGreaterThan(0.5);
     expect(easeOut(0.9)).toBeGreaterThan(0.98);
   });
@@ -40,8 +32,6 @@ describe('cubic-bezier', () => {
   });
 
   it('dépasse la cible avant d’y revenir, pour la courbe à rebond', () => {
-    // `cubic-bezier(0.34, 1.56, 0.64, 1)` : c'est le dépassement qui EST le
-    // rebond. Une approximation sans dépassement le supprimerait.
     const peak = Math.max(...Array.from({ length: 101 }, (_, i) => easeSpring(i / 100)));
     expect(peak).toBeGreaterThan(1);
     expect(easeSpring(1)).toBe(1);

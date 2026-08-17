@@ -1,17 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Rôles de couleur que Material 3 ne définit pas.
-///
-/// Material 3 n'a ni `success`, ni `warning`, ni `info`, ni le moindre rôle
-/// pour l'or CPI. Ils vivent ici, dans une [ThemeExtension], et non dans des
-/// constantes globales : une constante globale n'est ni surchargeable dans un
-/// test, ni lisible via `Theme.of(context)`, et finit toujours par être
-/// dupliquée à la main dans un widget.
-///
-/// Règle non négociable (docs/design.md §2.3) : `#C8921A` fait 2,77:1 sur
-/// blanc. Il échoue AA texte *et* le seuil grand texte. Il n'est exposé ici que
-/// comme [accent] : une **surface décorative**. Pour du texte ou une icône or,
-/// c'est [accentText] (`#856011`, 5,71:1) et rien d'autre.
 @immutable
 class CpiColors extends ThemeExtension<CpiColors> {
   const CpiColors({
@@ -54,8 +42,6 @@ class CpiColors extends ThemeExtension<CpiColors> {
     required this.syncBlocked,
   });
 
-  /// Palette claire auditée. Seule palette du mobile : l'app est verrouillée en
-  /// clair (docs/design.md §3), qui réserve le mode sombre au panel web.
   static const CpiColors light = CpiColors(
     success: Color(0xFF1A6B44),
     onSuccess: Color(0xFFFFFFFF),
@@ -108,29 +94,16 @@ class CpiColors extends ThemeExtension<CpiColors> {
   final Color onInfo;
   final Color infoSurface;
 
-  /// Or CPI. **Surface décorative uniquement.** Jamais de texte dessus sans
-  /// passer par [accentForeground], jamais de texte *en* cette couleur.
   final Color accent;
 
-  /// Texte posé sur une surface [accent] : 6,95:1.
   final Color accentForeground;
 
-  /// Seule déclinaison d'or autorisée pour du texte et des icônes : 5,71:1.
   final Color accentText;
   final Color accentBorder;
 
-  /// Or lisible sur bordeaux : 8,71:1 sur `primary`.
   final Color accentOnDark;
   final Color accentSurface;
 
-  /// Rouge d'erreur lisible SUR BORDEAUX : 4,91:1 sur `primary`.
-  ///
-  /// `destructive` (#B91C1C) ne fait que **2,10:1** sur `#630210` : il échoue
-  /// AA texte *et* le seuil 3:1 des éléments non textuels. Or l'écran de
-  /// connexion est bordeaux plein, et ses messages de validation s'y posaient
-  /// directement : ils étaient illisibles. C'est la déclinaison `destructive`
-  /// du mode sombre de docs/design.md §3, réutilisée ici pour la même raison
-  /// qu'elle existe là-bas : le rouge foncé ne passe pas sur fond foncé.
   final Color destructiveOnDark;
 
   final Color navSurface;
@@ -158,8 +131,6 @@ class CpiColors extends ThemeExtension<CpiColors> {
   final Color syncFailed;
   final Color syncBlocked;
 
-  /// Les 5 couleurs de série, dans l'ordre. Au-delà de 5 séries on regroupe en
-  /// « Autres » (docs/design.md §2.6) : on ne rallonge pas la liste.
   List<Color> get chartSeries => <Color>[chart1, chart2, chart3, chart4, chart5];
 
   @override
@@ -289,7 +260,6 @@ class CpiColors extends ThemeExtension<CpiColors> {
   }
 }
 
-/// Accès court aux rôles CPI depuis un `BuildContext`.
 extension CpiColorsX on BuildContext {
   CpiColors get cpi => Theme.of(this).extension<CpiColors>() ?? CpiColors.light;
 }

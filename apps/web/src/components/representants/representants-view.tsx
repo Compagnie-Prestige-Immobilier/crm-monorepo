@@ -19,7 +19,7 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
 import { RepresentantsFiltersBar } from '@/components/representants/representants-filters-bar';
 import { useRepresentantFilters } from '@/components/representants/use-representant-filters';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -40,38 +40,6 @@ import { countActiveRepresentantFilters } from '@/lib/representant-filters';
 import type { RepresentantRow } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-/**
- * Représentants : les personnes rencontrées sur le terrain qui remettent les
- * listes de prospects.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * L'écran n'est plus en lecture seule, et la nuance compte.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Une fiche naît normalement sur le mobile, en tournée, face à la personne : le
- * numéro de téléphone sert de clé de déduplication, et il se vérifie de vive
- * voix. Cela reste le parcours principal. Mais il n'existait AUCUNE issue pour
- * l'exception : corriger une faute depuis le siège, saisir une fiche remontée
- * par téléphone, ou reprendre les milliers de lignes d'un partenaire. Le
- * dialogue de saisie et l'import de masse couvrent ces cas-là, avec le même
- * contrôle d'unicité qu'au mobile.
- *
- * La colonne « Prospects » reste l'information centrale : c'est elle qui dit si
- * une fiche compte.
- *
- * Les critères vivent dans l'URL (`useRepresentantFilters`), comme sur les
- * prospects et les dossiers : « les représentants de Ziguinchor sans aucun
- * prospect » est un lien, pas un état perdu au rechargement. L'export part
- * exactement de ces critères.
- */
-/**
- * Absence de valeur, dans un tableau comme dans une carte.
- *
- * Un tiret DEMI-cadratin (U+2013), comme le rapport d'import : le cadratin est
- * proscrit dans ce dépôt. Et un tiret plutôt que « aucune » : les fiches saisies
- * avant l'arrivée du référentiel des IEF n'en portent pas, ce qui est un fait
- * d'historique et non une anomalie à commenter sur chaque ligne.
- */
 const NO_VALUE = '–';
 
 export function RepresentantsView() {
@@ -111,12 +79,12 @@ export function RepresentantsView() {
             Nouveau représentant
           </Button>
 
-          <Button asChild variant="outline">
-            <Link href="/representants/import">
-              <UploadIcon aria-hidden="true" />
-              Import Excel
-            </Link>
-          </Button>
+          {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
+              poserait `role="button"` sur le `<a>`. */}
+          <Link href="/representants/import" className={buttonVariants({ variant: 'outline' })}>
+            <UploadIcon aria-hidden="true" />
+            Import Excel
+          </Link>
 
           {/* L'export part des filtres de l'URL, pas de la page affichée :
               celui qui envoie le fichier doit pouvoir jurer qu'il contient ce
@@ -156,20 +124,6 @@ export function RepresentantsView() {
           fallback="Liste des représentants non chargée."
         />
       ) : data.items.length === 0 ? (
-        /*
-          Deux vides, deux messages : et la distinction n'est pas cosmétique.
-
-          Ce bloc disait toujours « Aucun représentant ne correspond à ces
-          critères. Élargissez la recherche ou retirez un filtre. », y compris
-          sans le moindre critère posé. Une installation neuve, ou un compte qui
-          ouvre l'écran pour la première fois, se voyait donc renvoyé retirer des
-          filtres qu'il n'avait jamais mis : il cherchait, ne trouvait rien à
-          retirer, et concluait à une panne. Les campagnes, les dossiers et les
-          demandes clients branchent déjà sur leur compteur de filtres actifs.
-
-          Sorti du `<tbody>` : le tableau n'existe plus sous 1024 px, et un état
-          vide enfermé dans une cellule y aurait disparu avec lui.
-        */
         <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card py-16 text-center shadow-elev-sm">
           <UsersRoundIcon className="size-8 text-muted-foreground" aria-hidden="true" />
           <p className="font-[600]">
@@ -249,9 +203,6 @@ export function RepresentantsView() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        // Le nom est DANS l'intitulé : « Modifier » répété sur
-                        // vingt-cinq lignes ne distingue rien pour qui parcourt
-                        // la page au lecteur d'écran.
                         aria-label={`Modifier la fiche de ${representant.fullName}`}
                         onClick={() => {
                           setEditing({ representant });
@@ -337,25 +288,6 @@ export function RepresentantsView() {
   );
 }
 
-/**
- * Le même représentant, en CARTE lisible.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Huit colonnes ne rentrent pas sur un téléphone, et les comprimer ne les y
- * fait pas rentrer.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * L'écran n'avait qu'un tableau, avec le seul défilement horizontal du composant
- * `Table` pour tout recours. Huit colonnes sur 360 px, ce sont des colonnes de
- * quarante pixels : « +221 77 123 45 67 » se coupe en trois lignes, « Première
- * saisie » devient illisible, et il faut balayer latéralement pour lire UNE
- * fiche. `/dossiers` traite exactement le même nombre de colonnes en rendant
- * deux fois : ce composant reprend cet arrangement, pour que les deux listes se
- * lisent pareil sur le même téléphone.
- *
- * Le défilement horizontal reste possible sur le tableau : c'est une sortie de
- * secours, pas la réponse au petit écran.
- */
 function RepresentantCard({
   representant,
   onEdit,

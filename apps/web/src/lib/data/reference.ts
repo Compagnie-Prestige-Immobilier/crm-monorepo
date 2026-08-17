@@ -12,39 +12,14 @@ import type {
   Syndicat,
 } from '@/lib/types';
 
-/**
- * Référentiels : tout ce qui alimente les listes déroulantes de filtre.
- *
- * `activeOnly: false` partout, et c'est délibéré : un prospect saisi en mars
- * référence peut-être une banque retirée depuis. Si le combobox ne proposait
- * que les référentiels actifs, ce prospect deviendrait infiltrable : on ne
- * pourrait plus retrouver ses lignes pour les corriger. Les écrans marquent la
- * valeur « (retiré) » plutôt que de la cacher.
- */
-
 export async function fetchReferenceData(
   client: ApiClient = getApiClient(),
 ): Promise<ReferenceData> {
   const [bundle, iefs, users, representants, campaigns] = await Promise.all([
     client.GET('/api/v1/referentiels', { params: { query: { activeOnly: false } } }),
-    /**
-     * Les IEF ne sont pas dans le lot `/referentiels` : elles y ajouteraient
-     * 59 lignes à une réponse déjà tirée par tous les écrans, alors qu'un seul
-     * s'en sert. Requête séparée, mais dans le MÊME `Promise.all` : la barre de
-     * filtre ne doit pas afficher six listes prêtes et une septième en attente.
-     */
     client.GET('/api/v1/referentiels/iefs', { params: { query: { activeOnly: false } } }),
-    // 200 : au-delà, l'API plafonne. CPI compte une dizaine de téléconseillers ;
-    // une pagination de la liste de filtre serait de la complexité gratuite.
     client.GET('/api/v1/users', { params: { query: { role: 'COMMERCIAL', pageSize: 200 } } }),
     client.GET('/api/v1/representants', { params: { query: { pageSize: 200 } } }),
-    /**
-     * Campagnes d'appels : elles alimentent le filtre « Campagne » du tableau
-     * des prospects. Rangées dans le MÊME lot que les autres référentiels
-     * plutôt que dans une requête à part : la barre de filtre serait sinon
-     * capable d'afficher ses six listes déroulantes pendant que la septième
-     * charge encore, et un utilisateur filtrerait sur un écran à moitié prêt.
-     */
     client.GET('/api/v1/phase2/campaigns', { params: { query: { pageSize: 100 } } }),
   ]);
 
@@ -59,8 +34,6 @@ export async function fetchReferenceData(
     commerciaux: unwrap(users).items.map((user): FilterOption => ({
       value: user.id,
       label: user.fullName,
-      // Un compte désactivé garde ses prospects : il reste filtrable, mais
-      // l'état doit être visible pour qu'on ne le croie pas encore en poste.
       hint: user.isActive ? (user.departementName ?? undefined) : 'Compte désactivé',
     })),
     representants: unwrap(representants).items.map((representant): FilterOption => ({
@@ -71,8 +44,6 @@ export async function fetchReferenceData(
     campagnes: unwrap(campaigns).items.map((campaign): FilterOption => ({
       value: campaign.id,
       label: campaign.name,
-      // Le périmètre distingue deux campagnes du même mois ; le statut évite
-      // de croire encore active une campagne clôturée la semaine dernière.
       hint: `${campaign.scope} · ${campaign.status === 'ACTIVE' ? 'en cours' : 'clôturée'}`,
     })),
   };

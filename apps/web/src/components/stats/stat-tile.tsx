@@ -9,18 +9,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { StatKey } from '@/lib/stat-explanations';
 
-/**
- * Tuile de statistique : un libellé, une valeur, une précision, une bulle.
- *
- * La valeur peut être un NOMBRE, qui glisse d'un cycle à l'autre, ou un contenu
- * déjà mis en forme : un pourcentage, une durée, un montant en francs CFA rendu
- * par `MoneyText`. Les deux cas existent réellement et méritaient d'être
- * distingués plutôt que d'obliger l'appelant à formater partout : seuls les
- * nombres bruts peuvent s'interpoler.
- *
- * `tabular-nums` sur les deux : sans lui, une valeur qui change de chiffres
- * décale la carte, et la grille entière tremble à chaque rafraîchissement.
- */
 export function StatTile({
   stat,
   label,
@@ -32,7 +20,6 @@ export function StatTile({
 }: {
   stat: StatKey;
   label: string;
-  /** `number` pour un compteur interpolé, sinon n'importe quel rendu déjà mis en forme. */
   value: number | React.ReactNode;
   hint?: React.ReactNode | undefined;
   icon: LucideIcon;
@@ -46,7 +33,6 @@ export function StatTile({
         ? 'text-destructive'
         : tone === 'warning'
           ? // §2.3 : `--warning` vaut #856011, la seule déclinaison or lisible
-            // en texte. Jamais `--accent`, qui ne fait que 2,77:1.
             'text-warning'
           : '';
 
@@ -87,7 +73,6 @@ export function StatTile({
   );
 }
 
-/** Carte de graphique portant sa bulle « i », comme les tuiles. */
 export function StatChartCard({
   stat,
   title,

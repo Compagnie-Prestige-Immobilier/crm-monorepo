@@ -58,12 +58,6 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { BANK_STAGE_TYPE_LABELS, type BankCaseStage } from '@/lib/types';
 
-/**
- * Rôles de couleur proposés. Le contrat impose un RÔLE du design system, pas un
- * hex : c'est ce qui garantit qu'une étape créée aujourd'hui reste lisible dans
- * les deux thèmes sans que personne ait à mesurer un contraste. Un sélecteur de
- * couleur libre produirait, tôt ou tard, du gris clair sur blanc.
- */
 const COLOR_ROLES: readonly { value: string; label: string }[] = [
   { value: 'info', label: 'Information (rose CPI)' },
   { value: 'warning', label: 'Attention (or)' },
@@ -72,21 +66,6 @@ const COLOR_ROLES: readonly { value: string; label: string }[] = [
   { value: 'secondary', label: 'Neutre' },
 ];
 
-/**
- * Configuration du flux bancaire : ADMIN.
- *
- * Le réordonnancement se fait à DEUX BOUTONS, « Monter » et « Descendre », et
- * non par glisser-déposer. Ce n'est pas une économie de bibliothèque : un
- * glisser-déposer est inutilisable au clavier sans une implémentation ARIA
- * complète, illisible pour un lecteur d'écran, et casse-tête au doigt sur une
- * tablette. Deux boutons sont atteignables à la tabulation, annoncés
- * correctement, et fonctionnent partout : pour une opération qu'un
- * administrateur fait trois fois par an.
- *
- * Chaque déplacement envoie la liste COMPLÈTE des étapes ouvertes, l'initiale
- * en tête : c'est ce que `POST /bank-case-stages/reorder` exige, et une liste
- * partielle renverrait `BANK_STAGE_REORDER_INCOMPLETE`.
- */
 export function BankStagesView() {
   const queryClient = useQueryClient();
   const [creating, setCreating] = useState(false);
@@ -125,14 +104,6 @@ export function BankStagesView() {
       );
     },
     onError: (error) => {
-      /**
-       * `BANK_STAGE_HAS_OPEN_CASES` : le refus le plus important à EXPLIQUER.
-       *
-       * Sans message dédié, l'administrateur lirait « Conflit » et croirait à un
-       * bug. La vraie réponse est qu'il reste des dossiers arrêtés sur cette
-       * étape : les désactiver les rendrait invisibles au flux, sans qu'aucun
-       * écran ne dise où ils sont passés.
-       */
       if (error instanceof ApiError && error.status === 409) {
         const code = (error.body as { code?: string }).code;
         if (code === 'BANK_STAGE_HAS_OPEN_CASES') {
@@ -168,9 +139,6 @@ export function BankStagesView() {
   function move(index: number, direction: -1 | 1): void {
     const target = index + direction;
     if (target < 0 || target >= open.length) return;
-    // L'étape initiale doit rester en tête : l'API le refuse autrement
-    // (`BANK_STAGE_INITIAL_MUST_BE_FIRST`), et le dire par un bouton désactivé
-    // vaut mieux qu'un message d'erreur après coup.
     if (open[0]?.isInitial === true && (index === 0 || target === 0)) return;
 
     const next = [...open];
@@ -212,24 +180,6 @@ export function BankStagesView() {
               const canMoveUp = index > 0 && !(initialLocked && (index === 1 || index === 0));
               const canMoveDown = index < open.length - 1 && !(initialLocked && index === 0);
 
-              /**
-               * ═════════════════════════════════════════════════════════════
-               * La RAISON du verrouillage doit être du TEXTE, dans les deux
-               * rendus.
-               * ═════════════════════════════════════════════════════════════
-               *
-               * Elle n'était portée que par un attribut `title` sur le bouton
-               * du bureau, et pas du tout sous 1024 px. Or `title` sur un
-               * élément DÉSACTIVÉ est le pire des supports : il ne s'ouvre pas
-               * au survol dans plusieurs navigateurs, il ne s'atteint jamais au
-               * clavier (l'élément n'est pas focalisable), et les lecteurs
-               * d'écran l'annoncent rarement. L'administrateur voyait donc
-               * « Désactiver » grisé, sans la moindre explication, et concluait
-               * à une panne de droits.
-               *
-               * La phrase est maintenant rendue en toutes lettres à côté du
-               * bouton sur le bureau, et dans l'entrée de menu sous 1024 px.
-               */
               const locked = stage.isSystem || stage.isInitial;
               const lockedLabel = stage.isSystem
                 ? 'Étape système : sa désactivation casserait le flux.'
@@ -287,8 +237,6 @@ export function BankStagesView() {
                       type="button"
                       variant="outline"
                       size="icon"
-                      // Le nom accessible NOMME l'étape : « Monter » seul, répété
-                      // six fois dans la page, ne dit pas quoi on déplace.
                       aria-label={`Monter « ${stage.label} »`}
                       disabled={!canMoveUp || reorder.isPending}
                       onClick={() => {
@@ -344,20 +292,22 @@ export function BankStagesView() {
                       que quatre pictogrammes ne disaient pas. */}
                   <div className="ml-auto shrink-0 lg:hidden">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          aria-label={`Actions pour « ${stage.label} »`}
-                        >
-                          <MoreHorizontalIcon className="size-4" aria-hidden="true" />
-                        </Button>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            aria-label={`Actions pour « ${stage.label} »`}
+                          />
+                        }
+                      >
+                        <MoreHorizontalIcon className="size-4" aria-hidden="true" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuItem
                           disabled={!canMoveUp || reorder.isPending}
-                          onSelect={() => {
+                          onClick={() => {
                             move(index, -1);
                           }}
                         >
@@ -366,7 +316,7 @@ export function BankStagesView() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={!canMoveDown || reorder.isPending}
-                          onSelect={() => {
+                          onClick={() => {
                             move(index, 1);
                           }}
                         >
@@ -374,7 +324,7 @@ export function BankStagesView() {
                           Descendre
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onSelect={() => {
+                          onClick={() => {
                             setEditing(stage);
                           }}
                         >
@@ -385,7 +335,7 @@ export function BankStagesView() {
                         <DropdownMenuItem
                           disabled={locked || toggleActive.isPending}
                           variant={stage.isActive ? 'destructive' : 'default'}
-                          onSelect={toggle}
+                          onClick={toggle}
                         >
                           {stage.isActive ? (
                             <PowerOffIcon aria-hidden="true" />
@@ -395,9 +345,6 @@ export function BankStagesView() {
                           {toggleLabel}
                         </DropdownMenuItem>
                         {lockedLabel === null ? null : (
-                          /* Hors du `DropdownMenuItem` : une entrée désactivée
-                             n'est pas atteignable au clavier, donc sa
-                             description ne serait jamais lue. */
                           <p className="px-2 py-1.5 text-[0.75rem] leading-tight text-muted-foreground">
                             {lockedLabel}
                           </p>
@@ -423,13 +370,6 @@ export function BankStagesView() {
         <CardContent className="p-0">
           <ul className="divide-y divide-border">
             {systemStages.map((stage) => (
-              /*
-                `min-w-0` + `truncate` sur le libellé, et surtout PAS de
-                `ml-auto` sur la pastille : poussée à droite, elle sautait à la
-                ligne au premier repli et laissait un blanc au milieu de la
-                rangée. Sans `min-w-0`, « Encaissé · code CASHED » refusait de
-                se couper et débordait de la carte sous 360 px.
-              */
               <li key={stage.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <StageBadge stage={stage} />
                 <span className="min-w-0 truncate text-[0.8125rem] text-muted-foreground">
@@ -513,7 +453,6 @@ export function BankStagesView() {
   );
 }
 
-/** Création et renommage : même dialogue, le mode décide des champs modifiables. */
 function StageFormDialog({
   mode,
   stage,
@@ -536,9 +475,6 @@ function StageFormDialog({
   const [color, setColor] = useState('info');
   const [initialised, setInitialised] = useState<string | null>(null);
 
-  // Réamorçage à l'ouverture, sans `useEffect` : on compare l'identité de
-  // l'étape rendue à celle déjà chargée. Un effet ferait un rendu de plus, et
-  // le champ afficherait la valeur précédente pendant une frame.
   const key = stage?.id ?? (mode === 'create' ? 'nouveau' : null);
   if (open && key !== null && initialised !== key) {
     setInitialised(key);
@@ -640,7 +576,16 @@ function StageFormDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={colorId}>Couleur de la pastille</Label>
-            <Select value={color} onValueChange={setColor}>
+            {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
+                pas le texte de l'item. */}
+            <Select
+              items={COLOR_ROLES}
+              value={color}
+              onValueChange={(value) => {
+                if (value === null) return;
+                setColor(value);
+              }}
+            >
               <SelectTrigger id={colorId} className="w-full">
                 <SelectValue />
               </SelectTrigger>

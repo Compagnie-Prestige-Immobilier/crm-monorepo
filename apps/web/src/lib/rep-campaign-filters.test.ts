@@ -8,24 +8,12 @@ import {
   serializeRepCampaignFilters,
 } from '@/lib/rep-campaign-filters';
 
-/**
- * Filtre des campagnes représentants.
- *
- * Il vit dans sa PROPRE route (`/campagnes/representants`) et non dans un
- * paramètre d'onglet : `useUrlFilters` réécrit la chaîne de requête entière, et
- * deux listes filtrables partageant une URL se marcheraient dessus au premier
- * « Tout effacer ». Ces tests fixent la traduction, pas ce choix : mais ils
- * garantissent au moins que l'aller-retour ne perd rien.
- */
-
 describe('parseRepCampaignFilters', () => {
   it('part sans aucun critère quand l’URL est vide', () => {
     expect(parseRepCampaignFilters(new URLSearchParams())).toEqual(EMPTY_REP_CAMPAIGN_FILTERS);
   });
 
   it('écarte un statut inconnu plutôt que de le propager vers l’API', () => {
-    // Une URL bricolée à la main ne doit pas produire un 400 sur un écran que
-    // l'utilisateur n'a fait qu'ouvrir depuis un lien.
     expect(parseRepCampaignFilters(new URLSearchParams('status=ARCHIVED')).status).toBeNull();
     expect(parseRepCampaignFilters(new URLSearchParams('status=CLOSED')).status).toBe('CLOSED');
   });
@@ -59,8 +47,6 @@ describe('serializeRepCampaignFilters', () => {
 
 describe('critères avancés', () => {
   it('efface exactement les trois critères repliés, et rien d’autre', () => {
-    // Effacer aussi la recherche ou le statut retirerait sous les doigts de
-    // l'utilisateur des critères qu'il a toujours sous les yeux.
     expect(clearRepCampaignAdvancedFilters()).toEqual({
       createdById: null,
       dateFrom: null,

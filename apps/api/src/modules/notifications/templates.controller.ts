@@ -21,15 +21,9 @@ import {
   UpdateNotificationTemplateDto,
 } from './dto.js';
 
-/** Gabarits de notification. ADMIN seul : ce sont les textes envoyés à tous. */
 @ApiTags('notification-templates')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
-// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
-// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
-// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
-// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
-// cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'notification-templates', version: '1' })
 export class NotificationTemplatesController {
@@ -85,11 +79,6 @@ export class NotificationTemplatesController {
     return this.templates.update(id, body);
   }
 
-  // POST qui n'ÉCRIT RIEN : la substitution est calculée et rendue, aucune
-  // ligne n'est touchée. La méthode ne vaut POST que parce que l'aperçu prend
-  // un corps, et la garde ne juge que la méthode. La bloquer casserait
-  // l'aperçu du compositeur pendant une démonstration, c'est à dire au moment
-  // précis où on le montre.
   @DemoWritable('aperçu calculé, aucune écriture malgré la méthode POST')
   @Post(':id/render')
   @ApiOperation({

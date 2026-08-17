@@ -13,20 +13,6 @@ import { guardRoles } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Référentiels' };
 
-/**
- * Référentiels. ADMIN seul : les écritures le sont côté API, et ouvrir l'écran
- * en lecture aux autres rôles montrerait des boutons qui échouent.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Un refus de droits n'est pas un état vide.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Cet écran rendait un `EmptyState` « Accès réservé aux administrateurs » : sans
- * nommer le rôle en cours (l'utilisateur ne peut donc pas savoir quoi demander),
- * sans aucune sortie, et en confondant une session absente avec un rôle
- * insuffisant. `guardRoles` distingue les trois issues, et `PermissionDenied`
- * les rend : comme sur les quatorze autres pages gardées du panel.
- */
 export default async function ReferentielsPage() {
   const guard = await guardRoles(['ADMIN']);
   if (guard.status === 'anonymous') redirect('/connexion');

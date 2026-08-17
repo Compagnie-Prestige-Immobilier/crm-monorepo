@@ -1,24 +1,8 @@
-/**
- * Colonnes du modèle d'import, définies UNE SEULE FOIS.
- *
- * Le générateur de modèle et le lecteur d'import lisent cette liste : c'est ce
- * qui garantit qu'un fichier téléchargé le matin est relu correctement l'après
- * midi. Deux listes séparées finiraient par diverger d'une colonne, et l'erreur
- * ne se verrait qu'au moment où quelqu'un a déjà rempli mille lignes.
- *
- * L'ORDRE EST CONTRACTUEL. Le lecteur travaille par POSITION et non par
- * en-tête : un utilisateur renomme une colonne bien plus souvent qu'il n'en
- * déplace une, et rapprocher par le texte de l'en-tête ferait échouer un
- * fichier par ailleurs parfait.
- */
-
 export interface ImportColumn {
   readonly header: string;
   readonly width: number;
   readonly required: boolean;
-  /** Ce que l'auteur du fichier doit comprendre en lisant l'onglet Instructions. */
   readonly help: string;
-  /** Valeur de la ligne d'exemple grisée. */
   readonly sample: string;
 }
 
@@ -60,10 +44,8 @@ export const IMPORT_COLUMNS: readonly ImportColumn[] = [
   },
 ];
 
-/** Nom de la feuille de saisie. Le lecteur prend la PREMIÈRE feuille, pas celle-ci par son nom. */
 export const IMPORT_SHEET_NAME = 'Représentants';
 
 export const INSTRUCTIONS_SHEET_NAME = 'Instructions';
 
-/** Feuille technique qui alimente les listes déroulantes. Masquée à l'ouverture. */
 export const LISTS_SHEET_NAME = 'Listes';

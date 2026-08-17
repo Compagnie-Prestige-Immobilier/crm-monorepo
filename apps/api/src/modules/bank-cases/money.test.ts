@@ -12,15 +12,6 @@ import {
 } from './money.js';
 import { normalizeReferenceDisplay, normalizeReferenceKey } from './reference-key.js';
 
-/**
- * Le franc CFA voyage en CHAÎNE, jamais en nombre JSON.
- *
- * Ce n'est pas une préférence de style : la colonne est un `Decimal(18,0)` et
- * un nombre JSON perd de la précision au-delà de 2^53. Le test le démontre sur
- * une valeur que `JSON.parse` corrompt réellement, sans cette démonstration,
- * la règle finirait par être « simplifiée » un jour de refactorisation.
- */
-
 describe('discipline du montant', () => {
   it('un montant à 18 chiffres survit à l’aller-retour JSON en chaîne, mais PAS en nombre', () => {
     const montant = '123456789012345678';
@@ -50,8 +41,6 @@ describe('discipline du montant', () => {
   it('une somme d’agrégat SQL devient une chaîne entière, nulle comprise', () => {
     expect(sumToString(null)).toBe(ZERO_XOF);
     expect(sumToString('1200000')).toBe('1200000');
-    // PostgreSQL rend un `numeric` avec décimales : elles sont tronquées, XOF
-    // n'en a pas.
     expect(sumToString('1200000.000')).toBe('1200000');
     expect(sumToString(new Prisma.Decimal('42'))).toBe('42');
     expect(sumToString(7.9)).toBe('7');
@@ -74,12 +63,6 @@ describe('discipline du montant', () => {
   });
 });
 
-/**
- * `reference` est la saisie de l'agent ; `referenceKey` porte l'unicité. La
- * normalisation est volontairement MINIMALE : majuscules et espaces compactés,
- * rien de plus. Retirer les tirets fusionnerait des références que la banque
- * considère distinctes.
- */
 describe('normalisation de la référence', () => {
   it('la clé ignore la casse et les espaces superflus', () => {
     expect(normalizeReferenceKey('abc-123')).toBe('ABC-123');

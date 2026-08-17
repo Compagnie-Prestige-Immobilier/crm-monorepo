@@ -4,17 +4,8 @@ import { BankStageType } from '@crm/database';
 import { BankCaseError } from './errors.js';
 import { ZERO_XOF, isStrictlyPositive } from './money.js';
 
-/**
- * Règles du workflow, en fonctions PURES.
- *
- * Elles ne connaissent ni Prisma ni HTTP : c'est ce qui permet de les
- * éprouver exhaustivement, chaque combinaison d'étape, de montant et de motif
- *, sans base de données, et c'est là que vivent les invariants financiers.
- *
- * La règle centrale : un montant n'existe QUE sur un encaissement, un motif
- * QUE sur un rejet, et un dossier ouvert ne porte ni l'un ni l'autre.
- */
-
+// Règles du workflow en fonctions PURES : un montant n'existe QUE sur un
+// encaissement, un motif QUE sur un rejet, un dossier ouvert ne porte ni l'un ni l'autre.
 export interface WorkflowStage {
   readonly id: string;
   readonly code: string;
@@ -32,14 +23,13 @@ export interface TransitionInput {
   readonly rejectionDetail?: string | undefined;
 }
 
-/** Ce que la transition écrit sur le dossier. Trois champs, toujours les trois. */
 export interface TransitionEffect {
   readonly amountXof: string | null;
   readonly rejectionReasonId: string | null;
   readonly rejectionDetail: string | null;
 }
 
-/** Code du motif « Autre » : le seul qui exige une précision libre. */
+/** Le seul motif de rejet qui exige une précision libre. */
 export const OTHER_REJECTION_CODE = 'AUTRE';
 
 const byPosition = (left: WorkflowStage, right: WorkflowStage): number =>
@@ -48,14 +38,8 @@ const byPosition = (left: WorkflowStage, right: WorkflowStage): number =>
 export const activeOpenStages = (stages: readonly WorkflowStage[]): WorkflowStage[] =>
   stages.filter((stage) => stage.isActive && stage.type === BankStageType.OPEN).sort(byPosition);
 
-/**
- * Étape ouverte suivante.
- *
- * Fondée sur la POSITION et non sur un chaînage stocké : réordonner le workflow
- * ne doit toucher que les transitions futures, jamais réécrire l'historique.
- * Une étape désactivée est simplement sautée, les dossiers qui y stationnent
- * restent lisibles et repartent vers la suivante encore active.
- */
+// Fondée sur la POSITION et non sur un chaînage stocké : réordonner le workflow
+// ne touche que les transitions futures. Une étape désactivée est sautée.
 export function nextOpenStage(
   stages: readonly WorkflowStage[],
   current: WorkflowStage,
@@ -71,13 +55,8 @@ export const stageOfType = (
   type: BankStageType,
 ): WorkflowStage | undefined => stages.find((stage) => stage.type === type);
 
-/**
- * Une étape ouverte peut-elle encore recevoir un encaissement ?
- *
- * Non : l'encaissement clôt le parcours, il ne se déclare qu'à la DERNIÈRE
- * étape ouverte active. Autrement dit un dossier « à traiter » ne peut pas
- * sauter la validation bancaire pour être déclaré encaissé.
- */
+// L'encaissement clôt le parcours : il ne se déclare qu'à la DERNIÈRE étape
+// ouverte active, et une étape ouverte ne s'atteint que depuis la précédente.
 export function assertReachable(
   stages: readonly WorkflowStage[],
   current: WorkflowStage,
@@ -99,8 +78,7 @@ export function assertReachable(
     });
   }
 
-  // Le rejet est atteignable depuis n'importe quelle étape ouverte : une banque
-  // peut refuser un dossier à n'importe quel moment de son instruction.
+  // Une banque peut refuser à n'importe quel moment de l'instruction.
   if (target.type === BankStageType.REJECTED) return;
 
   if (target.type === BankStageType.CASHED) {
@@ -129,14 +107,8 @@ export function assertReachable(
   }
 }
 
-/**
- * Calcule les trois champs financiers d'une transition, ou refuse.
- *
- * Le montant d'un REJET n'est jamais lu depuis le client : il est forcé à zéro.
- * Un agent qui poste « rejeté, 1 200 000 » décrirait un encaissement rejeté,
- * ce qui n'existe pas, et cette valeur entrerait ensuite dans la somme
- * encaissée du tableau de bord.
- */
+// Un montant n'est accepté QUE vers un encaissement, un motif QUE vers un
+// rejet, et le montant d'un rejet est forcé à zéro sans jamais être lu du client.
 export function planTransitionEffect(
   target: WorkflowStage,
   input: TransitionInput,
@@ -180,7 +152,8 @@ export function planTransitionEffect(
       });
     }
     return {
-      // Zéro, et non le montant reçu : voir l'en-tête de la fonction.
+      // Zéro, et non le montant reçu : « rejeté, 1 200 000 » entrerait sinon
+      // dans la somme encaissée du tableau de bord.
       amountXof: ZERO_XOF,
       rejectionReasonId: input.rejectionReasonId,
       rejectionDetail: detail ?? null,

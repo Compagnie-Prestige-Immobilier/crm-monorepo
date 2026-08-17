@@ -5,22 +5,6 @@ import type * as RepresentantsModule from '@/lib/data/representants';
 import { renderWithQuery } from '@/test/render-query';
 import { setUrl } from '@/test/router-mock';
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * Deux vides, deux messages, et la distinction n'est pas cosmétique.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * L'état vide disait TOUJOURS « Aucun représentant ne correspond à ces critères.
- * Élargissez la recherche ou retirez un filtre. », y compris sans le moindre
- * critère posé. Une installation neuve, ou un compte qui ouvre l'écran pour la
- * première fois, se voyait donc renvoyé retirer des filtres qu'il n'avait jamais
- * mis : il cherchait, ne trouvait rien à retirer, et concluait à une panne.
- *
- * Le critère de bascule est le nombre de filtres ACTIFS, lu dans l'URL. Le test
- * pose donc une vraie URL plutôt que d'injecter un état : c'est le seul endroit
- * où ces critères vivent, et un correctif qui lirait ailleurs serait faux.
- */
-
 const fetchRepresentants = vi.fn();
 
 vi.mock('@/lib/data/representants', async () => {
@@ -28,11 +12,6 @@ vi.mock('@/lib/data/representants', async () => {
   return { ...actual, fetchRepresentants: () => fetchRepresentants() as unknown };
 });
 
-/**
- * La barre de filtres charge les référentiels (départements, IEF) pour ses
- * listes déroulantes. Ils n'ont aucun rapport avec l'état vide du tableau, et
- * les laisser partir ferait échouer le test sur un appel réseau absent.
- */
 vi.mock('@/lib/data/reference', () => ({
   fetchDepartements: () => Promise.resolve([]),
   fetchIefs: () => Promise.resolve([]),
@@ -80,7 +59,6 @@ describe('RepresentantsView, état vide', () => {
     renderWithQuery(<RepresentantsView />);
 
     expect(await screen.findByText('Aucun représentant enregistré.')).toBeTruthy();
-    // La phrase fautive, celle qui envoyait chercher des filtres absents.
     expect(screen.queryByText(/retirez un filtre/)).toBeNull();
   });
 
@@ -88,18 +66,9 @@ describe('RepresentantsView, état vide', () => {
     setUrl('/representants');
     renderWithQuery(<RepresentantsView />);
 
-    // Un état vide utile nomme le geste suivant : ici, la tournée mobile,
-    // la saisie unitaire ou l'import.
     expect(await screen.findByText(/saisies en tournée depuis le mobile/)).toBeTruthy();
   });
 
-  /**
-   * L'état vide vit désormais HORS du `<tbody>`.
-   *
-   * Il y était enfermé dans un `<td colSpan={8}>`, ce qui le faisait disparaître
-   * avec le tableau sous 1024 px : le petit écran n'avait alors ni liste, ni
-   * message, ni la moindre indication que la requête avait abouti.
-   */
   it('rend son état vide en dehors du tableau, pour qu’il survive au petit écran', async () => {
     setUrl('/representants');
     renderWithQuery(<RepresentantsView />);
@@ -120,21 +89,6 @@ describe('RepresentantsView, état vide', () => {
   });
 });
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * Huit colonnes, DEUX rendus.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * L'écran n'avait qu'un tableau de huit colonnes, sans repli en carte sous
- * 1024 px, alors que `/dossiers` en offre un pour exactement le même nombre de
- * colonnes. Sur 360 px, cela donne des colonnes de quarante pixels et un
- * balayage latéral pour lire une seule fiche.
- *
- * jsdom n'applique aucune requête de média : on ne peut donc pas éprouver LEQUEL
- * des deux est visible. Ce qui se vérifie, et qui est le fond du correctif,
- * c'est que le second rendu EXISTE, qu'il porte les mêmes données, et qu'il est
- * hors du tableau : un repli qui vivrait dans une cellule disparaîtrait avec lui.
- */
 describe('RepresentantsView, repli en carte', () => {
   beforeEach(() => {
     fetchRepresentants.mockReturnValue(Promise.resolve(ONE_PAGE));
@@ -160,8 +114,6 @@ describe('RepresentantsView, repli en carte', () => {
 
     expect(within(carte).getByText('Dakar')).toBeTruthy();
     expect(within(carte).getByText('Aminata Diallo')).toBeTruthy();
-    // Le compte de prospects est l'information centrale : c'est lui qui dit si
-    // une fiche compte.
     expect(within(carte).getByText('12')).toBeTruthy();
     expect(
       within(carte).getByRole('button', { name: /Modifier la fiche de Ndeye Fall/ }),

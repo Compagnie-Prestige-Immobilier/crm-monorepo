@@ -62,22 +62,19 @@ const ACTIVE_FILTER: Record<ActiveFilterValue, boolean | null> = {
   desactives: false,
 };
 
-/** « Tous les rôles » porte une valeur explicite : voir `lib/user-filters.ts`. */
 const ALL_ROLES = 'tous';
 
-/**
- * Comptes des téléconseillers.
- *
- * Un compte désactivé n'est pas rendu par une case à cocher dans une colonne :
- * la LIGNE ENTIÈRE change d'aspect (fond atténué, liseré, nom en gris, badge
- * explicite). Une désactivation coupe l'accès de quelqu'un au terrain : cela
- * doit se voir en balayant la liste, pas en lisant la septième colonne.
- *
- * Le RÔLE est un filtre à part entière depuis qu'il est exposé : l'écran
- * envoyait `COMMERCIAL` en dur, si bien qu'un compte Banque & Finance restait
- * introuvable et qu'aucun champ ne disait pourquoi. Les critères vivent dans
- * l'URL, comme partout ailleurs dans le panel.
- */
+const ROLE_ITEMS = [
+  { value: ALL_ROLES, label: 'Tous les rôles' },
+  ...ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] })),
+];
+
+const ACTIVE_ITEMS = [
+  { value: 'tous', label: 'Tous' },
+  { value: 'actifs', label: 'Actifs' },
+  { value: 'desactives', label: 'Désactivés' },
+];
+
 export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
   const queryClient = useQueryClient();
   const searchId = useId();
@@ -87,18 +84,8 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | undefined>(undefined);
   const [passwordTarget, setPasswordTarget] = useState<UserRow | null>(null);
-  /**
-   * Le compte dont on est sur le point de FERMER l'accès.
-   *
-   * La désactivation partait auparavant d'un simple `onSelect` de menu : un
-   * téléconseiller perdait sa connexion mobile en pleine tournée, sans qu'aucun
-   * écran n'ait annoncé la portée du geste. La réactivation, elle, reste
-   * immédiate : elle ne coupe l'accès de personne.
-   */
   const [deactivating, setDeactivating] = useState<UserRow | null>(null);
 
-  // La recherche est appliquée après une pause de frappe : une requête par
-  // caractère saturerait l'API pour rien.
   useEffect(() => {
     setSearchDraft(filters.search);
   }, [filters.search]);
@@ -117,8 +104,6 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
   const toggleActive = useMutation({
     mutationFn: ({ user, isActive }: { user: UserRow; isActive: boolean }) =>
       setUserActive(user.id, isActive),
-    // État optimiste : la ligne change d'aspect immédiatement. La bascule est
-    // sûre à anticiper : un seul booléen, et l'échec la remet en place.
     onMutate: async ({ user, isActive }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.commerciaux(filters) });
       const previous = queryClient.getQueryData(queryKeys.commerciaux(filters));
@@ -204,8 +189,10 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
         <div className="flex w-48 flex-col gap-1.5">
           <Label htmlFor="role-compte">Rôle</Label>
           <Select
+            items={ROLE_ITEMS}
             value={filters.role ?? ALL_ROLES}
             onValueChange={(value) => {
+              if (value === null) return;
               setFilters({ role: value === ALL_ROLES ? null : (value as Role) });
             }}
           >
@@ -213,10 +200,9 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL_ROLES}>Tous les rôles</SelectItem>
-              {ROLES.map((role) => (
-                <SelectItem key={role} value={role}>
-                  {ROLE_LABELS[role]}
+              {ROLE_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -226,18 +212,22 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
         <div className="flex w-48 flex-col gap-1.5">
           <Label htmlFor="etat-compte">État du compte</Label>
           <Select
+            items={ACTIVE_ITEMS}
             value={activeValue}
             onValueChange={(value) => {
-              setFilters({ isActive: ACTIVE_FILTER[value as ActiveFilterValue] });
+              if (value === null) return;
+              setFilters({ isActive: ACTIVE_FILTER[value] });
             }}
           >
             <SelectTrigger id="etat-compte">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="tous">Tous</SelectItem>
-              <SelectItem value="actifs">Actifs</SelectItem>
-              <SelectItem value="desactives">Désactivés</SelectItem>
+              {ACTIVE_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -246,8 +236,6 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
       {isPending ? (
         <TableSkeleton />
       ) : isError ? (
-        /* Un 403 arrive ici pour un compte non-ADMIN : l'écran doit le dire,
-           et surtout ne pas proposer « Réessayer » sur un refus de droits. */
         <QueryErrorState
           error={error}
           onRetry={() => {
@@ -291,8 +279,6 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                     key={user.id}
                     data-inactive={!user.isActive}
                     className={cn(
-                      // Un compte fermé se reconnaît d'un coup d'œil : liseré
-                      // rouge, fond atténué, contenu en retrait.
                       !user.isActive &&
                         'bg-destructive-surface/50 [&>td:first-child]:border-l-2 [&>td:first-child]:border-l-destructive',
                     )}
@@ -336,18 +322,20 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={`Actions pour ${user.fullName}`}
-                          >
-                            <MoreHorizontalIcon className="size-4" aria-hidden="true" />
-                          </Button>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Actions pour ${user.fullName}`}
+                            />
+                          }
+                        >
+                          <MoreHorizontalIcon className="size-4" aria-hidden="true" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
                           <DropdownMenuItem
-                            onSelect={() => {
+                            onClick={() => {
                               setEditing(user);
                               setFormOpen(true);
                             }}
@@ -356,7 +344,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                             Modifier
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onSelect={() => {
+                            onClick={() => {
                               setPasswordTarget(user);
                             }}
                           >
@@ -365,14 +353,9 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            // Se désactiver soi-même fermerait la session en
-                            // cours et laisserait CPI sans administrateur.
                             disabled={user.id === currentUserId || toggleActive.isPending}
                             variant={user.isActive ? 'destructive' : 'default'}
-                            onSelect={() => {
-                              // Fermer un accès passe par une confirmation qui
-                              // NOMME le compte et CHIFFRE ses prospects. Le
-                              // rouvrir ne coupe rien à personne : immédiat.
+                            onClick={() => {
                               if (user.isActive) setDeactivating(user);
                               else toggleActive.mutate({ user, isActive: true });
                             }}

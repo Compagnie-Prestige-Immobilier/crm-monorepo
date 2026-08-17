@@ -19,8 +19,6 @@ describe('vieillissement du portefeuille bancaire', () => {
     const { service, sql } = makeAnalyticsPrisma();
     await new PortfolioService(service, fakeDemoVisibility()).bankAging(admin, {});
 
-    // Un dossier encaissé ou rejeté est sorti du portefeuille : le laisser
-    // vieillir remplirait « plus de 60 jours » de dossiers clos.
     expect(sql()).toContain(`st."type" = 'OPEN'`);
     expect(sql()).toContain('bc."deletedAt" IS NULL');
     expect(sql()).toContain('bc."isDemo" = FALSE');
@@ -40,8 +38,6 @@ describe('vieillissement du portefeuille bancaire', () => {
       'J31_60',
       'J60_PLUS',
     ]);
-    // Les cinq barres restent présentes à zéro dossier, mais leur PART est
-    // nulle : aucun dossier au dénominateur, donc aucune part à publier.
     expect(result.buckets.every((bucket) => bucket.dossiers === 0 && bucket.share === null)).toBe(
       true,
     );
@@ -79,7 +75,6 @@ describe('vieillissement du portefeuille bancaire', () => {
     expect(result.buckets.map((bucket) => bucket.dossiers)).toEqual([3, 2, 2, 1, 2]);
     expect(result.buckets[0]?.share).toBe(30);
     expect(result.stages[1]?.medianStationDays).toBe(41.7);
-    // La tranche interne d'une étape est rapportée à CETTE étape, pas au total.
     expect(result.stages[1]?.buckets[4]?.share).toBe(50);
     expect(result.stages[0]?.share).toBe(60);
   });
@@ -121,12 +116,8 @@ describe('cohortes hebdomadaires', () => {
     );
 
     expect(result.items[0]?.week).toBe('2026-07-06');
-    // XOF est un Decimal(18,0) : jamais un nombre JSON.
     expect(result.items[0]?.cashedAmountXof).toBe('18000000');
     expect(result.items[0]?.conversionRate).toBe(7.5);
-    // Cohorte vide : taux NUL, parce qu'une semaine sans entrée n'a pas
-    // converti 0 %, elle n'a rien eu à convertir. Le montant, lui, reste '0' :
-    // zéro franc encaissé est un fait, pas une absence.
     expect(result.items[1]?.conversionRate).toBeNull();
     expect(result.items[1]?.cashedAmountXof).toBe('0');
     expect(result.total).toBe(80);
@@ -174,8 +165,6 @@ describe('rendement par département', () => {
 
     expect(result.items[0]?.conversionRate).toBe(1);
     expect(result.items[0]?.methodRate).toBe(25);
-    // Le petit département convertit douze fois mieux : c'est ce que le volume
-    // seul cachait.
     expect(result.items[1]?.conversionRate).toBe(12);
     expect(result.items[1]?.cashedAmountXof).toBe('90000000');
     expect(result.total).toBe(2300);

@@ -5,15 +5,6 @@ import { Bar, Chart as MixedChart, Doughnut } from 'react-chartjs-2';
 
 import { Chart } from '@/components/dashboard/chart-setup';
 
-/**
- * Contrôleurs du graphe MIXTE (barres + ligne).
- *
- * `chart-setup` n'enregistre que des éléments. Les composants typés de
- * react-chartjs-2 (`Bar`, `Doughnut`) enregistrent LEUR contrôleur à
- * l'importation ; le composant générique `Chart`, lui, n'en enregistre aucun.
- * Sans ces deux lignes, le graphe des encaissements lève « bar is not a
- * registered controller » à l'exécution : et seulement à l'exécution.
- */
 Chart.register(BarController, LineController);
 
 import { seriesBorderColor, seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
@@ -21,26 +12,6 @@ import { formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof, formatXofAxisTick, xofToChartNumber } from '@/lib/money';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
 
-/**
- * Graphiques de Banque & Finance.
- *
- * Deux choses les distinguent de ceux du tableau de bord des prospects :
- *
- * 1. Ils sont CLIQUABLES. Un segment renvoie vers la liste filtrée sur ce même
- *    segment : « 42 rejets pour document manquant » mène aux 42 dossiers. Sans
- *    cela, l'agent lit un chiffre puis refait le filtre à la main, ce qui
- *    produit régulièrement une sélection différente de celle du graphique.
- * 2. Les montants passent par `xofToChartNumber`. C'est le SEUL endroit du
- *    panel où un montant devient un `number` : Chart.js ne trace rien d'autre -
- *    et la conversion est nommée pour ça. Tout ce qui est ÉCRIT (info-bulles,
- *    axes, totaux) repart de la chaîne d'origine via `formatXof`.
- *
- * Les couleurs sont lues sur `<html>` par `useChartTheme` (MutationObserver) :
- * un `<canvas>` n'est atteint ni par une classe Tailwind ni par une variable
- * CSS.
- */
-
-/** Options communes. `onSelect` branche le clic sur un index de catégorie. */
 function baseOptions(
   theme: ChartTheme,
   reducedMotion: boolean,
@@ -49,8 +20,6 @@ function baseOptions(
   return {
     responsive: true,
     maintainAspectRatio: false,
-    // `prefers-reduced-motion` ne peut PAS atteindre un canvas depuis le CSS :
-    // Chart.js anime en JavaScript. On coupe donc l'option ici, explicitement.
     animation: reducedMotion ? (false as const) : { duration: 220 },
     ...(onSelect === undefined
       ? {}
@@ -101,11 +70,9 @@ function axisScales(theme: ChartTheme, horizontal: boolean) {
 export interface ClickableSlice {
   label: string;
   value: number;
-  /** Appelé au clic. Absent = tranche non cliquable. */
   onSelect?: (() => void) | undefined;
 }
 
-/** Barres horizontales cliquables : répartition par étape, par motif, par agent. */
 export function BankRankChart({
   items,
   label,
@@ -134,7 +101,6 @@ export function BankRankChart({
             label,
             data: items.map((item) => item.value),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
-            // §2.6 : la série or ne tient que par son contour `accent-border`.
             borderColor: items.map((_, index) =>
               seriesBorderColor(theme, index, seriesColor(theme, index)),
             ),
@@ -149,7 +115,6 @@ export function BankRankChart({
   );
 }
 
-/** Anneau cliquable : part d'étape ou de banque. */
 export function BankShareChart({ items }: { items: readonly ClickableSlice[] }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
@@ -197,8 +162,6 @@ export function BankShareChart({ items }: { items: readonly ClickableSlice[] }) 
           {
             data: items.map((item) => item.value),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
-            // La part or prend `accent-border` (§2.6) : un séparateur couleur
-            // carte ne la délimiterait pas sur un fond clair.
             borderColor: items.map((_, index) =>
               seriesBorderColor(theme, index, theme.tooltipBackground),
             ),
@@ -210,15 +173,6 @@ export function BankShareChart({ items }: { items: readonly ClickableSlice[] }) 
   );
 }
 
-/**
- * Encaissements dans le temps : NOMBRE en barres, MONTANT en ligne.
- *
- * Deux axes verticaux, et c'est nécessaire ici : trois encaissements à
- * 40 millions et quarante encaissements à 200 000 francs racontent deux
- * histoires opposées, et un seul axe écraserait l'une des deux courbes contre
- * le zéro. L'info-bulle du montant repart de la CHAÎNE : `formatXof` sur la
- * valeur d'origine, jamais un `toLocaleString` sur le nombre tracé.
- */
 export function CashingsOverTimeChart({
   buckets,
 }: {
@@ -227,9 +181,6 @@ export function CashingsOverTimeChart({
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
 
-  // `'bar' | 'line'` : le type UNION est ce qui autorise un jeu de données
-  // `line` dans un graphe `bar`. Typé `'bar'` seul, TypeScript refuse le
-  // second jeu : à raison, puisqu'il n'appartient pas au même contrôleur.
   const options: ChartOptions<'bar' | 'line'> = {
     ...baseOptions(theme, reducedMotion),
     scales: {
@@ -254,9 +205,6 @@ export function CashingsOverTimeChart({
         ticks: {
           color: theme.tick,
           font: { size: 11 },
-          // Abrégé : « 1,25 Mrd » et non « 1 250 000 000 », qui mangerait la
-          // moitié de la surface du graphique. Le montant exact est dans
-          // l'info-bulle, et il repart de la CHAÎNE d'origine.
           callback: (value) => formatXofAxisTick(Number(value)),
         },
         title: { display: true, text: 'FCFA', color: theme.tick, font: { size: 11 } },
@@ -299,8 +247,6 @@ export function CashingsOverTimeChart({
         type: 'line' as const,
         label: 'Montant',
         data: buckets.map((point) => xofToChartNumber(point.amountXof)),
-        // Le trait de la courbe EST son contour : il prend donc
-        // `accent-border`, seule teinte or autorisée pour un tracé (§2.6).
         borderColor: seriesBorderColor(theme, 1, seriesColor(theme, 1)),
         backgroundColor: seriesColor(theme, 1),
         borderWidth: 2,
@@ -316,7 +262,6 @@ export function CashingsOverTimeChart({
   return <MixedChart type="bar" options={options} data={data} />;
 }
 
-/** Délai moyen de traitement par banque, en heures. */
 export function MeanDelayChart({ items }: { items: readonly { label: string; hours: number }[] }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
@@ -330,8 +275,6 @@ export function MeanDelayChart({ items }: { items: readonly { label: string; hou
       tooltip: {
         ...baseOptions(theme, reducedMotion).plugins.tooltip,
         callbacks: {
-          // En heures ET en jours : « 137 heures » ne parle à personne, « 5,7
-          // jours » se compare à un engagement de délai.
           label: (context) =>
             ` ${formatNumber(Math.round(context.parsed.x ?? 0))} h (${((context.parsed.x ?? 0) / 24).toFixed(1)} j)`,
         },
@@ -349,7 +292,6 @@ export function MeanDelayChart({ items }: { items: readonly { label: string; hou
             label: 'Heures',
             data: items.map((item) => item.hours),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
-            // §2.6 : la série or ne tient que par son contour `accent-border`.
             borderColor: items.map((_, index) =>
               seriesBorderColor(theme, index, seriesColor(theme, index)),
             ),

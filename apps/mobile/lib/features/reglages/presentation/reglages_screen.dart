@@ -17,7 +17,6 @@ import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/sync_badge.dart';
 import '../../auth/auth_state.dart';
 
-/// Réglages : profil, synchronisation, affichage, session.
 class ReglagesScreen extends ConsumerStatefulWidget {
   const ReglagesScreen({super.key});
 
@@ -61,9 +60,6 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
         ],
       ),
       body: ListView(
-        // Marge haute réduite : le premier contenu utile commence à 12 dp du
-        // bandeau, pas à 16. Sur un écran de 360 dp, chaque bande vide en haut
-        // pousse le reste hors de portée du pouce.
         padding: const EdgeInsets.fromLTRB(
           CpiSpacing.md,
           CpiSpacing.sm,
@@ -87,9 +83,6 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                   ),
                 ),
                 title: Text(auth.fullName ?? 'Compte', style: theme.textTheme.titleSmall),
-                // L'identifiant technique a disparu d'ici. Un UUID sous un nom
-                // n'apprend rien à personne ; il vit désormais dans
-                // « À propos », où il sert au support.
                 subtitle: Text(_profileLine(auth)),
               ),
             ],
@@ -128,10 +121,6 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                   ),
                 ),
               FilledButton.tonalIcon(
-                // Style explicite : `filledButtonTheme` force `backgroundColor`
-                // sur `primary`, ce qui écrasait la variante tonale et faisait
-                // passer « Synchroniser » pour l'action principale de l'écran.
-                // Ce n'en est pas une : c'est un rappel manuel.
                 style: FilledButton.styleFrom(
                   backgroundColor: theme.colorScheme.secondaryContainer,
                   foregroundColor: theme.colorScheme.primary,
@@ -154,13 +143,6 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
             ],
           ),
 
-          // ── Affichage ────────────────────────────────────────────────────
-          //
-          // Le réglage vit ici et pas dans les réglages d'Android : la moitié
-          // des ROM du parc enterrent la taille de police sous trois niveaux de
-          // menu, et un utilisateur qui ne lit pas l'écran ne va pas partir la
-          // chercher. Le choix de l'app se multiplie au choix système, il ne le
-          // remplace pas.
           _Section(
             title: 'Affichage',
             children: <Widget>[
@@ -212,9 +194,6 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                 leading: const Icon(PhosphorIconsRegular.batteryCharging, size: 26),
                 title: const Text('Autorisations d\'arrière-plan'),
                 trailing: const Icon(PhosphorIconsRegular.caretRight, size: 20),
-                // `push` et non `go` : `go` remplace la pile de navigation, et
-                // la flèche de retour de l'écran d'arrivée n'a alors plus rien
-                // à dépiler.
                 onTap: () => context.push(Routes.batteryHelp),
               ),
             ],
@@ -249,7 +228,6 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
     );
   }
 
-  /// Ligne d'identité : rôle et adresse, dans cet ordre de priorité.
   static String _profileLine(AuthState auth) {
     final List<String> parts = <String>[
       if (auth.roleLabel != null) auth.roleLabel!,
@@ -258,12 +236,6 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
     return parts.isEmpty ? 'Session active' : parts.join(' · ');
   }
 
-  /// Heuristique « la dernière tâche de fond date de N jours ».
-  ///
-  /// C'est le seul signal observable qu'une ROM constructeur tue nos workers :
-  /// Android ne dit jamais « j'ai supprimé votre tâche ». On ne l'affiche pas
-  /// tout de suite après l'installation : quelqu'un qui vient d'installer n'a
-  /// évidemment pas encore de tâche de fond exécutée.
   bool get _shouldSuggestBatteryHelp {
     if (!_loadedBackground) return false;
     final DateTime? last = _lastBackgroundRun;
@@ -280,13 +252,6 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
   }
 
   Future<void> _signOut(BuildContext context, int pending) async {
-    // Déconnexion BLOQUÉE tant que la file n'est pas vide.
-    //
-    // `signOut` efface les jetons ; l'outbox, elle, survit dans la base. Mais
-    // sans session, plus rien ne peut partir, et si l'utilisateur se reconnecte
-    // avec un autre compte, ses opérations partiraient sous une identité qui
-    // n'est pas celle qui les a saisies : le serveur les refuserait en
-    // `ENTITY_ID_OWNED_BY_ANOTHER_USER`.
     if (pending > 0) {
       final bool? force = await showDialog<bool>(
         context: context,
@@ -333,10 +298,6 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
 
 }
 
-/// Trois paliers de taille, en segments.
-///
-/// Segments et non menu déroulant : les trois choix sont visibles d'un coup, et
-/// le résultat se voit immédiatement sur l'écran qui les porte.
 class _TextScaleChoice extends StatelessWidget {
   const _TextScaleChoice({required this.value, required this.onChanged});
 
@@ -371,8 +332,6 @@ class _Section extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          // 14 sp gras et non `labelSmall` 11 : capitalisé et espacé, un
-          // libellé perd en lisibilité à taille égale (voir CpiTypography).
           Text(
             title.toUpperCase(),
             style: CpiTypography.sectionLabel.copyWith(

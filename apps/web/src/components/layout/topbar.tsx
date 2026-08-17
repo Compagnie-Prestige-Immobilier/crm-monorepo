@@ -13,32 +13,26 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import type { SessionUser } from '@/lib/types';
 
-/**
- * Barre supérieure. Sous 768 px elle porte le déclencheur du tiroir de
- * navigation : la sidebar fixe mangerait la moitié de la largeur utile sur un
- * téléphone, et le tableau des prospects a besoin de toute la place.
- */
 export function Topbar({ user }: { user: SessionUser }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
-  // Le titre est dérivé de la route ET du rôle, pas passé en prop : le layout
-  // serveur ne connaît pas la page rendue, et deux sources de vérité pour un
-  // même libellé finissent toujours par diverger.
   const title = navTitle(user.role, pathname);
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-4 backdrop-blur-sm">
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            aria-label="Ouvrir la navigation"
-          >
-            <MenuIcon className="size-5" aria-hidden="true" />
-          </Button>
+        <SheetTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              aria-label="Ouvrir la navigation"
+            />
+          }
+        >
+          <MenuIcon className="size-5" aria-hidden="true" />
         </SheetTrigger>
         <SheetContent
           side="left"

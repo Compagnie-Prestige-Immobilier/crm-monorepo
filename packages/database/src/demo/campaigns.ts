@@ -1,28 +1,3 @@
-/**
- * Deux campagnes d'appels, choisies pour montrer les deux moitiés du cycle :
- * une campagne CLOSED entièrement traitée (les KPI ont des chiffres définitifs)
- * et une campagne ACTIVE en cours (les commerciaux ont encore des tâches
- * ouvertes à l'écran).
- *
- *   « Campagne janvier : toutes bases »  CLOSED, scope ALL,  24 tâches, 4 commerciaux
- *   « Relance CHUES / CBAO »             ACTIVE, scope BDD1, 18 tâches, 3 commerciaux
- *
- * Six prospects restés injoignables en janvier reviennent dans la campagne
- * active : c'est exactement ce que fait l'outil en vrai, et c'est le genre de
- * détail qui rend une démonstration crédible. Deux tâches sur le même prospect
- * ne se marchent pas dessus tant qu'une seule est ACTIVE : c'est l'invariant que
- * porte l'index partiel `call_tasks_one_active_per_prospect`.
- *
- * Les six `CallOutcome` sont représentés. Les tentatives `OTHER` portent toutes
- * un commentaire : la contrainte CHECK `call_attempts_other_requires_comment`
- * refuse la ligne sans lui, et un semis qui échoue devant un auditoire est le
- * pire moment pour découvrir la règle.
- *
- * La répartition est un round-robin sur l'ordre des commerciaux : la tâche de
- * rang i va au commercial `i % n`, à la position `i / n + 1`. Elle est calculée
- * plutôt que recopiée, ce qui garantit les deux uniques
- * `(campagne, commercial, position)` et `(campagne, prospect)`.
- */
 import type { CallOutcome, CallTaskStatus, EnrollmentMethod } from '@prisma/client';
 
 import type { DemoCallAttempt, DemoCallTask, DemoCampaign } from './types.js';
@@ -32,7 +7,6 @@ interface AttemptSpec {
   method: EnrollmentMethod | null;
   comment: string | null;
   daysAgo: number;
-  /** `null` = la tentative a été passée par le commercial assigné. */
   performedByKey: string | null;
 }
 
@@ -66,10 +40,6 @@ function attempt(
   return { outcome, method: null, comment, daysAgo, performedByKey: null };
 }
 
-/**
- * Matérialise les tâches : round-robin sur `commerciauxKeys`, position
- * croissante, tentatives rattachées et clés locales dérivées du rang.
- */
 function distribute(
   campaignKey: string,
   commerciauxKeys: string[],
@@ -99,17 +69,12 @@ function distribute(
       position: Math.floor(index / commerciauxKeys.length) + 1,
       status: spec.status,
       isActive,
-      // Une tâche terminée l'a été le jour de sa dernière tentative.
       completedDaysAgo: isActive ? null : (last?.daysAgo ?? null),
       attempts,
     };
   });
 }
 
-// ── Campagne close : toutes bases ────────────────────────────────────────────
-// 24 tâches, toutes terminées : 10 méthodes obtenues, 5 refus, 3 mauvais
-// numéros, 6 injoignables. Un taux de succès de 42 %, plausible, et six
-// injoignables qui donnent sa raison d'être à la campagne suivante.
 const CLOSED_CAMPAIGN_KEY = 'camp-janvier';
 
 const CLOSED_TASKS: TaskSpec[] = [
@@ -145,18 +110,12 @@ const CLOSED_TASKS: TaskSpec[] = [
   done('p069', [attempt('UNREACHABLE', 18)]),
 ];
 
-// ── Campagne active : segment BDD1 ───────────────────────────────────────────
-// 18 tâches : 6 déjà traitées, 12 encore ouvertes dont 5 avec une première
-// tentative. Le programme d'appel de chaque commercial reste donc visible et
-// non vide à l'écran pendant la démonstration.
 const ACTIVE_CAMPAIGN_KEY = 'camp-relance-bdd1';
 
 const ACTIVE_TASKS: TaskSpec[] = [
   done('p033', [obtained('PLATFORM', 10)]),
   done('p035', [obtained('PHYSICAL', 9)]),
   done('p038', [obtained('VOICE_OR_ELECTRONIC_MESSAGING', 7)]),
-  // Numéro attribué à Awa, complété par Moussa : `performedById` et
-  // `assignedToId` diffèrent, et l'attribution reste juste des deux côtés.
   done('p040', [obtained('PLATFORM', 5, 'moussa')]),
   done('p042', [attempt('REFUSED', 8)]),
   done('p037', [attempt('WRONG_NUMBER', 6)]),
@@ -182,8 +141,6 @@ export const DEMO_CAMPAIGNS: DemoCampaign[] = [
     key: CLOSED_CAMPAIGN_KEY,
     name: 'Campagne janvier : toutes bases',
     scope: 'ALL',
-    // La graine est PERSISTÉE : consulter la campagne ou rééditer un PDF ne
-    // doit jamais retirer au sort.
     seed: 'demo-janvier-toutes-bases',
     status: 'CLOSED',
     createdByKey: 'admin',

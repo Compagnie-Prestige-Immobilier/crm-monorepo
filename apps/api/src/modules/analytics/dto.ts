@@ -57,6 +57,7 @@ export class TimeBucketDto {
   @ApiProperty({ type: Number }) representants!: number;
 }
 
+/** La clé d'énumération accompagne le libellé : le tableau de bord colore et ordonne sur la clé, jamais sur le texte. Les buckets vides sont rendus à zéro, pas omis. */
 export class NamedCountDto {
   @ApiProperty({ type: String, format: 'uuid', nullable: true }) id!: string | null;
   @ApiProperty() label!: string;
@@ -102,16 +103,6 @@ export class TopRepresentantListDto {
   @ApiProperty({ type: () => [TopRepresentantDto] }) items!: TopRepresentantDto[];
   @ApiProperty({ type: Number }) total!: number;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Phase 2, avancement
-//
-// Chaque série porte la clé d'énumération EN PLUS du libellé : le tableau de
-// bord colore et ordonne à partir de la clé, jamais du libellé, qui est du
-// texte destiné à l'œil et peut être retraduit sans casser un graphique.
-// Les buckets vides sont renvoyés à zéro plutôt qu'omis, pour qu'un histogramme
-// garde le même nombre de barres d'un rafraîchissement à l'autre.
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class Phase2StatusCountDto {
   @ApiProperty({ enum: Phase2Status, enumName: 'Phase2Status' }) status!: Phase2Status;

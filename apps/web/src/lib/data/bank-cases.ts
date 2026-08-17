@@ -15,18 +15,6 @@ import type {
   Paginated,
 } from '@/lib/types';
 
-/**
- * Banque & Finance : dossiers, étapes, motifs de rejet, agrégats.
- *
- * Deux invariants du contrat sont respectés ici sans exception :
- *
- *  1. TOUT montant reste une chaîne. Aucune fonction de ce module ne fait
- *     `Number(amountXof)` : voir `lib/money.ts` pour ce que coûterait l'inverse.
- *  2. Toute écriture porte `expectedRev`. L'API répond 409 si le dossier a
- *     bougé entre-temps, et c'est ce qui empêche deux agents de faire avancer
- *     le même dossier de deux étapes en croyant chacun l'avoir avancé d'une.
- */
-
 export async function fetchBankCases(
   filters: BankCaseFilters,
   client: ApiClient = getApiClient(),
@@ -73,11 +61,6 @@ export async function fetchRejectionReasons(
   ).items;
 }
 
-/**
- * Autocomplétion client. L'API n'accepte qu'à partir de deux caractères ; on
- * renvoie une liste vide en deçà plutôt que de provoquer un 400 à chaque
- * première frappe.
- */
 export async function searchBankProspects(
   q: string,
   client: ApiClient = getApiClient(),
@@ -121,19 +104,12 @@ export async function updateBankCase(
 export interface TransitionInput {
   targetStageId: string;
   expectedRev: number;
-  /** Chaîne de chiffres. Exigé vers l'encaissement, interdit ailleurs. */
   amountXof?: string | undefined;
   rejectionReasonId?: string | undefined;
   rejectionDetail?: string | undefined;
   comment?: string | undefined;
 }
 
-/**
- * `exactOptionalPropertyTypes` : une clé présente avec `undefined` n'est PAS
- * une clé absente. `amountXof: undefined` posté vers une étape ouverte
- * déclencherait `BANK_CASE_AMOUNT_NOT_ALLOWED` alors que l'agent n'a rien
- * saisi.
- */
 function toTransitionBody(input: TransitionInput): {
   targetStageId: string;
   expectedRev: number;
@@ -170,7 +146,6 @@ export async function createBankCaseTransition(
   );
 }
 
-/** Correction d'un dossier terminal. ADMIN seulement ; justification obligatoire. */
 export async function createBankCaseCorrection(
   id: string,
   input: TransitionInput & { reason: string },
@@ -183,8 +158,6 @@ export async function createBankCaseCorrection(
     }),
   );
 }
-
-// ─── Configuration des étapes (ADMIN) ───────────────────────────────────────
 
 export interface CreateStageInput {
   code: string;
@@ -219,11 +192,6 @@ export async function updateBankStage(
   );
 }
 
-/**
- * Réordonnancement. L'API attend la liste COMPLÈTE des étapes ouvertes -
- * actives comme inactives : l'initiale en tête. Envoyer une liste partielle
- * renvoie `BANK_STAGE_REORDER_INCOMPLETE`.
- */
 export async function reorderBankStages(
   stageIds: string[],
   client: ApiClient = getApiClient(),
@@ -245,17 +213,13 @@ export async function setBankStageActive(
   );
 }
 
-// ─── Dérivations d'écran ────────────────────────────────────────────────────
-
 const byPosition = (a: BankCaseStage, b: BankCaseStage): number =>
   a.position - b.position || a.id.localeCompare(b.id);
 
-/** Étapes ouvertes ET actives, dans l'ordre du flux. */
 export function activeOpenStages(stages: readonly BankCaseStage[]): BankCaseStage[] {
   return stages.filter((stage) => stage.isActive && stage.type === 'OPEN').sort(byPosition);
 }
 
-/** Toutes les étapes ouvertes, actives ou non : l'ordre que `reorder` attend. */
 export function allOpenStages(stages: readonly BankCaseStage[]): BankCaseStage[] {
   return stages.filter((stage) => stage.type === 'OPEN').sort(byPosition);
 }
@@ -271,14 +235,6 @@ export function stageOfType(
   return stages.find((stage) => stage.type === type);
 }
 
-/**
- * Étape ouverte suivante : reproduction EXACTE de `nextOpenStage` côté API.
- *
- * Fondée sur la position, pas sur un chaînage stocké : une étape désactivée est
- * sautée, et les dossiers qui y stationnent repartent vers la suivante encore
- * active. Recalculer ici évite de proposer un bouton « Étape suivante » que
- * l'API refuserait en `BANK_STAGE_NOT_NEXT`.
- */
 export function nextOpenStage(
   stages: readonly BankCaseStage[],
   current: BankCaseStage,
@@ -290,13 +246,6 @@ export function lastOpenStage(stages: readonly BankCaseStage[]): BankCaseStage |
   return activeOpenStages(stages).at(-1);
 }
 
-/**
- * Ce que le bouton principal du détail doit faire.
- *
- * L'encaissement ne se déclare qu'à la DERNIÈRE étape ouverte active
- * (`assertReachable` côté API). Décider ici plutôt que d'afficher les deux
- * boutons évite de présenter une action que le serveur refusera.
- */
 export type PrimaryAction =
   | { kind: 'advance'; target: BankCaseStage }
   | { kind: 'cash'; target: BankCaseStage }

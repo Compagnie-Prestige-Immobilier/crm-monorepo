@@ -19,18 +19,10 @@ import type {
 import type { BankCaseFilterDto } from './dto.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
-/**
- * Date d'ENTRÉE en étape terminale, pour l'alias `c` de `BANK_CASE_FROM`.
- *
- * La définition vit dans `bank-cases.sql.ts` et non plus ici : l'entonnoir
- * analytique en a besoin sur son propre alias, et deux copies finiraient par
- * donner deux dates d'encaissement pour le même dossier.
- */
 const CLOSED_AT = closedAtLateral(Prisma.sql`c`);
 
 const SECONDS_PER_HOUR = 3600;
 
-/** Part en pourcentage, arrondie au dixième. Zéro plutôt qu'une division par zéro. */
 const share = (value: number, total: number): number =>
   total === 0 ? 0 : Math.round((value / total) * 1000) / 10;
 
@@ -44,13 +36,6 @@ export class BankCaseAnalyticsService {
     private readonly demo: DemoVisibilityService,
   ) {}
 
-  /**
-   * Un seul appel pour tout le tableau de bord.
-   *
-   * Sept requêtes agrégées, zéro ligne de dossier rapatriée, et le MÊME filtre
-   * que la liste, c'est cette dernière propriété qui garantit qu'un compteur
-   * affiché est toujours exactement le décompte du tableau en dessous.
-   */
   async overview(query: BankAnalyticsQueryDto): Promise<BankCaseAnalyticsDto> {
     const [totals, byStage, createdOverTime, cashingsOverTime, byBank, byRejectionReason, byAgent] =
       await Promise.all([
@@ -111,9 +96,6 @@ export class BankCaseAnalyticsService {
       encaisses,
       rejetes,
       totalAmountCashed: sumToString(row?.amountCashed ?? null),
-      // Le taux est calculé sur les dossiers CLOS. Rapporté au total, il
-      // baisserait mécaniquement à chaque nouveau dossier ouvert et ne dirait
-      // plus rien de la qualité des dossiers transmis.
       rejectionRate: share(rejetes, encaisses + rejetes),
       meanDelayHours: hours(row?.delaySeconds ?? null),
     };
@@ -160,7 +142,6 @@ export class BankCaseAnalyticsService {
     }));
   }
 
-  /** Encaissements datés par leur transition, en nombre ET en montant. */
   async cashingsOverTime(query: BankAnalyticsQueryDto): Promise<BankTimeBucketDto[]> {
     const where = bankCaseConditions(query, await this.demo.enabled());
     const rows = await this.prisma.$queryRaw<{ bucket: Date; cases: number; amount: string }[]>`
@@ -239,13 +220,6 @@ export class BankCaseAnalyticsService {
     return rows.map((row) => ({ ...row, share: share(row.cases, total) }));
   }
 
-  /**
-   * Activité par agent.
-   *
-   * Deux mesures distinctes et volontairement séparées : ce qu'un agent a
-   * OUVERT, et ce qu'il a FAIT AVANCER. Les confondre ferait disparaître le
-   * travail de celui qui reprend les dossiers d'un collègue absent.
-   */
   async byAgent(filter: BankCaseFilterDto): Promise<BankAgentActivityDto[]> {
     const where = bankCaseConditions(filter, await this.demo.enabled());
     const rows = await this.prisma.$queryRaw<
@@ -300,11 +274,6 @@ export class BankCaseAnalyticsService {
   }
 }
 
-/**
- * `date_trunc` prend un LITTÉRAL, jamais un paramètre : la valeur vient d'une
- * énumération fermée et non de la chaîne reçue, ce qui interdit toute injection
- * par ce chemin.
- */
 function unit(granularity: TimeGranularity | undefined): Prisma.Sql {
   if (granularity === TimeGranularity.MONTH) return Prisma.sql`'month'`;
   if (granularity === TimeGranularity.WEEK) return Prisma.sql`'week'`;

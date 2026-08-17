@@ -14,28 +14,15 @@ import {
 import { MAX_SPREAD_DAYS, MIN_SPREAD_DAYS } from '@/lib/data/phase2';
 import { formatNumber } from '@/lib/format';
 
-/**
- * « Étaler sur N jours », partagé par les deux dialogues de création.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Le paramètre existe pour un chiffre précis : 120 000 fiches.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Sans étalement, une campagne sur toute la base produit UN programme par
- * téléconseiller, de plusieurs centaines de pages, qu'aucun d'entre eux ne peut
- * ni imprimer ni tenir. Découpé en sept journées, le même tirage donne sept
- * liasses tenables, et la charge du jour devient une décision prise avant le
- * tirage plutôt qu'un constat après impression.
- *
- * Une liste déroulante et non un champ numérique : les bornes (1 à 31) sont
- * celles de la contrainte CHECK en base, et une saisie libre laisserait taper
- * « 60 » pour se faire refuser après coup, à l'étape de confirmation.
- */
-
 const DAY_OPTIONS: readonly number[] = Array.from(
   { length: MAX_SPREAD_DAYS - MIN_SPREAD_DAYS + 1 },
   (_, index) => MIN_SPREAD_DAYS + index,
 );
+
+const DAY_ITEMS = DAY_OPTIONS.map((days) => ({
+  value: String(days),
+  label: days === 1 ? 'Une seule journée' : `${formatNumber(days)} journées`,
+}));
 
 export function SpreadDaysField({
   value,
@@ -53,9 +40,10 @@ export function SpreadDaysField({
         Étaler sur
       </Label>
       <Select
+        items={DAY_ITEMS}
         value={String(value)}
         onValueChange={(next) => {
-          const parsed = Number.parseInt(next, 10);
+          const parsed = Number.parseInt(next ?? '', 10);
           onChange(Number.isFinite(parsed) ? parsed : MIN_SPREAD_DAYS);
         }}
       >
@@ -63,9 +51,9 @@ export function SpreadDaysField({
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-64">
-          {DAY_OPTIONS.map((days) => (
-            <SelectItem key={days} value={String(days)}>
-              {days === 1 ? 'Une seule journée' : `${formatNumber(days)} journées`}
+          {DAY_ITEMS.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
             </SelectItem>
           ))}
         </SelectContent>
@@ -79,14 +67,6 @@ export function SpreadDaysField({
   );
 }
 
-/**
- * La charge journalière, chiffrée.
- *
- * C'est le seul chiffre qui répond à la question posée : « est-ce tenable ? ».
- * Le total de la campagne ne s'y substitue pas, et une moyenne non plus : la
- * répartition met le reliquat sur les PREMIÈRES journées, donc le jour 1 est
- * toujours le plus chargé. L'annoncer évite de découvrir l'écart sur le papier.
- */
 export function SpreadPreview({
   spreadDays,
   perDay,

@@ -22,19 +22,6 @@ import { queryKeys } from '@/lib/query-keys';
 import { countActiveRepCampaignFilters } from '@/lib/rep-campaign-filters';
 import { CAMPAIGN_STATUS_LABELS } from '@/lib/types';
 
-/**
- * Liste des campagnes d'appels REPRÉSENTANTS.
- *
- * C'est la première campagne du produit dans l'ordre du métier : on appelle les
- * représentants pour qu'ils remettent leurs listes, et seulement ensuite les
- * prospects qui en sortent. Elle n'existait pas, alors que le module de
- * campagnes tournait déjà : la cible « représentant » n'était simplement pas
- * prévue par le tirage.
- *
- * En cartes comme les campagnes prospects : chaque ligne porte une barre
- * d'avancement à trois segments, un périmètre en toutes lettres et deux dates,
- * illisibles en colonnes sous 1 200 px.
- */
 export function RepCampaignsView() {
   const { filters, setFilters } = useRepCampaignFilters();
   const [creating, setCreating] = useState(false);

@@ -4,29 +4,6 @@ import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
 import { TopQueryDto } from './dto.js';
 
-/**
- * Productivité des représentants, qualité de la base, provenance des fiches.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI CES OBJETS EXISTENT
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Le classement des représentants existant ne dit qu'une chose : qui a apporté
- * le plus de fiches, depuis toujours. Il ne distingue pas un représentant qui
- * apporte 40 fiches dont 30 aboutissent d'un représentant qui en apporte 60
- * dont aucune, et il continue d'afficher en tête un représentant qui n'a rien
- * apporté depuis huit mois.
- *
- * La qualité de la base répond à la plainte inverse, venue des téléconseillers :
- * une part des numéros ne répond jamais ou n'existe pas. L'information est déjà
- * dans `CallOutcome` (UNREACHABLE, WRONG_NUMBER) ; il manquait seulement de la
- * remonter par représentant et par département, c'est à dire à l'endroit où
- * une décision peut être prise (reprendre une zone, rappeler un représentant).
- *
- * La provenance mesure ce qui entre HORS tournée terrain. `origin` est vide
- * pour l'écrasante majorité des fiches, et c'est justement la minorité
- * renseignée qui intéresse : elle chiffre l'apport des autres canaux.
- */
 export class RepresentantProductivityQueryDto extends TopQueryDto {
   @ApiPropertyOptional({
     type: Number,

@@ -17,7 +17,6 @@ const alice: AuthenticatedUser = {
 };
 const admin: AuthenticatedUser = { ...alice, id: 'admin-1', username: 'admin', role: Role.ADMIN };
 
-/** Requête rendue avec ses paramètres substitués, pour être lisible par un test. */
 function rendered(sql: Prisma.Sql): string {
   return sql.strings.reduce(
     (text, chunk, index) =>
@@ -35,8 +34,6 @@ function makePrisma(rows: unknown[]): {
   const seen: string[] = [];
   const prisma = {
     $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown[]> => {
-      // Le service compose sa requête avec des fragments `Prisma.Sql` ; on les
-      // aplatit pour pouvoir vérifier ce qui part réellement vers PostgreSQL.
       seen.push(
         strings.reduce((text, chunk, index) => {
           if (index === 0) return chunk;
@@ -59,10 +56,6 @@ function makePrisma(rows: unknown[]): {
 
 describe('traduction SQL du segment', () => {
   it('reprend les axes de la définition partagée au lieu de les redécider', () => {
-    // Le contrôle relie la clause SQL à `segmentAxes`, la MÊME source que
-    // `segmentWhere` utilisé par la liste et par les onglets du classeur. Une
-    // matrice réécrite ici passerait un test de forme puis divergerait au
-    // premier ajustement, sans que rien ne le signale.
     for (const segment of ['BDD1', 'BDD2', 'BDD3', 'BDD4'] as const) {
       const { isChues, isCbao } = segmentAxes(segment);
       const sql = rendered(segmentCondition(segment));
@@ -80,7 +73,6 @@ describe('traduction SQL du segment', () => {
       };
       const sql = rendered(segmentCondition(segment));
 
-      // Égalité côté Prisma ⇔ `=` côté SQL ; négation ⇔ `<>`.
       expect(sql.includes('sy."sigle" = ')).toBe(typeof where.syndicat.sigle === 'string');
       expect(sql.includes('bq."shortName" = ')).toBe(typeof where.banque.shortName === 'string');
     }
@@ -91,8 +83,6 @@ describe('traduction SQL du segment', () => {
     for (const segment of ['BDD1', 'BDD2', 'BDD3', 'BDD4'] as const) {
       expect(sql).toContain(`THEN "${segment}"::text`);
     }
-    // Pas de branche `ELSE` : un segment ajouté sans reconstruire l'expression
-    // doit rendre NULL, pas se ranger silencieusement quelque part.
     expect(sql).not.toContain('ELSE');
   });
 });
@@ -125,7 +115,6 @@ describe('conditions communes', () => {
 
     expect(sql).toContain('p."phase2Status" = "METHOD_OBTAINED"');
     expect(sql).toContain('p."enrollmentMethod" = "PLATFORM"');
-    // L'auteur de la MÉTHODE, jamais confondu avec l'auteur de la saisie.
     expect(sql).toContain('p."enrollmentCapturedById" = "com-bob"');
     expect(sql).not.toContain('p."createdById" = "com-bob"');
   });
@@ -136,20 +125,6 @@ describe('conditions communes', () => {
     expect(sql).toContain('ct."campaignId" = "camp-1"');
   });
 
-  /**
-   * LA SOUS-REQUÊTE CLOISONNE SA PROPRE TABLE.
-   *
-   * L'assertion précédente ne vérifiait que la présence de la table et du
-   * paramètre : elle restait verte alors que `call_tasks` était lue sans
-   * aucune condition de visibilité. Une tâche de démonstration accrochée à un
-   * prospect réel faisait donc entrer ce prospect dans le total d'une
-   * campagne, mode éteint.
-   *
-   * Le balayage SQL ne pouvait pas le dénoncer : il travaille au niveau du
-   * FICHIER, et ce fichier cloisonne déjà `p` quelques lignes plus haut.
-   * C'est la conséquence vivante de la limite épinglée dans
-   * `demo-visibility.sweep.test.ts`.
-   */
   it('CLOISONNE la sous-requête de campagne, mode éteint', () => {
     const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }, false));
     expect(sql).toContain('ct."isDemo" = FALSE');
@@ -158,15 +133,12 @@ describe('conditions communes', () => {
   it('et l’ouvre quand le mode est allumé', () => {
     const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }, true));
     expect(sql).not.toContain('ct."isDemo" = FALSE');
-    // `TRUE` plutôt qu'un fragment vide : la condition se compose sans risque
-    // de produire un `AND` orphelin. Même convention que `demoScopeOn`.
     expect(sql).toContain('AND TRUE');
   });
 
   it('exclut les fiches supprimées et celles d’un représentant supprimé', () => {
     const sql = rendered(prospectConditions(admin, {}, false));
     expect(sql).toContain('p."deletedAt" IS NULL');
-    // Sans elle, un total « par département » dépasserait le total global.
     expect(sql).toContain('r."deletedAt" IS NULL');
   });
 });
@@ -183,8 +155,6 @@ describe('séries de phase 2', () => {
       {},
     );
 
-    // Un histogramme qui perd une barre dès que le compteur tombe à zéro change
-    // de forme sans raison : l'absence de « Refus » se lirait comme une panne.
     expect(result.items.map((item) => item.status)).toEqual([
       'PENDING',
       'METHOD_OBTAINED',
@@ -211,7 +181,6 @@ describe('séries de phase 2', () => {
       'PHYSICAL',
       'VOICE_OR_ELECTRONIC_MESSAGING',
     ]);
-    // `total` est celui des porteurs d'une méthode, pas celui de la population.
     expect(result.total).toBe(4);
     expect(result.items[0]?.share).toBe(100);
   });
@@ -228,7 +197,6 @@ describe('séries de phase 2', () => {
     expect(result.items.map((item) => item.prospects)).toEqual([5, 0, 0, 5]);
     expect(result.items.map((item) => item.methodObtained)).toEqual([2, 0, 0, 0]);
     expect(result.total).toBe(10);
-    // Libellé issu de SEGMENT_LABELS, jamais réécrit ici.
     expect(result.items[0]?.label).toContain('CHUES');
   });
 
@@ -252,12 +220,8 @@ describe('séries de phase 2', () => {
     await analytics.byPhase2Status(admin, filter);
     await analytics.byEnrollmentMethod(admin, filter);
 
-    // Chaque requête est examinée séparément : `bySegment` embarque en plus
-    // l'expression de classement, qui cite les quatre segments, et un comptage
-    // d'occurrences sur le texte concaténé serait donc trompeur.
     for (const query of queries()) {
       expect(query).toContain('ct."campaignId" = "camp-1"');
-      // BDD2 = CHUES × banque autre que CBAO, telle que la définit la matrice.
       expect(query).toContain('(sy."sigle" = "CHUES" AND bq."shortName" <> "CBAO")');
     }
     expect(queries()).toHaveLength(3);
@@ -297,8 +261,6 @@ describe('cloisonnement des agrégats', () => {
 describe('granularité temporelle', () => {
   it('n’injecte jamais la valeur reçue dans le date_trunc', async () => {
     const { service, sql } = makePrisma([]);
-    // La valeur vient d'une énumération fermée : une chaîne arbitraire retombe
-    // sur 'day' plutôt que d'atteindre la requête.
     await new AnalyticsService(service, fakeDemoVisibility()).overTime(admin, {
       granularity: "day'); DROP TABLE prospects; --" as never,
     });

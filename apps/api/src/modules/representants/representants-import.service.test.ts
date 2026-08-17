@@ -49,10 +49,8 @@ function prismaStub(): MockDb {
     ief: { findMany: vi.fn().mockResolvedValue(IEFS) },
     $transaction: vi.fn(),
   };
-  // Le rappel de transaction interactive de Prisma est asynchrone à dessein.
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   db.$transaction.mockImplementation((run: (tx: MockDb) => Promise<unknown>) => run(db));
-  // `createMany` de Prisma est asynchrone à dessein, comme `$transaction`.
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   db.representant.createMany.mockImplementation((args: { data: unknown[] }) =>
     Promise.resolve({ count: args.data.length }),
@@ -60,14 +58,6 @@ function prismaStub(): MockDb {
   return db;
 }
 
-/**
- * Construit un classeur AU FORMAT EXACT DU MODÈLE téléchargé.
- *
- * Ligne 1 l'en-tête, ligne 2 l'exemple grisé, ligne 3 la première fiche. Le
- * gabarit doit être respecté ici, sinon le test valide un fichier que
- * l'utilisateur n'a aucun moyen de produire, et le décalage d'une ligne entre
- * le générateur de modèle et le lecteur passe inaperçu.
- */
 async function workbookOf(rows: readonly (readonly string[])[]): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Représentants');
@@ -78,7 +68,6 @@ async function workbookOf(rows: readonly (readonly string[])[]): Promise<Buffer>
   return Buffer.from(written);
 }
 
-/** Requête Fastify factice portant un seul fichier multipart. */
 const requestWith = (buffer: Buffer, truncated = false): FastifyRequest =>
   ({
     file: () =>
@@ -98,8 +87,6 @@ beforeEach(() => {
 
 describe('normalizeKey', () => {
   it('rapproche les orthographes qu’un fichier rempli à la main produit', () => {
-    // Refuser « SAINT-LOUIS » parce qu'il manque un tiret rendrait l'import
-    // inutilisable sur exactement le genre de fichier qu'on lui destine.
     const expected = normalizeKey('Saint-Louis');
     for (const variant of ['SAINT-LOUIS', 'saint louis', 'Saint  Louis', 'Sáint-Loüis']) {
       expect(normalizeKey(variant)).toBe(expected);
@@ -109,8 +96,6 @@ describe('normalizeKey', () => {
 
 describe('import : simulation', () => {
   it('N’ÉCRIT RIEN par défaut, même sur un fichier parfait', async () => {
-    // `dryRun` vaut vrai par défaut : l'écriture doit être un acte explicite,
-    // pas ce qui arrive quand on oublie un paramètre.
     const file = await workbookOf([['Fatou Ndiaye', '77 123 45 67', 'Dakar', '', '']]);
 
     const report = await service.import(ADMIN, requestWith(file), {});
@@ -137,7 +122,6 @@ describe('import : simulation', () => {
   });
 
   it('numérote les erreurs sur la ligne DU FICHIER, en-tête compris', async () => {
-    // Un index de tableau ferait chercher au mauvais endroit dans Excel.
     const file = await workbookOf([
       ['Fatou Ndiaye', '77 123 45 67', 'Dakar', '', ''],
       ['Moussa Sarr', 'pas-un-numero', 'Dakar', '', ''],
@@ -167,8 +151,6 @@ describe('import : simulation', () => {
   });
 
   it('SIGNALE une IEF qui n’appartient pas au département déclaré', async () => {
-    // Trancher en silence changerait le rattachement, dont dépend tout le
-    // reporting terrain : mieux vaut le dire.
     const file = await workbookOf([
       ['Fatou Ndiaye', '+221771000001', 'Dakar', 'Saint-Louis Ville', ''],
     ]);
@@ -179,9 +161,6 @@ describe('import : simulation', () => {
   });
 
   it('détecte les doublons DANS LE FICHIER, sur la forme normalisée', async () => {
-    // « 77 123 45 67 » et « +221771234567 » sont le même abonné : les compter
-    // comme deux personnes est exactement l'erreur que la normalisation existe
-    // pour empêcher.
     const file = await workbookOf([
       ['Fatou Ndiaye', '77 123 45 67', 'Dakar', '', ''],
       ['Fatou N. Ndiaye', '+221771234567', 'Dakar', '', ''],
@@ -191,8 +170,6 @@ describe('import : simulation', () => {
 
     expect(report.valid).toBe(1);
     expect(report.duplicates).toBe(1);
-    // C'est la SECONDE occurrence qui est rejetée : celle du haut du fichier
-    // est celle que l'utilisateur reconnaît.
     expect(report.errors[0]).toMatchObject({ line: 4, code: 'DUPLICATE_IN_FILE' });
   });
 
@@ -211,13 +188,6 @@ describe('import : simulation', () => {
     expect(db.representant.findMany).toHaveBeenCalledTimes(1);
   });
 
-  /**
-   * L'unicité du téléphone est GLOBALE : l'index partiel
-   * `representants_phone_e164_active_key` ne connaît pas le mode démonstration.
-   * Filtrer ce contrôle déclarait libre un numéro que la base refuse ensuite,
-   * `skipDuplicates` écartait la ligne en silence, et le rapport annonçait des
-   * créations qui n'avaient pas eu lieu.
-   */
   it('cherche les doublons SANS portée de démonstration : l’unicité est globale', async () => {
     const file = await workbookOf([['Fatou Ndiaye', '+221771000001', 'Dakar', '', '']]);
     await service.import(ADMIN, requestWith(file), {});
@@ -229,8 +199,6 @@ describe('import : simulation', () => {
   });
 
   it('IGNORE les lignes vides au lieu de les compter en erreur', async () => {
-    // Un classeur rempli à la main en porte toujours quelques-unes en fin de
-    // fichier ; les compter ferait paraître l'import cassé.
     const file = await workbookOf([
       ['Fatou Ndiaye', '+221771000001', 'Dakar', '', ''],
       ['', '', '', '', ''],
@@ -246,8 +214,6 @@ describe('import : simulation', () => {
 
 describe('import : application', () => {
   it('écrit les lignes retenues dans UNE SEULE transaction', async () => {
-    // Un import à moitié appliqué ne se rattrape pas : rejouer le fichier bute
-    // sur les doublons de ce qui est déjà passé.
     const file = await workbookOf([
       ['Fatou Ndiaye', '+221771000001', 'Dakar', 'Almadies', ''],
       ['Moussa Sarr', 'pas-un-numero', 'Dakar', '', ''],
@@ -274,17 +240,9 @@ describe('import : application', () => {
       iefId: 'ief-alm',
       createdById: ADMIN.id,
     });
-    // L'identifiant est un UUID v7 : l'ordre lexicographique doit rester
-    // l'ordre temporel, comme pour les fiches nées sur mobile.
     expect(args.data[0]?.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-/);
   });
 
-  /**
-   * `skipDuplicates` peut écarter une ligne retenue si un commercial saisit la
-   * même fiche pendant l'import. Muet, l'écart contredit la promesse « tout ou
-   * rien » de l'en-tête : le rapport annonçait « 2 valides, 2 créés » pour une
-   * seule fiche réellement en base.
-   */
   it('SIGNALE les lignes écartées à l’écriture au lieu de les perdre', async () => {
     db.representant.createMany.mockResolvedValue({ count: 1 });
     const file = await workbookOf([
@@ -307,11 +265,6 @@ describe('import : application', () => {
     expect(report.errors).toEqual([]);
   });
 
-  /**
-   * Sans options, Prisma coupe à 5 s : une insertion de 5 000 lignes les
-   * dépasse sur une base chargée, et l'utilisateur perd son import après avoir
-   * attendu la lecture complète du classeur.
-   */
   it('relève les délais de la transaction d’écriture', async () => {
     const file = await workbookOf([['Fatou Ndiaye', '+221771000001', 'Dakar', '', '']]);
     await service.import(ADMIN, requestWith(file), { dryRun: false });
@@ -334,13 +287,6 @@ describe('import : application', () => {
 });
 
 describe('import : la ligne d’exemple du modèle', () => {
-  /**
-   * Le défaut concret : `FIRST_DATA_ROW` valait 2, donc l'exemple grisé du
-   * modèle était lu comme une fiche ordinaire, et l'onglet Instructions
-   * autorisait à le laisser en place. Un classeur téléchargé puis rempli sans
-   * supprimer la ligne 2 créait « Fatou Ndiaye » au 77 123 45 67, qui prenait
-   * ce numéro dans l'index d'unicité.
-   */
   it('n’est JAMAIS importée : un modèle vierge ne produit aucune ligne', async () => {
     const file = await workbookOf([]);
 
@@ -374,23 +320,9 @@ describe('import : refus de fichier', () => {
     );
   });
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * LE PLAFOND DE LIGNES, PRIS SUR SON BORD
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * Le refus est écrit `rows.length >= IMPORT_MAX_ROWS` À L'INTÉRIEUR de la
-   * boucle, avant l'empilement : il se déclenche donc quand on s'apprête à
-   * ajouter la 5 001e. Un `>` au lieu d'un `>=`, ou un contrôle déplacé après
-   * l'empilement, décale la frontière d'exactement une ligne, ce qu'aucun essai
-   * mené loin du bord ne peut voir. Les deux cas ci-dessous encadrent la
-   * frontière au plus près : 5 000 passe, 5 001 est refusé.
-   */
   const lignesFactices = (count: number): string[][] =>
     Array.from({ length: count }, (_, index) => [
       `Fiche ${String(index)}`,
-      // Numéros sénégalais distincts : un doublon n'a rien à voir avec le
-      // plafond, mais il polluerait le rapport et brouillerait la lecture.
       `+2217${String(70000000 + index)}`,
       'Dakar',
       '',
@@ -420,11 +352,6 @@ describe('import : refus de fichier', () => {
     });
   }, 60_000);
 
-  /**
-   * Un fichier SANS AUCUNE ligne de données n'est pas une faute : c'est le
-   * modèle vierge, que les gens téléchargent puis renvoient par erreur. Il doit
-   * rendre un rapport vide, et surtout n'ouvrir aucune transaction.
-   */
   it('un fichier de zéro ligne rend un rapport vide sans rien écrire', async () => {
     const file = await workbookOf([]);
 
@@ -436,7 +363,6 @@ describe('import : refus de fichier', () => {
     expect(db.$transaction).not.toHaveBeenCalled();
   });
 
-  /** Un classeur sans la moindre feuille : ExcelJS le lit, il n'a rien à offrir. */
   it('refuse un classeur dépourvu de feuille', async () => {
     const workbook = new ExcelJS.Workbook();
     const vide = Buffer.from(await workbook.xlsx.writeBuffer());
@@ -457,12 +383,6 @@ describe('import : refus de fichier', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  /**
-   * Le plafond de TAILLE est remis au parseur multipart et non vérifié après
-   * coup : un envoi de 500 Mo était sinon intégralement matérialisé en mémoire
-   * avant d'être refusé, ce qui fait de ce contrôle un moyen d'épuiser le
-   * conteneur plutôt qu'une protection contre lui.
-   */
   it('borne le flux multipart AVANT de le matérialiser', async () => {
     const buffer = await workbookOf([['Fatou Ndiaye', '+221771000001', 'Dakar', '', '']]);
     const file = vi.fn().mockResolvedValue({

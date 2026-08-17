@@ -5,11 +5,6 @@ import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
 import 'cpi_pressable.dart';
 
-/// Carte de synthèse de l'accueil.
-///
-/// `elevation: 0` et une bordure au lieu d'une ombre : docs/design.md §5 plafonne
-/// à `elev-sm` dans une liste défilante, et chaque ombre est une passe de rendu
-/// de plus par élément sur un appareil d'entrée de gamme.
 class SummaryCard extends StatelessWidget {
   const SummaryCard({
     super.key,
@@ -63,8 +58,6 @@ class SummaryCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  // `bodyMedium` (16) et non `bodySmall` (13 avant refonte) :
-                  // c'est le libellé qui dit ce que compte le chiffre.
                   Text(
                     label,
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -75,8 +68,6 @@ class SummaryCard extends StatelessWidget {
                   if (isLoading)
                     const _CountPlaceholder()
                   else
-                    // Le chiffre se remplace en fondu court : une valeur qui
-                    // change sous les doigts sans mouvement passe inaperçue.
                     AnimatedSwitcher(
                       duration: CpiMotion.of(context).micro,
                       switchInCurve: CpiMotion.of(context).easeOut,
@@ -101,8 +92,6 @@ class SummaryCard extends StatelessWidget {
   }
 }
 
-/// Réserve la hauteur du chiffre pendant le premier cadre, pour que la carte ne
-/// change pas de taille quand la valeur arrive.
 class _CountPlaceholder extends StatelessWidget {
   const _CountPlaceholder();
 

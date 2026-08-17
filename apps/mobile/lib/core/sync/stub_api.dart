@@ -2,13 +2,6 @@ import 'package:crm_api_client/crm_api_client.dart';
 
 import 'api_port.dart';
 
-/// [ApiPort] hors ligne, pour les tests de widgets et les captures d'écran.
-///
-/// Le transport réel est `DioApi`, adossé au client généré. Cette
-/// implémentation-ci n'est **pas** un simulateur de serveur : elle échoue
-/// explicitement sur tout ce qu'elle ne peut pas honnêtement rendre, pour qu'un
-/// oubli de câblage se voie tout de suite au lieu de produire une app qui a
-/// l'air de marcher.
 class StubApi implements ApiPort {
   const StubApi();
 
@@ -51,8 +44,6 @@ class StubApi implements ApiPort {
 
   @override
   Future<PullPage> pull({String? cursor, int limit = 200}) async {
-    // Une page vide et `hasMore = false` est le seul comportement qui ne mente
-    // pas au moteur quand il n'y a pas de serveur.
     return PullPage(
       changes: SyncChangesDto(
         departements: const <DepartementDto>[],
@@ -87,9 +78,6 @@ class StubApi implements ApiPort {
     String? cursor,
     int limit = 2000,
   }) async {
-    // Page vide et `hasMore = false` : le seul comportement qui ne mente pas au
-    // client quand il n'y a pas de serveur. Renvoyer `hasMore = true` le ferait
-    // boucler 300 fois pour rien.
     return Phase2DirectoryPage(
       entries: const <Phase2DirectoryEntry>[],
       nextCursor: cursor ?? '',

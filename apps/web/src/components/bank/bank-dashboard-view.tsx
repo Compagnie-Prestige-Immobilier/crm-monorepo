@@ -36,20 +36,6 @@ import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
 import type { FilterOption } from '@/lib/types';
 
-/**
- * Tableau de bord Banque & Finance.
- *
- * Deux propriétés le distinguent d'un simple assemblage de graphiques :
- *
- * 1. Il partage l'OBJET DE FILTRE de la liste et de l'export. Un chiffre lu ici
- *    décrit exactement la population du tableau et du classeur : c'est une
- *    propriété testée côté API, on ne la casse pas côté écran en réintroduisant
- *    une seconde source de critères.
- * 2. Chaque tranche de graphique est un LIEN vers la liste correspondante.
- *    L'agent qui voit « 42 rejets pour document manquant » clique et obtient
- *    les 42 dossiers, avec les mêmes bornes de date. Refaire le filtre à la main
- *    produisait régulièrement une sélection différente de celle du graphique.
- */
 export function BankDashboardView() {
   const router = useRouter();
   const { filters, hrefWith } = useBankFilters();
@@ -58,25 +44,18 @@ export function BankDashboardView() {
   const { data, isPending, isError, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: queryKeys.bankAnalytics(filters),
     queryFn: () => fetchBankAnalytics(filters),
-    // Rafraîchissement continu : les chiffres restent affichés pendant le
-    // cycle suivant, l'écran ne repasse jamais par son squelette.
     refetchInterval: live.refetchInterval,
     placeholderData: keepPreviousData,
   });
 
   const hasData = data !== undefined;
 
-  /** Va vers la liste, filtre appliqué. `push` et non `replace` : le bouton
-   *  « Précédent » doit ramener au graphique. */
   const drillTo =
     (patch: Parameters<typeof hrefWith>[0]): (() => void) =>
     () => {
       router.push(hrefWith(patch, '/dossiers'));
     };
 
-  // Les agents ne sont pas listables par un BANQUE_FINANCE (`GET /users` est
-  // réservé à l'ADMIN) : on dérive les options du filtre de l'agrégat, qui lui
-  // est accessible et qui contient exactement les agents ayant une activité.
   const agentOptions: FilterOption[] = (data?.byAgent ?? []).map((agent) => ({
     value: agent.agentId,
     label: agent.label,
@@ -313,7 +292,6 @@ function Kpi({
 }: {
   label: string;
   value: string;
-  /** Peut porter un montant rendu par `MoneyText`, pas seulement du texte. */
   hint: ReactNode;
   icon: LucideIcon;
   index: number;

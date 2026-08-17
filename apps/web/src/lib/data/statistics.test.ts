@@ -14,15 +14,6 @@ import {
 } from '@/lib/data/statistics';
 import { STAT_EXPLANATIONS, STAT_KEYS, explain } from '@/lib/stat-explanations';
 
-/**
- * Le calcul des statistiques.
- *
- * Ce qui casse un écran de statistiques n'est presque jamais le cas nominal :
- * c'est la division par zéro sur une base vide, le `null` pris pour un zéro, et
- * le dénominateur choisi au hasard entre deux candidats plausibles. Les tests
- * ci-dessous fixent ces trois-là.
- */
-
 describe('ratio', () => {
   it('arrondit au dixième', () => {
     expect(percentOf(1, 3)).toBe(33.3);
@@ -30,7 +21,6 @@ describe('ratio', () => {
   });
 
   it('rend zéro et jamais NaN sur un dénominateur nul', () => {
-    // « NaN % » à l'écran fait douter de TOUS les autres chiffres de la page.
     expect(percentOf(5, 0)).toBe(0);
     expect(percentOf(0, 0)).toBe(0);
   });
@@ -46,8 +36,6 @@ describe('ratio', () => {
 
 describe('taux de conversion', () => {
   it('rapporte les convertis au TOTAL filtré, pas à la somme des statuts', () => {
-    // Les deux coïncident aujourd'hui ; un statut ajouté demain les ferait
-    // diverger, et le taux dépasserait discrètement 100 %.
     expect(conversionRate({ converti: 25, prospects: 200 })).toBe(12.5);
   });
 
@@ -79,7 +67,6 @@ describe('moyenne journalière', () => {
 
 describe('rythme hebdomadaire', () => {
   it('compare les 7 derniers jours aux 23 précédents, ramenés à 7', () => {
-    // 230 sur 23 jours = 70 sur 7 jours. 70 contre 70 : aucun écart.
     expect(weeklyPace({ prospects7Jours: 70, prospects30Jours: 300 })).toBe(0);
   });
 
@@ -108,8 +95,6 @@ describe('heures en jours', () => {
   });
 
   it('conserve l’absence de mesure', () => {
-    // « Aucun dossier clos » n'est PAS « zéro jour » : les confondre afficherait
-    // un délai parfait sur une banque qui n'a rien traité.
     expect(hoursToDays(null)).toBeNull();
     expect(hoursToDays(0)).toBe(0);
   });

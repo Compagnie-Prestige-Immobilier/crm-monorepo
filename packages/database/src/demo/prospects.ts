@@ -1,43 +1,8 @@
-/**
- * 120 prospects de démonstration, écrits en tableau compact.
- *
- * ── Répartition VOULUE des segments BDD ──────────────────────────────────────
- * Le segment n'est pas une colonne : il se DÉDUIT du croisement
- * (syndicat = CHUES ?) × (banque = CBAO ?), via `classifySegment`. Les paires
- * ci-dessous sont donc choisies pour produire exactement cette répartition,
- * que le test vérifie en recalculant les segments :
- *
- *   BDD1  CHUES / CBAO          42 prospects  (35 %)   lignes p001 → p042
- *   BDD2  CHUES / autre banque  24 prospects  (20 %)   lignes p043 → p066
- *   BDD3  autre syndicat / CBAO 30 prospects  (25 %)   lignes p067 → p096
- *   BDD4  autre / autre         24 prospects  (20 %)   lignes p097 → p120
- *
- * ── Répartition VOULUE de la phase 2 ─────────────────────────────────────────
- *   PENDING          60  (50 %)   le stock à travailler
- *   METHOD_OBTAINED  40  (33 %)   dont 18 PLATFORM, 14 PHYSICAL, 8 VOICE…
- *   REFUSED          12  (10 %)
- *   WRONG_NUMBER      8  ( 7 %)
- * BDD1 convertit mieux que BDD4 (18/42 contre 5/24) : c'est le message que la
- * démonstration doit faire passer, pas une égalité artificielle entre segments.
- *
- * ── Propriété des fiches ─────────────────────────────────────────────────────
- * Le commercial propriétaire n'est PAS saisi ligne à ligne : il est déduit du
- * représentant. Une seule source, donc aucune contradiction possible entre
- * « le représentant d'Awa » et « le prospect de Moussa ».
- *   Awa 42 · Moussa 30 · Fatou 26 · Ibrahima 22
- *
- * Toutes les clés de référentiel employées ici : sigles de syndicats et noms
- * courts de banques : existent dans `seed-data/syndicats.ts` et
- * `seed-data/banques.ts`, et le test le revérifie une par une.
- */
 import type { EnrollmentMethod, Phase2Status, ProspectStatut } from '@prisma/client';
 
 import { DEMO_REPRESENTANTS } from './representants.js';
 import type { DemoProspect } from './types.js';
 
-// Abréviations locales : sans elles, un tableau de 120 lignes déborde et
-// devient illisible : or c'est justement sa lisibilité qui permet de vérifier
-// la répartition à l'œil avant même de lancer le test.
 const WAIT: Phase2Status = 'PENDING';
 const OK: Phase2Status = 'METHOD_OBTAINED';
 const NO: Phase2Status = 'REFUSED';
@@ -61,7 +26,6 @@ type ProspectRow = readonly [
 ];
 
 const PROSPECT_ROWS: readonly ProspectRow[] = [
-  // ══ BDD1 : CHUES / CBAO : 42 ═══════════════════════════════════════════════
   ['p001', 'Awa', 'Diop', 'CHUES', 'CBAO', 'r01', OK, PLAT, 95, 36],
   ['p002', 'Modou', 'Fall', 'CHUES', 'CBAO', 'r01', WAIT, null, 88, null],
   ['p003', 'Aïssatou', 'Sarr', 'CHUES', 'CBAO', 'r01', OK, PHYS, 84, 34],
@@ -105,7 +69,6 @@ const PROSPECT_ROWS: readonly ProspectRow[] = [
   ['p041', 'Adja', 'Sarr', 'CHUES', 'CBAO', 'r15', WAIT, null, 21, null],
   ['p042', 'Baba', 'Guèye', 'CHUES', 'CBAO', 'r15', NO, null, 20, null],
 
-  // ══ BDD2 : CHUES / autre banque : 24 ═══════════════════════════════════════
   ['p043', 'Ndèye', 'Diouf', 'CHUES', 'SGS', 'r01', WAIT, null, 92, null],
   ['p044', 'Alioune', 'Faye', 'CHUES', 'Ecobank', 'r01', OK, PLAT, 90, 35],
   ['p045', 'Coumba', 'Mbaye', 'CHUES', 'BHS', 'r02', WAIT, null, 86, null],
@@ -131,7 +94,6 @@ const PROSPECT_ROWS: readonly ProspectRow[] = [
   ['p065', 'Yacine', 'Diakhaté', 'CHUES', 'SGS', 'r15', NO, null, 27, null],
   ['p066', 'Malick', 'Tall', 'CHUES', 'BHS', 'r15', OK, PHYS, 25, 14],
 
-  // ══ BDD3 : autre syndicat / CBAO : 30 ══════════════════════════════════════
   ['p067', 'Mor', 'Ndiaye', 'UES', 'CBAO', 'r01', OK, PLAT, 98, 38],
   ['p068', 'Sokhna', 'Diop', 'SAEMSS', 'CBAO', 'r01', WAIT, null, 94, null],
   ['p069', 'Assane', 'Fall', 'CUSEMS', 'CBAO', 'r02', WAIT, null, 91, null],
@@ -163,7 +125,6 @@ const PROSPECT_ROWS: readonly ProspectRow[] = [
   ['p095', 'Idrissa', 'Lô', 'UES', 'CBAO', 'r15', NO, null, 18, null],
   ['p096', 'Adja', 'Samb', 'CUSEMS', 'CBAO', 'r15', WAIT, null, 16, null],
 
-  // ══ BDD4 : autre syndicat / autre banque : 24 ══════════════════════════════
   ['p097', 'Ngagne', 'Diop', 'SAEMSS', 'SGS', 'r01', WAIT, null, 96, null],
   ['p098', 'Astou', 'Ndiaye', 'CNTS', 'Ecobank', 'r01', OK, PHYS, 93, 64],
   ['p099', 'Cheikh', 'Diallo', 'UES', 'CMS', 'r02', WAIT, null, 89, null],
@@ -190,15 +151,6 @@ const PROSPECT_ROWS: readonly ProspectRow[] = [
   ['p120', 'Seynabou', 'Tall', 'SELS', 'BHS', 'r15', WAIT, null, 25, null],
 ];
 
-/**
- * Numéros sénégalais plausibles et uniques par construction.
- *
- * Le rang du prospect est encodé dans le numéro : deux lignes ne peuvent donc
- * pas partager un numéro, ce qui compte parce que le téléphone est la clé de
- * déduplication métier : un doublon ferait échouer le semis de la démo.
- * Les préfixes alternent entre les quatre plages mobiles réelles (77, 78, 76,
- * 70) pour que la liste ne ressemble pas à une suite générée.
- */
 const PHONE_BANDS = ['77243', '78615', '76308', '70452'] as const;
 
 function demoPhone(rank: number): string {
@@ -206,15 +158,6 @@ function demoPhone(rank: number): string {
   return `+221${band}${String(rank).padStart(3, '0')}${String(rank % 10)}`;
 }
 
-/**
- * Statut de prospection générale (phase 1), déduit de la phase 2.
- *
- * Les deux dimensions sont indépendantes dans le schéma, mais elles ne sont pas
- * décorrélées dans la réalité : un prospect dont on a obtenu la méthode est
- * converti, un refus est une perte. Le stock en attente est « nouveau » tant
- * qu'il est récent, « contacté » au-delà de six semaines : l'ancienneté est le
- * seul signal disponible ici, et il suffit à peupler les deux colonnes.
- */
 function deriveStatut(phase2Status: Phase2Status, daysAgo: number): ProspectStatut {
   if (phase2Status === 'METHOD_OBTAINED') return 'CONVERTI';
   if (phase2Status === 'REFUSED' || phase2Status === 'WRONG_NUMBER') return 'PERDU';

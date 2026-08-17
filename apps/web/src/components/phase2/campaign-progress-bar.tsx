@@ -1,18 +1,6 @@
 import { formatNumber } from '@/lib/format';
 import type { CampaignProgress } from '@/lib/types';
 
-/**
- * Avancement d'une campagne : abouties / annulées / restantes.
- *
- * Trois segments et non un pourcentage seul. « 60 % » ne dit pas si les 40 %
- * manquants sont encore à appeler ou ont été annulés par une clôture : or
- * c'est exactement la question qu'on se pose devant une campagne en retard.
- *
- * La barre n'est pas le support de l'information : elle est
- * `aria-hidden`, et le compte chiffré juste dessous porte le sens. Une barre
- * seule serait invisible à un lecteur d'écran, et illisible pour quelqu'un qui
- * distingue mal le vert du bordeaux.
- */
 export function CampaignProgressBar({
   progress,
   compact = false,

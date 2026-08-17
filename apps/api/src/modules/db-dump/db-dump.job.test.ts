@@ -39,12 +39,6 @@ describe('effectiveStatus', () => {
     expect(effectiveStatus(job({ status: 'ready', expiresAt }), NOW)).toBe('ready');
   });
 
-  /**
-   * LE test de l'échéance. Sans lui, un fichier contenant la base entière
-   * resterait servi indéfiniment sur la seule foi de l'état enregistré : rien
-   * dans la ligne ne change au passage de l'échéance, c'est l'horloge qui
-   * bouge.
-   */
   it('rend « expired » dès que l’échéance est passée, sans rien réécrire', () => {
     const expiresAt = new Date(NOW.getTime() - 1).toISOString();
     expect(effectiveStatus(job({ status: 'ready', expiresAt }), NOW)).toBe('expired');
@@ -61,12 +55,6 @@ describe('effectiveStatus', () => {
     expect(effectiveStatus(job({ status: 'running', startedAt }), NOW)).toBe('running');
   });
 
-  /**
-   * Un `running` que plus rien ne fera avancer BLOQUERAIT toute nouvelle
-   * demande, puisqu'une seule est autorisée à la fois. C'est le scénario du
-   * redéploiement en plein export : sans cette borne, le bouton reste muet
-   * jusqu'à ce que quelqu'un édite la base à la main.
-   */
   it('enterre un export démarré depuis plus longtemps que la durée maximale', () => {
     const startedAt = new Date(NOW.getTime() - DUMP_MAX_RUNTIME_MS - 1_000).toISOString();
     expect(effectiveStatus(job({ status: 'running', startedAt }), NOW)).toBe('failed');
@@ -84,22 +72,6 @@ describe('effectiveStatus', () => {
     );
   });
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * LE TEST QUI REMPLACE UNE ASSERTION FAUSSE
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * Ce fichier ÉPINGLAIT le contraire : « ne touche pas à queued », dans la
-   * même phrase que `failed` et `expired`, comme si les trois étaient des états
-   * finaux. `queued` n'en est pas un, c'est le plus fugace de tous, et le
-   * laisser passer à travers la borne rendait la panne DÉFINITIVE.
-   *
-   * Un conteneur qui meurt entre l'écriture de `queued` et celle de `running`
-   * laissait une ligne que rien ne faisait vieillir. `isInFlight('queued')`
-   * étant vrai, toute demande ultérieure rendait ce fantôme au lieu de démarrer
-   * un export, pour toujours, sans aucune route pour réarmer. Le test précédent
-   * faisait passer ce trou pour une décision.
-   */
   it('enterre un « queued » plus vieux que la durée maximale', () => {
     const requestedAt = new Date(NOW.getTime() - DUMP_MAX_RUNTIME_MS - 1_000).toISOString();
     expect(effectiveStatus(job({ status: 'queued', startedAt: null, requestedAt }), NOW)).toBe(
@@ -107,95 +79,34 @@ describe('effectiveStatus', () => {
     );
   });
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * CE TEST AFFIRMAIT « ready », ET IL RENDAIT L'ARCHIVE ÉTERNELLE
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * `effectiveStatus` est la SEULE porte par laquelle un export prêt devient
-   * échu, donc la seule par laquelle le fichier est détruit. Un `ready` sans
-   * échéance la traversait sans jamais la franchir : la réconciliation horaire
-   * ne pouvait plus rien contre lui, et une archive contenant toute la
-   * clientèle survivait indéfiniment sur le volume, très au-delà des six heures
-   * annoncées. Une valeur héritée ou malformée dans `app_settings` suffisait.
-   *
-   * `execute()` écrit TOUJOURS une échéance en passant `ready`. Une ligne qui
-   * n'en a pas est une anomalie, et le doute penche du côté qui détruit :
-   * relancer un export coûte quelques minutes, un second exemplaire de la base
-   * oublié sur le disque ne se rattrape pas.
-   */
   it('ÉCHOIT un export prêt dont l’échéance manque', () => {
     expect(effectiveStatus(job({ status: 'ready', expiresAt: null }), NOW)).toBe('expired');
   });
 
   it('ÉCHOIT un export prêt dont l’échéance est illisible', () => {
-    // `Date.parse` rend `NaN`, et `NaN <= t` est faux : la comparaison seule
-    // laissait cette ligne éternelle elle aussi.
     expect(effectiveStatus(job({ status: 'ready', expiresAt: 'jamais' }), NOW)).toBe('expired');
   });
 
-  /**
-   * Contre-épreuve : une fonction qui rendrait « expired » sans condition
-   * ferait passer les deux tests ci-dessus en cassant la fonctionnalité.
-   */
   it('laisse « ready » un export dont l’échéance est encore devant', () => {
     const expiresAt = new Date(NOW.getTime() + 60_000).toISOString();
     expect(effectiveStatus(job({ status: 'ready', expiresAt }), NOW)).toBe('ready');
   });
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * LA BRANCHE « EN COURS » LAISSAIT VIVRE CE QUE LA BRANCHE « ready » ENTERRE
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * Le contrôle était écrit `Number.isFinite(since) && âge > borne`, donc
-   * protégeait le mauvais côté : un horodatage illisible ne franchissait JAMAIS
-   * la borne. La ligne restait « en cours » indéfiniment, `isInFlight` interdit
-   * toute nouvelle demande, et l'export devenait impossible POUR TOUJOURS, sans
-   * aucune route pour réarmer. Une valeur écrite par une version antérieure ou
-   * corrompue dans `app_settings` suffisait.
-   *
-   * Même doctrine que l'échéance illisible d'un `ready` : le doute penche du
-   * côté qui déclare mort.
-   */
   it('enterre un « running » dont la date de démarrage est illisible', () => {
     expect(effectiveStatus(job({ status: 'running', startedAt: 'jamais' }), NOW)).toBe('failed');
   });
 
-  /**
-   * Le même trou par l'autre horodatage : un `queued` n'a pas de `startedAt`,
-   * c'est `requestedAt` qui le fait vieillir. C'est aussi l'état le plus court,
-   * donc celui qu'aucune recette n'observe et que la panne fige pour de bon.
-   */
   it('enterre un « queued » dont la date de demande est illisible', () => {
     expect(
       effectiveStatus(job({ status: 'queued', startedAt: null, requestedAt: 'jamais' }), NOW),
     ).toBe('failed');
   });
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * L'HORLOGE QUI RECULE FIGEAIT LA LIGNE AUSSI SÛREMENT
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * Une machine restaurée depuis un instantané, un conteneur démarré avant la
-   * synchronisation NTP : l'horloge recule, l'âge du travail devient négatif,
-   * et un nombre négatif ne dépasse jamais `DUMP_MAX_RUNTIME_MS`. La ligne « en
-   * cours » ne vieillit donc PLUS JAMAIS, et la fonctionnalité meurt comme dans
-   * le cas de l'horodatage illisible.
-   */
   it('enterre un travail en cours daté au-delà de la tolérance dans le futur', () => {
     const startedAt = new Date(NOW.getTime() + DUMP_CLOCK_SKEW_TOLERANCE_MS + 1_000).toISOString();
     expect(effectiveStatus(job({ status: 'running', startedAt }), NOW)).toBe('failed');
   });
 
-  /**
-   * Contre-épreuve indispensable : une fonction qui enterrerait tout ce qui est
-   * daté dans le futur ferait passer le test ci-dessus en tuant les exports
-   * sains. L'horodatage est écrit par un processus, l'horloge relue par un
-   * autre, et un ajustement NTP de quelques secondes entre les deux est banal.
-   * Il ne doit rien coûter.
-   */
   it('laisse courir un travail que quelques secondes d’écart d’horloge mettent en avance', () => {
     const startedAt = new Date(NOW.getTime() + 2_000).toISOString();
     expect(effectiveStatus(job({ status: 'running', startedAt }), NOW)).toBe('running');
@@ -203,12 +114,6 @@ describe('effectiveStatus', () => {
 });
 
 describe('DUMP_CLOCK_SKEW_TOLERANCE_MS', () => {
-  /**
-   * La tolérance n'est pas une durée d'exécution : c'est la largeur du doute
-   * accordé à l'horloge. Elle doit rester très au-dessus de ce que corrige un
-   * NTP en marche, et très en deçà de la borne d'exécution, faute de quoi elle
-   * repousserait l'enterrement d'un travail réellement mort.
-   */
   it('reste très en deçà de la borne d’exécution', () => {
     expect(DUMP_CLOCK_SKEW_TOLERANCE_MS).toBeGreaterThan(60_000);
     expect(DUMP_CLOCK_SKEW_TOLERANCE_MS).toBeLessThan(DUMP_MAX_RUNTIME_MS);
@@ -226,11 +131,6 @@ describe('isInFlight', () => {
 });
 
 describe('DUMP_TTL_MS', () => {
-  /**
-   * Le chiffre est un arbitrage, documenté dans `db-dump.job.ts` : assez long
-   * pour couvrir une demi-journée de bureau, assez court pour ne jamais
-   * traverser la nuit, où passent les instantanés de volume.
-   */
   it('vaut six heures, sous une journée', () => {
     expect(DUMP_TTL_MS).toBe(6 * 60 * 60 * 1_000);
     expect(DUMP_TTL_MS).toBeLessThan(24 * 60 * 60 * 1_000);
@@ -238,11 +138,6 @@ describe('DUMP_TTL_MS', () => {
 });
 
 describe('dumpFileName', () => {
-  /**
-   * Le nom ne prend RIEN de la requête. La route de téléchargement ne porte
-   * aucun paramètre, et ce nom-là est la seule chose qui touche au système de
-   * fichiers.
-   */
   it('compose le nom depuis l’horodatage et l’identifiant du travail', () => {
     expect(dumpFileName('abc-123', new Date('2026-08-15T10:04:05.000Z'))).toBe(
       'cpi-base-20260815100405-abc-123.sql.gz',
@@ -269,11 +164,6 @@ describe('pgEnvironmentFrom', () => {
     expect(pgEnvironmentFrom('postgresql://crm:secret@db/crm').PGPORT).toBe('5432');
   });
 
-  /**
-   * Un mot de passe contenant `@`, `/` ou `#` est OBLIGATOIREMENT
-   * percent-encodé dans une URI. Le transmettre encodé à libpq fait échouer
-   * l'authentification avec un message qui ne dit jamais pourquoi.
-   */
   it('décode un mot de passe percent-encodé', () => {
     expect(pgEnvironmentFrom('postgresql://crm:p%40ss%2Fw%23rd@db/crm').PGPASSWORD).toBe(
       'p@ss/w#rd',
@@ -286,12 +176,6 @@ describe('pgEnvironmentFrom', () => {
     );
   });
 
-  /**
-   * `?schema=public` est une convention PRISMA. La traduire en `--schema` ou
-   * en variable libpq restreindrait l'export à UN schéma, alors que la demande
-   * porte sur la base entière : l'utilisateur croirait tenir une copie
-   * complète et n'en aurait qu'une partie.
-   */
   it('ignore le paramètre schema de Prisma', () => {
     const env = pgEnvironmentFrom('postgresql://crm:x@db:5432/crm?schema=public');
     expect(env).toEqual({
@@ -303,7 +187,6 @@ describe('pgEnvironmentFrom', () => {
     });
   });
 
-  /** `sslmode`, lui, EST un paramètre libpq : une base gérée le réclame. */
   it('reprend sslmode, qui est un vrai paramètre libpq', () => {
     expect(pgEnvironmentFrom('postgresql://crm:x@db/crm?sslmode=require').PGSSLMODE).toBe(
       'require',

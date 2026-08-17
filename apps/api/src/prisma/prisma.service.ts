@@ -14,10 +14,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit(): Promise<void> {
-    // `pnpm openapi:generate` démarre le conteneur Nest entier pour lire les
-    // métadonnées Swagger. Sans cette porte, la génération exigerait un
-    // Postgres joignable et se bloquerait dès que Docker est arrêté, alors
-    // que le document produit ne dépend d'aucune donnée.
     if (isOpenApiGeneration()) {
       this.logger.log('OPENAPI_GENERATION=1, connexion à la base ignorée');
       return;

@@ -12,25 +12,6 @@ import type {
   ProspectFilters,
 } from '@/lib/types';
 
-/**
- * Écran « Statistiques » : volet téléconseil.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Ce module NE RECALCULE PAS ce que l'API sait déjà.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Les totaux, les répartitions et les parts viennent du serveur, qui les
- * calcule en SQL sur la population filtrée. Un panel qui referait ces sommes à
- * partir d'une page de résultats afficherait, tôt ou tard, un chiffre différent
- * de celui du tableau d'à côté : et c'est l'écart qu'un directeur remarque en
- * premier.
- *
- * Ne sont dérivés ici que les RAPPORTS entre deux chiffres déjà servis : ils
- * dépendent de la fenêtre affichée, pas de la donnée, et les faire calculer par
- * le serveur obligerait à lui repasser les mêmes bornes une seconde fois. Ces
- * dérivations sont des fonctions pures, testées à part.
- */
-
 export interface StatusCount {
   status: Phase2Status;
   label: string;
@@ -71,58 +52,26 @@ export interface TeleconseilStats {
   parStatutPhase2: StatusCount[];
   parMethode: MethodCount[];
   parSegment: SegmentCount[];
-  /** Prospects porteurs d'une méthode. Sous-population, pas le total filtré. */
   methodTotal: number;
 }
 
-// ─── Dérivations ─────────────────────────────────────────────────────────────
-
-/**
- * Ratio en pourcentage, arrondi au dixième.
- *
- * Le dénominateur nul rend `0` et non `NaN` : un écran qui affiche « NaN % »
- * fait douter de TOUS les autres chiffres de la page, y compris les justes.
- */
 export function percentOf(part: number, whole: number): number {
   if (whole <= 0) return 0;
   return Math.round((part / whole) * 1000) / 10;
 }
 
-/**
- * Taux de conversion : prospects convertis rapportés au total filtré.
- *
- * Le dénominateur est bien le TOTAL, et non la somme des quatre statuts : les
- * deux coïncident aujourd'hui, mais un statut ajouté demain les ferait diverger
- * en silence, et le taux dépasserait discrètement 100 %.
- */
 export function conversionRate(totals: { converti: number; prospects: number }): number {
   return percentOf(totals.converti, totals.prospects);
 }
 
-/** Part des prospects ayant livré une méthode d'enrôlement. */
 export function methodRate(input: { methodTotal: number; prospects: number }): number {
   return percentOf(input.methodTotal, input.prospects);
 }
 
-/**
- * Moyenne de saisies par jour sur les 30 derniers jours.
- *
- * Une moyenne journalière et non un total : « 1 240 sur 30 jours » ne se
- * compare à rien, « 41 par jour » se compare au jour d'hier.
- */
 export function dailyAverage(prospects30Jours: number): number {
   return Math.round((prospects30Jours / 30) * 10) / 10;
 }
 
-/**
- * Variation entre les 7 derniers jours et les 7 précédents, en pourcentage.
- *
- * Les 7 précédents s'obtiennent par différence : `30 jours` couvre les 7
- * derniers. C'est une approximation ASSUMÉE : la fenêtre de comparaison fait 23
- * jours ramenés à 7 : et c'est pourquoi l'écran ne l'affiche pas comme une
- * tendance mais comme un rythme. Rien ne justifierait un septième appel d'API
- * pour un chiffre indicatif.
- */
 export function weeklyPace(input: { prospects7Jours: number; prospects30Jours: number }): number {
   const earlier = Math.max(0, input.prospects30Jours - input.prospects7Jours);
   const perWeekEarlier = (earlier / 23) * 7;
@@ -130,12 +79,6 @@ export function weeklyPace(input: { prospects7Jours: number; prospects30Jours: n
   return Math.round(((input.prospects7Jours - perWeekEarlier) / perWeekEarlier) * 1000) / 10;
 }
 
-/**
- * Segment le plus productif, à la part de méthodes obtenues.
- *
- * `null` quand aucun segment ne porte de prospect : afficher « BDD1 » sur une
- * base vide laisserait croire à une donnée, alors qu'il n'y en a aucune.
- */
 export function bestSegment(segments: readonly SegmentCount[]): SegmentCount | null {
   const populated = segments.filter((segment) => segment.prospects > 0);
   if (populated.length === 0) return null;
@@ -147,7 +90,6 @@ export function bestSegment(segments: readonly SegmentCount[]): SegmentCount | n
   );
 }
 
-/** Série cumulée, calculée sur la fenêtre affichée. */
 function toTimeSeries(
   buckets: readonly { bucket: string; prospects: number }[],
 ): { date: string; count: number; cumulative: number }[] {
@@ -158,29 +100,12 @@ function toTimeSeries(
   });
 }
 
-/**
- * Heures en jours, arrondi au dixième.
- *
- * `null` reste `null` : « aucun dossier clos » n'est pas « zéro jour ». Les
- * confondre ferait afficher un délai de traitement parfait sur une banque qui
- * n'a rien traité du tout.
- */
 export function hoursToDays(hours: number | null): number | null {
   if (hours === null) return null;
   return Math.round((hours / 24) * 10) / 10;
 }
 
-/**
- * Au-delà de 5 séries on regroupe : docs/design.md §2.6.
- *
- * La fonction et son seuil vivent dans `lib/data/series.ts`, partagés avec le
- * tableau de bord. Ils étaient dupliqués mot pour mot entre les deux modules :
- * deux copies d'une règle de rendu divergent tôt ou tard, et deux écrans
- * afficheraient alors la même distribution autrement.
- */
 export { MAX_CHART_SERIES as MAX_SERIES, groupTail };
-
-// ─── Chargement ──────────────────────────────────────────────────────────────
 
 export async function fetchTeleconseilStats(
   filters: ProspectFilters,

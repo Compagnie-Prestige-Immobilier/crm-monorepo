@@ -19,18 +19,12 @@ export default async function ProspectsPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  // `GET /prospects` et les agrégats sont fermés à un BANQUE_FINANCE : son
-  // métier tient dans les dossiers bancaires. On coupe ici plutôt que de
-  // laisser l'écran se monter et empiler des refus de droits.
   const guard = await guardRoles(['ADMIN']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="Le suivi des prospects" />;
   }
 
-  // Les filtres sont lus dans l'URL, côté serveur : la première page rendue est
-  // déjà la page filtrée. Un lien partagé s'ouvre directement sur le bon écran,
-  // sans passer par un état vide.
   const filters = parseProspectFilters(await searchParams);
   const session = await getSession();
   const client = getServerApiClient();

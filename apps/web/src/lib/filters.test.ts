@@ -18,12 +18,6 @@ import {
 } from '@/lib/filters';
 import type { ProspectFilters } from '@/lib/types';
 
-/**
- * L'URL EST l'état du tableau. Il n'y a pas de copie dans un store React, donc
- * `parse` et `serialize` doivent être exactement réciproques : un lien collé
- * dans une conversation doit rendre l'écran de son auteur, au filtre près.
- */
-
 const FULL: ProspectFilters = {
   search: 'Ndiaye',
   commercialId: 'c-1',
@@ -57,8 +51,6 @@ describe('aller-retour filtres ⇄ search params', () => {
   });
 
   it('n’écrit AUCUN paramètre pour le filtre par défaut', () => {
-    // Une URL propre quand rien n'est filtré : `/prospects`, pas
-    // `/prospects?page=1&pageSize=25&sortBy=...`.
     expect(serializeProspectFilters(EMPTY_FILTERS).toString()).toBe('');
   });
 
@@ -74,7 +66,6 @@ describe('aller-retour filtres ⇄ search params', () => {
     const restored = parseProspectFilters({
       search: 'Ndiaye',
       statut: 'CONVERTI',
-      // Next passe un tableau quand la clé est répétée : on retient la première.
       departementId: ['d-1', 'd-2'],
       page: '3',
     });
@@ -97,7 +88,6 @@ describe('analyse défensive des URL bricolées', () => {
   });
 
   it('écarte un champ de tri que l’API ne supporte pas', () => {
-    // Un tri « par représentant » afficherait une flèche qui ne trie rien.
     expect(parseProspectFilters(new URLSearchParams('sortBy=representant')).sortBy).toBe(
       EMPTY_FILTERS.sortBy,
     );
@@ -113,8 +103,6 @@ describe('analyse défensive des URL bricolées', () => {
   it('retombe sur les valeurs par défaut pour une pagination absurde', () => {
     const filters = parseProspectFilters(new URLSearchParams('page=-3&pageSize=99999'));
     expect(filters.page).toBe(1);
-    // 99999 n'est pas dans PAGE_SIZE_OPTIONS : un export involontaire de toute
-    // la base ne doit pas être à un caractère d'URL près.
     expect(filters.pageSize).toBe(DEFAULT_PAGE_SIZE);
   });
 
@@ -127,13 +115,9 @@ describe('buildExportUrl', () => {
   it('retire page et pageSize et CONSERVE tous les filtres', () => {
     const params = new URLSearchParams(buildExportUrl(FULL).split('?')[1]);
 
-    // Ce que l'export ne doit surtout pas garder : un fichier Excel contient
-    // toute la sélection, pas la page affichée.
     expect(params.has('page')).toBe(false);
     expect(params.has('pageSize')).toBe(false);
 
-    // Ce qu'il doit garder, sans exception : c'est la promesse faite à
-    // l'administrateur qui envoie le fichier à sa direction.
     expect(params.get('search')).toBe('Ndiaye');
     expect(params.get('commercialId')).toBe('c-1');
     expect(params.get('representantId')).toBe('r-1');
@@ -146,9 +130,6 @@ describe('buildExportUrl', () => {
   });
 
   it('couvre TOUS les critères de sélection, sans en oublier un', () => {
-    // Test de garde : si quelqu'un ajoute un critère à ProspectFilters sans
-    // l'ajouter à la sérialisation, l'export cesserait silencieusement de
-    // correspondre à l'écran. On compare les clés attendues au contrat.
     const selectionKeys = Object.keys(FULL).filter(
       (key) => !['page', 'pageSize', 'sortBy', 'sortDir'].includes(key),
     );
@@ -171,16 +152,12 @@ describe('buildExportUrl', () => {
 
 describe('traduction vers les paramètres de l’API', () => {
   it('élargit les bornes de date à la journée entière', () => {
-    // `dateTo=2026-03-31` seul exclurait tout prospect saisi ce jour-là :
-    // l'API l'interpréterait comme minuit pile.
     const query = toFilterQuery(FULL);
     expect(query.dateFrom).toBe('2026-01-01T00:00:00.000Z');
     expect(query.dateTo).toBe('2026-03-31T23:59:59.999Z');
   });
 
   it('n’écrit aucune clé pour un critère non renseigné', () => {
-    // `exactOptionalPropertyTypes` interdit `undefined` explicite, et une clé
-    // vide relayée à l'API produirait un 400.
     expect(Object.keys(toFilterQuery(EMPTY_FILTERS))).toHaveLength(0);
   });
 
@@ -190,12 +167,10 @@ describe('traduction vers les paramètres de l’API', () => {
     expect(query.pageSize).toBe(50);
     expect(query.sortBy).toBe('nom');
     expect(query.sortOrder).toBe('asc');
-    // La sélection reste intacte : tableau et export voient les mêmes critères.
     expect(query.statut).toBe('CONTACTE');
   });
 
   it('la sélection de toProspectQuery est identique à celle de toFilterQuery', () => {
-    // Garantie centrale : le tableau et l'export ne peuvent pas diverger.
     const { page, pageSize, sortBy, sortOrder, ...selection } = toProspectQuery(FULL);
     void page;
     void pageSize;
@@ -223,7 +198,6 @@ describe('countActiveFilters', () => {
   });
 
   it('compte chaque critère renseigné plus la plage de dates', () => {
-    // Sept critères de phase 1, cinq de phase 2, et la plage comptée pour un.
     expect(countActiveFilters(FULL)).toBe(13);
   });
 
@@ -236,15 +210,6 @@ describe('countActiveFilters', () => {
   });
 });
 
-/**
- * Phase 2 dans l'URL.
- *
- * Ces cinq critères sont arrivés APRÈS le tableau, les graphiques et l'export.
- * S'ils avaient été rangés dans un second objet de filtre, un lien « BDD2,
- * méthode obtenue » aurait rouvert le tableau filtré et l'export non filtré -
- * et personne ne s'en serait aperçu avant qu'un classeur ne parte au siège.
- * Ces tests fixent l'aller-retour et la présence dans l'export.
- */
 describe('filtres de phase 2', () => {
   it('fait l’aller-retour URL ⇄ filtre sans perte', () => {
     const filters: ProspectFilters = {
@@ -284,19 +249,12 @@ describe('filtres de phase 2', () => {
   });
 });
 
-/**
- * Le classeur consolidé porte SA PROPRE segmentation, en cinq feuilles fixes.
- * Y relayer `segment=BDD2` produirait quatre feuilles vides sur cinq : et
- * l'utilisateur ne le découvrirait qu'en ouvrant Excel.
- */
 describe('classeur consolidé', () => {
   it('demande le mode consolidé et RETIRE le critère de segment', () => {
     const url = buildExportUrl(FULL, 'consolidated');
     const params = new URLSearchParams(url.split('?')[1]);
     expect(params.get('mode')).toBe('consolidated');
     expect(params.has('segment')).toBe(false);
-    // Les autres critères restent : le classeur consolidé d'un département
-    // donné reste un classeur consolidé.
     expect(params.get('departementId')).toBe('d-1');
   });
 
@@ -311,25 +269,8 @@ describe('classeur consolidé', () => {
   });
 });
 
-/**
- * Le partage entre filtrage simple et filtrage avancé.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Ce que ces tests protègent : un filtre actif ne doit JAMAIS devenir
- * invisible.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Replier dix champs raccourcit la page, mais si un critère resté actif
- * disparaît de l'écran, le tableau affiche une population restreinte que
- * personne ne sait expliquer. Le chiffre lu est faux, et il a l'air normal.
- *
- * D'où deux invariants : le compte des critères repliés est exact, et une URL
- * qui en porte un ouvre le panneau quelle que soit la préférence enregistrée.
- */
 describe('filtrage avancé', () => {
   it('compte les critères repliés, sans compter ceux restés visibles', () => {
-    // Les dix critères avancés de FULL. La recherche, la période et le
-    // téléconseiller restent à l'air libre : ils ne comptent pas ici.
     expect(countAdvancedFilters(FULL)).toBe(10);
     expect(activeAdvancedKeys(FULL)).toEqual([...ADVANCED_FILTER_KEYS]);
     expect(hasAdvancedFilters(FULL)).toBe(true);
@@ -345,15 +286,12 @@ describe('filtrage avancé', () => {
     };
     expect(countAdvancedFilters(visibleOnly)).toBe(0);
     expect(hasAdvancedFilters(visibleOnly)).toBe(false);
-    // Trois critères actifs tout de même : le compte global les voit.
     expect(countActiveFilters(visibleOnly)).toBe(3);
   });
 
   it('n’efface QUE les critères repliés', () => {
     const cleared: ProspectFilters = { ...FULL, ...clearAdvancedFilters() };
     expect(hasAdvancedFilters(cleared)).toBe(false);
-    // Ce que l'utilisateur voit à l'écran n'a pas bougé : effacer un champ
-    // visible depuis un bouton rangé ailleurs se lirait comme un défaut.
     expect(cleared.search).toBe('Ndiaye');
     expect(cleared.commercialId).toBe('c-1');
     expect(cleared.dateFrom).toBe('2026-01-01');
@@ -376,20 +314,6 @@ describe('filtrage avancé', () => {
   });
 });
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * Le lien « Voir le prospect créé » porte un numéro E.164, avec son « + ».
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `client-requests-view.tsx` construit `/prospects?search=<E164>` : c'est la
- * seule façon d'atteindre la fiche, le panel n'ayant pas d'écran de détail de
- * prospect ni de critère par identifiant.
- *
- * Le piège est le « + » : dans une chaîne de requête, il vaut une ESPACE. Un
- * lien écrit sans `encodeURIComponent` livrerait donc « 221771234567 » sans
- * indicatif, la recherche ne trouverait rien, et l'admin conclurait que le
- * prospect n'a pas été créé alors qu'il l'a bien été.
- */
 describe('un numéro E.164 survit à l’aller-retour d’URL', () => {
   it('conserve l’indicatif quand le lien encode le terme', () => {
     const phone = '+221771234567';
@@ -407,7 +331,6 @@ describe('un numéro E.164 survit à l’aller-retour d’URL', () => {
     expect(restored.search).toBe(phone);
   });
 
-  /** La preuve du défaut évité : sans encodage, l'indicatif disparaît. */
   it('un « + » NON encodé serait lu comme une espace', () => {
     expect(new URLSearchParams('search=+221771234567').get('search')).toBe(' 221771234567');
   });

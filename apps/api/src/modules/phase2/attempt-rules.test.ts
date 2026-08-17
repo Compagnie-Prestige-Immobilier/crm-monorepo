@@ -9,7 +9,6 @@ import {
   normalizeAttempt,
 } from './attempt-rules.js';
 
-/** Extrait le code métier d'une exception Nest, ou échoue. */
 function codeOf(run: () => unknown): string {
   try {
     run();
@@ -126,7 +125,6 @@ describe('normalizeAttempt, commentaire', () => {
     expect(codeOf(() => normalizeAttempt({ outcome: CallOutcome.OTHER, comment: tooLong }))).toBe(
       'PHASE2_COMMENT_TOO_LONG',
     );
-    // La limite exacte passe.
     expect(
       normalizeAttempt({ outcome: CallOutcome.OTHER, comment: 'x'.repeat(COMMENT_MAX_LENGTH) })
         .comment,
