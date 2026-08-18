@@ -25,6 +25,8 @@ class SyncApi {
   /// Parameters:
   /// * [since] - Curseur opaque renvoyé par l’appel précédent. Absent : synchronisation complète.
   /// * [limit]
+  /// * [pendingOps] - Opérations en attente de remontée dans l’appareil. Le serveur ne peut pas la deviner. Facultatif sans limite de temps.
+  /// * [appVersion] - Version de l’application mobile, telle qu’elle s’annonce. Facultative.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -37,6 +39,8 @@ class SyncApi {
   Future<Response<SyncPullResponseDto>> pullSyncChanges({
     String? since,
     num? limit = 200,
+    num? pendingOps,
+    String? appVersion,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -60,6 +64,8 @@ class SyncApi {
     final _queryParameters = <String, dynamic>{
       if (since != null) r'since': since,
       if (limit != null) r'limit': limit,
+      if (pendingOps != null) r'pendingOps': pendingOps,
+      if (appVersion != null) r'appVersion': appVersion,
     };
 
     final _response = await _dio.request<Object>(

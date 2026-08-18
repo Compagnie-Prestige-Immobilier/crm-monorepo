@@ -193,10 +193,18 @@ final StreamProvider<List<OutboxData>> needsAttentionProvider =
     });
 
 
-final StreamProvider<List<Departement>> departementsProvider =
-    StreamProvider<List<Departement>>((Ref ref) {
-      return ref.watch(referenceRepositoryProvider).watchDepartements();
-    });
+final StreamProvider<List<Region>> regionsProvider = StreamProvider<List<Region>>((
+  Ref ref,
+) {
+  return ref.watch(referenceRepositoryProvider).watchRegions();
+});
+
+final departementsProvider = StreamProvider.family<List<Departement>, String?>((
+  Ref ref,
+  String? regionId,
+) {
+  return ref.watch(referenceRepositoryProvider).watchDepartements(regionId: regionId);
+});
 
 final iefsProvider = StreamProvider.family<List<Ief>, String?>((
   Ref ref,
@@ -252,12 +260,28 @@ final StreamProvider<List<RepresentantSyncViewData>> representantPickerListProvi
           .watchRepresentants(search: ref.watch(representantPickerSearchProvider));
     });
 
+final representantDetailProvider =
+    StreamProvider.family<RepresentantSyncViewData?, String>((
+      Ref ref,
+      String representantId,
+    ) {
+      return ref.watch(referenceRepositoryProvider).watchRepresentant(representantId);
+    });
+
 final prospectsForRepresentantProvider =
     StreamProvider.family<List<ProspectSyncViewData>, String>((
       Ref ref,
       String representantId,
     ) {
       return ref.watch(referenceRepositoryProvider).watchProspectsFor(representantId);
+    });
+
+final representantCommentsProvider =
+    StreamProvider.family<List<RepresentantComment>, String>((
+      Ref ref,
+      String representantId,
+    ) {
+      return ref.watch(referenceRepositoryProvider).watchCommentsFor(representantId);
     });
 
 final prospectCountForProvider = StreamProvider.family<int, String>((

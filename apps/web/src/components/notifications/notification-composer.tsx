@@ -60,7 +60,7 @@ type When = 'now' | 'later';
 
 const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DOSSIER', 'SYSTEME'];
 const AUDIENCES: NotificationAudience[] = ['ALL', 'ROLE', 'DEPARTEMENT', 'USERS'];
-const ROLES: Role[] = ['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE'];
+const ROLES: Role[] = ['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE', 'SUPERVISEUR'];
 
 const CATEGORY_ITEMS = CATEGORIES.map((item) => ({ value: item, label: CATEGORY_LABELS[item] }));
 const AUDIENCE_ITEMS = AUDIENCES.map((item) => ({ value: item, label: AUDIENCE_LABELS[item] }));

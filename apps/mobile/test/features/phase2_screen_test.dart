@@ -267,6 +267,88 @@ void main() {
     expect(await db.countPhase2Pending().getSingle(), 1);
   });
 
+  /// Ouvre la feuille des issues négatives et choisit une issue.
+  Future<void> chooseOutcome(WidgetTester tester, String label) async {
+    await tester.ensureVisible(find.text('Méthode non obtenue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Méthode non obtenue'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(label));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(label));
+    await tester.pumpAndSettle();
+  }
+
+  // ═══ L'HEURE DE RAPPEL SE SAISIT SANS CLAVIER ═══
+  //
+  // Le terrain saisit debout, souvent d'une main : un clavier de date couvre la
+  // moitié de l'écran et demande une frappe exacte. Les puces sont l'exigence,
+  // pas le confort.
+  phase2TestWidgets('« À rappeler » propose des heures, en un seul appui', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await type(tester, '771234567');
+    await chooseOutcome(tester, 'À rappeler');
+
+    expect(find.text('Dans 1 h'), findsOneWidget);
+    expect(find.text('Demain 9 h'), findsOneWidget);
+    expect(find.text('Autre heure'), findsOneWidget);
+  });
+
+  phase2TestWidgets('une autre issue n\'offre pas d\'heure de rappel', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await type(tester, '771234567');
+    await chooseOutcome(tester, 'Refus');
+
+    expect(find.text('Demain 9 h'), findsNothing);
+  });
+
+  phase2TestWidgets('l\'heure choisie est enregistrée avec la tentative', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await type(tester, '771234567');
+    await chooseOutcome(tester, 'À rappeler');
+
+    await tester.ensureVisible(find.text('Demain 9 h'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Demain 9 h'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+
+    final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+    expect(attempt.outcome, CallOutcomes.callback);
+    // `t0` vaut le 12 août 2026 à 9 h : « Demain 9 h » est donc le 13 à 9 h,
+    // heure de Dakar, c'est-à-dire UTC toute l'année.
+    expect(attempt.callbackAt, DateTime.utc(2026, 8, 13, 9));
+  });
+
+  // Le champ est FACULTATIF côté serveur pour les téléphones déjà déployés :
+  // l'écran ne doit pas le rendre obligatoire dans leur dos.
+  phase2TestWidgets('un rappel sans heure s\'enregistre quand même', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await type(tester, '771234567');
+    await chooseOutcome(tester, 'À rappeler');
+
+    await tester.ensureVisible(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enregistré'), findsOneWidget);
+    final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+    expect(attempt.callbackAt, isNull);
+  });
+
   phase2TestWidgets('« Numéro suivant » vide le champ et lui rend le focus', (
     WidgetTester tester,
   ) async {

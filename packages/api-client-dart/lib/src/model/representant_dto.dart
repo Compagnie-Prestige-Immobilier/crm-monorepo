@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -48,6 +49,8 @@ class RepresentantDto {
     required this.updatedAt,
 
     required this.prospectCount,
+
+    required this.relationStatus,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -97,6 +100,14 @@ class RepresentantDto {
   @JsonKey(name: r'prospectCount', required: true, includeIfNull: false)
   final num prospectCount;
 
+  @JsonKey(
+    name: r'relationStatus',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
+  )
+  final RepresentantRelation relationStatus;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is RepresentantDto &&
@@ -118,6 +129,7 @@ class RepresentantDto {
                 createdAt,
                 updatedAt,
                 prospectCount,
+                relationStatus,
               ],
               [
                 other.id,
@@ -135,6 +147,7 @@ class RepresentantDto {
                 other.createdAt,
                 other.updatedAt,
                 other.prospectCount,
+                other.relationStatus,
               ],
             );
   }
@@ -158,6 +171,7 @@ class RepresentantDto {
         createdAt,
         updatedAt,
         prospectCount,
+        relationStatus,
       ]);
 
   factory RepresentantDto.fromJson(Map<String, dynamic> json) =>

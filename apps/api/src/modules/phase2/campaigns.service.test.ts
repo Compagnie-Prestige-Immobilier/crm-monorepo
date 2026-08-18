@@ -6,6 +6,7 @@ import {
   CampaignStatus,
   EnrollmentMethod,
   Role,
+  ScheduledCallbackStatus,
 } from '@crm/database';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -22,6 +23,7 @@ type MockDb = {
   callCampaignCommercial: Record<'findUnique' | 'createMany', MockFn>;
   callTask: Record<'groupBy' | 'findMany' | 'count' | 'updateMany' | 'createMany', MockFn>;
   callAttempt: Record<'findMany', MockFn>;
+  scheduledCallback: Record<'updateMany', MockFn>;
   prospect: Record<'findMany', MockFn>;
   user: Record<'findMany', MockFn>;
   $transaction: MockFn;
@@ -35,6 +37,13 @@ const ADMIN: AuthenticatedUser = {
   username: 'admin',
   fullName: 'Admin CPI',
   role: Role.ADMIN,
+};
+const TELECONSEILLER: AuthenticatedUser = {
+  id: 'com-1',
+  email: 'awa@cpi.sn',
+  username: 'awa',
+  fullName: 'Awa Ndiaye',
+  role: Role.COMMERCIAL,
 };
 const date = new Date('2026-04-08T14:30:00.000Z');
 
@@ -56,6 +65,7 @@ function prismaStub(): MockDb {
       createMany: vi.fn(),
     },
     callAttempt: { findMany: vi.fn() },
+    scheduledCallback: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     prospect: { findMany: vi.fn() },
     user: { findMany: vi.fn() },
     $transaction: vi.fn(),
@@ -102,11 +112,17 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
     const result = await new Phase2CampaignsService(
       db as unknown as PrismaService,
       fakeDemoVisibility(),
-    ).list({});
+    ).list(ADMIN, {});
 
     expect(result.items[0]?.progress).toEqual({ total: 6, open: 3, done: 2, cancelled: 1 });
     expect(result.items[0]?.scopeLabel).toContain('CHUES');
     expect(result.meta).toEqual({ total: 1, page: 1, pageSize: 25, pageCount: 1 });
+
+    const where = (db.callCampaign.findMany.mock.calls[0]?.[0] as { where: object }).where;
+    expect(where).not.toHaveProperty('tasks');
+    expect((db.callTask.groupBy.mock.calls[0]?.[0] as { where: object }).where).not.toHaveProperty(
+      'assignedToId',
+    );
   });
 
   it('une liste vide reste UNE page vide, comme partout ailleurs', async () => {
@@ -118,10 +134,61 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
     const result = await new Phase2CampaignsService(
       db as unknown as PrismaService,
       fakeDemoVisibility(),
-    ).list({});
+    ).list(ADMIN, {});
 
     expect(result.items).toEqual([]);
     expect(result.meta).toEqual({ total: 0, page: 1, pageSize: 25, pageCount: 1 });
+  });
+
+  it('CLOISONNE la liste d’un téléconseiller sur les campagnes où il a des tâches', async () => {
+    const db = prismaStub();
+    db.callCampaign.count.mockResolvedValue(0);
+    db.callCampaign.findMany.mockResolvedValue([]);
+    db.callTask.groupBy.mockResolvedValue([]);
+
+    await new Phase2CampaignsService(db as unknown as PrismaService, fakeDemoVisibility()).list(
+      TELECONSEILLER,
+      {},
+    );
+
+    for (const call of [db.callCampaign.count, db.callCampaign.findMany]) {
+      const where = (call.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
+      expect(where).toMatchObject({ tasks: { some: { assignedToId: TELECONSEILLER.id } } });
+    }
+  });
+
+  it('ne rend à un téléconseiller que SES compteurs, pas ceux de l’équipe', async () => {
+    const db = prismaStub();
+    db.callCampaign.count.mockResolvedValue(1);
+    db.callCampaign.findMany.mockResolvedValue([
+      {
+        id: 'camp-1',
+        name: 'Avril',
+        scope: CampaignScope.BDD1,
+        status: CampaignStatus.ACTIVE,
+        seed: 'seed',
+        spreadDays: 1,
+        createdById: ADMIN.id,
+        createdAt: date,
+        closedAt: null,
+        createdBy: { fullName: ADMIN.fullName },
+        _count: { commerciaux: 2 },
+      },
+    ]);
+    db.callTask.groupBy.mockResolvedValue([
+      { campaignId: 'camp-1', status: CallTaskStatus.OPEN, _count: { _all: 2 } },
+    ]);
+
+    const result = await new Phase2CampaignsService(
+      db as unknown as PrismaService,
+      fakeDemoVisibility(),
+    ).list(TELECONSEILLER, {});
+
+    // Le décompte est BORNÉ EN BASE : sans cette clause, la campagne rendrait les
+    // tâches de toute l'équipe sous couvert d'un « avancement ».
+    const where = (db.callTask.groupBy.mock.calls[0]?.[0] as { where: object }).where;
+    expect(where).toMatchObject({ assignedToId: TELECONSEILLER.id });
+    expect(result.items[0]?.progress).toEqual({ total: 2, open: 2, done: 0, cancelled: 0 });
   });
 
   it('rend le détail avec progression par commercial et tentative récente', async () => {
@@ -248,6 +315,36 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
       where: { campaignId: 'camp-1', isActive: true },
       data: { status: CallTaskStatus.CANCELLED, isActive: false },
     });
+    expect(db.scheduledCallback.updateMany).toHaveBeenCalledWith({
+      where: { campaignId: 'camp-1', status: ScheduledCallbackStatus.PENDING },
+      data: { status: ScheduledCallbackStatus.CANCELLED },
+    });
+  });
+
+  it('une campagne déjà close ne réannule pas les rappels', async () => {
+    const db = prismaStub();
+    db.callCampaign.findFirst.mockResolvedValueOnce({ status: CampaignStatus.CLOSED });
+    db.callCampaign.findFirst.mockResolvedValue({
+      id: 'camp-1',
+      name: 'Avril',
+      scope: CampaignScope.ALL,
+      status: CampaignStatus.CLOSED,
+      seed: 'seed',
+      spreadDays: 1,
+      createdById: ADMIN.id,
+      createdAt: date,
+      closedAt: date,
+      createdBy: { fullName: ADMIN.fullName },
+      commerciaux: [],
+    });
+    db.callTask.groupBy.mockResolvedValue([]);
+    db.callAttempt.findMany.mockResolvedValue([]);
+
+    await new Phase2CampaignsService(db as unknown as PrismaService, fakeDemoVisibility()).close(
+      'camp-1',
+    );
+
+    expect(db.scheduledCallback.updateMany).not.toHaveBeenCalled();
   });
 
   it('retourne le programme dans la position persistée, sans nom de prospect', async () => {

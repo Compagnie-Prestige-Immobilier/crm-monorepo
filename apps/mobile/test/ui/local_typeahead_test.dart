@@ -165,4 +165,90 @@ void main() {
       expect(find.textContaining('Aucun résultat'), findsNothing);
     });
   });
+
+  group('choisir une option ferme la liste', () {
+    /// Un champ monté comme les quatre appelants le montent : `selectedId` est
+    /// posé dans `onSelected`, effacé dès que l'utilisateur retape.
+    Future<({FocusNode focus, List<String> chosen})> pumpSelectable(
+      WidgetTester tester,
+    ) async {
+      final TextEditingController controller = TextEditingController();
+      final FocusNode focus = FocusNode();
+      addTearDown(controller.dispose);
+      addTearDown(focus.dispose);
+      final List<String> chosen = <String>[];
+      String? selectedId;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (BuildContext context, StateSetter setState) => LocalTypeahead(
+                controller: controller,
+                focusNode: focus,
+                options: <TypeaheadOption>[
+                  option('Tambacounda'),
+                  option('Dakar'),
+                  option('Thiès'),
+                ],
+                label: 'Département',
+                selectedId: selectedId,
+                onChanged: (String _) {
+                  if (selectedId != null) setState(() => selectedId = null);
+                },
+                onSelected: (TypeaheadOption o) {
+                  chosen.add(o.id);
+                  setState(() => selectedId = o.id);
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return (focus: focus, chosen: chosen);
+    }
+
+    testWidgets('après un choix, la liste est fermée et le champ rend la main', (
+      WidgetTester tester,
+    ) async {
+      // Plainte terrain : « je tape, je complète avec le combobox, il me
+      // réaffiche toute la liste encore et je dois choisir à nouveau ».
+      final ({FocusNode focus, List<String> chosen}) f = await pumpSelectable(tester);
+
+      await tester.tap(find.byType(TextField));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Tamba');
+      await tester.pumpAndSettle();
+      expect(find.byType(ListTile), findsOneWidget);
+
+      await tester.tap(find.byType(ListTile));
+      await tester.pumpAndSettle();
+
+      expect(f.chosen, <String>['Tambacounda']);
+      expect(find.byType(ListTile), findsNothing);
+      expect(f.focus.hasFocus, isFalse);
+    });
+
+    testWidgets('revenir sur le champ sans le toucher ne rouvre pas tout', (
+      WidgetTester tester,
+    ) async {
+      final ({FocusNode focus, List<String> chosen}) f = await pumpSelectable(tester);
+
+      await tester.tap(find.byType(TextField));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Tamba');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(ListTile));
+      await tester.pumpAndSettle();
+
+      f.focus.unfocus();
+      await tester.pumpAndSettle();
+      f.focus.requestFocus();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ListTile), findsOneWidget);
+    });
+  });
 }

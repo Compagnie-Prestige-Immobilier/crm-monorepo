@@ -22,21 +22,37 @@ export const PHASE2_STATUS_FOR_OUTCOME: Readonly<Record<TerminalOutcome, Phase2S
   [CallOutcome.WRONG_NUMBER]: Phase2Status.WRONG_NUMBER,
 };
 
+/** Même valeur que `IMPORT_CLOCK_SKEW_TOLERANCE_MS` : une seule dérive admise dans le dépôt. */
+export const CALLBACK_CLOCK_SKEW_TOLERANCE_MS = 5 * 60_000;
+
 export interface RawAttempt {
   readonly outcome: CallOutcome;
   readonly method?: EnrollmentMethod | null;
   readonly comment?: string | null;
+  readonly callbackAt?: string | null;
+  readonly clientCreatedAt?: string | null;
 }
 
 export interface NormalizedAttempt {
   readonly outcome: CallOutcome;
   readonly method: EnrollmentMethod | null;
   readonly comment: string | null;
+  readonly callbackAt: Date | null;
   readonly terminal: boolean;
 }
 
 const invalid = (code: string, message: string): never => {
   throw new BadRequestException({ code, message });
+};
+
+/**
+ * Référence du « futur » : l'horodatage TERRAIN, jamais l'heure du serveur. Les
+ * deux dates sortent de la même horloge, donc un téléphone déréglé les décale
+ * ensemble, et un lot poussé trois semaines plus tard reste valide.
+ */
+const fieldTime = (iso: string | null | undefined): number => {
+  const parsed = iso === null || iso === undefined ? Number.NaN : new Date(iso).getTime();
+  return Number.isNaN(parsed) ? Date.now() : parsed;
 };
 
 export function normalizeAttempt(input: RawAttempt): NormalizedAttempt {
@@ -73,5 +89,33 @@ export function normalizeAttempt(input: RawAttempt): NormalizedAttempt {
     );
   }
 
-  return { outcome: input.outcome, method, comment, terminal };
+  return { outcome: input.outcome, method, comment, callbackAt: callbackAt(input), terminal };
+}
+
+/**
+ * Une issue CALLBACK sans date n'est PAS refusée : les versions déjà installées
+ * proposent « À rappeler » sans date, et un refus mettrait leur saisie en échec
+ * à la remontée. Elle donne une tentative, sans rappel planifié.
+ */
+function callbackAt(input: RawAttempt): Date | null {
+  const raw = input.callbackAt ?? null;
+  if (raw === null) return null;
+
+  if (input.outcome !== CallOutcome.CALLBACK) {
+    invalid(
+      'PHASE2_CALLBACK_AT_NOT_ALLOWED',
+      'Une date de rappel n’est admise que pour l’issue CALLBACK.',
+    );
+  }
+
+  const scheduled = new Date(raw);
+  if (Number.isNaN(scheduled.getTime())) {
+    invalid('PHASE2_CALLBACK_AT_INVALID', 'La date de rappel est illisible.');
+  }
+
+  if (scheduled.getTime() < fieldTime(input.clientCreatedAt) - CALLBACK_CLOCK_SKEW_TOLERANCE_MS) {
+    invalid('PHASE2_CALLBACK_AT_PAST', 'La date de rappel précède l’appel qui l’a promise.');
+  }
+
+  return scheduled;
 }

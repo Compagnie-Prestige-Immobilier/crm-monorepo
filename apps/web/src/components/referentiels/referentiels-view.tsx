@@ -10,6 +10,7 @@ import {
   PowerIcon,
   PowerOffIcon,
 } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -78,7 +79,10 @@ export function ReferentielsView() {
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-3xl text-[0.9375rem] text-muted-foreground">
-        Listes de valeurs proposées à la saisie des prospects.
+        Listes de valeurs proposées à la saisie des prospects.{' '}
+        <Link href="/referentiels/issues-appel" className="underline underline-offset-2">
+          Issues d’appel
+        </Link>
       </p>
 
       <Tabs

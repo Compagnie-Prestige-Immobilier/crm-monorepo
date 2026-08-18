@@ -209,6 +209,37 @@ class WriteRepository {
   }
 
 
+  /// Ajout seul. Un commentaire ne se modifie ni ne s'efface : il n'y a donc ni
+  /// `rev` à envoyer ni conflit possible, et deux téléconseillers hors ligne qui
+  /// commentent la même fiche produisent deux lignes distinctes.
+  Future<String> addRepresentantComment({
+    required String representantId,
+    required String body,
+    required String authorId,
+    required String authorName,
+  }) async {
+    final String trimmed = body.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(body, 'body', 'un commentaire vide ne s\'écrit pas');
+    }
+    final String entityId = Ids.newId();
+    final DateTime now = _clock.now();
+    await _db
+        .into(_db.representantComments)
+        .insert(
+          RepresentantCommentsCompanion.insert(
+            id: entityId,
+            representantId: representantId,
+            authorId: authorId,
+            authorName: authorName,
+            body: trimmed,
+            clientCreatedAt: now,
+          ),
+        );
+    return entityId;
+  }
+
+
   Future<String> createProspect({
     required String nom,
     required String prenom,
@@ -342,6 +373,7 @@ class WriteRepository {
     required String createdById,
     String? method,
     String? comment,
+    DateTime? callbackAt,
     String? id,
   }) async {
     final String? normalizedComment = normalizeComment(comment);
@@ -352,6 +384,8 @@ class WriteRepository {
     );
     if (problem != null) throw CallAttemptInvalid(problem);
 
+    // Le serveur refuse une heure de rappel sur une autre issue que CALLBACK.
+    final DateTime? callback = outcome == CallOutcomes.callback ? callbackAt : null;
     final String entityId = id ?? Ids.newId();
     final DateTime now = _clock.now();
 
@@ -365,6 +399,7 @@ class WriteRepository {
               outcome: outcome,
               method: Value<String?>(method),
               comment: Value<String?>(normalizedComment),
+              callbackAt: Value<DateTime?>(callback),
               clientCreatedAt: now,
               createdById: createdById,
             ),
@@ -379,6 +414,7 @@ class WriteRepository {
           'outcome': outcome,
           'method': ?method,
           'comment': ?normalizedComment,
+          'callbackAt': ?callback?.toUtc().toIso8601String(),
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
         now: now,

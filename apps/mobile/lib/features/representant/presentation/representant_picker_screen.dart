@@ -45,7 +45,7 @@ class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScr
     );
     final String search = ref.watch(representantPickerSearchProvider);
     final Map<String, String> departements = <String, String>{
-      for (final Departement d in ref.watch(departementsProvider).value ?? const [])
+      for (final Departement d in ref.watch(departementsProvider(null)).value ?? const [])
         d.id: d.name,
     };
 
@@ -141,53 +141,75 @@ class _RepresentantRow extends StatelessWidget {
         ? Phone.format(data.phoneE164)
         : '${Phone.format(data.phoneE164)} · $departement';
 
-    return Semantics(
-      button: true,
-      label: '${data.fullName}, $subtitle. Ajouter des prospects.',
-      child: ExcludeSemantics(
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            context.pushOnce(Routes.newProspectFor(data.id));
-          },
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: kCpiMinTouchTarget + 12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: CpiSpacing.md,
-                vertical: CpiSpacing.sm,
-              ),
-              child: Row(
-                children: <Widget>[
-                  SyncStatusIcon(status: status, size: 20),
-                  const SizedBox(width: CpiSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+    void openDetail() {
+      HapticFeedback.selectionClick();
+      context.pushOnce(Routes.representantDetailFor(data.id));
+    }
+
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Semantics(
+            button: true,
+            label: '${data.fullName}, $subtitle. Ajouter des prospects.',
+            child: ExcludeSemantics(
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  context.pushOnce(Routes.newProspectFor(data.id));
+                },
+                onLongPress: openDetail,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: kCpiMinTouchTarget + 12,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      CpiSpacing.md,
+                      CpiSpacing.sm,
+                      CpiSpacing.xs,
+                      CpiSpacing.sm,
+                    ),
+                    child: Row(
                       children: <Widget>[
-                        Text(data.fullName, style: theme.textTheme.titleSmall),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        SyncStatusIcon(status: status, size: 20),
+                        const SizedBox(width: CpiSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Text(data.fullName, style: theme.textTheme.titleSmall),
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
+                        Icon(
+                          PhosphorIconsRegular.userPlus,
+                          size: 20,
+                          color: context.cpi.accentText,
                         ),
                       ],
                     ),
                   ),
-                  Icon(
-                    PhosphorIconsRegular.userPlus,
-                    size: 20,
-                    color: context.cpi.accentText,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
         ),
-      ),
+        IconButton(
+          tooltip: 'Ouvrir la fiche',
+          onPressed: openDetail,
+          icon: const Icon(PhosphorIconsRegular.caretRight, size: 20),
+        ),
+        const SizedBox(width: CpiSpacing.xxs),
+      ],
     );
   }
 }

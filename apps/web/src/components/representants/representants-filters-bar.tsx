@@ -24,8 +24,11 @@ import { queryKeys } from '@/lib/query-keys';
 import {
   clearRepresentantAdvancedFilters,
   countActiveRepresentantFilters,
+  REPRESENTANT_RELATION_LABELS,
+  REPRESENTANT_RELATIONS,
   REPRESENTANT_SORT_FIELDS,
   REPRESENTANT_SORT_LABELS,
+  type RepresentantRelation,
   type RepresentantAdvancedFilterKey,
   type RepresentantFilters,
   type RepresentantSortField,
@@ -37,6 +40,14 @@ const PRESENCE_ITEMS = [
   { value: 'tous', label: 'Tous' },
   { value: 'oui', label: 'Au moins un' },
   { value: 'non', label: 'Aucun' },
+];
+
+const RELATION_ITEMS = [
+  { value: 'tous', label: 'Tous' },
+  ...REPRESENTANT_RELATIONS.map((relation) => ({
+    value: relation,
+    label: REPRESENTANT_RELATION_LABELS[relation],
+  })),
 ];
 
 const SORT_ITEMS: { value: RepresentantSortField; label: string }[] = REPRESENTANT_SORT_FIELDS.map(
@@ -53,12 +64,19 @@ export function RepresentantsFiltersBar() {
   const sortId = useId();
   const orderId = useId();
   const presenceId = useId();
+  const relationId = useId();
 
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,
     queryFn: () => fetchReferenceData(),
     staleTime: 5 * 60_000,
   });
+
+  const [regionDraft, setRegionDraft] = useState<string | null>(null);
+  const departements = reference?.departements ?? [];
+  const regionId =
+    departements.find((departement) => departement.id === filters.departementId)?.regionId ??
+    regionDraft;
 
   const [searchDraft, setSearchDraft] = useState(filters.search);
   useEffect(() => {
@@ -99,14 +117,59 @@ export function RepresentantsFiltersBar() {
         />
 
         <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
+          <Label htmlFor={relationId}>Relation</Label>
+          <Select
+            items={RELATION_ITEMS}
+            value={filters.relationStatus ?? 'tous'}
+            onValueChange={(value) => {
+              if (value === null) return;
+              setFilters({
+                relationStatus: value === 'tous' ? null : (value as RepresentantRelation),
+              });
+            }}
+          >
+            <SelectTrigger id={relationId} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {RELATION_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
+          <FilterCombobox
+            label="Région"
+            placeholder="Toutes les régions"
+            value={regionId}
+            options={(reference?.regions ?? []).map((region) => ({
+              value: region.id,
+              label: region.name,
+            }))}
+            onChange={(value) => {
+              setRegionDraft(value);
+              if (filters.departementId === null && filters.iefId === null) return;
+              setFilters({ departementId: null, iefId: null });
+            }}
+          />
+        </div>
+
+        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
           <FilterCombobox
             label="Département"
             placeholder="Tous les départements"
             value={filters.departementId}
-            options={(reference?.departements ?? []).map((departement) => ({
-              value: departement.id,
-              label: departement.name,
-            }))}
+            options={departements
+              .filter((departement) => regionId === null || departement.regionId === regionId)
+              .map((departement) => ({
+                value: departement.id,
+                label: departement.name,
+                hint: departement.regionName,
+              }))}
             onChange={(value) => {
               setFilters({ departementId: value, iefId: null });
             }}

@@ -47,6 +47,7 @@ export class ProspectsController {
   ) {}
 
   @Get()
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'listProspects',
     summary: 'Liste filtrée, triée et paginée côté serveur.',
@@ -61,6 +62,7 @@ export class ProspectsController {
   }
 
   @Get(':id')
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({ operationId: 'getProspect', summary: 'Détail d’un prospect.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: ProspectDto })

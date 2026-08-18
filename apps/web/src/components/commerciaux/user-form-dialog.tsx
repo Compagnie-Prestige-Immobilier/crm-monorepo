@@ -216,7 +216,9 @@ export function UserFormDialog({
                   ? 'Accès complet, y compris les comptes et les référentiels.'
                   : role === 'COMMERCIAL'
                     ? 'Saisit les prospects depuis l’application mobile.'
-                    : 'Décide de ce que le compte pourra consulter.'
+                    : role === 'SUPERVISEUR'
+                      ? 'Suit le travail des téléconseillers, en lecture. Ne saisit rien.'
+                      : 'Décide de ce que le compte pourra consulter.'
             }
             error={formState.errors.role?.message}
           >

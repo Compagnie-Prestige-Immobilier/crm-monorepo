@@ -16,6 +16,7 @@ import '../../../data/repositories/write_repository.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../phase2_controller.dart';
+import 'callback_picker.dart';
 
 class Phase2Screen extends ConsumerStatefulWidget {
   const Phase2Screen({super.key});
@@ -74,10 +75,20 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     _phoneFocus.requestFocus();
   }
 
-  Future<void> _record({required String outcome, String? method, String? comment}) async {
+  Future<void> _record({
+    required String outcome,
+    String? method,
+    String? comment,
+    DateTime? callbackAt,
+  }) async {
     final bool ok = await ref
         .read(phase2ControllerProvider.notifier)
-        .record(outcome: outcome, method: method, comment: comment);
+        .record(
+          outcome: outcome,
+          method: method,
+          comment: comment,
+          callbackAt: callbackAt,
+        );
     if (!mounted) return;
     if (!ok) {
       await HapticFeedback.heavyImpact();
@@ -162,10 +173,15 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (BuildContext context) => const _NegativeSheet(),
+      builder: (BuildContext context) =>
+          _NegativeSheet(now: ref.read(clockProvider).now()),
     );
     if (result == null || !mounted) return;
-    await _record(outcome: result.outcome, comment: result.comment);
+    await _record(
+      outcome: result.outcome,
+      comment: result.comment,
+      callbackAt: result.callbackAt,
+    );
   }
 }
 
@@ -847,14 +863,17 @@ class _Confirmed extends StatelessWidget {
 
 
 class _NegativeResult {
-  const _NegativeResult(this.outcome, this.comment);
+  const _NegativeResult(this.outcome, this.comment, this.callbackAt);
 
   final String outcome;
   final String? comment;
+  final DateTime? callbackAt;
 }
 
 class _NegativeSheet extends StatefulWidget {
-  const _NegativeSheet();
+  const _NegativeSheet({required this.now});
+
+  final DateTime now;
 
   @override
   State<_NegativeSheet> createState() => _NegativeSheetState();
@@ -864,6 +883,7 @@ class _NegativeSheetState extends State<_NegativeSheet> {
   final TextEditingController _comment = TextEditingController();
   String? _outcome;
   String? _error;
+  DateTime? _callbackAt;
 
   @override
   void dispose() {
@@ -923,7 +943,7 @@ class _NegativeSheetState extends State<_NegativeSheet> {
       setState(() => _error = problem.message);
       return;
     }
-    Navigator.of(context).pop(_NegativeResult(outcome, comment));
+    Navigator.of(context).pop(_NegativeResult(outcome, comment, _callbackAt));
   }
 
   @override
@@ -996,10 +1016,19 @@ class _NegativeSheetState extends State<_NegativeSheet> {
                             setState(() {
                               _outcome = option.outcome;
                               _error = null;
+                              _callbackAt = null;
                             });
                           },
                         ),
                       ),
+                    if (_outcome == CallOutcomes.callback) ...<Widget>[
+                      const SizedBox(height: CpiSpacing.sm),
+                      CallbackPicker(
+                        key: const ValueKey<String>('callback-picker'),
+                        now: widget.now,
+                        onChanged: (DateTime? at) => _callbackAt = at,
+                      ),
+                    ],
                     const SizedBox(height: CpiSpacing.sm),
                     TextField(
                       controller: _comment,

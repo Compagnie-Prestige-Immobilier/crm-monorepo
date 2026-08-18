@@ -37,7 +37,7 @@ const userBaseSchema = z.object({
   fullName: z.string().trim().min(1, 'Le nom complet est obligatoire.').max(160, 'Nom trop long.'),
   phone: z.string().trim().max(40, 'Numéro trop long.'),
   departementId: z.string().trim(),
-  role: z.enum(['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE'], {
+  role: z.enum(['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE', 'SUPERVISEUR'], {
     message: 'Choisissez le rôle du compte.',
   }),
 });

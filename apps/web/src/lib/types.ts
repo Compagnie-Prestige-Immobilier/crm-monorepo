@@ -39,6 +39,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrateur',
   COMMERCIAL: 'Téléconseiller',
   BANQUE_FINANCE: 'Banque & Finance',
+  SUPERVISEUR: 'Supervision',
 };
 
 export const RETIRED_SUFFIX = '(retiré)';

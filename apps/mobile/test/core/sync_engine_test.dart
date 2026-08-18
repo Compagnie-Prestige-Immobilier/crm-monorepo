@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:cpi_go/core/sync/api_port.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/sync/outbox_status.dart';
+import 'package:cpi_go/core/sync/phase2_directory_sync.dart';
 import 'package:cpi_go/core/sync/stub_api.dart';
 import 'package:cpi_go/core/sync/sync_engine.dart';
 import 'package:cpi_go/core/sync/sync_engine_factory.dart';
@@ -1203,6 +1204,63 @@ void main() {
       expect(row.attempts, 1);
     });
 
+    // `_toOperation` valide le lot sortant contre un vocabulaire compilé et
+    // marque `PAYLOAD_SCHEMA_MISMATCH`, statut TERMINAL, sur toute valeur qu'il
+    // ne sait pas envoyer. Une heure de rappel doit traverser ce filtre.
+    test('une heure de rappel part avec la tentative d\'appel', () async {
+      await queueOp(
+        db,
+        id: 'CB1',
+        entityType: callAttemptEntity,
+        entityId: 'att-1',
+        payload: <String, Object?>{
+          'prospectId': 'pros-1',
+          'outcome': CallOutcomes.callback,
+          'callbackAt': '2026-08-13T09:00:00.000Z',
+          'clientCreatedAt': t0.toIso8601String(),
+        },
+      );
+
+      await build().drain();
+
+      final SyncOperationDto sent = api.calls.single.operations.firstWhere(
+        (SyncOperationDto o) => o.opId == 'CB1',
+      );
+      expect(sent.data?.callbackAt, DateTime.utc(2026, 8, 13, 9));
+      expect(
+        (await outboxById(db, 'CB1')).lastErrorCode,
+        isNot(ClientErrorCodes.payloadSchemaMismatch),
+      );
+    });
+
+    // Le contrat garde le champ facultatif pour les téléphones déjà déployés :
+    // une opération en file depuis trois semaines n'en porte pas, et doit rester
+    // lisible par ce code-ci.
+    test('une tentative sans heure de rappel reste lisible', () async {
+      await queueOp(
+        db,
+        id: 'CB2',
+        entityType: callAttemptEntity,
+        entityId: 'att-2',
+        payload: <String, Object?>{
+          'prospectId': 'pros-1',
+          'outcome': CallOutcomes.callback,
+          'clientCreatedAt': t0.toIso8601String(),
+        },
+      );
+
+      await build().drain();
+
+      final SyncOperationDto sent = api.calls.single.operations.firstWhere(
+        (SyncOperationDto o) => o.opId == 'CB2',
+      );
+      expect(sent.data?.callbackAt, isNull);
+      expect(
+        (await outboxById(db, 'CB2')).lastErrorCode,
+        isNot(ClientErrorCodes.payloadSchemaMismatch),
+      );
+    });
+
     test('un payload indécodable échoue proprement, sans exception en fond', () async {
       await db
           .into(db.outbox)
@@ -1222,6 +1280,92 @@ void main() {
       final OutboxData row = await outboxById(db, 'BAD');
       expect(row.status, OutboxStatus.failed);
       expect(row.lastErrorCode, ClientErrorCodes.payloadSchemaMismatch);
+    });
+  });
+
+  group('champs facultatifs vidés', () {
+    late AppDatabase db;
+    late FakeApi api;
+    late SyncEngine engine;
+
+    setUp(() async {
+      db = await openTestDatabase();
+      api = FakeApi();
+      engine = SyncEngine(
+        database: db,
+        api: api,
+        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        clock: FakeClock(t0),
+        random: Random(7),
+      );
+    });
+    tearDown(() => db.close());
+
+    Future<SyncOperationDto> sendUpdate(Map<String, Object?> payload) async {
+      await insertRepresentant(
+        db,
+        id: 'repA',
+        phone: '+221770000001',
+        serverUpdatedAt: t0,
+      );
+      await queueOp(
+        db,
+        id: 'A1',
+        entityType: 'representant',
+        entityId: 'repA',
+        op: 'update',
+        baseRev: 1,
+        payload: payload,
+      );
+      await engine.drain();
+      return api.calls.single.operations.single;
+    }
+
+    test('vider l\'IEF et les notes se dit au serveur', () async {
+      // Sans `clearedFields`, la sérialisation supprime les nuls : le serveur
+      // lit « champ absent », donc « inchangé », et la valeur effacée revient
+      // au pull suivant.
+      final SyncOperationDto sent = await sendUpdate(<String, Object?>{
+        'fullName': 'Awa Sy',
+        'phone': '+221770000001',
+        'departementId': 'dep-1',
+        'iefId': null,
+        'notes': null,
+      });
+
+      expect(sent.clearedFields, <String>['iefId', 'notes']);
+      expect(sent.data?.iefId, isNull);
+      expect(sent.data?.notes, isNull);
+    });
+
+    test('un champ que le formulaire ne porte pas n\'efface rien', () async {
+      final SyncOperationDto sent = await sendUpdate(<String, Object?>{
+        'fullName': 'Awa Sy',
+        'phone': '+221770000001',
+        'departementId': 'dep-1',
+        'notes': 'à rappeler lundi',
+      });
+
+      expect(sent.clearedFields, isNull);
+    });
+
+    test('une création ne réclame aucun effacement', () async {
+      await insertRepresentant(db, id: 'repB', phone: '+221770000002');
+      await queueOp(
+        db,
+        id: 'B1',
+        entityType: 'representant',
+        entityId: 'repB',
+        payload: <String, Object?>{
+          'fullName': 'Awa Sy',
+          'phone': '+221770000002',
+          'departementId': 'dep-1',
+          'iefId': null,
+        },
+      );
+      await engine.drain();
+
+      expect(api.calls.single.operations.single.clearedFields, isNull);
     });
   });
 
@@ -1314,6 +1458,55 @@ void main() {
       expect(rep.fullName, 'Nom récent');
       expect(rep.rev, 9);
       expect(await engine.readCursor(), 'cur-2');
+    });
+
+    // Le pull est la SEULE source de ces deux libellés : ils sont écrits par le
+    // serveur et jamais depuis le terrain. Les jeter à l'upsert rendait la
+    // cascade région et la relation invisibles hors ligne.
+    test('le pull garde le libellé de région et la relation', () async {
+      api.pullPages.add(
+        PullPage(
+          changes: SyncChangesDto(
+            departements: <DepartementDto>[
+              DepartementDto(
+                id: 'dep-9',
+                code: 'TC',
+                name: 'Bakel',
+                regionId: 'reg-tc',
+                regionName: 'Tambacounda',
+                isActive: true,
+                updatedAt: t0,
+              ),
+            ],
+            iefs: const <IefDto>[],
+            banques: const <BanqueDto>[],
+            syndicats: const <SyndicatDto>[],
+            representants: <RepresentantDto>[
+              representantDto(
+                id: 'repZ',
+                phoneE164: '+221770000009',
+                departementId: 'dep-9',
+                relationStatus: RepresentantRelation.AMBASSADEUR,
+              ),
+            ],
+            prospects: const <ProspectDto>[],
+          ),
+          deletions: const <SyncDeletionDto>[],
+          nextCursor: 'cur-9',
+          hasMore: false,
+          serverTime: t0,
+        ),
+      );
+
+      await engine.pullChanges();
+
+      final Departement dep = (await (db.select(
+        db.departements,
+      )..where((Departements t) => t.id.equals('dep-9'))).get()).single;
+      expect(dep.regionName, 'Tambacounda');
+
+      final Representant rep = (await db.select(db.representants).get()).single;
+      expect(rep.relationStatus, 'AMBASSADEUR');
     });
 
     test('une suppression serveur est logique, jamais physique', () async {

@@ -322,6 +322,87 @@ export interface paths {
     patch: operations['updateDepartement'];
     trace?: never;
   };
+  '/api/v1/call-outcome-reasons': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Vocabulaire d’issues qu’un client de terrain sait émettre.
+     * @description Restreint aux motifs actifs dont `minPayloadVersion` ne dépasse pas la version déclarée. Un motif que l’appelant ne saurait pas émettre ne lui est jamais proposé : sa remontée finirait en PAYLOAD_SCHEMA_MISMATCH, qui ne se rejoue pas.
+     */
+    get: operations['listCallOutcomeReasons'];
+    put?: never;
+    /**
+     * Ajoute un motif d’issue.
+     * @description L’effet est choisi à la création et n’est plus modifiable : l’historique le référence. Le motif naît en version de charge utile 2, donc invisible du parc tant que l’application n’a pas été renouvelée.
+     */
+    post: operations['createCallOutcomeReason'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/call-outcome-reasons/administration': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Tous les motifs, actifs ou non, toutes versions de charge utile. */
+    get: operations['listAllCallOutcomeReasons'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/call-outcome-reasons/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Renomme, recolorie ou réordonne un motif.
+     * @description Ni le code, ni l’effet, ni la version de charge utile. Sur un motif système, les règles de saisie non plus : elles sont compilées dans l’application de terrain.
+     */
+    patch: operations['updateCallOutcomeReason'];
+    trace?: never;
+  };
+  '/api/v1/call-outcome-reasons/{id}/active': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Active ou retire un motif des listes.
+     * @description Jamais de suppression : les tentatives déjà remontées référencent le code. Refusé sur un motif système, que les téléphones en place proposent encore.
+     */
+    post: operations['setCallOutcomeReasonActive'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/representants': {
     parameters: {
       query?: never;
@@ -397,6 +478,61 @@ export interface paths {
     head?: never;
     /** Modifie un représentant. */
     patch: operations['updateRepresentant'];
+    trace?: never;
+  };
+  '/api/v1/representants/{id}/relation-history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Bascules de relation déjà subies par une fiche, de la plus récente à la plus ancienne. */
+    get: operations['listRepresentantRelationChanges'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/representants/{id}/comments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Fil de commentaires d’une fiche, du plus récent au plus ancien. */
+    get: operations['listRepresentantComments'];
+    put?: never;
+    /**
+     * Ajoute un commentaire. L’identifiant fourni sert de clé d’idempotence.
+     * @description Le fil est en AJOUT SEUL : ni édition ni fusion, deux téléconseillers hors ligne produisent deux lignes. Reposter le même identifiant rend la ligne déjà enregistrée.
+     */
+    post: operations['addRepresentantComment'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/representants/{id}/comments/{commentId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Supprime logiquement un commentaire. */
+    delete: operations['deleteRepresentantComment'];
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/v1/prospects': {
@@ -645,6 +781,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/phase2/callbacks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Rappels promis encore dus.
+     * @description Un téléconseiller ne voit que les rappels qu’il a promis. Les rappels en retard remontent dans la journée courante : le retard se déduit de la date, il n’est jamais écrit.
+     */
+    get: operations['listScheduledCallbacks'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/phase2/callbacks/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Annule un rappel qui n’a plus lieu d’être.
+     * @description Idempotent : un rappel déjà clos ou annulé est rendu tel quel.
+     */
+    post: operations['cancelScheduledCallback'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/rep-campaigns/preview': {
     parameters: {
       query?: never;
@@ -676,7 +852,7 @@ export interface paths {
     put?: never;
     /**
      * Enregistre un appel passé à un représentant et clôt la tâche si l’issue aboutit.
-     * @description L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie `duplicate` sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base.
+     * @description L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie `duplicate` sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base. `suggestedPhone` recueille, dans le même geste, le numéro qu’un représentant qui refuse propose d’appeler à sa place : la réponse dit si ce numéro est déjà une fiche connue.
      */
     post: operations['recordRepCallAttempt'];
     delete?: never;
@@ -761,6 +937,43 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/api/v1/suggestions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Numéros donnés par des représentants qui ont refusé.
+     * @description Un numéro cité par deux représentants apparaît deux fois : c’est l’information, pas un doublon.
+     */
+    get: operations['listSuggestions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/suggestions/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Marque un numéro suggéré comme appelé ou abandonné. */
+    patch: operations['updateSuggestionStatus'];
     trace?: never;
   };
   '/api/v1/bank-cases': {
@@ -1264,127 +1477,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/admin/demo': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** État du mode démonstration, compteurs et autorisation de bascule. */
-    get: operations['getDemoStatus'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/demo/enable': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Peuple la plateforme de données de démonstration.
-     * @description Idempotent : activer une seconde fois ne double pas le jeu. Refusé en production tant que DEMO_MODE_ALLOWED ne vaut pas true. CONSÉQUENCE À ANNONCER AVANT LA CONFIRMATION : tant que le mode est actif, la plateforme passe en LECTURE SEULE pour tout le monde. Les écritures interactives (POST, PATCH, PUT, DELETE) sont refusées en 409 `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).
-     */
-    post: operations['enableDemoMode'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/demo/purge': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Supprime définitivement le jeu de démonstration.
-     * @description IRRÉVERSIBLE, et distinct de la désactivation. Supprime exactement les lignes enregistrées à l’ensemencement, dans l’ordre inverse de création. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration. L’interface doit faire confirmer.
-     */
-    post: operations['purgeDemoData'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/demo/disable': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Masque les données de démonstration.
-     * @description NE SUPPRIME RIEN. Les lignes de démonstration restent en base, invisibles pour toute lecture, export Excel compris. Pour les effacer définitivement, utiliser /purge. REND AUSSI L’ÉCRITURE à toute la plateforme : c’est cette route qui lève la lecture seule posée par /enable.
-     */
-    post: operations['disableDemoMode'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/purge': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Domaines purgeables, leurs dépendances et le nombre de lignes concernées.
-     * @description `allowed` vaut false pour tout administrateur autre que le premier : l’écran masque alors la commande, et POST /admin/purge refuse de son côté.
-     */
-    get: operations['getPurgeCatalog'];
-    put?: never;
-    /**
-     * Supprime définitivement les domaines sélectionnés.
-     * @description Réservé au premier compte administrateur, qui ressaisit son identifiant de connexion. Transactionnel, enfants avant parents. Le compte appelant n’est jamais supprimé. Journalisé.
-     */
-    post: operations['purgeDatabase'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/supervision': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Téléconseillers et pôle Finances générales, avec présence et dernière activité.
-     * @description La présence est déduite des traces existantes : familles de jetons, lots de synchronisation, écritures métier. Aucune colonne dédiée.
-     */
-    get: operations['getSupervision'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/analytics/funnel': {
     parameters: {
       query?: never;
@@ -1761,6 +1853,147 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supervision/activite': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Activité des téléconseillers sur la fenêtre demandée.
+     * @description La fenêtre porte sur la date de l’ACTE, pas sur celle de la fiche : un téléconseiller resté hors ligne trois semaines verrait sinon ses appels du lundi comptés le jeudi de la synchronisation. Les lignes n’existent qu’aux périodes où il s’est passé quelque chose ; `teleconseillers` porte la liste complète et le reste à faire, qu’aucune date ne borne.
+     */
+    get: operations['getSupervisionActivite'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/demo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** État du mode démonstration, compteurs et autorisation de bascule. */
+    get: operations['getDemoStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/demo/enable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Peuple la plateforme de données de démonstration.
+     * @description Idempotent : activer une seconde fois ne double pas le jeu. Refusé en production tant que DEMO_MODE_ALLOWED ne vaut pas true. CONSÉQUENCE À ANNONCER AVANT LA CONFIRMATION : tant que le mode est actif, la plateforme passe en LECTURE SEULE pour tout le monde. Les écritures interactives (POST, PATCH, PUT, DELETE) sont refusées en 409 `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).
+     */
+    post: operations['enableDemoMode'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/demo/purge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Supprime définitivement le jeu de démonstration.
+     * @description IRRÉVERSIBLE, et distinct de la désactivation. Supprime exactement les lignes enregistrées à l’ensemencement, dans l’ordre inverse de création. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration. L’interface doit faire confirmer.
+     */
+    post: operations['purgeDemoData'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/demo/disable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Masque les données de démonstration.
+     * @description NE SUPPRIME RIEN. Les lignes de démonstration restent en base, invisibles pour toute lecture, export Excel compris. Pour les effacer définitivement, utiliser /purge. REND AUSSI L’ÉCRITURE à toute la plateforme : c’est cette route qui lève la lecture seule posée par /enable.
+     */
+    post: operations['disableDemoMode'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/purge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Domaines purgeables, leurs dépendances et le nombre de lignes concernées.
+     * @description `allowed` vaut false pour tout administrateur autre que le premier : l’écran masque alors la commande, et POST /admin/purge refuse de son côté.
+     */
+    get: operations['getPurgeCatalog'];
+    put?: never;
+    /**
+     * Supprime définitivement les domaines sélectionnés.
+     * @description Réservé au premier compte administrateur, qui ressaisit son identifiant de connexion. Transactionnel, enfants avant parents. Le compte appelant n’est jamais supprimé. Journalisé.
+     */
+    post: operations['purgeDatabase'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/supervision': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Téléconseillers et pôle Finances générales, avec présence et dernière activité.
+     * @description La présence est déduite des traces existantes : familles de jetons, lots de synchronisation, écritures métier. Aucune colonne dédiée.
+     */
+    get: operations['getSupervision'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/export/prospects.xlsx': {
     parameters: {
       query?: never;
@@ -2050,7 +2283,7 @@ export interface components {
       password: string;
     };
     /** @enum {string} */
-    Role: 'ADMIN' | 'COMMERCIAL' | 'BANQUE_FINANCE';
+    Role: 'ADMIN' | 'COMMERCIAL' | 'BANQUE_FINANCE' | 'SUPERVISEUR';
     AuthUserDto: {
       /** Format: uuid */
       id: string;
@@ -2293,6 +2526,64 @@ export interface components {
       isActive: boolean;
     };
     /** @enum {string} */
+    CallOutcomeEffect:
+      'CLOSE_METHOD' | 'CLOSE_REFUSED' | 'CLOSE_WRONG_NUMBER' | 'KEEP_OPEN' | 'SCHEDULE_CALLBACK';
+    CallOutcomeReasonDto: {
+      /** Format: uuid */
+      id: string;
+      /** @description Code stable, jamais modifiable : les tentatives déjà remontées le référencent. */
+      code: string;
+      label: string;
+      effect: components['schemas']['CallOutcomeEffect'];
+      requiresComment: boolean;
+      requiresCallback: boolean;
+      /** @description Compte pour un appel joignable dans le taux de joignabilité. */
+      countsAsReached: boolean;
+      isActive: boolean;
+      /** @description Motif système : porte une règle compilée, ni désactivable ni reconfigurable. */
+      isSystem: boolean;
+      sortOrder: number;
+      color: string | null;
+      /** @description Version de charge utile minimale du client. Un téléphone plus ancien ne reçoit pas ce motif : il ne saurait pas l’émettre. */
+      minPayloadVersion: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    CallOutcomeReasonListDto: {
+      items: components['schemas']['CallOutcomeReasonDto'][];
+    };
+    CreateCallOutcomeReasonDto: {
+      code: string;
+      label: string;
+      effect: components['schemas']['CallOutcomeEffect'];
+      /** @default false */
+      requiresComment: boolean;
+      /**
+       * @description Réservé à l’effet SCHEDULE_CALLBACK.
+       * @default false
+       */
+      requiresCallback: boolean;
+      /** @default true */
+      countsAsReached: boolean;
+      /** @description Rôle du design system. */
+      color?: string;
+      /** @default 100 */
+      sortOrder: number;
+    };
+    UpdateCallOutcomeReasonDto: {
+      label?: string;
+      color?: string;
+      sortOrder?: number;
+      requiresComment?: boolean;
+      requiresCallback?: boolean;
+      countsAsReached?: boolean;
+    };
+    SetCallOutcomeReasonActiveDto: {
+      isActive: boolean;
+    };
+    /** @enum {string} */
+    RepresentantRelation: 'INCONNU' | 'CONTACTE' | 'AMBASSADEUR' | 'REFUS';
+    /** @enum {string} */
     RepresentantSortField: 'clientCreatedAt' | 'createdAt' | 'fullName' | 'prospects';
     /** @enum {string} */
     SortOrder: 'asc' | 'desc';
@@ -2321,6 +2612,7 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
       prospectCount: number;
+      relationStatus: components['schemas']['RepresentantRelation'];
     };
     RepresentantListDto: {
       items: components['schemas']['RepresentantDto'][];
@@ -2422,6 +2714,67 @@ export interface components {
       /**
        * Format: date-time
        * @description Horodatage de la saisie sur le terrain. Défaut : maintenant. Distinct de createdAt, qui est l’arrivée en base.
+       */
+      clientCreatedAt?: string;
+      /** @description État de la relation. Chaque bascule est historisée ; reposter le même statut n’écrit rien. */
+      relationStatus?: components['schemas']['RepresentantRelation'];
+      /** @description Motif de la bascule, repris dans la chronologie. Sans effet quand `relationStatus` est absent ou reposte le statut courant. */
+      relationReason?: string;
+    };
+    /**
+     * @description Le canal qui a écrit la bascule.
+     * @enum {string}
+     */
+    ChangeSource: 'WEB' | 'MOBILE';
+    RepresentantRelationChangeDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      representantId: string;
+      fromStatus: components['schemas']['RepresentantRelation'];
+      toStatus: components['schemas']['RepresentantRelation'];
+      reason: string | null;
+      /** Format: uuid */
+      changedById: string;
+      changedByName: string;
+      /** @description Le canal qui a écrit la bascule. */
+      source: components['schemas']['ChangeSource'];
+      /** Format: date-time */
+      changedAt: string;
+    };
+    RepresentantRelationChangeListDto: {
+      /** @description De la plus récente à la plus ancienne. */
+      items: components['schemas']['RepresentantRelationChangeDto'][];
+    };
+    RepresentantCommentDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      representantId: string;
+      /** Format: uuid */
+      authorId: string;
+      authorName: string;
+      body: string;
+      /** Format: date-time */
+      clientCreatedAt: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    RepresentantCommentListDto: {
+      /** @description Du plus récent au plus ancien. */
+      items: components['schemas']['RepresentantCommentDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    CreateRepresentantCommentDto: {
+      /**
+       * Format: uuid
+       * @description UUID v7 engendré par le client. Clé d’idempotence : un rejeu ne crée rien.
+       */
+      id: string;
+      body: string;
+      /**
+       * Format: date-time
+       * @description Horodatage de la saisie sur le terrain. Défaut : maintenant.
        */
       clientCreatedAt?: string;
     };
@@ -2628,11 +2981,6 @@ export interface components {
       /** @description Révision attendue. Un écart renvoie PROSPECT_REV_CONFLICT avec la révision réelle. */
       expectedRev: number;
     };
-    /**
-     * @description Le canal qui a écrit la bascule. Le panel écrit WEB.
-     * @enum {string}
-     */
-    ChangeSource: 'WEB' | 'MOBILE';
     SegmentChangeDto: {
       /** Format: uuid */
       id: string;
@@ -2736,6 +3084,11 @@ export interface components {
       method?: components['schemas']['EnrollmentMethod'];
       /** @description Tentative d’appel : obligatoire et non vide si outcome vaut OTHER. */
       comment?: string;
+      /**
+       * Format: date-time
+       * @description Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut CALLBACK. Une version ancienne de l’application ne l’envoie pas.
+       */
+      callbackAt?: string;
     };
     SyncOperationDto: {
       /**
@@ -2769,6 +3122,10 @@ export interface components {
       /** @description Version du format de charge utile. */
       payloadVersion: number;
       operations: components['schemas']['SyncOperationDto'][];
+      /** @description Opérations restant dans la file d’attente de l’appareil APRÈS ce lot. Le serveur ne peut pas la deviner. Facultatif sans limite de temps : une version déjà déployée ne l’envoie pas. */
+      pendingOps?: number;
+      /** @description Version de l’application mobile, telle qu’elle s’annonce. Facultative. */
+      appVersion?: string;
     };
     /** @enum {string} */
     SyncOpStatus: 'applied' | 'duplicate' | 'conflict' | 'invalid' | 'skipped_dependency_failed';
@@ -2958,6 +3315,38 @@ export interface components {
       /** @description Les vingt dernières tentatives, de la plus récente à la plus ancienne. */
       recentAttempts: components['schemas']['CampaignAttemptDto'][];
     };
+    /** @enum {string} */
+    CallbackScope: 'today' | 'overdue' | 'week';
+    CallbackDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      prospectId: string;
+      /** @description Code court à six caractères du prospect. */
+      shortCode: string;
+      phoneE164: string;
+      /** Format: date-time */
+      scheduledAt: string;
+      comment: string | null;
+      /** Format: uuid */
+      assignedToId: string;
+      assignedToName: string;
+      /** Format: uuid */
+      campaignId: string | null;
+      /** Format: uuid */
+      taskId: string | null;
+      /** @description Le rappel est passé. État DÉRIVÉ de scheduledAt et de l’heure du serveur, jamais stocké. */
+      overdue: boolean;
+    };
+    CallbackListDto: {
+      /** @description Du plus ancien au plus récent. */
+      items: components['schemas']['CallbackDto'][];
+      /**
+       * Format: date-time
+       * @description Heure du serveur ayant servi à décider du retard.
+       */
+      serverTime: string;
+    };
     RepCampaignPreviewDto: {
       /** @description Représentants éligibles sur ce périmètre. */
       eligible: number;
@@ -2990,6 +3379,14 @@ export interface components {
       promisedProspects?: number;
       /** @description Obligatoire et non vide si l’issue vaut OTHER. */
       comment?: string;
+      /** @description État de la relation tel que l’appel vient de l’apprendre. Absent : le statut ne bouge pas. Identique au statut courant : rien n’est écrit. */
+      relationStatus?: components['schemas']['RepresentantRelation'];
+      /** @description Numéro qu’un représentant qui refuse propose d’appeler à sa place. Saisie libre, normalisé par le serveur. Un numéro illisible refuse la tentative entière : le téléconseiller est sur l’écran au moment où il le tape. */
+      suggestedPhone?: string;
+      /** @description Nom du contact suggéré, tel que dicté. Ignoré sans `suggestedPhone`. */
+      suggestedName?: string;
+      /** @description Ce que le représentant dit du contact. Ignoré sans `suggestedPhone`. */
+      suggestedNote?: string;
       /**
        * Format: date-time
        * @description Horodatage de l’appel sur le terrain, distinct de son arrivée en base.
@@ -3009,6 +3406,8 @@ export interface components {
       taskId: string | null;
       /** @description Vrai si l’issue a clos la tâche. Les issues « à rappeler » la laissent ouverte. */
       taskClosed: boolean;
+      /** @description Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas. */
+      suggestion: components['schemas']['RepresentantLookupDto'] | null;
     };
     RepCampaignProgressDto: {
       /** @description Nombre total de tâches affectées. */
@@ -3144,6 +3543,46 @@ export interface components {
       commerciaux: components['schemas']['RepCampaignCommercialDto'][];
       /** @description Les vingt dernières tentatives, de la plus récente à la plus ancienne. */
       recentAttempts: components['schemas']['RepCampaignAttemptDto'][];
+    };
+    /** @enum {string} */
+    SuggestionStatus: 'A_APPELER' | 'APPELE' | 'ABANDONNE';
+    SuggestionDto: {
+      /** Format: uuid */
+      id: string;
+      /**
+       * Format: uuid
+       * @description Le représentant qui a donné le numéro.
+       */
+      sourceRepresentantId: string;
+      /** @description Code court à six caractères du représentant qui a donné le numéro. */
+      sourceRepresentantShortCode: string;
+      suggestedName: string | null;
+      /** @description Numéro normalisé par le serveur. */
+      suggestedPhoneE164: string;
+      note: string | null;
+      status: components['schemas']['SuggestionStatus'];
+      /**
+       * Format: uuid
+       * @description Téléconseiller qui a recueilli la suggestion.
+       */
+      suggestedById: string;
+      suggestedByName: string;
+      /**
+       * Format: uuid
+       * @description Fiche existante portant ce numéro au moment de la saisie. La piste est déjà connue.
+       */
+      resolvedRepresentantId: string | null;
+      /** Format: date-time */
+      clientCreatedAt: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    SuggestionListDto: {
+      items: components['schemas']['SuggestionDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    UpdateSuggestionStatusDto: {
+      status: components['schemas']['SuggestionStatus'];
     };
     /** @enum {string} */
     BankStageType: 'OPEN' | 'CASHED' | 'REJECTED';
@@ -3652,137 +4091,6 @@ export interface components {
       /** @description Variables citées et non fournies. Le marqueur `{{nom}}` reste visible dans le texte rendu. */
       missing: string[];
     };
-    DemoCountsDto: {
-      users: number;
-      representants: number;
-      prospects: number;
-      campaigns: number;
-      campaignCommerciaux: number;
-      callTasks: number;
-      callAttempts: number;
-      bankCases: number;
-      bankCaseTransitions: number;
-    };
-    DemoStatusDto: {
-      /** @description Vrai si des données de démonstration sont actuellement en place ET visibles. ATTENTION, ce booléen a une SECONDE conséquence, que l’interface doit annoncer avant la bascule : tant qu’il vaut vrai, la plateforme est en LECTURE SEULE. Toute requête POST, PATCH, PUT ou DELETE est refusée en 409 avec le code `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST). Les lignes créées par ces chemins sont du travail RÉEL : elles sont écrites `isDemo: false` et survivent à l’extinction. */
-      enabled: boolean;
-      /**
-       * Format: date-time
-       * @description Date du dernier ensemencement, nulle si le mode n’a jamais été activé.
-       */
-      seededAt: string | null;
-      /** @description Faux quand l’environnement interdit la bascule : en production, tant que DEMO_MODE_ALLOWED ne vaut pas true. L’interface doit afficher `reason`, pas se contenter de griser le bouton. */
-      canToggle: boolean;
-      /** @description Explication lisible quand canToggle est faux. */
-      reason: string | null;
-      counts: components['schemas']['DemoCountsDto'];
-    };
-    /** @enum {string} */
-    PurgeDomainKey:
-      | 'teleconseillers'
-      | 'finances'
-      | 'representants'
-      | 'prospects'
-      | 'campagnes'
-      | 'campagnesRepresentants'
-      | 'demandesClients'
-      | 'fileAppels'
-      | 'tentatives'
-      | 'dossiers'
-      | 'notifications'
-      | 'synchronisation'
-      | 'journal'
-      | 'referentiels';
-    PurgeDomainDto: {
-      key: components['schemas']['PurgeDomainKey'];
-      label: string;
-      hint: string;
-      /** @description Domaines entraînés par celui-ci, clés étrangères obligent. L’écran les coche avec lui. */
-      requires: string[];
-      /** @description Lignes actuellement concernées. */
-      rows: number;
-    };
-    PurgeCatalogDto: {
-      /** @description Vrai si le compte appelant est le premier administrateur, seul habilité à purger. */
-      allowed: boolean;
-      /** @description Identifiant de connexion à ressaisir pour confirmer. */
-      confirmationHint: string;
-      domains: components['schemas']['PurgeDomainDto'][];
-    };
-    PurgeRequestDto: {
-      /** @description Domaines cochés. Le serveur y ajoute leurs dépendances. */
-      domains: components['schemas']['PurgeDomainKey'][];
-      /** @description Identifiant de connexion de l’administrateur, ressaisi. Comparé à son e-mail ou à son nom d’utilisateur. */
-      confirmation: string;
-    };
-    PurgeDeletionDto: {
-      key: components['schemas']['PurgeDomainKey'];
-      label: string;
-      rows: number;
-    };
-    PurgeResultDto: {
-      deleted: components['schemas']['PurgeDeletionDto'][];
-      total: number;
-      /**
-       * Format: date-time
-       * @description Horodatage serveur de la purge.
-       */
-      purgedAt: string;
-    };
-    /** @enum {string} */
-    PresenceState: 'ONLINE' | 'RECENT' | 'AWAY';
-    SupervisedUserDto: {
-      /** Format: uuid */
-      id: string;
-      fullName: string;
-      username: string;
-      email: string;
-      role: components['schemas']['Role'];
-      isActive: boolean;
-      departementName: string | null;
-      presence: components['schemas']['PresenceState'];
-      /** @description Une famille de jetons est encore vivante : ni révoquée, ni expirée. */
-      hasLiveSession: boolean;
-      /** @description Sessions ouvertes, tous appareils confondus. */
-      sessionCount: number;
-      /**
-       * Format: date-time
-       * @description Trace d’activité la plus récente, toutes sources confondues.
-       */
-      lastSeenAt: string | null;
-      /** Format: date-time */
-      lastLoginAt: string | null;
-      /**
-       * Format: date-time
-       * @description Dernier lot de synchronisation reçu d’un appareil.
-       */
-      lastSyncAt: string | null;
-      /**
-       * Format: date-time
-       * @description Dernière écriture métier : tentative d’appel ou transition de dossier.
-       */
-      lastWriteAt: string | null;
-    };
-    PresenceCountsDto: {
-      online: number;
-      recent: number;
-      away: number;
-    };
-    SupervisionDto: {
-      /**
-       * Format: date-time
-       * @description Horloge du serveur au moment de la lecture.
-       */
-      observedAt: string;
-      /**
-       * @description Fenêtre, en minutes, en deçà de laquelle un compte est dit connecté.
-       * @default 20
-       */
-      onlineWindowMinutes: number;
-      teleconseillers: components['schemas']['SupervisedUserDto'][];
-      finances: components['schemas']['SupervisedUserDto'][];
-      counts: components['schemas']['PresenceCountsDto'];
-    };
     FunnelStageDto: {
       /** @description Nom de l’étape, prêt à afficher. */
       label: string;
@@ -4176,6 +4484,197 @@ export interface components {
       /** @description Second niveau : le détail lisible, à provenance égale. */
       byLabel: components['schemas']['OriginLabelCountDto'][];
       total: number;
+    };
+    /** @enum {string} */
+    SupervisionGranularity: 'day' | 'week';
+    SupervisionActivityRowDto: {
+      /** @description Début de la journée ou de la semaine, en AAAA-MM-JJ. */
+      bucket: string;
+      /** Format: uuid */
+      teleconseillerId: string;
+      teleconseillerName: string;
+      /** @description Appels passés à des prospects. */
+      calls: number;
+      /** @description Issue UNREACHABLE : NRP ou injoignable. */
+      unreachable: number;
+      /** @description Issue WRONG_NUMBER : faux numéro. */
+      wrongNumber: number;
+      /** @description Issue REFUSED : refus. */
+      refused: number;
+      /** @description Issue OTHER. */
+      other: number;
+      /** @description Issue METHOD_OBTAINED. */
+      methodObtained: number;
+      /** @description Issue CALLBACK : à rappeler. */
+      callback: number;
+      /** @description Part des appels dont le numéro s’est révélé exploitable, en pourcentage. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ». */
+      reachRate: number | null;
+      /** @description Fiches prospect saisies sur la période. */
+      prospectsCreated: number;
+      /** @description Représentants distincts appelés sur la période. */
+      representantsContacted: number;
+      /** @description Tâches d’appel clôturées sur la période. */
+      tasksClosed: number;
+    };
+    SupervisionTeleconseillerDto: {
+      /** Format: uuid */
+      id: string;
+      fullName: string;
+      isActive: boolean;
+      /** @description Tâches d’appel encore OUVERTES. Instantané : la fenêtre ne le borne pas. */
+      openTasks: number;
+    };
+    SupervisionActivityDto: {
+      /** Format: date-time */
+      from: string | null;
+      /** Format: date-time */
+      to: string | null;
+      granularity: components['schemas']['SupervisionGranularity'];
+      /** @description Une ligne par téléconseiller et par période, seulement là où il s’est passé quelque chose. */
+      items: components['schemas']['SupervisionActivityRowDto'][];
+      /** @description Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre. */
+      teleconseillers: components['schemas']['SupervisionTeleconseillerDto'][];
+    };
+    DemoCountsDto: {
+      users: number;
+      representants: number;
+      prospects: number;
+      campaigns: number;
+      campaignCommerciaux: number;
+      callTasks: number;
+      callAttempts: number;
+      bankCases: number;
+      bankCaseTransitions: number;
+    };
+    DemoStatusDto: {
+      /** @description Vrai si des données de démonstration sont actuellement en place ET visibles. ATTENTION, ce booléen a une SECONDE conséquence, que l’interface doit annoncer avant la bascule : tant qu’il vaut vrai, la plateforme est en LECTURE SEULE. Toute requête POST, PATCH, PUT ou DELETE est refusée en 409 avec le code `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST). Les lignes créées par ces chemins sont du travail RÉEL : elles sont écrites `isDemo: false` et survivent à l’extinction. */
+      enabled: boolean;
+      /**
+       * Format: date-time
+       * @description Date du dernier ensemencement, nulle si le mode n’a jamais été activé.
+       */
+      seededAt: string | null;
+      /** @description Faux quand l’environnement interdit la bascule : en production, tant que DEMO_MODE_ALLOWED ne vaut pas true. L’interface doit afficher `reason`, pas se contenter de griser le bouton. */
+      canToggle: boolean;
+      /** @description Explication lisible quand canToggle est faux. */
+      reason: string | null;
+      counts: components['schemas']['DemoCountsDto'];
+    };
+    /** @enum {string} */
+    PurgeDomainKey:
+      | 'teleconseillers'
+      | 'finances'
+      | 'supervision'
+      | 'representants'
+      | 'prospects'
+      | 'campagnes'
+      | 'campagnesRepresentants'
+      | 'demandesClients'
+      | 'fileAppels'
+      | 'tentatives'
+      | 'dossiers'
+      | 'notifications'
+      | 'synchronisation'
+      | 'journal'
+      | 'referentiels';
+    PurgeDomainDto: {
+      key: components['schemas']['PurgeDomainKey'];
+      label: string;
+      hint: string;
+      /** @description Domaines entraînés par celui-ci, clés étrangères obligent. L’écran les coche avec lui. */
+      requires: string[];
+      /** @description Lignes actuellement concernées. */
+      rows: number;
+    };
+    PurgeCatalogDto: {
+      /** @description Vrai si le compte appelant est le premier administrateur, seul habilité à purger. */
+      allowed: boolean;
+      /** @description Identifiant de connexion à ressaisir pour confirmer. */
+      confirmationHint: string;
+      domains: components['schemas']['PurgeDomainDto'][];
+    };
+    PurgeRequestDto: {
+      /** @description Domaines cochés. Le serveur y ajoute leurs dépendances. */
+      domains: components['schemas']['PurgeDomainKey'][];
+      /** @description Identifiant de connexion de l’administrateur, ressaisi. Comparé à son e-mail ou à son nom d’utilisateur. */
+      confirmation: string;
+    };
+    PurgeDeletionDto: {
+      key: components['schemas']['PurgeDomainKey'];
+      label: string;
+      rows: number;
+    };
+    PurgeResultDto: {
+      deleted: components['schemas']['PurgeDeletionDto'][];
+      total: number;
+      /**
+       * Format: date-time
+       * @description Horodatage serveur de la purge.
+       */
+      purgedAt: string;
+    };
+    /** @enum {string} */
+    PresenceState: 'ONLINE' | 'RECENT' | 'AWAY';
+    SupervisedUserDto: {
+      /** Format: uuid */
+      id: string;
+      fullName: string;
+      username: string;
+      email: string;
+      role: components['schemas']['Role'];
+      isActive: boolean;
+      departementName: string | null;
+      presence: components['schemas']['PresenceState'];
+      /** @description Une famille de jetons est encore vivante : ni révoquée, ni expirée. */
+      hasLiveSession: boolean;
+      /** @description Sessions ouvertes, tous appareils confondus. */
+      sessionCount: number;
+      /**
+       * Format: date-time
+       * @description Trace d’activité la plus récente, toutes sources confondues.
+       */
+      lastSeenAt: string | null;
+      /** Format: date-time */
+      lastLoginAt: string | null;
+      /**
+       * Format: date-time
+       * @description Dernier lot de synchronisation reçu d’un appareil.
+       */
+      lastSyncAt: string | null;
+      /**
+       * Format: date-time
+       * @description Dernière synchronisation descendante. Un appareil ouvert appelle toutes les minutes, même quand il n’a rien à remonter.
+       */
+      lastPullAt: string | null;
+      /** @description Opérations en attente de remontée dans l’appareil, DÉCLARÉES PAR LUI. `null` quand l’application ne les annonce pas : le serveur ne voit pas ce qui dort dans un téléphone. */
+      pendingOps: number | null;
+      /** @description Version de l’application mobile, telle qu’elle s’annonce. */
+      appVersion: string | null;
+      /**
+       * Format: date-time
+       * @description Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.
+       */
+      lastWriteAt: string | null;
+    };
+    PresenceCountsDto: {
+      online: number;
+      recent: number;
+      away: number;
+    };
+    SupervisionDto: {
+      /**
+       * Format: date-time
+       * @description Horloge du serveur au moment de la lecture.
+       */
+      observedAt: string;
+      /**
+       * @description Fenêtre, en minutes, en deçà de laquelle un compte est dit connecté.
+       * @default 20
+       */
+      onlineWindowMinutes: number;
+      teleconseillers: components['schemas']['SupervisedUserDto'][];
+      finances: components['schemas']['SupervisedUserDto'][];
+      counts: components['schemas']['PresenceCountsDto'];
     };
     /** @enum {string} */
     ExportMode: 'filtered' | 'consolidated';
@@ -5438,6 +5937,291 @@ export interface operations {
       };
     };
   };
+  listCallOutcomeReasons: {
+    parameters: {
+      query: {
+        /** @description Version de charge utile du client appelant. Obligatoire. */
+        payloadVersion: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallOutcomeReasonListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createCallOutcomeReason: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCallOutcomeReasonDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallOutcomeReasonDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUTCOME_REASON_CODE_CONFLICT, OUTCOME_REASON_LABEL_CONFLICT ou OUTCOME_REASON_CALLBACK_NOT_ALLOWED. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listAllCallOutcomeReasons: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallOutcomeReasonListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateCallOutcomeReason: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateCallOutcomeReasonDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallOutcomeReasonDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUTCOME_REASON_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUTCOME_REASON_SYSTEM_IMMUTABLE ou OUTCOME_REASON_LABEL_CONFLICT. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  setCallOutcomeReasonActive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetCallOutcomeReasonActiveDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallOutcomeReasonDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUTCOME_REASON_SYSTEM_IMMUTABLE. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   listRepresentants: {
     parameters: {
       query?: {
@@ -5453,6 +6237,8 @@ export interface operations {
         dateTo?: string;
         /** @description true : au moins un prospect vivant. false : aucun (représentant dormant). */
         hasProspects?: boolean;
+        /** @description Ne retient que les représentants dans cet état de relation. */
+        relationStatus?: components['schemas']['RepresentantRelation'];
         sortBy?: components['schemas']['RepresentantSortField'];
         sortOrder?: components['schemas']['SortOrder'];
         page?: number;
@@ -5834,6 +6620,242 @@ export interface operations {
       };
     };
   };
+  listRepresentantRelationChanges: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepresentantRelationChangeListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listRepresentantComments: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepresentantCommentListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  addRepresentantComment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateRepresentantCommentDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepresentantCommentDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description ENTITY_ID_OWNED_BY_ANOTHER_USER · NOT_OWNER. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  deleteRepresentantComment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        commentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OkDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_COMMENT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   listProspects: {
     parameters: {
       query?: {
@@ -5854,6 +6876,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -6444,6 +7468,10 @@ export interface operations {
         /** @description Curseur opaque renvoyé par l’appel précédent. Absent : synchronisation complète. */
         since?: string;
         limit?: number;
+        /** @description Opérations en attente de remontée dans l’appareil. Le serveur ne peut pas la deviner. Facultatif sans limite de temps. */
+        pendingOps?: number;
+        /** @description Version de l’application mobile, telle qu’elle s’annonce. Facultative. */
+        appVersion?: string;
       };
       header?: never;
       path?: never;
@@ -6842,6 +7870,114 @@ export interface operations {
       };
     };
   };
+  listScheduledCallbacks: {
+    parameters: {
+      query?: {
+        /** @description today : tout ce qui est dû d’ici la fin de la journée, retards compris. overdue : les seuls retards. week : les sept prochaines journées. */
+        scope?: components['schemas']['CallbackScope'];
+        /** @description File d’un téléconseiller donné. Réservé à l’administration et à la supervision ; ignoré pour les autres, qui ne voient que la leur. */
+        assignedToId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallbackListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  cancelScheduledCallback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallbackDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CALLBACK_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   previewRepCampaign: {
     parameters: {
       query?: {
@@ -6915,7 +8051,7 @@ export interface operations {
           'application/json': components['schemas']['RepCallAttemptResultDto'];
         };
       };
-      /** @description REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED. */
+      /** @description REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED · PHONE_INVALID. */
       400: {
         headers: {
           [name: string]: unknown;
@@ -7242,6 +8378,117 @@ export interface operations {
         };
       };
       /** @description REP_CAMPAIGN_PROGRAMME_NOT_FOUND · REP_CAMPAIGN_DAY_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listSuggestions: {
+    parameters: {
+      query?: {
+        status?: components['schemas']['SuggestionStatus'];
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SuggestionListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateSuggestionStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateSuggestionStatusDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SuggestionDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description SUGGESTION_NOT_FOUND. */
       404: {
         headers: {
           [name: string]: unknown;
@@ -9110,6 +10357,1567 @@ export interface operations {
       };
     };
   };
+  getAnalyticsFunnel: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AnalyticsFunnelDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getAnalyticsTotals: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AnalyticsTotalsDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getProspectsOverTime: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+        granularity?: components['schemas']['TimeGranularity'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AnalyticsSeriesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getTopCommercials: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TopCommercialListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getProspectsByDepartement: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NamedCountListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getProspectsByBanque: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NamedCountListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getProspectsBySyndicat: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NamedCountListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getProspectsByPhase2Status: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Phase2StatusListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getProspectsByEnrollmentMethod: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EnrollmentMethodListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getProspectsBySegment: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SegmentListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getTopRepresentants: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TopRepresentantListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getCampaignPilotage: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CampaignPilotageDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getAnalyticsDelays: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AnalyticsDelaysDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getBankAging: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankAgingDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getWeeklyCohorts: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WeeklyCohortListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getDepartementYield: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DepartementYieldListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getRepresentantProductivity: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+        limit?: number;
+        /** @description Ancienneté, en jours, au delà de laquelle un représentant sans nouvel apport est déclaré dormant. Le seuil est un paramètre parce qu’il dépend du rythme de la zone : trois mois de silence n’ont pas le même sens partout. */
+        dormantDays?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepresentantProductivityListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getDataQuality: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DataQualityDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getSegmentConversions: {
+    parameters: {
+      query?: {
+        /** @description Borne basse sur la date de bascule, incluse. Une date nue vaut minuit à Dakar. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de bascule, incluse. Une date nue vaut 23:59:59 à Dakar. */
+        dateTo?: string;
+        /** @description Segment de DÉPART. « Combien de BDD3 avons-nous fait basculer. » */
+        fromSegment?: components['schemas']['BddSegment'];
+        /** @description Segment d’ARRIVÉE. « Combien de conversions vers BDD1. » */
+        toSegment?: components['schemas']['BddSegment'];
+        /** @description Auteur de la bascule. Réservé à l’ADMIN : un COMMERCIAL ne voit que les siennes. */
+        changedById?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SegmentConversionListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getOriginBreakdown: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OriginBreakdownDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getSupervisionActivite: {
+    parameters: {
+      query?: {
+        /** @description Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar. */
+        actFrom?: string;
+        /** @description Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999. */
+        actTo?: string;
+        granularity?: components['schemas']['SupervisionGranularity'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SupervisionActivityDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   getDemoStatus: {
     parameters: {
       query?: never;
@@ -9436,1477 +12244,6 @@ export interface operations {
       };
     };
   };
-  getAnalyticsFunnel: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['AnalyticsFunnelDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getAnalyticsTotals: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['AnalyticsTotalsDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getProspectsOverTime: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-        granularity?: components['schemas']['TimeGranularity'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['AnalyticsSeriesDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getTopCommercials: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-        limit?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['TopCommercialListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getProspectsByDepartement: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['NamedCountListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getProspectsByBanque: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['NamedCountListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getProspectsBySyndicat: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['NamedCountListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getProspectsByPhase2Status: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['Phase2StatusListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getProspectsByEnrollmentMethod: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['EnrollmentMethodListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getProspectsBySegment: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SegmentListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getTopRepresentants: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-        limit?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['TopRepresentantListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getCampaignPilotage: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CampaignPilotageDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getAnalyticsDelays: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['AnalyticsDelaysDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getBankAging: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankAgingDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getWeeklyCohorts: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['WeeklyCohortListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getDepartementYield: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DepartementYieldListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getRepresentantProductivity: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-        limit?: number;
-        /** @description Ancienneté, en jours, au delà de laquelle un représentant sans nouvel apport est déclaré dormant. Le seuil est un paramètre parce qu’il dépend du rythme de la zone : trois mois de silence n’ont pas le même sens partout. */
-        dormantDays?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RepresentantProductivityListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getDataQuality: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DataQualityDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getSegmentConversions: {
-    parameters: {
-      query?: {
-        /** @description Borne basse sur la date de bascule, incluse. Une date nue vaut minuit à Dakar. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de bascule, incluse. Une date nue vaut 23:59:59 à Dakar. */
-        dateTo?: string;
-        /** @description Segment de DÉPART. « Combien de BDD3 avons-nous fait basculer. » */
-        fromSegment?: components['schemas']['BddSegment'];
-        /** @description Segment d’ARRIVÉE. « Combien de conversions vers BDD1. » */
-        toSegment?: components['schemas']['BddSegment'];
-        /** @description Auteur de la bascule. Réservé à l’ADMIN : un COMMERCIAL ne voit que les siennes. */
-        changedById?: string;
-        page?: number;
-        pageSize?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SegmentConversionListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getOriginBreakdown: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['OriginBreakdownDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
   exportProspectsXlsx: {
     parameters: {
       query?: {
@@ -10927,6 +12264,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
         campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */

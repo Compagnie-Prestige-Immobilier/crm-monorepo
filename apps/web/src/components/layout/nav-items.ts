@@ -2,12 +2,15 @@ import {
   ActivityIcon,
   BellIcon,
   ChartColumnIcon,
+  ClockIcon,
   FileSpreadsheetIcon,
   FolderOpenIcon,
+  HeadsetIcon,
   LayoutDashboardIcon,
   LibraryIcon,
   ListOrderedIcon,
   MegaphoneIcon,
+  PhoneForwardedIcon,
   PlusCircleIcon,
   SettingsIcon,
   UploadIcon,
@@ -40,6 +43,15 @@ const SECTIONS: readonly NavSection[] = [
     title: null,
     items: [
       {
+        // Écran d'accueil du SUPERVISEUR : c'est le seul qui montre le travail
+        // de chaque téléconseiller ligne à ligne.
+        href: '/supervision',
+        label: 'Supervision',
+        icon: ActivityIcon,
+        description: 'Activité et présence des téléconseillers',
+        roles: ['SUPERVISEUR'],
+      },
+      {
         href: '/tableau-de-bord',
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
@@ -58,14 +70,14 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Statistiques',
         icon: ChartColumnIcon,
         description: 'Téléconseil et banques',
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'SUPERVISEUR'],
       },
       {
         href: '/prospects',
         label: 'Prospects',
         icon: UsersIcon,
         description: 'Liste filtrable et export',
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'SUPERVISEUR'],
       },
       {
         href: '/campagnes',
@@ -73,6 +85,46 @@ const SECTIONS: readonly NavSection[] = [
         icon: MegaphoneIcon,
         description: 'Campagnes d’appels prospects et représentants',
         roles: ['ADMIN'],
+      },
+    ],
+  },
+  {
+    title: 'Terrain',
+    items: [
+      {
+        href: '/console',
+        label: 'Console d’appel',
+        icon: HeadsetIcon,
+        description: 'File d’appels et qualification',
+        roles: ['ADMIN', 'COMMERCIAL'],
+      },
+      {
+        href: '/rappels',
+        label: 'Rappels',
+        icon: ClockIcon,
+        description: 'Échéances promises et retards',
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
+      },
+      {
+        href: '/representants',
+        label: 'Représentants',
+        icon: UsersRoundIcon,
+        description: 'Fiches et coordonnées',
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
+      },
+      {
+        href: '/suggestions',
+        label: 'Numéros suggérés',
+        icon: PhoneForwardedIcon,
+        description: 'Contacts nommés par les représentants',
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
+      },
+      {
+        href: '/prospects/nouveau',
+        label: 'Nouveau prospect',
+        icon: PlusCircleIcon,
+        description: 'Saisie d’un contact',
+        roles: ['ADMIN', 'COMMERCIAL'],
       },
     ],
   },
@@ -149,13 +201,6 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN'],
       },
       {
-        href: '/representants',
-        label: 'Représentants',
-        icon: UsersRoundIcon,
-        description: 'Fiches et coordonnées',
-        roles: ['ADMIN'],
-      },
-      {
         href: '/commerciaux',
         label: 'Utilisateurs',
         icon: UsersIcon,
@@ -212,10 +257,9 @@ export function navItems(role: Role): NavItem[] {
 /**
  * Écran d'atterrissage après connexion.
  *
- * COMMERCIAL n'a pas de panel : il est refusé à la porte (voir
- * `lib/data/auth.ts`). La fonction lui renvoie tout de même la connexion plutôt
- * qu'une exception : un rôle ajouté demain au contrat ne doit pas faire tomber
- * l'écran de login.
+ * Un rôle sans écran d'accueil retombe sur la connexion, que `/connexion`
+ * renvoie aussitôt ici : la valeur par défaut n'existe que pour un rôle ajouté
+ * demain au contrat, jamais pour un rôle admis dans le panel.
  */
 export function homePathForRole(role: Role): string {
   switch (role) {
@@ -223,6 +267,10 @@ export function homePathForRole(role: Role): string {
       return '/tableau-de-bord';
     case 'BANQUE_FINANCE':
       return '/dossiers';
+    case 'COMMERCIAL':
+      return '/console';
+    case 'SUPERVISEUR':
+      return '/supervision';
     default:
       return '/connexion';
   }

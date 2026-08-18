@@ -545,3 +545,49 @@ describe('nature de la fiche créée', () => {
     expect(select?.isDemo).toBe(true);
   });
 });
+
+describe('lecture du SUPERVISEUR', () => {
+  const superviseur: AuthenticatedUser = {
+    ...alice,
+    id: 'sup-1',
+    username: 'sup',
+    role: Role.SUPERVISEUR,
+  };
+
+  let prisma: PrismaMock;
+
+  beforeEach(() => {
+    prisma = makePrisma();
+  });
+
+  it('sa liste porte sur le portefeuille national', async () => {
+    await service(prisma).list(superviseur, {});
+
+    expect(firstArg(prisma.prospect.findMany).where?.createdById).toBeUndefined();
+  });
+
+  it('son filtre par téléconseiller RÉPOND, au lieu de rendre zéro ligne', async () => {
+    await service(prisma).list(superviseur, { commercialId: 'com-bob' });
+
+    expect(firstArg(prisma.prospect.findMany).where?.createdById).toBe('com-bob');
+  });
+
+  it('ouvre la fiche d’un téléconseiller', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: bob.id }));
+
+    await expect(service(prisma).get(superviseur, 'p-1')).resolves.toMatchObject({ id: 'p-1' });
+    await expect(service(prisma).get(alice, 'p-1')).rejects.toThrow(ForbiddenException);
+  });
+
+  it('n’écrit rien : modification, suppression et réaffectation lui sont refusées', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: bob.id }));
+
+    await expect(service(prisma).update(superviseur, 'p-1', { nom: 'Pirate' })).rejects.toThrow(
+      ForbiddenException,
+    );
+    await expect(service(prisma).remove(superviseur, 'p-1')).rejects.toThrow(ForbiddenException);
+    await expect(
+      service(prisma).reassign(superviseur, { prospectIds: ['p-1'], commercialId: 'com-alice' }),
+    ).rejects.toThrow(ForbiddenException);
+  });
+});

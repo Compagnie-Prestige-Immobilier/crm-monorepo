@@ -31,13 +31,21 @@ class AuthController extends Notifier<AuthState> {
     String? name;
     String? role;
     String? email;
+    String? departementId;
     if (store is SecureTokenStore) {
-      final ({String fullName, String id, String? role, String? email})? identity =
-          await store.readIdentity();
+      final ({
+        String fullName,
+        String id,
+        String? role,
+        String? email,
+        String? departementId,
+      })?
+      identity = await store.readIdentity();
       id = identity?.id;
       name = identity?.fullName;
       role = identity?.role;
       email = identity?.email;
+      departementId = identity?.departementId;
     }
     state = AuthState(
       status: AuthStatus.authenticated,
@@ -45,6 +53,7 @@ class AuthController extends Notifier<AuthState> {
       fullName: name,
       role: role,
       email: email,
+      departementId: departementId,
     );
   }
 
@@ -73,6 +82,7 @@ class AuthController extends Notifier<AuthState> {
           fullName: tokens.fullName,
           role: tokens.role,
           email: tokens.email,
+          departementId: tokens.departementId,
         );
       }
       state = AuthState(
@@ -81,6 +91,7 @@ class AuthController extends Notifier<AuthState> {
         fullName: tokens.fullName,
         role: tokens.role,
         email: tokens.email,
+        departementId: tokens.departementId,
       );
       unawaited(ref.read(notificationInboxProvider).refresh(force: true));
       return true;

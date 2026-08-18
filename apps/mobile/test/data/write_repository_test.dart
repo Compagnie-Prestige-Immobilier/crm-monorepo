@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/sync/outbox_status.dart';
+import 'package:cpi_go/core/sync/phase2_directory_sync.dart';
 import 'package:cpi_go/core/sync/sync_engine.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/draft_repository.dart';
@@ -494,6 +495,57 @@ void main() {
       expect(payload['clientCreatedAt'], t0.toIso8601String());
     });
 
+    test('un rappel daté part avec son heure, en UTC', () async {
+      final DateTime demain = DateTime.utc(2026, 8, 13, 9);
+      await repo.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.callback,
+        createdById: 'me',
+        callbackAt: demain,
+      );
+
+      final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+      expect(attempt.callbackAt, demain);
+
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
+      expect(payload['callbackAt'], demain.toIso8601String());
+    });
+
+    // Le champ reste FACULTATIF côté serveur pour cette raison exacte : les
+    // versions déjà déployées poussent des « À rappeler » sans date, et elles
+    // doivent continuer de passer.
+    test('un rappel sans heure s\'enregistre et ne porte pas la clé', () async {
+      await repo.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.callback,
+        createdById: 'me',
+      );
+
+      final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+      expect(attempt.callbackAt, isNull);
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
+      expect(payload.containsKey('callbackAt'), isFalse);
+    });
+
+    // Le serveur refuse une heure sur une autre issue : la retenir localement
+    // fabriquerait une opération vouée au refus, trois semaines plus tard.
+    test('une heure posée sur une autre issue est écartée', () async {
+      await repo.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.refused,
+        createdById: 'me',
+        callbackAt: DateTime.utc(2026, 8, 13, 9),
+      );
+
+      final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+      expect(attempt.callbackAt, isNull);
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
+      expect(payload.containsKey('callbackAt'), isFalse);
+    });
+
     test('une note vide n\'est pas envoyée', () async {
       await repo.createRepresentant(
         fullName: 'Awa Sy',
@@ -505,6 +557,94 @@ void main() {
       final Map<String, Object?> payload =
           jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
       expect(payload.containsKey('notes'), isFalse);
+    });
+  });
+
+  group('fil de commentaires', () {
+    setUp(() => insertRepresentant(db, id: 'rep-1', phone: '+221770000001'));
+
+    // ═══ LA PROPRIÉTÉ QUI DÉFINIT LE LOT ═══
+    //
+    // Deux téléconseillers hors ligne qui commentent la même fiche produisent
+    // DEUX lignes, jamais une fusion. C'est ce qui rend inutile tout arbitrage :
+    // sans écrasement possible, il n'y a rien à départager.
+    test('deux auteurs sur la même fiche font deux lignes distinctes', () async {
+      await repo.addRepresentantComment(
+        representantId: 'rep-1',
+        body: 'Injoignable le matin.',
+        authorId: 'u-1',
+        authorName: 'Awa Sy',
+      );
+      clock.advance(const Duration(minutes: 5));
+      await repo.addRepresentantComment(
+        representantId: 'rep-1',
+        body: 'Rappelle à 15 h.',
+        authorId: 'u-2',
+        authorName: 'Modou Fall',
+      );
+
+      final List<RepresentantComment> fil = await db
+          .commentsForRepresentant(representantId: 'rep-1')
+          .get();
+      expect(fil, hasLength(2));
+      expect(fil.map((RepresentantComment c) => c.body), <String>[
+        'Rappelle à 15 h.',
+        'Injoignable le matin.',
+      ], reason: 'le plus récent en tête');
+      expect(fil.map((RepresentantComment c) => c.authorName), <String>[
+        'Modou Fall',
+        'Awa Sy',
+      ]);
+    });
+
+    test('le fil ne rend que celui de CETTE fiche', () async {
+      await insertRepresentant(db, id: 'rep-2', phone: '+221770000002');
+      await repo.addRepresentantComment(
+        representantId: 'rep-1',
+        body: 'Pour la première fiche.',
+        authorId: 'u-1',
+        authorName: 'Awa Sy',
+      );
+      await repo.addRepresentantComment(
+        representantId: 'rep-2',
+        body: 'Pour la seconde fiche.',
+        authorId: 'u-1',
+        authorName: 'Awa Sy',
+      );
+
+      final List<RepresentantComment> fil = await db
+          .commentsForRepresentant(representantId: 'rep-1')
+          .get();
+      expect(fil.single.body, 'Pour la première fiche.');
+    });
+
+    test('la ligne écrite n\'a pas encore d\'horodatage serveur', () async {
+      final String id = await repo.addRepresentantComment(
+        representantId: 'rep-1',
+        body: '  Marché de Thiaroye.  ',
+        authorId: 'u-1',
+        authorName: 'Awa Sy',
+      );
+
+      final RepresentantComment c =
+          (await db.select(db.representantComments).get()).single;
+      expect(c.id, id);
+      expect(c.body, 'Marché de Thiaroye.', reason: 'les blancs de bord sautent');
+      expect(c.clientCreatedAt, t0);
+      expect(c.serverCreatedAt, isNull);
+    });
+
+    test('un commentaire blanc est refusé au lieu d\'être écrit', () async {
+      await expectLater(
+        repo.addRepresentantComment(
+          representantId: 'rep-1',
+          body: '   \n ',
+          authorId: 'u-1',
+          authorName: 'Awa Sy',
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(await db.select(db.representantComments).get(), isEmpty);
     });
   });
 }

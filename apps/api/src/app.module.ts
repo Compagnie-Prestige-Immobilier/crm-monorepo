@@ -14,6 +14,7 @@ import { RolesGuard } from './common/guards/roles.guard.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { BankCasesModule } from './modules/bank-cases/bank-cases.module.js';
+import { CallbacksModule } from './modules/callbacks/callbacks.module.js';
 import { ClientRequestsModule } from './modules/client-requests/client-requests.module.js';
 import { DbDumpModule } from './modules/db-dump/db-dump.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
@@ -27,6 +28,7 @@ import { HealthModule } from './modules/health/health.module.js';
 import { ProspectsModule } from './modules/prospects/prospects.module.js';
 import { ReferentielsModule } from './modules/referentiels/referentiels.module.js';
 import { RepresentantsModule } from './modules/representants/representants.module.js';
+import { SuggestionsModule } from './modules/suggestions/suggestions.module.js';
 import { SyncModule } from './modules/sync/sync.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { AppUpdatesModule } from './modules/app-updates/app-updates.module.js';
@@ -80,7 +82,9 @@ const env = readEnv();
     ProspectsModule,
     SyncModule,
     Phase2Module,
+    CallbacksModule,
     RepCampaignsModule,
+    SuggestionsModule,
     BankCasesModule,
     ClientRequestsModule,
     DemoModule,

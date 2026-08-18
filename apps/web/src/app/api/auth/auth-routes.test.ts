@@ -133,7 +133,7 @@ describe('POST /api/auth/login', () => {
 });
 
 describe('cloisonnement des rôles à la connexion', () => {
-  it('refuse un COMMERCIAL avec EXACTEMENT le message d’un mot de passe faux', async () => {
+  it('refuse un rôle hors panel avec EXACTEMENT le message d’un mot de passe faux', async () => {
     const { POST } = await import('@/app/api/auth/login/route');
 
     fetchMock.mockResolvedValue(json({ statusCode: 401, message: 'Unauthorized' }, 401));
@@ -147,19 +147,21 @@ describe('cloisonnement des rôles à la connexion', () => {
         accessToken: ACCESS_JWT,
         refreshToken: REFRESH_JWT,
         expiresIn: 900,
-        user: COMMERCIAL,
+        user: { ...ADMIN, id: 'u3', role: 'ROLE_INCONNU' },
       }),
     );
     const { POST: POST2 } = await import('@/app/api/auth/login/route');
-    const refusedRole = await POST2(loginRequest('awa@cpi.sn', 'bonMotDePasse'));
+    const refusedRole = await POST2(loginRequest('sombre@cpi.sn', 'bonMotDePasse'));
     const refusedRoleBody = await refusedRole.text();
 
     expect(refusedRole.status).toBe(wrongPassword.status);
     expect(refusedRole.status).toBe(401);
     expect(refusedRoleBody).toBe(wrongPasswordBody);
+    expect(store.raw(ACCESS_COOKIE)).toBeUndefined();
+    expect(store.raw(REFRESH_COOKIE)).toBeUndefined();
   });
 
-  it('ne pose aucun cookie pour un COMMERCIAL dont le mot de passe est pourtant bon', async () => {
+  it('pose les cookies d’un COMMERCIAL, que le panel admet désormais', async () => {
     fetchMock.mockResolvedValue(
       json({
         accessToken: ACCESS_JWT,
@@ -171,11 +173,12 @@ describe('cloisonnement des rôles à la connexion', () => {
     const { POST } = await import('@/app/api/auth/login/route');
 
     const response = await POST(loginRequest('awa@cpi.sn', 'bonMotDePasse'));
+    const body = (await response.json()) as Record<string, unknown>;
 
-    expect(response.status).toBe(401);
-    expect(store.raw(ACCESS_COOKIE)).toBeUndefined();
-    expect(store.raw(REFRESH_COOKIE)).toBeUndefined();
-    expect(await response.text()).not.toContain(ACCESS_JWT);
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ user: COMMERCIAL });
+    expect(store.raw(ACCESS_COOKIE)?.value).toBe(ACCESS_JWT);
+    expect(store.raw(REFRESH_COOKIE)?.value).toBe(REFRESH_JWT);
   });
 });
 

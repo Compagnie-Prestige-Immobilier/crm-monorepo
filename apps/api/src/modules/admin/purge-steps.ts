@@ -44,6 +44,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.callAttempt.count(),
     remove: async (db) => (await db.callAttempt.deleteMany({})).count,
   },
+  scheduledCallbacks: {
+    table: 'scheduled_callbacks',
+    count: (db) => db.scheduledCallback.count(),
+    remove: async (db) => (await db.scheduledCallback.deleteMany({})).count,
+  },
   callTasks: {
     table: 'call_tasks',
     count: (db) => db.callTask.count(),
@@ -58,6 +63,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     table: 'call_campaigns',
     count: (db) => db.callCampaign.count(),
     remove: async (db) => (await db.callCampaign.deleteMany({})).count,
+  },
+  repSuggestions: {
+    table: 'representant_suggestions',
+    count: (db) => db.representantSuggestion.count(),
+    remove: async (db) => (await db.representantSuggestion.deleteMany({})).count,
   },
   repCallAttempts: {
     table: 'rep_call_attempts',
@@ -126,10 +136,16 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
   },
   commercialAccounts: accountsOfRole(Role.COMMERCIAL),
   financeAccounts: accountsOfRole(Role.BANQUE_FINANCE),
+  supervisionAccounts: accountsOfRole(Role.SUPERVISEUR),
   bankCaseStages: {
     table: 'bank_case_stages',
     count: (db) => db.bankCaseStage.count(),
     remove: async (db) => (await db.bankCaseStage.deleteMany({})).count,
+  },
+  callOutcomeReasons: {
+    table: 'call_outcome_reasons',
+    count: (db) => db.callOutcomeReason.count(),
+    remove: async (db) => (await db.callOutcomeReason.deleteMany({})).count,
   },
   bankRejectionReasons: {
     table: 'bank_rejection_reasons',

@@ -2,18 +2,42 @@ import 'package:drift/drift.dart';
 
 import '../local/database.dart';
 
+typedef Region = ({String id, String name});
+
 class ReferenceRepository {
   ReferenceRepository(this._db);
 
   final AppDatabase _db;
 
-  Stream<List<Departement>> watchDepartements() {
-    return (_db.select(_db.departements)
+  /// Les régions, dérivées des départements : il n'existe pas de table
+  /// `regions` en local, seulement le libellé dénormalisé que porte chaque
+  /// département. Les départements sans libellé sont écartés, sinon la liste
+  /// rendrait une entrée sans nom.
+  Stream<List<Region>> watchRegions() {
+    return _db
+        .customSelect(
+          'SELECT DISTINCT region_id AS id, region_name AS name FROM departements '
+          'WHERE is_active = 1 AND deleted_at IS NULL AND region_name <> \'\' '
+          'ORDER BY name',
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{_db.departements},
+        )
+        .map(
+          (QueryRow row) => (id: row.read<String>('id'), name: row.read<String>('name')),
+        )
+        .watch();
+  }
+
+  Stream<List<Departement>> watchDepartements({String? regionId}) {
+    final SimpleSelectStatement<Departements, Departement> query =
+        _db.select(_db.departements)
           ..where((Departements t) => t.isActive.equals(true) & t.deletedAt.isNull())
           ..orderBy(<OrderClauseGenerator<Departements>>[
             (Departements t) => OrderingTerm.asc(t.name),
-          ]))
-        .watch();
+          ]);
+    if (regionId != null) {
+      query.where((Departements t) => t.regionId.equals(regionId));
+    }
+    return query.watch();
   }
 
   Stream<List<Ief>> watchIefs({String? departementId}) {
@@ -100,8 +124,26 @@ class ReferenceRepository {
         .watch();
   }
 
+  Stream<RepresentantSyncViewData?> watchRepresentant(String id) {
+    return _db
+        .customSelect(
+          'SELECT * FROM representant_sync_view WHERE id = ?1 AND deleted_at IS NULL',
+          variables: <Variable<Object>>[Variable<String>(id)],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.representants,
+            _db.outbox,
+          },
+        )
+        .map((QueryRow row) => _db.representantSyncView.map(row.data))
+        .watchSingleOrNull();
+  }
+
   Stream<List<ProspectSyncViewData>> watchProspectsFor(String representantId) {
     return _db.prospectsForRepresentant(representantId: representantId).watch();
+  }
+
+  Stream<List<RepresentantComment>> watchCommentsFor(String representantId) {
+    return _db.commentsForRepresentant(representantId: representantId).watch();
   }
 
   Stream<List<ProspectSyncViewData>> watchAllProspects({String? search}) {

@@ -11,6 +11,7 @@ class AuthState {
     this.fullName,
     this.role,
     this.email,
+    this.departementId,
     this.errorMessage,
     this.isSubmitting = false,
   });
@@ -29,6 +30,8 @@ class AuthState {
 
   final String? email;
 
+  final String? departementId;
+
   final String? errorMessage;
   final bool isSubmitting;
 
@@ -46,6 +49,7 @@ class AuthState {
       Role.COMMERCIAL => 'Téléconseiller',
       Role.ADMIN => 'Administrateur',
       Role.BANQUE_FINANCE => 'Banque et financement',
+      Role.SUPERVISEUR => 'Supervision',
       Role.unknownDefaultOpenApi => raw,
     };
   }
@@ -56,6 +60,7 @@ class AuthState {
     String? fullName,
     String? role,
     String? email,
+    String? departementId,
     String? errorMessage,
     bool clearError = false,
     bool? isSubmitting,
@@ -66,6 +71,7 @@ class AuthState {
       fullName: fullName ?? this.fullName,
       role: role ?? this.role,
       email: email ?? this.email,
+      departementId: departementId ?? this.departementId,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       isSubmitting: isSubmitting ?? this.isSubmitting,
     );
@@ -80,10 +86,19 @@ class AuthState {
           other.fullName == fullName &&
           other.role == role &&
           other.email == email &&
+          other.departementId == departementId &&
           other.errorMessage == errorMessage &&
           other.isSubmitting == isSubmitting;
 
   @override
-  int get hashCode =>
-      Object.hash(status, userId, fullName, role, email, errorMessage, isSubmitting);
+  int get hashCode => Object.hash(
+    status,
+    userId,
+    fullName,
+    role,
+    email,
+    departementId,
+    errorMessage,
+    isSubmitting,
+  );
 }

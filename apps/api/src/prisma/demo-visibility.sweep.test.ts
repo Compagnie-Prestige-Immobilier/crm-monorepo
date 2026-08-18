@@ -25,6 +25,10 @@ const DEMO_MODELS = [
   'notificationDelivery',
   'deviceToken',
   'segmentChange',
+  'scheduledCallback',
+  'representantRelationChange',
+  'representantSuggestion',
+  'representantComment',
   'importJob',
 ] as const;
 
@@ -73,6 +77,10 @@ const DEMO_TABLES = [
   'notification_deliveries',
   'device_tokens',
   'segment_changes',
+  'scheduled_callbacks',
+  'representant_relation_changes',
+  'representant_suggestions',
+  'representant_comments',
   'import_jobs',
 ] as const;
 

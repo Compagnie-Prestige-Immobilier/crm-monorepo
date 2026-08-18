@@ -16,6 +16,7 @@ import { useState } from 'react';
 
 import { useFileDownload } from '@/components/exports/download-button';
 import { QueryErrorState } from '@/components/query-error-state';
+import { RelationBadge } from '@/components/representants/relation-badge';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
 import { RepresentantsFiltersBar } from '@/components/representants/representants-filters-bar';
 import { useRepresentantFilters } from '@/components/representants/use-representant-filters';
@@ -36,13 +37,22 @@ import {
 } from '@/lib/data/representants-import';
 import { formatDate, formatNumber, formatPhone } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
-import { countActiveRepresentantFilters } from '@/lib/representant-filters';
+import {
+  countActiveRepresentantFilters,
+  type RepresentantFilters,
+} from '@/lib/representant-filters';
 import type { RepresentantRow } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const NO_VALUE = '–';
 
-export function RepresentantsView() {
+export function RepresentantsView({
+  canAdminister,
+  readOnly = false,
+}: {
+  canAdminister: boolean;
+  readOnly?: boolean;
+}) {
   const { filters, setFilters } = useRepresentantFilters();
   const exporter = useFileDownload();
   const [editing, setEditing] = useState<{ representant: RepresentantRow | null } | null>(null);
@@ -52,6 +62,22 @@ export function RepresentantsView() {
     queryFn: () => fetchRepresentants(filters),
     placeholderData: (previous) => previous,
   });
+
+  // Le total des ambassadeurs porte sur la SÉLECTION entière, pas sur la page :
+  // l'API ne le rend pas avec la liste, il se lit sur le `total` d'une seconde
+  // requête aux mêmes critères.
+  const ambassadorFilters: RepresentantFilters = {
+    ...filters,
+    relationStatus: 'AMBASSADEUR',
+    page: 1,
+  };
+  const ambassadors = useQuery({
+    queryKey: queryKeys.representants(ambassadorFilters),
+    queryFn: () => fetchRepresentants(ambassadorFilters),
+    placeholderData: (previous) => previous,
+  });
+  const ambassadorCount =
+    filters.relationStatus === 'AMBASSADEUR' ? null : (ambassadors.data?.total ?? null);
 
   const total = data?.total ?? 0;
   const page = data?.page ?? 1;
@@ -69,45 +95,51 @@ export function RepresentantsView() {
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            onClick={() => {
-              setEditing({ representant: null });
-            }}
-          >
-            <PlusIcon aria-hidden="true" />
-            Nouveau représentant
-          </Button>
+          {readOnly ? null : (
+            <Button
+              type="button"
+              onClick={() => {
+                setEditing({ representant: null });
+              }}
+            >
+              <PlusIcon aria-hidden="true" />
+              Nouveau représentant
+            </Button>
+          )}
 
-          {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
-              poserait `role="button"` sur le `<a>`. */}
-          <Link href="/representants/import" className={buttonVariants({ variant: 'outline' })}>
-            <UploadIcon aria-hidden="true" />
-            Import Excel
-          </Link>
+          {canAdminister ? (
+            // Un LIEN habillé en bouton : la primitive `Button` de Base UI
+            // poserait `role="button"` sur le `<a>`.
+            <Link href="/representants/import" className={buttonVariants({ variant: 'outline' })}>
+              <UploadIcon aria-hidden="true" />
+              Import Excel
+            </Link>
+          ) : null}
 
           {/* L'export part des filtres de l'URL, pas de la page affichée :
               celui qui envoie le fichier doit pouvoir jurer qu'il contient ce
               qu'il avait sous les yeux. */}
-          <Button
-            type="button"
-            variant="outline"
-            disabled={exporter.pending || total === 0}
-            onClick={() => {
-              void exporter.download({
-                url: buildRepresentantsExportUrl(filters),
-                fileName: representantsExportFileName(),
-                failureMessage: 'L’export n’a pas pu être généré.',
-              });
-            }}
-          >
-            {exporter.pending ? (
-              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <FileSpreadsheetIcon aria-hidden="true" />
-            )}
-            Exporter
-          </Button>
+          {readOnly ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={exporter.pending || total === 0}
+              onClick={() => {
+                void exporter.download({
+                  url: buildRepresentantsExportUrl(filters),
+                  fileName: representantsExportFileName(),
+                  failureMessage: 'L’export n’a pas pu être généré.',
+                });
+              }}
+            >
+              {exporter.pending ? (
+                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <FileSpreadsheetIcon aria-hidden="true" />
+              )}
+              Exporter
+            </Button>
+          )}
         </div>
       </div>
 
@@ -145,9 +177,13 @@ export function RepresentantsView() {
               <li key={representant.id}>
                 <RepresentantCard
                   representant={representant}
-                  onEdit={() => {
-                    setEditing({ representant });
-                  }}
+                  onEdit={
+                    readOnly
+                      ? null
+                      : () => {
+                          setEditing({ representant });
+                        }
+                  }
                 />
               </li>
             ))}
@@ -164,21 +200,34 @@ export function RepresentantsView() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Représentant</TableHead>
+                  <TableHead>Relation</TableHead>
                   <TableHead>Téléphone</TableHead>
                   <TableHead>Département</TableHead>
                   <TableHead>IEF</TableHead>
                   <TableHead>Saisi par</TableHead>
                   <TableHead className="text-right">Prospects</TableHead>
                   <TableHead>Première saisie</TableHead>
-                  <TableHead className="w-24">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
+                  {readOnly ? null : (
+                    <TableHead className="w-24">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data.items.map((representant) => (
                   <TableRow key={representant.id}>
-                    <TableCell className="font-[600]">{representant.fullName}</TableCell>
+                    <TableCell className="font-[600]">
+                      <Link
+                        href={`/representants/${representant.id}`}
+                        className="hover:underline focus-visible:underline"
+                      >
+                        {representant.fullName}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <RelationBadge status={representant.relationStatus} />
+                    </TableCell>
                     <TableCell className="tabular-nums">
                       {formatPhone(representant.phoneE164)}
                     </TableCell>
@@ -198,20 +247,22 @@ export function RepresentantsView() {
                     <TableCell className="text-muted-foreground">
                       {formatDate(representant.clientCreatedAt)}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Modifier la fiche de ${representant.fullName}`}
-                        onClick={() => {
-                          setEditing({ representant });
-                        }}
-                      >
-                        <PencilIcon className="size-4" aria-hidden="true" />
-                        <span aria-hidden="true">Modifier</span>
-                      </Button>
-                    </TableCell>
+                    {readOnly ? null : (
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Modifier la fiche de ${representant.fullName}`}
+                          onClick={() => {
+                            setEditing({ representant });
+                          }}
+                        >
+                          <PencilIcon className="size-4" aria-hidden="true" />
+                          <span aria-hidden="true">Modifier</span>
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -245,6 +296,9 @@ export function RepresentantsView() {
             {total === 0
               ? 'Aucun résultat'
               : `${formatNumber(first)}–${formatNumber(last)} sur ${formatNumber(total)}`}
+            {total === 0 || ambassadorCount === null
+              ? ''
+              : `, dont ${formatNumber(ambassadorCount)} ambassadeur${ambassadorCount === 1 ? '' : 's'}`}
           </p>
 
           <div className="flex items-center gap-1">
@@ -293,16 +347,26 @@ function RepresentantCard({
   onEdit,
 }: {
   representant: RepresentantRow;
-  onEdit: () => void;
+  onEdit: (() => void) | null;
 }) {
   return (
     <article className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-[600]">{representant.fullName}</p>
+          <p className="truncate font-[600]">
+            <Link
+              href={`/representants/${representant.id}`}
+              className="hover:underline focus-visible:underline"
+            >
+              {representant.fullName}
+            </Link>
+          </p>
           <p className="truncate text-[0.8125rem] text-muted-foreground tabular-nums">
             {formatPhone(representant.phoneE164)}
           </p>
+          <div className="mt-1.5">
+            <RelationBadge status={representant.relationStatus} />
+          </div>
         </div>
         {/*
           Le compte de prospects reste l'information CENTRALE : c'est lui qui dit
@@ -340,17 +404,19 @@ function RepresentantCard({
         </div>
       </dl>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="w-fit"
-        aria-label={`Modifier la fiche de ${representant.fullName}`}
-        onClick={onEdit}
-      >
-        <PencilIcon className="size-4" aria-hidden="true" />
-        <span aria-hidden="true">Modifier</span>
-      </Button>
+      {onEdit === null ? null : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-fit"
+          aria-label={`Modifier la fiche de ${representant.fullName}`}
+          onClick={onEdit}
+        >
+          <PencilIcon className="size-4" aria-hidden="true" />
+          <span aria-hidden="true">Modifier</span>
+        </Button>
+      )}
     </article>
   );
 }

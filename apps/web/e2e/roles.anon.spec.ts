@@ -38,6 +38,10 @@ import { expect, request, test, type Page } from '@playwright/test';
 const BANK_IDENTIFIER = process.env.E2E_BANK_IDENTIFIER ?? 'demo.banque@cpi.sn';
 const BANK_PASSWORD = process.env.E2E_BANK_PASSWORD ?? 'Demo1-CPI-Sunugal';
 
+/** Même provenance que le compte bancaire : le jeu de démonstration semé ci-dessous. */
+const TELECONSEILLER_IDENTIFIER = process.env.E2E_TELECONSEILLER_IDENTIFIER ?? 'demo.awa@cpi.sn';
+const TELECONSEILLER_PASSWORD = process.env.E2E_TELECONSEILLER_PASSWORD ?? 'Demo1-CPI-Sunugal';
+
 const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
 
 /**
@@ -149,7 +153,7 @@ async function login(page: Page, identifier: string, password: string): Promise<
   // réussite plutôt que d'attendre en vain une URL qui ne viendra pas.
   const landed = await Promise.race([
     page
-      .waitForURL(/\/(tableau-de-bord|dossiers)/, { timeout: 15_000 })
+      .waitForURL(/\/(tableau-de-bord|dossiers|console|supervision)/, { timeout: 15_000 })
       .then(() => true)
       .catch(() => false),
     alert
@@ -272,18 +276,86 @@ test('une URL interdite tapée à la main rend un refus lisible, pas une page ca
   await expect(page.getByRole('heading', { name: 'Mes demandes', level: 1 })).toBeVisible();
 });
 
-test('un TÉLÉCONSEILLER est refusé à la porte du panel', async ({ page }) => {
-  // Son outil est l'application mobile : le laisser entrer ici lui donnerait la
-  // base nominative complète, là où l'annuaire de phase 2 ne lui expose qu'un
-  // téléphone et un statut.
-  await page.goto('/connexion');
-  await page.getByLabel('E-mail ou identifiant').fill('demo.awa@cpi.sn');
-  await page.getByLabel('Mot de passe').fill('Demo1-CPI-Sunugal');
-  await page.getByRole('button', { name: 'Se connecter' }).click();
+/**
+ * Le panel est OUVERT au téléconseiller depuis « ouvrir le panneau aux
+ * teleconseillers, avec une section Terrain ». Ce fichier éprouvait l'inverse,
+ * et c'est la seule couverture du nouvel atterrissage.
+ */
+test('un téléconseiller atterrit sur la console, sans boucle de redirection', async ({ page }) => {
+  await login(page, TELECONSEILLER_IDENTIFIER, TELECONSEILLER_PASSWORD);
 
-  const alert = page.locator('form').getByRole('alert').first();
-  await expect(alert).toBeVisible();
-  // Message générique : la réponse ne doit pas permettre d'énumérer les comptes.
-  await expect(alert).toContainText(/incorrects ou compte non autorisé/i);
-  await expect(page).toHaveURL(/\/connexion/);
+  await expect(page).toHaveURL(/\/console/);
+  await expect(page.getByRole('heading', { name: 'Console d’appel', level: 1 })).toBeVisible();
+
+  /**
+   * Les deux routes qui ont déjà bouclé : `/` et `/connexion` renvoient toutes
+   * deux vers l'écran d'accueil du rôle, et cet écran ne doit pas renvoyer
+   * ailleurs. Un aller-retour infini se solderait ici par un délai dépassé,
+   * pas par une assertion fausse : `waitForURL` est ce qui le nomme.
+   */
+  for (const entry of ['/', '/connexion']) {
+    await page.goto(entry);
+    await page.waitForURL('**/console');
+    await expect(page.getByRole('heading', { name: 'Console d’appel', level: 1 })).toBeVisible();
+  }
+});
+
+test('sa navigation se limite au Terrain, et le pilotage lui reste fermé', async ({ page }) => {
+  await login(page, TELECONSEILLER_IDENTIFIER, TELECONSEILLER_PASSWORD);
+
+  const nav = page.getByRole('navigation', { name: 'Navigation principale' });
+  await expect(nav.getByRole('heading', { name: 'Terrain', level: 2 })).toBeVisible();
+
+  for (const visible of ['Console d’appel', 'Rappels', 'Représentants', 'Nouveau prospect']) {
+    await expect(nav.getByRole('link', { name: visible, exact: true })).toBeVisible();
+  }
+
+  // `exact` : sans lui, « Supervision » matcherait aussi une entrée dont le
+  // libellé la contient, et « Tableau de bord » le logo de la barre latérale.
+  for (const hidden of [
+    'Tableau de bord',
+    'Statistiques',
+    'Prospects',
+    'Campagnes',
+    'Supervision',
+    'Utilisateurs',
+    'Référentiels',
+    'Imports',
+    'Paramètres',
+    'Dossiers',
+    'Étapes bancaires',
+    'Demandes clients',
+  ]) {
+    await expect(nav.getByRole('link', { name: hidden, exact: true })).toHaveCount(0);
+  }
+
+  /**
+   * Le masquage du menu ne protège rien : c'est la garde serveur qui décide.
+   * Chaque écran de pilotage est donc redemandé PAR SON URL.
+   */
+  for (const forbidden of [
+    '/tableau-de-bord',
+    '/statistiques',
+    '/campagnes',
+    '/campagnes/representants',
+    '/commerciaux',
+    '/supervision',
+    '/referentiels',
+    '/imports',
+    '/parametres',
+    '/representants/import',
+    '/dossiers',
+  ]) {
+    await page.goto(forbidden);
+    await expect(
+      page.getByRole('heading', { name: 'Accès refusé', level: 2 }),
+      `${forbidden} devrait être refusé à un téléconseiller`,
+    ).toBeVisible();
+  }
+
+  // Le refus NOMME le rôle en cours, et propose une sortie vers un écran ouvert.
+  await expect(page.getByRole('alert').filter({ hasText: 'Accès refusé' })).toContainText(
+    'Téléconseiller',
+  );
+  await expect(page.getByRole('link', { name: 'Retour à l’accueil', exact: true })).toBeVisible();
 });
