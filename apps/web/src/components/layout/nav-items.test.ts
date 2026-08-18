@@ -7,6 +7,7 @@ import {
   navSections,
   navTitle,
 } from '@/components/layout/nav-items';
+import { PANEL_ROLES } from '@/lib/data/auth';
 
 const hrefs = (role: Parameters<typeof navItems>[0]): string[] =>
   navItems(role).map((item) => item.href);
@@ -163,17 +164,20 @@ describe('écran d’atterrissage après connexion', () => {
     expect(homePathForRole('ADMIN')).toBe('/tableau-de-bord');
     expect(homePathForRole('BANQUE_FINANCE')).toBe('/dossiers');
     expect(homePathForRole('COMMERCIAL')).toBe('/console');
+    expect(homePathForRole('SUPERVISEUR')).toBe('/supervision');
   });
 
+  // Sur PANEL_ROLES et non sur une liste retapée : un rôle admis dans le
+  // panel sans écran d'accueil part en boucle vers « /connexion ».
   it('ne renvoie personne vers « /connexion », qui l’y renverrait en boucle', () => {
-    for (const role of ['ADMIN', 'BANQUE_FINANCE', 'COMMERCIAL'] as const) {
-      expect(homePathForRole(role)).not.toBe('/connexion');
+    for (const role of PANEL_ROLES) {
+      expect(homePathForRole(role), role).not.toBe('/connexion');
     }
   });
 
   it('mène chaque rôle sur un écran que sa propre navigation lui propose', () => {
-    for (const role of ['ADMIN', 'BANQUE_FINANCE', 'COMMERCIAL'] as const) {
-      expect(hrefs(role)).toContain(homePathForRole(role));
+    for (const role of PANEL_ROLES) {
+      expect(hrefs(role), role).toContain(homePathForRole(role));
     }
   });
 });
@@ -207,5 +211,40 @@ describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
 
   it('retombe sur « CPI GO » pour une route hors navigation', () => {
     expect(navTitle('ADMIN', '/une-route-inconnue')).toBe('CPI GO');
+  });
+});
+
+describe('navigation d’un SUPERVISEUR', () => {
+  it('ne montre QUE des écrans de lecture', () => {
+    expect(hrefs('SUPERVISEUR')).toEqual([
+      '/supervision',
+      '/statistiques',
+      '/prospects',
+      '/representants',
+    ]);
+  });
+
+  it('masque tout ce qui écrit, saisit, administre ou synchronise', () => {
+    const visible = hrefs('SUPERVISEUR');
+    for (const forbidden of [
+      '/console',
+      '/prospects/nouveau',
+      '/representants/import',
+      '/campagnes',
+      '/dossiers',
+      '/demandes-clients',
+      '/notifications',
+      '/commerciaux',
+      '/referentiels',
+      '/imports',
+      '/parametres',
+    ]) {
+      expect(visible, `« ${forbidden} » ne doit pas être proposé`).not.toContain(forbidden);
+    }
+  });
+
+  it('ne dit jamais « commercial » dans ses intitulés', () => {
+    const labels = navItems('SUPERVISEUR').map((item) => `${item.label} ${item.description}`);
+    for (const text of labels) expect(text.toLowerCase()).not.toContain('commercial');
   });
 });

@@ -12,6 +12,7 @@ const PANEL_LABELS: Record<Role, string> = {
   ADMIN: 'Panneau d’administration',
   BANQUE_FINANCE: 'Espace Banque & Finance',
   COMMERCIAL: 'Espace téléconseiller',
+  SUPERVISEUR: 'Espace supervision',
 };
 
 export function SidebarNav({

@@ -8,7 +8,7 @@ import { guardRoles } from '@/lib/session';
 export const metadata: Metadata = { title: 'Notifications' };
 
 export default async function NotificationsPage() {
-  const guard = await guardRoles(['ADMIN', 'BANQUE_FINANCE', 'COMMERCIAL']);
+  const guard = await guardRoles(['ADMIN', 'BANQUE_FINANCE', 'COMMERCIAL', 'SUPERVISEUR']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="Les notifications" />;

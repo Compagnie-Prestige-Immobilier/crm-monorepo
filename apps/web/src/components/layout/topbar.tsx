@@ -57,7 +57,7 @@ export function Topbar({ user }: { user: SessionUser }) {
           client, rappels système) et l'agent BANQUE_FINANCE (réponse à ses
           demandes, dossiers sans mouvement). Celles d'un téléconseiller visent
           l'application mobile, et sa console n'en affiche aucune. */}
-      {user.role === 'ADMIN' || user.role === 'BANQUE_FINANCE' ? <NotificationBell /> : null}
+      {user.role === 'COMMERCIAL' ? null : <NotificationBell />}
       <ThemeToggle />
       <UserMenu user={user} />
     </header>
