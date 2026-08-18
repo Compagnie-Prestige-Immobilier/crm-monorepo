@@ -4,6 +4,7 @@ import {
   BANK_REJECTION_REASONS,
   BANK_STAGES,
   BANQUES_SENEGAL,
+  CALL_OUTCOME_REASONS,
   DEPARTEMENT_COUNT,
   PrismaClient,
   PrismaPg,
@@ -132,6 +133,29 @@ async function seedBankWorkflow(): Promise<void> {
   );
 }
 
+async function seedCallOutcomes(): Promise<void> {
+  for (const reason of CALL_OUTCOME_REASONS) {
+    await prisma.callOutcomeReason.upsert({
+      where: { code: reason.code },
+      // `minPayloadVersion` a 1: seuls ces six motifs sont emettables par les
+      // telephones deja deployes.
+      create: { ...reason, isSystem: true, minPayloadVersion: 1 },
+      update: {
+        label: reason.label,
+        effect: reason.effect,
+        requiresComment: reason.requiresComment,
+        requiresCallback: reason.requiresCallback,
+        countsAsReached: reason.countsAsReached,
+        color: reason.color,
+        sortOrder: reason.sortOrder,
+        isSystem: true,
+        minPayloadVersion: 1,
+      },
+    });
+  }
+  console.info(`  issues d'appel : ${String(CALL_OUTCOME_REASONS.length)} motifs systeme`);
+}
+
 async function seedAdmin(): Promise<void> {
   const email = process.env.SEED_ADMIN_EMAIL;
   const username = process.env.SEED_ADMIN_USERNAME;
@@ -173,6 +197,7 @@ async function main(): Promise<void> {
   await seedBanques();
   await seedSyndicats();
   await seedBankWorkflow();
+  await seedCallOutcomes();
   await seedAdmin();
   console.info('Seed terminé.');
 }
