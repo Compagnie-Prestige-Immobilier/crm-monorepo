@@ -824,3 +824,73 @@ describe('réessai d’un rappel et tick d’échéance qui se croisent', () => 
     expect(rappel?.dispatchClaim).toBeNull();
   });
 });
+
+describe('rappel « rappels à passer »', () => {
+  const AUJOURDHUI = new Date('2026-08-13T16:00:00.000Z');
+  const HIER = new Date('2026-08-12T16:00:00.000Z');
+  const DEMAIN = new Date('2026-08-14T09:00:00.000Z');
+
+  beforeEach(() => {
+    db.addUser({ id: 'usr-1', fullName: 'Awa Diop' });
+    db.addUser({ id: 'usr-2', fullName: 'Modou Sarr' });
+  });
+
+  it('compte les rappels du jour de chaque téléconseiller, séparément', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+    db.addScheduledCallback({ assignedToId: 'usr-2', scheduledAt: AUJOURDHUI });
+
+    const run = await reminders.remindDueCallbacks(NOW);
+
+    expect(run.created).toBe(2);
+    expect(db.notifications[0]?.body).toContain('2 rappel(s)');
+    expect(db.notifications[1]?.body).toContain('1 rappel(s)');
+    expect(db.notifications[0]?.route).toBe('/phase2/callbacks');
+  });
+
+  it('un rappel EN RETARD compte dans la relance du jour', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(1);
+    expect(db.notifications[0]?.body).toContain('1 rappel(s)');
+  });
+
+  it('un rappel de demain ne relance personne aujourd’hui', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: DEMAIN });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+  });
+
+  it('un rappel déjà passé ou annulé ne relance plus', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'DONE' });
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'CANCELLED' });
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'SUPERSEDED' });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+  });
+
+  it('ne relance jamais sur une file de démonstration', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI, isDemo: true });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+  });
+
+  it('deux passages le même jour ne donnent qu’une relance', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(1);
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+    expect(db.notifications).toHaveLength(1);
+  });
+
+  it('la clé de rappel lui est propre, elle ne prend pas la place d’une autre', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+    db.addCallTask({ assignedToId: 'usr-1' });
+
+    await reminders.runAll(NOW);
+
+    const cles = db.deliveries.map((delivery) => delivery.reminderKey);
+    expect(cles).toContain(ReminderKey.DUE_CALLBACKS);
+    expect(cles).toContain(ReminderKey.OPEN_CALL_TASKS);
+  });
+});

@@ -153,8 +153,9 @@ export class ExportController {
     }
   }
 
-  // Recopie le `@Roles` de `GET /representants` : un export plus large que son écran
-  // serait un contournement.
+  // Plus étroit que `GET /representants`, jamais plus large : un export plus large
+  // que son écran serait un contournement. Le SUPERVISEUR consulte, il n'emporte pas
+  // l'annuaire national dans un classeur.
   @Get('representants.xlsx')
   @Roles(Role.COMMERCIAL, Role.ADMIN)
   @ApiProduces(XLSX_MIME)

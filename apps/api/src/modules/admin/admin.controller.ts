@@ -67,6 +67,7 @@ export class AdminController {
   }
 
   @Get('supervision')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'getSupervision',
     summary: 'Téléconseillers et pôle Finances générales, avec présence et dernière activité.',

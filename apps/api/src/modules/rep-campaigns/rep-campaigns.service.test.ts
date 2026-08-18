@@ -5,7 +5,14 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { CallTaskStatus, CampaignStatus, RepCallOutcome, Role } from '@crm/database';
+import {
+  CallTaskStatus,
+  CampaignStatus,
+  ChangeSource,
+  RepCallOutcome,
+  RepresentantRelation,
+  Role,
+} from '@crm/database';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -25,7 +32,8 @@ type MockDb = {
     MockFn
   >;
   repCallAttempt: Record<'findMany' | 'findUnique' | 'create' | 'createMany', MockFn>;
-  representant: Record<'findMany' | 'findFirst' | 'count', MockFn>;
+  representant: Record<'findMany' | 'findFirst' | 'count' | 'updateMany', MockFn>;
+  representantRelationChange: Record<'create', MockFn>;
   departement: Record<'findUnique', MockFn>;
   ief: Record<'findUnique', MockFn>;
   user: Record<'findMany', MockFn>;
@@ -77,7 +85,13 @@ function prismaStub(): MockDb {
       create: vi.fn(),
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    representant: { findMany: vi.fn(), findFirst: vi.fn(), count: vi.fn() },
+    representant: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      count: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    representantRelationChange: { create: vi.fn() },
     departement: { findUnique: vi.fn() },
     ief: { findUnique: vi.fn() },
     user: { findMany: vi.fn() },
@@ -706,6 +720,135 @@ describe('RepCampaignsService : tentatives', () => {
       db.repCallAttempt.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }]
     )[0].data[0];
     expect(written?.isDemo).toBe(true);
+  });
+
+  const relationOf = (db: MockDb): Record<string, unknown> =>
+    (db.representantRelationChange.create.mock.calls[0]?.[0] as { data: Record<string, unknown> })
+      .data;
+
+  const readyFor = (relationStatus: RepresentantRelation, isDemo = false): MockDb => {
+    const db = prismaStub();
+    db.repCallAttempt.findUnique.mockResolvedValue(null);
+    db.representant.findFirst.mockResolvedValue({ id: 'rep-1', isDemo, relationStatus });
+    db.repCallTask.findFirst.mockResolvedValue(null);
+    return db;
+  };
+
+  it('pose le statut de relation appris pendant l’appel, source WEB', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU);
+
+    await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    const guard = (
+      db.representant.updateMany.mock.calls[0] as [
+        { where: Record<string, unknown>; data: Record<string, unknown> },
+      ]
+    )[0];
+    expect(guard.where).toMatchObject({
+      id: 'rep-1',
+      relationStatus: RepresentantRelation.INCONNU,
+    });
+    expect(guard.data).toMatchObject({ relationStatus: RepresentantRelation.AMBASSADEUR });
+
+    expect(relationOf(db)).toMatchObject({
+      representantId: 'rep-1',
+      fromStatus: RepresentantRelation.INCONNU,
+      toStatus: RepresentantRelation.AMBASSADEUR,
+      changedById: COMMERCIAL.id,
+      source: ChangeSource.WEB,
+      isDemo: false,
+    });
+  });
+
+  it('accepte la RÉGRESSION : un ambassadeur qui cesse redevient un refus', async () => {
+    const db = readyFor(RepresentantRelation.AMBASSADEUR);
+
+    await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      outcome: RepCallOutcome.REFUSED,
+      relationStatus: RepresentantRelation.REFUS,
+    });
+
+    expect(relationOf(db)).toMatchObject({
+      fromStatus: RepresentantRelation.AMBASSADEUR,
+      toStatus: RepresentantRelation.REFUS,
+    });
+  });
+
+  it('n’écrit AUCUNE histoire quand le statut posté est déjà celui de la fiche', async () => {
+    const db = readyFor(RepresentantRelation.AMBASSADEUR);
+
+    await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    expect(db.representant.updateMany).not.toHaveBeenCalled();
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('ne touche à la relation que si la tentative la mentionne', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU);
+
+    await build(db).recordAttempt(COMMERCIAL, attempt);
+
+    expect(db.representant.updateMany).not.toHaveBeenCalled();
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('un REJEU de la même tentative ne rebascule pas la relation', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU);
+    db.repCallAttempt.findUnique.mockResolvedValue({ id: attempt.id, taskId: null });
+
+    const result = await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('ni le rejeu écarté par l’unicité, découvert dans la transaction', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU);
+    db.repCallAttempt.createMany.mockResolvedValue({ count: 0 });
+
+    const result = await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('n’écrit pas l’histoire quand un autre appel a déjà quitté le statut de départ', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU);
+    db.representant.updateMany.mockResolvedValue({ count: 0 });
+
+    await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('la trace suit la fiche fictive, pas le mode en vigueur', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU, true);
+
+    await new RepCampaignsService(
+      db as unknown as PrismaService,
+      fakeDemoVisibility(true),
+    ).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.CONTACTE,
+    });
+
+    expect(relationOf(db).isDemo).toBe(true);
   });
 
   it('exige un commentaire sur « Autre » et refuse une promesse hors contexte', async () => {

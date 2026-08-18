@@ -579,6 +579,7 @@ export class SyncService {
         outcome: data.outcome,
         ...(data.method === undefined ? {} : { method: data.method }),
         ...(data.comment === undefined ? {} : { comment: data.comment }),
+        ...(data.callbackAt === undefined ? {} : { callbackAt: data.callbackAt }),
         clientCreatedAt: data.clientCreatedAt,
       });
 

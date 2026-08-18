@@ -1656,6 +1656,15 @@
             }
           },
           {
+            "name": "relationStatus",
+            "required": false,
+            "in": "query",
+            "description": "Ne retient que les représentants dans cet état de relation.",
+            "schema": {
+              "$ref": "#/components/schemas/RepresentantRelation"
+            }
+          },
+          {
             "name": "sortBy",
             "required": false,
             "in": "query",
@@ -2196,6 +2205,81 @@
           }
         ],
         "summary": "Supprime logiquement un représentant.",
+        "tags": ["representants"]
+      }
+    },
+    "/api/v1/representants/{id}/relation-history": {
+      "get": {
+        "operationId": "listRepresentantRelationChanges",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepresentantRelationChangeListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "REPRESENTANT_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bascules de relation déjà subies par une fiche, de la plus récente à la plus ancienne.",
         "tags": ["representants"]
       }
     },
@@ -3779,6 +3863,158 @@
           }
         ],
         "summary": "Programme d’appels imprimable d’un commercial.",
+        "tags": ["phase2"]
+      }
+    },
+    "/api/v1/phase2/callbacks": {
+      "get": {
+        "description": "Un téléconseiller ne voit que les rappels qu’il a promis. Les rappels en retard remontent dans la journée courante : le retard se déduit de la date, il n’est jamais écrit.",
+        "operationId": "listScheduledCallbacks",
+        "parameters": [
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "description": "today : tout ce qui est dû d’ici la fin de la journée, retards compris. overdue : les seuls retards. week : les sept prochaines journées.",
+            "schema": {
+              "$ref": "#/components/schemas/CallbackScope"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "File d’un téléconseiller donné. Réservé à l’administration et à la supervision ; ignoré pour les autres, qui ne voient que la leur.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallbackListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rappels promis encore dus.",
+        "tags": ["phase2"]
+      }
+    },
+    "/api/v1/phase2/callbacks/{id}/cancel": {
+      "post": {
+        "description": "Idempotent : un rappel déjà clos ou annulé est rendu tel quel.",
+        "operationId": "cancelScheduledCallback",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallbackDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "CALLBACK_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Annule un rappel qui n’a plus lieu d’être.",
         "tags": ["phase2"]
       }
     },
@@ -13394,7 +13630,7 @@
       },
       "Role": {
         "type": "string",
-        "enum": ["ADMIN", "COMMERCIAL", "BANQUE_FINANCE"]
+        "enum": ["ADMIN", "COMMERCIAL", "BANQUE_FINANCE", "SUPERVISEUR"]
       },
       "AuthUserDto": {
         "type": "object",
@@ -14060,6 +14296,10 @@
           }
         }
       },
+      "RepresentantRelation": {
+        "type": "string",
+        "enum": ["INCONNU", "CONTACTE", "AMBASSADEUR", "REFUS"]
+      },
       "RepresentantSortField": {
         "type": "string",
         "enum": ["clientCreatedAt", "createdAt", "fullName", "prospects"]
@@ -14127,6 +14367,13 @@
           },
           "prospectCount": {
             "type": "number"
+          },
+          "relationStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
           }
         },
         "required": [
@@ -14144,7 +14391,8 @@
           "clientCreatedAt",
           "createdAt",
           "updatedAt",
-          "prospectCount"
+          "prospectCount",
+          "relationStatus"
         ]
       },
       "RepresentantListDto": {
@@ -14377,8 +14625,95 @@
             "type": "string",
             "format": "date-time",
             "description": "Horodatage de la saisie sur le terrain. Défaut : maintenant. Distinct de createdAt, qui est l’arrivée en base."
+          },
+          "relationStatus": {
+            "description": "État de la relation. Chaque bascule est historisée ; reposter le même statut n’écrit rien.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
           }
         }
+      },
+      "ChangeSource": {
+        "type": "string",
+        "enum": ["WEB", "MOBILE"],
+        "description": "Le canal qui a écrit la bascule."
+      },
+      "RepresentantRelationChangeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "representantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fromStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
+          },
+          "toStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "changedById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changedByName": {
+            "type": "string"
+          },
+          "source": {
+            "description": "Le canal qui a écrit la bascule.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChangeSource"
+              }
+            ]
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "representantId",
+          "fromStatus",
+          "toStatus",
+          "reason",
+          "changedById",
+          "changedByName",
+          "source",
+          "changedAt"
+        ]
+      },
+      "RepresentantRelationChangeListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "De la plus récente à la plus ancienne.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantRelationChangeDto"
+            }
+          }
+        },
+        "required": ["items"]
       },
       "ProspectStatut": {
         "type": "string",
@@ -14830,11 +15165,6 @@
         },
         "required": ["reason", "expectedRev"]
       },
-      "ChangeSource": {
-        "type": "string",
-        "enum": ["WEB", "MOBILE"],
-        "description": "Le canal qui a écrit la bascule. Le panel écrit WEB."
-      },
       "SegmentChangeDto": {
         "type": "object",
         "properties": {
@@ -15065,6 +15395,11 @@
             "type": "string",
             "maxLength": 2000,
             "description": "Tentative d’appel : obligatoire et non vide si outcome vaut OTHER."
+          },
+          "callbackAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut CALLBACK. Une version ancienne de l’application ne l’envoie pas."
           }
         }
       },
@@ -15726,6 +16061,90 @@
           "recentAttempts"
         ]
       },
+      "CallbackScope": {
+        "type": "string",
+        "enum": ["today", "overdue", "week"]
+      },
+      "CallbackDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prospectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "shortCode": {
+            "type": "string",
+            "description": "Code court à six caractères du prospect."
+          },
+          "phoneE164": {
+            "type": "string"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedToId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assignedToName": {
+            "type": "string"
+          },
+          "campaignId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Le rappel est passé. État DÉRIVÉ de scheduledAt et de l’heure du serveur, jamais stocké."
+          }
+        },
+        "required": [
+          "id",
+          "prospectId",
+          "shortCode",
+          "phoneE164",
+          "scheduledAt",
+          "comment",
+          "assignedToId",
+          "assignedToName",
+          "campaignId",
+          "taskId",
+          "overdue"
+        ]
+      },
+      "CallbackListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Du plus ancien au plus récent.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CallbackDto"
+            }
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Heure du serveur ayant servi à décider du retard."
+          }
+        },
+        "required": ["items", "serverTime"]
+      },
       "RepCampaignPreviewDto": {
         "type": "object",
         "properties": {
@@ -15792,6 +16211,14 @@
             "type": "string",
             "maxLength": 2000,
             "description": "Obligatoire et non vide si l’issue vaut OTHER."
+          },
+          "relationStatus": {
+            "description": "État de la relation tel que l’appel vient de l’apprendre. Absent : le statut ne bouge pas. Identique au statut courant : rien n’est écrit.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
           },
           "clientCreatedAt": {
             "type": "string",
@@ -17792,6 +18219,7 @@
         "enum": [
           "teleconseillers",
           "finances",
+          "supervision",
           "representants",
           "prospects",
           "campagnes",

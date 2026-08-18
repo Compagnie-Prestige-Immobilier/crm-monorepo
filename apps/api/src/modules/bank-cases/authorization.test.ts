@@ -62,10 +62,9 @@ const allows = (
   }
 };
 
+/** TOUS les rôles du contrat : un rôle ajouté sans être arbitré fait rougir la matrice. */
 const admitted = (controller: new (...args: never[]) => object, method: string): Role[] =>
-  [Role.ADMIN, Role.BANQUE_FINANCE, Role.COMMERCIAL].filter((role) =>
-    allows(controller, method, role),
-  );
+  Object.values(Role).filter((role) => allows(controller, method, role));
 
 const MATRICE: { controller: new (...args: never[]) => object; method: string; roles: Role[] }[] = [
   { controller: BankCasesController, method: 'list', roles: [Role.ADMIN, Role.BANQUE_FINANCE] },
@@ -172,11 +171,15 @@ const MATRICE_NOUVEAUX: {
   { controller: ClientRequestsController, method: 'reject', roles: [Role.ADMIN] },
 
   { controller: RepCampaignsController, method: 'preview', roles: [Role.ADMIN] },
-  { controller: RepCampaignsController, method: 'list', roles: [Role.ADMIN] },
+  { controller: RepCampaignsController, method: 'list', roles: [Role.ADMIN, Role.SUPERVISEUR] },
   { controller: RepCampaignsController, method: 'create', roles: [Role.ADMIN] },
-  { controller: RepCampaignsController, method: 'get', roles: [Role.ADMIN] },
+  { controller: RepCampaignsController, method: 'get', roles: [Role.ADMIN, Role.SUPERVISEUR] },
   { controller: RepCampaignsController, method: 'close', roles: [Role.ADMIN] },
-  { controller: RepCampaignsController, method: 'downloadProgramme', roles: [Role.ADMIN] },
+  {
+    controller: RepCampaignsController,
+    method: 'downloadProgramme',
+    roles: [Role.ADMIN, Role.SUPERVISEUR],
+  },
   {
     controller: RepCampaignsController,
     method: 'recordAttempt',
@@ -186,18 +189,27 @@ const MATRICE_NOUVEAUX: {
   {
     controller: RepresentantsController,
     method: 'list',
-    roles: [Role.ADMIN, Role.COMMERCIAL],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR],
   },
   {
     controller: RepresentantsController,
     method: 'lookup',
     roles: [Role.ADMIN, Role.COMMERCIAL],
   },
-  { controller: RepresentantsController, method: 'get', roles: [Role.ADMIN, Role.COMMERCIAL] },
+  {
+    controller: RepresentantsController,
+    method: 'get',
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR],
+  },
   { controller: RepresentantsController, method: 'create', roles: [Role.ADMIN, Role.COMMERCIAL] },
   { controller: RepresentantsController, method: 'update', roles: [Role.ADMIN, Role.COMMERCIAL] },
   { controller: RepresentantsController, method: 'remove', roles: [Role.ADMIN, Role.COMMERCIAL] },
   { controller: RepresentantsController, method: 'import', roles: [Role.ADMIN] },
+  {
+    controller: RepresentantsController,
+    method: 'relationHistory',
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR],
+  },
 ];
 
 describe('matrice d’autorisation des modules récents', () => {
@@ -245,6 +257,12 @@ describe('matrice d’autorisation des modules récents', () => {
     expect(allows(RepresentantsController, 'import', Role.ADMIN)).toBe(true);
   });
 
+  it('l’annuaire des représentants n’est ouvert au SUPERVISEUR qu’en lecture', () => {
+    for (const method of ['create', 'update', 'remove', 'import']) {
+      expect(allows(RepresentantsController, method, Role.SUPERVISEUR), method).toBe(false);
+    }
+  });
+
   it('l’annuaire des représentants est fermé à BANQUE_FINANCE, route par route', () => {
     for (const method of Object.getOwnPropertyNames(RepresentantsController.prototype).filter(
       (name) => name !== 'constructor',
@@ -261,7 +279,7 @@ describe('matrice d’autorisation des modules récents', () => {
 
     for (const method of routes) {
       expect(admitted(AnalyticsController, method).sort()).toEqual(
-        [Role.ADMIN, Role.COMMERCIAL].sort(),
+        [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR].sort(),
       );
       expect(allows(AnalyticsController, method, Role.BANQUE_FINANCE)).toBe(false);
     }
@@ -269,6 +287,7 @@ describe('matrice d’autorisation des modules récents', () => {
     expect(Reflect.getMetadata(ROLES_KEY, AnalyticsController)).toEqual([
       Role.ADMIN,
       Role.COMMERCIAL,
+      Role.SUPERVISEUR,
     ]);
   });
 });

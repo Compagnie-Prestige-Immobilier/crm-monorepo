@@ -1,5 +1,5 @@
-import { ConflictException } from '@nestjs/common';
-import { Role } from '@crm/database';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { ChangeSource, RepresentantRelation, Role } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -12,7 +12,12 @@ import { RepresentantsService } from './representants.service.js';
 type MockFn = ReturnType<typeof vi.fn>;
 
 interface MockDb {
-  representant: Record<'findFirst' | 'findMany' | 'findUnique' | 'count' | 'create', MockFn>;
+  representant: Record<
+    'findFirst' | 'findMany' | 'findUnique' | 'count' | 'create' | 'update' | 'updateMany',
+    MockFn
+  >;
+  representantRelationChange: Record<'create' | 'findMany', MockFn>;
+  $transaction: MockFn;
 }
 
 const COMMERCIAL: AuthenticatedUser = {
@@ -48,6 +53,8 @@ const foreignRow = (): Record<string, unknown> => ({
   clientCreatedAt: date,
   createdAt: date,
   updatedAt: date,
+  relationStatus: RepresentantRelation.INCONNU,
+  isDemo: false,
   _count: { prospects: 42 },
 });
 
@@ -62,7 +69,11 @@ beforeEach(() => {
       findUnique: vi.fn().mockResolvedValue(null),
       count: vi.fn().mockResolvedValue(0),
       create: vi.fn(),
+      update: vi.fn().mockResolvedValue(foreignRow()),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    representantRelationChange: { create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    $transaction: vi.fn((run: (tx: MockDb) => Promise<unknown>) => run(db)),
   };
   service = new RepresentantsService(db as unknown as PrismaService, fakeDemoVisibility());
 });
@@ -234,5 +245,226 @@ describe('nature de la fiche créée', () => {
     );
 
     expect(dataOf().isDemo).toBe(true);
+  });
+});
+
+describe('filtre par état de relation', () => {
+  const whereOf = (): Record<string, unknown> =>
+    (db.representant.findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
+
+  it('ne retient que les fiches dans l’état demandé', async () => {
+    await service.list(ADMIN, { relationStatus: RepresentantRelation.AMBASSADEUR });
+
+    expect(whereOf().relationStatus).toBe(RepresentantRelation.AMBASSADEUR);
+  });
+
+  it('ne filtre sur rien quand l’état n’est pas demandé', async () => {
+    await service.list(ADMIN, {});
+
+    expect(whereOf()).not.toHaveProperty('relationStatus');
+  });
+
+  it('rend l’état de relation avec la fiche', async () => {
+    db.representant.findFirst.mockResolvedValue({
+      ...foreignRow(),
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    await expect(service.get(ADMIN, 'rep-9')).resolves.toMatchObject({
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+  });
+
+  it('laisse le cloisonnement du téléconseiller par-dessus le filtre', async () => {
+    await service.list(COMMERCIAL, { relationStatus: RepresentantRelation.AMBASSADEUR });
+
+    expect(whereOf()).toMatchObject({
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+      createdById: COMMERCIAL.id,
+    });
+  });
+});
+
+describe('bascule de relation par le panel', () => {
+  const own = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    ...foreignRow(),
+    createdById: COMMERCIAL.id,
+    createdBy: { id: COMMERCIAL.id, fullName: COMMERCIAL.fullName },
+    ...over,
+  });
+
+  const historyOf = (): Record<string, unknown> =>
+    (db.representantRelationChange.create.mock.calls[0]?.[0] as { data: Record<string, unknown> })
+      .data;
+
+  it('écrit la transition et son histoire, source WEB', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+
+    await service.update(COMMERCIAL, 'rep-9', {
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    const guard = (
+      db.representant.updateMany.mock.calls[0] as [
+        { where: Record<string, unknown>; data: Record<string, unknown> },
+      ]
+    )[0];
+    expect(guard.where).toMatchObject({
+      id: 'rep-9',
+      relationStatus: RepresentantRelation.INCONNU,
+    });
+    expect(guard.data).toMatchObject({ relationStatus: RepresentantRelation.AMBASSADEUR });
+
+    expect(historyOf()).toMatchObject({
+      representantId: 'rep-9',
+      fromStatus: RepresentantRelation.INCONNU,
+      toStatus: RepresentantRelation.AMBASSADEUR,
+      changedById: COMMERCIAL.id,
+      source: ChangeSource.WEB,
+      isDemo: false,
+    });
+  });
+
+  it('n’écrit RIEN quand le statut posté est déjà le statut courant', async () => {
+    db.representant.findFirst.mockResolvedValue(
+      own({ relationStatus: RepresentantRelation.AMBASSADEUR }),
+    );
+
+    await service.update(COMMERCIAL, 'rep-9', {
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    expect(db.representant.updateMany).not.toHaveBeenCalled();
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('n’écrit aucune histoire quand la garde sur le statut de départ ne passe pas', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+    db.representant.updateMany.mockResolvedValue({ count: 0 });
+
+    await service.update(COMMERCIAL, 'rep-9', { relationStatus: RepresentantRelation.REFUS });
+
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('laisse la relation tranquille quand la modification ne la mentionne pas', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+
+    await service.update(COMMERCIAL, 'rep-9', { fullName: 'Fatou Ndiaye Sow' });
+
+    expect(db.representant.updateMany).not.toHaveBeenCalled();
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('fait suivre la trace la nature de la fiche, pas le mode en vigueur', async () => {
+    db.representant.findFirst.mockResolvedValue(own({ isDemo: true }));
+
+    await new RepresentantsService(db as unknown as PrismaService, fakeDemoVisibility(true)).update(
+      COMMERCIAL,
+      'rep-9',
+      { relationStatus: RepresentantRelation.CONTACTE },
+    );
+
+    expect(historyOf().isDemo).toBe(true);
+  });
+});
+
+describe('historique de relation', () => {
+  it('refuse la fiche d’un autre téléconseiller', async () => {
+    db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: 'com-2' });
+
+    await expect(service.relationHistory(COMMERCIAL, 'rep-9')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(db.representantRelationChange.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rend les bascules de la fiche, de la plus récente à la plus ancienne', async () => {
+    db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: COMMERCIAL.id });
+    db.representantRelationChange.findMany.mockResolvedValue([
+      {
+        id: 'chg-2',
+        representantId: 'rep-9',
+        fromStatus: RepresentantRelation.CONTACTE,
+        toStatus: RepresentantRelation.AMBASSADEUR,
+        reason: null,
+        changedById: COMMERCIAL.id,
+        changedBy: { fullName: COMMERCIAL.fullName },
+        source: ChangeSource.WEB,
+        changedAt: date,
+      },
+    ]);
+
+    const result = await service.relationHistory(COMMERCIAL, 'rep-9');
+
+    expect(result.items).toEqual([
+      {
+        id: 'chg-2',
+        representantId: 'rep-9',
+        fromStatus: RepresentantRelation.CONTACTE,
+        toStatus: RepresentantRelation.AMBASSADEUR,
+        reason: null,
+        changedById: COMMERCIAL.id,
+        changedByName: COMMERCIAL.fullName,
+        source: ChangeSource.WEB,
+        changedAt: date.toISOString(),
+      },
+    ]);
+
+    const args = db.representantRelationChange.findMany.mock.calls[0]?.[0] as {
+      orderBy: unknown[];
+    };
+    expect(args.orderBy).toEqual([{ changedAt: 'desc' }, { id: 'desc' }]);
+  });
+
+  it('rend une liste vide sans erreur quand la relation n’a jamais bougé', async () => {
+    db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: COMMERCIAL.id });
+
+    await expect(service.relationHistory(ADMIN, 'rep-9')).resolves.toEqual({ items: [] });
+  });
+});
+
+describe('lecture du SUPERVISEUR', () => {
+  const SUPERVISEUR: AuthenticatedUser = {
+    id: 'sup-1',
+    email: 'sup@cpi.sn',
+    username: 'sup',
+    fullName: 'Awa Sy',
+    role: Role.SUPERVISEUR,
+  };
+
+  const whereOf = (): Record<string, unknown> =>
+    (db.representant.findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
+
+  it('liste l’annuaire national', async () => {
+    await service.list(SUPERVISEUR, {});
+
+    expect(whereOf().createdById).toBeUndefined();
+  });
+
+  it('son filtre par téléconseiller RÉPOND, au lieu de rendre zéro ligne', async () => {
+    await service.list(SUPERVISEUR, { commercialId: 'com-2' });
+
+    expect(whereOf().createdById).toBe('com-2');
+  });
+
+  it('ouvre la fiche d’autrui, et son historique de relation', async () => {
+    db.representant.findFirst.mockResolvedValue(foreignRow());
+
+    await expect(service.get(SUPERVISEUR, 'rep-9')).resolves.toMatchObject({ id: 'rep-9' });
+    await expect(service.relationHistory(SUPERVISEUR, 'rep-9')).resolves.toMatchObject({
+      items: [],
+    });
+  });
+
+  it('n’écrit rien : la modification lui est refusée comme à un tiers', async () => {
+    db.representant.findFirst.mockResolvedValue(foreignRow());
+
+    await expect(service.update(SUPERVISEUR, 'rep-9', { notes: 'vu' })).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    await expect(service.remove(SUPERVISEUR, 'rep-9', { cascade: true })).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 });

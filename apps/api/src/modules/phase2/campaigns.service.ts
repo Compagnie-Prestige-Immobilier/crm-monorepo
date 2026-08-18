@@ -12,11 +12,13 @@ import {
   Prisma,
   Role,
   SEGMENT_LABELS,
+  ScheduledCallbackStatus,
   eligibleForCampaignWhere,
 } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { shortCode } from '../../common/short-code.js';
+import { isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import {
   MIN_SPREAD_DAYS,
@@ -293,12 +295,22 @@ export class Phase2CampaignsService {
 
   // Lecture
 
-  async list(query: CampaignQueryDto): Promise<CampaignListDto> {
+  /**
+   * Liste des campagnes. CLOISONNÉE pour un non-administrateur.
+   *
+   * Un téléconseiller ne voit que les campagnes où il a des tâches, et leur
+   * `progress` compte SES tâches, pas celles de l'équipe : ouvrir cette lecture
+   * pour lui rendre un sélecteur de campagne ne doit pas lui livrer au passage
+   * la production de ses collègues.
+   */
+  async list(user: AuthenticatedUser, query: CampaignQueryDto): Promise<CampaignListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
     const search = query.search?.trim();
+    const assignedToId = isAdmin(user) ? undefined : user.id;
     const where: Prisma.CallCampaignWhereInput = {
       ...demoScope(await this.demo.enabled()),
+      ...(assignedToId === undefined ? {} : { tasks: { some: { assignedToId } } }),
       ...(query.status ? { status: query.status } : {}),
       ...(query.scope ? { scope: query.scope } : {}),
       ...(query.createdById ? { createdById: query.createdById } : {}),
@@ -327,7 +339,10 @@ export class Phase2CampaignsService {
       }),
     ]);
 
-    const progress = await this.progressByCampaign(campaigns.map((row) => row.id));
+    const progress = await this.progressByCampaign(
+      campaigns.map((row) => row.id),
+      assignedToId,
+    );
 
     return {
       items: campaigns.map((row): CampaignSummaryDto => ({
@@ -510,12 +525,17 @@ export class Phase2CampaignsService {
 
   private async progressByCampaign(
     ids: readonly string[],
+    assignedToId?: string,
   ): Promise<Map<string, CampaignProgressDto>> {
     if (ids.length === 0) return new Map();
 
     const grouped = await this.prisma.callTask.groupBy({
       by: ['campaignId', 'status'],
-      where: { campaignId: { in: [...ids] }, ...demoScope(await this.demo.enabled()) },
+      where: {
+        campaignId: { in: [...ids] },
+        ...(assignedToId === undefined ? {} : { assignedToId }),
+        ...demoScope(await this.demo.enabled()),
+      },
       _count: { _all: true },
     });
 
@@ -564,6 +584,10 @@ export class Phase2CampaignsService {
       await tx.callTask.updateMany({
         where: { campaignId: id, isActive: true },
         data: { status: CallTaskStatus.CANCELLED, isActive: false },
+      });
+      await tx.scheduledCallback.updateMany({
+        where: { campaignId: id, status: ScheduledCallbackStatus.PENDING },
+        data: { status: ScheduledCallbackStatus.CANCELLED },
       });
     });
 

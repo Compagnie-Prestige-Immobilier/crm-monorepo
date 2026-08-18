@@ -120,6 +120,7 @@ const MODULES: Record<string, string[]> = {
     'importRepresentants',
     'getRepresentant',
     'updateRepresentant',
+    'listRepresentantRelationChanges',
     'deleteRepresentant',
   ],
   export: [

@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { demoScope } from '../../prisma/demo-visibility.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
-import { isAdmin } from '../../common/scope.js';
+import { readsEveryone } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type {
   SegmentConversionAuthorDto,
@@ -111,7 +111,7 @@ export class SegmentConversionsService {
 
     // Écrasement et non fusion : un `changedById` reçu du client ne doit jamais
     // élargir la portée, seulement la restreindre.
-    const author = isAdmin(user) ? query.changedById : user.id;
+    const author = readsEveryone(user) ? query.changedById : user.id;
 
     return {
       ...demoScope(demoEnabled),

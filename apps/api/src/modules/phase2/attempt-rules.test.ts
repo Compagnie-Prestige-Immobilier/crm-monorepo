@@ -3,6 +3,7 @@ import { CallOutcome, EnrollmentMethod, Phase2Status } from '@crm/database';
 import { describe, expect, it } from 'vitest';
 
 import {
+  CALLBACK_CLOCK_SKEW_TOLERANCE_MS,
   COMMENT_MAX_LENGTH,
   PHASE2_STATUS_FOR_OUTCOME,
   isTerminalOutcome,
@@ -93,6 +94,110 @@ describe('normalizeAttempt, méthode et issue', () => {
     expect(
       normalizeAttempt({ outcome: CallOutcome.OTHER, comment: 'rappelle lundi' }).terminal,
     ).toBe(false);
+  });
+});
+
+describe('normalizeAttempt, date de rappel', () => {
+  const APPEL = '2026-08-18T10:00:00.000Z';
+
+  it('retient la date de rappel promise avec CALLBACK', () => {
+    const result = normalizeAttempt({
+      outcome: CallOutcome.CALLBACK,
+      callbackAt: '2026-08-19T09:00:00.000Z',
+      clientCreatedAt: APPEL,
+    });
+    expect(result.callbackAt?.toISOString()).toBe('2026-08-19T09:00:00.000Z');
+  });
+
+  it('refuse une date de rappel sur toute autre issue', () => {
+    for (const outcome of [
+      CallOutcome.UNREACHABLE,
+      CallOutcome.REFUSED,
+      CallOutcome.WRONG_NUMBER,
+      CallOutcome.METHOD_OBTAINED,
+    ]) {
+      expect(
+        codeOf(() =>
+          normalizeAttempt({
+            outcome,
+            ...(outcome === CallOutcome.METHOD_OBTAINED
+              ? { method: EnrollmentMethod.PLATFORM }
+              : {}),
+            callbackAt: '2026-08-19T09:00:00.000Z',
+            clientCreatedAt: APPEL,
+          }),
+        ),
+      ).toBe('PHASE2_CALLBACK_AT_NOT_ALLOWED');
+    }
+  });
+
+  it('refuse une date de rappel illisible', () => {
+    expect(
+      codeOf(() =>
+        normalizeAttempt({
+          outcome: CallOutcome.CALLBACK,
+          callbackAt: 'demain matin',
+          clientCreatedAt: APPEL,
+        }),
+      ),
+    ).toBe('PHASE2_CALLBACK_AT_INVALID');
+  });
+
+  it('refuse un rappel antérieur à l’appel qui l’a promis', () => {
+    expect(
+      codeOf(() =>
+        normalizeAttempt({
+          outcome: CallOutcome.CALLBACK,
+          callbackAt: '2026-08-17T10:00:00.000Z',
+          clientCreatedAt: APPEL,
+        }),
+      ),
+    ).toBe('PHASE2_CALLBACK_AT_PAST');
+  });
+
+  it('tolère quatre minutes de dérive d’horloge, et pas six', () => {
+    expect(
+      normalizeAttempt({
+        outcome: CallOutcome.CALLBACK,
+        callbackAt: '2026-08-18T09:56:00.000Z',
+        clientCreatedAt: APPEL,
+      }).callbackAt?.toISOString(),
+    ).toBe('2026-08-18T09:56:00.000Z');
+
+    expect(
+      codeOf(() =>
+        normalizeAttempt({
+          outcome: CallOutcome.CALLBACK,
+          callbackAt: '2026-08-18T09:54:00.000Z',
+          clientCreatedAt: APPEL,
+        }),
+      ),
+    ).toBe('PHASE2_CALLBACK_AT_PAST');
+  });
+
+  it('reprend la dérive déjà retenue ailleurs dans le dépôt', () => {
+    expect(CALLBACK_CLOCK_SKEW_TOLERANCE_MS).toBe(5 * 60_000);
+  });
+
+  it('mesure le retard sur l’HEURE DE L’APPEL, pas sur celle du serveur', () => {
+    const vieuxLot = normalizeAttempt({
+      outcome: CallOutcome.CALLBACK,
+      callbackAt: '2020-01-02T09:00:00.000Z',
+      clientCreatedAt: '2020-01-01T10:00:00.000Z',
+    });
+    expect(vieuxLot.callbackAt?.toISOString()).toBe('2020-01-02T09:00:00.000Z');
+  });
+
+  it('une issue CALLBACK sans date reste acceptée, sans rappel planifié', () => {
+    const result = normalizeAttempt({ outcome: CallOutcome.CALLBACK, clientCreatedAt: APPEL });
+    expect(result.callbackAt).toBeNull();
+    expect(result.terminal).toBe(false);
+  });
+
+  it('aucune autre issue ne se voit imposer la date', () => {
+    for (const outcome of [CallOutcome.UNREACHABLE, CallOutcome.REFUSED]) {
+      expect(normalizeAttempt({ outcome, clientCreatedAt: APPEL }).callbackAt).toBeNull();
+    }
   });
 });
 

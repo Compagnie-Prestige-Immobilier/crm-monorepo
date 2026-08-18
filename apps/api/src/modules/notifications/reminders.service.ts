@@ -10,9 +10,11 @@ import {
   NotificationStatus,
   Prisma,
   Role,
+  ScheduledCallbackStatus,
 } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { dakarDayEnd } from '../callbacks/callbacks.service.js';
 import { isOpenApiGeneration } from '../../env.js';
 import { DELIVERY_RETRY_ERROR, NotificationsService } from './notifications.service.js';
 import { SENDING_LEASE_MS } from './dispatch-claim.js';
@@ -38,6 +40,7 @@ export const ReminderKey = {
   OPEN_REP_CALL_TASKS: 'open-rep-call-tasks',
   BANK_CASES_PENDING: 'bank-cases-pending',
   BANK_CASES_STALE: 'bank-cases-stale',
+  DUE_CALLBACKS: 'due-callbacks',
 } as const;
 
 export type ReminderKeyValue = (typeof ReminderKey)[keyof typeof ReminderKey];
@@ -122,10 +125,11 @@ export class RemindersService {
 
     const tasks = await this.remindOpenCallTasks(now);
     const repTasks = await this.remindOpenRepCallTasks(now);
+    const callbacks = await this.remindDueCallbacks(now);
     const bankPending = await this.remindBankCasesPending(now);
     const bankStale = await this.remindBankCasesStale(now);
 
-    const runs = [tasks, repTasks, bankPending, bankStale];
+    const runs = [tasks, repTasks, callbacks, bankPending, bankStale];
     return {
       created: runs.reduce((total, run) => total + run.created, 0),
       skipped: runs.reduce((total, run) => total + run.skipped, 0),
@@ -181,9 +185,51 @@ export class RemindersService {
     );
     if (!eligible.length) return { created: 0, skipped: 0 };
 
+    return this.emit({
+      key,
+      now,
+      candidates: await this.assignedCandidates(eligible),
+      titleTemplate: title,
+      bodyTemplate: body,
+      route,
+      category: NotificationCategory.CAMPAGNE,
+    });
+  }
+
+  /**
+   * Rappels promis et encore dus d'ici la fin de la journée, RETARDS COMPRIS :
+   * la même borne suffit, un rappel de la veille est toujours antérieur à ce
+   * soir. Rien n'a besoin d'être réécrit la nuit pour le savoir.
+   */
+  async remindDueCallbacks(now: Date = new Date()): Promise<ReminderRunDto> {
+    const grouped = await this.prisma.scheduledCallback.groupBy({
+      by: ['assignedToId'],
+      where: {
+        status: ScheduledCallbackStatus.PENDING,
+        scheduledAt: { lte: dakarDayEnd(now, 0) },
+        ...demoScope(false),
+      },
+      _count: { _all: true },
+    });
+    if (!grouped.length) return { created: 0, skipped: 0 };
+
+    return this.emit({
+      key: ReminderKey.DUE_CALLBACKS,
+      now,
+      candidates: await this.assignedCandidates(grouped),
+      titleTemplate: 'Rappels à passer',
+      bodyTemplate: 'Vous avez {{nombre}} rappel(s) à passer aujourd’hui, retards compris.',
+      route: '/phase2/callbacks',
+      category: NotificationCategory.RAPPEL,
+    });
+  }
+
+  private async assignedCandidates(
+    groups: readonly { assignedToId: string; _count: { _all: number } }[],
+  ): Promise<ReminderCandidate[]> {
     const users = await this.prisma.user.findMany({
       where: {
-        id: { in: eligible.map((group) => group.assignedToId) },
+        id: { in: groups.map((group) => group.assignedToId) },
         isActive: true,
         deletedAt: null,
         ...demoScope(false),
@@ -192,7 +238,7 @@ export class RemindersService {
     });
     const nameById = new Map(users.map((user) => [user.id, user.fullName]));
 
-    const candidates: ReminderCandidate[] = eligible
+    return groups
       .filter((group) => nameById.has(group.assignedToId))
       .map((group) => ({
         userId: group.assignedToId,
@@ -202,16 +248,6 @@ export class RemindersService {
           nombre: String(group._count._all),
         },
       }));
-
-    return this.emit({
-      key,
-      now,
-      candidates,
-      titleTemplate: title,
-      bodyTemplate: body,
-      route,
-      category: NotificationCategory.CAMPAGNE,
-    });
   }
 
   async remindBankCasesPending(now: Date = new Date()): Promise<ReminderRunDto> {

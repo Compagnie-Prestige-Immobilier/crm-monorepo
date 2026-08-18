@@ -44,6 +44,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.callAttempt.count(),
     remove: async (db) => (await db.callAttempt.deleteMany({})).count,
   },
+  scheduledCallbacks: {
+    table: 'scheduled_callbacks',
+    count: (db) => db.scheduledCallback.count(),
+    remove: async (db) => (await db.scheduledCallback.deleteMany({})).count,
+  },
   callTasks: {
     table: 'call_tasks',
     count: (db) => db.callTask.count(),
@@ -126,6 +131,7 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
   },
   commercialAccounts: accountsOfRole(Role.COMMERCIAL),
   financeAccounts: accountsOfRole(Role.BANQUE_FINANCE),
+  supervisionAccounts: accountsOfRole(Role.SUPERVISEUR),
   bankCaseStages: {
     table: 'bank_case_stages',
     count: (db) => db.bankCaseStage.count(),

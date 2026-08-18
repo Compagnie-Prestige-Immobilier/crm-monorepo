@@ -44,6 +44,7 @@ import {
   RepresentantLookupDto,
   RepresentantLookupQueryDto,
   RepresentantQueryDto,
+  RepresentantRelationChangeListDto,
   UpdateRepresentantDto,
 } from './dto.js';
 
@@ -59,6 +60,7 @@ export class RepresentantsController {
   ) {}
 
   @Get()
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'listRepresentants',
     summary: 'Liste paginée. Un COMMERCIAL ne voit que ses propres représentants.',
@@ -124,6 +126,7 @@ export class RepresentantsController {
   }
 
   @Get(':id')
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({ operationId: 'getRepresentant', summary: 'Détail d’un représentant.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: RepresentantDto })
@@ -172,6 +175,27 @@ export class RepresentantsController {
     @Body() body: UpdateRepresentantDto,
   ): Promise<RepresentantDto> {
     return this.representants.update(user, id, body);
+  }
+
+  @Get(':id/relation-history')
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
+  @ApiOperation({
+    operationId: 'listRepresentantRelationChanges',
+    summary:
+      'Bascules de relation déjà subies par une fiche, de la plus récente à la plus ancienne.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: RepresentantRelationChangeListDto })
+  @ApiResponse({
+    status: 404,
+    type: ApiErrorDto,
+    description: 'REPRESENTANT_NOT_FOUND.',
+  })
+  relationHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<RepresentantRelationChangeListDto> {
+    return this.representants.relationHistory(user, id);
   }
 
   @Delete(':id')

@@ -13,6 +13,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { ChangeSource, RepresentantRelation } from '@crm/database';
 
 import { PageMetaDto, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
@@ -75,7 +76,17 @@ export class CreateRepresentantDto {
   clientCreatedAt?: string;
 }
 
-export class UpdateRepresentantDto extends PartialType(CreateRepresentantDto) {}
+export class UpdateRepresentantDto extends PartialType(CreateRepresentantDto) {
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    description:
+      'État de la relation. Chaque bascule est historisée ; reposter le même statut n’écrit rien.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation)
+  relationStatus?: RepresentantRelation;
+}
 
 export class RepresentantDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -94,6 +105,8 @@ export class RepresentantDto {
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
   @ApiProperty({ type: Number }) prospectCount!: number;
+  @ApiProperty({ enum: RepresentantRelation, enumName: 'RepresentantRelation' })
+  relationStatus!: RepresentantRelation;
 }
 
 export class RepresentantListDto {
@@ -157,6 +170,15 @@ export class RepresentantExportQueryDto {
 }
 
 export class RepresentantQueryDto extends RepresentantExportQueryDto {
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    description: 'Ne retient que les représentants dans cet état de relation.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation)
+  relationStatus?: RepresentantRelation;
+
   @ApiPropertyOptional({ enum: RepresentantSortField, enumName: 'RepresentantSortField' })
   @IsOptional()
   @IsEnum(RepresentantSortField)
@@ -297,4 +319,37 @@ export class ImportQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   dryRun?: boolean;
+}
+
+export class RepresentantRelationChangeDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ format: 'uuid' }) representantId!: string;
+
+  @ApiProperty({ enum: RepresentantRelation, enumName: 'RepresentantRelation' })
+  fromStatus!: RepresentantRelation;
+
+  @ApiProperty({ enum: RepresentantRelation, enumName: 'RepresentantRelation' })
+  toStatus!: RepresentantRelation;
+
+  @ApiProperty({ type: String, nullable: true }) reason!: string | null;
+
+  @ApiProperty({ format: 'uuid' }) changedById!: string;
+  @ApiProperty() changedByName!: string;
+
+  @ApiProperty({
+    enum: ChangeSource,
+    enumName: 'ChangeSource',
+    description: 'Le canal qui a écrit la bascule.',
+  })
+  source!: ChangeSource;
+
+  @ApiProperty({ type: String, format: 'date-time' }) changedAt!: string;
+}
+
+export class RepresentantRelationChangeListDto {
+  @ApiProperty({
+    type: () => [RepresentantRelationChangeDto],
+    description: 'De la plus récente à la plus ancienne.',
+  })
+  items!: RepresentantRelationChangeDto[];
 }

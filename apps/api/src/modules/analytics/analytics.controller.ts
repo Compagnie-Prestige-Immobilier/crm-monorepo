@@ -40,7 +40,7 @@ import { SegmentConversionListDto, SegmentConversionsQueryDto } from './segment-
 
 @ApiTags('analytics')
 @ApiBearerAuth()
-@Roles(Role.ADMIN, Role.COMMERCIAL)
+@Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR)
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'analytics', version: '1' })
 export class AnalyticsController {
@@ -309,7 +309,7 @@ export class AnalyticsController {
   }
 
   @Get('segment-conversions')
-  @Roles(Role.ADMIN, Role.COMMERCIAL)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'getSegmentConversions',
     summary: 'Bascules de segment : sur la période, par segment d’origine, et par auteur.',

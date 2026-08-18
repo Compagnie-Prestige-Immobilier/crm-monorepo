@@ -101,6 +101,18 @@ const SITES: Record<string, Site> = {
       'la FICHE qu’elle décrit, et non le mode en vigueur à la seconde du clic. SegmentChange.prospect est ' +
       'en onDelete: Cascade : une trace née sur un prospect fictif part avec lui à la purge',
   },
+  'modules/representants/relation-change.ts → change.isDemo': {
+    verdict: 'HERITE',
+    note:
+      'SEUL site qui écrit une bascule de relation, pour ses deux appelants ; tous deux refusés en 409 ' +
+      'pendant une démonstration. La trace suit la FICHE qu’elle décrit et non le mode en vigueur, et ' +
+      'RepresentantRelationChange.representant est en onDelete: Cascade : une trace née sur un ' +
+      'représentant fictif part avec lui à la purge',
+  },
+  'modules/representants/representants.service.ts → existing.isDemo': {
+    verdict: 'HERITE',
+    note: 'PATCH /v1/representants/:id, refusé en 409 ; la nature de la fiche relue est passée à applyRelationChange',
+  },
   'modules/client-requests/client-requests.service.ts → request.isDemo': {
     verdict: 'HERITE',
     note: 'approbation d’une demande, refusée en 409 ; le prospect créé suit la demande',
@@ -123,6 +135,10 @@ const SITES: Record<string, Site> = {
       'clause `select` de la relecture d’autorité sur les routes à rôle : la garde LIT isDemo pour ' +
       'refuser une session de démonstration survivant à l’extinction du mode, et n’écrit rien. ' +
       'C’est le pendant, pour les jetons DÉJÀ émis, du refus d’émission d’AuthService',
+  },
+  'modules/representants/relation-change.ts → boolean;': {
+    verdict: 'LECTURE',
+    note: 'déclaration de type de RelationChange.isDemo',
   },
   'prisma/demo-visibility.ts → false': {
     verdict: 'LECTURE',
