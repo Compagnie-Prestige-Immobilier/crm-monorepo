@@ -86,6 +86,17 @@ export class UpdateRepresentantDto extends PartialType(CreateRepresentantDto) {
   @IsOptional()
   @IsEnum(RepresentantRelation)
   relationStatus?: RepresentantRelation;
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 500,
+    description:
+      'Motif de la bascule, repris dans la chronologie. Sans effet quand `relationStatus` est absent ou reposte le statut courant.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  relationReason?: string;
 }
 
 export class RepresentantDto {
@@ -352,4 +363,64 @@ export class RepresentantRelationChangeListDto {
     description: 'De la plus récente à la plus ancienne.',
   })
   items!: RepresentantRelationChangeDto[];
+}
+
+export class CreateRepresentantCommentDto {
+  @ApiProperty({
+    format: 'uuid',
+    description: 'UUID v7 engendré par le client. Clé d’idempotence : un rejeu ne crée rien.',
+  })
+  @IsUUID()
+  id!: string;
+
+  @ApiProperty({ maxLength: 2000 })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  body!: string;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description: 'Horodatage de la saisie sur le terrain. Défaut : maintenant.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  clientCreatedAt?: string;
+}
+
+export class RepresentantCommentDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ format: 'uuid' }) representantId!: string;
+  @ApiProperty({ format: 'uuid' }) authorId!: string;
+  @ApiProperty() authorName!: string;
+  @ApiProperty() body!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) clientCreatedAt!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
+}
+
+export class RepresentantCommentListDto {
+  @ApiProperty({
+    type: () => [RepresentantCommentDto],
+    description: 'Du plus récent au plus ancien.',
+  })
+  items!: RepresentantCommentDto[];
+
+  @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
+}
+
+export class RepresentantCommentQueryDto {
+  @ApiPropertyOptional({ minimum: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 200, default: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  pageSize?: number;
 }

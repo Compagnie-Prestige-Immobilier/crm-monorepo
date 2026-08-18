@@ -117,6 +117,18 @@ const SITES: Record<string, Site> = {
     verdict: 'HERITE',
     note: 'PATCH /v1/representants/:id, refusé en 409 ; la nature de la fiche relue est passée à applyRelationChange',
   },
+  'modules/representants/representants.service.ts → representant.isDemo': {
+    verdict: 'HERITE',
+    note:
+      'POST /v1/representants/:id/comments, refusé en 409 ; et mode éteint, demoScope écarte les fiches ' +
+      'fictives, la fiche lue est donc réelle. Le commentaire suit la FICHE qu’il commente et non le mode ' +
+      'en vigueur, et RepresentantComment.representant est en onDelete: Cascade : un commentaire né sur ' +
+      'un représentant fictif part avec lui à la purge',
+  },
+  'modules/representants/representants.service.ts → true': {
+    verdict: 'LECTURE',
+    note: 'projection sur la fiche commentée, lue pour l’écriture du commentaire',
+  },
   'modules/client-requests/client-requests.service.ts → request.isDemo': {
     verdict: 'HERITE',
     note: 'approbation d’une demande, refusée en 409 ; le prospect créé suit la demande',

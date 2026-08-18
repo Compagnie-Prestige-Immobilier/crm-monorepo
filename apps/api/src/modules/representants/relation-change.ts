@@ -6,6 +6,8 @@ export interface RelationChange {
   readonly representantId: string;
   readonly fromStatus: RepresentantRelation;
   readonly toStatus: RepresentantRelation;
+  /** Facultatif : aucun payload existant ne le porte, et l'exiger les casserait. */
+  readonly reason?: string | null;
   readonly changedById: string;
   readonly source: ChangeSource;
   readonly isDemo: boolean;
@@ -42,6 +44,7 @@ export async function applyRelationChange(
       representantId: change.representantId,
       fromStatus: change.fromStatus,
       toStatus: change.toStatus,
+      reason: change.reason ?? null,
       changedById: change.changedById,
       source: change.source,
       // La trace suit SA FICHE, pas le mode en vigueur à la seconde du clic :

@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, RequestMethod } from '@nestjs/common';
 import { ChangeSource, RepresentantRelation, Role } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,6 +17,10 @@ interface MockDb {
     MockFn
   >;
   representantRelationChange: Record<'create' | 'findMany', MockFn>;
+  representantComment: Record<
+    'findMany' | 'findUniqueOrThrow' | 'count' | 'createMany' | 'updateMany',
+    MockFn
+  >;
   $transaction: MockFn;
 }
 
@@ -73,6 +77,13 @@ beforeEach(() => {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     representantRelationChange: { create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    representantComment: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findUniqueOrThrow: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     $transaction: vi.fn((run: (tx: MockDb) => Promise<unknown>) => run(db)),
   };
   service = new RepresentantsService(db as unknown as PrismaService, fakeDemoVisibility());
@@ -367,6 +378,38 @@ describe('bascule de relation par le panel', () => {
 
     expect(historyOf().isDemo).toBe(true);
   });
+
+  it('porte le motif jusqu’à l’histoire', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+
+    await service.update(COMMERCIAL, 'rep-9', {
+      relationStatus: RepresentantRelation.REFUS,
+      relationReason: 'Ne veut plus etre appele avant la rentree',
+    });
+
+    expect(historyOf().reason).toBe('Ne veut plus etre appele avant la rentree');
+  });
+
+  it('accepte un payload sans motif, et l’histoire porte alors null', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+
+    await service.update(COMMERCIAL, 'rep-9', {
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    expect(historyOf().reason).toBeNull();
+  });
+
+  it('ne retient pas un motif fait d’espaces', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+
+    await service.update(COMMERCIAL, 'rep-9', {
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+      relationReason: '   ',
+    });
+
+    expect(historyOf().reason).toBeNull();
+  });
 });
 
 describe('historique de relation', () => {
@@ -424,6 +467,182 @@ describe('historique de relation', () => {
   });
 });
 
+describe('fil de commentaires', () => {
+  const own = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    ...foreignRow(),
+    createdById: COMMERCIAL.id,
+    createdBy: { id: COMMERCIAL.id, fullName: COMMERCIAL.fullName },
+    ...over,
+  });
+
+  const comment = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    id: 'cmt-1',
+    representantId: 'rep-9',
+    authorId: COMMERCIAL.id,
+    author: { fullName: COMMERCIAL.fullName },
+    body: 'Rappeler apres la rentree',
+    clientCreatedAt: date,
+    createdAt: date,
+    ...over,
+  });
+
+  const postedData = (call: number): Record<string, unknown> =>
+    (
+      db.representantComment.createMany.mock.calls[call]?.[0] as {
+        data: Record<string, unknown>[];
+      }
+    ).data[0] as Record<string, unknown>;
+
+  it('deux commentaires du même geste COEXISTENT, sans rien à arbitrer', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+    db.representantComment.findUniqueOrThrow
+      .mockResolvedValueOnce(comment({ id: 'cmt-a', authorId: COMMERCIAL.id }))
+      .mockResolvedValueOnce(
+        comment({ id: 'cmt-b', authorId: ADMIN.id, author: { fullName: ADMIN.fullName } }),
+      );
+
+    const premier = await service.addComment(COMMERCIAL, 'rep-9', {
+      id: 'cmt-a',
+      body: 'Vu sur place',
+    });
+    const second = await service.addComment(ADMIN, 'rep-9', {
+      id: 'cmt-b',
+      body: 'Relance faite',
+    });
+
+    expect([premier.id, second.id]).toEqual(['cmt-a', 'cmt-b']);
+    expect(db.representantComment.createMany).toHaveBeenCalledTimes(2);
+    expect(postedData(0)).toMatchObject({ id: 'cmt-a', authorId: COMMERCIAL.id });
+    expect(postedData(1)).toMatchObject({ id: 'cmt-b', authorId: ADMIN.id });
+
+    // Aucune bascule de révision : sans `rev`, il n'y a pas de fusion possible.
+    expect(db.representant.updateMany).not.toHaveBeenCalled();
+    expect(db.representant.update).not.toHaveBeenCalled();
+    for (const [call] of db.representantComment.createMany.mock.calls as [
+      Record<string, unknown>,
+    ][]) {
+      expect(call).not.toHaveProperty('rev');
+    }
+  });
+
+  it('un rejeu du même identifiant ne crée pas de doublon', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+    db.representantComment.createMany.mockResolvedValue({ count: 0 });
+    db.representantComment.findUniqueOrThrow.mockResolvedValue(comment());
+
+    const rejoue = await service.addComment(COMMERCIAL, 'rep-9', {
+      id: 'cmt-1',
+      body: 'Rappeler apres la rentree',
+    });
+
+    expect(rejoue.id).toBe('cmt-1');
+    expect(
+      (db.representantComment.createMany.mock.calls[0]?.[0] as { skipDuplicates: boolean })
+        .skipDuplicates,
+    ).toBe(true);
+  });
+
+  it('l’auteur vient de la session, jamais du corps de requête', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+    db.representantComment.findUniqueOrThrow.mockResolvedValue(comment());
+
+    const corpsAvecAuteur = { id: 'cmt-1', body: 'Vu sur place', authorId: 'com-2' };
+    await service.addComment(COMMERCIAL, 'rep-9', corpsAvecAuteur);
+
+    expect(postedData(0).authorId).toBe(COMMERCIAL.id);
+  });
+
+  it('refuse un identifiant déjà pris par le commentaire d’un autre', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+    db.representantComment.createMany.mockResolvedValue({ count: 0 });
+    db.representantComment.findUniqueOrThrow.mockResolvedValue(comment({ authorId: 'com-2' }));
+
+    await expect(
+      service.addComment(COMMERCIAL, 'rep-9', { id: 'cmt-1', body: 'Vu sur place' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('refuse d’écrire sur la fiche d’un autre téléconseiller', async () => {
+    db.representant.findFirst.mockResolvedValue(foreignRow());
+
+    await expect(
+      service.addComment(COMMERCIAL, 'rep-9', { id: 'cmt-1', body: 'Vu sur place' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(db.representantComment.createMany).not.toHaveBeenCalled();
+  });
+
+  it('le commentaire suit la nature de la FICHE, pas le mode en vigueur', async () => {
+    db.representant.findFirst.mockResolvedValue(own({ isDemo: true }));
+    db.representantComment.findUniqueOrThrow.mockResolvedValue(comment());
+
+    await new RepresentantsService(
+      db as unknown as PrismaService,
+      fakeDemoVisibility(true),
+    ).addComment(COMMERCIAL, 'rep-9', { id: 'cmt-1', body: 'Vu sur place' });
+
+    expect(postedData(0).isDemo).toBe(true);
+  });
+
+  it('rend le fil du plus récent au plus ancien, départagé par l’identifiant', async () => {
+    db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: COMMERCIAL.id });
+    db.representantComment.count.mockResolvedValue(1);
+    db.representantComment.findMany.mockResolvedValue([comment()]);
+
+    const result = await service.listComments(COMMERCIAL, 'rep-9', {});
+
+    expect(result.items).toEqual([
+      {
+        id: 'cmt-1',
+        representantId: 'rep-9',
+        authorId: COMMERCIAL.id,
+        authorName: COMMERCIAL.fullName,
+        body: 'Rappeler apres la rentree',
+        clientCreatedAt: date.toISOString(),
+        createdAt: date.toISOString(),
+      },
+    ]);
+
+    const args = db.representantComment.findMany.mock.calls[0]?.[0] as { orderBy: unknown[] };
+    expect(args.orderBy).toEqual([{ clientCreatedAt: 'desc' }, { id: 'desc' }]);
+  });
+
+  it('refuse le fil de la fiche d’un autre téléconseiller', async () => {
+    db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: 'com-2' });
+
+    await expect(service.listComments(COMMERCIAL, 'rep-9', {})).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(db.representantComment.findMany).not.toHaveBeenCalled();
+  });
+
+  it('la suppression est DOUCE et bornée à la fiche visée', async () => {
+    await expect(service.removeComment('rep-9', 'cmt-1')).resolves.toEqual({ ok: true });
+
+    const args = db.representantComment.updateMany.mock.calls[0]?.[0] as {
+      where: Record<string, unknown>;
+      data: Record<string, unknown>;
+    };
+    expect(args.where).toMatchObject({ id: 'cmt-1', representantId: 'rep-9', deletedAt: null });
+    expect(args.data.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it('AUCUNE route n’édite un commentaire', () => {
+    const prototype = RepresentantsController.prototype as unknown as Record<string, object>;
+    const verbes = Object.getOwnPropertyNames(prototype)
+      .filter((name) => name !== 'constructor')
+      .map((name) => ({
+        path: Reflect.getMetadata('path', prototype[name] as object) as string | undefined,
+        verbe: Reflect.getMetadata('method', prototype[name] as object) as number | undefined,
+      }))
+      .filter((route) => (route.path ?? '').includes('comments'))
+      .map((route) => route.verbe)
+      .sort();
+
+    expect(verbes).toEqual([RequestMethod.GET, RequestMethod.POST, RequestMethod.DELETE].sort());
+    expect(service).not.toHaveProperty('updateComment');
+  });
+});
+
 describe('lecture du SUPERVISEUR', () => {
   const SUPERVISEUR: AuthenticatedUser = {
     id: 'sup-1',
@@ -466,5 +685,17 @@ describe('lecture du SUPERVISEUR', () => {
     await expect(service.remove(SUPERVISEUR, 'rep-9', { cascade: true })).rejects.toBeInstanceOf(
       ForbiddenException,
     );
+  });
+
+  it('lit le fil de commentaires, et n’en dépose aucun', async () => {
+    db.representant.findFirst.mockResolvedValue(foreignRow());
+
+    await expect(service.listComments(SUPERVISEUR, 'rep-9', {})).resolves.toMatchObject({
+      items: [],
+    });
+    await expect(
+      service.addComment(SUPERVISEUR, 'rep-9', { id: 'cmt-1', body: 'vu' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(db.representantComment.createMany).not.toHaveBeenCalled();
   });
 });

@@ -26,6 +26,7 @@ import { ProspectsController } from '../../modules/prospects/prospects.controlle
 import { ReferentielsController } from '../../modules/referentiels/referentiels.controller.js';
 import { RepCampaignsController } from '../../modules/rep-campaigns/rep-campaigns.controller.js';
 import { RepresentantsController } from '../../modules/representants/representants.controller.js';
+import { SuggestionsController } from '../../modules/suggestions/suggestions.controller.js';
 import { SupervisionController } from '../../modules/analytics/supervision.controller.js';
 import { SyncController } from '../../modules/sync/sync.controller.js';
 import { UsersController } from '../../modules/users/users.controller.js';
@@ -54,6 +55,7 @@ const CONTROLLERS: readonly Controller[] = [
   ReferentielsController,
   RepCampaignsController,
   RepresentantsController,
+  SuggestionsController,
   SupervisionController,
   SyncController,
   UsersController,
@@ -126,7 +128,10 @@ const ADMISES: readonly string[] = [
 
   'RepresentantsController.get',
   'RepresentantsController.list',
+  'RepresentantsController.listComments',
   'RepresentantsController.relationHistory',
+
+  'SuggestionsController.list',
 
   'SupervisionController.activite',
   'UsersController.list',
@@ -193,9 +198,10 @@ describe('ce qu’un SUPERVISEUR atteint, route par route', () => {
     for (const method of ['create', 'update', 'remove', 'merge', 'reassign', 'changeSegment']) {
       expect(allows(ProspectsController, method), `prospects.${method}`).toBe(false);
     }
-    for (const method of ['create', 'update', 'remove', 'import']) {
+    for (const method of ['create', 'update', 'remove', 'import', 'addComment', 'removeComment']) {
       expect(allows(RepresentantsController, method), `representants.${method}`).toBe(false);
     }
+    expect(allows(SuggestionsController, 'setStatus')).toBe(false);
     for (const method of routesOf(NotificationTemplatesController)) {
       expect(allows(NotificationTemplatesController, method), `gabarits.${method}`).toBe(false);
     }

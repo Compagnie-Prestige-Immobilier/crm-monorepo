@@ -28,6 +28,7 @@ const DEMO_MODELS = [
   'scheduledCallback',
   'representantRelationChange',
   'representantSuggestion',
+  'representantComment',
   'importJob',
 ] as const;
 
@@ -79,6 +80,7 @@ const DEMO_TABLES = [
   'scheduled_callbacks',
   'representant_relation_changes',
   'representant_suggestions',
+  'representant_comments',
   'import_jobs',
 ] as const;
 

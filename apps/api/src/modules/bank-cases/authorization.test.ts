@@ -210,6 +210,17 @@ const MATRICE_NOUVEAUX: {
     method: 'relationHistory',
     roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR],
   },
+  {
+    controller: RepresentantsController,
+    method: 'listComments',
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR],
+  },
+  {
+    controller: RepresentantsController,
+    method: 'addComment',
+    roles: [Role.ADMIN, Role.COMMERCIAL],
+  },
+  { controller: RepresentantsController, method: 'removeComment', roles: [Role.ADMIN] },
 ];
 
 describe('matrice d’autorisation des modules récents', () => {
@@ -258,7 +269,7 @@ describe('matrice d’autorisation des modules récents', () => {
   });
 
   it('l’annuaire des représentants n’est ouvert au SUPERVISEUR qu’en lecture', () => {
-    for (const method of ['create', 'update', 'remove', 'import']) {
+    for (const method of ['create', 'update', 'remove', 'import', 'addComment', 'removeComment']) {
       expect(allows(RepresentantsController, method, Role.SUPERVISEUR), method).toBe(false);
     }
   });
