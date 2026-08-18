@@ -21,6 +21,8 @@ abstract class _$UpdateRepresentantDtoCWProxy {
 
   UpdateRepresentantDto clientCreatedAt(DateTime? clientCreatedAt);
 
+  UpdateRepresentantDto relationStatus(RepresentantRelation? relationStatus);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateRepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -35,6 +37,7 @@ abstract class _$UpdateRepresentantDtoCWProxy {
     String? iefId,
     String? notes,
     DateTime? clientCreatedAt,
+    RepresentantRelation? relationStatus,
   });
 }
 
@@ -69,6 +72,10 @@ class _$UpdateRepresentantDtoCWProxyImpl
       this(clientCreatedAt: clientCreatedAt);
 
   @override
+  UpdateRepresentantDto relationStatus(RepresentantRelation? relationStatus) =>
+      this(relationStatus: relationStatus);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateRepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -83,6 +90,7 @@ class _$UpdateRepresentantDtoCWProxyImpl
     Object? iefId = const $CopyWithPlaceholder(),
     Object? notes = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
+    Object? relationStatus = const $CopyWithPlaceholder(),
   }) {
     return UpdateRepresentantDto(
       id: id == const $CopyWithPlaceholder()
@@ -113,6 +121,10 @@ class _$UpdateRepresentantDtoCWProxyImpl
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
           : clientCreatedAt as DateTime?,
+      relationStatus: relationStatus == const $CopyWithPlaceholder()
+          ? _value.relationStatus
+          // ignore: cast_nullable_to_non_nullable
+          : relationStatus as RepresentantRelation?,
     );
   }
 }
@@ -142,6 +154,14 @@ UpdateRepresentantDto _$UpdateRepresentantDtoFromJson(
       'clientCreatedAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    relationStatus: $checkedConvert(
+      'relationStatus',
+      (v) => $enumDecodeNullable(
+        _$RepresentantRelationEnumMap,
+        v,
+        unknownValue: RepresentantRelation.unknownDefaultOpenApi,
+      ),
+    ),
   );
   return val;
 });
@@ -157,4 +177,14 @@ Map<String, dynamic> _$UpdateRepresentantDtoToJson(
   if (instance.notes case final value?) 'notes': value,
   if (instance.clientCreatedAt?.toIso8601String() case final value?)
     'clientCreatedAt': value,
+  if (_$RepresentantRelationEnumMap[instance.relationStatus] case final value?)
+    'relationStatus': value,
+};
+
+const _$RepresentantRelationEnumMap = {
+  RepresentantRelation.INCONNU: 'INCONNU',
+  RepresentantRelation.CONTACTE: 'CONTACTE',
+  RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
+  RepresentantRelation.REFUS: 'REFUS',
+  RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

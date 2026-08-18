@@ -28,6 +28,8 @@ import 'package:crm_api_client/src/model/bank_rejection_reason_list_dto.dart';
 import 'package:crm_api_client/src/model/bank_stage_count_dto.dart';
 import 'package:crm_api_client/src/model/bank_time_bucket_dto.dart';
 import 'package:crm_api_client/src/model/banque_dto.dart';
+import 'package:crm_api_client/src/model/callback_dto.dart';
+import 'package:crm_api_client/src/model/callback_list_dto.dart';
 import 'package:crm_api_client/src/model/campaign_attempt_dto.dart';
 import 'package:crm_api_client/src/model/campaign_closed_day_dto.dart';
 import 'package:crm_api_client/src/model/campaign_commercial_dto.dart';
@@ -133,6 +135,8 @@ import 'package:crm_api_client/src/model/representant_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
 import 'package:crm_api_client/src/model/representant_productivity_dto.dart';
 import 'package:crm_api_client/src/model/representant_productivity_list_dto.dart';
+import 'package:crm_api_client/src/model/representant_relation_change_dto.dart';
+import 'package:crm_api_client/src/model/representant_relation_change_list_dto.dart';
 import 'package:crm_api_client/src/model/reset_password_dto.dart';
 import 'package:crm_api_client/src/model/segment_change_dto.dart';
 import 'package:crm_api_client/src/model/segment_change_list_dto.dart';
@@ -288,6 +292,12 @@ ReturnType deserialize<ReturnType, BaseType>(
       return BanqueDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'BddSegment':
     case 'CallOutcome':
+    case 'CallbackDto':
+      return CallbackDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'CallbackListDto':
+      return CallbackListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CallbackScope':
     case 'CampaignAttemptDto':
       return CampaignAttemptDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -616,6 +626,17 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'RepresentantProductivityListDto':
       return RepresentantProductivityListDto.fromJson(
+            value as Map<String, dynamic>,
+          )
+          as ReturnType;
+    case 'RepresentantRelation':
+    case 'RepresentantRelationChangeDto':
+      return RepresentantRelationChangeDto.fromJson(
+            value as Map<String, dynamic>,
+          )
+          as ReturnType;
+    case 'RepresentantRelationChangeListDto':
+      return RepresentantRelationChangeListDto.fromJson(
             value as Map<String, dynamic>,
           )
           as ReturnType;

@@ -5,21 +5,17 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-/// Le canal qui a écrit la bascule.
-enum ChangeSource {
-  /// Le canal qui a écrit la bascule.
-  @JsonValue(r'WEB')
-  WEB(r'WEB'),
-
-  /// Le canal qui a écrit la bascule.
-  @JsonValue(r'MOBILE')
-  MOBILE(r'MOBILE'),
-
-  /// Le canal qui a écrit la bascule.
+enum CallbackScope {
+  @JsonValue(r'today')
+  today(r'today'),
+  @JsonValue(r'overdue')
+  overdue(r'overdue'),
+  @JsonValue(r'week')
+  week(r'week'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 
-  const ChangeSource(this.value);
+  const CallbackScope(this.value);
 
   final String value;
 

@@ -17,6 +17,8 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
 
   CreateRepCallAttemptDto comment(String? comment);
 
+  CreateRepCallAttemptDto relationStatus(RepresentantRelation? relationStatus);
+
   CreateRepCallAttemptDto clientCreatedAt(DateTime clientCreatedAt);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateRepCallAttemptDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -31,6 +33,7 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
     RepCallOutcome outcome,
     num? promisedProspects,
     String? comment,
+    RepresentantRelation? relationStatus,
     DateTime clientCreatedAt,
   });
 }
@@ -61,6 +64,11 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
   CreateRepCallAttemptDto comment(String? comment) => this(comment: comment);
 
   @override
+  CreateRepCallAttemptDto relationStatus(
+    RepresentantRelation? relationStatus,
+  ) => this(relationStatus: relationStatus);
+
+  @override
   CreateRepCallAttemptDto clientCreatedAt(DateTime clientCreatedAt) =>
       this(clientCreatedAt: clientCreatedAt);
 
@@ -77,6 +85,7 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
     Object? outcome = const $CopyWithPlaceholder(),
     Object? promisedProspects = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
+    Object? relationStatus = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
   }) {
     return CreateRepCallAttemptDto(
@@ -100,6 +109,10 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
           ? _value.comment
           // ignore: cast_nullable_to_non_nullable
           : comment as String?,
+      relationStatus: relationStatus == const $CopyWithPlaceholder()
+          ? _value.relationStatus
+          // ignore: cast_nullable_to_non_nullable
+          : relationStatus as RepresentantRelation?,
       clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -139,6 +152,14 @@ CreateRepCallAttemptDto _$CreateRepCallAttemptDtoFromJson(
     ),
     promisedProspects: $checkedConvert('promisedProspects', (v) => v as num?),
     comment: $checkedConvert('comment', (v) => v as String?),
+    relationStatus: $checkedConvert(
+      'relationStatus',
+      (v) => $enumDecodeNullable(
+        _$RepresentantRelationEnumMap,
+        v,
+        unknownValue: RepresentantRelation.unknownDefaultOpenApi,
+      ),
+    ),
     clientCreatedAt: $checkedConvert(
       'clientCreatedAt',
       (v) => DateTime.parse(v as String),
@@ -155,6 +176,8 @@ Map<String, dynamic> _$CreateRepCallAttemptDtoToJson(
   'outcome': _$RepCallOutcomeEnumMap[instance.outcome]!,
   if (instance.promisedProspects case final value?) 'promisedProspects': value,
   if (instance.comment case final value?) 'comment': value,
+  if (_$RepresentantRelationEnumMap[instance.relationStatus] case final value?)
+    'relationStatus': value,
   'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
 };
 
@@ -167,4 +190,12 @@ const _$RepCallOutcomeEnumMap = {
   RepCallOutcome.WRONG_NUMBER: 'WRONG_NUMBER',
   RepCallOutcome.OTHER: 'OTHER',
   RepCallOutcome.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$RepresentantRelationEnumMap = {
+  RepresentantRelation.INCONNU: 'INCONNU',
+  RepresentantRelation.CONTACTE: 'CONTACTE',
+  RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
+  RepresentantRelation.REFUS: 'REFUS',
+  RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
