@@ -36,6 +36,7 @@ export default async function RepresentantPage({ params }: { params: Promise<{ i
       <RepresentantDetailView
         representantId={id}
         author={{ id: guard.user.id, fullName: guard.user.fullName }}
+        canAdminister={guard.user.role === 'ADMIN'}
       />
     </HydrationBoundary>
   );

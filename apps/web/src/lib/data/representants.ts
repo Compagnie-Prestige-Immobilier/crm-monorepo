@@ -1,5 +1,5 @@
 import type { ApiClient, components, operations } from '@crm/api-client';
-import { unwrap, type ApiResult } from '@crm/api-client/query';
+import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
@@ -101,14 +101,7 @@ export async function deleteRepresentant(
   unwrap(await client.DELETE('/api/v1/representants/{id}', { params: { path: { id } } }));
 }
 
-export interface RepresentantComment {
-  id: string;
-  body: string;
-  authorId: string;
-  authorName: string;
-  clientCreatedAt: string;
-  createdAt: string;
-}
+export type RepresentantComment = components['schemas']['RepresentantCommentDto'];
 
 export interface NewRepresentantComment {
   id: string;
@@ -119,25 +112,12 @@ export interface NewRepresentantComment {
 export const representantCommentsQueryKey = (representantId: string) =>
   ['representants', 'detail', representantId, 'comments'] as const;
 
-// Le contrat ne porte pas encore `/representants/{id}/comments` : ce typage
-// local tombe au prochain codegen, avec la conversion ci-dessous.
-interface CommentsEndpoints {
-  GET: (
-    path: string,
-    init: unknown,
-  ) => Promise<ApiResult<{ items: RepresentantComment[] }, unknown>>;
-  POST: (path: string, init: unknown) => Promise<ApiResult<RepresentantComment, unknown>>;
-}
-
-const commentsApi = (client: ApiClient): CommentsEndpoints =>
-  client as unknown as CommentsEndpoints;
-
 export async function fetchRepresentantComments(
   representantId: string,
   client: ApiClient = getApiClient(),
 ): Promise<RepresentantComment[]> {
   const payload = unwrap(
-    await commentsApi(client).GET('/api/v1/representants/{id}/comments', {
+    await client.GET('/api/v1/representants/{id}/comments', {
       params: { path: { id: representantId } },
     }),
   );
@@ -150,9 +130,21 @@ export async function createRepresentantComment(
   client: ApiClient = getApiClient(),
 ): Promise<RepresentantComment> {
   return unwrap(
-    await commentsApi(client).POST('/api/v1/representants/{id}/comments', {
+    await client.POST('/api/v1/representants/{id}/comments', {
       params: { path: { id: representantId } },
       body: comment,
+    }),
+  );
+}
+
+export async function deleteRepresentantComment(
+  representantId: string,
+  commentId: string,
+  client: ApiClient = getApiClient(),
+): Promise<void> {
+  unwrap(
+    await client.DELETE('/api/v1/representants/{id}/comments/{commentId}', {
+      params: { path: { id: representantId, commentId } },
     }),
   );
 }

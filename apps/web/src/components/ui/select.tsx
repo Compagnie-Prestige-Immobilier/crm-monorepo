@@ -73,6 +73,11 @@ function SelectContent({
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Positioner
+        // Le `transform` que Base UI pose ici cree un contexte d'empilement: le
+        // `z-50` du popup y reste enferme, et la liste se peint SOUS le calque
+        // d'un dialogue. Sans cette ligne, tout `Select` dans un dialogue est
+        // invisible. Meme geste que `popover.tsx`.
+        className="isolate z-50"
         align={align}
         alignOffset={alignOffset}
         side={side}
