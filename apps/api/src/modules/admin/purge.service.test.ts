@@ -4,23 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import { PURGE_DOMAIN_KEYS } from './purge-plan.js';
 import { PurgeService } from './purge.service.js';
-
-/**
- * Ce que ces tests protègent, dans l'ordre d'importance :
- *
- *  1. Un administrateur autre que le premier ne peut PAS purger, même en
- *     appelant l'endpoint à la main. Le contrôle vit dans le service, pas dans
- *     l'écran.
- *  2. Le compte qui exécute la purge n'est jamais supprimé par elle.
- *  3. L'ordre des suppressions respecte les clés étrangères, quelle que soit la
- *     sélection cochée.
- *
- * Le double de Prisma est un Proxy plutôt qu'une liste de délégués simulés :
- * les VRAIES implémentations de `PURGE_STEPS` sont donc exécutées, et une
- * étape qui viserait la mauvaise table serait visible ici. Un double écrit
- * table par table testerait le double.
- */
 
 const FIRST_ADMIN = { id: 'admin-1', email: 'direction@cpi.sn', username: 'direction' };
 
@@ -46,7 +31,6 @@ interface Trace {
   readonly audits: Record<string, unknown>[];
 }
 
-/** Ordre d'apparition d'un modèle dans le journal des suppressions. */
 function indexOfModel(trace: Trace, model: string): number {
   return trace.deletes.findIndex((call) => call.model === model);
 }
@@ -121,7 +105,6 @@ describe('PurgeService, autorisation', () => {
     await expect(
       service.purge(actor(), { domains: ['journal'], confirmation: 'purger' }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
-    // Le refus précède la transaction : rien n'a été supprimé.
     expect(trace.deletes).toEqual([]);
   });
 
@@ -152,7 +135,6 @@ describe('PurgeService, autorisation', () => {
     const { prisma } = makePrisma();
     const catalog = await new PurgeService(prisma).catalog(actor());
 
-    // « Dossiers bancaires » porte deux étapes, à 7 lignes chacune dans ce double.
     expect(catalog.domains.find((domain) => domain.key === 'dossiers')?.rows).toBe(14);
     expect(catalog.domains.find((domain) => domain.key === 'journal')?.rows).toBe(7);
   });
@@ -212,14 +194,14 @@ describe('PurgeService, exécution', () => {
   it('ne vise jamais les comptes administrateurs', async () => {
     const { prisma, trace } = makePrisma();
     await new PurgeService(prisma).purge(actor(), {
-      domains: ['teleconseillers', 'finances'],
+      domains: ['teleconseillers', 'finances', 'supervision'],
       confirmation: 'direction',
     });
 
     const roles = trace.deletes
       .filter((call) => call.model === 'user')
       .map((call) => (call.args as { where: { role: Role } }).where.role);
-    expect(roles).toEqual([Role.COMMERCIAL, Role.BANQUE_FINANCE]);
+    expect(roles).toEqual([Role.COMMERCIAL, Role.BANQUE_FINANCE, Role.SUPERVISEUR]);
     expect(roles).not.toContain(Role.ADMIN);
   });
 
@@ -270,5 +252,26 @@ describe('PurgeService, exécution', () => {
     expect(result.deleted).toEqual([{ key: 'dossiers', label: 'Dossiers bancaires', rows: 10 }]);
     expect(result.total).toBe(10);
     expect(Number.isNaN(Date.parse(result.purgedAt))).toBe(false);
+  });
+});
+
+describe('aucun rôle n’échappe à la purge des comptes', () => {
+  it('chaque rôle non-ADMIN est emporté par un domaine', async () => {
+    const { prisma, trace } = makePrisma();
+    await new PurgeService(prisma).purge(actor(), {
+      domains: [...PURGE_DOMAIN_KEYS],
+      confirmation: 'direction',
+    });
+
+    const roles = new Set(
+      trace.deletes
+        .filter((call) => call.model === 'user')
+        .map((call) => (call.args as { where: { role: Role } }).where.role),
+    );
+
+    for (const role of Object.values(Role)) {
+      if (role === Role.ADMIN) continue;
+      expect(roles, `les comptes ${role} survivraient à une purge totale`).toContain(role);
+    }
   });
 });

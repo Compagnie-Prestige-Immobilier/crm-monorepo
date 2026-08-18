@@ -35,23 +35,6 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { ENROLLMENT_METHODS, ENROLLMENT_METHOD_LABELS, type EnrollmentMethod } from '@/lib/types';
 
-/**
- * Les deux décisions possibles sur une demande, dans un composant unique.
- *
- * Un seul composant parce que les deux dialogues sont mutuellement exclusifs et
- * portent le MÊME objet : les séparer obligerait l'écran appelant à tenir deux
- * états ouverts/fermés et à garantir lui-même qu'ils ne le soient jamais
- * ensemble.
- *
- * L'approbation demande trois champs que l'API exige et que la banque ne
- * connaît pas : représentant de rattachement, syndicat et méthode d'enrôlement.
- * Ce n'est pas de la bureaucratie ajoutée : le prospect naît en
- * `METHOD_OBTAINED` (la condition exacte du filtre de recherche bancaire, pour
- * que le dossier puisse s'y rattacher tout de suite), et une contrainte CHECK
- * lie ce statut à la méthode. Les demander ici évite de créer une fiche qui
- * échouerait à l'insertion, ou pire, qui serait invisible du formulaire de
- * dossier après avoir été approuvée.
- */
 export function ClientRequestReviewDialogs({
   pending,
   onClose,
@@ -88,9 +71,6 @@ function ApproveDialog({
   const [syndicat, setSyndicat] = useState<string | null>(null);
   const [method, setMethod] = useState<EnrollmentMethod | null>(null);
 
-  // Remise à zéro à chaque nouvelle demande : garder le choix précédent ferait
-  // rattacher la fiche suivante au représentant de la précédente, en un clic
-  // et sans que rien ne l'annonce.
   useEffect(() => {
     setRepresentant(null);
     setSyndicat(null);
@@ -168,7 +148,19 @@ function ApproveDialog({
                 *
               </span>
             </Label>
-            <Select value={syndicat ?? ''} onValueChange={setSyndicat}>
+            {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
+                pas le texte de l'item — ici, l'identifiant du syndicat. */}
+            <Select
+              items={(reference?.syndicats ?? []).map((item) => ({
+                value: item.id,
+                label: `${item.sigle}, ${item.name}`,
+              }))}
+              value={syndicat ?? ''}
+              onValueChange={(value) => {
+                if (value === null) return;
+                setSyndicat(value);
+              }}
+            >
               <SelectTrigger id={syndicatId} className="w-full">
                 <SelectValue placeholder="Choisir un syndicat" />
               </SelectTrigger>
@@ -190,8 +182,10 @@ function ApproveDialog({
               </span>
             </Label>
             <Select
+              items={ENROLLMENT_METHOD_LABELS}
               value={method ?? ''}
               onValueChange={(value) => {
+                if (value === null) return;
                 setMethod(value as EnrollmentMethod);
               }}
             >

@@ -11,17 +11,6 @@ import {
 import { apiErrorText } from '@/lib/mutation-feedback';
 import { ApiError } from '@crm/api-client/query';
 
-/**
- * Une configuration incomplète et un réseau coupé produisent le MÊME symptôme
- * : aucune donnée : et appellent deux réparations opposées.
- *
- * Le panel affichait « Serveur injoignable. Vérifiez la connexion, puis
- * réessayez. » dans les deux cas. Un administrateur a cherché une panne de
- * réseau pendant qu'`API_URL` manquait dans l'environnement. Ces tests fixent
- * la distinction : le message de configuration NOMME la variable, celui du
- * réseau garde sa formulation générique.
- */
-
 const ORIGINAL_API_URL = process.env.API_URL;
 const ORIGINAL_INTERNAL = process.env.API_INTERNAL_URL;
 

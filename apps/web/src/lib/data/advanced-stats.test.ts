@@ -7,16 +7,6 @@ import {
   formatDelayDays,
 } from '@/lib/data/advanced-stats';
 
-/**
- * Les dérivations du volet « Campagnes ».
- *
- * Elles ne recalculent rien que le serveur sache déjà : elles REPLIENT une
- * série servie par (jour, commercial) selon l'axe du graphique affiché. Le
- * risque est donc le repli lui-même, et deux règles de lecture qu'un chiffre
- * seul rendrait faux : « aucune mesure » n'est pas « zéro jour », et « pas de
- * cadence » n'est pas « fini demain ».
- */
-
 const ROWS = [
   { day: '2026-08-10', commercialId: 'c1', commercialName: 'Aminata', done: 12 },
   { day: '2026-08-10', commercialId: 'c2', commercialName: 'Moussa', done: 8 },
@@ -32,8 +22,6 @@ describe('closedPerDayTotals', () => {
   });
 
   it('rend une série vide sans donnée, jamais une ligne à zéro', () => {
-    // Une ligne « 0 » sur un graphique de cadence se lit comme une journée
-    // travaillée sans résultat, ce qui est faux : il n'y a simplement rien.
     expect(closedPerDayTotals([])).toEqual([]);
   });
 });
@@ -49,8 +37,6 @@ describe('closedPerCommercial', () => {
 
 describe('formatDelayDays', () => {
   it('distingue « aucune mesure » de « zéro jour »', () => {
-    // Les confondre afficherait un délai de traitement parfait sur une chaîne
-    // qui n'a rien traité du tout.
     expect(formatDelayDays(null)).toBe('Aucune mesure');
     expect(formatDelayDays(0)).toBe('Moins d’un jour');
   });
@@ -62,8 +48,6 @@ describe('formatDelayDays', () => {
 
 describe('estimatedEndLabel', () => {
   it('ne promet pas de date quand la campagne est à l’arrêt', () => {
-    // L'API rend `null` quand la cadence observée est nulle : annoncer une
-    // date serait une division par zéro déguisée en prévision.
     expect(estimatedEndLabel(null, 400)).toBe('Aucune cadence observée');
   });
 

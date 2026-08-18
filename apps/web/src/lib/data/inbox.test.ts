@@ -12,16 +12,6 @@ import {
   type Inbox,
 } from '@/lib/data/inbox';
 
-/**
- * La cloche de notification.
- *
- * Trois règles y sont réellement risquées, et ce sont les trois testées ici :
- * une route venue du mobile ne doit jamais faire naviguer le panel vers un
- * écran qui n'existe pas, l'animation d'appel ne doit se déclencher que sur une
- * ARRIVÉE (sinon elle devient un décor permanent), et la pastille doit rester
- * lisible quel que soit le compte.
- */
-
 describe('webRouteFor', () => {
   it('accepte les écrans réellement servis par le panel', () => {
     expect(webRouteFor('/demandes-clients')).toBe('/demandes-clients');
@@ -39,16 +29,11 @@ describe('webRouteFor', () => {
   });
 
   it('refuse les routes MOBILES, qui n’existent pas ici', () => {
-    // `reminders.service.ts` cible `/a-corriger` et `/phase2` : ce sont des
-    // écrans Flutter. Y envoyer le panel afficherait un 404 à quelqu'un qui
-    // vient de cliquer sur une notification parfaitement légitime.
     expect(webRouteFor('/a-corriger')).toBeNull();
     expect(webRouteFor('/phase2')).toBeNull();
   });
 
   it('ne se laisse pas piéger par un préfixe partiel', () => {
-    // Comparaison par segment : sans elle, `/dossiers-archives` passerait pour
-    // une sous-route de `/dossiers`.
     expect(webRouteFor('/dossiers-archives')).toBeNull();
   });
 
@@ -62,8 +47,6 @@ describe('webRouteFor', () => {
 
 describe('hasNewArrival', () => {
   it('ne s’anime pas au premier chargement', () => {
-    // Ouvrir le panel avec trois notifications en attente n'est pas une
-    // arrivée : la cloche bougerait à chaque changement de page.
     expect(hasNewArrival(null, { topId: 'a', unreadCount: 3 })).toBe(false);
   });
 
@@ -80,16 +63,12 @@ describe('hasNewArrival', () => {
   });
 
   it('s’anime aussi quand seul le compte monte', () => {
-    // Deux notifications reçues entre deux sondages : la tête ne change qu'une
-    // fois, mais le compte dit qu'il s'est passé quelque chose.
     expect(hasNewArrival({ topId: 'a', unreadCount: 3 }, { topId: 'a', unreadCount: 5 })).toBe(
       true,
     );
   });
 
   it('ne s’anime jamais sans non-lu', () => {
-    // Marquer tout lu change la tête de liste : sans cette garde, la cloche
-    // oscillerait au moment exact où l'utilisateur vient de vider sa boîte.
     expect(hasNewArrival({ topId: 'a', unreadCount: 1 }, { topId: 'b', unreadCount: 0 })).toBe(
       false,
     );
@@ -133,24 +112,12 @@ describe('pastille et intitulé', () => {
   });
 
   it('ANNONCE le compte, il n’est pas seulement peint', () => {
-    // La pastille est `aria-hidden` : sans le compte dans l'intitulé du bouton,
-    // un utilisateur de lecteur d'écran n'aurait aucun moyen de le connaître.
     expect(bellLabel(0)).toBe('Notifications, aucune non lue');
     expect(bellLabel(1)).toBe('Notifications, 1 non lue');
     expect(bellLabel(4)).toBe('Notifications, 4 non lues');
   });
 });
 
-// ─── « Tout marquer comme lu » ───────────────────────────────────────────────
-
-/**
- * Faux client, réduit aux deux appels que la fonction émet.
- *
- * Il REPRODUIT le comportement du serveur : une notification marquée quitte la
- * sélection `unreadOnly`. C'est cette propriété qui rend le test intéressant -
- * une pagination naïve, qui avancerait l'index de page, sauterait une ligne sur
- * deux au lieu de tout marquer.
- */
 function fakeInboxClient(unreadIds: string[]) {
   const remaining = new Set(unreadIds);
   const read: string[] = [];
@@ -219,9 +186,6 @@ describe('markAllNotificationsRead', () => {
   });
 
   it('BORNE le nombre de pages, pour ne pas se faire limiter en débit', async () => {
-    // Une boîte laissée six mois peut porter des centaines de lignes. Enchaîner
-    // autant d'appels sur un clic saturerait le limiteur (300 req/min) et
-    // déconnecterait l'utilisateur pour avoir voulu ranger sa boîte.
     const ids = Array.from(
       { length: MARK_ALL_PAGE_SIZE * (MARK_ALL_MAX_PAGES + 3) },
       (_, i) => `n-${String(i)}`,
@@ -231,8 +195,6 @@ describe('markAllNotificationsRead', () => {
     const marked = await markAllNotificationsRead(fake.client as never);
 
     expect(marked).toBe(MARK_ALL_PAGE_SIZE * MARK_ALL_MAX_PAGES);
-    // Ce qui dépasse la borne reste NON LU : visible, et réparable d'un second
-    // clic. Une session cassée ne le serait pas.
     expect(fake.remaining.size).toBeGreaterThan(0);
     expect(fake.pagesFetched()).toBe(MARK_ALL_MAX_PAGES);
   });

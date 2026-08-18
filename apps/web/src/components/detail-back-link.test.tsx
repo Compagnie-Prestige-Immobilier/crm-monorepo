@@ -3,23 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithQuery } from '@/test/render-query';
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * Les trois écrans de détail doivent offrir une SORTIE sur leur branche d'erreur.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Le défaut corrigé : chacun sortait en `return` dès `isError`, donc avant le
- * lien de retour. Un identifiant périmé (signet, lien collé, campagne purgée)
- * donnait un écran sans issue, puisque `QueryErrorState` ne propose pas de
- * rejouer un 404.
- *
- * La régression est facile à réintroduire : il suffit qu'une relecture « range »
- * le `<DetailBackLink>` sous le bloc d'erreur. Ce test la rattrape sur les trois
- * écrans à la fois, et vérifie surtout que chacun pointe vers SA liste : un
- * copier-coller entre les deux détails de campagne renverrait l'un vers la liste
- * de l'autre, ce qu'aucun rendu ne signalerait.
- */
-
 const failing = () => Promise.reject(new Error('404'));
 
 vi.mock('@/lib/data/rep-campaigns', () => ({
@@ -51,8 +34,6 @@ const { BankCaseDetailView } = await import('@/components/bank/bank-case-detail-
 
 describe('sortie de secours des écrans de détail', () => {
   beforeEach(() => {
-    // Une requête qui échoue journalise par défaut ; le bruit masquerait un vrai
-    // échec dans la sortie de la suite.
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 

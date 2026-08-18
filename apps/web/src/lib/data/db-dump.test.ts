@@ -10,16 +10,6 @@ import {
   type DatabaseDump,
 } from '@/lib/data/db-dump';
 
-/**
- * L'état de l'export intégral, tel que l'écran le LIT.
- *
- * Ces quatre fonctions décident de ce que l'administrateur voit pendant les
- * minutes où il attend, et de ce qu'il croit devoir faire ensuite. Elles sont
- * séparées du composant pour être exerçables : un `expired` présenté comme une
- * erreur le ferait relancer un export inutile, et une absence d'avis passée
- * sous silence le ferait attendre un e-mail qui ne viendra jamais.
- */
-
 const dump = (overrides: Partial<DatabaseDump>): DatabaseDump => ({
   id: 'job-1',
   status: 'ready',
@@ -46,11 +36,6 @@ describe('isDumpRunning', () => {
     expect(isDumpRunning(dump({ status: 'idle' }))).toBe(false);
   });
 
-  /**
-   * Le premier rendu n'a pas encore de données. Sans ce cas, le chargeur
-   * s'afficherait à l'ouverture de l'écran, avant même qu'on sache si un export
-   * existe.
-   */
   it('ne tourne pas quand rien n’a encore été chargé', () => {
     expect(isDumpRunning(undefined)).toBe(false);
   });
@@ -62,11 +47,6 @@ describe('dumpStatusLabel', () => {
     expect(dumpStatusLabel(dump({ status: 'queued' }))).toContain('préviendra');
   });
 
-  /**
-   * `expired` N'EST PAS une erreur : c'est l'aboutissement normal du cycle,
-   * après téléchargement ou après échéance. Le présenter comme un échec ferait
-   * relancer un export de la base entière pour rien.
-   */
   it('ne présente pas « expired » comme un échec', () => {
     const label = dumpStatusLabel(dump({ status: 'expired' }));
     expect(label).not.toMatch(/échou|erreur/iu);
@@ -85,11 +65,6 @@ describe('dumpStatusLabel', () => {
 });
 
 describe('dumpNoticeWarning', () => {
-  /**
-   * LE cas qui motive cette fonction. Sans transport e-mail, l'export aboutit
-   * mais aucun message ne part : l'administrateur attendrait indéfiniment.
-   * L'écran doit le dire, sinon la panne est silencieuse.
-   */
   it('avertit quand aucun service d’e-mail n’est configuré', () => {
     const warning = dumpNoticeWarning(dump({ noticeStatus: 'NOT_CONFIGURED' }));
     expect(warning).not.toBeNull();
@@ -101,42 +76,16 @@ describe('dumpNoticeWarning', () => {
     expect(dumpNoticeWarning(dump({ noticeStatus: 'FAILED' }))).not.toBeNull();
   });
 
-  /**
-   * Contre-épreuve : un e-mail parti n'a pas à occuper une ligne à l'écran.
-   * Sans elle, une fonction qui avertirait TOUJOURS passerait les tests
-   * ci-dessus, et l'avertissement perdrait tout sens.
-   */
   it('ne dit rien quand l’avis est parti', () => {
     expect(dumpNoticeWarning(dump({ noticeStatus: 'SENT' }))).toBeNull();
     expect(dumpNoticeWarning(dump({ noticeStatus: null }))).toBeNull();
     expect(dumpNoticeWarning(undefined)).toBeNull();
   });
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * `INBOX_ONLY` EST L'ISSUE NOMINALE, ET ELLE NE DOIT RIEN DIRE
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * Aucun e-mail ne part JAMAIS pour cet avis : la sélection des destinataires
-   * d'e-mail ne retient que les comptes COMMERCIAL, et le demandeur d'un export
-   * est toujours un ADMIN. L'état portait pourtant `SENT`, que cet écran
-   * présentait comme « le message est parti ». L'administrateur attendait alors
-   * un e-mail qui ne viendrait pas, concluait à une panne, et relançait
-   * l'export : la promesse fausse PRODUISAIT une copie de plus de la clientèle
-   * sur le disque.
-   *
-   * L'avis arrive bien, dans la cloche. Il n'y a donc rien à signaler, et la
-   * carte annonce désormais l'absence d'e-mail AVANT l'export plutôt que de la
-   * faire découvrir après.
-   */
   it('ne dit rien quand l’avis n’est arrivé que dans la cloche', () => {
     expect(dumpNoticeWarning(dump({ noticeStatus: 'INBOX_ONLY' }))).toBeNull();
   });
 
-  /**
-   * Et l'avertissement ne parle plus d'e-mail : il n'y en a pas, promettre d'y
-   * renoncer laisserait croire qu'il en existait un.
-   */
   it('n’oriente jamais vers un e-mail qui n’existe pas', () => {
     for (const status of ['NOT_CONFIGURED', 'TRANSPORT_ERROR', 'FAILED']) {
       const warning = dumpNoticeWarning(dump({ noticeStatus: status }));
@@ -147,11 +96,6 @@ describe('dumpNoticeWarning', () => {
 });
 
 describe('téléchargement', () => {
-  /**
-   * L'URL ne porte AUCUN paramètre : le fichier servi est celui de l'export
-   * courant, nommé par la base. Rien de ce que le navigateur envoie n'entre
-   * dans un chemin côté serveur.
-   */
   it('vise une route sans paramètre', () => {
     expect(DATABASE_DUMP_DOWNLOAD_URL).toBe('/api/v1/admin/database-dump/download');
     expect(DATABASE_DUMP_DOWNLOAD_URL).not.toContain('?');

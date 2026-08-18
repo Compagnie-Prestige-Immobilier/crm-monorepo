@@ -14,31 +14,6 @@ import { RepresentantsExportService } from './representants-export.service.js';
 import { ExportMode } from './dto.js';
 import { DEMO_FILENAME_SUFFIX, demoFilenameSuffix } from './demo-marking.js';
 
-/**
- * Le marquage de démonstration, ÉPROUVÉ DE BOUT EN BOUT SUR CHAQUE EXPORT.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * CE QUI MANQUAIT
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `demo-marking.test.ts` éprouve les PRIMITIVES : un classeur fabriqué sur
- * place, une feuille écrite à la main, et les trois marques vérifiées dessus.
- * C'est nécessaire et ce n'est pas suffisant. Il ne dit rien de la seule chose
- * qui compte à l'usage : que chaque SERVICE d'export les appelle, sur CHACUNE
- * de ses feuilles.
- *
- * Or c'est là que le défaut se loge. Un service qui ajoute un onglet et oublie
- * `writeDemoWarningRow` produit un classeur dont une feuille sur trois est
- * marquée. Le fichier part au siège, la feuille non marquée en est extraite,
- * et des lignes fictives sont lues comme réelles. Aucune épreuve existante ne
- * bouge : les primitives fonctionnent toujours, et le service ne les appelle
- * simplement pas partout.
- *
- * On balaie donc les feuilles RÉELLEMENT produites, quelles qu'elles soient :
- * un onglet ajouté demain entre dans le contrôle sans que personne ait à y
- * penser, ce qui est tout l'intérêt.
- */
-
 const admin: AuthenticatedUser = {
   id: 'admin-1',
   email: 'admin@cpi.sn',
@@ -47,16 +22,8 @@ const admin: AuthenticatedUser = {
   role: Role.ADMIN,
 };
 
-/**
- * Fragment de l'avertissement écrit par `writeDemoWarningRow`.
- *
- * On cherche une SOUS-CHAÎNE stable plutôt que la phrase entière : la
- * formulation peut être retouchée sans que la mécanique change, et exiger le
- * texte au caractère près ferait de ce balayage un test de rédaction.
- */
 const AVERTISSEMENT = 'MODE DÉMONSTRATION';
 
-/** Exécute un écrivain de classeur et relit le fichier produit. */
 async function relire(write: (stream: PassThrough) => Promise<void>): Promise<ExcelJS.Workbook> {
   const sink = new PassThrough();
   const chunks: Buffer[] = [];
@@ -77,7 +44,6 @@ async function relire(write: (stream: PassThrough) => Promise<void>): Promise<Ex
   return workbook;
 }
 
-/** Textes des dix premières lignes d'une feuille, aplatis. */
 function tete(sheet: ExcelJS.Worksheet): string {
   const morceaux: string[] = [];
   for (let ligne = 1; ligne <= 10; ligne += 1) {
@@ -92,10 +58,6 @@ function tete(sheet: ExcelJS.Worksheet): string {
   }
   return morceaux.join(' | ');
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Doublures : le contenu importe peu, seules les FEUILLES comptent.
-// ─────────────────────────────────────────────────────────────────────────────
 
 const prospectRow = (id: string): Record<string, unknown> => ({
   id,
@@ -218,14 +180,6 @@ const bankPrisma = (): PrismaService =>
     $queryRawUnsafe: () => Promise.resolve([]),
   }) as unknown as PrismaService;
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Les trois exports du produit, chacun rendu deux fois : mode ALLUMÉ puis
- * ÉTEINT. Le second passage n'est pas décoratif : il établit que la marque
- * vient bien de la BASCULE et non d'un en-tête écrit en toutes circonstances,
- * ce qu'un contrôle du seul mode allumé ne saurait distinguer.
- */
 const EXPORTS: { nom: string; rendre: (demo: boolean, stream: PassThrough) => Promise<void> }[] = [
   {
     nom: 'prospects (mode filtré)',
@@ -270,7 +224,6 @@ describe('mode démonstration ALLUMÉ : chaque feuille de chaque export est marq
   it.each(EXPORTS)('$nom porte l’avertissement sur TOUTES ses feuilles', async ({ rendre }) => {
     const workbook = await relire((stream) => rendre(true, stream));
 
-    // Garde-fou : un classeur sans feuille ferait passer la boucle à vide.
     expect(workbook.worksheets.length).toBeGreaterThan(0);
 
     const nues = workbook.worksheets
@@ -286,9 +239,6 @@ describe('mode démonstration ALLUMÉ : chaque feuille de chaque export est marq
   });
 
   it.each(EXPORTS)('$nom ne porte AUCUNE marque mode éteint', async ({ rendre }) => {
-    // La contrepartie indispensable : un classeur de plateforme en service ne
-    // doit rien laisser voir de cette mécanique. Sans cette moitié, écrire
-    // l'avertissement en toutes circonstances satisferait l'épreuve ci-dessus.
     const workbook = await relire((stream) => rendre(false, stream));
 
     const marquees = workbook.worksheets
@@ -300,11 +250,6 @@ describe('mode démonstration ALLUMÉ : chaque feuille de chaque export est marq
 });
 
 describe('le nom du fichier porte le suffixe', () => {
-  /**
-   * Le suffixe survit à tout : renommage manuel excepté, c'est la seule marque
-   * qui reste visible dans un dossier de téléchargements, avant même que le
-   * fichier ne soit ouvert.
-   */
   it('ajoute le suffixe mode allumé, et rien mode éteint', () => {
     expect(demoFilenameSuffix(true)).toBe(DEMO_FILENAME_SUFFIX);
     expect(demoFilenameSuffix(true)).not.toBe('');
@@ -312,9 +257,6 @@ describe('le nom du fichier porte le suffixe', () => {
   });
 
   it('les trois contrôleurs composent le même nom de fichier', () => {
-    // Les trois routes construisent `prefixe-date${suffixe}.xlsx`. On éprouve
-    // ici la composition, seul endroit où une faute produirait un fichier
-    // « demo.xlsx » ou « .xlsx-demo ».
     for (const prefixe of ['prospects-cpi', 'representants-cpi', 'dossiers-bancaires']) {
       const nom = `${prefixe}-2026-03-03${demoFilenameSuffix(true)}.xlsx`;
       expect(nom.endsWith('.xlsx')).toBe(true);

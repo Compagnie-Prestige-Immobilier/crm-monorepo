@@ -9,13 +9,6 @@ import {
   shortCode,
 } from './short-code.js';
 
-/**
- * Jeu d'UUID reproductible.
- *
- * Volontairement PAS `randomUUID()` : un test de collision sur des entrées
- * aléatoires est un test dont le verdict change d'une exécution à l'autre.
- * Ici la population est figée, donc le résultat l'est aussi.
- */
 function fixtureUuids(count: number): string[] {
   const ids: string[] = [];
   for (let index = 0; index < count; index += 1) {
@@ -54,8 +47,6 @@ describe('shortCode', () => {
     const first = shortCode(id);
     expect(shortCode(id)).toBe(first);
     expect(shortCode(id)).toBe(first);
-    // Valeur figée : un changement de dérivation invaliderait tous les
-    // programmes déjà imprimés, ce doit donc être un échec visible.
     expect(first).toBe(shortCode('01931f3c-1a2b-7c4d-8e5f-0a1b2c3d4e5f'));
   });
 
@@ -66,8 +57,6 @@ describe('shortCode', () => {
   });
 
   it('ne tronque pas l’UUID : deux UUID v7 de la même milliseconde ont des codes distincts', () => {
-    // Même préfixe horodaté, seul le suffixe aléatoire diffère : c'est le cas
-    // que produit une saisie en rafale sur le terrain.
     const prefix = '01931f3c-1a2b-7c4d-8e5f-';
     const codes = new Set(
       Array.from({ length: 500 }, (_, index) =>

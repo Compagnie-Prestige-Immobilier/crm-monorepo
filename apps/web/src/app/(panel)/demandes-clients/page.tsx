@@ -13,27 +13,6 @@ import { guardRoles } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Demandes clients' };
 
-/**
- * Demandes de création de client : ARBITRAGE pour l'ADMIN, SUIVI pour la banque.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Pourquoi cet écran ne peut PAS rester réservé à l'ADMIN.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Refuser une demande notifie l'agent BANQUE_FINANCE qui l'a déposée, et cette
- * notification porte `route: '/demandes-clients'`. La cloche en fait un lien,
- * l'agent clique : et tombait sur un refus de droits, depuis une notification
- * parfaitement légitime qui lui annonçait une décision le concernant.
- *
- * L'API, elle, était déjà juste : `GET /client-requests` est ouvert au rôle
- * BANQUE_FINANCE et restreint la liste à `requestedById = user.id`. Un agent ne
- * voit donc que SES demandes, jamais celles d'une autre banque : le filtrage
- * n'est pas laissé au navigateur.
- *
- * L'écran, lui, se règle sur le rôle : l'agent LIT (statut, motif de refus,
- * prospect créé), il n'arbitre pas. Les deux boutons de décision, la recherche
- * par banque demandeuse et les compteurs d'arbitrage restent à l'ADMIN.
- */
 export default async function DemandesClientsPage({
   searchParams,
 }: {
@@ -45,8 +24,6 @@ export default async function DemandesClientsPage({
     return <PermissionDenied role={guard.user.role} what="Le suivi des demandes de création" />;
   }
 
-  // Filtres lus dans l'URL côté serveur : la première page rendue est déjà la
-  // page filtrée, et « les demandes en attente de la CBAO » est un lien.
   const filters = parseClientRequestFilters(await searchParams);
   const queryClient = getQueryClient();
   await queryClient.prefetchQuery({

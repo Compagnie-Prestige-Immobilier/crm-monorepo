@@ -26,22 +26,8 @@ import { BanqueDto, DepartementDto, IefDto, SyndicatDto } from '../referentiels/
 import { ProspectDto } from '../prospects/dto.js';
 import { RepresentantDto } from '../representants/dto.js';
 
-/**
- * Plafonds lus au chargement du module.
- *
- * Les décorateurs class-validator sont évalués une fois, à l'import : la valeur
- * ne peut donc pas venir d'une injection. On lit `process.env` directement, avec
- * le même défaut que le schéma zod.
- */
 export const SYNC_MAX_BATCH_SIZE = Number(process.env.SYNC_MAX_BATCH_SIZE ?? 200) || 200;
 
-/**
- * Un lot ne peut pas dépasser 25 groupes de dépendance.
- *
- * Chaque groupe est une transaction ; 25 transactions bornent le temps
- * d'occupation d'une connexion, et donc l'effet d'un client qui enverrait un
- * lot énorme après trois semaines hors ligne.
- */
 export const SYNC_MAX_DEPENDENCY_GROUPS = 25;
 
 export enum SyncEntity {
@@ -64,37 +50,6 @@ export enum SyncOpStatus {
   SKIPPED_DEPENDENCY_FAILED = 'skipped_dependency_failed',
 }
 
-/**
- * Charge utile d'une opération, tous champs optionnels.
- *
- * Les deux entités partagent un seul DTO plutôt qu'une union discriminée : une
- * union produit en Dart une classe `OneOf` que le code applicatif doit
- * déballer, alors qu'un objet plat aux champs optionnels donne un type utile
- * immédiatement. La validation par entité (quels champs sont obligatoires pour
- * un `representant.create`) est faite dans le service, et une opération mal
- * formée ressort en `invalid` DANS le corps de réponse, jamais en 400 pour
- * tout le lot, ce qui condamnerait les 199 autres opérations.
- */
-/**
- * Les seuls champs qu'une remontée peut VIDER.
- *
- * La liste est courte parce que la question ne se pose que pour une colonne à
- * la fois FACULTATIVE en base et MODIFIABLE par l'utilisateur :
- *
- *   · `iefId` : l'IEF de rattachement d'un représentant, que le formulaire
- *     mobile permet explicitement de retirer ;
- *   · `notes` : les notes libres d'un représentant, effaçables dès que le
- *     formulaire les expose.
- *
- * Tout le reste de `SyncEntityDataDto` désigne soit une colonne obligatoire
- * (nom, téléphone, département, banque, syndicat, rattachement, statut), où
- * « vidé » n'a pas de sens, soit une entité créée et jamais modifiée par la
- * synchronisation (la tentative d'appel et ses champs `method` et `comment`),
- * où l'absence à la création dit déjà « pas de valeur ».
- *
- * La liste vit ICI, dans le contrat, et non dans le service : c'est elle que la
- * validation applique, et c'est elle que le client engendré lit.
- */
 export const CLEARABLE_FIELDS = ['iefId', 'notes'] as const;
 
 export type ClearableField = (typeof CLEARABLE_FIELDS)[number];
@@ -177,12 +132,6 @@ export class SyncEntityDataDto {
   @IsISO8601()
   clientCreatedAt?: string;
 
-  // ── Phase 2 : tentative d'appel ────────────────────────────────────────
-  // Ces champs ne sont lus que pour `entity = call_attempt`. Les règles
-  // croisées (méthode obligatoire si et seulement si METHOD_OBTAINED,
-  // commentaire obligatoire pour OTHER) sont vérifiées par le module phase 2,
-  // qui en est la seule autorité, les dupliquer ici les ferait diverger.
-
   @ApiPropertyOptional({
     format: 'uuid',
     description: 'Tentative d’appel : prospect concerné. Sert aussi de clé de groupe.',
@@ -213,6 +162,16 @@ export class SyncEntityDataDto {
   @IsString()
   @MaxLength(2000)
   comment?: string;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description:
+      'Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut ' +
+      'CALLBACK. Une version ancienne de l’application ne l’envoie pas.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  callbackAt?: string;
 }
 
 export class SyncOperationDto {
@@ -269,59 +228,6 @@ export class SyncOperationDto {
   @Type(() => SyncEntityDataDto)
   data?: SyncEntityDataDto;
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * CHAMPS QUE LE CLIENT DEMANDE EXPLICITEMENT DE VIDER
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * ═══ LE DÉFAUT : « ABSENT » ET « VIDÉ » ARRIVAIENT IDENTIQUES ═══
-   *
-   * `data` est un correctif partiel : une clé absente veut dire « inchangé »,
-   * et c'est ce qui garde un lot de deux cents opérations à une taille
-   * raisonnable sur une liaison EDGE. Le service applique donc la règle
-   * `undefined` égale « ne touche pas », qui est la bonne règle.
-   *
-   * Sauf qu'un client ne pouvait PAS dire l'autre chose. Le client Dart est
-   * engendré avec `includeIfNull: false` : un `iefId` mis à `null` parce que
-   * l'utilisateur a vidé le champ était SUPPRIMÉ de la charge utile avant
-   * l'envoi, et arrivait donc exactement comme un champ jamais touché. Le
-   * téléphone affichait le champ vide, le serveur gardait l'ancienne valeur, et
-   * la réponse alignait la révision locale sur celle du serveur : aucune
-   * relecture ultérieure ne pouvait plus rattraper l'écart, et rien nulle part
-   * ne le signalait.
-   *
-   * Ce n'est un défaut d'aucune des trois couches prises isolément. Il vit dans
-   * la COUTURE, ce qui est précisément la raison pour laquelle six rondes
-   * d'audit par module ne l'ont pas vu.
-   *
-   * ═══ POURQUOI UNE LISTE, ET NON UN `null` SUR LE CHAMP ═══
-   *
-   * Trois réparations étaient possibles :
-   *
-   *   · engendrer le client avec `includeIfNull: true`. C'est un réglage
-   *     GLOBAL du générateur : tous les DTO de tous les modules émettraient
-   *     alors leurs champs nuls, et la remontée hors ligne perdrait la
-   *     propriété « les champs inchangés sont omis » sur laquelle repose la
-   *     taille des lots. On ne paie pas la taille de toutes les charges utiles
-   *     pour deux champs facultatifs ;
-   *   · traiter l'absence comme un vidage sur les `update`. Cela ferait effacer
-   *     une IEF renseignée par toute application ANCIENNE, qui n'envoie pas le
-   *     champ parce qu'elle ne le connaît pas. Une correction qui détruit des
-   *     données chez les clients non mis à jour n'en est pas une ;
-   *   · nommer l'intention. C'est ce qui est fait ici.
-   *
-   * La liste est explicite, elle ne coûte que les champs réellement vidés (donc
-   * presque jamais rien), et elle laisse intacte la règle « absent égale
-   * inchangé » dont le reste de la charge utile dépend.
-   *
-   * ═══ CE QUI PEUT ÊTRE VIDÉ, ET RIEN D'AUTRE ═══
-   *
-   * Seuls les noms de `CLEARABLE_FIELDS` sont acceptés. Un nom inconnu, ou un
-   * nom qui désigne une colonne obligatoire, est refusé en 400 : sans ce
-   * contrôle, cette liste deviendrait un moyen d'écrire `null` dans n'importe
-   * quelle colonne, y compris celles que le schéma déclare non nulles, et
-   * l'erreur remonterait du pilote de base plutôt que de la validation.
-   */
   @ApiPropertyOptional({
     type: [String],
     description:
@@ -337,14 +243,6 @@ export class SyncOperationDto {
   clearedFields?: string[];
 }
 
-/**
- * Vérifie le plafond de groupes de dépendance.
- *
- * Le nombre de groupes ne se déduit pas d'un décorateur de cardinalité : il
- * dépend du contenu des opérations. Le contrôle est donc porté par une
- * contrainte dédiée, pour qu'il reste une règle de validation du DTO, refusée
- * en 400 avant tout accès à la base, et non un test enfoui dans le service.
- */
 @ValidatorConstraint({ name: 'maxDependencyGroups', async: false })
 export class MaxDependencyGroupsConstraint implements ValidatorConstraintInterface {
   validate(operations: unknown): boolean {
@@ -361,14 +259,6 @@ export class MaxDependencyGroupsConstraint implements ValidatorConstraintInterfa
   }
 }
 
-/**
- * Clé de groupe transactionnel : l'identifiant du représentant.
- *
- * Un prospect en création est groupé avec son représentant, pour qu'il ne
- * puisse pas atterrir si son parent a échoué. Une mise à jour ou une
- * suppression de prospect, dont le parent existe déjà, forme son propre groupe :
- * les mêler ferait échouer des lignes indépendantes ensemble.
- */
 export function dependencyKeyOf(operation: {
   entity: SyncEntity;
   entityId: string;
@@ -376,11 +266,6 @@ export function dependencyKeyOf(operation: {
 }): string {
   if (operation.entity === SyncEntity.REPRESENTANT) return `representant:${operation.entityId}`;
 
-  // Une tentative d'appel de phase 2 est groupée sur SON prospect, jamais sur
-  // le représentant : le prospect existe déjà en base au moment de l'appel
-  // (l'annuaire ne contient que des lignes synchronisées), et le grouper avec
-  // une saisie de phase 1 en cours ferait échouer ensemble deux choses sans
-  // rapport.
   if (operation.entity === SyncEntity.CALL_ATTEMPT) {
     return `prospect:${operation.data?.prospectId ?? operation.entityId}`;
   }
@@ -413,6 +298,30 @@ export class SyncPushDto {
   @ValidateNested({ each: true })
   @Type(() => SyncOperationDto)
   operations!: SyncOperationDto[];
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 0,
+    description:
+      'Opérations restant dans la file d’attente de l’appareil APRÈS ce lot. ' +
+      'Le serveur ne peut pas la deviner. Facultatif sans limite de temps : une ' +
+      'version déjà déployée ne l’envoie pas.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  pendingOps?: number;
+
+  @ApiPropertyOptional({
+    maxLength: 32,
+    description: 'Version de l’application mobile, telle qu’elle s’annonce. Facultative.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  appVersion?: string;
 }
 
 export class SyncOperationResultDto {
@@ -457,8 +366,6 @@ export class SyncPushResponseDto {
   nextCursor!: string | null;
 }
 
-// ─── Pull ───────────────────────────────────────────────────────────────────
-
 export class SyncPullQueryDto {
   @ApiPropertyOptional({
     description: 'Curseur opaque renvoyé par l’appel précédent. Absent : synchronisation complète.',
@@ -476,6 +383,29 @@ export class SyncPullQueryDto {
   @Min(1)
   @Max(1_000)
   limit?: number;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 0,
+    description:
+      'Opérations en attente de remontée dans l’appareil. Le serveur ne peut pas ' +
+      'la deviner. Facultatif sans limite de temps.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  pendingOps?: number;
+
+  @ApiPropertyOptional({
+    maxLength: 32,
+    description: 'Version de l’application mobile, telle qu’elle s’annonce. Facultative.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  appVersion?: string;
 }
 
 export class SyncChangesDto {

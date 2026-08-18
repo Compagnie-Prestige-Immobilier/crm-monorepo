@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/rep_call_outcome.dart';
+import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -29,6 +30,14 @@ class CreateRepCallAttemptDto {
     this.promisedProspects,
 
     this.comment,
+
+    this.relationStatus,
+
+    this.suggestedPhone,
+
+    this.suggestedName,
+
+    this.suggestedNote,
 
     required this.clientCreatedAt,
   });
@@ -58,6 +67,27 @@ class CreateRepCallAttemptDto {
   @JsonKey(name: r'comment', required: false, includeIfNull: false)
   final String? comment;
 
+  /// État de la relation tel que l’appel vient de l’apprendre. Absent : le statut ne bouge pas. Identique au statut courant : rien n’est écrit.
+  @JsonKey(
+    name: r'relationStatus',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
+  )
+  final RepresentantRelation? relationStatus;
+
+  /// Numéro qu’un représentant qui refuse propose d’appeler à sa place. Saisie libre, normalisé par le serveur. Un numéro illisible refuse la tentative entière : le téléconseiller est sur l’écran au moment où il le tape.
+  @JsonKey(name: r'suggestedPhone', required: false, includeIfNull: false)
+  final String? suggestedPhone;
+
+  /// Nom du contact suggéré, tel que dicté. Ignoré sans `suggestedPhone`.
+  @JsonKey(name: r'suggestedName', required: false, includeIfNull: false)
+  final String? suggestedName;
+
+  /// Ce que le représentant dit du contact. Ignoré sans `suggestedPhone`.
+  @JsonKey(name: r'suggestedNote', required: false, includeIfNull: false)
+  final String? suggestedNote;
+
   /// Horodatage de l’appel sur le terrain, distinct de son arrivée en base.
   @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
   final DateTime clientCreatedAt;
@@ -73,6 +103,10 @@ class CreateRepCallAttemptDto {
                 outcome,
                 promisedProspects,
                 comment,
+                relationStatus,
+                suggestedPhone,
+                suggestedName,
+                suggestedNote,
                 clientCreatedAt,
               ],
               [
@@ -81,6 +115,10 @@ class CreateRepCallAttemptDto {
                 other.outcome,
                 other.promisedProspects,
                 other.comment,
+                other.relationStatus,
+                other.suggestedPhone,
+                other.suggestedName,
+                other.suggestedNote,
                 other.clientCreatedAt,
               ],
             );
@@ -95,6 +133,10 @@ class CreateRepCallAttemptDto {
         outcome,
         promisedProspects,
         comment,
+        relationStatus,
+        suggestedPhone,
+        suggestedName,
+        suggestedNote,
         clientCreatedAt,
       ]);
 

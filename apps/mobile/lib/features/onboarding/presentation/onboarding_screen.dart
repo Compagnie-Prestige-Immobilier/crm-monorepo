@@ -116,17 +116,6 @@ class _OnboardingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    // ═══ CENTRÉ TANT QUE ÇA RENTRE, DÉFILANT QUAND ÇA NE RENTRE PLUS ═══
-    //
-    // La colonne était centrée dans une hauteur contrainte, sans échappatoire :
-    // l'icône de 88 px et les deux blocs de texte tenaient à 1,0×, et
-    // débordaient dès 1,3×, c'est-à-dire chez tout utilisateur ayant poussé la
-    // taille de texte d'Android. C'est le tout premier écran de l'application,
-    // celui qu'on voit avant d'avoir pu régler quoi que ce soit.
-    //
-    // `Center` + `SingleChildScrollView` + `mainAxisSize.min` donne les deux
-    // comportements avec un seul arbre : la colonne garde sa hauteur naturelle
-    // et reste centrée quand il y a la place, et devient défilante sinon.
     return Center(
       child: SingleChildScrollView(
         child: Column(

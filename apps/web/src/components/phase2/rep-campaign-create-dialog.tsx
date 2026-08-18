@@ -35,22 +35,6 @@ import { queryKeys } from '@/lib/query-keys';
 import type { FilterOption } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-/**
- * Création d'une campagne d'appels REPRÉSENTANTS : nom → périmètre →
- * étalement → téléconseillers → APERÇU.
- *
- * Même dispositif que pour les prospects, et pour la même raison : le tirage
- * est IRRÉVERSIBLE. Il matérialise une tâche par représentant, rend ces fiches
- * inéligibles à toute autre campagne, et la seule façon de revenir en arrière
- * est de clôturer, ce qui annule aussi les appels déjà en cours.
- *
- * Une différence de fond avec les prospects : ici l'aperçu vient du SERVEUR
- * (`GET /rep-campaigns/preview`). L'éligibilité croise le rattachement, la
- * présence de prospects vivants et les campagnes en cours : trois questions que
- * seule la base tranche d'un coup, et qu'un calcul côté écran ferait diverger
- * du tirage réel dès qu'une campagne concurrente est ouverte.
- */
-
 type Step = 'saisie' | 'apercu';
 
 export function RepCampaignCreateDialog({
@@ -67,6 +51,7 @@ export function RepCampaignCreateDialog({
 
   const [step, setStep] = useState<Step>('saisie');
   const [name, setName] = useState('');
+  const [regionDraft, setRegionDraft] = useState<string | null>(null);
   const [departementId, setDepartementId] = useState<string | null>(null);
   const [iefId, setIefId] = useState<string | null>(null);
   const [onlyWithoutProspects, setOnlyWithoutProspects] = useState(false);
@@ -81,6 +66,9 @@ export function RepCampaignCreateDialog({
   });
 
   const commerciaux: readonly FilterOption[] = reference.data?.commerciaux ?? [];
+  const departements = reference.data?.departements ?? [];
+  const regionId =
+    departements.find((departement) => departement.id === departementId)?.regionId ?? regionDraft;
 
   const scope: RepCampaignScope = { departementId, iefId, onlyWithoutProspects };
 
@@ -97,8 +85,6 @@ export function RepCampaignCreateDialog({
 
   const create = useMutation({
     mutationFn: () => {
-      // `exactOptionalPropertyTypes` : une clé posée à `undefined` n'est pas
-      // une clé absente, et l'API refuserait un UUID vide.
       const body: Parameters<typeof createRepCampaign>[0] = {
         name: trimmedName,
         commercialIds: selected,
@@ -127,6 +113,7 @@ export function RepCampaignCreateDialog({
   function reset(): void {
     setStep('saisie');
     setName('');
+    setRegionDraft(null);
     setDepartementId(null);
     setIefId(null);
     setOnlyWithoutProspects(false);
@@ -194,19 +181,33 @@ export function RepCampaignCreateDialog({
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <FilterCombobox
+                label="Région"
+                placeholder="Toutes les régions"
+                value={regionId}
+                options={(reference.data?.regions ?? []).map((region) => ({
+                  value: region.id,
+                  label: region.name,
+                }))}
+                onChange={(value) => {
+                  setRegionDraft(value);
+                  setDepartementId(null);
+                  setIefId(null);
+                }}
+              />
               <FilterCombobox
                 label="Département"
                 placeholder="Tous les départements"
                 value={departementId}
-                options={(reference.data?.departements ?? []).map((departement) => ({
-                  value: departement.id,
-                  label: departement.name,
-                }))}
+                options={departements
+                  .filter((departement) => regionId === null || departement.regionId === regionId)
+                  .map((departement) => ({
+                    value: departement.id,
+                    label: departement.name,
+                    hint: departement.regionName,
+                  }))}
                 onChange={(value) => {
-                  // Une IEF n'appartient qu'à un département : la garder après
-                  // un changement donnerait un tirage vide sans que rien à
-                  // l'écran n'explique pourquoi.
                   setDepartementId(value);
                   setIefId(null);
                 }}
@@ -366,14 +367,10 @@ export function RepCampaignCreateDialog({
               </Button>
               <Button
                 type="button"
-                // Bloqué tant que l'aperçu n'a pas abouti : confirmer sans avoir
-                // vu le nombre annulerait tout l'intérêt de cette étape.
                 disabled={
                   create.isPending ||
                   preview.isPending ||
                   preview.isError ||
-                  // Après les deux gardes ci-dessus, `data` est chargée : la
-                  // requête est une union discriminée par son statut.
                   preview.data.eligible === 0
                 }
                 onClick={() => {
@@ -400,7 +397,6 @@ export function RepCampaignCreateDialog({
   );
 }
 
-/** Le chiffre du serveur, la charge journalière, la répartition nominative. */
 function RepCampaignPreviewPanel({
   selectedNames,
   spreadDays,

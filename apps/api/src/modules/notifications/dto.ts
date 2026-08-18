@@ -29,14 +29,6 @@ import {
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
 
-/**
- * Un lien profond est une ROUTE INTERNE. `^/` et pas d'URL absolue.
- *
- * Le mobile passe cette chaîne telle quelle à `go_router`. Autoriser
- * `https://…` transformerait chaque notification en vecteur d'hameçonnage
- * portant le logo de l'application, et l'utilisateur n'a aucun moyen de
- * vérifier la destination avant d'appuyer.
- */
 export const ROUTE_PATTERN = /^\/[A-Za-z0-9\-._~/%?&=+:@!$'(),;[\]*]*$/;
 
 export class NotificationDeliveryCountsDto {
@@ -126,10 +118,6 @@ export class NotificationDetailDto {
   recipients!: NotificationRecipientDto[];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Boîte de réception
-// ─────────────────────────────────────────────────────────────────────────────
-
 export class InboxItemDto {
   @ApiProperty({ format: 'uuid', description: 'Identifiant de la LIVRAISON, pas de l’envoi.' })
   id!: string;
@@ -149,10 +137,6 @@ export class InboxDto {
   @ApiProperty({ type: Number }) unreadCount!: number;
   @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Écritures
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class CreateNotificationDto {
   @ApiProperty({ minLength: 1, maxLength: 120 })
@@ -272,7 +256,6 @@ export class InboxQueryDto {
   pageSize?: number;
 }
 
-/** Public à évaluer AVANT envoi. Mêmes champs que la composition, sans le texte. */
 export class AudiencePreviewQueryDto {
   @ApiProperty({ enum: NotificationAudience, enumName: 'NotificationAudience' })
   @IsEnum(NotificationAudience)
@@ -306,10 +289,6 @@ export class AudiencePreviewDto {
   })
   recipientCount!: number;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Gabarits
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class NotificationTemplateDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -404,18 +383,7 @@ export class UpdateNotificationTemplateDto {
   isActive?: boolean;
 }
 
-/** Rendu d'un gabarit avec un jeu de variables, pour l'aperçu du compositeur. */
 export class RenderTemplateDto {
-  /**
-   * `additionalProperties` est OBLIGATOIRE ici, pas décoratif.
-   *
-   * `type: Object` seul produit un schéma `{ "type": "object" }` sans la
-   * moindre propriété. Les générateurs le lisent littéralement (« un objet, et
-   * aucune clé n'est permise ») et rendent `Record<string, never>` côté
-   * TypeScript, `Object?` côté Dart : dans les deux cas un type qui interdit
-   * d'écrire ce que la route attend, et que l'appelant doit contourner par une
-   * assertion. Déclarer le dictionnaire rend le contrat exploitable.
-   */
   @ApiProperty({
     type: 'object',
     additionalProperties: { type: 'string' },
@@ -436,14 +404,11 @@ export class RenderedTemplateDto {
   missing!: string[];
 }
 
-/** Compteurs bruts servant à l'écran d'administration des rappels. */
 export class ReminderRunDto {
   @ApiProperty({ type: Number }) created!: number;
   @ApiProperty({ type: Number }) skipped!: number;
 }
 
-/** Défini localement plutôt qu'emprunté au module bancaire : deux modules ne
- *  doivent pas se tenir par un DTO de commodité. */
 export class IncludeInactiveQueryDto {
   @ApiPropertyOptional({ default: false })
   @IsOptional()

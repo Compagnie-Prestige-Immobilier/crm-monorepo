@@ -1,0 +1,180 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'supervision_activity_dto.dart';
+
+// **************************************************************************
+// CopyWithGenerator
+// **************************************************************************
+
+abstract class _$SupervisionActivityDtoCWProxy {
+  SupervisionActivityDto from(DateTime? from);
+
+  SupervisionActivityDto to(DateTime? to);
+
+  SupervisionActivityDto granularity(SupervisionGranularity granularity);
+
+  SupervisionActivityDto items(List<SupervisionActivityRowDto> items);
+
+  SupervisionActivityDto teleconseillers(
+    List<SupervisionTeleconseillerDto> teleconseillers,
+  );
+
+  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
+  ///
+  /// Usage
+  /// ```dart
+  /// SupervisionActivityDto(...).copyWith(id: 12, name: "My name")
+  /// ````
+  SupervisionActivityDto call({
+    DateTime? from,
+    DateTime? to,
+    SupervisionGranularity granularity,
+    List<SupervisionActivityRowDto> items,
+    List<SupervisionTeleconseillerDto> teleconseillers,
+  });
+}
+
+/// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfSupervisionActivityDto.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfSupervisionActivityDto.copyWith.fieldName(...)`
+class _$SupervisionActivityDtoCWProxyImpl
+    implements _$SupervisionActivityDtoCWProxy {
+  const _$SupervisionActivityDtoCWProxyImpl(this._value);
+
+  final SupervisionActivityDto _value;
+
+  @override
+  SupervisionActivityDto from(DateTime? from) => this(from: from);
+
+  @override
+  SupervisionActivityDto to(DateTime? to) => this(to: to);
+
+  @override
+  SupervisionActivityDto granularity(SupervisionGranularity granularity) =>
+      this(granularity: granularity);
+
+  @override
+  SupervisionActivityDto items(List<SupervisionActivityRowDto> items) =>
+      this(items: items);
+
+  @override
+  SupervisionActivityDto teleconseillers(
+    List<SupervisionTeleconseillerDto> teleconseillers,
+  ) => this(teleconseillers: teleconseillers);
+
+  @override
+  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
+  ///
+  /// Usage
+  /// ```dart
+  /// SupervisionActivityDto(...).copyWith(id: 12, name: "My name")
+  /// ````
+  SupervisionActivityDto call({
+    Object? from = const $CopyWithPlaceholder(),
+    Object? to = const $CopyWithPlaceholder(),
+    Object? granularity = const $CopyWithPlaceholder(),
+    Object? items = const $CopyWithPlaceholder(),
+    Object? teleconseillers = const $CopyWithPlaceholder(),
+  }) {
+    return SupervisionActivityDto(
+      from: from == const $CopyWithPlaceholder()
+          ? _value.from
+          // ignore: cast_nullable_to_non_nullable
+          : from as DateTime?,
+      to: to == const $CopyWithPlaceholder()
+          ? _value.to
+          // ignore: cast_nullable_to_non_nullable
+          : to as DateTime?,
+      granularity: granularity == const $CopyWithPlaceholder()
+          ? _value.granularity
+          // ignore: cast_nullable_to_non_nullable
+          : granularity as SupervisionGranularity,
+      items: items == const $CopyWithPlaceholder()
+          ? _value.items
+          // ignore: cast_nullable_to_non_nullable
+          : items as List<SupervisionActivityRowDto>,
+      teleconseillers: teleconseillers == const $CopyWithPlaceholder()
+          ? _value.teleconseillers
+          // ignore: cast_nullable_to_non_nullable
+          : teleconseillers as List<SupervisionTeleconseillerDto>,
+    );
+  }
+}
+
+extension $SupervisionActivityDtoCopyWith on SupervisionActivityDto {
+  /// Returns a callable class that can be used as follows: `instanceOfSupervisionActivityDto.copyWith(...)` or like so:`instanceOfSupervisionActivityDto.copyWith.fieldName(...)`.
+  // ignore: library_private_types_in_public_api
+  _$SupervisionActivityDtoCWProxy get copyWith =>
+      _$SupervisionActivityDtoCWProxyImpl(this);
+}
+
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+SupervisionActivityDto _$SupervisionActivityDtoFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate('SupervisionActivityDto', json, ($checkedConvert) {
+  $checkKeys(
+    json,
+    requiredKeys: const [
+      'from',
+      'to',
+      'granularity',
+      'items',
+      'teleconseillers',
+    ],
+  );
+  final val = SupervisionActivityDto(
+    from: $checkedConvert(
+      'from',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    to: $checkedConvert(
+      'to',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    granularity: $checkedConvert(
+      'granularity',
+      (v) => $enumDecode(
+        _$SupervisionGranularityEnumMap,
+        v,
+        unknownValue: SupervisionGranularity.unknownDefaultOpenApi,
+      ),
+    ),
+    items: $checkedConvert(
+      'items',
+      (v) => (v as List<dynamic>)
+          .map(
+            (e) =>
+                SupervisionActivityRowDto.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
+    ),
+    teleconseillers: $checkedConvert(
+      'teleconseillers',
+      (v) => (v as List<dynamic>)
+          .map(
+            (e) => SupervisionTeleconseillerDto.fromJson(
+              e as Map<String, dynamic>,
+            ),
+          )
+          .toList(),
+    ),
+  );
+  return val;
+});
+
+Map<String, dynamic> _$SupervisionActivityDtoToJson(
+  SupervisionActivityDto instance,
+) => <String, dynamic>{
+  'from': instance.from?.toIso8601String(),
+  'to': instance.to?.toIso8601String(),
+  'granularity': _$SupervisionGranularityEnumMap[instance.granularity]!,
+  'items': instance.items.map((e) => e.toJson()).toList(),
+  'teleconseillers': instance.teleconseillers.map((e) => e.toJson()).toList(),
+};
+
+const _$SupervisionGranularityEnumMap = {
+  SupervisionGranularity.day: 'day',
+  SupervisionGranularity.week: 'week',
+  SupervisionGranularity.unknownDefaultOpenApi: 'unknown_default_open_api',
+};

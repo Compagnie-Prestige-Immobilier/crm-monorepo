@@ -22,41 +22,12 @@ import {
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 
-/**
- * Supervision des comptes.
- *
- * L'écran répond à une seule question : QUI EST LÀ, MAINTENANT. Tout le reste
- * : l'historique, les droits, les mots de passe : vit ailleurs et n'a rien à
- * faire ici.
- *
- * Les colonnes ne racontent pas comment la présence est déduite. Un superviseur
- * n'a que faire des familles de jetons ; il lui faut un état et une ancienneté.
- * Le mécanisme est documenté côté API (`presence.ts`), là où il se modifie.
- */
-
 const PRESENCE_VARIANT: Record<PresenceState, 'success' | 'info' | 'secondary'> = {
   ONLINE: 'success',
   RECENT: 'info',
   AWAY: 'secondary',
 };
 
-/**
- * L'état de présence, REPLIÉ avant d'être indexé.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Le typage engendré décrit ce que l'API promet, pas ce qu'elle envoie.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Les deux tables ci-dessus sont des `Record<PresenceState, …>` : elles ne
- * répondent qu'aux trois états connus à la compilation. Un état livré côté API
- * avant que le panel ne soit redéployé rendrait `undefined` des deux côtés, donc
- * une pastille sans variante ni libellé, sur l'écran qui sert précisément à
- * savoir qui est là.
- *
- * `knownPresence` replie sur `AWAY`, l'état le moins affirmatif : dire
- * « inactif » de quelqu'un qui est peut-être connecté induit moins en erreur que
- * l'inverse. La ligne reste nommée et datée, ce qui est l'essentiel.
- */
 function PresenceBadge({ presence }: { presence: string }) {
   const state = knownPresence(presence);
   return <Badge variant={PRESENCE_VARIANT[state]}>{PRESENCE_LABELS[state]}</Badge>;
@@ -69,8 +40,6 @@ export function SupervisionView() {
     queryKey: queryKeys.supervision,
     queryFn: () => fetchSupervision(),
     refetchInterval: live.refetchInterval,
-    // L'ancienne liste reste affichée pendant le cycle suivant : sans cela,
-    // l'écran repasserait par un squelette toutes les dix secondes.
     placeholderData: keepPreviousData,
   });
 
@@ -160,8 +129,6 @@ function PresenceCard({
         </p>
         <AnimatedNumber
           value={value}
-          // `tabular-nums` : sans lui, la largeur des chiffres change et la
-          // carte se décale à chaque image de l'interpolation.
           className={`mt-1 block font-display text-[1.75rem] font-[800] leading-none tracking-[-0.02em] tabular-nums ${color}`}
         />
       </CardContent>
@@ -216,8 +183,6 @@ function PresenceTable({
             {users.map((user) => (
               <tr
                 key={user.id}
-                // La transition porte sur la couleur seule : rien ne bouge de
-                // place quand un compte change d'état.
                 className="transition-colors duration-(--dur-2) ease-(--ease-out-cpi)"
               >
                 <th scope="row" className="px-5 py-2 text-left font-[400]">

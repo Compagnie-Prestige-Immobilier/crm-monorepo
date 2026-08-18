@@ -16,36 +16,13 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { CampaignStatus, RepCallOutcome } from '@crm/database';
+import { CampaignStatus, RepCallOutcome, RepresentantRelation } from '@crm/database';
 
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { MAX_SPREAD_DAYS, MIN_SPREAD_DAYS } from '../phase2/distribution.js';
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
+import { RepresentantLookupDto } from '../representants/dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
-
-/**
- * Contrat HTTP des campagnes d'appels aux REPRÉSENTANTS.
- *
- * Les trois règles du contrat de phase 2 valent ici à l'identique, parce que le
- * client Dart est engendré du même document :
- *
- * 1. Toute propriété de type tableau déclare `type: () => [X]`. Sans cela le
- *    générateur produit `List<dynamic>` : le code compile, l'application
- *    plante à l'exécution sur le premier accès à un champ.
- * 2. `nullable: true` et « facultatif » sont deux choses différentes et sont
- *    distingués ici.
- * 3. Rien de non déterministe : le document engendré est comparé octet à octet
- *    en intégration continue.
- *
- * `PageMetaDto` (commun) est réemployé plutôt que dupliqué. La pagination a
- * UNE forme dans tout le produit, et un doublon de forme identique sous un
- * autre nom obligerait chaque client engendré à porter deux classes pour la
- * même chose, donc le web à écrire deux fois le même composant.
- */
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Création
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class CreateRepCampaignDto {
   @ApiProperty({ maxLength: 120, example: 'Relance représentants dormants' })
@@ -108,10 +85,6 @@ export class CreateRepCampaignDto {
   spreadDays?: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Lecture
-// ─────────────────────────────────────────────────────────────────────────────
-
 export class RepCampaignProgressDto {
   @ApiProperty({ type: Number, description: 'Nombre total de tâches affectées.' })
   total!: number;
@@ -140,13 +113,6 @@ export class RepCampaignCommercialDto {
   perDay!: number[];
 }
 
-/**
- * Tentative récente, telle qu'affichée dans le suivi.
- *
- * Le représentant y est désigné par son téléphone et son code court, jamais par
- * son nom : suivre une campagne consiste à savoir QUI a appelé QUEL numéro et
- * avec quel résultat. La même règle que sur les prospects, pour la même raison.
- */
 export class RepCampaignAttemptDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ format: 'uuid' }) representantId!: string;
@@ -278,15 +244,6 @@ export class RepCampaignQueryDto {
   pageSize?: number;
 }
 
-/**
- * Aperçu du tirage, AVANT création.
- *
- * Créer une campagne fige des dizaines de milliers d'affectations et rend les
- * représentants inéligibles à toute autre campagne : l'opération ne se
- * rattrape qu'en clôturant. L'aperçu est ce qui permet de constater qu'un
- * périmètre trop large donne 40 000 fiches à sept personnes avant de le
- * découvrir sur le PDF.
- */
 export class RepCampaignPreviewQueryDto {
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
@@ -343,17 +300,6 @@ export class RepCampaignPreviewDto {
   @ApiProperty({ description: 'Libellé lisible du périmètre.' }) scopeLabel!: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tentatives
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Enregistrement d'un appel passé à un représentant.
- *
- * L'identifiant est engendré PAR LE CLIENT (UUID v7) et sert de clé
- * d'idempotence, exactement comme pour une tentative de phase 2 : un envoi
- * rejoué après une coupure réseau ne compte pas deux appels.
- */
 export class CreateRepCallAttemptDto {
   @ApiProperty({
     format: 'uuid',
@@ -393,6 +339,49 @@ export class CreateRepCallAttemptDto {
   @MaxLength(COMMENT_MAX_LENGTH)
   comment?: string;
 
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    description:
+      'État de la relation tel que l’appel vient de l’apprendre. Absent : le statut ne bouge pas. Identique au statut courant : rien n’est écrit.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation)
+  relationStatus?: RepresentantRelation;
+
+  @ApiPropertyOptional({
+    type: String,
+    minLength: 6,
+    maxLength: 40,
+    description:
+      'Numéro qu’un représentant qui refuse propose d’appeler à sa place. Saisie libre, normalisé par le serveur. Un numéro illisible refuse la tentative entière : le téléconseiller est sur l’écran au moment où il le tape.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  suggestedPhone?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 120,
+    description: 'Nom du contact suggéré, tel que dicté. Ignoré sans `suggestedPhone`.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  suggestedName?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: COMMENT_MAX_LENGTH,
+    description: 'Ce que le représentant dit du contact. Ignoré sans `suggestedPhone`.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMENT_MAX_LENGTH)
+  suggestedNote?: string;
+
   @ApiProperty({
     type: String,
     format: 'date-time',
@@ -404,7 +393,6 @@ export class CreateRepCallAttemptDto {
 
 export enum RepCallAttemptApplyStatus {
   APPLIED = 'applied',
-  /** L'identifiant de tentative était déjà connu : rejeu, rien n'a été réécrit. */
   DUPLICATE = 'duplicate',
 }
 
@@ -427,11 +415,15 @@ export class RepCallAttemptResultDto {
     description: 'Vrai si l’issue a clos la tâche. Les issues « à rappeler » la laissent ouverte.',
   })
   taskClosed!: boolean;
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Programme PDF
-// ─────────────────────────────────────────────────────────────────────────────
+  @ApiProperty({
+    type: () => RepresentantLookupDto,
+    nullable: true,
+    description:
+      'Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas.',
+  })
+  suggestion!: RepresentantLookupDto | null;
+}
 
 export class RepProgrammeQueryDto {
   @ApiPropertyOptional({

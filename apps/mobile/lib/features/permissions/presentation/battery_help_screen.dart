@@ -10,27 +10,6 @@ import '../../../core/router/route_paths.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 
-/// « Autorisations & batterie ».
-///
-/// ## Pourquoi cet écran existe
-///
-/// Android ne dit jamais « j'ai supprimé votre tâche de fond ». Sur les ROM
-/// Transsion (Tecno, Infinix, itel) et Xiaomi : qui représentent l'essentiel du
-/// parc sénégalais : une couche maison tue les processus en arrière-plan
-/// indépendamment de ce que prévoit AOSP, et souvent indépendamment de
-/// l'exemption d'optimisation de batterie standard. Le résultat, côté
-/// utilisateur, est une app qui « ne synchronise pas », sans message, sans
-/// erreur, sans rien à cliquer.
-///
-/// Le seul remède est humain : indiquer le réglage constructeur à changer. On
-/// ouvre donc l'écran système correspondant, et on décrit le chemin en toutes
-/// lettres pour les ROM où l'Intent n'aboutit pas.
-///
-/// **On ne demande PAS `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`.** Google Play
-/// n'accepte cette permission que pour une liste courte de cas d'usage : alarmes,
-/// VoIP, suivi d'activité : dont la synchronisation de données ne fait pas
-/// partie. La demander ferait rejeter la publication. On ouvre l'écran de
-/// réglages, l'utilisateur décide.
 class BatteryHelpScreen extends StatelessWidget {
   const BatteryHelpScreen({super.key});
 
@@ -116,9 +95,6 @@ class BatteryHelpScreen extends StatelessWidget {
   static Future<void> _openBatterySettings() async {
     if (!Platform.isAndroid) return;
     try {
-      // Écran de LISTE, et non la boîte de dialogue de demande directe : cette
-      // dernière exige `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, que Google Play
-      // refuse pour de la synchronisation de données.
       await const AndroidIntent(
         action: 'android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS',
       ).launch();
@@ -161,8 +137,6 @@ class _Step extends StatelessWidget {
             height: 26,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              // Surface or décorative : le texte posé dessus est
-              // `accentForeground` (#1C0810, 6,95:1), jamais l'or lui-même.
               color: context.cpi.accent,
               borderRadius: CpiRadius.brFull,
             ),

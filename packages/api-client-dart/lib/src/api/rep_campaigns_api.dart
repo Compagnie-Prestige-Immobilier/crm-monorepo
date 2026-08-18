@@ -568,7 +568,7 @@ class RepCampaignsApi {
   }
 
   /// Enregistre un appel passé à un représentant et clôt la tâche si l’issue aboutit.
-  /// L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie &#x60;duplicate&#x60; sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base.
+  /// L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie &#x60;duplicate&#x60; sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base. &#x60;suggestedPhone&#x60; recueille, dans le même geste, le numéro qu’un représentant qui refuse propose d’appeler à sa place : la réponse dit si ce numéro est déjà une fiche connue.
   ///
   /// Parameters:
   /// * [createRepCallAttemptDto]

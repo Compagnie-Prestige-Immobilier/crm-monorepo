@@ -1,11 +1,3 @@
-/**
- * Découpage administratif du Sénégal : 14 régions, 46 départements.
- *
- * Le département est l'axe d'analyse principal du panel admin (« regrouper par
- * département »), et la région lui donne un second niveau d'agrégation sans
- * coût supplémentaire côté saisie : le commercial ne choisit que le département.
- */
-
 export interface RegionSeed {
   code: string;
   name: string;

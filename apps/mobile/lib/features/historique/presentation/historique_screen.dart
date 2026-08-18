@@ -16,21 +16,6 @@ import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/sync_badge.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 
-/// Historique : mes représentants, dépliables vers leurs prospects.
-///
-/// ## Sur le statut par ligne
-///
-/// `sync_status` est lu depuis les **vues SQL**, jamais dénormalisé sur la ligne
-/// métier. Une colonne dénormalisée se désynchronise au premier chemin de code
-/// qui oublie de la mettre à jour : et ce chemin existe toujours : réessai,
-/// expiration de bail, purge, remappage d'identifiant. La vue joint l'outbox :
-/// il n'y a rien à tenir à jour, donc rien à oublier (ADR 0001).
-///
-/// **Tout état non vert est tapable.** Une icône d'état sur laquelle on ne peut
-/// rien faire ne renseigne pas l'utilisateur, elle l'inquiète, et se transforme
-/// en appel au support. Ici, `pending` explique et propose de synchroniser,
-/// `conflict`/`failed` ouvrent « À corriger », `blocked` désigne le représentant
-/// fautif.
 class HistoriqueScreen extends ConsumerWidget {
   const HistoriqueScreen({super.key});
 
@@ -43,9 +28,6 @@ class HistoriqueScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Historique'),
-        // La bannière d'attente n'est plus montée ici : elle vit dans la coque
-        // (`app_shell.dart`), donc sur les quatre branches. Ne restent dans
-        // l'AppBar que les deux indicateurs d'état.
         actions: const <Widget>[
           OfflineIndicator(),
           SyncBadge(),
@@ -55,8 +37,6 @@ class HistoriqueScreen extends ConsumerWidget {
       body: Column(
         children: <Widget>[
           Padding(
-            // 12 dp en haut au lieu de 16 : le champ de recherche est le
-            // premier contenu utile, il n'a pas à commencer bas.
             padding: const EdgeInsets.fromLTRB(
               CpiSpacing.md,
               CpiSpacing.sm,
@@ -88,9 +68,6 @@ class HistoriqueScreen extends ConsumerWidget {
                     padding: const EdgeInsets.only(bottom: CpiSpacing.xxl),
                     physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: list.length,
-                    // La clé porte l'identifiant : sans elle, replier un
-                    // représentant réattribuerait l'état d'expansion au voisin
-                    // quand la liste se réordonne après une synchronisation.
                     itemBuilder: (BuildContext context, int index) => CpiListEntrance(
                       index: index,
                       child: _RepresentantTile(
@@ -103,12 +80,6 @@ class HistoriqueScreen extends ConsumerWidget {
               },
             ),
           ),
-          // Action principale en bas, pas en haut.
-          //
-          // Elle n'existait que dans l'AppBar, hors d'atteinte du pouce sur un
-          // écran de 6,5 pouces tenu à une main. Elle est ici pleine largeur,
-          // comme sur l'accueil et comme sur les formulaires : trois écrans,
-          // une seule place pour l'action qui compte.
           const _NewRepresentantBar(),
         ],
       ),
@@ -116,7 +87,6 @@ class HistoriqueScreen extends ConsumerWidget {
   }
 }
 
-/// Barre d'action ancrée en zone de pouce.
 class _NewRepresentantBar extends StatelessWidget {
   const _NewRepresentantBar();
 
@@ -166,14 +136,8 @@ class _RepresentantTile extends ConsumerWidget {
         padding: const EdgeInsets.only(right: CpiSpacing.lg),
         child: const Icon(PhosphorIconsRegular.trash, color: Colors.white),
       ),
-      // Confirmation systématique. Un balayage se déclenche par accident dans
-      // une poche ou en faisant défiler d'un pouce : une suppression sans
-      // confirmation perdrait un représentant et tous ses prospects.
       confirmDismiss: (DismissDirection _) => _confirmDelete(context, data.fullName),
       onDismissed: (DismissDirection _) async {
-        // Suppression LOGIQUE qui se synchronise, jamais un effacement local :
-        // le serveur doit apprendre la suppression, sinon le prochain pull
-        // ramène la fiche.
         await ref.read(writeRepositoryProvider).deleteRepresentant(data.id);
         ref.read(syncCoordinatorProvider.notifier).nudge();
       },
@@ -197,6 +161,11 @@ class _RepresentantTile extends ConsumerWidget {
               tooltip: 'Ajouter des prospects',
               onPressed: () => context.push(Routes.newProspectFor(data.id)),
               icon: const Icon(PhosphorIconsRegular.userPlus, size: 20),
+            ),
+            IconButton(
+              tooltip: 'Ouvrir la fiche',
+              onPressed: () => context.push(Routes.representantDetailFor(data.id)),
+              icon: const Icon(PhosphorIconsRegular.caretRight, size: 20),
             ),
           ],
         ),
@@ -227,11 +196,6 @@ class _RepresentantTile extends ConsumerWidget {
   }
 }
 
-/// Sous-liste des prospects.
-///
-/// Construite **à l'ouverture seulement** : `ExpansionTile` ne construit ses
-/// enfants qu'une fois déplié, donc trois cents représentants ne créent pas
-/// trois cents requêtes de prospects au premier affichage.
 class _ProspectList extends ConsumerWidget {
   const _ProspectList({required this.representantId});
 
@@ -325,10 +289,6 @@ class _ProspectList extends ConsumerWidget {
   }
 }
 
-/// Icône d'état **tapable**.
-///
-/// Chaque état non vert mène quelque part. Un état qu'on ne peut qu'observer
-/// devient un appel au support (docs/design.md §8).
 class _StatusButton extends ConsumerWidget {
   const _StatusButton({required this.status, required this.entityLabel});
 

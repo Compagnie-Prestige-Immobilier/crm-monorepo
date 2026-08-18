@@ -14,38 +14,32 @@ import {
   periodFor,
   remindersCron,
 } from './reminders.service.js';
-import { FakeBrevoTransport, FakePrisma } from './fake-prisma.js';
+import { FakeActivity, FakeBrevoTransport, FakePrisma } from './fake-prisma.js';
 import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
-
-/**
- * Rappels programmés.
- *
- * Le cœur de ces tests est l'IDEMPOTENCE. Un rappel se déclenche seul, la nuit,
- * sans personne pour constater qu'il est parti deux fois, c'est exactement le
- * genre de défaut qu'on ne découvre qu'après avoir réveillé quarante personnes.
- */
 
 const NOW = new Date('2026-08-13T08:00:00Z');
 
 let db: FakePrisma;
 let brevo: FakeBrevoTransport;
+let activite: FakeActivity;
 let reminders: RemindersService;
 
-/** Reconstruit le service sur la MÊME base : c'est la simulation d'un redémarrage. */
 const restart = (): RemindersService => {
   const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
-  return new RemindersService(db.asService(), notifications, fakeDemoVisibility());
+  return new RemindersService(
+    db.asService(),
+    notifications,
+    fakeDemoVisibility(),
+    activite.asService(),
+  );
 };
 
 beforeEach(() => {
   db = new FakePrisma();
   brevo = new FakeBrevoTransport();
+  activite = new FakeActivity();
   reminders = restart();
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Période
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('découpage en périodes', () => {
   it('découpe par journée civile dans le fuseau métier', () => {
@@ -53,9 +47,6 @@ describe('découpage en périodes', () => {
   });
 
   it('deux instants du même matin à Dakar tombent dans la MÊME période', () => {
-    // Découper en UTC ferait, pour les ticks nocturnes, considérer deux envois
-    // du même matin comme appartenant à deux jours différents, et le rappel
-    // repartirait.
     const early = periodFor(new Date('2026-08-13T00:30:00Z'), 'Africa/Dakar');
     const later = periodFor(new Date('2026-08-13T23:30:00Z'), 'Africa/Dakar');
     expect(early).toBe(later);
@@ -66,10 +57,6 @@ describe('découpage en périodes', () => {
     expect(remindersCron('19:45')).toBe('0 45 19 * * *');
   });
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tâches d'appel ouvertes
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('rappel « appels en attente »', () => {
   beforeEach(() => {
@@ -94,11 +81,6 @@ describe('rappel « appels en attente »', () => {
     expect((await reminders.remindOpenCallTasks(NOW)).created).toBe(0);
   });
 
-  // Régression : le rappel n'interrogeait QUE `callTask`. Les campagnes
-  // représentants, dont l'en-tête de module affirme qu'elles se comportent
-  // comme celles de la phase 2, ne produisaient donc jamais de relance : un
-  // téléconseiller pouvait laisser dormir cent représentants à rappeler sans
-  // qu'aucun signal ne parte, et le silence ressemblait à « rien à faire ».
   it('relance aussi les campagnes REPRÉSENTANTS, sur leur propre écran', async () => {
     db.addRepCallTask({ assignedToId: 'usr-1' });
     db.addRepCallTask({ assignedToId: 'usr-1' });
@@ -110,9 +92,6 @@ describe('rappel « appels en attente »', () => {
     expect(db.notifications[0]?.route).toBe('/rep-campaigns');
   });
 
-  // Deux clés d'idempotence distinctes, et non un compte fusionné : les deux
-  // files sont deux métiers, elles renvoient vers deux écrans, et l'une doit
-  // pouvoir être relancée sans l'autre.
   it('les deux files donnent DEUX rappels, jamais un compte fusionné', async () => {
     db.addCallTask({ assignedToId: 'usr-1' });
     db.addRepCallTask({ assignedToId: 'usr-1' });
@@ -122,7 +101,6 @@ describe('rappel « appels en attente »', () => {
 
     expect(db.notifications).toHaveLength(2);
     expect(db.notifications.map((row) => row.route).sort()).toEqual(['/phase2', '/rep-campaigns']);
-    // Aucune des deux ne compte les tâches de l'autre.
     expect(db.notifications.every((row) => row.body.includes('1 '))).toBe(true);
   });
 
@@ -157,15 +135,10 @@ describe('rappel « appels en attente »', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Dossiers bancaires
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('rappels du pôle banque et financement', () => {
   beforeEach(() => {
     db.addUser({ id: 'usr-banque-1', role: Role.BANQUE_FINANCE, fullName: 'Fatou Ndiaye' });
     db.addUser({ id: 'usr-banque-2', role: Role.BANQUE_FINANCE, fullName: 'Ibrahima Fall' });
-    // Un commercial, qui ne doit RIEN recevoir de ces deux familles.
     db.addUser({ id: 'usr-commercial', role: Role.COMMERCIAL, fullName: 'Awa Diop' });
   });
 
@@ -173,13 +146,10 @@ describe('rappels du pôle banque et financement', () => {
     it('compte les dossiers ouverts au-delà du délai, et prévient tout le pôle', async () => {
       db.addBankCase({ createdAt: new Date('2026-08-01T08:00:00Z') });
       db.addBankCase({ createdAt: new Date('2026-08-02T08:00:00Z') });
-      // Déposé avant-hier : il est dans le délai de traitement normal.
       db.addBankCase({ createdAt: new Date('2026-08-11T08:00:00Z') });
 
       const run = await reminders.remindBankCasesPending(NOW);
 
-      // Le compte est GLOBAL : un dossier bancaire n'a pas de propriétaire,
-      // c'est le pôle entier qui le fait avancer.
       expect(run.created).toBe(2);
       expect(db.notifications).toHaveLength(2);
       expect(db.notifications[0]?.body).toContain('2 dossier(s)');
@@ -232,15 +202,11 @@ describe('rappels du pôle banque et financement', () => {
 
   describe('« dossiers sans mouvement »', () => {
     it('ne retient que les dossiers qu’aucune transition récente n’a touchés', async () => {
-      // Jamais bougé depuis juillet : c'est exactement le cas visé.
       db.addBankCase({ createdAt: new Date('2026-07-01T08:00:00Z'), lastTransitionAt: null });
-      // Ancien lui aussi, mais avancé il y a trois jours.
       db.addBankCase({
         createdAt: new Date('2026-07-01T08:00:00Z'),
         lastTransitionAt: new Date('2026-08-10T08:00:00Z'),
       });
-      // Créé hier : sans transition, forcément. L'y compter noierait le signal
-      // sous les entrées du jour.
       db.addBankCase({ createdAt: new Date('2026-08-12T08:00:00Z'), lastTransitionAt: null });
 
       const run = await reminders.remindBankCasesStale(NOW);
@@ -304,10 +270,6 @@ describe('rappels du pôle banque et financement', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Idempotence, la propriété centrale
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('idempotence par période', () => {
   beforeEach(() => {
     db.addUser({ id: 'usr-1', fullName: 'Awa Diop' });
@@ -325,10 +287,6 @@ describe('idempotence par période', () => {
   });
 
   it('UN REDÉMARRAGE NE RENVOIE PAS', async () => {
-    // Le scénario réel : l'API tique à 8 h, est redéployée à 8 h 02, et la
-    // nouvelle instance retique. La parade n'est pas un « j'ai déjà tourné » en
-    // mémoire, il disparaît précisément au redémarrage, mais la contrainte
-    // unique en base, qui survit à tout.
     await reminders.remindOpenCallTasks(NOW);
 
     const afterRestart = restart();
@@ -381,16 +339,8 @@ describe('idempotence par période', () => {
   });
 
   it('UN ÉCHEC PASSAGER EST RÉESSAYÉ DANS LA MÊME PÉRIODE', async () => {
-    // Le piège symétrique de l'idempotence : sans ce rattrapage, la personne
-    // dont l'e-mail a buté sur un 429 voit sa notification écrite, la
-    // contrainte unique interdire toute seconde écriture, et donc PLUS AUCUNE
-    // tentative avant le lendemain. Un incident réseau de trente secondes
-    // coûterait une journée de rappel.
     db.addUser({ id: 'usr-tc', role: Role.COMMERCIAL, email: 'tc@cpi.sn', fullName: 'Awa Diop' });
     db.addCallTask({ assignedToId: 'usr-tc' });
-    // Les deux bouts de la comparaison de bail doivent appartenir à la MÊME
-    // échelle de temps : `updatedAt`, posé par la doublure, et l'instant du
-    // passage. Voir `FakePrisma.clock`.
     db.clock = () => NOW;
 
     let refuse = true;
@@ -406,24 +356,11 @@ describe('idempotence par période', () => {
     expect(stalled?.status).toBe(NotificationDeliveryStatus.PENDING);
     expect(stalled?.error).toBe(DELIVERY_RETRY_ERROR);
 
-    // ═══ LE RÉESSAI ATTEND L'EXPIRATION DU BAIL, ET C'EST LE PRIX DU BAIL ═══
-    //
-    // `retryStalled` rejouait l'envoi SANS RIEN RÉCLAMER : deux passages
-    // simultanés servaient donc la même livraison deux fois. La prise en charge
-    // vit désormais dans `dispatch()` lui-même, pour tous ses appelants ; tant
-    // que le bail du passage précédent court, son détenteur est réputé vivant
-    // et le réessai est refusé.
-    //
-    // Le rappel n'est pas perdu pour autant, et c'est ce qui rend l'échange
-    // acceptable : quinze minutes plus tard, la même relance repart, très loin
-    // de la fin de la journée qu'elle décrit.
     const APRES_LE_BAIL = new Date(NOW.getTime() + SENDING_LEASE_MS + 60_000);
     db.clock = () => APRES_LE_BAIL;
     refuse = false;
     const second = await reminders.remindOpenCallTasks(APRES_LE_BAIL);
 
-    // Toujours AUCUNE notification supplémentaire : c'est l'envoi existant qui
-    // est rejoué, pas un second qui est composé.
     expect(second.created).toBe(0);
     expect(db.notifications).toHaveLength(2);
     expect(db.deliveries.find((row) => row.userId === 'usr-tc')?.status).toBe(
@@ -431,10 +368,6 @@ describe('idempotence par période', () => {
     );
   });
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tick des envois programmés
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('expédition des envois programmés', () => {
   beforeEach(() => {
@@ -464,9 +397,6 @@ describe('expédition des envois programmés', () => {
   });
 
   it('DEUX INSTANCES ne l’expédient qu’une fois', async () => {
-    // Le verrou est un `updateMany` conditionné sur `status = SCHEDULED` :
-    // une comparaison-et-échange atomique, pas une lecture suivie d'une
-    // écriture.
     await schedule(new Date('2026-08-13T07:00:00Z'));
 
     const a = restart();
@@ -488,35 +418,6 @@ describe('expédition des envois programmés', () => {
     expect(brevo.sent).toHaveLength(0);
   });
 
-  /**
-   * ═════════════════════════════════════════════════════════════════════════
-   * LA FENÊTRE DE PANNE
-   * ═════════════════════════════════════════════════════════════════════════
-   *
-   * Le processus meurt APRÈS avoir réclamé l'envoi et pendant qu'il expédie :
-   * le transport est entré, il ne rend jamais la main, et on abandonne le
-   * passage sans l'attendre. C'est ce que fait un `SIGKILL` reçu au milieu d'un
-   * appel Brevo : la prise en charge est validée en base, la suite n'arrive pas.
-   *
-   * ═══ POURQUOI LE SERVICE EST RÉEL, ET NON UN `dispatch` EN DOUBLURE ═══
-   *
-   * La prise en charge vivait dans `dispatchDue`, qui posait son `updateMany`
-   * avant d'appeler `dispatch()` : une doublure de `dispatch` laissait donc
-   * quand même la ligne `SENDING`. Elle est DESCENDUE dans `dispatch()`, pour
-   * que tous ses appelants la reçoivent, y compris ceux qui n'existent pas
-   * encore. Doubler `dispatch` reviendrait maintenant à doubler la prise
-   * elle-même, c'est-à-dire à poser l'état à la main sous couvert de le
-   * produire.
-   *
-   * Le service est donc RÉEL et c'est son TRANSPORT qui se fige. L'état
-   * `SENDING` orphelin, jeton de bail compris, est produit par le code de
-   * production, ce qui est la seule façon de prouver que le passage suivant le
-   * rattrape vraiment.
-   *
-   * L'horloge de la doublure est calée sur `NOW` : `updatedAt`, qui date le
-   * bail, et l'instant passé au tick doivent appartenir à la MÊME échelle de
-   * temps, sans quoi la comparaison ne veut rien dire.
-   */
   const PENDANT_LE_BAIL = new Date(NOW.getTime() + 60_000);
   const APRES_LE_BAIL = new Date(NOW.getTime() + SENDING_LEASE_MS + 60_000);
 
@@ -528,15 +429,12 @@ describe('expédition des envois programmés', () => {
       entre = resolve;
     });
 
-    /** Transport qui accepte l'appel et ne répond jamais. */
     const fige: BrevoTransport = {
       isConfigured: () => true,
       unavailableReason: () => null,
       send: () => {
         entre();
-        return new Promise<never>(() => {
-          /* le processus meurt ici : cette promesse ne se résout jamais */
-        });
+        return new Promise<never>(() => {});
       },
     };
 
@@ -544,6 +442,7 @@ describe('expédition des envois programmés', () => {
       db.asService(),
       new NotificationsService(db.asService(), fakeDemoVisibility(), fige),
       fakeDemoVisibility(),
+      activite.asService(),
     );
 
     void moribond.dispatchDue(NOW);
@@ -554,18 +453,13 @@ describe('expédition des envois programmés', () => {
     const id = await schedule(new Date('2026-08-13T07:00:00Z'));
     await mourirEnPleineExpedition();
 
-    // La prise en charge a bien eu lieu, et rien n'est parti : c'est
-    // exactement la ligne que plus aucun passage ne relisait.
     expect(db.notifications.find((row) => row.id === id)?.status).toBe(NotificationStatus.SENDING);
     expect(brevo.sent).toHaveLength(0);
 
-    // AVANT l'expiration, on ne reprend pas. Reprendre une expédition qui
-    // tourne encore ferait repartir les e-mails déjà confiés à Brevo.
     db.clock = () => PENDANT_LE_BAIL;
     expect(await restart().dispatchDue(PENDANT_LE_BAIL)).toBe(0);
     expect(brevo.sent).toHaveLength(0);
 
-    // APRÈS, la ligne redevient prenable et part pour de bon.
     db.clock = () => APRES_LE_BAIL;
     expect(await restart().dispatchDue(APRES_LE_BAIL)).toBe(1);
     expect(brevo.sent).toHaveLength(1);
@@ -576,10 +470,6 @@ describe('expédition des envois programmés', () => {
     await schedule(new Date('2026-08-13T07:00:00Z'));
     await mourirEnPleineExpedition();
 
-    // Le prédicat sur `updatedAt` est réévalué DANS l'`updateMany`, et
-    // `@updatedAt` renouvelle le bail au passage : le second repreneur retrouve
-    // une date fraîche et repart avec 0 ligne. Sans ce renouvellement, la
-    // reprise transformerait une notification perdue en deux envois.
     db.clock = () => APRES_LE_BAIL;
     const a = restart();
     const b = restart();
@@ -592,19 +482,6 @@ describe('expédition des envois programmés', () => {
     expect(brevo.sent).toHaveLength(1);
   });
 
-  /**
-   * Le rattrapage doit couvrir les lignes que `dispatchDue` n'a PAS écrites.
-   *
-   * Un rappel sort de `emit()` : il naît `SENDING` sans `scheduledFor`, et
-   * `emit()` l'expédie dans la foulée. Un processus tué à cet instant laisse
-   * donc exactement le même orphelin, sauf qu'aucune date d'échéance ne le
-   * décrit. `retryStalled` ne le reprendra pas non plus : la livraison est
-   * restée `error: null`, faute d'avoir eu le temps d'être marquée.
-   *
-   * Et le prochain balayage n'a lieu que le lendemain, où il buterait sur la
-   * contrainte unique de la veille. Sans le bail, ce rappel est perdu pour sa
-   * journée, c'est-à-dire pour de bon.
-   */
   it('rattrape aussi un RAPPEL abandonné, qui n’a pourtant aucune échéance', async () => {
     db.clock = () => NOW;
     db.addCallTask({ assignedToId: 'usr-1' });
@@ -613,15 +490,12 @@ describe('expédition des envois programmés', () => {
     const moribond = new RemindersService(
       db.asService(),
       {
-        dispatch: () =>
-          new Promise<never>(() => {
-            /* le processus meurt entre l'écriture du rappel et son envoi */
-          }),
+        dispatch: () => new Promise<never>(() => {}),
       } as unknown as NotificationsService,
       fakeDemoVisibility(),
+      activite.asService(),
     );
     void moribond.remindOpenCallTasks(NOW);
-    // Laisse l'écriture du rappel se valider avant qu'on abandonne le passage.
     await vi.waitUntil(() => db.notifications.length === 1);
 
     const rappel = db.notifications[0];
@@ -638,33 +512,7 @@ describe('expédition des envois programmés', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Expédition plus longue que son propre bail
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * UN BAIL QUE PERSONNE NE RENOUVELLE FAIT PASSER LE VIVANT POUR UN MORT
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `dispatchDue` reprend une notification `SENDING` dont `updatedAt` a plus de
- * `SENDING_LEASE_MS`, sur le motif que son détenteur est mort. Rien n'écrivait
- * pourtant la notification PENDANT l'expédition : `persistVerdicts` touche les
- * livraisons, et `settleNotification` n'écrit qu'à la toute fin. Une annonce
- * générale plus lente que le bail voyait donc `updatedAt` rester figé sur
- * l'instant de la prise, et un second passage la réclamait alors que le premier
- * envoyait encore. Les deux lisaient les mêmes livraisons `PENDING` et les
- * servaient toutes les deux.
- *
- * Le doc-bloc de `SENDING_LEASE_MS` traitait cette borne comme un PLANCHER
- * suffisant (« quinze minutes couvrent l'expédition la plus lente qui soit
- * légitime »). Ce n'est pas une propriété, c'est une estimation, et elle
- * dépend d'un service tiers : Brevo en 429 sur chaque vague, ou une base lente,
- * la dépassent sans que rien ne soit anormal. Un bail se RENOUVELLE, il ne
- * s'estime pas.
- */
 describe('expédition plus longue que le bail', () => {
-  /** Deux vagues : le renouvellement a lieu entre les deux. */
   const TOTAL = EMAIL_PERSIST_GROUP_SIZE + 8;
   const APRES_LE_BAIL = new Date(NOW.getTime() + SENDING_LEASE_MS + 60_000);
 
@@ -694,7 +542,6 @@ describe('expédition plus longue que le bail', () => {
       },
     });
 
-    /** Ce que le SECOND passage a réussi à reprendre pendant que le premier envoyait. */
     let repris: number | null = null;
 
     const lent = new (class implements BrevoTransport {
@@ -716,25 +563,15 @@ describe('expédition plus longue que le bail', () => {
         );
 
         if (this.calls === 1) {
-          // La première vague a duré plus que le bail. C'est le cas que la
-          // borne de quinze minutes suppose impossible, et qu'un service tiers
-          // en 429 produit sans rien casser par ailleurs.
           db.clock = () => APRES_LE_BAIL;
         }
 
         if (this.calls === 2) {
-          // Un autre passage tique pendant que la seconde vague est EN VOL.
-          // Sans renouvellement du bail, il trouve `updatedAt` figé sur
-          // l'instant de la prise, réclame la notification, relit les
-          // livraisons encore `PENDING` et renvoie les mêmes e-mails.
-          //
-          // Il porte le MÊME transport, comme une seconde instance derrière le
-          // même répartiteur : c'est ce qui rend le doublon visible ici plutôt
-          // que dans une doublure que personne ne regarde.
           repris = await new RemindersService(
             db.asService(),
             new NotificationsService(db.asService(), fakeDemoVisibility(), this),
             fakeDemoVisibility(),
+            activite.asService(),
           ).dispatchDue(APRES_LE_BAIL);
         }
 
@@ -747,59 +584,33 @@ describe('expédition plus longue que le bail', () => {
     })();
 
     const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(), lent);
-    const service = new RemindersService(db.asService(), notifications, fakeDemoVisibility());
+    const service = new RemindersService(
+      db.asService(),
+      notifications,
+      fakeDemoVisibility(),
+      activite.asService(),
+    );
 
     expect(await service.dispatchDue(NOW)).toBe(1);
 
-    // LE POINT DU TEST : le second passage repart les mains vides.
     expect(repris).toBe(0);
 
-    // Et la propriété qui compte pour le destinataire : une adresse, un e-mail.
     expect(lent.servies).toHaveLength(TOTAL);
     expect(new Set(lent.servies).size).toBe(TOTAL);
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Visibilité de démonstration
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * LE DÉFAUT CORRIGÉ
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Les rappels LISAIENT sous l'interrupteur : ils comptaient les fiches et
- * résolvaient les destinataires sous `demoScope(mode)`. Comme la garde de
- * lecture seule ne juge que des requêtes HTTP et qu'une tâche planifiée n'en est
- * pas une, mode allumé le balayage comptait des fiches FICTIVES au profit d'un
- * VRAI commercial, et adressait de vraies relances à des comptes d'exemple.
- *
- * Ce qu'ils ne faisaient PAS, contrairement à ce qui a déjà été affirmé ici :
- * écrire `isDemo: mode`. La version fautive ne posait pas `isDemo` du tout, la
- * colonne prenait son défaut `false`. Aucune relance fictive n'a donc jamais été
- * écrite, et il n'y a pas de population héritée à rattraper. Le défaut était
- * dans la LECTURE, et là seulement.
- *
- * La règle est donc sans condition : les rappels comptent du réel et écrivent du
- * réel, `isDemo: false` étant désormais posé explicitement plutôt que laissé au
- * défaut de colonne. Ces tests-ci en épinglent les conséquences, dont celle qui
- * fait la promesse à l'utilisateur : ce qui est dû est reçu, même émis pendant
- * une démonstration.
- *
- * L'expédition des envois PROGRAMMÉS est le seul endroit du fichier qui suit
- * encore l'interrupteur, et pour la raison inverse : elle n'invente rien, elle
- * expédie des lignes composées ailleurs, dont une annonce d'exemple qui ne doit
- * pas partir pour de bon.
- */
 describe('visibilité de démonstration', () => {
-  /** Même base, mais un service dont l'interrupteur est ALLUMÉ. */
   const enDemonstration = (): RemindersService => {
     const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(true), brevo);
-    return new RemindersService(db.asService(), notifications, fakeDemoVisibility(true));
+    return new RemindersService(
+      db.asService(),
+      notifications,
+      fakeDemoVisibility(true),
+      activite.asService(),
+    );
   };
 
-  /** La boîte de réception d'une personne, MODE ÉTEINT : ce qu'elle voit vraiment. */
   const boiteModeEteint = async (userId: string) => {
     const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
     return notifications.inbox(
@@ -827,13 +638,6 @@ describe('visibilité de démonstration', () => {
     expect(db.deliveries.map((row) => row.isDemo)).toEqual([false]);
   });
 
-  /**
-   * LA PROMESSE FAITE À L'UTILISATEUR, en un seul test.
-   *
-   * Un vrai commercial, de vraies fiches à appeler, et un administrateur qui a
-   * laissé le mode allumé pendant le tick de 8 h. Le rappel lui est dû : il
-   * doit partir, et il doit TOUJOURS être là quand l'interrupteur retombe.
-   */
   it('mode ALLUMÉ : le rappel dû à un vrai commercial reste dans sa boîte une fois le mode ÉTEINT', async () => {
     db.addCallTask({ assignedToId: 'usr-1' });
 
@@ -843,19 +647,12 @@ describe('visibilité de démonstration', () => {
     expect(db.notifications.map((row) => row.isDemo)).toEqual([false]);
     expect(db.deliveries.map((row) => row.isDemo)).toEqual([false]);
 
-    // Le mode est éteint : la relance est TOUJOURS visible, c'est tout l'objet.
     const boite = await boiteModeEteint('usr-1');
     expect(boite.items).toHaveLength(1);
     expect(boite.items[0]?.body).toContain('1 fiche(s)');
     expect(boite.unreadCount).toBe(1);
   });
 
-  /**
-   * Les fiches FICTIVES ne sont dues à personne.
-   *
-   * Les compter gonflerait le chiffre annoncé à un vrai commercial de fiches
-   * qu'il ne verra jamais, et l'enverrait sur un écran qui en montre moins.
-   */
   it('mode ALLUMÉ : le décompte ignore les fiches de démonstration', async () => {
     db.addCallTask({ assignedToId: 'usr-1' });
     db.addCallTask({ assignedToId: 'usr-1', isDemo: true });
@@ -867,17 +664,6 @@ describe('visibilité de démonstration', () => {
     expect(db.notifications[0]?.body).toContain('1 fiche(s)');
   });
 
-  /**
-   * Un compte de démonstration n'a rien à recevoir.
-   *
-   * `demo.awa@cpi.sn` est une adresse d'exemple, mais elle part par Brevo comme
-   * une autre : sur le vrai quota, et vers une boîte que personne ne relève.
-   *
-   * Les tâches sont RÉELLES ici, et l'attributaire fictif : c'est la seule
-   * façon d'éprouver la résolution des destinataires SEULE. Avec des tâches
-   * fictives, le décompte les écarterait d'abord et le test passerait au vert
-   * même si le public cessait d'être cloisonné.
-   */
   it('mode ALLUMÉ : un commercial FICTIF ne reçoit aucun rappel', async () => {
     db.addUser({ id: 'usr-demo', fullName: 'Awa (démo)', isDemo: true });
     db.addCallTask({ assignedToId: 'usr-demo' });
@@ -907,8 +693,6 @@ describe('visibilité de démonstration', () => {
     expect(db.notifications[0]?.isDemo).toBe(false);
   });
 
-  // Le rappel « sans mouvement » compte sa propre population : elle est
-  // cloisonnée pour elle-même, et non parce que la précédente l'est.
   it('mode ALLUMÉ : « sans mouvement » ne compte pas les dossiers fictifs', async () => {
     db.addUser({ id: 'usr-banque', role: Role.BANQUE_FINANCE, fullName: 'Fatou Ndiaye' });
     db.addBankCase({ createdAt: new Date('2026-07-01T08:00:00Z'), lastTransitionAt: null });
@@ -923,20 +707,6 @@ describe('visibilité de démonstration', () => {
     expect(db.notifications[0]?.body).toContain('1 dossier(s)');
   });
 
-  /**
-   * ═══ L'INTERACTION AVEC LA CLÉ D'IDEMPOTENCE ═══
-   *
-   * `(reminderKey, period)` NE PORTE PAS `isDemo` : la place prise dans l'index
-   * l'est pour la journée entière, quelle que soit la nature de la ligne qui
-   * l'occupe. Une relance écrite fictive à 8 h condamnait donc le vrai rappel du
-   * jour, même une fois le mode éteint à 9 h : le second passage se heurtait à
-   * la clé, et le rattrapage, cherchant sous la portée du moment, ne retrouvait
-   * même plus la ligne bloquée.
-   *
-   * Écrire toujours du réel referme la question, et ce test le vérifie DES DEUX
-   * CÔTÉS de l'interrupteur : pas de doublon, et la relance qui occupe la clé
-   * est celle que la personne voit.
-   */
   it('la clé du jour est occupée par la VRAIE relance, des deux côtés de l’interrupteur', async () => {
     db.addCallTask({ assignedToId: 'usr-1' });
 
@@ -950,22 +720,9 @@ describe('visibilité de démonstration', () => {
     expect((await boiteModeEteint('usr-1')).items).toHaveLength(1);
   });
 
-  /**
-   * Le rattrapage d'un échec passager TRAVERSE l'extinction du mode.
-   *
-   * Le pire enchaînement possible, et il n'a rien d'improbable : le tick de 8 h
-   * tombe pendant une démonstration, Brevo répond 429, l'administrateur éteint
-   * le mode à 9 h. Quand la relance naissait fictive, le rattrapage la cherchait
-   * sous la portée du moment et ne la retrouvait plus : la ligne restait
-   * `PENDING` pour la journée, sans que rien ne le signale. Écrite réelle, elle
-   * est retrouvée et rejouée.
-   */
   it('un échec passager survenu PENDANT la démonstration est réessayé après l’extinction', async () => {
     db.addUser({ id: 'usr-tc', role: Role.COMMERCIAL, email: 'tc@cpi.sn', fullName: 'Modou Sarr' });
     db.addCallTask({ assignedToId: 'usr-tc' });
-    // Même raison que le rattrapage de la section « idempotence » : le bail se
-    // compare à `updatedAt`, que la doublure horodate. Une heure sépare les
-    // deux passages, le bail est donc bien expiré au second.
     db.clock = () => NOW;
 
     let refuse = true;
@@ -1006,48 +763,13 @@ describe('visibilité de démonstration', () => {
     expect(await reminders.dispatchDue(NOW)).toBe(0);
     expect(brevo.sent).toHaveLength(0);
 
-    // Elle est MASQUÉE, pas perdue : le mode rallumé, elle repart.
     expect(await enDemonstration().dispatchDue(NOW)).toBe(1);
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Le réessai d'un rappel est une PORTE D'ENVOI comme une autre
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * `retryStalled` ENVOYAIT SANS RIEN RÉCLAMER, ET PERSONNE NE L'AVAIT VU
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Cinq rondes de corrections ont porté sur le bail de `dispatchDue` : prise
- * atomique, renouvellement par vague, écriture des acceptations au fil de l'eau.
- * Toutes exactes, toutes sur la MÊME porte.
- *
- * `retryStalled` en est une autre, et elle était restée grande ouverte : il
- * retrouve une livraison en file et appelle `dispatch()` DIRECTEMENT, sans
- * prise en charge d'aucune sorte. Deux ticks de rappel simultanés, ou un
- * réessai croisant le balayage d'échéances, servaient donc la même livraison en
- * même temps. Les tests prouvaient la porte réparée sans jamais toucher à
- * celle-là.
- *
- * La réparation n'ajoute pas une sixième prise ici : elle DESCEND la prise dans
- * `dispatch()`, où tous les appelants la reçoivent, y compris ceux qui ne sont
- * pas encore écrits. Ce test-ci exerce le croisement par les deux vraies
- * portes, sans jamais poser d'état à la main.
- */
 describe('réessai d’un rappel et tick d’échéance qui se croisent', () => {
-  /** Le bail du premier passage a expiré : le rattrapage est LÉGITIME. */
   const APRES_LE_BAIL = new Date(NOW.getTime() + SENDING_LEASE_MS + 60_000);
 
-  /**
-   * Transport qui laisse un AUTRE passage tiquer pendant qu'il envoie.
-   *
-   * C'est le seul moyen d'obtenir un entrelacement RÉEL sans piloter
-   * l'ordonnanceur : le second passage s'exécute entièrement à l'intérieur du
-   * point d'attente du premier, exactement comme deux instances derrière un
-   * répartiteur de charge.
-   */
   class TransportCroise implements BrevoTransport {
     readonly servies: string[] = [];
     refuse = true;
@@ -1079,7 +801,6 @@ describe('réessai d’un rappel et tick d’échéance qui se croisent', () => 
         };
       }
 
-      // Une seule fois : le passage concurrent n'a pas à se rejouer lui-même.
       const concurrent = this.pendantLEnvoi;
       this.pendantLEnvoi = null;
       if (concurrent) await concurrent();
@@ -1100,34 +821,202 @@ describe('réessai d’un rappel et tick d’échéance qui se croisent', () => 
         db.asService(),
         new NotificationsService(db.asService(), fakeDemoVisibility(), croise),
         fakeDemoVisibility(),
+        activite.asService(),
       );
 
-    // ── Le rappel du matin bute sur un 429 : la livraison reste en file. ──
     await passage().remindOpenCallTasks(NOW);
     const enFile = db.deliveries.find((row) => row.userId === 'usr-tc');
     expect(enFile?.status).toBe(NotificationDeliveryStatus.PENDING);
     expect(enFile?.error).toBe(DELIVERY_RETRY_ERROR);
     expect(croise.servies).toHaveLength(0);
 
-    // ── Le bail expire. Deux chemins visent alors la MÊME notification : le
-    //    réessai (par la contrainte unique) et le tick d'échéance (par le bail
-    //    expiré). Le second tique PENDANT que le premier envoie.
     db.clock = () => APRES_LE_BAIL;
     croise.refuse = false;
     croise.pendantLEnvoi = () => passage().dispatchDue(APRES_LE_BAIL);
 
     await passage().remindOpenCallTasks(APRES_LE_BAIL);
 
-    // LA PROPRIÉTÉ : une personne, un e-mail. Sans prise en charge dans
-    // `dispatch()`, les deux chemins lisaient la même ligne `PENDING` et la
-    // servaient tous les deux.
     expect(croise.servies).toEqual(['tc@cpi.sn']);
     expect(db.deliveries.find((row) => row.userId === 'usr-tc')?.status).toBe(
       NotificationDeliveryStatus.SENT,
     );
-    // Et l'envoi se referme proprement, sans propriétaire résiduel.
     const rappel = db.notifications.find((row) => row.reminderKey?.startsWith('open-call-tasks'));
     expect(rappel?.status).toBe(NotificationStatus.SENT);
     expect(rappel?.dispatchClaim).toBeNull();
+  });
+});
+
+describe('rappel « rappels à passer »', () => {
+  const AUJOURDHUI = new Date('2026-08-13T16:00:00.000Z');
+  const HIER = new Date('2026-08-12T16:00:00.000Z');
+  const DEMAIN = new Date('2026-08-14T09:00:00.000Z');
+
+  beforeEach(() => {
+    db.addUser({ id: 'usr-1', fullName: 'Awa Diop' });
+    db.addUser({ id: 'usr-2', fullName: 'Modou Sarr' });
+  });
+
+  it('compte les rappels du jour de chaque téléconseiller, séparément', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+    db.addScheduledCallback({ assignedToId: 'usr-2', scheduledAt: AUJOURDHUI });
+
+    const run = await reminders.remindDueCallbacks(NOW);
+
+    expect(run.created).toBe(2);
+    expect(db.notifications[0]?.body).toContain('2 rappel(s)');
+    expect(db.notifications[1]?.body).toContain('1 rappel(s)');
+    expect(db.notifications[0]?.route).toBe('/phase2/callbacks');
+  });
+
+  it('un rappel EN RETARD compte dans la relance du jour', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(1);
+    expect(db.notifications[0]?.body).toContain('1 rappel(s)');
+  });
+
+  it('un rappel de demain ne relance personne aujourd’hui', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: DEMAIN });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+  });
+
+  it('un rappel déjà passé ou annulé ne relance plus', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'DONE' });
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'CANCELLED' });
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'SUPERSEDED' });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+  });
+
+  it('ne relance jamais sur une file de démonstration', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI, isDemo: true });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+  });
+
+  it('deux passages le même jour ne donnent qu’une relance', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(1);
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+    expect(db.notifications).toHaveLength(1);
+  });
+
+  it('la clé de rappel lui est propre, elle ne prend pas la place d’une autre', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+    db.addCallTask({ assignedToId: 'usr-1' });
+
+    await reminders.runAll(NOW);
+
+    const cles = db.deliveries.map((delivery) => delivery.reminderKey);
+    expect(cles).toContain(ReminderKey.DUE_CALLBACKS);
+    expect(cles).toContain(ReminderKey.OPEN_CALL_TASKS);
+  });
+});
+
+describe('compte rendu de fin de journée', () => {
+  const SOIR = new Date('2026-08-13T17:00:00.000Z');
+
+  beforeEach(() => {
+    db.clock = () => SOIR;
+    db.addUser({ id: 'usr-sup', fullName: 'Fatou Ndiaye', role: Role.SUPERVISEUR });
+    db.addUser({ id: 'usr-tc', fullName: 'Awa Diop', role: Role.COMMERCIAL });
+    activite.addTeleconseiller({ id: 'usr-tc', fullName: 'Awa Diop' });
+  });
+
+  it('demande les chiffres de la journée en cours, dans le fuseau métier', async () => {
+    await reminders.sendDailyReport(new Date('2026-08-13T23:30:00.000Z'));
+
+    expect(activite.windows).toEqual([{ from: '2026-08-13', to: '2026-08-13' }]);
+  });
+
+  it('additionne les actes de tous les téléconseillers', async () => {
+    activite.addRow({ teleconseillerId: 'usr-tc', calls: 30, methodObtained: 4, unreachable: 9 });
+    activite.addRow({
+      teleconseillerId: 'usr-2',
+      calls: 12,
+      methodObtained: 1,
+      prospectsCreated: 3,
+    });
+
+    await reminders.sendDailyReport(SOIR);
+
+    const corps = db.notifications[0]?.body ?? '';
+    expect(corps).toContain('42 appel(s)');
+    expect(corps).toContain('5 méthode(s)');
+    expect(corps).toContain('9 NRP');
+    expect(corps).toContain('3 prospect(s)');
+  });
+
+  it('compte les rappels honorés dans la journée et ceux qui traînent', async () => {
+    db.addScheduledCallback({
+      assignedToId: 'usr-tc',
+      scheduledAt: new Date('2026-08-13T10:00:00.000Z'),
+      updatedAt: new Date('2026-08-13T11:00:00.000Z'),
+      status: 'DONE',
+    });
+    // Promis hier, honoré ce matin : c'est la journée de l'ACTE qui compte.
+    db.addScheduledCallback({
+      assignedToId: 'usr-tc',
+      scheduledAt: new Date('2026-08-12T10:00:00.000Z'),
+      updatedAt: new Date('2026-08-13T08:00:00.000Z'),
+      status: 'DONE',
+    });
+    db.addScheduledCallback({
+      assignedToId: 'usr-tc',
+      scheduledAt: new Date('2026-08-12T10:00:00.000Z'),
+      updatedAt: new Date('2026-08-12T11:00:00.000Z'),
+      status: 'DONE',
+    });
+    db.addScheduledCallback({
+      assignedToId: 'usr-tc',
+      scheduledAt: new Date('2026-08-13T09:00:00.000Z'),
+    });
+    db.addScheduledCallback({
+      assignedToId: 'usr-tc',
+      scheduledAt: new Date('2026-08-14T09:00:00.000Z'),
+    });
+
+    await reminders.sendDailyReport(SOIR);
+
+    const corps = db.notifications[0]?.body ?? '';
+    expect(corps).toContain('2 honoré(s)');
+    expect(corps).toContain('1 en retard');
+  });
+
+  it('nomme le téléconseiller qui n’a rien fait de la journée', async () => {
+    activite.addTeleconseiller({ id: 'usr-2', fullName: 'Modou Sarr' });
+    activite.addRow({ teleconseillerId: 'usr-tc', calls: 5 });
+
+    await reminders.sendDailyReport(SOIR);
+
+    const corps = db.notifications[0]?.body ?? '';
+    expect(corps).toContain('Modou Sarr');
+    expect(corps).not.toContain('Awa Diop');
+  });
+
+  it('ne compte pas comme muet un compte désactivé', async () => {
+    activite.addTeleconseiller({ id: 'usr-2', fullName: 'Modou Sarr', isActive: false });
+
+    await reminders.sendDailyReport(SOIR);
+
+    expect(db.notifications[0]?.body).not.toContain('Modou Sarr');
+  });
+
+  it('s’adresse à l’administration et à la supervision, jamais aux téléconseillers', async () => {
+    const run = await reminders.sendDailyReport(SOIR);
+
+    expect(run.created).toBe(2);
+    expect(new Set(db.deliveries.map((row) => row.userId))).toEqual(
+      new Set(['usr-admin', 'usr-sup']),
+    );
+  });
+
+  it('deux passages le même soir ne donnent qu’un compte rendu', async () => {
+    expect((await reminders.sendDailyReport(SOIR)).created).toBe(2);
+    expect((await reminders.sendDailyReport(SOIR)).created).toBe(0);
+    expect(db.notifications).toHaveLength(2);
   });
 });

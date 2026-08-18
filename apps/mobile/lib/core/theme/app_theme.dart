@@ -5,16 +5,7 @@ import 'cpi_colors.dart';
 import 'cpi_tokens.dart';
 import 'cpi_typography.dart';
 
-/// Thème Material 3 de CPI GO.
-///
-/// **Un seul thème.** L'app est verrouillée en clair (docs/design.md §3) : elle
-/// s'utilise dehors, en plein soleil, où le mode sombre réduit la lisibilité.
-/// `MaterialApp.darkTheme` n'est pas fourni et `themeMode` reste
-/// [ThemeMode.light] : suivre le thème système serait une régression.
 abstract final class AppTheme {
-  /// Graine de la palette. Elle ne sert que de **point de départ** : l'algorithme
-  /// Material dérive des rôles qui ne correspondent pas aux valeurs auditées, et
-  /// tous les rôles critiques sont écrasés juste après (docs/design.md §10).
   static const Color seed = Color(0xFF630210);
 
   static const Color _primary = Color(0xFF630210);
@@ -32,31 +23,20 @@ abstract final class AppTheme {
   static const Color _destructive = Color(0xFFB91C1C);
   static const Color _destructiveSurface = Color(0xFFF8E8E8);
 
-  /// `border: rgba(99,2,16,0.12)` aplati sur blanc. Material a besoin d'une
-  /// couleur opaque pour `outlineVariant`, l'alpha ne survit pas aux bordures
-  /// composées.
   static const Color _borderFlattened = Color(0xFFECE1E2);
 
   static ColorScheme get colorScheme {
-    // `fromSeed` d'abord : il remplit correctement les rôles secondaires et les
-    // niveaux `surfaceDim`/`surfaceBright` qu'on ne veut pas écrire à la main :
-    // puis on écrase tout ce que docs/design.md fixe explicitement.
     return ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light).copyWith(
       primary: _primary,
       onPrimary: _onPrimary,
       primaryContainer: _primaryContainer,
       onPrimaryContainer: _onPrimaryContainer,
 
-      // `secondary` Material = composants de moindre emphase. C'est exactement
-      // le rôle des tokens `muted` / `muted-foreground`.
       secondary: _mutedForeground,
       onSecondary: const Color(0xFFFFFFFF),
       secondaryContainer: _muted,
       onSecondaryContainer: _mutedForeground,
 
-      // `tertiary` = l'or. On y met `accent-text` (#856011, 5,71:1) et JAMAIS
-      // #C8921A : Material se sert de `tertiary` comme couleur de texte dans
-      // plusieurs composants, et #C8921A y échouerait AA (2,77:1).
       tertiary: const Color(0xFF856011),
       onTertiary: const Color(0xFFFFFFFF),
       tertiaryContainer: const Color(0xFFFAF4E8),
@@ -91,7 +71,6 @@ abstract final class AppTheme {
     );
   }
 
-  /// Style de la barre système au-dessus de l'AppBar bordeaux.
   static const SystemUiOverlayStyle systemOverlay = SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
@@ -131,8 +110,6 @@ abstract final class AppTheme {
       cardTheme: CardThemeData(
         color: scheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
-        // Aucune élévation Material : l'ombre est portée par le conteneur, ce
-        // qui laisse le contrôle du budget de rendu dans les listes.
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
@@ -232,19 +209,10 @@ abstract final class AppTheme {
         minVerticalPadding: CpiSpacing.sm,
         iconColor: scheme.onSurfaceVariant,
         titleTextStyle: text.bodyLarge,
-        // `bodyMedium` (16) et non `bodySmall` : un sous-titre de ListTile porte
-        // souvent l'information utile : l'état de synchronisation, le numéro :
-        // et se lisait à 13 sp.
         subtitleTextStyle: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
         shape: const RoundedRectangleBorder(borderRadius: CpiRadius.brMd),
       ),
 
-      // Libellés de navigation TOUJOURS visibles et à 14 sp.
-      //
-      // Le défaut Material colle `labelMedium` sur une barre de 80 dp ; à 12 sp
-      // les quatre destinations se lisaient mal. `alwaysShow` parce qu'une
-      // destination sans libellé oblige à reconnaître une icône, ce qui est un
-      // apprentissage qu'aucune app de saisie ne mérite.
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,

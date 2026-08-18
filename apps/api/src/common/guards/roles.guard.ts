@@ -5,12 +5,6 @@ import type { Role } from '@crm/database';
 import { ROLES_KEY } from '../decorators/roles.decorator.js';
 import type { AuthenticatedUser } from '../decorators/current-user.decorator.js';
 
-/**
- * Applique `@Roles(...)`. S'exécute APRÈS le JwtAuthGuard, qui a rempli
- * `request.user`. Sans décorateur, toute identité authentifiée passe : le
- * cloisonnement par commercial ne se joue pas ici mais dans la couche service,
- * pour qu'aucune route ne puisse l'oublier.
- */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}

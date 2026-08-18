@@ -45,32 +45,13 @@ import {
 
 const PDF_MIME = 'application/pdf';
 
-/**
- * Campagnes d'appels aux représentants.
- *
- * Même régime d'autorisation que les campagnes prospects : l'ADMIN seul en
- * écriture et en lecture de campagne, parce que ces écrans montrent la
- * répartition entre commerciaux, ce qui n'est ni utile ni sain à exposer aux
- * intéressés. Seul l'enregistrement d'une tentative est ouvert au COMMERCIAL :
- * c'est lui qui passe l'appel.
- *
- * Aucune route n'est ouverte à BANQUE_FINANCE : ce rôle travaille sur des
- * dossiers déjà constitués.
- */
 @ApiTags('rep-campaigns')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
-// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
-// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
-// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
-// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
-// cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'rep-campaigns', version: '1' })
 export class RepCampaignsController {
   constructor(private readonly campaigns: RepCampaignsService) {}
-
-  // ─── Routes littérales : AVANT `:id`, sinon le paramètre les avale ─────────
 
   @Get('preview')
   @ApiOperation({
@@ -91,13 +72,14 @@ export class RepCampaignsController {
     operationId: 'recordRepCallAttempt',
     summary: 'Enregistre un appel passé à un représentant et clôt la tâche si l’issue aboutit.',
     description:
-      'L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie `duplicate` sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base.',
+      'L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie `duplicate` sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base. `suggestedPhone` recueille, dans le même geste, le numéro qu’un représentant qui refuse propose d’appeler à sa place : la réponse dit si ce numéro est déjà une fiche connue.',
   })
   @ApiResponse({ status: 200, type: RepCallAttemptResultDto })
   @ApiResponse({
     status: 400,
     type: ApiErrorDto,
-    description: 'REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED.',
+    description:
+      'REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED · PHONE_INVALID.',
   })
   @ApiResponse({
     status: 404,
@@ -111,9 +93,8 @@ export class RepCampaignsController {
     return this.campaigns.recordAttempt(user, body);
   }
 
-  // ─── Campagnes ────────────────────────────────────────────────────────────
-
   @Get()
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'listRepCampaigns',
     summary: 'Liste des campagnes représentants, avec l’avancement de chacune.',
@@ -152,6 +133,7 @@ export class RepCampaignsController {
   }
 
   @Get(':id')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'getRepCampaign',
     summary: 'Détail d’une campagne, ventilé par commercial et par journée.',
@@ -178,9 +160,8 @@ export class RepCampaignsController {
     return this.campaigns.close(id);
   }
 
-  // ─── Programme PDF ────────────────────────────────────────────────────────
-
   @Get(':id/commerciaux/:userId/programme.pdf')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiProduces(PDF_MIME)
   @ApiOperation({
     operationId: 'downloadRepProgrammePdf',
@@ -193,17 +174,11 @@ export class RepCampaignsController {
   @ApiResponse({
     status: 200,
     description: 'Document PDF, en flux.',
-    // Binaire déclaré explicitement : sans cela le générateur Dart fabrique une
-    // méthode qui tente de désérialiser le PDF en JSON.
     content: { [PDF_MIME]: { schema: { type: 'string', format: 'binary' } } },
   })
   @ApiResponse({
     status: 404,
     description: 'REP_CAMPAIGN_PROGRAMME_NOT_FOUND · REP_CAMPAIGN_DAY_NOT_FOUND.',
-    // `@ApiProduces` s'applique à TOUTES les réponses de la route, y compris
-    // aux erreurs : sans ce `content` explicite, le contrat annonçait un corps
-    // d'erreur servi en PDF, alors qu'une erreur sort toujours en JSON. Les
-    // générateurs en tiraient un désérialiseur incapable de lire le refus.
     content: { 'application/json': { schema: { $ref: getSchemaPath(ApiErrorDto) } } },
   })
   async downloadProgramme(
@@ -215,9 +190,6 @@ export class RepCampaignsController {
     const programme = await this.campaigns.programme(id, userId, query.jour);
     const generatedAt = new Date();
 
-    // On écrit dans le flux Node brut : pdfkit pousse les pages au fil de
-    // l'eau, et passer par la sérialisation de Fastify obligerait à tamponner
-    // le document entier avant le premier octet.
     reply.hijack();
     reply.raw.setHeader('Content-Type', PDF_MIME);
     reply.raw.setHeader(
@@ -238,9 +210,6 @@ export class RepCampaignsController {
         checkboxGroups: REP_CHECKBOX_GROUPS,
       });
     } catch (error) {
-      // Les en-têtes sont déjà partis : impossible de renvoyer un code
-      // d'erreur. On coupe, ce que le client lit comme un téléchargement
-      // incomplet, préférable à un PDF tronqué qui s'ouvrirait normalement.
       reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
       throw error;
     }

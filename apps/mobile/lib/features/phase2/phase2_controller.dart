@@ -8,26 +8,15 @@ import '../../core/utils/phone.dart';
 import '../../data/local/database.dart';
 import '../../data/repositories/write_repository.dart';
 
-/// Les cinq états de l'écran de phase 2.
-///
-/// Une énumération et pas trois booléens : « pas trouvé » et « déjà traité »
-/// sont deux écrans différents avec deux issues différentes, et les représenter
-/// par des drapeaux indépendants rendrait représentable l'état « pas trouvé ET
-/// déjà traité », qui n'existe pas.
 enum Phase2Stage {
-  /// Le champ attend un numéro.
   search,
 
-  /// Numéro absent de l'annuaire répliqué.
   notFound,
 
-  /// Dossier déjà clos côté serveur : lecture seule.
   alreadyClosed,
 
-  /// Dossier ouvert : les trois cartes de méthode et l'issue négative.
   capture,
 
-  /// Écriture locale confirmée. Le champ se vide et reprend le focus.
   confirmed,
 }
 
@@ -48,21 +37,16 @@ class Phase2State {
 
   final Phase2Stage stage;
 
-  /// L'entrée d'annuaire trouvée. Six champs : pas de nom, pas de banque.
   final Phase2DirectoryData? entry;
 
-  /// Le numéro normalisé qui a servi à chercher, tel qu'on veut le réafficher.
   final String? searchedPhone;
 
-  /// Erreur de saisie, en français, lisible d'un coup d'œil entre deux appels.
   final String? errorMessage;
 
-  /// Ce qui vient d'être enregistré, pour le libellé de confirmation.
   final String? confirmation;
 
   final bool saving;
 
-  // ── Téléchargement de l'annuaire ─────────────────────────────────────────
   final bool downloading;
   final int downloaded;
   final bool downloadHasMore;
@@ -102,11 +86,6 @@ class Phase2State {
       identical(this, other) ||
       other is Phase2State &&
           other.stage == stage &&
-          // L'entrée ENTIÈRE, et non trois de ses champs : `rev` en fait
-          // partie, et c'est elle qui change quand un pull d'annuaire
-          // réconcilie un miroir optimiste. Comparée par morceaux, la
-          // réconciliation ne provoquait aucun rebuild et l'écran gardait à
-          // l'affichage un état que le serveur venait de contredire.
           other.entry == entry &&
           other.searchedPhone == searchedPhone &&
           other.errorMessage == errorMessage &&
@@ -131,11 +110,6 @@ class Phase2State {
   );
 }
 
-/// Ce que l'écran a besoin de savoir faire, sans rien savoir de son rendu.
-///
-/// Écrit à la main : `riverpod_generator` n'a aucun palier d'`analyzer` commun
-/// avec `drift_dev` à cette version de Flutter (voir `pubspec.yaml`). Un
-/// `Notifier` manuel a exactement la même sémantique.
 class Phase2Controller extends Notifier<Phase2State> {
   @override
   Phase2State build() => const Phase2State();
@@ -143,14 +117,6 @@ class Phase2Controller extends Notifier<Phase2State> {
   Phase2DirectorySync get _directory => ref.read(phase2DirectoryProvider);
   WriteRepository get _writes => ref.read(writeRepositoryProvider);
 
-  /// Cherche un numéro dans l'annuaire répliqué.
-  ///
-  /// La normalisation passe par [Phone.toE164], celle-là même qui sert aux
-  /// représentants et aux prospects, et qui reproduit le verdict de
-  /// `libphonenumber-js` région `SN` employé par le serveur. C'est ce qui fait
-  /// que `77 123 45 67`, `+221771234567` et `00221771234567` retrouvent la même
-  /// ligne : sans elle, la clé de recherche dépendrait de la façon dont le
-  /// commercial recopie le papier.
   Future<void> search(String raw) async {
     final PhoneResult parsed = Phone.parse(raw);
     if (parsed is! PhoneValid) {
@@ -174,10 +140,6 @@ class Phase2Controller extends Notifier<Phase2State> {
     }
 
     state = state.copyWith(
-      // Tout ce qui n'est pas `PENDING` est terminal côté serveur : une
-      // nouvelle tentative y serait refusée en `PHASE2_ALREADY_COMPLETED`,
-      // quelle qu'en soit l'issue. On ne propose donc pas un formulaire dont on
-      // sait qu'il ne peut pas aboutir.
       stage: found.phase2Status == Phase2Statuses.pending
           ? Phase2Stage.capture
           : Phase2Stage.alreadyClosed,
@@ -187,13 +149,12 @@ class Phase2Controller extends Notifier<Phase2State> {
     );
   }
 
-  /// Enregistre une issue. Renvoie `true` si l'écriture locale a abouti.
-  ///
-  /// **Le retour porte la vibration.** L'appelant ne fait vibrer qu'après un
-  /// `true` : une vibration de succès déclenchée à la pression, avant que la
-  /// transaction soit commitée, affirmerait un enregistrement qui peut encore
-  /// échouer. Un retour haptique qui ment est pire que pas de retour du tout.
-  Future<bool> record({required String outcome, String? method, String? comment}) async {
+  Future<bool> record({
+    required String outcome,
+    String? method,
+    String? comment,
+    DateTime? callbackAt,
+  }) async {
     final Phase2DirectoryData? entry = state.entry;
     if (entry == null) return false;
     final String? me = ref.read(authControllerProvider).userId;
@@ -211,6 +172,7 @@ class Phase2Controller extends Notifier<Phase2State> {
         outcome: outcome,
         method: method,
         comment: comment,
+        callbackAt: callbackAt,
         createdById: me,
       );
     } on CallAttemptInvalid catch (e) {
@@ -224,22 +186,16 @@ class Phase2Controller extends Notifier<Phase2State> {
       confirmation: labelForOutcome(outcome, method),
       clearError: true,
     );
-    // Coup de pouce au moteur, sans pull : on vient d'écrire, tirer maintenant
-    // ne rapporterait rien et coûterait un aller-retour. Hors ligne, l'échec est
-    // silencieux et la ligne reste en file : c'est le comportement voulu.
     ref.read(syncCoordinatorProvider.notifier).nudge();
     return true;
   }
 
-  /// Repart sur un champ vide, prêt pour le numéro suivant.
   void next() {
     state = const Phase2State();
   }
 
-  /// Revient à la recherche depuis le formulaire, sans rien enregistrer.
   void cancel() => next();
 
-  /// Télécharge ou met à jour l'annuaire.
   Future<void> download() async {
     if (state.downloading) return;
     state = state.copyWith(
@@ -272,8 +228,6 @@ class Phase2Controller extends Notifier<Phase2State> {
     _ => e.message ?? 'Téléchargement impossible pour le moment.',
   };
 
-  /// Libellé humain d'une issue, pour la confirmation et pour la fiche en
-  /// lecture seule.
   static String labelForOutcome(String outcome, [String? method]) => switch (outcome) {
     CallOutcomes.methodObtained => 'Méthode obtenue : ${labelForMethod(method ?? '')}',
     CallOutcomes.unreachable => 'Injoignable',

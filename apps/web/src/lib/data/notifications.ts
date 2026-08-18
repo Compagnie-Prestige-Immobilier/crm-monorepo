@@ -17,26 +17,6 @@ import type {
 import { getApiClient } from '@/lib/api/browser';
 import { fetchDepartements } from '@/lib/data/reference';
 
-/**
- * Composition des notifications : envoi, annulation, gabarits, public visé.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Ce module remplace un `fetch` manuel qui castait en `as T`, sans rien valider.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `components/notifications/api.ts` avait été écrit AVANT la régénération du
- * contrat, sur la promesse d'être remplacé ensuite. Les neuf routes figurent
- * maintenant dans `packages/api-client/src/generated`, et la dette avait tourné
- * au piège : un `as T` fait entrer dans l'écran une valeur dont personne n'a
- * vérifié la forme, et le compilateur la croit sur parole. Le champ
- * `reachableCount`, retiré du contrat, est resté « présent » pour le composeur
- * jusqu'à ce que le typage engendré le contredise.
- *
- * Le chemin est inchangé : `getApiClient()` frappe le relais `/api/v1/*` de
- * Next, qui attache le jeton depuis le cookie `httpOnly`. Aucun JWT n'atteint le
- * JavaScript de la page, ici pas plus qu'ailleurs.
- */
-
 export interface NotificationFilters {
   page: number;
   pageSize: number;
@@ -48,11 +28,6 @@ export async function fetchNotifications(
   filters: NotificationFilters,
   client: ApiClient = getApiClient(),
 ): Promise<NotificationList> {
-  /*
-    `exactOptionalPropertyTypes` : écrire `status: undefined` n'est pas la même
-    chose que ne pas l'écrire. `openapi-fetch` sérialiserait la clé, et l'API
-    refuserait un `status=undefined` littéral.
-  */
   const query = {
     page: filters.page,
     pageSize: filters.pageSize,
@@ -70,13 +45,6 @@ export async function fetchNotification(
   return unwrap(await client.GET('/api/v1/notifications/{id}', { params: { path: { id } } }));
 }
 
-/**
- * Nombre de destinataires du public visé, calculé par le SERVEUR.
- *
- * C'est ce chiffre qui rend l'étape de confirmation utile : « Confirmer
- * l'envoi ? » sans destinataires ne protège de rien. Il est donc demandé avec
- * exactement les critères de l'envoi, et jamais estimé côté panel.
- */
 export async function fetchAudiencePreview(
   query: AudienceQuery,
   client: ApiClient = getApiClient(),
@@ -99,8 +67,6 @@ export async function cancelNotification(
     await client.POST('/api/v1/notifications/{id}/cancel', { params: { path: { id } } }),
   );
 }
-
-// ─── Gabarits ────────────────────────────────────────────────────────────────
 
 export async function fetchTemplates(
   includeInactive = false,
@@ -130,23 +96,8 @@ export async function updateTemplate(
   );
 }
 
-// ─── Référentiel du sélecteur de public ──────────────────────────────────────
-
-/**
- * Les départements viennent de `lib/data/reference.ts`, comme partout ailleurs.
- *
- * Le module supprimé en redéclarait une version locale, avec son propre type
- * `DepartementOption` : deux appels vers la même route, deux formes déclarées,
- * et deux entrées de cache pour une liste qui change une fois par an.
- */
 export { fetchDepartements };
 
-/**
- * Clés de cache de la COMPOSITION, distinctes de celles de la boîte de
- * réception (`queryKeys.inbox*`) : deux publics, deux caches. Un admin qui
- * compose une annonce ne doit pas voir sa propre cloche se recharger, et
- * marquer une ligne lue ne doit pas invalider l'historique d'envoi.
- */
 export const notificationKeys = {
   root: ['notifications'] as const,
   list: (filters: NotificationFilters) => ['notifications', 'list', filters] as const,

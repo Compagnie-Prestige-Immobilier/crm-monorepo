@@ -33,6 +33,12 @@ abstract class _$SupervisedUserDtoCWProxy {
 
   SupervisedUserDto lastSyncAt(DateTime? lastSyncAt);
 
+  SupervisedUserDto lastPullAt(DateTime? lastPullAt);
+
+  SupervisedUserDto pendingOps(num? pendingOps);
+
+  SupervisedUserDto appVersion(String? appVersion);
+
   SupervisedUserDto lastWriteAt(DateTime? lastWriteAt);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisedUserDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -55,6 +61,9 @@ abstract class _$SupervisedUserDtoCWProxy {
     DateTime? lastSeenAt,
     DateTime? lastLoginAt,
     DateTime? lastSyncAt,
+    DateTime? lastPullAt,
+    num? pendingOps,
+    String? appVersion,
     DateTime? lastWriteAt,
   });
 }
@@ -112,6 +121,17 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
       this(lastSyncAt: lastSyncAt);
 
   @override
+  SupervisedUserDto lastPullAt(DateTime? lastPullAt) =>
+      this(lastPullAt: lastPullAt);
+
+  @override
+  SupervisedUserDto pendingOps(num? pendingOps) => this(pendingOps: pendingOps);
+
+  @override
+  SupervisedUserDto appVersion(String? appVersion) =>
+      this(appVersion: appVersion);
+
+  @override
   SupervisedUserDto lastWriteAt(DateTime? lastWriteAt) =>
       this(lastWriteAt: lastWriteAt);
 
@@ -136,6 +156,9 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
     Object? lastSeenAt = const $CopyWithPlaceholder(),
     Object? lastLoginAt = const $CopyWithPlaceholder(),
     Object? lastSyncAt = const $CopyWithPlaceholder(),
+    Object? lastPullAt = const $CopyWithPlaceholder(),
+    Object? pendingOps = const $CopyWithPlaceholder(),
+    Object? appVersion = const $CopyWithPlaceholder(),
     Object? lastWriteAt = const $CopyWithPlaceholder(),
   }) {
     return SupervisedUserDto(
@@ -191,6 +214,18 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
           ? _value.lastSyncAt
           // ignore: cast_nullable_to_non_nullable
           : lastSyncAt as DateTime?,
+      lastPullAt: lastPullAt == const $CopyWithPlaceholder()
+          ? _value.lastPullAt
+          // ignore: cast_nullable_to_non_nullable
+          : lastPullAt as DateTime?,
+      pendingOps: pendingOps == const $CopyWithPlaceholder()
+          ? _value.pendingOps
+          // ignore: cast_nullable_to_non_nullable
+          : pendingOps as num?,
+      appVersion: appVersion == const $CopyWithPlaceholder()
+          ? _value.appVersion
+          // ignore: cast_nullable_to_non_nullable
+          : appVersion as String?,
       lastWriteAt: lastWriteAt == const $CopyWithPlaceholder()
           ? _value.lastWriteAt
           // ignore: cast_nullable_to_non_nullable
@@ -228,6 +263,9 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
           'lastSeenAt',
           'lastLoginAt',
           'lastSyncAt',
+          'lastPullAt',
+          'pendingOps',
+          'appVersion',
           'lastWriteAt',
         ],
       );
@@ -271,6 +309,12 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
           'lastSyncAt',
           (v) => v == null ? null : DateTime.parse(v as String),
         ),
+        lastPullAt: $checkedConvert(
+          'lastPullAt',
+          (v) => v == null ? null : DateTime.parse(v as String),
+        ),
+        pendingOps: $checkedConvert('pendingOps', (v) => v as num?),
+        appVersion: $checkedConvert('appVersion', (v) => v as String?),
         lastWriteAt: $checkedConvert(
           'lastWriteAt',
           (v) => v == null ? null : DateTime.parse(v as String),
@@ -294,6 +338,9 @@ Map<String, dynamic> _$SupervisedUserDtoToJson(SupervisedUserDto instance) =>
       'lastSeenAt': instance.lastSeenAt?.toIso8601String(),
       'lastLoginAt': instance.lastLoginAt?.toIso8601String(),
       'lastSyncAt': instance.lastSyncAt?.toIso8601String(),
+      'lastPullAt': instance.lastPullAt?.toIso8601String(),
+      'pendingOps': instance.pendingOps,
+      'appVersion': instance.appVersion,
       'lastWriteAt': instance.lastWriteAt?.toIso8601String(),
     };
 
@@ -301,6 +348,7 @@ const _$RoleEnumMap = {
   Role.ADMIN: 'ADMIN',
   Role.COMMERCIAL: 'COMMERCIAL',
   Role.BANQUE_FINANCE: 'BANQUE_FINANCE',
+  Role.SUPERVISEUR: 'SUPERVISEUR',
   Role.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

@@ -35,41 +35,26 @@ import { Roles } from '../../common/decorators/roles.decorator.js';
 import { RepresentantsService } from './representants.service.js';
 import { RepresentantsImportService } from './representants-import.service.js';
 import {
+  CreateRepresentantCommentDto,
   CreateRepresentantDto,
   DeleteQueryDto,
   ImportQueryDto,
   ImportReportDto,
+  RepresentantCommentDto,
+  RepresentantCommentListDto,
+  RepresentantCommentQueryDto,
   RepresentantDto,
   RepresentantListDto,
   RepresentantLookupDto,
   RepresentantLookupQueryDto,
   RepresentantQueryDto,
+  RepresentantRelationChangeListDto,
   UpdateRepresentantDto,
 } from './dto.js';
 
-/**
- * Le rôle est posé SUR LA CLASSE, et non route par route.
- *
- * Un représentant est une personne physique identifiée : nom, téléphone en
- * E.164, notes de terrain, département. Rien de tout cela ne concerne le pôle
- * Banque & Finance, qui travaille sur des dossiers déjà ouverts et n'a aucun
- * usage de l'annuaire de prospection. Sans décorateur, `RolesGuard` laisse
- * passer TOUTE identité authentifiée : `lookup` en particulier répondait à un
- * agent bancaire avec la fiche complète d'un représentant qu'il n'a aucune
- * raison de connaître.
- *
- * Sur la classe plutôt que sur chaque méthode : une route ajoutée demain hérite
- * de la restriction au lieu de naître ouverte. `import` la resserre encore, à
- * ADMIN seul, et `getAllAndOverride` fait gagner le décorateur de méthode.
- */
 @ApiTags('representants')
 @ApiBearerAuth()
 @Roles(Role.COMMERCIAL, Role.ADMIN)
-// Toute route de ce contrôleur peut refuser pour ces trois raisons : jeton
-// absent ou expiré, rôle insuffisant, et entrée refusée par la validation
-// globale (`forbidNonWhitelisted` transforme un paramètre mal orthographié en
-// 400). Les déclarer ici évite de les oublier route par route, ce qui était le
-// cas sur 116 opérations sur 119.
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'representants', version: '1' })
 export class RepresentantsController {
@@ -79,6 +64,7 @@ export class RepresentantsController {
   ) {}
 
   @Get()
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'listRepresentants',
     summary: 'Liste paginée. Un COMMERCIAL ne voit que ses propres représentants.',
@@ -91,11 +77,6 @@ export class RepresentantsController {
     return this.representants.list(user, query);
   }
 
-  /**
-   * Déclaré AVANT `:id` : Fastify n'ordonne pas les routes par déclaration,
-   * mais la lisibilité l'exige et cela protège d'une régression si l'adaptateur
-   * change.
-   */
   @Get('lookup')
   @ApiOperation({
     operationId: 'lookupRepresentantByPhone',
@@ -149,6 +130,7 @@ export class RepresentantsController {
   }
 
   @Get(':id')
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({ operationId: 'getRepresentant', summary: 'Détail d’un représentant.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: RepresentantDto })
@@ -197,6 +179,88 @@ export class RepresentantsController {
     @Body() body: UpdateRepresentantDto,
   ): Promise<RepresentantDto> {
     return this.representants.update(user, id, body);
+  }
+
+  @Get(':id/relation-history')
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
+  @ApiOperation({
+    operationId: 'listRepresentantRelationChanges',
+    summary:
+      'Bascules de relation déjà subies par une fiche, de la plus récente à la plus ancienne.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: RepresentantRelationChangeListDto })
+  @ApiResponse({
+    status: 404,
+    type: ApiErrorDto,
+    description: 'REPRESENTANT_NOT_FOUND.',
+  })
+  relationHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<RepresentantRelationChangeListDto> {
+    return this.representants.relationHistory(user, id);
+  }
+
+  @Get(':id/comments')
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
+  @ApiOperation({
+    operationId: 'listRepresentantComments',
+    summary: 'Fil de commentaires d’une fiche, du plus récent au plus ancien.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: RepresentantCommentListDto })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'REPRESENTANT_NOT_FOUND.' })
+  listComments(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: RepresentantCommentQueryDto,
+  ): Promise<RepresentantCommentListDto> {
+    return this.representants.listComments(user, id, query);
+  }
+
+  @Post(':id/comments')
+  @ApiOperation({
+    operationId: 'addRepresentantComment',
+    summary: 'Ajoute un commentaire. L’identifiant fourni sert de clé d’idempotence.',
+    description:
+      'Le fil est en AJOUT SEUL : ni édition ni fusion, deux téléconseillers hors ligne produisent deux lignes. Reposter le même identifiant rend la ligne déjà enregistrée.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 201, type: RepresentantCommentDto })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'REPRESENTANT_NOT_FOUND.' })
+  @ApiResponse({
+    status: 403,
+    type: ApiErrorDto,
+    description: 'ENTITY_ID_OWNED_BY_ANOTHER_USER · NOT_OWNER.',
+  })
+  addComment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CreateRepresentantCommentDto,
+  ): Promise<RepresentantCommentDto> {
+    return this.representants.addComment(user, id, body);
+  }
+
+  @Delete(':id/comments/:commentId')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    operationId: 'deleteRepresentantComment',
+    summary: 'Supprime logiquement un commentaire.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'commentId', format: 'uuid' })
+  @ApiResponse({ status: 200, type: OkDto })
+  @ApiResponse({
+    status: 404,
+    type: ApiErrorDto,
+    description: 'REPRESENTANT_COMMENT_NOT_FOUND.',
+  })
+  removeComment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
+  ): Promise<OkDto> {
+    return this.representants.removeComment(id, commentId);
   }
 
   @Delete(':id')

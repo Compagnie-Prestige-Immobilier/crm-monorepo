@@ -5,34 +5,16 @@ import type * as RepresentantsModule from '@/lib/data/representants';
 import { renderWithQuery } from '@/test/render-query';
 import { setUrl } from '@/test/router-mock';
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * Deux vides, deux messages, et la distinction n'est pas cosmétique.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * L'état vide disait TOUJOURS « Aucun représentant ne correspond à ces critères.
- * Élargissez la recherche ou retirez un filtre. », y compris sans le moindre
- * critère posé. Une installation neuve, ou un compte qui ouvre l'écran pour la
- * première fois, se voyait donc renvoyé retirer des filtres qu'il n'avait jamais
- * mis : il cherchait, ne trouvait rien à retirer, et concluait à une panne.
- *
- * Le critère de bascule est le nombre de filtres ACTIFS, lu dans l'URL. Le test
- * pose donc une vraie URL plutôt que d'injecter un état : c'est le seul endroit
- * où ces critères vivent, et un correctif qui lirait ailleurs serait faux.
- */
-
 const fetchRepresentants = vi.fn();
 
 vi.mock('@/lib/data/representants', async () => {
   const actual = await vi.importActual<typeof RepresentantsModule>('@/lib/data/representants');
-  return { ...actual, fetchRepresentants: () => fetchRepresentants() as unknown };
+  return {
+    ...actual,
+    fetchRepresentants: (filters: unknown) => fetchRepresentants(filters) as unknown,
+  };
 });
 
-/**
- * La barre de filtres charge les référentiels (départements, IEF) pour ses
- * listes déroulantes. Ils n'ont aucun rapport avec l'état vide du tableau, et
- * les laisser partir ferait échouer le test sur un appel réseau absent.
- */
 vi.mock('@/lib/data/reference', () => ({
   fetchDepartements: () => Promise.resolve([]),
   fetchIefs: () => Promise.resolve([]),
@@ -77,32 +59,22 @@ describe('RepresentantsView, état vide', () => {
 
   it('sans aucun critère, ne renvoie PAS retirer un filtre inexistant', async () => {
     setUrl('/representants');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
     expect(await screen.findByText('Aucun représentant enregistré.')).toBeTruthy();
-    // La phrase fautive, celle qui envoyait chercher des filtres absents.
     expect(screen.queryByText(/retirez un filtre/)).toBeNull();
   });
 
   it('sans aucun critère, dit d’où viennent les fiches', async () => {
     setUrl('/representants');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
-    // Un état vide utile nomme le geste suivant : ici, la tournée mobile,
-    // la saisie unitaire ou l'import.
     expect(await screen.findByText(/saisies en tournée depuis le mobile/)).toBeTruthy();
   });
 
-  /**
-   * L'état vide vit désormais HORS du `<tbody>`.
-   *
-   * Il y était enfermé dans un `<td colSpan={8}>`, ce qui le faisait disparaître
-   * avec le tableau sous 1024 px : le petit écran n'avait alors ni liste, ni
-   * message, ni la moindre indication que la requête avait abouti.
-   */
   it('rend son état vide en dehors du tableau, pour qu’il survive au petit écran', async () => {
     setUrl('/representants');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
     const message = await screen.findByText('Aucun représentant enregistré.');
     expect(message.closest('table')).toBeNull();
@@ -110,7 +82,7 @@ describe('RepresentantsView, état vide', () => {
 
   it('avec un critère actif, invite bien à l’élargir', async () => {
     setUrl('/representants?search=Ndeye');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
     expect(
       await screen.findByText('Aucun représentant ne correspond à ces critères.'),
@@ -118,23 +90,16 @@ describe('RepresentantsView, état vide', () => {
     expect(screen.getByText(/Élargissez la recherche ou retirez un filtre/)).toBeTruthy();
     expect(screen.queryByText('Aucun représentant enregistré.')).toBeNull();
   });
+
+  it('ne propose l’import Excel qu’aux administrateurs', async () => {
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister={false} />);
+
+    expect(await screen.findByText('Aucun représentant enregistré.')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Import Excel' })).toBeNull();
+  });
 });
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * Huit colonnes, DEUX rendus.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * L'écran n'avait qu'un tableau de huit colonnes, sans repli en carte sous
- * 1024 px, alors que `/dossiers` en offre un pour exactement le même nombre de
- * colonnes. Sur 360 px, cela donne des colonnes de quarante pixels et un
- * balayage latéral pour lire une seule fiche.
- *
- * jsdom n'applique aucune requête de média : on ne peut donc pas éprouver LEQUEL
- * des deux est visible. Ce qui se vérifie, et qui est le fond du correctif,
- * c'est que le second rendu EXISTE, qu'il porte les mêmes données, et qu'il est
- * hors du tableau : un repli qui vivrait dans une cellule disparaîtrait avec lui.
- */
 describe('RepresentantsView, repli en carte', () => {
   beforeEach(() => {
     fetchRepresentants.mockReturnValue(Promise.resolve(ONE_PAGE));
@@ -142,7 +107,7 @@ describe('RepresentantsView, repli en carte', () => {
 
   it('rend chaque représentant DEUX fois : en ligne de tableau et en carte', async () => {
     setUrl('/representants');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
     const noms = await screen.findAllByText('Ndeye Fall');
     expect(noms).toHaveLength(2);
@@ -152,7 +117,7 @@ describe('RepresentantsView, repli en carte', () => {
 
   it('la carte porte les mêmes champs que la ligne, sans en perdre un seul', async () => {
     setUrl('/representants');
-    renderWithQuery(<RepresentantsView />);
+    renderWithQuery(<RepresentantsView canAdminister />);
 
     await screen.findAllByText('Ndeye Fall');
     const carte = screen.getAllByRole('article')[0];
@@ -160,11 +125,135 @@ describe('RepresentantsView, repli en carte', () => {
 
     expect(within(carte).getByText('Dakar')).toBeTruthy();
     expect(within(carte).getByText('Aminata Diallo')).toBeTruthy();
-    // Le compte de prospects est l'information centrale : c'est lui qui dit si
-    // une fiche compte.
     expect(within(carte).getByText('12')).toBeTruthy();
     expect(
       within(carte).getByRole('button', { name: /Modifier la fiche de Ndeye Fall/ }),
     ).toBeTruthy();
+  });
+});
+
+describe('RepresentantsView vue par un SUPERVISEUR', () => {
+  beforeEach(() => {
+    fetchRepresentants.mockReturnValue(Promise.resolve(ONE_PAGE));
+  });
+
+  it('affiche les fiches, et AUCUN geste que l’API lui refuserait', async () => {
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister={false} readOnly />);
+
+    await screen.findAllByText('Ndeye Fall');
+
+    expect(screen.queryByRole('button', { name: 'Nouveau représentant' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Modifier la fiche/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Exporter' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Import Excel' })).toBeNull();
+  });
+
+  it('un téléconseiller, lui, garde la saisie et l’export', async () => {
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister={false} />);
+
+    expect(await screen.findByRole('button', { name: 'Nouveau représentant' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Exporter' })).toBeTruthy();
+  });
+});
+
+const fiche = (id: string, fullName: string, relationStatus: string) => ({
+  id,
+  fullName,
+  phoneE164: '+221771234567',
+  departementId: 'd-1',
+  departementName: 'Dakar',
+  iefId: null,
+  iefName: null,
+  createdById: 'u-1',
+  createdByName: 'Aminata Diallo',
+  prospectCount: 3,
+  relationStatus,
+  clientCreatedAt: '2026-03-01T09:00:00.000Z',
+  notes: null,
+  createdAt: '2026-03-01T09:00:00.000Z',
+  updatedAt: '2026-03-01T09:00:00.000Z',
+});
+
+describe('RepresentantsView, état de la relation', () => {
+  it('donne à chacun des quatre états sa propre pastille', async () => {
+    fetchRepresentants.mockReturnValue(
+      Promise.resolve({
+        items: [
+          fiche('r-1', 'Ndeye Fall', 'INCONNU'),
+          fiche('r-2', 'Moussa Sow', 'CONTACTE'),
+          fiche('r-3', 'Awa Ba', 'AMBASSADEUR'),
+          fiche('r-4', 'Ibou Sy', 'REFUS'),
+        ],
+        total: 4,
+        page: 1,
+        pageCount: 1,
+      }),
+    );
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister />);
+
+    const table = (await screen.findAllByRole('table'))[0];
+    if (table === undefined) throw new Error('Aucun tableau.');
+
+    for (const [nom, etat] of [
+      ['Ndeye Fall', 'Pas encore contacté'],
+      ['Moussa Sow', 'Contacté'],
+      ['Awa Ba', 'Ambassadeur'],
+      ['Ibou Sy', 'Refus'],
+    ]) {
+      const ligne = within(table)
+        .getByText(nom as string)
+        .closest('tr');
+      if (ligne === null) throw new Error(`Ligne introuvable pour ${nom as string}.`);
+      expect(within(ligne).getByText(etat as string)).toBeTruthy();
+    }
+  });
+
+  it('mène de chaque nom à sa fiche', async () => {
+    fetchRepresentants.mockReturnValue(
+      Promise.resolve({
+        items: [fiche('r-9', 'Awa Ba', 'AMBASSADEUR')],
+        total: 1,
+        page: 1,
+        pageCount: 1,
+      }),
+    );
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister />);
+
+    const liens = await screen.findAllByRole('link', { name: 'Awa Ba' });
+    expect(liens[0]?.getAttribute('href')).toBe('/representants/r-9');
+  });
+
+  it('compte les ambassadeurs de la sélection, sur le total et non sur la page', async () => {
+    fetchRepresentants.mockImplementation((filters: { relationStatus: string | null }) =>
+      Promise.resolve(
+        filters.relationStatus === 'AMBASSADEUR'
+          ? { items: [], total: 143, page: 1, pageCount: 6 }
+          : { items: [fiche('r-1', 'Ndeye Fall', 'CONTACTE')], total: 900, page: 1, pageCount: 36 },
+      ),
+    );
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister />);
+
+    expect(await screen.findByText(/dont 143 ambassadeurs/u)).toBeTruthy();
+  });
+
+  it('ne redit pas le décompte quand la sélection ne retient QUE les ambassadeurs', async () => {
+    fetchRepresentants.mockReturnValue(
+      Promise.resolve({
+        items: [fiche('r-3', 'Awa Ba', 'AMBASSADEUR')],
+        total: 143,
+        page: 1,
+        pageCount: 6,
+      }),
+    );
+    setUrl('/representants?relationStatus=AMBASSADEUR');
+    renderWithQuery(<RepresentantsView canAdminister />);
+
+    await screen.findAllByText('Awa Ba');
+    expect(screen.queryByText(/ambassadeurs/u)).toBeNull();
   });
 });

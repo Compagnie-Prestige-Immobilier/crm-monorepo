@@ -2,52 +2,20 @@ import { Role, type Prisma } from '@crm/database';
 
 import type { PurgeStepKey } from './purge-plan.js';
 
-/**
- * Traduction d'une étape de purge en opérations Prisma.
- *
- * Table de correspondance plutôt que `switch` disséminé, pour la même raison que
- * `DEMO_DELETERS` : une étape ajoutée à `PURGE_STEP_ORDER` sans son exécution
- * ici casse la compilation, au lieu d'être silencieusement ignorée, c'est-à-dire
- * au lieu de laisser des lignes derrière une purge annoncée comme complète.
- *
- * `count` et `remove` portent la MÊME clause. C'est ce qui rend l'écran honnête :
- * le nombre annoncé avant la validation est celui des lignes réellement
- * supprimées, et non le décompte d'un autre critère.
- *
- * Les délégués sont écrits en toutes lettres plutôt que dérivés d'une clé
- * générique : Prisma type chaque modèle séparément, et l'indexation dynamique
- * n'y survivrait qu'au prix d'une assertion, exactement la construction qui
- * laisse passer une faute de frappe sur un nom de table.
- */
-
-/** Contexte d'exécution. Le compte qui agit n'est jamais supprimé par sa propre purge. */
 export interface PurgeContext {
   readonly actorId: string;
 }
 
-/**
- * Sous-ensemble de client Prisma utilisé ici. `PrismaService` comme
- * `Prisma.TransactionClient` y répondent, si bien que le comptage (hors
- * transaction) et la suppression (dans la transaction) partagent le même code.
- */
 export type PurgeClient = Prisma.TransactionClient;
 
 export interface PurgeStep {
-  /** Table visée. Sert au journal d'audit, jamais à l'interface. */
   readonly table: string;
   readonly count: (db: PurgeClient, context: PurgeContext) => Promise<number>;
   readonly remove: (db: PurgeClient, context: PurgeContext) => Promise<number>;
 }
 
-/**
- * Un compte n'est JAMAIS supprimé par l'administrateur qui exécute la purge.
- *
- * La garantie ne repose pas sur le seul filtre de rôle. Le premier
- * administrateur porte le rôle ADMIN, qu'aucune étape ne vise aujourd'hui, mais
- * l'exclusion explicite survivra à un futur domaine « Comptes administrateurs ».
- * Une protection qui dépend d'une condition située ailleurs finit toujours par
- * tomber avec elle.
- */
+// Le compte qui exécute la purge n'est JAMAIS supprimé, exclusion explicite et non
+// déduite du rôle : elle doit survivre à un futur domaine « Comptes administrateurs ».
 function accountsOfRole(role: Role): PurgeStep {
   const where = (context: PurgeContext): Prisma.UserWhereInput => ({
     role,
@@ -76,6 +44,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.callAttempt.count(),
     remove: async (db) => (await db.callAttempt.deleteMany({})).count,
   },
+  scheduledCallbacks: {
+    table: 'scheduled_callbacks',
+    count: (db) => db.scheduledCallback.count(),
+    remove: async (db) => (await db.scheduledCallback.deleteMany({})).count,
+  },
   callTasks: {
     table: 'call_tasks',
     count: (db) => db.callTask.count(),
@@ -90,6 +63,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     table: 'call_campaigns',
     count: (db) => db.callCampaign.count(),
     remove: async (db) => (await db.callCampaign.deleteMany({})).count,
+  },
+  repSuggestions: {
+    table: 'representant_suggestions',
+    count: (db) => db.representantSuggestion.count(),
+    remove: async (db) => (await db.representantSuggestion.deleteMany({})).count,
   },
   repCallAttempts: {
     table: 'rep_call_attempts',
@@ -158,10 +136,16 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
   },
   commercialAccounts: accountsOfRole(Role.COMMERCIAL),
   financeAccounts: accountsOfRole(Role.BANQUE_FINANCE),
+  supervisionAccounts: accountsOfRole(Role.SUPERVISEUR),
   bankCaseStages: {
     table: 'bank_case_stages',
     count: (db) => db.bankCaseStage.count(),
     remove: async (db) => (await db.bankCaseStage.deleteMany({})).count,
+  },
+  callOutcomeReasons: {
+    table: 'call_outcome_reasons',
+    count: (db) => db.callOutcomeReason.count(),
+    remove: async (db) => (await db.callOutcomeReason.deleteMany({})).count,
   },
   bankRejectionReasons: {
     table: 'bank_rejection_reasons',
@@ -195,15 +179,8 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
   },
 };
 
-/**
- * Étapes après lesquelles le registre de démonstration ne désigne plus rien.
- *
- * Le registre (`demo_entities`) mémorise les identifiants créés par le semeur.
- * Une purge qui emporte ces lignes le laisse pointer dans le vide : l'écran des
- * paramètres continuerait d'annoncer un jeu de démonstration en place, et la
- * désactivation ne supprimerait rien. On remet donc l'interrupteur à zéro dans
- * la MÊME transaction, plutôt que de laisser deux sources se contredire.
- */
+// Étapes après lesquelles le registre `demo_entities` ne désigne plus rien : l'interrupteur
+// de démonstration est remis à zéro dans la MÊME transaction, sinon l'écran l'annonce encore.
 export const DEMO_TRACKED_STEPS: readonly PurgeStepKey[] = [
   'commercialAccounts',
   'representants',

@@ -12,11 +12,13 @@ import {
   Prisma,
   Role,
   SEGMENT_LABELS,
+  ScheduledCallbackStatus,
   eligibleForCampaignWhere,
 } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { shortCode } from '../../common/short-code.js';
+import { isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import {
   MIN_SPREAD_DAYS,
@@ -39,27 +41,17 @@ import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { demoScope } from '../../prisma/demo-visibility.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 
-/**
- * Le tirage d'une campagne écrit autant de lignes qu'il y a de prospects
- * éligibles, jusqu'à plusieurs centaines de milliers. Le délai par défaut de
- * Prisma (5 s) l'interromprait au milieu ; on l'élargit franchement, mais
- * borné : une transaction qui dépasse cette limite est un incident, pas une
- * lenteur à absorber.
- */
+/** Bornes de transaction pour matérialiser une grande campagne. */
 const CAMPAIGN_TRANSACTION_TIMEOUT_MS = 120_000;
 const CAMPAIGN_TRANSACTION_MAX_WAIT_MS = 15_000;
 
-/**
- * Taille des lots d'insertion des tâches. Une seule instruction pour 500 000
- * lignes construirait une requête de plusieurs dizaines de mégaoctets côté
- * client comme côté serveur.
- */
+/** Évite les instructions d'insertion de plusieurs mégaoctets. */
 const TASK_INSERT_CHUNK = 5_000;
 
-/** Nombre de tentatives affichées dans le détail d'une campagne. */
+/** Nombre de tentatives récentes affichées dans le détail. */
 const RECENT_ATTEMPTS = 20;
 
-/** Libellé lisible d'un périmètre de campagne. */
+/** Libellé lisible du périmètre de campagne. */
 export function scopeLabel(scope: CampaignScope): string {
   // ALL n'a pas de libellé de segment : les quatre segments réunis FORMENT la
   // base, sans recouvrement ni trou (voir `segment.ts`).
@@ -68,7 +60,7 @@ export function scopeLabel(scope: CampaignScope): string {
 
 const emptyProgress = (): CampaignProgressDto => ({ total: 0, open: 0, done: 0, cancelled: 0 });
 
-/** Histogramme vide d'étalement. Toujours au moins une case : « jour 1 ». */
+/** Histogramme vide, contenant toujours le jour 1. */
 const zeroes = (length: number): number[] => Array.from({ length: Math.max(1, length) }, () => 0);
 
 type ProgressIndex = Map<string, CampaignProgressDto>;
@@ -95,9 +87,7 @@ export class Phase2CampaignsService {
     private readonly demo: DemoVisibilityService,
   ) {}
 
-  // ───────────────────────────────────────────────────────────────────────────
   // Création
-  // ───────────────────────────────────────────────────────────────────────────
 
   /**
    * Crée une campagne, tire l'ensemble éligible et MATÉRIALISE la répartition.
@@ -303,16 +293,24 @@ export class Phase2CampaignsService {
     });
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
   // Lecture
-  // ───────────────────────────────────────────────────────────────────────────
 
-  async list(query: CampaignQueryDto): Promise<CampaignListDto> {
+  /**
+   * Liste des campagnes. CLOISONNÉE pour un non-administrateur.
+   *
+   * Un téléconseiller ne voit que les campagnes où il a des tâches, et leur
+   * `progress` compte SES tâches, pas celles de l'équipe : ouvrir cette lecture
+   * pour lui rendre un sélecteur de campagne ne doit pas lui livrer au passage
+   * la production de ses collègues.
+   */
+  async list(user: AuthenticatedUser, query: CampaignQueryDto): Promise<CampaignListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
     const search = query.search?.trim();
+    const assignedToId = isAdmin(user) ? undefined : user.id;
     const where: Prisma.CallCampaignWhereInput = {
       ...demoScope(await this.demo.enabled()),
+      ...(assignedToId === undefined ? {} : { tasks: { some: { assignedToId } } }),
       ...(query.status ? { status: query.status } : {}),
       ...(query.scope ? { scope: query.scope } : {}),
       ...(query.createdById ? { createdById: query.createdById } : {}),
@@ -341,7 +339,10 @@ export class Phase2CampaignsService {
       }),
     ]);
 
-    const progress = await this.progressByCampaign(campaigns.map((row) => row.id));
+    const progress = await this.progressByCampaign(
+      campaigns.map((row) => row.id),
+      assignedToId,
+    );
 
     return {
       items: campaigns.map((row): CampaignSummaryDto => ({
@@ -524,12 +525,17 @@ export class Phase2CampaignsService {
 
   private async progressByCampaign(
     ids: readonly string[],
+    assignedToId?: string,
   ): Promise<Map<string, CampaignProgressDto>> {
     if (ids.length === 0) return new Map();
 
     const grouped = await this.prisma.callTask.groupBy({
       by: ['campaignId', 'status'],
-      where: { campaignId: { in: [...ids] }, ...demoScope(await this.demo.enabled()) },
+      where: {
+        campaignId: { in: [...ids] },
+        ...(assignedToId === undefined ? {} : { assignedToId }),
+        ...demoScope(await this.demo.enabled()),
+      },
       _count: { _all: true },
     });
 
@@ -538,9 +544,7 @@ export class Phase2CampaignsService {
     return index;
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
   // Clôture
-  // ───────────────────────────────────────────────────────────────────────────
 
   /**
    * Clôt la campagne et ANNULE toutes les tâches encore ouvertes.
@@ -581,14 +585,16 @@ export class Phase2CampaignsService {
         where: { campaignId: id, isActive: true },
         data: { status: CallTaskStatus.CANCELLED, isActive: false },
       });
+      await tx.scheduledCallback.updateMany({
+        where: { campaignId: id, status: ScheduledCallbackStatus.PENDING },
+        data: { status: ScheduledCallbackStatus.CANCELLED },
+      });
     });
 
     return this.get(id);
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
   // Programme d'un commercial
-  // ───────────────────────────────────────────────────────────────────────────
 
   /**
    * Lignes du programme d'un commercial, DANS L'ORDRE PERSISTÉ.

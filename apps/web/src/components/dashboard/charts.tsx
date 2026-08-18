@@ -10,7 +10,6 @@ import { formatNumber, formatShortDate } from '@/lib/format';
 import type { NamedCount, TimeSeriePoint } from '@/lib/types';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
 
-/** Options communes : police, info-bulle et grille reprises des tokens CPI. */
 function baseOptions(theme: ChartTheme, reducedMotion: boolean) {
   return {
     responsive: true,
@@ -48,8 +47,6 @@ function axisScales(theme: ChartTheme, horizontal: boolean) {
   return horizontal ? { x: value, y: category } : { x: category, y: value };
 }
 
-// ─── Prospects dans le temps (ligne cumulée) ────────────────────────────────
-
 export function ProspectsTrendChart({ points }: { points: readonly TimeSeriePoint[] }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
@@ -72,8 +69,6 @@ export function ProspectsTrendChart({ points }: { points: readonly TimeSeriePoin
             label: 'Prospects cumulés',
             data: points.map((p) => p.cumulative),
             borderColor: accent,
-            // Aplat très léger : la zone sert à lire la pente, pas à peser
-            // visuellement plus que la courbe elle-même.
             backgroundColor: `color-mix(in srgb, ${accent} 14%, transparent)`,
             borderWidth: 2,
             fill: true,
@@ -84,8 +79,6 @@ export function ProspectsTrendChart({ points }: { points: readonly TimeSeriePoin
     />
   );
 }
-
-// ─── Classement (barres horizontales) ───────────────────────────────────────
 
 export function RankBarChart({ items, label }: { items: readonly NamedCount[]; label: string }) {
   const theme = useChartTheme();
@@ -107,7 +100,6 @@ export function RankBarChart({ items, label }: { items: readonly NamedCount[]; l
             label,
             data: items.map((item) => item.value),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
-            // §2.6 : la série or ne tient que par son contour `accent-border`.
             borderColor: items.map((_, index) =>
               seriesBorderColor(theme, index, seriesColor(theme, index)),
             ),
@@ -121,8 +113,6 @@ export function RankBarChart({ items, label }: { items: readonly NamedCount[]; l
     />
   );
 }
-
-// ─── Répartition (barres verticales) ────────────────────────────────────────
 
 export function CategoryBarChart({
   items,
@@ -149,7 +139,6 @@ export function CategoryBarChart({
             label,
             data: items.map((item) => item.value),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
-            // §2.6 : la série or ne tient que par son contour `accent-border`.
             borderColor: items.map((_, index) =>
               seriesBorderColor(theme, index, seriesColor(theme, index)),
             ),
@@ -163,8 +152,6 @@ export function CategoryBarChart({
     />
   );
 }
-
-// ─── Part (anneau) ──────────────────────────────────────────────────────────
 
 export function ShareDoughnutChart({ items }: { items: readonly NamedCount[] }) {
   const theme = useChartTheme();
@@ -211,10 +198,6 @@ export function ShareDoughnutChart({ items }: { items: readonly NamedCount[] }) 
           {
             data: items.map((item) => item.value),
             backgroundColor: items.map((_, index) => seriesColor(theme, index)),
-            // La bordure reprend la couleur de la carte : elle sépare les parts
-            // sans introduire une teinte qui n'est dans aucun token. Seule la
-            // part or fait exception et prend `accent-border` (§2.6) : un
-            // séparateur blanc ne la délimiterait pas sur un fond blanc.
             borderColor: items.map((_, index) =>
               seriesBorderColor(theme, index, theme.tooltipBackground),
             ),

@@ -1,21 +1,10 @@
-/**
- * Seed idempotent : conçu pour être relancé sur une base déjà peuplée sans
- * jamais dupliquer ni écraser des données de production.
- *
- * Chaque entité est écrite en `upsert` sur sa clé naturelle (`code`, `name`,
- * `sigle`), pas sur son identifiant : les identifiants sont générés et ne sont
- * donc pas stables entre deux environnements.
- *
- * Les référentiels ne sont jamais SUPPRIMÉS ici. Une banque retirée de la liste
- * BCEAO peut rester référencée par des prospects existants ; la désactiver
- * (`isActive = false`) est l'affaire de l'admin, depuis le panel web.
- */
 import { argon2id, hash } from 'argon2';
 
 import {
   BANK_REJECTION_REASONS,
   BANK_STAGES,
   BANQUES_SENEGAL,
+  CALL_OUTCOME_REASONS,
   DEPARTEMENT_COUNT,
   PrismaClient,
   PrismaPg,
@@ -31,8 +20,6 @@ const prisma = new PrismaClient({
   }),
 });
 
-// Mêmes paramètres que la vérification à la connexion. Un écart ici rendrait
-// le mot de passe de l'admin initial invérifiable.
 const ARGON2_OPTIONS = {
   type: argon2id,
   memoryCost: 19_456,
@@ -52,8 +39,6 @@ async function seedGeography(): Promise<void> {
       await prisma.departement.upsert({
         where: { code: departement.code },
         create: { code: departement.code, name: departement.name, regionId: saved.id },
-        // `isActive` est délibérément absent : un département désactivé par
-        // l'admin ne doit pas être réactivé par un simple re-seed.
         update: { name: departement.name, regionId: saved.id },
       });
     }
@@ -68,15 +53,6 @@ async function seedGeography(): Promise<void> {
   await seedIefs();
 }
 
-/**
- * Les IEF, rattachées à leur département par son CODE.
- *
- * Le code et non le libellé : la matrice nationale écrit « Birkilane » là où la
- * feuille de route régionale et l'orthographe officielle écrivent
- * « Birkelane ». Un rattachement par libellé aurait donc échoué sur ce seul
- * département, et l'échec se serait lu comme « IEF manquante » plutôt que
- * comme « les deux sources ne s'accordent pas sur un nom ».
- */
 async function seedIefs(): Promise<void> {
   const departements = await prisma.departement.findMany({ select: { id: true, code: true } });
   const byCode = new Map(departements.map((row) => [row.code, row.id]));
@@ -90,7 +66,6 @@ async function seedIefs(): Promise<void> {
     await prisma.ief.upsert({
       where: { code: ief.code },
       create: { code: ief.code, name: ief.name, departementId },
-      // Même raison que pour les départements : `isActive` n'est pas réécrit.
       update: { name: ief.name, departementId },
     });
   }
@@ -133,8 +108,6 @@ async function seedBankWorkflow(): Promise<void> {
     await prisma.bankCaseStage.upsert({
       where: { code: stage.code },
       create: stage,
-      // `isActive` est absent de l'update : une étape intermédiaire désactivée
-      // par l'admin ne doit pas être réactivée par un simple re-seed.
       update: {
         label: stage.label,
         position: stage.position,
@@ -160,6 +133,29 @@ async function seedBankWorkflow(): Promise<void> {
   );
 }
 
+async function seedCallOutcomes(): Promise<void> {
+  for (const reason of CALL_OUTCOME_REASONS) {
+    await prisma.callOutcomeReason.upsert({
+      where: { code: reason.code },
+      // `minPayloadVersion` a 1: seuls ces six motifs sont emettables par les
+      // telephones deja deployes.
+      create: { ...reason, isSystem: true, minPayloadVersion: 1 },
+      update: {
+        label: reason.label,
+        effect: reason.effect,
+        requiresComment: reason.requiresComment,
+        requiresCallback: reason.requiresCallback,
+        countsAsReached: reason.countsAsReached,
+        color: reason.color,
+        sortOrder: reason.sortOrder,
+        isSystem: true,
+        minPayloadVersion: 1,
+      },
+    });
+  }
+  console.info(`  issues d'appel : ${String(CALL_OUTCOME_REASONS.length)} motifs systeme`);
+}
+
 async function seedAdmin(): Promise<void> {
   const email = process.env.SEED_ADMIN_EMAIL;
   const username = process.env.SEED_ADMIN_USERNAME;
@@ -176,9 +172,6 @@ async function seedAdmin(): Promise<void> {
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    // On ne réécrit JAMAIS le mot de passe d'un compte existant : un re-seed
-    // en production remettrait le mot de passe de l'administrateur à la valeur
-    // du fichier .env, silencieusement.
     console.info(`  admin : ${email} existe déjà, inchangé`);
     return;
   }
@@ -204,6 +197,7 @@ async function main(): Promise<void> {
   await seedBanques();
   await seedSyndicats();
   await seedBankWorkflow();
+  await seedCallOutcomes();
   await seedAdmin();
   console.info('Seed terminé.');
 }

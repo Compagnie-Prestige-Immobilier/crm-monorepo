@@ -30,25 +30,6 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 
-/**
- * La BOÎTE DE RÉCEPTION complète.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * L'écran que la cloche promettait sans jamais y mener.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Le panneau de la cloche montre les vingt dernières lignes, et son code
- * annonçait « au-delà, un lien vers l'écran complet ». Ce lien n'existait pas,
- * et `/notifications` était le COMPOSEUR, réservé à l'ADMIN. Une notification
- * tombée en vingt-et-unième position était donc définitivement hors de portée -
- * pour un téléconseiller comme pour un agent bancaire, à qui le panel n'offrait
- * aucun autre moyen de retrouver un rappel de la semaine passée.
- *
- * Deux gestes, et seulement deux : PAGINER, et TOUT MARQUER COMME LU. Une boîte
- * qui garde vingt lignes en gras cesse d'être lue ; il faut pouvoir la remettre
- * à zéro d'un clic, sinon la pastille rouge devient un décor permanent et la
- * cloche perd sa raison d'être.
- */
 export function InboxView({
   page,
   unreadOnly,
@@ -74,8 +55,6 @@ export function InboxView({
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.inboxRoot });
     },
-    // Silencieux en cas d'échec : le marquage est l'effet de bord d'un clic
-    // dont l'intention réelle est la lecture ou la navigation.
   });
 
   const markAll = useMutation({
@@ -235,12 +214,6 @@ export function InboxView({
   );
 }
 
-/**
- * Une ligne. Toujours un `<button>`, même quand la route n'est pas servie par
- * le panel : le clic garde alors son second effet, le marquage en lu. Une ligne
- * inerte resterait éternellement en gras dans la liste de quelqu'un qui l'a
- * pourtant lue.
- */
 function InboxRow({ item, onActivate }: { item: InboxItem; onActivate: () => void }) {
   const navigable = webRouteFor(item.route) !== null;
 

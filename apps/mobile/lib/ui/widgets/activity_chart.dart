@@ -4,50 +4,24 @@ import 'package:intl/intl.dart';
 import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
 
-/// Une journée de saisie.
 @immutable
 class ActivityDay {
   const ActivityDay({required this.day, required this.synced, required this.pending});
 
   final DateTime day;
 
-  /// Lignes acquittées par le serveur.
   final int synced;
 
-  /// Lignes encore en file, quelle qu'en soit la raison.
   final int pending;
 
   int get total => synced + pending;
 }
 
-/// Sept barres, deux segments, un `CustomPainter`.
-///
-/// ## Pourquoi pas une librairie de graphiques
-///
-/// Les paquets de graphiques Flutter embarquent leur propre moteur de rendu,
-/// leurs gestes et leurs animations. Pour sept barres à deux segments, c'est
-/// plusieurs centaines de kilooctets d'APK et une passe de composition
-/// supplémentaire par image, sur un appareil qui n'en a pas les moyens. Un
-/// `CustomPainter` peint sept rectangles arrondis : aucune allocation par image,
-/// aucun sous-arbre de widgets, `shouldRepaint` faux tant que les données ne
-/// bougent pas.
-///
-/// ## Accessibilité
-///
-/// docs/design.md §2.6 l'exige : un canevas n'est pas lisible par un lecteur
-/// d'écran, donc le graphe est **doublé d'une alternative textuelle** portée par
-/// le `Semantics` parent, et aucune information n'est portée par la couleur
-/// seule (chaque série est nommée dans la légende).
 class ActivityChart extends StatelessWidget {
   const ActivityChart({super.key, required this.days});
 
   final List<ActivityDay> days;
 
-  /// Deux lettres et non une.
-  ///
-  /// « L M M J V S D » place deux M côte à côte : sur sept barres, on ne sait
-  /// plus laquelle est mardi et laquelle est mercredi, ce qui est exactement la
-  /// question qu'on se pose devant un graphe d'activité.
   static final DateFormat _weekday = DateFormat('E', 'fr');
 
   static String _dayLetters(DateTime d) {
@@ -96,9 +70,6 @@ class ActivityChart extends StatelessWidget {
                   syncedColor: theme.colorScheme.primary,
                   pendingColor: cpi.accent,
                   pendingBorder: cpi.accentBorder,
-                  // Piste très effacée : à pleine teinte, les jours vides se
-                  // lisaient comme des barres pleines et le graphe racontait
-                  // l'inverse de la réalité.
                   trackColor: theme.colorScheme.surfaceContainerHigh.withValues(
                     alpha: 0.45,
                   ),
@@ -121,9 +92,6 @@ class ActivityChart extends StatelessWidget {
               ],
             ),
             const SizedBox(height: CpiSpacing.xs),
-            // `Wrap` et non `Row` : à la plus grande taille de texte, les deux
-            // entrées de légende dépassaient de 21 px sur 360 dp de large.
-            // Elles passent alors l'une sous l'autre au lieu de déborder.
             Wrap(
               spacing: CpiSpacing.md,
               runSpacing: CpiSpacing.xxs,
@@ -175,9 +143,6 @@ class _LegendDot extends StatelessWidget {
           decoration: BoxDecoration(
             color: color,
             borderRadius: CpiRadius.brXs,
-            // Le contour de l'or : docs/design.md §2.6 n'autorise `chart-2`
-            // qu'accompagné de `accent-border`, c'est ce trait qui dessine la
-            // forme.
             border: border == null ? null : Border.all(color: border!),
           ),
         ),
@@ -230,8 +195,6 @@ class _BarsPainter extends CustomPainter {
       final double left = i * slot + (slot - barWidth) / 2;
       final Rect track = Rect.fromLTWH(left, 0, barWidth, size.height);
 
-      // Piste toujours peinte : sans elle, un jour vide n'a aucune existence
-      // visuelle et le graphe se lit comme s'il ne portait que cinq jours.
       paint.color = trackColor;
       canvas.drawRRect(RRect.fromRectAndRadius(track, radius), paint);
 

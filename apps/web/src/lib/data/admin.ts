@@ -4,28 +4,7 @@ import { unwrap } from '@crm/api-client/query';
 import { getApiClient } from '@/lib/api/browser';
 import type { Role } from '@/lib/types';
 
-/**
- * Purge de la base et supervision des comptes : `GET|POST /admin/purge`,
- * `GET /admin/supervision`. Premier administrateur et ADMIN, respectivement.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Les formes viennent du CONTRAT, plus d'une liste tenue à la main.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Ce module redéclarait `PurgeDomainKey` en douze clés et refusait tout ce qui
- * n'y figurait pas (« domaine inconnu »). Le contrat en compte QUATORZE : les
- * campagnes représentants et les demandes clients s'y sont ajoutées. L'écran de
- * purge tombait donc entièrement sur un catalogue parfaitement valide, et
- * l'administrateur voyait un écran d'erreur là où il fallait décocher deux
- * cases. C'est exactement ce que produit une déclaration parallèle d'un contrat
- * déjà typé : elle ne protège de rien et elle dérive.
- *
- * Toute la logique de DÉCISION reste ici, en fonctions pures, pour qu'elle soit
- * éprouvable sans navigateur. Les écrans ne font que la rendre.
- */
 type Schemas = components['schemas'];
-
-// ─── Purge ───────────────────────────────────────────────────────────────────
 
 export type PurgeDomainKey = Schemas['PurgeDomainKey'];
 export type PurgeDomain = Schemas['PurgeDomainDto'];
@@ -43,24 +22,6 @@ export async function runPurge(
   return unwrap(await client.POST('/api/v1/admin/purge', { body: input }));
 }
 
-// ─── Sélection ───────────────────────────────────────────────────────────────
-
-/**
- * Ferme une sélection sur ses dépendances, transitivement.
- *
- * L'écran affiche cette fermeture AVANT la validation. Une case qui s'allume
- * toute seule au moment de la suppression se vit comme une dérive, et à raison :
- * l'administrateur croit retirer les représentants et découvre, après coup,
- * qu'il a aussi perdu les dossiers bancaires.
- *
- * Le serveur refait le même calcul de son côté. Ce n'est pas une redondance
- * inutile : ici c'est de l'affichage, là-bas c'est la garantie.
- *
- * L'ensemble intermédiaire est un `Set<string>` et non un `Set<PurgeDomainKey>` :
- * le contrat déclare `requires` en `string[]`, et le forcer au type énuméré
- * mentirait au compilateur sur une valeur venue du réseau. La liste RENDUE, elle,
- * est filtrée depuis le catalogue, donc typée sans conversion.
- */
 export function expandSelection(
   selected: readonly PurgeDomainKey[],
   domains: readonly PurgeDomain[],
@@ -76,12 +37,9 @@ export function expandSelection(
     pending.push(...(byKey.get(key)?.requires ?? []));
   }
 
-  // Trié dans l'ordre du catalogue : deux sélections équivalentes doivent
-  // produire le même récapitulatif, quel que soit l'ordre des clics.
   return domains.map((domain) => domain.key).filter((key) => resolved.has(key));
 }
 
-/** Domaines entraînés par la sélection sans avoir été cochés. */
 export function impliedDomains(
   selected: readonly PurgeDomainKey[],
   domains: readonly PurgeDomain[],
@@ -90,7 +48,6 @@ export function impliedDomains(
   return expandSelection(selected, domains).filter((key) => !chosen.has(key));
 }
 
-/** Lignes que la sélection étendue emporterait aujourd'hui. */
 export function selectionRows(
   selected: readonly PurgeDomainKey[],
   domains: readonly PurgeDomain[],
@@ -101,16 +58,6 @@ export function selectionRows(
     .reduce((sum, domain) => sum + domain.rows, 0);
 }
 
-/**
- * La purge peut-elle partir ?
- *
- * QUATRE conditions, et aucune n'est superflue :
- *  - le compte est le premier administrateur ;
- *  - au moins un domaine est coché ;
- *  - l'identifiant a été ressaisi à l'identique ;
- *  - aucun appel n'est déjà en cours : sans quoi un double-clic envoie deux
- *    purges, et la seconde échoue bruyamment au moment où la première réussit.
- */
 export function canSubmitPurge(input: {
   catalog: PurgeCatalog;
   selected: readonly PurgeDomainKey[];
@@ -123,18 +70,11 @@ export function canSubmitPurge(input: {
   return matchesHint(input.confirmation, input.catalog.confirmationHint);
 }
 
-/**
- * Comparaison de la ressaisie. Insensible à la casse et aux espaces de bord,
- * comme la connexion : c'est le GESTE de ressaisie qui porte la confirmation,
- * pas sa mise en forme. Le serveur applique exactement la même règle.
- */
 export function matchesHint(typed: string, hint: string): boolean {
   const normalized = typed.trim().toLocaleLowerCase();
   if (normalized === '') return false;
   return normalized === hint.trim().toLocaleLowerCase();
 }
-
-// ─── Supervision ─────────────────────────────────────────────────────────────
 
 export type PresenceState = Schemas['PresenceState'];
 export type SupervisedUser = Schemas['SupervisedUserDto'];
@@ -146,37 +86,13 @@ export async function fetchSupervision(client: ApiClient = getApiClient()): Prom
 
 const PRESENCE_STATES = ['ONLINE', 'RECENT', 'AWAY'] as const satisfies readonly PresenceState[];
 
-/**
- * Les rôles du CONTRAT, et non un tableau de chaînes.
- *
- * `readonly string[]` acceptait n'importe quoi : la liste pouvait dériver du
- * contrat sans que rien ne le signale. Typée `readonly Role[]`, elle est
- * vérifiée par le compilateur, et `ROLE_LABELS` casse déjà le build si un rôle
- * est ajouté sans libellé.
- */
-const ROLES = ['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE'] as const satisfies readonly Role[];
+const ROLES = [
+  'ADMIN',
+  'COMMERCIAL',
+  'BANQUE_FINANCE',
+  'SUPERVISEUR',
+] as const satisfies readonly Role[];
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * Une valeur inconnue DÉGRADE la ligne ; elle ne fait pas tomber l'écran.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Ces deux replis sont appliqués À L'AFFICHAGE, dans `supervision-view.tsx`, et
- * non plus dans un validateur d'entrée. Le déplacement change le mode de panne
- * mais garde la protection, et c'est le point : le typage engendré décrit ce que
- * l'API PROMET, il ne contraint rien au moment de l'exécution. Un rôle livré
- * côté API avant que le panel ne soit redéployé arrive donc bel et bien dans la
- * page, où `Record<PresenceState, …>` rendrait `undefined` et casserait le rendu
- * de la ligne.
- *
- * On replie sur une valeur sûre plutôt que de perdre la page :
- *  - une présence inconnue vaut `AWAY`, l'état le moins affirmatif : dire
- *    « inactif » de quelqu'un qui est peut-être connecté induit moins en erreur
- *    que l'inverse ;
- *  - un rôle inconnu vaut `COMMERCIAL`, le rôle par défaut du terrain. La ligne
- *    reste listée, nommée, avec sa dernière activité : c'est cette information
- *    que l'écran doit rendre, pas la taxonomie des rôles.
- */
 export function knownRole(value: string): Role {
   return (ROLES as readonly string[]).includes(value) ? (value as Role) : 'COMMERCIAL';
 }
@@ -185,19 +101,12 @@ export function knownPresence(value: string): PresenceState {
   return (PRESENCE_STATES as readonly string[]).includes(value) ? (value as PresenceState) : 'AWAY';
 }
 
-/** Libellés d'état. Un état se nomme, il ne se raconte pas. */
 export const PRESENCE_LABELS: Record<PresenceState, string> = {
   ONLINE: 'Connecté',
   RECENT: 'Récent',
   AWAY: 'Inactif',
 };
 
-/**
- * Écart en minutes entre une trace et l'horloge du serveur.
- *
- * `null` quand la trace n'existe pas, et négatif ramené à zéro : une horloge
- * d'appareil en avance ne doit pas produire « dans 3 minutes ».
- */
 export function minutesSince(iso: string | null, observedAt: string): number | null {
   if (iso === null) return null;
   const seen = Date.parse(iso);
@@ -206,12 +115,6 @@ export function minutesSince(iso: string | null, observedAt: string): number | n
   return Math.max(0, Math.round((now - seen) / 60_000));
 }
 
-/**
- * Écart lisible, en français, sans mode d'emploi : « 4 min », « 3 h », « 2 j ».
- *
- * Les unités changent aux seuils où le chiffre cesse d'être parlant : personne
- * ne lit « 2 880 min » comme « deux jours ».
- */
 export function formatElapsed(minutes: number | null): string {
   if (minutes === null) return 'Jamais';
   if (minutes < 1) return 'À l’instant';
@@ -220,4 +123,383 @@ export function formatElapsed(minutes: number | null): string {
   if (hours < 24) return `${String(hours)} h`;
   const days = Math.floor(hours / 24);
   return `${String(days)} j`;
+}
+
+export type SupervisionGranularity = Schemas['SupervisionGranularity'];
+export type ActivityRow = Schemas['SupervisionActivityRowDto'];
+export type ActivityTeleconseiller = Schemas['SupervisionTeleconseillerDto'];
+export type SupervisionActivity = Schemas['SupervisionActivityDto'];
+
+/** Bornes en AAAA-MM-JJ, incluses, journée d'Africa/Dakar. */
+export type ActivityRange = { from: string; to: string };
+
+export type PeriodPreset = 'today' | 'week' | 'last7' | 'custom';
+
+export const PERIOD_LABELS: Record<PeriodPreset, string> = {
+  today: 'Aujourd’hui',
+  week: 'Cette semaine',
+  last7: '7 derniers jours',
+  custom: 'Période libre',
+};
+
+// Africa/Dakar est à UTC+0 toute l'année: la date UTC EST la date de Dakar.
+export function dakarToday(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+export function shiftDays(isoDate: string, days: number): string {
+  const at = new Date(`${isoDate}T00:00:00.000Z`);
+  at.setUTCDate(at.getUTCDate() + days);
+  return at.toISOString().slice(0, 10);
+}
+
+export function presetRange(
+  preset: Exclude<PeriodPreset, 'custom'>,
+  today: string = dakarToday(),
+): ActivityRange {
+  if (preset === 'today') return { from: today, to: today };
+  if (preset === 'last7') return { from: shiftDays(today, -6), to: today };
+  const weekday = new Date(`${today}T00:00:00.000Z`).getUTCDay();
+  return { from: shiftDays(today, -((weekday + 6) % 7)), to: today };
+}
+
+export function supervisionActivityKey(
+  range: ActivityRange,
+  granularity: SupervisionGranularity,
+): readonly unknown[] {
+  return ['supervision', 'activite', range.from, range.to, granularity];
+}
+
+export async function fetchSupervisionActivite(
+  input: { range: ActivityRange; granularity: SupervisionGranularity },
+  client: ApiClient = getApiClient(),
+): Promise<SupervisionActivity> {
+  return unwrap(
+    await client.GET('/api/v1/supervision/activite', {
+      params: {
+        query: {
+          actFrom: `${input.range.from}T00:00:00.000Z`,
+          actTo: `${input.range.to}T23:59:59.999Z`,
+          granularity: input.granularity,
+        },
+      },
+    }),
+  );
+}
+
+export type ActivityLine = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  openTasks: number;
+  calls: number;
+  methodObtained: number;
+  unreachable: number;
+  wrongNumber: number;
+  refused: number;
+  callback: number;
+  reachRate: number | null;
+  prospectsCreated: number;
+  representantsContacted: number;
+  tasksClosed: number;
+  hasActivity: boolean;
+};
+
+export function reachRateOf(counts: {
+  calls: number;
+  unreachable: number;
+  wrongNumber: number;
+}): number | null {
+  if (counts.calls === 0) return null;
+  const reached = counts.calls - counts.unreachable - counts.wrongNumber;
+  return Math.round((reached / counts.calls) * 1000) / 10;
+}
+
+/**
+ * `items` n'a de ligne que là où il s'est passé quelque chose: le croisement
+ * avec `teleconseillers` est ce qui fait apparaître les agents à zéro acte.
+ */
+export function activityLines(data: SupervisionActivity): ActivityLine[] {
+  const lines = new Map<string, ActivityLine>();
+
+  for (const person of data.teleconseillers) {
+    lines.set(person.id, {
+      id: person.id,
+      name: person.fullName,
+      isActive: person.isActive,
+      openTasks: person.openTasks,
+      calls: 0,
+      methodObtained: 0,
+      unreachable: 0,
+      wrongNumber: 0,
+      refused: 0,
+      callback: 0,
+      reachRate: null,
+      prospectsCreated: 0,
+      representantsContacted: 0,
+      tasksClosed: 0,
+      hasActivity: false,
+    });
+  }
+
+  for (const row of data.items) {
+    let line = lines.get(row.teleconseillerId);
+    if (line === undefined) {
+      line = {
+        id: row.teleconseillerId,
+        name: row.teleconseillerName,
+        isActive: true,
+        openTasks: 0,
+        calls: 0,
+        methodObtained: 0,
+        unreachable: 0,
+        wrongNumber: 0,
+        refused: 0,
+        callback: 0,
+        reachRate: null,
+        prospectsCreated: 0,
+        representantsContacted: 0,
+        tasksClosed: 0,
+        hasActivity: false,
+      };
+      lines.set(line.id, line);
+    }
+    line.calls += row.calls;
+    line.methodObtained += row.methodObtained;
+    line.unreachable += row.unreachable;
+    line.wrongNumber += row.wrongNumber;
+    line.refused += row.refused;
+    line.callback += row.callback;
+    line.prospectsCreated += row.prospectsCreated;
+    // Distinct DANS une période: le cumul recompte un représentant rappelé une autre période.
+    line.representantsContacted += row.representantsContacted;
+    line.tasksClosed += row.tasksClosed;
+    line.hasActivity = true;
+  }
+
+  const result = [...lines.values()];
+  for (const line of result) line.reachRate = reachRateOf(line);
+  return result;
+}
+
+export type ActivityTotals = {
+  people: number;
+  calls: number;
+  methodObtained: number;
+  unreachable: number;
+  wrongNumber: number;
+  refused: number;
+  callback: number;
+  reachRate: number | null;
+  prospectsCreated: number;
+  representantsContacted: number;
+  tasksClosed: number;
+  openTasks: number;
+};
+
+export function activityTotals(lines: readonly ActivityLine[]): ActivityTotals {
+  const totals: ActivityTotals = {
+    people: lines.length,
+    calls: 0,
+    methodObtained: 0,
+    unreachable: 0,
+    wrongNumber: 0,
+    refused: 0,
+    callback: 0,
+    reachRate: null,
+    prospectsCreated: 0,
+    representantsContacted: 0,
+    tasksClosed: 0,
+    openTasks: 0,
+  };
+
+  for (const line of lines) {
+    totals.calls += line.calls;
+    totals.methodObtained += line.methodObtained;
+    totals.unreachable += line.unreachable;
+    totals.wrongNumber += line.wrongNumber;
+    totals.refused += line.refused;
+    totals.callback += line.callback;
+    totals.prospectsCreated += line.prospectsCreated;
+    totals.representantsContacted += line.representantsContacted;
+    totals.tasksClosed += line.tasksClosed;
+    totals.openTasks += line.openTasks;
+  }
+
+  totals.reachRate = reachRateOf(totals);
+  return totals;
+}
+
+export function activityAverages(totals: ActivityTotals): Omit<ActivityTotals, 'people'> {
+  const divisor = totals.people === 0 ? 1 : totals.people;
+  const mean = (value: number): number => Math.round((value / divisor) * 10) / 10;
+  return {
+    calls: mean(totals.calls),
+    methodObtained: mean(totals.methodObtained),
+    unreachable: mean(totals.unreachable),
+    wrongNumber: mean(totals.wrongNumber),
+    refused: mean(totals.refused),
+    callback: mean(totals.callback),
+    reachRate: totals.reachRate,
+    prospectsCreated: mean(totals.prospectsCreated),
+    representantsContacted: mean(totals.representantsContacted),
+    tasksClosed: mean(totals.tasksClosed),
+    openTasks: mean(totals.openTasks),
+  };
+}
+
+export type BucketTotals = {
+  bucket: string;
+  calls: number;
+  methodObtained: number;
+  unreachable: number;
+  wrongNumber: number;
+  refused: number;
+  callback: number;
+  reachRate: number | null;
+};
+
+export function bucketTotals(rows: readonly ActivityRow[]): BucketTotals[] {
+  const buckets = new Map<string, BucketTotals>();
+
+  for (const row of rows) {
+    const bucket = buckets.get(row.bucket) ?? {
+      bucket: row.bucket,
+      calls: 0,
+      methodObtained: 0,
+      unreachable: 0,
+      wrongNumber: 0,
+      refused: 0,
+      callback: 0,
+      reachRate: null,
+    };
+    bucket.calls += row.calls;
+    bucket.methodObtained += row.methodObtained;
+    bucket.unreachable += row.unreachable;
+    bucket.wrongNumber += row.wrongNumber;
+    bucket.refused += row.refused;
+    bucket.callback += row.callback;
+    buckets.set(bucket.bucket, bucket);
+  }
+
+  const result = [...buckets.values()].sort((a, b) => a.bucket.localeCompare(b.bucket));
+  for (const bucket of result) bucket.reachRate = reachRateOf(bucket);
+  return result;
+}
+
+export type ActivitySortKey = 'name' | Exclude<keyof ActivityTotals, 'people'>;
+export type SortDirection = 'asc' | 'desc';
+
+export function sortActivityLines(
+  lines: readonly ActivityLine[],
+  key: ActivitySortKey,
+  direction: SortDirection,
+): ActivityLine[] {
+  const sign = direction === 'asc' ? 1 : -1;
+  return [...lines].sort((a, b) => {
+    if (key === 'name') return sign * a.name.localeCompare(b.name, 'fr');
+    const left = a[key];
+    const right = b[key];
+    if (left === null || right === null) {
+      if (left === right) return a.name.localeCompare(b.name, 'fr');
+      return left === null ? 1 : -1;
+    }
+    if (left === right) return a.name.localeCompare(b.name, 'fr');
+    return sign * (left - right);
+  });
+}
+
+const CSV_HEADERS = [
+  'Téléconseiller',
+  'Appels',
+  'Méthodes obtenues',
+  'NRP / injoignables',
+  'Faux numéros',
+  'Refus',
+  'À rappeler',
+  'Taux de joignabilité (%)',
+  'Prospects saisis',
+  'Représentants contactés',
+  'Tâches closes',
+  'Reste à faire',
+];
+
+function csvCell(value: string | number | null): string {
+  if (value === null) return '';
+  const text = typeof value === 'number' ? String(value).replace('.', ',') : value;
+  return /[";\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
+}
+
+export function activityCsv(input: {
+  lines: readonly ActivityLine[];
+  totals: ActivityTotals;
+  range: ActivityRange;
+  granularity: SupervisionGranularity;
+}): string {
+  const rows: (string | number | null)[][] = [
+    [
+      `Activité des téléconseillers du ${input.range.from} au ${input.range.to}`,
+      input.granularity === 'week' ? 'Par semaine' : 'Par jour',
+    ],
+    [],
+    CSV_HEADERS,
+  ];
+
+  for (const line of input.lines) {
+    rows.push([
+      line.isActive ? line.name : `${line.name} (désactivé)`,
+      line.calls,
+      line.methodObtained,
+      line.unreachable,
+      line.wrongNumber,
+      line.refused,
+      line.callback,
+      line.reachRate,
+      line.prospectsCreated,
+      line.representantsContacted,
+      line.tasksClosed,
+      line.openTasks,
+    ]);
+  }
+
+  const totals = input.totals;
+  const averages = activityAverages(totals);
+  rows.push([
+    'Total équipe',
+    totals.calls,
+    totals.methodObtained,
+    totals.unreachable,
+    totals.wrongNumber,
+    totals.refused,
+    totals.callback,
+    totals.reachRate,
+    totals.prospectsCreated,
+    totals.representantsContacted,
+    totals.tasksClosed,
+    totals.openTasks,
+  ]);
+  rows.push([
+    'Moyenne par téléconseiller',
+    averages.calls,
+    averages.methodObtained,
+    averages.unreachable,
+    averages.wrongNumber,
+    averages.refused,
+    averages.callback,
+    averages.reachRate,
+    averages.prospectsCreated,
+    averages.representantsContacted,
+    averages.tasksClosed,
+    averages.openTasks,
+  ]);
+  rows.push([]);
+  rows.push(['Reste à faire : tâches d’appel ouvertes à l’instant, hors période.']);
+
+  return rows.map((row) => row.map(csvCell).join(';')).join('\r\n');
+}
+
+export function activityCsvFileName(range: ActivityRange): string {
+  return range.from === range.to
+    ? `cpi-supervision-activite-${range.from}.csv`
+    : `cpi-supervision-activite-${range.from}_${range.to}.csv`;
 }

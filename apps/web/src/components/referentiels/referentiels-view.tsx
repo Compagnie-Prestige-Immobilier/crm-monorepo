@@ -10,6 +10,7 @@ import {
   PowerIcon,
   PowerOffIcon,
 } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -48,19 +49,6 @@ import { queryKeys } from '@/lib/query-keys';
 import type { Banque, Departement, Syndicat } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-/**
- * Référentiels : banques, syndicats, départements.
- *
- * Ces trois listes descendent EN LECTURE SEULE vers l'application mobile. Toute
- * modification faite ici change ce que les commerciaux peuvent choisir lors de
- * leur prochaine synchronisation : d'où le compteur d'usage affiché sur chaque
- * ligne et la confirmation explicite avant désactivation.
- *
- * L'onglet ouvert et la recherche vivent dans l'URL, comme les critères des
- * autres écrans : « le référentiel des syndicats, filtré sur SUDES » se colle
- * dans un message, et le rechargement ne renvoie plus l'administrateur sur
- * l'onglet des banques.
- */
 const TABS = ['banques', 'syndicats', 'departements'] as const;
 
 type ReferentielTab = (typeof TABS)[number];
@@ -91,15 +79,15 @@ export function ReferentielsView() {
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-3xl text-[0.9375rem] text-muted-foreground">
-        Listes de valeurs proposées à la saisie des prospects.
+        Listes de valeurs proposées à la saisie des prospects.{' '}
+        <Link href="/referentiels/issues-appel" className="underline underline-offset-2">
+          Issues d’appel
+        </Link>
       </p>
 
       <Tabs
         value={tab}
         onValueChange={(value) => {
-          // La recherche est ABANDONNÉE au changement d'onglet : « CBAO » n'a
-          // aucun sens sur les syndicats, et un onglet qui s'ouvre déjà filtré
-          // sur un mot venu d'ailleurs se lit comme une liste vide.
           write(value as ReferentielTab, '');
         }}
       >
@@ -138,15 +126,6 @@ export function ReferentielsView() {
   );
 }
 
-/**
- * Recherche par nom, appliquée EN MÉMOIRE.
- *
- * Les trois référentiels descendent en entier dans une seule requête (une
- * quinzaine de banques, une quarantaine de syndicats, quarante-six
- * départements) : filtrer ici évite un aller-retour par frappe pour un gain
- * nul. La comparaison est insensible à la casse et aux accents, sinon
- * « departement » ne trouverait jamais « Département ».
- */
 function normalize(value: string): string {
   return value
     .normalize('NFD')
@@ -160,7 +139,6 @@ function matches(search: string, ...fields: readonly (string | null)[]): boolean
   return fields.some((field) => field !== null && normalize(field).includes(needle));
 }
 
-/** Compteurs d'usage, partagés par les trois onglets. */
 function useUsage(): { banques: UsageCounts; syndicats: UsageCounts; departements: UsageCounts } {
   const { data } = useQuery({
     queryKey: queryKeys.referentielUsage,
@@ -232,11 +210,7 @@ function TableSkeleton() {
   );
 }
 
-/** Ligne désactivée : atténuée, badge explicite, liseré. Pas juste un booléen. */
 const inactiveRowClass =
-  // Liseré à pleine opacité : à `/40` il tombait à 1,90:1, sous les 3:1 exigés
-  // d'un élément graphique porteur de sens : et c'est le seul marqueur visuel
-  // qui distingue une ligne désactivée.
   'bg-muted/50 [&>td:first-child]:border-l-2 [&>td:first-child]:border-l-muted-foreground';
 
 function UsageCell({ count }: { count: number }) {
@@ -246,8 +220,6 @@ function UsageCell({ count }: { count: number }) {
     </span>
   );
 }
-
-// ─── Banques ────────────────────────────────────────────────────────────────
 
 function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: string) => void }) {
   const queryClient = useQueryClient();
@@ -287,8 +259,6 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
     },
   });
 
-  // Réordonner = échanger le `sortOrder` avec le voisin. Deux PATCH plutôt
-  // qu'un endpoint de réordonnancement, que le contrat n'expose pas.
   const swap = useMutation({
     mutationFn: async ({ a, b }: { a: Banque; b: Banque }) => {
       await updateBanque(a.id, {
@@ -310,12 +280,6 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
     },
   });
 
-  /**
-   * Le tri porte sur la liste COMPLÈTE, la recherche ne fait que masquer : les
-   * flèches « Monter » et « Descendre » échangent le `sortOrder` avec le voisin
-   * réel, pas avec le voisin affiché. Réordonner depuis une liste filtrée
-   * produirait sinon un ordre que personne n'a demandé.
-   */
   const allRows = [...(data ?? [])].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.shortName.localeCompare(b.shortName, 'fr'),
   );
@@ -473,8 +437,6 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
   );
 }
 
-// ─── Syndicats ──────────────────────────────────────────────────────────────
-
 function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: string) => void }) {
   const queryClient = useQueryClient();
   const usage = useUsage();
@@ -525,7 +487,6 @@ function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: 
     },
   });
 
-  // Ordre complet d'un côté, affichage filtré de l'autre : voir `BanquesTab`.
   const allRows = [...(data ?? [])].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.sigle.localeCompare(b.sigle, 'fr'),
   );
@@ -695,8 +656,6 @@ function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: 
   );
 }
 
-// ─── Départements ───────────────────────────────────────────────────────────
-
 function DepartementsTab({
   search,
   onSearch,
@@ -735,15 +694,11 @@ function DepartementsTab({
     },
   });
 
-  // Pas de `sortOrder` sur les départements dans le contrat : ils sont
-  // présentés par région puis par nom, comme dans le découpage administratif.
   const rows = [...(data ?? [])]
     .sort(
       (a, b) =>
         a.regionName.localeCompare(b.regionName, 'fr') || a.name.localeCompare(b.name, 'fr'),
     )
-    // La région entre dans la recherche : « Kolda » doit ramener ses trois
-    // départements, c'est la façon dont on cherche sur cette liste de 46 lignes.
     .filter((departement) =>
       matches(search, departement.name, departement.code, departement.regionName),
     );
@@ -883,14 +838,6 @@ function DepartementsTab({
   );
 }
 
-/**
- * Ligne « aucun élément » d'un référentiel.
- *
- * Les trois tableaux rendaient `rows.map(...)` sans garde : un référentiel vide
- * : installation neuve, ou réponse filtrée par l'API : n'affichait qu'une ligne
- * d'en-tête au-dessus d'une carte blanche, sans un mot d'explication. Les
- * tableaux voisins (prospects, représentants, commerciaux) traitent tous ce cas.
- */
 function EmptyRow({ colSpan, children }: { colSpan: number; children: ReactNode }) {
   return (
     <TableRow className="hover:bg-transparent">

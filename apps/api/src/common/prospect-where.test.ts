@@ -15,10 +15,6 @@ const admin: AuthenticatedUser = { ...alice, id: 'admin-1', username: 'admin', r
 
 describe('filtre par segment', () => {
   it('délègue à segmentWhere plutôt que de réécrire le croisement', () => {
-    // Le contrôle est volontairement une ÉGALITÉ avec la définition partagée,
-    // et non une vérification de la forme attendue : une clause « équivalente »
-    // écrite à la main passerait un test de forme, puis divergerait au premier
-    // ajustement de la matrice sans que rien ne le signale.
     for (const segment of ['BDD1', 'BDD2', 'BDD3', 'BDD4'] as const) {
       const where = buildProspectWhere(admin, { segment }, false);
       expect(where.AND).toEqual([segmentWhere(segment)]);
@@ -64,8 +60,6 @@ describe('filtres de phase 2', () => {
   });
 
   it('distingue l’auteur de la méthode du commercial de saisie', () => {
-    // Deux colonnes différentes : les confondre attribuerait le travail
-    // d'appel de la phase 2 à celui qui a rempli la fiche sur le terrain.
     const where = buildProspectWhere(
       admin,
       {
@@ -97,14 +91,41 @@ describe('filtres de phase 2', () => {
   });
 });
 
+describe('filtre par attribution de la tâche d’appel', () => {
+  it('borne la campagne à la file d’UN téléconseiller', () => {
+    const where = buildProspectWhere(
+      admin,
+      { campaignId: 'camp-1', assignedToId: 'com-bob' },
+      false,
+    );
+
+    expect(where.AND).toEqual([
+      { callTasks: { some: { campaignId: 'camp-1', assignedToId: 'com-bob' } } },
+    ]);
+  });
+
+  it('sans campagne, retient les fiches attribuées à ce téléconseiller', () => {
+    const where = buildProspectWhere(admin, { assignedToId: 'com-bob' }, false);
+    expect(where.AND).toEqual([{ callTasks: { some: { assignedToId: 'com-bob' } } }]);
+  });
+
+  it('ne se confond pas avec l’auteur de la saisie', () => {
+    const where = buildProspectWhere(
+      admin,
+      { commercialId: 'com-alice', assignedToId: 'com-bob' },
+      false,
+    );
+
+    expect(where.createdById).toBe('com-alice');
+    expect(where.AND).toEqual([{ callTasks: { some: { assignedToId: 'com-bob' } } }]);
+  });
+});
+
 describe('recherche, la clause téléphone ne doit jamais tout matcher', () => {
   const clauses = (search: string) =>
     (buildProspectWhere(admin, { search }, false).OR ?? []) as Record<string, unknown>[];
 
   it('un terme alphabétique ne pose PAS de clause téléphone', () => {
-    // Régression : `"ZZZZ".replace(/[^\d+]/g, '')` donne '', et
-    // `contains: ''` vaut `LIKE '%%'`, qui renvoie la base entière. Le filtre
-    // paraissait fonctionner tant que personne ne cherchait un nom absent.
     const or = clauses('ZZZZZNOPE');
     expect(or).toHaveLength(2);
     expect(or.some((c) => 'phoneE164' in c)).toBe(false);
@@ -126,5 +147,29 @@ describe('recherche, la clause téléphone ne doit jamais tout matcher', () => {
   it('un fragment de numéro suffisamment long est cherché tel quel', () => {
     const phone = clauses('1234').find((c) => 'phoneE164' in c);
     expect(phone).toEqual({ phoneE164: { contains: '1234' } });
+  });
+});
+
+describe('portée du SUPERVISEUR', () => {
+  const superviseur: AuthenticatedUser = {
+    ...alice,
+    id: 'sup-1',
+    username: 'sup',
+    role: Role.SUPERVISEUR,
+  };
+
+  it('lit le portefeuille national, sans borne sur son propre identifiant', () => {
+    const where = buildProspectWhere(superviseur, {}, false);
+    expect(where.createdById).toBeUndefined();
+  });
+
+  it('son filtre par téléconseiller RÉPOND, au lieu de rendre zéro ligne', () => {
+    const where = buildProspectWhere(superviseur, { commercialId: 'com-alice' }, false);
+    expect(where.createdById).toBe('com-alice');
+  });
+
+  it('un téléconseiller reste enfermé sur lui-même quoi qu’il demande', () => {
+    const where = buildProspectWhere(alice, { commercialId: 'com-bob' }, false);
+    expect(where.createdById).toBe('__aucun__');
   });
 });

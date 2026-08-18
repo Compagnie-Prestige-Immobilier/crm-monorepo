@@ -39,6 +39,8 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto comment(String? comment);
 
+  SyncEntityDataDto callbackAt(DateTime? callbackAt);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncEntityDataDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -62,6 +64,7 @@ abstract class _$SyncEntityDataDtoCWProxy {
     CallOutcome? outcome,
     EnrollmentMethod? method,
     String? comment,
+    DateTime? callbackAt,
   });
 }
 
@@ -125,6 +128,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
   SyncEntityDataDto comment(String? comment) => this(comment: comment);
 
   @override
+  SyncEntityDataDto callbackAt(DateTime? callbackAt) =>
+      this(callbackAt: callbackAt);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncEntityDataDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -148,6 +155,7 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? outcome = const $CopyWithPlaceholder(),
     Object? method = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
+    Object? callbackAt = const $CopyWithPlaceholder(),
   }) {
     return SyncEntityDataDto(
       fullName: fullName == const $CopyWithPlaceholder()
@@ -214,6 +222,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.comment
           // ignore: cast_nullable_to_non_nullable
           : comment as String?,
+      callbackAt: callbackAt == const $CopyWithPlaceholder()
+          ? _value.callbackAt
+          // ignore: cast_nullable_to_non_nullable
+          : callbackAt as DateTime?,
     );
   }
 }
@@ -272,6 +284,10 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
           ),
         ),
         comment: $checkedConvert('comment', (v) => v as String?),
+        callbackAt: $checkedConvert(
+          'callbackAt',
+          (v) => v == null ? null : DateTime.parse(v as String),
+        ),
       );
       return val;
     });
@@ -298,6 +314,8 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(SyncEntityDataDto instance) =>
       if (_$EnrollmentMethodEnumMap[instance.method] case final value?)
         'method': value,
       if (instance.comment case final value?) 'comment': value,
+      if (instance.callbackAt?.toIso8601String() case final value?)
+        'callbackAt': value,
     };
 
 const _$ProspectStatutEnumMap = {

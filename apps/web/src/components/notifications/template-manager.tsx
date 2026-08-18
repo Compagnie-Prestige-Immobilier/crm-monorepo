@@ -50,15 +50,8 @@ import { CATEGORY_LABELS, type NotificationCategory, type NotificationTemplate }
 
 const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DOSSIER', 'SYSTEME'];
 
-/**
- * Gabarits.
- *
- * La liste des variables n'est JAMAIS saisie : elle est déduite du texte, ici
- * comme sur le serveur. Un champ « variables » à remplir à la main diverge du
- * gabarit dès la première correction : l'auteur ajoute `{{campagne}}` au corps,
- * oublie la liste, et le compositeur cesse de proposer le champ. La variable
- * reste alors éternellement non substituée.
- */
+const CATEGORY_ITEMS = CATEGORIES.map((item) => ({ value: item, label: CATEGORY_LABELS[item] }));
+
 export function TemplateManager() {
   const [editing, setEditing] = useState<NotificationTemplate | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -192,9 +185,6 @@ function TemplateFormDialog({
 
   const variables = mergedVariables(titleTemplate, bodyTemplate);
 
-  // L'aperçu montre le gabarit avec des valeurs d'EXEMPLE nommées d'après la
-  // variable. Un aperçu rempli de `{{nom}}` ne dit rien de la longueur réelle
-  // de la phrase, qui est justement ce qu'on vient vérifier.
   const sample = Object.fromEntries(variables.map((variable) => [variable, `«${variable}»`]));
   const preview = renderNotification(titleTemplate, bodyTemplate, sample);
 
@@ -254,18 +244,20 @@ function TemplateFormDialog({
             <Field label="Catégorie">
               {(props) => (
                 <Select
+                  items={CATEGORY_ITEMS}
                   value={category}
                   onValueChange={(value) => {
-                    setCategory(value as NotificationCategory);
+                    if (value === null) return;
+                    setCategory(value);
                   }}
                 >
                   <SelectTrigger id={props.id}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((item) => (
-                      <SelectItem key={item} value={item}>
-                        {CATEGORY_LABELS[item]}
+                    {CATEGORY_ITEMS.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

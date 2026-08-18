@@ -1,20 +1,3 @@
-/**
- * Doublure Prisma en mémoire, réservée aux tests de synchronisation.
- *
- * Elle n'imite pas PostgreSQL : elle reproduit exactement les trois
- * comportements dont dépend la logique d'idempotence, et rien d'autre.
- *
- *  1. `INSERT ... ON CONFLICT DO NOTHING` renvoie 1 ou 0 lignes affectées.
- *  2. `$transaction` restaure l'état antérieur si le rappel lève, c'est ce qui
- *     permet de vérifier qu'un groupe défaillant n'emporte pas le groupe voisin.
- *  3. Le marqueur de lot vit HORS des transactions : les tests peuvent donc
- *     constater qu'un rollback ne l'efface pas.
- *
- * Les garanties réelles (atomicité de ON CONFLICT sous concurrence, isolation
- * ReadCommitted) ne se démontrent que contre un vrai serveur : c'est l'objet de
- * `sync.integration.test.ts`.
- */
-
 interface BatchRow {
   key: string;
   userId: string;
@@ -43,13 +26,6 @@ export interface RepresentantRow {
   fullName: string;
   phoneE164: string;
   notes: string | null;
-  /**
-   * IEF de rattachement, FACULTATIVE.
-   *
-   * Présente dans la doublure parce que c'est le seul champ que l'utilisateur
-   * peut VIDER : sans elle, le test qui distingue « champ absent » de « champ
-   * vidé » n'aurait rien à observer.
-   */
   iefId?: string | null;
   rev: number;
   departementId: string;
@@ -58,15 +34,6 @@ export interface RepresentantRow {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
-  /**
-   * Posée par `SyncService` depuis la NATURE DE L'AUTEUR.
-   *
-   * Elle était auparavant absente, au motif que « la remontée hors ligne est
-   * du travail réel ». C'était faux : l'animateur d'une démonstration se
-   * connecte sur le téléphone avec un compte de démonstration, et ses fiches
-   * naissaient donc réelles. Reste facultative dans le double, pour qu'un test
-   * puisse constater l'absence au lieu de la supposer.
-   */
   isDemo?: boolean;
 }
 
@@ -85,13 +52,11 @@ export interface ProspectRow {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
-  /** Facultatif à dessein, même raison que sur `RepresentantRow`. */
   isDemo?: boolean;
 }
 
 type Row = Record<string, unknown>;
 
-/** Filtre `where` minimal : égalité, `null`, `{ not }`, et l'imbriqué `createdBy`. */
 function matches(row: Row, where: Row | undefined): boolean {
   if (!where) return true;
   for (const [key, expected] of Object.entries(where)) {
@@ -122,29 +87,13 @@ export class FakePrisma {
   operations = new Map<string, OperationRow>();
   representants = new Map<string, RepresentantRow>();
   prospects = new Map<string, ProspectRow>();
-  /**
-   * Comptes connus, pour la seule question que `SyncService` leur pose : cet
-   * auteur est-il un compte de démonstration ? Un compte ABSENT vaut « réel »,
-   * ce qui est l'état de la quasi-totalité des tests et leur évite d'avoir à
-   * déclarer un utilisateur qui ne les concerne pas.
-   */
   users = new Map<string, { id: string; isDemo: boolean; role?: string }>();
-  /** Entrées du registre de purge, dans leur ordre d'inscription. */
   demoEntities: { entityType: string; entityId: string; sequence: number }[] = [];
 
-  /** Déclare un compte de démonstration, pour les tests qui parlent de lui. */
   addDemoUser(id: string): void {
     this.users.set(id, { id, isDemo: true });
   }
 
-  /**
-   * Déclare un compte avec son RÔLE.
-   *
-   * Le rôle vient désormais de la même lecture que `isDemo`, parce que le lot
-   * lit son autorité en une fois : une doublure qui ne porterait pas le rôle
-   * ferait retomber le service sur celui du jeton quoi qu'il arrive, et le test
-   * de cohérence du lot ne pourrait pas rougir.
-   */
   addUser(id: string, row: { role?: string; isDemo?: boolean } = {}): void {
     this.users.set(id, {
       id,
@@ -153,16 +102,12 @@ export class FakePrisma {
     });
   }
 
-  /** Compte les tentatives de transaction, pour vérifier une-transaction-par-groupe. */
   transactionCount = 0;
-  /** Nombre de rollbacks constatés. */
   rollbackCount = 0;
 
   private key(userId: string, key: string): string {
     return `${userId}|${key}`;
   }
-
-  // ─── SQL brut ─────────────────────────────────────────────────────────────
 
   $executeRaw = (strings: TemplateStringsArray, ...values: unknown[]): Promise<number> => {
     const sql = strings.join('?');
@@ -232,8 +177,6 @@ export class FakePrisma {
     throw new Error(`FakePrisma : requête non prise en charge, ${sql}`);
   };
 
-  // ─── Transactions ─────────────────────────────────────────────────────────
-
   $transaction = async <T>(fn: (tx: FakePrisma) => Promise<T>): Promise<T> => {
     this.transactionCount += 1;
     const snapshot = {
@@ -244,8 +187,6 @@ export class FakePrisma {
     try {
       return await fn(this);
     } catch (error) {
-      // Les lots (`sync_batches`) ne sont PAS restaurés : leur marqueur vit
-      // hors transaction, et c'est précisément ce que les tests vérifient.
       this.operations = snapshot.operations;
       this.representants = snapshot.representants;
       this.prospects = snapshot.prospects;
@@ -253,8 +194,6 @@ export class FakePrisma {
       throw error;
     }
   };
-
-  // ─── Modèles ──────────────────────────────────────────────────────────────
 
   syncBatch = {
     updateMany: (args: { where: { userId: string; key: string }; data: Partial<BatchRow> }) => {
@@ -290,11 +229,6 @@ export class FakePrisma {
       Promise.resolve(this.users.get(args.where.id) ?? null),
   };
 
-  /**
-   * Registre de purge. Le service y inscrit les lignes fictives nées hors
-   * ensemenceur ; sans cette inscription, elles retiendraient les lignes
-   * semées par `onDelete: Restrict` et rendraient la purge impossible.
-   */
   demoEntity = {
     aggregate: () =>
       Promise.resolve({
@@ -401,7 +335,6 @@ export class FakePrisma {
   };
 }
 
-/** Applique un `data` Prisma, y compris `{ increment: n }`. */
 function applyUpdate(row: Row, data: Row): void {
   for (const [key, value] of Object.entries(data)) {
     if (value && typeof value === 'object' && 'increment' in value) {

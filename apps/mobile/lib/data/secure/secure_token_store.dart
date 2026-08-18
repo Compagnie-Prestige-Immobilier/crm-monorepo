@@ -2,36 +2,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../core/sync/token_store.dart';
 
-/// Stockage des jetons sur l'appareil.
-///
-/// Deux traitements différents, volontairement :
-///
-/// * **Jeton d'accès : mémoire uniquement.** Il vit quinze minutes et se
-///   renouvelle. L'écrire sur disque n'allongerait pas la session d'une seconde
-///   et ajouterait une copie de plus à voler.
-/// * **Jeton de renouvellement : stockage chiffré.** C'est lui qui porte la
-///   session à travers les redémarrages, donc lui qu'il faut protéger.
-///
-/// À propos de `AndroidOptions(encryptedSharedPreferences: true)` : ce drapeau
-/// est **déprécié et ignoré** depuis `flutter_secure_storage` 10.3. Il activait
-/// `EncryptedSharedPreferences` de Jetpack Security, que Google a lui-même
-/// déprécié. Le paquet chiffre désormais sans condition : AES-256-GCM, clé
-/// enveloppée par RSA-OAEP dans l'Android KeyStore : et migre les données
-/// existantes au premier accès. Le passer aujourd'hui n'ajoute rien et fait
-/// remonter un avertissement de dépréciation ; l'intention (« les jetons ne
-/// touchent jamais un fichier en clair ») est tenue par défaut.
 class SecureTokenStore implements TokenStore {
   SecureTokenStore({FlutterSecureStorage? storage})
     : _storage =
           storage ??
           const FlutterSecureStorage(
             aOptions: AndroidOptions(
-              // Espace de noms explicite : sans lui, une future app CPI sur le
-              // même appareil pourrait entrer en collision de clés.
               storageNamespace: 'sn.cpi.go.tokens',
-              // Un jeton illisible (rotation de clé, restauration de sauvegarde)
-              // doit se solder par une reconnexion, pas par un plantage au
-              // démarrage sans issue.
               resetOnError: true,
             ),
           );
@@ -41,12 +18,12 @@ class SecureTokenStore implements TokenStore {
   static const String _userNameKey = 'user_name';
   static const String _userRoleKey = 'user_role';
   static const String _userEmailKey = 'user_email';
+  static const String _userDepartementKey = 'user_departement';
 
   final FlutterSecureStorage _storage;
 
   String? _accessToken;
 
-  /// Quand « rester connecté » est décoché, le refresh ne touche pas le disque.
   bool persistRefreshToken = true;
   String? _volatileRefreshToken;
 
@@ -83,6 +60,7 @@ class SecureTokenStore implements TokenStore {
     await _storage.delete(key: _userNameKey);
     await _storage.delete(key: _userRoleKey);
     await _storage.delete(key: _userEmailKey);
+    await _storage.delete(key: _userDepartementKey);
   }
 
   @override
@@ -93,14 +71,24 @@ class SecureTokenStore implements TokenStore {
     required String fullName,
     String? role,
     String? email,
+    String? departementId,
   }) async {
     await _storage.write(key: _userIdKey, value: userId);
     await _storage.write(key: _userNameKey, value: fullName);
     if (role != null) await _storage.write(key: _userRoleKey, value: role);
     if (email != null) await _storage.write(key: _userEmailKey, value: email);
+    // Écrit même quand il est nul : une affectation retirée doit disparaître,
+    // sinon le formulaire pré-remplit un département qui n'est plus le sien.
+    if (departementId == null) {
+      await _storage.delete(key: _userDepartementKey);
+    } else {
+      await _storage.write(key: _userDepartementKey, value: departementId);
+    }
   }
 
-  Future<({String id, String fullName, String? role, String? email})?>
+  Future<
+    ({String id, String fullName, String? role, String? email, String? departementId})?
+  >
   readIdentity() async {
     final String? id = await _storage.read(key: _userIdKey);
     if (id == null) return null;
@@ -110,6 +98,7 @@ class SecureTokenStore implements TokenStore {
       fullName: name,
       role: await _storage.read(key: _userRoleKey),
       email: await _storage.read(key: _userEmailKey),
+      departementId: await _storage.read(key: _userDepartementKey),
     );
   }
 }

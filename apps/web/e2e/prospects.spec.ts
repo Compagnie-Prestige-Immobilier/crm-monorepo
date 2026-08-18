@@ -112,6 +112,9 @@ test('chaque écran du panel se charge sans état d’erreur', async ({ page }) 
   for (const [path, heading, marker] of [
     ['/tableau-de-bord', 'Tableau de bord', null],
     ['/prospects', 'Prospects', null],
+    ['/prospects/nouveau', 'Nouveau prospect', 'Enregistrer et suivant'],
+    ['/console', 'Console d’appel', 'Carte clavier'],
+    ['/rappels', 'Rappels', 'En retard'],
     ['/campagnes', 'Campagnes', 'Appels prospects'],
     ['/campagnes/representants', 'Campagnes', 'Appels représentants'],
     ['/dossiers', 'Dossiers', null],
@@ -121,9 +124,10 @@ test('chaque écran du panel se charge sans état d’erreur', async ({ page }) 
     ['/demandes-clients', 'Demandes clients', null],
     ['/representants', 'Représentants', null],
     ['/representants/import', 'Représentants', 'Partir du modèle'],
-    ['/commerciaux', 'Téléconseillers', null],
+    ['/commerciaux', 'Utilisateurs', null],
     ['/supervision', 'Supervision', null],
     ['/referentiels', 'Référentiels', null],
+    ['/imports', 'Imports', 'Déposer un classeur'],
     ['/parametres', 'Paramètres', null],
     ['/notifications', 'Notifications', null],
   ] as const) {

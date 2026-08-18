@@ -15,12 +15,6 @@ import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/theme/cpi_typography.dart';
 import '../../auth/auth_state.dart';
 
-/// « À propos ».
-///
-/// C'est ici, et nulle part ailleurs, que vivent les valeurs techniques :
-/// numéro de build, adresse du serveur, identifiant de compte. Sur un écran
-/// courant, un identifiant de base de données n'informe personne ; ici il a un
-/// usage précis : le dire au support : et un seul geste pour le transmettre.
 class AboutScreen extends ConsumerWidget {
   const AboutScreen({super.key});
 
@@ -134,11 +128,6 @@ class AboutScreen extends ConsumerWidget {
     );
   }
 
-  /// Démonstration ou production, déduit de l'adresse du serveur.
-  ///
-  /// Déduit et non déclaré : un drapeau de build supplémentaire finirait par
-  /// dire « production » alors que l'app pointe sur une machine de test, ce qui
-  /// est précisément le mensonge que cet écran doit rendre impossible.
   static String get _environmentLabel {
     final String url = ApiEnvironment.baseUrl;
     if (ApiEnvironment.isDevelopmentServer) return 'Développement';
@@ -164,7 +153,6 @@ class AboutScreen extends ConsumerWidget {
   }
 }
 
-/// Ligne « libellé / valeur », copiable par appui long.
 class _InfoRow extends StatelessWidget {
   const _InfoRow({required this.label, required this.value});
 

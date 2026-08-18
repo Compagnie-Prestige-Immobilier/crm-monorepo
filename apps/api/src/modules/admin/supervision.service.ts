@@ -16,18 +16,25 @@ import { demoScope } from '../../prisma/demo-visibility.js';
 /**
  * Supervision des comptes.
  *
- * AUCUNE colonne n'a été ajoutée au schéma pour cet écran, et c'est délibéré.
- * Une colonne `lastRequestAt` écrite à chaque requête coûterait une écriture
- * par appel d'API sur la table la plus lue de la base, pour une information que
- * les traces existantes portent déjà (voir `presence.ts`).
+ * AUCUNE colonne n'a été ajoutée à `users` pour cet écran, et c'est délibéré.
+ * Un `lastRequestAt` sur `users` coûterait une écriture par appel d'API sur la
+ * table la plus lue de la base. Le battement de cœur vit donc dans sa propre
+ * table, étroite et sans index secondaire (voir `agent_heartbeats`).
  *
- * Cinq agrégats, cinq requêtes. Aucune boucle par utilisateur : sur cinquante
- * comptes, un `findMany` par compte ferait deux cent cinquante allers-retours
- * pour un écran qui se rafraîchit toutes les quinze secondes.
+ * Six agrégats, six requêtes. Aucune boucle par utilisateur : sur cinquante
+ * comptes, un `findMany` par compte ferait trois cents allers-retours pour un
+ * écran qui se rafraîchit toutes les quinze secondes.
  */
 
-/** Les deux rôles supervisés. L'ADMIN se supervise dans le miroir. */
+/**
+ * Les deux rôles supervisés. L'ADMIN se supervise dans le miroir, et le
+ * SUPERVISEUR avec lui : la présence se lit sur des lots de synchronisation et
+ * des tentatives d'appel, qu'aucun des deux ne produit.
+ */
 const SUPERVISED_ROLES: readonly Role[] = [Role.COMMERCIAL, Role.BANQUE_FINANCE];
+
+/** Durée de vie d'une famille de jetons : au-delà, un compte est dormant quoi qu'il arrive. */
+const ACTIVITY_WINDOW_DAYS = 31;
 
 /** `{ userId → date }`, à partir d'un `groupBy` Prisma. */
 function toDateMap<K extends string>(
@@ -59,8 +66,9 @@ export class SupervisionService {
 
   async overview(): Promise<SupervisionDto> {
     const now = new Date();
+    const since = new Date(now.getTime() - ACTIVITY_WINDOW_DAYS * 86_400_000);
 
-    const [users, sessions, syncs, calls, transitions] = await Promise.all([
+    const [users, sessions, syncs, calls, transitions, heartbeats] = await Promise.all([
       this.prisma.user.findMany({
         where: {
           role: { in: [...SUPERVISED_ROLES] },
@@ -108,15 +116,35 @@ export class SupervisionService {
        * toujours » un vrai compte dont la dernière action porte, elle, sur une
        * fiche de démonstration, ce qui est un contresens sur un écran dont le
        * seul objet est de repérer les comptes dormants.
+       *
+       * Bornés à trente et un jours : au-delà, la date ne change plus rien à
+       * l'affichage, la présence se joue sur vingt-quatre heures et une famille
+       * de jetons meurt à trente et un jours. Sans cette borne, l'écran
+       * parcourait tout l'historique des appels toutes les dix secondes et par
+       * onglet ouvert.
        */
       this.prisma.callAttempt.groupBy({
         by: ['performedById'],
+        where: { createdAt: { gte: since } },
         _max: { createdAt: true },
       }),
 
       this.prisma.bankCaseTransition.groupBy({
         by: ['performedById'],
+        where: { createdAt: { gte: since } },
         _max: { createdAt: true },
+      }),
+
+      // Une ligne par compte, jamais davantage : la table entière tient dans la
+      // liste ci-dessus, et la filtrer coûterait plus que la lire.
+      this.prisma.agentHeartbeat.findMany({
+        select: {
+          userId: true,
+          lastPullAt: true,
+          lastPushAt: true,
+          pendingOps: true,
+          appVersion: true,
+        },
       }),
     ]);
 
@@ -125,14 +153,20 @@ export class SupervisionService {
     const syncAt = toDateMap(syncs, 'userId', 'createdAt');
     const callAt = toDateMap(calls, 'performedById', 'createdAt');
     const transitionAt = toDateMap(transitions, 'performedById', 'createdAt');
+    const beatOf = new Map(heartbeats.map((row) => [row.userId, row]));
 
     const rows = users.map((user): SupervisedUserDto => {
+      const beat = beatOf.get(user.id);
+      const pushedAt = latest(syncAt.get(user.id), beat?.lastPushAt ?? undefined);
+
       const signals: ActivitySignals = {
         isActive: user.isActive,
         hasLiveSession: tokenAt.has(user.id),
         lastLoginAt: user.lastLoginAt,
         lastTokenAt: tokenAt.get(user.id) ?? null,
-        lastSyncAt: syncAt.get(user.id) ?? null,
+        // Un pull ne laisse aucune autre trace : sans lui, un appareil ouvert
+        // qui n'a rien à remonter passe pour absent pendant des heures.
+        lastSyncAt: latest(pushedAt ?? undefined, beat?.lastPullAt ?? undefined),
         // Un téléconseiller écrit des tentatives d'appel, un agent des
         // transitions de dossier. On prend la plus récente des deux plutôt que
         // de brancher sur le rôle : un compte peut changer de rôle, son
@@ -153,7 +187,10 @@ export class SupervisionService {
         sessionCount: sessionCounts.get(user.id) ?? 0,
         lastSeenAt: lastSeenAt(signals)?.toISOString() ?? null,
         lastLoginAt: signals.lastLoginAt?.toISOString() ?? null,
-        lastSyncAt: signals.lastSyncAt?.toISOString() ?? null,
+        lastSyncAt: pushedAt?.toISOString() ?? null,
+        lastPullAt: beat?.lastPullAt?.toISOString() ?? null,
+        pendingOps: beat?.pendingOps ?? null,
+        appVersion: beat?.appVersion ?? null,
         lastWriteAt: signals.lastWriteAt?.toISOString() ?? null,
       };
     });

@@ -4,24 +4,36 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@crm/database';
+import { ChangeSource, Prisma } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { normalizePhone } from '../../common/phone.js';
-import { assertOwnership, isAdmin, ownerScope } from '../../common/scope.js';
+import {
+  assertOwnership,
+  assertReadable,
+  isAdmin,
+  readScope,
+  readsEveryone,
+} from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
 import { RepresentantSortField } from './dto.js';
 import type {
+  CreateRepresentantCommentDto,
   CreateRepresentantDto,
   DeleteQueryDto,
+  RepresentantCommentDto,
+  RepresentantCommentListDto,
+  RepresentantCommentQueryDto,
   RepresentantDto,
   RepresentantListDto,
   RepresentantLookupDto,
   RepresentantQueryDto,
   UpdateRepresentantDto,
+  RepresentantRelationChangeListDto,
 } from './dto.js';
+import { applyRelationChange, toRelationChangeDto } from './relation-change.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { demoScope } from '../../prisma/demo-visibility.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
@@ -83,6 +95,29 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     prospectCount: row._count.prospects,
+    relationStatus: row.relationStatus,
+  };
+}
+
+interface CommentRow {
+  id: string;
+  representantId: string;
+  authorId: string;
+  author: { fullName: string };
+  body: string;
+  clientCreatedAt: Date;
+  createdAt: Date;
+}
+
+export function toRepresentantCommentDto(row: CommentRow): RepresentantCommentDto {
+  return {
+    id: row.id,
+    representantId: row.representantId,
+    authorId: row.authorId,
+    authorName: row.author.fullName,
+    body: row.body,
+    clientCreatedAt: row.clientCreatedAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -101,11 +136,11 @@ export class RepresentantsService {
     // contrôleur, il dépendrait de la discipline de chaque route.
     const where: Prisma.RepresentantWhereInput = {
       deletedAt: null,
-      ...ownerScope(user),
+      ...readScope(user),
       ...demoScope(await this.demo.enabled()),
     };
     if (query.commercialId) {
-      where.createdById = isAdmin(user)
+      where.createdById = readsEveryone(user)
         ? query.commercialId
         : query.commercialId === user.id
           ? user.id
@@ -113,6 +148,7 @@ export class RepresentantsService {
     }
     if (query.departementId) where.departementId = query.departementId;
     if (query.iefId) where.iefId = query.iefId;
+    if (query.relationStatus) where.relationStatus = query.relationStatus;
 
     if (query.dateFrom || query.dateTo) {
       where.clientCreatedAt = {
@@ -163,7 +199,7 @@ export class RepresentantsService {
         message: 'Représentant introuvable.',
       });
     }
-    assertOwnership(user, row);
+    assertReadable(user, row);
     return toRepresentantDto(row);
   }
 
@@ -279,20 +315,192 @@ export class RepresentantsService {
     const phoneE164 = input.phone ? normalizePhone(input.phone) : undefined;
     if (phoneE164 && phoneE164 !== existing.phoneE164) await this.assertPhoneFree(user, phoneE164);
 
-    const updated = await this.prisma.representant.update({
-      where: { id },
-      data: {
-        ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
-        ...(phoneE164 ? { phoneE164 } : {}),
-        ...(input.notes !== undefined ? { notes: input.notes || null } : {}),
-        ...(input.departementId ? { departementId: input.departementId } : {}),
-        ...(input.iefId === undefined ? {} : { iefId: input.iefId }),
-        ...(input.clientCreatedAt ? { clientCreatedAt: new Date(input.clientCreatedAt) } : {}),
-        rev: { increment: 1 },
-      },
-      include: INCLUDE,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // La bascule de relation part AVANT la mise à jour ordinaire : elle porte
+      // sa propre garde sur le statut de départ, et la relecture qui suit doit
+      // rendre la fiche telle que les deux écritures l'ont laissée.
+      if (input.relationStatus !== undefined) {
+        await applyRelationChange(tx, {
+          representantId: id,
+          fromStatus: existing.relationStatus,
+          toStatus: input.relationStatus,
+          reason: input.relationReason?.trim() || null,
+          changedById: user.id,
+          source: ChangeSource.WEB,
+          isDemo: existing.isDemo,
+        });
+      }
+
+      return tx.representant.update({
+        where: { id },
+        data: {
+          ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
+          ...(phoneE164 ? { phoneE164 } : {}),
+          ...(input.notes !== undefined ? { notes: input.notes || null } : {}),
+          ...(input.departementId ? { departementId: input.departementId } : {}),
+          ...(input.iefId === undefined ? {} : { iefId: input.iefId }),
+          ...(input.clientCreatedAt ? { clientCreatedAt: new Date(input.clientCreatedAt) } : {}),
+          rev: { increment: 1 },
+        },
+        include: INCLUDE,
+      });
     });
     return toRepresentantDto(updated);
+  }
+
+  /**
+   * L'historique d'UNE fiche, du plus récent au plus ancien.
+   *
+   * Sert l'index `(representantId, changedAt)`. Le cloisonnement s'est joué sur
+   * la fiche, résolue par sa clé primaire juste au-dessus.
+   */
+  async relationHistory(
+    user: AuthenticatedUser,
+    id: string,
+  ): Promise<RepresentantRelationChangeListDto> {
+    const representant = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+      select: { id: true, createdById: true },
+    });
+    if (!representant) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_NOT_FOUND',
+        message: 'Représentant introuvable.',
+      });
+    }
+    assertReadable(user, representant);
+
+    // LECTURE GLOBALE délibérée : une trace suit toujours la nature de son
+    // représentant, déjà résolu ci-dessus. Rejouer le filtre ici rendrait soit
+    // le même ensemble, soit une fiche privée de son histoire, ce qui se lit à
+    // l'écran comme une relation jamais entamée.
+    const rows = await this.prisma.representantRelationChange.findMany({
+      where: { representantId: id },
+      include: { changedBy: { select: { fullName: true } } },
+      // `id` en second critère : deux bascules de la même milliseconde
+      // s'échangeraient sinon leur place d'un affichage à l'autre.
+      orderBy: [{ changedAt: 'desc' }, { id: 'desc' }],
+    });
+
+    return { items: rows.map(toRelationChangeDto) };
+  }
+
+  async listComments(
+    user: AuthenticatedUser,
+    id: string,
+    query: RepresentantCommentQueryDto,
+  ): Promise<RepresentantCommentListDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 50;
+    const demoEnabled = await this.demo.enabled();
+
+    const representant = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null, ...demoScope(demoEnabled) },
+      select: { id: true, createdById: true },
+    });
+    if (!representant) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_NOT_FOUND',
+        message: 'Représentant introuvable.',
+      });
+    }
+    assertReadable(user, representant);
+
+    const where: Prisma.RepresentantCommentWhereInput = {
+      representantId: id,
+      deletedAt: null,
+      ...demoScope(demoEnabled),
+    };
+
+    // `id` en second critère : l'UUID v7 est lexicographiquement ordonné, il
+    // départage deux commentaires hors ligne sans horloge partagée.
+    const [total, rows] = await Promise.all([
+      this.prisma.representantComment.count({ where }),
+      this.prisma.representantComment.findMany({
+        where,
+        include: { author: { select: { fullName: true } } },
+        orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    return {
+      items: rows.map(toRepresentantCommentDto),
+      meta: { total, page, pageSize, pageCount: Math.max(1, Math.ceil(total / pageSize)) },
+    };
+  }
+
+  /**
+   * Ajoute un commentaire. Le fil est en AJOUT SEUL : aucune concurrence à
+   * arbitrer, deux téléconseillers hors ligne produisent deux lignes.
+   *
+   * L'auteur vient de la session, jamais du corps de requête, et aucune route
+   * ne réécrit une ligne posée.
+   */
+  async addComment(
+    user: AuthenticatedUser,
+    id: string,
+    input: CreateRepresentantCommentDto,
+  ): Promise<RepresentantCommentDto> {
+    const representant = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+      select: { id: true, createdById: true, isDemo: true },
+    });
+    if (!representant) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_NOT_FOUND',
+        message: 'Représentant introuvable.',
+      });
+    }
+    assertOwnership(user, representant);
+
+    // `skipDuplicates` plutôt qu'une lecture préalable : le rejeu et la course
+    // se traitent du même geste, c'est PostgreSQL qui arbitre la clé primaire.
+    await this.prisma.representantComment.createMany({
+      data: [
+        {
+          id: input.id,
+          representantId: id,
+          authorId: user.id,
+          body: input.body.trim(),
+          clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
+          isDemo: representant.isDemo,
+        },
+      ],
+      skipDuplicates: true,
+    });
+
+    const posted = await this.prisma.representantComment.findUniqueOrThrow({
+      where: { id: input.id },
+      include: { author: { select: { fullName: true } } },
+    });
+
+    // Un identifiant déjà pris par le commentaire d'un autre : le rejeu rendrait
+    // sinon une ligne que l'appelant n'a pas écrite, et qu'il croirait sienne.
+    if (posted.representantId !== id || posted.authorId !== user.id) {
+      throw new ForbiddenException({
+        code: 'ENTITY_ID_OWNED_BY_ANOTHER_USER',
+        message: 'Cet identifiant appartient à un autre commentaire.',
+      });
+    }
+
+    return toRepresentantCommentDto(posted);
+  }
+
+  /** Suppression douce, réservée à l'ADMIN : l'auteur ne se dédit pas. */
+  async removeComment(id: string, commentId: string): Promise<OkDto> {
+    const removed = await this.prisma.representantComment.updateMany({
+      where: { id: commentId, representantId: id, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+    if (removed.count !== 1) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_COMMENT_NOT_FOUND',
+        message: 'Commentaire introuvable.',
+      });
+    }
+    return { ok: true };
   }
 
   async remove(user: AuthenticatedUser, id: string, query: DeleteQueryDto): Promise<OkDto> {

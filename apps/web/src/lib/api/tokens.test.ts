@@ -7,7 +7,6 @@ import {
   rotateRefreshTokenDetailed,
 } from '@/lib/api/tokens';
 
-/** Fabrique un JWT non signé dont seul `exp` compte ici. */
 function jwtExpiringAt(epochSeconds: number): string {
   const payload = Buffer.from(JSON.stringify({ sub: 'u1', exp: epochSeconds })).toString(
     'base64url',
@@ -129,21 +128,6 @@ describe('rotateRefreshToken', () => {
     });
   });
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * Un serveur qui répond MAL ne doit pas être traité plus durement qu'un
-   * serveur MUET.
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * `unavailable` fait garder les cookies (`proxy.ts`), `invalid` les efface et
-   * renvoie à l'écran de connexion. Tout statut non 2xx valait `invalid`, donc
-   * une réponse qui ne dit RIEN du jeton détruisait quand même la session.
-   *
-   * Le 429 n'est pas théorique : `ThrottlerGuard` est une garde GLOBALE de
-   * l'API, `/auth/refresh` est donc plafonné, et le contrat ne déclare pour
-   * cette route que 200 et 401. Le statut que le client ne prévoyait pas est
-   * exactement celui qui déconnectait.
-   */
   it('ne tue PAS la session sur un 429 : le plafond ne juge pas le jeton', async () => {
     const fetchImpl = vi.fn(() => Promise.resolve(new Response('{}', { status: 429 })));
     await expect(rotateRefreshTokenDetailed('http://api.test', 'old', fetchImpl)).resolves.toEqual({
@@ -153,8 +137,6 @@ describe('rotateRefreshToken', () => {
   });
 
   it('ne tue PAS la session sur une passerelle en panne', async () => {
-    // 502, 503, 504 : l'API redémarre ou un intermédiaire répond à sa place.
-    // Le refresh token sera toujours valable dans dix secondes.
     for (const status of [500, 502, 503, 504]) {
       const fetchImpl = vi.fn(() => Promise.resolve(new Response('', { status })));
       await expect(
@@ -163,12 +145,6 @@ describe('rotateRefreshToken', () => {
     }
   });
 
-  /**
-   * LE 2xx AU CORPS INEXPLOITABLE, qui décrit un intermédiaire et non un
-   * verdict. Ces trois formes rendaient `invalid`, donc effaçaient les deux
-   * cookies : une passerelle qui répond 200 avec une page HTML déconnectait
-   * tout le monde alors que le jeton de rafraîchissement était intact.
-   */
   it('ne tue PAS la session sur un 2xx dont le corps ne vient pas de l’API', async () => {
     const corps = [
       ['une page HTML de passerelle', '<html><body>502 Bad Gateway</body></html>', 200],
@@ -188,9 +164,6 @@ describe('rotateRefreshToken', () => {
   });
 
   it('tue la session sur un 401 : là, l’API s’est prononcée sur le jeton', async () => {
-    // Le pendant indispensable des deux tests ci-dessus : élargir `unavailable`
-    // à tout ne ferait plus jamais effacer un jeton révoqué, et l'utilisateur
-    // resterait coincé sur une session morte.
     const fetchImpl = vi.fn(() => Promise.resolve(new Response('{}', { status: 401 })));
     await expect(
       rotateRefreshTokenDetailed('http://api.test', 'revoked', fetchImpl),

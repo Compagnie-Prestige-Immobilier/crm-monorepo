@@ -30,20 +30,6 @@ import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
 import { hoursToDays } from '@/lib/data/statistics';
 
-/**
- * Volet banques.
- *
- * Les cinq exigences du cahier des charges sont servies par un SEUL appel,
- * `GET /bank-cases/analytics`, qui calcule tout en SQL : délai de traitement
- * (`meanDelayHours`), taux d'erreurs (`rejectionRate`), volumes (`total`,
- * `createdOverTime`), répartition par établissement (`byBank`) et évolution
- * dans le temps (`createdOverTime`, `cashingsOverTime`).
- *
- * Rien n'est recalculé ici à partir d'une liste de dossiers : un tableau de
- * bord qui rapatrierait dix mille dossiers pour en compter les encaissements
- * transporterait des données nominatives sans raison et s'effondrerait à la
- * première vraie volumétrie.
- */
 export function BanksPanel() {
   const { filters } = useBankFilters();
   const live = useLive();

@@ -7,15 +7,7 @@ import {
   navSections,
   navTitle,
 } from '@/components/layout/nav-items';
-
-/**
- * Navigation dépendante du rôle.
- *
- * L'exigence n'est pas cosmétique : l'API répond 403 à un BANQUE_FINANCE sur
- * `/prospects`, `/representants`, `/users`, `/referentiels` et `/phase2/*`. Une
- * entrée de menu qui mène à un refus de droits est un défaut de conception. Ces
- * tests fixent la liste exacte de ce que chaque rôle voit.
- */
+import { PANEL_ROLES } from '@/lib/data/auth';
 
 const hrefs = (role: Parameters<typeof navItems>[0]): string[] =>
   navItems(role).map((item) => item.href);
@@ -39,6 +31,7 @@ describe('navigation d’un agent BANQUE_FINANCE', () => {
       '/campagnes',
       '/notifications',
       '/representants',
+      '/suggestions',
       '/commerciaux',
       '/supervision',
       '/statistiques',
@@ -71,6 +64,7 @@ describe('navigation d’un ADMIN', () => {
       '/demandes-clients',
       '/notifications',
       '/representants',
+      '/suggestions',
       '/commerciaux',
       '/supervision',
       '/referentiels',
@@ -81,9 +75,6 @@ describe('navigation d’un ADMIN', () => {
   });
 
   it('propose les deux écrans qui n’étaient joignables qu’en tapant leur URL', () => {
-    // `/notifications` (composeur) existait sans entrée de menu ; l'arbitrage
-    // des demandes de création de client venait de naître au même endroit. Un
-    // écran sans entrée de menu est un écran que personne n'ouvre.
     const visible = hrefs('ADMIN');
     expect(visible).toContain('/notifications');
     expect(visible).toContain('/demandes-clients');
@@ -94,11 +85,6 @@ describe('navigation d’un ADMIN', () => {
   });
 
   it('propose à l’agent bancaire le SUIVI de ses demandes, sous son propre libellé', () => {
-    // Le même chemin, deux métiers : l'ADMIN arbitre (« Demandes clients »),
-    // l'agent suit les siennes (« Mes demandes »). Sans cette entrée, l'écran
-    // n'était joignable que par la notification de refus, et il n'existait
-    // aucun moyen d'y revenir : l'API restreint pourtant déjà la liste à
-    // `requestedById = user.id`.
     const entry = navItems('BANQUE_FINANCE').find((item) => item.href === '/demandes-clients');
     expect(entry?.label).toBe('Mes demandes');
     expect(navItems('ADMIN').find((item) => item.href === '/demandes-clients')?.label).toBe(
@@ -107,8 +93,6 @@ describe('navigation d’un ADMIN', () => {
   });
 
   it('ne voit PAS le tableau de bord bancaire en doublon de son propre tableau de bord', () => {
-    // Deux entrées « Tableau de bord » dans la même barre seraient
-    // indiscernables l'une de l'autre.
     expect(navItems('ADMIN').filter((item) => item.label === 'Tableau de bord')).toHaveLength(1);
     expect(hrefs('ADMIN')).not.toContain('/banque');
   });
@@ -126,29 +110,103 @@ describe('navigation d’un ADMIN', () => {
   });
 });
 
+describe('navigation d’un téléconseiller', () => {
+  it('ne montre QUE la section Terrain', () => {
+    expect(navSections('COMMERCIAL').map((section) => section.title)).toEqual(['Terrain']);
+    expect(hrefs('COMMERCIAL')).toEqual([
+      '/console',
+      '/rappels',
+      '/representants',
+      '/suggestions',
+      '/prospects/nouveau',
+    ]);
+  });
+
+  it('masque entièrement le pilotage et l’administration', () => {
+    const visible = hrefs('COMMERCIAL');
+    for (const forbidden of [
+      '/tableau-de-bord',
+      '/banque',
+      '/statistiques',
+      '/prospects',
+      '/campagnes',
+      '/dossiers',
+      '/dossiers/nouveau',
+      '/dossiers/export',
+      '/dossiers/etapes',
+      '/demandes-clients',
+      '/notifications',
+      '/commerciaux',
+      '/supervision',
+      '/referentiels',
+      '/imports',
+      '/parametres',
+    ]) {
+      expect(visible, `« ${forbidden} » ne doit pas être proposé`).not.toContain(forbidden);
+    }
+  });
+
+  it('donne à l’ADMIN les mêmes écrans de terrain, sans doublon de « Représentants »', () => {
+    for (const shared of ['/console', '/representants', '/prospects/nouveau']) {
+      expect(hrefs('ADMIN')).toContain(shared);
+    }
+    expect(hrefs('ADMIN').filter((href) => href === '/representants')).toHaveLength(1);
+  });
+
+  it('n’ouvre le terrain à aucun agent bancaire', () => {
+    const visible = hrefs('BANQUE_FINANCE');
+    for (const forbidden of ['/console', '/prospects/nouveau', '/representants', '/suggestions']) {
+      expect(visible).not.toContain(forbidden);
+    }
+  });
+
+  it('range les numéros suggérés dans le Terrain, sous son propre titre', () => {
+    const terrain = navSections('COMMERCIAL').find((section) => section.title === 'Terrain');
+    const entry = terrain?.items.find((item) => item.href === '/suggestions');
+    expect(entry?.label).toBe('Numéros suggérés');
+    expect(navTitle('COMMERCIAL', '/suggestions')).toBe('Numéros suggérés');
+  });
+
+  it('nomme sa console sans employer le mot proscrit', () => {
+    const labels = navItems('COMMERCIAL').map((item) => `${item.label} ${item.description}`);
+    for (const text of labels) expect(text.toLowerCase()).not.toContain('commercial');
+    expect(navTitle('COMMERCIAL', '/console')).toBe('Console d’appel');
+  });
+});
+
 describe('écran d’atterrissage après connexion', () => {
   it('mène chaque rôle là où l’API ne lui répondra pas 403', () => {
     expect(homePathForRole('ADMIN')).toBe('/tableau-de-bord');
     expect(homePathForRole('BANQUE_FINANCE')).toBe('/dossiers');
-    // Le COMMERCIAL est refusé à la porte du panel : son outil est le mobile.
-    expect(homePathForRole('COMMERCIAL')).toBe('/connexion');
+    expect(homePathForRole('COMMERCIAL')).toBe('/console');
+    expect(homePathForRole('SUPERVISEUR')).toBe('/supervision');
+  });
+
+  // Sur PANEL_ROLES et non sur une liste retapée : un rôle admis dans le
+  // panel sans écran d'accueil part en boucle vers « /connexion ».
+  it('ne renvoie personne vers « /connexion », qui l’y renverrait en boucle', () => {
+    for (const role of PANEL_ROLES) {
+      expect(homePathForRole(role), role).not.toBe('/connexion');
+    }
+  });
+
+  it('mène chaque rôle sur un écran que sa propre navigation lui propose', () => {
+    for (const role of PANEL_ROLES) {
+      expect(hrefs(role), role).toContain(homePathForRole(role));
+    }
   });
 });
 
 describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
   it('distingue « Nouveau dossier » de « Dossiers »', () => {
-    // `/dossiers/nouveau` commence par `/dossiers/` : une correspondance
-    // naïve par ordre de déclaration afficherait « Dossiers » sur le
-    // formulaire de création, et surlignerait la mauvaise entrée.
     expect(navTitle('BANQUE_FINANCE', '/dossiers/nouveau')).toBe('Nouveau dossier');
     expect(navTitle('BANQUE_FINANCE', '/dossiers/export')).toBe('Export');
     expect(navTitle('ADMIN', '/dossiers/etapes')).toBe('Étapes bancaires');
   });
 
-  it('nomme les téléconseillers par leur métier, pas par leur lieu', () => {
-    // L'application sert des téléconseillers sur place. « Commerciaux »
-    // décrivait un métier de terrain qui n'existe pas ici.
-    expect(navTitle('ADMIN', '/commerciaux')).toBe('Téléconseillers');
+  it('nomme l’écran des comptes par ce qu’il contient VRAIMENT', () => {
+    expect(navTitle('ADMIN', '/commerciaux')).toBe('Utilisateurs');
+    expect(navTitle('ADMIN', '/commerciaux')).not.toContain('Commerciaux');
     expect(navTitle('ADMIN', '/supervision')).toBe('Supervision');
     expect(navTitle('ADMIN', '/statistiques')).toBe('Statistiques');
   });
@@ -168,5 +226,42 @@ describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
 
   it('retombe sur « CPI GO » pour une route hors navigation', () => {
     expect(navTitle('ADMIN', '/une-route-inconnue')).toBe('CPI GO');
+  });
+});
+
+describe('navigation d’un SUPERVISEUR', () => {
+  it('ne montre QUE des écrans de lecture', () => {
+    expect(hrefs('SUPERVISEUR')).toEqual([
+      '/supervision',
+      '/statistiques',
+      '/prospects',
+      '/rappels',
+      '/representants',
+      '/suggestions',
+    ]);
+  });
+
+  it('masque tout ce qui écrit, saisit, administre ou synchronise', () => {
+    const visible = hrefs('SUPERVISEUR');
+    for (const forbidden of [
+      '/console',
+      '/prospects/nouveau',
+      '/representants/import',
+      '/campagnes',
+      '/dossiers',
+      '/demandes-clients',
+      '/notifications',
+      '/commerciaux',
+      '/referentiels',
+      '/imports',
+      '/parametres',
+    ]) {
+      expect(visible, `« ${forbidden} » ne doit pas être proposé`).not.toContain(forbidden);
+    }
+  });
+
+  it('ne dit jamais « commercial » dans ses intitulés', () => {
+    const labels = navItems('SUPERVISEUR').map((item) => `${item.label} ${item.description}`);
+    for (const text of labels) expect(text.toLowerCase()).not.toContain('commercial');
   });
 });

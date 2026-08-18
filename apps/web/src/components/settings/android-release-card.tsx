@@ -31,44 +31,6 @@ import { fetchAndroidUpdate, formatFileSize, uploadAndroidUpdate } from '@/lib/d
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
-/**
- * Publication d'une release Android.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * LES DEUX CHAMPS DE VERSION ONT DISPARU
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * « Version affichée » et « Version Android (code) » étaient saisis à la main,
- * alors que les deux valeurs sont écrites DANS l'APK par le build. L'API les
- * lit désormais dans le `AndroidManifest.xml` du fichier reçu, et affiche ici
- * ce qu'elle a lu.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI LA DÉTECTION N'EST PAS MONTRÉE AVANT L'ENVOI
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * L'idée serait d'annoncer « version 1.4.2, build 7 » dès le choix du fichier.
- * Elle demande de lire le manifeste, ce qui n'est possible qu'à deux prix, tous
- * deux plus élevés que le bénéfice :
- *
- *  - envoyer l'APK une PREMIÈRE fois à une route d'analyse, puis une seconde
- *    fois pour publier. La release CPI GO pèse 67 Mo : c'est doubler l'attente
- *    d'un administrateur sur une liaison sénégalaise, et ouvrir une route qui
- *    accepte 67 Mo pour les jeter ;
- *  - ou embarquer un lecteur d'AXML dans le navigateur, donc DEUX analyseurs de
- *    manifeste dans le dépôt, qui divergeraient, et dont c'est celui qui décide
- *    vraiment (le serveur) qui n'aurait pas le dernier mot à l'écran.
- *
- * Et le bénéfice est faible, parce que les trois erreurs qu'un aperçu
- * attraperait sont DÉJÀ refusées nommément par le serveur : mauvais paquet,
- * version pas assez haute, manifeste illisible. Le seul cas qu'il resterait
- * (le bon paquet, la bonne version, mais la mauvaise branche) est invisible
- * dans un aperçu comme dans un formulaire.
- *
- * Reste donc une CONFIRMATION avant l'envoi, dans le même registre que la carte
- * du mode démonstration : elle dit ce que le geste déclenche sur le parc, sans
- * prétendre annoncer une version qu'elle ne connaît pas encore.
- */
 export function AndroidReleaseCard() {
   const queryClient = useQueryClient();
   const fileId = useId();
@@ -77,7 +39,6 @@ export function AndroidReleaseCard() {
   const [forceUpdate, setForceUpdate] = useState(true);
   const [notes, setNotes] = useState('');
   const [confirming, setConfirming] = useState(false);
-  /** Ce que l'API a LU dans le manifeste, affiché après coup. */
   const [detected, setDetected] = useState<{ versionName: string; versionCode: number } | null>(
     null,
   );
@@ -101,10 +62,6 @@ export function AndroidReleaseCard() {
     },
     onError: (error) => {
       setConfirming(false);
-      // Les refus du serveur nomment la cause : paquet étranger, version pas
-      // assez haute (avec les deux nombres), manifeste illisible. On rend donc
-      // SON message, et non une phrase générique qui les effacerait tous les
-      // trois derrière « la publication a échoué ».
       toastApiError(error, 'La publication APK a échoué.');
     },
   });
@@ -261,8 +218,6 @@ export function AndroidReleaseCard() {
       <Dialog
         open={confirming}
         onOpenChange={(open) => {
-          // Fermer pendant l'envoi laisserait l'utilisateur sans retour sur un
-          // téléversement de plusieurs dizaines de mégaoctets qui court encore.
           if (!open && upload.isPending) return;
           setConfirming(open);
         }}

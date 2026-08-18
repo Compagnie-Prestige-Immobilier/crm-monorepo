@@ -1,30 +1,3 @@
-/**
- * 20 dossiers bancaires de démonstration, avec leur historique complet.
- *
- * RÈGLE PRODUIT : un dossier ne s'ouvre que sur un prospect `METHOD_OBTAINED`.
- * Les 20 prospects retenus le sont tous, et chaque dossier est daté APRÈS la
- * capture de la méthode : un dossier antérieur à l'enrôlement raconterait une
- * histoire impossible à la première question de l'auditoire.
- *
- * ── Répartition VOULUE ───────────────────────────────────────────────────────
- *   À traiter              4     nouveaux dossiers, colonne de gauche non vide
- *   En traitement banque   5
- *   Encaissé               7     22 000 000 XOF au total
- *   Rejeté                 4
- *
- * L'histoire que les chiffres doivent raconter :
- *   · la CBAO domine : 9 dossiers sur 20, et 12 000 000 XOF encaissés sur 22 ;
- *   · le motif « Document manquant » domine les rejets (2 sur 4), ce qui donne
- *     un enseignement exploitable au lieu d'un camembert plat.
- *
- * Les montants sont des CHAÎNES. Le XOF n'a pas de décimale et la colonne est un
- * Decimal(18,0) : un entier JSON perdrait de la précision au-delà de 2^53, et
- * une démonstration où un encaissement s'affiche à un franc près est une
- * démonstration ratée.
- *
- * Les étapes et les motifs sont désignés par `BankCaseStage.code` et
- * `BankRejectionReason.code` (voir `seed-data/bank-workflow.ts`).
- */
 import type { DemoBankCase, DemoBankCaseTransition } from './types.js';
 
 const A_TRAITER = 'A_TRAITER';
@@ -32,7 +5,6 @@ const EN_TRAITEMENT = 'EN_TRAITEMENT_BANQUE';
 const ENCAISSE = 'ENCAISSE';
 const REJETE = 'REJETE';
 
-/** L'agent Banque & Finance instruit les dossiers, quel qu'en soit l'auteur. */
 const AGENT = 'banque';
 
 type Outcome =
@@ -43,13 +15,10 @@ interface CaseSpec {
   key: string;
   reference: string;
   prospectKey: string;
-  /** `Banque.shortName`. */
   bank: string;
   createdByKey: string;
   openedDaysAgo: number;
-  /** `null` : le dossier n'a pas encore quitté « À traiter ». */
   toBankDaysAgo: number | null;
-  /** `null` : le dossier est encore ouvert. */
   outcome: Outcome | null;
 }
 
@@ -73,15 +42,6 @@ function transition(
   };
 }
 
-/**
- * Déplie une spécification en dossier complet.
- *
- * Les règles financières des étapes terminales sont appliquées ICI, une seule
- * fois, plutôt que recopiées vingt fois : encaissé ⇒ montant strictement
- * positif et aucun motif ; rejeté ⇒ montant à zéro et motif obligatoire ;
- * ouvert ⇒ ni l'un ni l'autre. C'est la même règle que le service applique, et
- * une ligne écrite à la main aurait fini par la violer.
- */
 function buildCase(spec: CaseSpec): DemoBankCase {
   const opening = transition(null, A_TRAITER, spec.createdByKey, spec.openedDaysAgo, {
     comment: 'Dossier transmis par le commercial.',
@@ -130,7 +90,6 @@ function buildCase(spec: CaseSpec): DemoBankCase {
 }
 
 const CASE_SPECS: CaseSpec[] = [
-  // ── Encaissés : 7 dossiers, 22 000 000 XOF ─────────────────────────────────
   {
     key: 'bc01',
     reference: 'CPI-DEMO-0001',
@@ -202,7 +161,6 @@ const CASE_SPECS: CaseSpec[] = [
     outcome: { kind: 'ENCAISSE', daysAgo: 33, amountXof: '2750000' },
   },
 
-  // ── Rejetés : 4 dossiers, « Document manquant » en tête ────────────────────
   {
     key: 'bc08',
     reference: 'CPI-DEMO-0008',
@@ -245,13 +203,10 @@ const CASE_SPECS: CaseSpec[] = [
       kind: 'REJETE',
       daysAgo: 32,
       reasonCode: 'AUTRE',
-      // « Autre » EXIGE une précision : sans elle, le motif n'apprend rien à
-      // personne six mois plus tard.
       detail: 'Prélèvement déjà en cours auprès d’un autre partenaire.',
     },
   },
 
-  // ── En traitement banque : 5 dossiers ──────────────────────────────────────
   {
     key: 'bc12',
     reference: 'CPI-DEMO-0012',
@@ -303,7 +258,6 @@ const CASE_SPECS: CaseSpec[] = [
     outcome: null,
   },
 
-  // ── À traiter : 4 dossiers ─────────────────────────────────────────────────
   {
     key: 'bc17',
     reference: 'CPI-DEMO-0017',

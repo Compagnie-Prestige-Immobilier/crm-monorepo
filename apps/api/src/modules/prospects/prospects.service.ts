@@ -11,7 +11,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { lastAttemptsByProspect, type LastAttempt } from './last-attempt.js';
 import { normalizePhone } from '../../common/phone.js';
-import { assertOwnership, isAdmin, ownerScope } from '../../common/scope.js';
+import { assertOwnership, assertReadable, isAdmin, ownerScope } from '../../common/scope.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
 import { ProspectSortField, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import type { ProspectQueryDto } from '../../common/dto/prospect-filter.dto.js';
@@ -141,7 +141,7 @@ export class ProspectsService {
     if (!row) {
       throw new NotFoundException({ code: 'PROSPECT_NOT_FOUND', message: 'Prospect introuvable.' });
     }
-    assertOwnership(user, row);
+    assertReadable(user, row);
     const attempts = await lastAttemptsByProspect(this.prisma, [row.id]);
     return toProspectDto(row, attempts.get(row.id));
   }

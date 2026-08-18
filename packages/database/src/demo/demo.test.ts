@@ -1,15 +1,3 @@
-/**
- * Le jeu de démonstration est semé DEVANT UN AUDITOIRE. Une clé de référentiel
- * inexistante, un montant nul sur un encaissement ou un doublon de téléphone ne
- * se découvrent pas à ce moment-là : ces tests sont le filet.
- *
- * Ils vérifient deux familles de propriétés :
- *   · l'INTÉGRITÉ : chaque clé naturelle citée existe vraiment dans
- *     `seed-data/`, chaque clé locale pointe sur une entité du jeu ;
- *   · la COHÉRENCE MÉTIER : les invariants que la base pose en CHECK, plus la
- *     répartition annoncée en commentaire, recalculée ici pour que le
- *     commentaire ne puisse pas mentir.
- */
 import type { BddSegment } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 
@@ -485,8 +473,6 @@ describe('dossiers bancaires', () => {
       let previous = first;
       for (const step of rest) {
         expect(step.fromStageCode, bankCase.key).toBe(previous.toStageCode);
-        // Les jours DÉCROISSENT : une transition plus récente est plus proche
-        // d'aujourd'hui.
         expect(step.daysAgo, bankCase.key).toBeLessThan(previous.daysAgo);
         previous = step;
       }

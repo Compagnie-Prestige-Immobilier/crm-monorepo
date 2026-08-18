@@ -16,6 +16,7 @@ import '../../features/permissions/presentation/battery_help_screen.dart';
 import '../../features/phase2/presentation/phase2_screen.dart';
 import '../../features/prospect/presentation/prospect_entry_screen.dart';
 import '../../features/reglages/presentation/reglages_screen.dart';
+import '../../features/representant/presentation/representant_detail_screen.dart';
 import '../../features/representant/presentation/representant_form_screen.dart';
 import '../../features/representant/presentation/representant_picker_screen.dart';
 import '../../features/shell/app_shell.dart';
@@ -24,11 +25,6 @@ import '../theme/cpi_tokens.dart';
 import 'route_memory.dart';
 import 'route_paths.dart';
 
-/// Pont Riverpod → go_router.
-///
-/// `GoRouter` ne connaît que `Listenable`. Sans ce pont il faudrait reconstruire
-/// le routeur à chaque changement de session, ce qui remettrait la pile de
-/// navigation à zéro : y compris lors d'un simple renouvellement de jeton.
 class _AuthRefreshNotifier extends ChangeNotifier {
   _AuthRefreshNotifier(Ref ref) {
     ref.listen<AuthState>(authControllerProvider, (AuthState? previous, AuthState next) {
@@ -46,9 +42,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   final _AuthRefreshNotifier refresh = _AuthRefreshNotifier(ref);
   ref.onDispose(refresh.dispose);
 
-  // Restauration de route : quatre conditions, toutes vérifiées dans
-  // [RouteMemory.read] : session valide, même numéro de build, moins de 24 h,
-  // et chemin sur la liste blanche.
   final bool authenticated = ref.read(authControllerProvider).isAuthenticated;
   final String initial = memory.read(authenticated: authenticated) ?? Routes.home;
 
@@ -61,9 +54,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       final AuthState auth = ref.read(authControllerProvider);
       final String location = state.uri.toString();
 
-      // Tant que la lecture du stockage chiffré n'a pas rendu son verdict, on ne
-      // redirige RIEN. Rediriger sur `unknown` déconnecterait visuellement
-      // l'utilisateur à chaque démarrage à froid.
       if (!auth.isResolved) return null;
 
       final bool onLogin = Routes.isPublic(location);
@@ -73,9 +63,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       }
 
       if (onLogin) {
-        // `queryParameters` a DÉJÀ décodé le pourcent-encodage. Un
-        // `Uri.decodeComponent` de plus ici casserait toute destination
-        // contenant un `%` légitime.
         final String? next = state.uri.queryParameters[Routes.nextParam];
         if (next == null || next.isEmpty || Routes.isPublic(next)) {
           return Routes.home;
@@ -92,13 +79,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: (BuildContext context, GoRouterState state) => const LoginScreen(),
       ),
 
-      // Écrans plein écran, hors coque : un formulaire de saisie n'affiche pas
-      // la barre de navigation. Elle offrirait, au milieu d'une saisie, trois
-      // façons de quitter l'écran sans enregistrer.
-      // Sélection d'un représentant existant. Déclarée AVANT
-      // `/representants/nouveau` n'aurait rien changé (go_router n'a pas de
-      // paramètre ici), mais l'ordre suit la lecture : on choisit d'abord, on
-      // crée ensuite.
       GoRoute(
         path: Routes.representants,
         name: 'representants',
@@ -116,6 +96,15 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           prefillName: state.uri.queryParameters[Routes.prefillNameParam],
           prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam],
         ),
+      ),
+      // Après `newRepresentant` : go_router essaie les routes dans l'ordre, et
+      // `:id` avalerait `/representants/nouveau`.
+      GoRoute(
+        path: Routes.representantDetail,
+        name: 'representantDetail',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            RepresentantDetailScreen(representantId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: Routes.newProspect,
@@ -204,18 +193,9 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         _RouteNotFound(location: state.uri.toString()),
   );
 
-  // La mémorisation écoute le routeur plutôt que d'être appelée depuis chaque
-  // écran : un écran qui oublierait l'appel créerait un trou silencieux dans la
-  // restauration.
-  //
-  // On lit `currentConfiguration` et non `router.state` : ce dernier fait
-  // `.last` sur la liste de correspondances et lève tant qu'aucune route n'a
-  // encore été résolue : ce qui est précisément le cas au premier appel.
   void remember() {
     final RouteMatchList config = router.routerDelegate.currentConfiguration;
     if (config.isEmpty) return;
-    // L'URI COMPLÈTE, paramètres de requête compris : c'est `?draft=<id>` qui
-    // ramène la saisie en cours.
     final String location = config.uri.toString();
     if (location.isEmpty) return;
     unawaited(memory.write(location));

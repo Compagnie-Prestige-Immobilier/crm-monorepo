@@ -4,20 +4,6 @@ import { buildAdvancedChips } from '@/components/filters/advanced-chips';
 import { EMPTY_FILTERS } from '@/lib/filters';
 import { RETIRED_SUFFIX, type ProspectFilters, type ReferenceData } from '@/lib/types';
 
-/**
- * Les puces qui rappellent les critères repliés.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Le défaut qu'elles existent pour supprimer.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Un filtre actif derrière un panneau fermé restreint la population sans que
- * rien ne l'annonce. L'écran affiche alors un chiffre partiel qui se lit comme
- * un total, et personne ne vérifie un nombre qui a l'air normal. Ces tests
- * fixent le contrat : toute valeur renseignée produit une puce, et cette puce
- * porte la VALEUR, pas seulement le nom du champ.
- */
-
 const REFERENCE: ReferenceData = {
   regions: [],
   iefs: [],
@@ -66,8 +52,6 @@ describe('buildAdvancedChips', () => {
       dateFrom: '2026-01-01',
       dateTo: '2026-03-31',
     };
-    // Le téléconseiller, la recherche et la période portent leur propre champ à
-    // l'écran : les rappeler en puce ferait lire deux fois la même information.
     expect(buildAdvancedChips(visibleOnly, REFERENCE)).toEqual([]);
   });
 
@@ -92,8 +76,6 @@ describe('buildAdvancedChips', () => {
     const banque = chips.find((chip) => chip.key === 'banqueId');
     expect(banque).toEqual({ key: 'banqueId', field: 'Banque', value: 'CBAO' });
 
-    // Savoir qu'un filtre banque existe sans savoir laquelle obligerait à
-    // rouvrir le panneau, ce qui annulerait le bénéfice du repli.
     expect(chips.find((chip) => chip.key === 'representantId')?.value).toBe('Moussa Fall');
     expect(chips.find((chip) => chip.key === 'campaignId')?.value).toBe('Relance avril');
     expect(chips.find((chip) => chip.key === 'enrollmentCapturedById')?.value).toBe('Awa Diop');
@@ -107,8 +89,6 @@ describe('buildAdvancedChips', () => {
   });
 
   it('montre tout de même la puce quand l’identifiant ne correspond à rien', () => {
-    // Cas réel : une URL partagée porte l'identifiant d'une campagne supprimée
-    // depuis. Masquer la puce laisserait un filtre actif sans aucune trace.
     const chips = buildAdvancedChips({ ...EMPTY_FILTERS, campaignId: 'disparue' }, REFERENCE);
     expect(chips).toHaveLength(1);
     expect(chips[0]?.field).toBe('Campagne d’appels');

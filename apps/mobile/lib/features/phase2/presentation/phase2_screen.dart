@@ -16,35 +16,8 @@ import '../../../data/repositories/write_repository.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../phase2_controller.dart';
+import 'callback_picker.dart';
 
-/// Phase 2 : saisie des méthodes d'enrôlement.
-///
-/// ## Ce que fait cet écran, et ce qu'il ne fait pas
-///
-/// Le téléconseiller travaille depuis un **programme imprimé** qui ne liste que
-/// des numéros de téléphone : pas de noms, délibérément. Il appelle, puis vient
-/// consigner ici soit la méthode d'enrôlement obtenue, soit la raison pour
-/// laquelle il n'en a pas obtenu. **Le papier est le programme ; l'app est
-/// l'outil d'enregistrement.** C'est pourquoi rien sur cet écran ne ressemble à
-/// une liste de tâches, à un « 42 / 120 » ni à un « prochain numéro » : une app
-/// qui prétendrait piloter la journée ferait sauter les numéros que le papier
-/// porte et qu'elle ignore, sans que personne ne s'en aperçoive.
-///
-/// ## Pourquoi chaque geste est compté
-///
-/// Il y a une pile de numéros à passer. Chaque appui superflu se paie autant de
-/// fois qu'il y a d'appels dans la journée. D'où : champ auto-focalisé au
-/// démarrage et après chaque enregistrement, clavier numérique, validation à la
-/// complétion du numéro sans appuyer sur « rechercher », trois cartes de méthode
-/// atteignables au pouce, et retour immédiat au champ après confirmation.
-///
-/// ## Le retour haptique ne ment jamais
-///
-/// `selectionClick` au choix d'une carte : c'est un retour de sélection, il est
-/// exact au moment où il est émis. La vibration de succès, elle, n'est déclenchée
-/// **qu'après** que l'écriture locale a été commitée : une vibration qui précède
-/// l'écriture affirme un enregistrement qui peut encore échouer. Rien ne vibre à
-/// la frappe.
 class Phase2Screen extends ConsumerStatefulWidget {
   const Phase2Screen({super.key});
 
@@ -56,8 +29,6 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   final TextEditingController _phone = TextEditingController();
   final FocusNode _phoneFocus = FocusNode();
 
-  /// Numéro pour lequel une recherche a déjà été lancée. Sans ce garde, chaque
-  /// frappe au-delà du neuvième chiffre relancerait la requête.
   String? _lastSearched;
 
   @override
@@ -74,12 +45,6 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     super.dispose();
   }
 
-  /// Recherche automatique dès que le numéro est complet.
-  ///
-  /// Neuf chiffres au Sénégal, sans ambiguïté de longueur : il n'existe aucun
-  /// numéro dont la complétion soit un préfixe d'un autre. On peut donc chercher
-  /// sans attendre un appui, ce qui retire un geste par appel. **Rien ne vibre
-  /// ici** : une frappe n'est pas un événement à signaler.
   void _onPhoneChanged() {
     final String raw = _phone.text;
     final PhoneResult parsed = Phone.parse(raw);
@@ -98,17 +63,11 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   Future<void> _runSearch(String e164) async {
     await ref.read(phase2ControllerProvider.notifier).search(e164);
     if (!mounted) return;
-    // Numéro inconnu de l'annuaire : c'est une erreur d'orientation, pas une
-    // faute de frappe : le commercial vient peut-être de tourner une page du
-    // mauvais programme. Le signaler par un retour tactile évite de lui faire
-    // relire l'écran entre deux appels.
     if (ref.read(phase2ControllerProvider).stage == Phase2Stage.notFound) {
       await HapticFeedback.heavyImpact();
     }
   }
 
-  /// Vide le champ et lui rend le focus. Appelée après chaque enregistrement :
-  /// le numéro suivant se tape immédiatement, sans un geste de plus.
   void _resetForNext() {
     _lastSearched = null;
     _phone.clear();
@@ -116,17 +75,25 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     _phoneFocus.requestFocus();
   }
 
-  Future<void> _record({required String outcome, String? method, String? comment}) async {
+  Future<void> _record({
+    required String outcome,
+    String? method,
+    String? comment,
+    DateTime? callbackAt,
+  }) async {
     final bool ok = await ref
         .read(phase2ControllerProvider.notifier)
-        .record(outcome: outcome, method: method, comment: comment);
+        .record(
+          outcome: outcome,
+          method: method,
+          comment: comment,
+          callbackAt: callbackAt,
+        );
     if (!mounted) return;
     if (!ok) {
-      // Échec : vibration d'erreur, et le message est déjà dans l'état.
       await HapticFeedback.heavyImpact();
       return;
     }
-    // ÉCRITURE CONFIRMÉE, PUIS vibration. Jamais l'inverse.
     await HapticFeedback.mediumImpact();
   }
 
@@ -135,9 +102,6 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     final Phase2State phase2 = ref.watch(phase2ControllerProvider);
     final CpiMotion motion = CpiMotion.of(context);
 
-    // `CpiPopScope` + `CpiBackButton` : la flèche ET le geste système
-    // aboutissent, y compris quand cet écran est le premier de la pile (route
-    // restaurée au démarrage à froid). C'est le bug signalé sur Phase 2.
     return CpiPopScope(
       child: Scaffold(
         appBar: AppBar(title: const Text('Phase 2'), leading: const CpiBackButton()),
@@ -160,12 +124,6 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                       enabled: phase2.stage != Phase2Stage.confirmed,
                     ),
                     const SizedBox(height: CpiSpacing.md),
-                    // `AnimatedSwitcher` et non trois `if` : le passage
-                    // recherche → résultat → confirmation est le seul mouvement de
-                    // cet écran, et il porte une information : quelque chose a
-                    // changé sous les doigts. `CpiMotion.of` ramène la durée à
-                    // zéro quand `MediaQuery.disableAnimations` est actif ; la
-                    // logique, elle, ne change pas.
                     AnimatedSwitcher(
                       duration: motion.component,
                       switchInCurve: motion.easeOut,
@@ -202,9 +160,6 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                   ],
                 ),
               ),
-              // Action ancrée en zone de pouce quand l'annuaire est vide : sans
-              // elle, le seul « Télécharger » était en haut de l'écran, hors
-              // d'atteinte à une main.
               const _DownloadBar(),
             ],
           ),
@@ -218,24 +173,19 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (BuildContext context) => const _NegativeSheet(),
+      builder: (BuildContext context) =>
+          _NegativeSheet(now: ref.read(clockProvider).now()),
     );
     if (result == null || !mounted) return;
-    await _record(outcome: result.outcome, comment: result.comment);
+    await _record(
+      outcome: result.outcome,
+      comment: result.comment,
+      callbackAt: result.callbackAt,
+    );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Bandeau d'état
-// ─────────────────────────────────────────────────────────────────────────────
 
-/// Annuaire, dernière synchronisation, écritures en attente, progression
-/// personnelle.
-///
-/// Formulé pour ne **pas** se faire passer pour le programme officiel : « mes
-/// saisies », jamais « ma campagne » ni un pourcentage d'avancement. Le
-/// dénominateur du travail de la journée est sur le papier, et l'app ne le
-/// connaît pas.
 class _StatusStrip extends ConsumerWidget {
   const _StatusStrip();
 
@@ -292,8 +242,6 @@ class _StatusStrip extends ConsumerWidget {
                         : PhosphorIconsRegular.cloudSlash,
                     value: '$pending',
                     label: 'à envoyer',
-                    // `accentText` (#856011) et jamais `accent` (#C8921A) : ce
-                    // chiffre est du texte, et l'or de surface fait 2,77:1.
                     color: pending == 0 ? cpi.syncSynced : cpi.accentText,
                   ),
                 ],
@@ -312,10 +260,6 @@ class _StatusStrip extends ConsumerWidget {
   }
 }
 
-/// Premier téléchargement de l'annuaire, ancré en bas d'écran.
-///
-/// Elle disparaît dès que l'annuaire existe : une barre d'action permanente
-/// mangerait la hauteur utile de l'écran le plus répétitif de l'app.
 class _DownloadBar extends ConsumerWidget {
   const _DownloadBar();
 
@@ -374,12 +318,6 @@ class _Metric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    // Le libellé sous la valeur, pas à côté d'elle.
-    //
-    // Côte à côte, les trois métriques se partagent 109 dp sur un écran de
-    // 360 dp : la largeur réelle des téléphones du parc : et « méthodes
-    // obtenues » déborde de 97 px. Empilé, le libellé dispose de toute la
-    // colonne et se replie sur deux lignes.
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -399,8 +337,6 @@ class _Metric extends StatelessWidget {
               ),
             ],
           ),
-          // 14 sp et non `labelSmall` 11 : ces trois libellés portent tout le
-          // sens des trois chiffres au-dessus d'eux, et se lisaient mal.
           Text(
             label,
             maxLines: 2,
@@ -416,8 +352,6 @@ class _Metric extends StatelessWidget {
   }
 }
 
-/// Ligne « annuaire » : taille, fraîcheur, bouton de mise à jour, progression du
-/// téléchargement.
 class _DirectoryLine extends ConsumerWidget {
   const _DirectoryLine({
     required this.directory,
@@ -441,10 +375,6 @@ class _DirectoryLine extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            // Progression INDÉTERMINÉE et un compteur, jamais une barre remplie
-            // à un pourcentage : le serveur ne dit pas combien de lignes il
-            // reste, et une barre inventée qui reculerait ou stagnerait à 90 %
-            // est pire qu'une barre honnête qui tourne.
             const LinearProgressIndicator(minHeight: 3),
             const SizedBox(height: CpiSpacing.xxs),
             Text(
@@ -481,9 +411,6 @@ class _DirectoryLine extends ConsumerWidget {
             ),
           ),
         ),
-        // Le bouton du haut ne subsiste que pour la mise à jour d'un annuaire
-        // déjà présent : le premier téléchargement, lui, est ancré en bas
-        // d'écran (voir `_DownloadBar`).
         if (directory > 0)
           ConstrainedBox(
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
@@ -500,9 +427,6 @@ class _DirectoryLine extends ConsumerWidget {
 
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Champ téléphone
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _PhoneBlock extends ConsumerWidget {
   const _PhoneBlock({
@@ -529,13 +453,8 @@ class _PhoneBlock extends ConsumerWidget {
             child: PhoneField(
               controller: controller,
               focusNode: focusNode,
-              // Le champ prend le focus au premier cadre : l'écran n'existe que
-              // pour taper un numéro, et demander un appui préalable coûterait
-              // un geste par appel de la journée.
               autofocus: true,
               label: 'Numéro appelé',
-              // `done` et non `next` : il n'y a rien après. La recherche part
-              // toute seule à la complétion.
               textInputAction: TextInputAction.done,
               helper: 'Recherche automatique',
             ),
@@ -556,9 +475,6 @@ class _PhoneBlock extends ConsumerWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Les cinq états
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _SearchHint extends StatelessWidget {
   const _SearchHint({this.message});
@@ -577,9 +493,6 @@ class _SearchHint extends StatelessWidget {
         message: message!,
       );
     }
-    // Aucun mode d'emploi : le champ au-dessus dit déjà « Numéro appelé », et
-    // une phrase qui explique un champ est une phrase que personne ne lit deux
-    // fois. L'icône marque l'attente, rien de plus.
     return Column(
       children: <Widget>[
         const SizedBox(height: CpiSpacing.xxl),
@@ -632,13 +545,6 @@ class _NotFound extends StatelessWidget {
   }
 }
 
-/// Dossier déjà clos : **lecture seule**.
-///
-/// Aucun bouton de correction, et c'est volontaire : le serveur refuserait toute
-/// nouvelle tentative (`PHASE2_ALREADY_COMPLETED`), et seul un ADMIN peut
-/// corriger depuis le panneau web. Offrir ici un formulaire qui ne peut pas
-/// aboutir ferait perdre du temps au commercial et lui ferait croire qu'il a
-/// corrigé quelque chose.
 class _AlreadyClosed extends StatelessWidget {
   const _AlreadyClosed({required this.entry, required this.onNext});
 
@@ -732,7 +638,6 @@ class _AlreadyClosed extends StatelessWidget {
   }
 }
 
-/// Les trois cartes de méthode, plus l'issue négative.
 class _Capture extends StatelessWidget {
   const _Capture({required this.state, required this.onMethod, required this.onNegative});
 
@@ -757,10 +662,6 @@ class _Capture extends StatelessWidget {
           ),
         ),
         const SizedBox(height: CpiSpacing.sm),
-        // Trois cartes empilées et non un groupe de radios : la cible d'un
-        // radio Material fait 40 dp de large pour un texte qui en fait 200, et
-        // se rate à une main, entre deux appels. Ici toute la carte est la
-        // cible, sur toute la largeur.
         _MethodCard(
           method: EnrollmentMethods.platform,
           title: 'Plateforme',
@@ -788,9 +689,6 @@ class _Capture extends StatelessWidget {
           onTap: onMethod,
         ),
         const SizedBox(height: CpiSpacing.md),
-        // Action secondaire, visuellement en retrait mais à la même portée de
-        // pouce : « pas de méthode » est l'issue la plus fréquente d'une pile
-        // d'appels, elle n'a pas à être cachée derrière un menu.
         SizedBox(
           height: 52,
           child: OutlinedButton.icon(
@@ -836,9 +734,6 @@ class _MethodCard extends StatelessWidget {
     final CpiColors cpi = context.cpi;
 
     void choose() {
-      // Retour de SÉLECTION, exact au moment où il est émis : la carte vient
-      // d'être choisie, c'est un fait. La vibration de succès, elle, attend
-      // l'écriture.
       HapticFeedback.selectionClick();
       onTap(method);
     }
@@ -846,17 +741,12 @@ class _MethodCard extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: enabled,
-      // Sans `onTap`, le nœud s'annonce « bouton » mais n'expose aucune action :
-      // `ExcludeSemantics` a supprimé celle de l'`InkWell`. Un lecteur d'écran
-      // décrit alors une carte qu'il ne peut pas activer.
       onTap: enabled ? choose : null,
       label: 'Méthode obtenue : $title. $subtitle',
       child: ExcludeSemantics(
         child: CpiPressable(
           onTap: enabled ? choose : null,
           child: Container(
-            // 72 dp : bien au-delà des 48 dp minimum. Une carte qui porte la
-            // décision de tout l'écran ne se dimensionne pas au plancher.
             constraints: const BoxConstraints(minHeight: 72),
             padding: const EdgeInsets.all(CpiSpacing.md),
             decoration: BoxDecoration(
@@ -931,9 +821,6 @@ class _Confirmed extends StatelessWidget {
               ),
               child: Row(
                 children: <Widget>[
-                  // Rebond léger sur la coche : c'est LA confirmation que
-                  // l'écriture est passée, et docs/design.md §7 réserve
-                  // `ease-spring` exactement à ce cas.
                   _SpringIn(
                     child: Icon(
                       PhosphorIconsFill.checkCircle,
@@ -974,27 +861,19 @@ class _Confirmed extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Feuille « méthode non obtenue »
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _NegativeResult {
-  const _NegativeResult(this.outcome, this.comment);
+  const _NegativeResult(this.outcome, this.comment, this.callbackAt);
 
   final String outcome;
   final String? comment;
+  final DateTime? callbackAt;
 }
 
-/// Les cinq issues sans méthode, et le commentaire.
-///
-/// `OTHER` **exige** un commentaire non vide : un `CHECK` PostgreSQL
-/// (`call_attempts_other_requires_comment`) le refuse sinon. On le valide donc
-/// ici, à la seconde où le commercial appuie, plutôt que de découvrir le refus à
-/// la synchronisation : c'est-à-dire potentiellement trois semaines plus tard,
-/// quand plus personne ne se souvient de l'appel et que la saisie est
-/// irrécupérable.
 class _NegativeSheet extends StatefulWidget {
-  const _NegativeSheet();
+  const _NegativeSheet({required this.now});
+
+  final DateTime now;
 
   @override
   State<_NegativeSheet> createState() => _NegativeSheetState();
@@ -1004,6 +883,7 @@ class _NegativeSheetState extends State<_NegativeSheet> {
   final TextEditingController _comment = TextEditingController();
   String? _outcome;
   String? _error;
+  DateTime? _callbackAt;
 
   @override
   void dispose() {
@@ -1059,12 +939,11 @@ class _NegativeSheetState extends State<_NegativeSheet> {
       comment: comment,
     );
     if (problem != null) {
-      // Vibration d'erreur : la saisie est refusée AVANT toute écriture.
       HapticFeedback.heavyImpact();
       setState(() => _error = problem.message);
       return;
     }
-    Navigator.of(context).pop(_NegativeResult(outcome, comment));
+    Navigator.of(context).pop(_NegativeResult(outcome, comment, _callbackAt));
   }
 
   @override
@@ -1073,13 +952,8 @@ class _NegativeSheetState extends State<_NegativeSheet> {
     final CpiColors cpi = context.cpi;
 
     return Padding(
-      // `viewInsets` : la feuille remonte au-dessus du clavier, sinon le champ
-      // de commentaire est masqué par ce qui sert à le remplir.
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: ConstrainedBox(
-        // La feuille ne dépasse jamais 90 % de la hauteur : au-delà, elle
-        // couvrirait le numéro qu'on est en train de traiter et on ne saurait
-        // plus pour qui on saisit.
         constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1118,14 +992,6 @@ class _NegativeSheetState extends State<_NegativeSheet> {
                 ],
               ),
             ),
-            // SEULES les options défilent ; les actions restent ancrées.
-            //
-            // Avec un `SingleChildScrollView` englobant tout, « Enregistrer »
-            // passe sous la ligne de flottaison dès que le clavier s'ouvre :
-            // c'est-à-dire exactement au moment où l'on veut appuyer dessus. Le
-            // commercial doit alors refermer le clavier ou faire défiler pour
-            // valider ce qu'il vient de taper : deux gestes de plus, à chaque
-            // issue négative, qui sont la majorité des appels.
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: CpiSpacing.md),
@@ -1150,10 +1016,19 @@ class _NegativeSheetState extends State<_NegativeSheet> {
                             setState(() {
                               _outcome = option.outcome;
                               _error = null;
+                              _callbackAt = null;
                             });
                           },
                         ),
                       ),
+                    if (_outcome == CallOutcomes.callback) ...<Widget>[
+                      const SizedBox(height: CpiSpacing.sm),
+                      CallbackPicker(
+                        key: const ValueKey<String>('callback-picker'),
+                        now: widget.now,
+                        onChanged: (DateTime? at) => _callbackAt = at,
+                      ),
+                    ],
                     const SizedBox(height: CpiSpacing.sm),
                     TextField(
                       controller: _comment,
@@ -1185,10 +1060,6 @@ class _NegativeSheetState extends State<_NegativeSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  // Le message est ANCRÉ avec le bouton, pas attaché au champ.
-                  // Sous le champ, il disparaîtrait avec lui au défilement, et
-                  // le commercial appuierait à nouveau sur « Enregistrer » sans
-                  // jamais voir pourquoi rien ne se passe.
                   if (_error != null) ...<Widget>[
                     Semantics(
                       liveRegion: true,
@@ -1318,7 +1189,6 @@ class _OutcomeTile extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _Notice extends StatelessWidget {
   const _Notice({
@@ -1357,11 +1227,6 @@ class _Notice extends StatelessWidget {
   }
 }
 
-/// Entrée avec rebond léger (`ease-spring`, docs/design.md §7).
-///
-/// Réservée aux **confirmations** : c'est la seule catégorie de mouvement que
-/// §7 autorise à dépasser, et elle ne s'applique qu'à une icône, jamais à un
-/// bloc de texte qu'on cherche à lire.
 class _SpringIn extends StatefulWidget {
   const _SpringIn({required this.child});
 
