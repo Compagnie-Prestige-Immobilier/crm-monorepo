@@ -35,6 +35,8 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto outcome(CallOutcome? outcome);
 
+  SyncEntityDataDto reasonCode(String? reasonCode);
+
   SyncEntityDataDto method(EnrollmentMethod? method);
 
   SyncEntityDataDto comment(String? comment);
@@ -62,6 +64,7 @@ abstract class _$SyncEntityDataDtoCWProxy {
     DateTime? clientCreatedAt,
     String? prospectId,
     CallOutcome? outcome,
+    String? reasonCode,
     EnrollmentMethod? method,
     String? comment,
     DateTime? callbackAt,
@@ -122,6 +125,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
   SyncEntityDataDto outcome(CallOutcome? outcome) => this(outcome: outcome);
 
   @override
+  SyncEntityDataDto reasonCode(String? reasonCode) =>
+      this(reasonCode: reasonCode);
+
+  @override
   SyncEntityDataDto method(EnrollmentMethod? method) => this(method: method);
 
   @override
@@ -153,6 +160,7 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? prospectId = const $CopyWithPlaceholder(),
     Object? outcome = const $CopyWithPlaceholder(),
+    Object? reasonCode = const $CopyWithPlaceholder(),
     Object? method = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
     Object? callbackAt = const $CopyWithPlaceholder(),
@@ -214,6 +222,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.outcome
           // ignore: cast_nullable_to_non_nullable
           : outcome as CallOutcome?,
+      reasonCode: reasonCode == const $CopyWithPlaceholder()
+          ? _value.reasonCode
+          // ignore: cast_nullable_to_non_nullable
+          : reasonCode as String?,
       method: method == const $CopyWithPlaceholder()
           ? _value.method
           // ignore: cast_nullable_to_non_nullable
@@ -275,6 +287,7 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
             unknownValue: CallOutcome.unknownDefaultOpenApi,
           ),
         ),
+        reasonCode: $checkedConvert('reasonCode', (v) => v as String?),
         method: $checkedConvert(
           'method',
           (v) => $enumDecodeNullable(
@@ -311,6 +324,7 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(SyncEntityDataDto instance) =>
       if (instance.prospectId case final value?) 'prospectId': value,
       if (_$CallOutcomeEnumMap[instance.outcome] case final value?)
         'outcome': value,
+      if (instance.reasonCode case final value?) 'reasonCode': value,
       if (_$EnrollmentMethodEnumMap[instance.method] case final value?)
         'method': value,
       if (instance.comment case final value?) 'comment': value,
