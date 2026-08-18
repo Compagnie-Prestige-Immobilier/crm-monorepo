@@ -50,6 +50,8 @@ class SyncEntityDataDto {
 
     this.outcome,
 
+    this.reasonCode,
+
     this.method,
 
     this.comment,
@@ -121,6 +123,10 @@ class SyncEntityDataDto {
   )
   final CallOutcome? outcome;
 
+  /// Tentative d’appel : code du motif d’issue. FACULTATIF POUR TOUJOURS. Un lot qui ne le porte pas résout le motif système dont le code égale outcome.
+  @JsonKey(name: r'reasonCode', required: false, includeIfNull: false)
+  final String? reasonCode;
+
   /// Obligatoire si et seulement si outcome vaut METHOD_OBTAINED.
   @JsonKey(
     name: r'method',
@@ -158,6 +164,7 @@ class SyncEntityDataDto {
                 clientCreatedAt,
                 prospectId,
                 outcome,
+                reasonCode,
                 method,
                 comment,
                 callbackAt,
@@ -177,6 +184,7 @@ class SyncEntityDataDto {
                 other.clientCreatedAt,
                 other.prospectId,
                 other.outcome,
+                other.reasonCode,
                 other.method,
                 other.comment,
                 other.callbackAt,
@@ -202,6 +210,7 @@ class SyncEntityDataDto {
         clientCreatedAt,
         prospectId,
         outcome,
+        reasonCode,
         method,
         comment,
         callbackAt,

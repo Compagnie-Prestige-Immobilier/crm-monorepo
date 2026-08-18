@@ -3080,6 +3080,8 @@ export interface components {
        */
       prospectId?: string;
       outcome?: components['schemas']['CallOutcome'];
+      /** @description Tentative d’appel : code du motif d’issue. FACULTATIF POUR TOUJOURS. Un lot qui ne le porte pas résout le motif système dont le code égale outcome. */
+      reasonCode?: string;
       /** @description Obligatoire si et seulement si outcome vaut METHOD_OBTAINED. */
       method?: components['schemas']['EnrollmentMethod'];
       /** @description Tentative d’appel : obligatoire et non vide si outcome vaut OTHER. */
