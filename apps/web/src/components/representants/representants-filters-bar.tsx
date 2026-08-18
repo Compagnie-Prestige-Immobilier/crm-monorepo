@@ -24,8 +24,11 @@ import { queryKeys } from '@/lib/query-keys';
 import {
   clearRepresentantAdvancedFilters,
   countActiveRepresentantFilters,
+  REPRESENTANT_RELATION_LABELS,
+  REPRESENTANT_RELATIONS,
   REPRESENTANT_SORT_FIELDS,
   REPRESENTANT_SORT_LABELS,
+  type RepresentantRelation,
   type RepresentantAdvancedFilterKey,
   type RepresentantFilters,
   type RepresentantSortField,
@@ -37,6 +40,14 @@ const PRESENCE_ITEMS = [
   { value: 'tous', label: 'Tous' },
   { value: 'oui', label: 'Au moins un' },
   { value: 'non', label: 'Aucun' },
+];
+
+const RELATION_ITEMS = [
+  { value: 'tous', label: 'Tous' },
+  ...REPRESENTANT_RELATIONS.map((relation) => ({
+    value: relation,
+    label: REPRESENTANT_RELATION_LABELS[relation],
+  })),
 ];
 
 const SORT_ITEMS: { value: RepresentantSortField; label: string }[] = REPRESENTANT_SORT_FIELDS.map(
@@ -53,6 +64,7 @@ export function RepresentantsFiltersBar() {
   const sortId = useId();
   const orderId = useId();
   const presenceId = useId();
+  const relationId = useId();
 
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,
@@ -103,6 +115,31 @@ export function RepresentantsFiltersBar() {
           onChange={setSearchDraft}
           placeholder="Nom ou téléphone…"
         />
+
+        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
+          <Label htmlFor={relationId}>Relation</Label>
+          <Select
+            items={RELATION_ITEMS}
+            value={filters.relationStatus ?? 'tous'}
+            onValueChange={(value) => {
+              if (value === null) return;
+              setFilters({
+                relationStatus: value === 'tous' ? null : (value as RepresentantRelation),
+              });
+            }}
+          >
+            <SelectTrigger id={relationId} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {RELATION_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
           <FilterCombobox

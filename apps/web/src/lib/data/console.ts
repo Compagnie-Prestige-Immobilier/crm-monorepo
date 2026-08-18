@@ -18,6 +18,13 @@ export const consoleKeys = {
   campaigns: ['console', 'campaigns'] as const,
 };
 
+export const callbackKeys = {
+  root: ['callbacks'] as const,
+  list: (scope: CallbackScope, assignedToId: string | null) =>
+    ['callbacks', scope, assignedToId] as const,
+  teleconseillers: ['callbacks', 'teleconseillers'] as const,
+};
+
 export const CONSOLE_QUEUE_SIZE = 200;
 
 export interface ConsolePage {
@@ -60,9 +67,127 @@ export async function fetchConsoleCampaigns(
   }));
 }
 
-export type QueueBucket = 'never' | 'callback' | 'unreachable' | 'other' | 'closed';
+export type Callback = components['schemas']['CallbackDto'];
+export type CallbackScope = components['schemas']['CallbackScope'];
+
+export interface CallbackList {
+  readonly items: Callback[];
+  readonly serverTime: string;
+}
+
+/** L'heure promise croissante : le retard étant une heure dépassée, il vient en tête. */
+export function sortCallbacks(items: readonly Callback[]): Callback[] {
+  return [...items].sort((left, right) => {
+    if (left.scheduledAt !== right.scheduledAt)
+      return left.scheduledAt < right.scheduledAt ? -1 : 1;
+    return left.id < right.id ? -1 : 1;
+  });
+}
+
+export type CallbackSchedules = ReadonlyMap<string, string>;
+
+const NO_SCHEDULES: CallbackSchedules = new Map();
+
+export function schedulesOf(items: readonly Callback[]): CallbackSchedules {
+  const byProspect = new Map<string, string>();
+  for (const callback of sortCallbacks(items)) {
+    if (!byProspect.has(callback.prospectId))
+      byProspect.set(callback.prospectId, callback.scheduledAt);
+  }
+  return byProspect;
+}
+
+export async function fetchCallbacks(
+  scope: CallbackScope,
+  assignedToId: string | null = null,
+  client: ApiClient = getApiClient(),
+): Promise<CallbackList> {
+  const list = unwrap(
+    await client.GET('/api/v1/phase2/callbacks', {
+      params: { query: { scope, ...(assignedToId === null ? {} : { assignedToId }) } },
+    }),
+  );
+  return { items: sortCallbacks(list.items), serverTime: list.serverTime };
+}
+
+export async function cancelCallback(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<Callback> {
+  return unwrap(
+    await client.POST('/api/v1/phase2/callbacks/{id}/cancel', { params: { path: { id } } }),
+  );
+}
+
+const HOUR_MS = 3_600_000;
+const DAY_MS = 86_400_000;
+
+/** Dakar est à UTC+0 toute l'année : les accesseurs UTC SONT l'horloge métier. */
+function dakarAt(now: number, plusDays: number, hour: number): number {
+  const day = new Date(now);
+  day.setUTCDate(day.getUTCDate() + plusDays);
+  day.setUTCHours(hour, 0, 0, 0);
+  return day.getTime();
+}
+
+function daysToMonday(now: number): number {
+  const weekday = new Date(now).getUTCDay();
+  return weekday === 1 ? 7 : (8 - weekday) % 7;
+}
+
+const pad = (value: number): string => String(value).padStart(2, '0');
+
+export function formatCallbackAt(iso: string, now: number): string {
+  const at = new Date(iso);
+  const clock = `${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())}`;
+  const days = Math.floor((at.getTime() - dakarAt(now, 0, 0)) / DAY_MS);
+
+  if (days === 0) return `aujourd’hui à ${clock}`;
+  if (days === 1) return `demain à ${clock}`;
+  return `le ${pad(at.getUTCDate())}/${pad(at.getUTCMonth() + 1)} à ${clock}`;
+}
+
+export function formatDelay(ms: number): string {
+  const minutes = Math.max(0, Math.floor(ms / 60_000));
+  if (minutes < 60) return `${String(minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${String(hours)} h`;
+  return `${String(Math.floor(hours / 24))} j`;
+}
+
+export interface CallbackSlot {
+  readonly key: string;
+  readonly label: string;
+  readonly at: string;
+}
+
+/**
+ * Zéro saisie : l'échéance se prend au chiffre. Une proposition déjà passée, ou
+ * qui tombe à la même heure qu'une précédente, ne s'affiche pas.
+ */
+export function callbackSlots(now: number): CallbackSlot[] {
+  const proposals: readonly (readonly [string, number])[] = [
+    ['Dans 1 h', now + HOUR_MS],
+    ['Cet après-midi (15 h)', dakarAt(now, 0, 15)],
+    ['Demain 9 h', dakarAt(now, 1, 9)],
+    ['Demain 15 h', dakarAt(now, 1, 15)],
+    ['Lundi 9 h', dakarAt(now, daysToMonday(now), 9)],
+    ['Dans 3 jours', dakarAt(now, 3, 9)],
+  ];
+
+  const slots: CallbackSlot[] = [];
+  for (const [label, at] of proposals) {
+    if (at <= now) continue;
+    if (slots.some((slot) => Date.parse(slot.at) === at)) continue;
+    slots.push({ key: String(slots.length + 1), label, at: new Date(at).toISOString() });
+  }
+  return slots;
+}
+
+export type QueueBucket = 'due' | 'never' | 'callback' | 'unreachable' | 'other' | 'closed';
 
 export const QUEUE_BUCKET_LABELS: Record<QueueBucket, string> = {
+  due: 'Rappels dus',
   never: 'Jamais appelées',
   callback: 'À rappeler',
   unreachable: 'Injoignables',
@@ -71,29 +196,63 @@ export const QUEUE_BUCKET_LABELS: Record<QueueBucket, string> = {
 };
 
 const BUCKET_RANK: Record<QueueBucket, number> = {
-  never: 0,
-  callback: 1,
-  unreachable: 2,
-  other: 3,
-  closed: 4,
+  due: 0,
+  never: 1,
+  callback: 2,
+  unreachable: 3,
+  other: 4,
+  closed: 5,
 };
 
-export function bucketOf(prospect: ProspectRow): QueueBucket {
+/** Un rappel promis dans moins d'une heure se prépare déjà : il remonte avec les retards. */
+export const DUE_SOON_MS = 3_600_000;
+
+export function bucketOf(
+  prospect: ProspectRow,
+  schedules: CallbackSchedules = NO_SCHEDULES,
+  now: number = Date.now(),
+): QueueBucket {
   if (prospect.phase2Status !== 'PENDING') return 'closed';
+
+  const scheduledAt = schedules.get(prospect.id);
+  if (scheduledAt !== undefined && Date.parse(scheduledAt) <= now + DUE_SOON_MS) return 'due';
+
   if (prospect.lastAttemptAt === null) return 'never';
   if (prospect.lastOutcome === 'CALLBACK') return 'callback';
   if (prospect.lastOutcome === 'UNREACHABLE') return 'unreachable';
   return 'other';
 }
 
-export function sortQueue(prospects: readonly ProspectRow[]): ProspectRow[] {
-  return [...prospects].sort((left, right) => {
-    const byBucket = BUCKET_RANK[bucketOf(left)] - BUCKET_RANK[bucketOf(right)];
-    if (byBucket !== 0) return byBucket;
+/**
+ * Une échéance à venir passe DERRIÈRE les fiches de son groupe : rappeler avant
+ * l'heure promise, c'est rappeler trop tôt.
+ */
+function orderKey(
+  prospect: ProspectRow,
+  schedules: CallbackSchedules,
+  now: number,
+): { rank: number; when: string } {
+  const bucket = bucketOf(prospect, schedules, now);
+  const scheduledAt = schedules.get(prospect.id);
+  const later = bucket !== 'due' && bucket !== 'closed' && scheduledAt !== undefined;
 
-    const leftAt = left.lastAttemptAt ?? '';
-    const rightAt = right.lastAttemptAt ?? '';
-    if (leftAt !== rightAt) return leftAt < rightAt ? -1 : 1;
+  if (bucket === 'due' || later) {
+    return { rank: BUCKET_RANK[bucket] * 2 + (later ? 1 : 0), when: scheduledAt ?? '' };
+  }
+  return { rank: BUCKET_RANK[bucket] * 2, when: prospect.lastAttemptAt ?? '' };
+}
+
+export function sortQueue(
+  prospects: readonly ProspectRow[],
+  schedules: CallbackSchedules = NO_SCHEDULES,
+  now: number = Date.now(),
+): ProspectRow[] {
+  return [...prospects].sort((left, right) => {
+    const leftKey = orderKey(left, schedules, now);
+    const rightKey = orderKey(right, schedules, now);
+
+    if (leftKey.rank !== rightKey.rank) return leftKey.rank - rightKey.rank;
+    if (leftKey.when !== rightKey.when) return leftKey.when < rightKey.when ? -1 : 1;
 
     return left.id < right.id ? -1 : 1;
   });
@@ -105,18 +264,36 @@ export interface ConsoleQueue {
   readonly counts: Record<QueueBucket, number>;
 }
 
-export function buildQueue(prospects: readonly ProspectRow[]): ConsoleQueue {
-  const items = sortQueue(prospects);
+export function buildQueue(
+  prospects: readonly ProspectRow[],
+  schedules: CallbackSchedules = NO_SCHEDULES,
+  now: number = Date.now(),
+): ConsoleQueue {
+  const items = sortQueue(prospects, schedules, now);
   const counts: Record<QueueBucket, number> = {
+    due: 0,
     never: 0,
     callback: 0,
     unreachable: 0,
     other: 0,
     closed: 0,
   };
-  for (const prospect of items) counts[bucketOf(prospect)] += 1;
+  for (const prospect of items) counts[bucketOf(prospect, schedules, now)] += 1;
 
   return { items, pendingCount: items.length - counts.closed, counts };
+}
+
+/** Fiches « À rappeler » saisies avant que l'échéance existe : elles n'en ont aucune. */
+export function undatedCallbacks(
+  prospects: readonly ProspectRow[],
+  schedules: CallbackSchedules,
+): number {
+  return prospects.filter(
+    (prospect) =>
+      prospect.phase2Status === 'PENDING' &&
+      prospect.lastOutcome === 'CALLBACK' &&
+      !schedules.has(prospect.id),
+  ).length;
 }
 
 export function nextAfter(items: readonly ProspectRow[], id: string): string | null {
@@ -132,14 +309,27 @@ export function daysSince(iso: string | null, now: number): number | null {
   return Math.max(0, Math.floor((now - at) / 86_400_000));
 }
 
-export function queueLabel(prospect: ProspectRow, now: number): string {
-  const bucket = bucketOf(prospect);
+export function queueLabel(
+  prospect: ProspectRow,
+  now: number,
+  schedules: CallbackSchedules = NO_SCHEDULES,
+): string {
+  const bucket = bucketOf(prospect, schedules, now);
   if (bucket === 'closed') return PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase();
+
+  const scheduledAt = schedules.get(prospect.id);
+  if (scheduledAt !== undefined) {
+    const at = Date.parse(scheduledAt);
+    return at < now
+      ? `rappel en retard de ${formatDelay(now - at)}`
+      : `rappel ${formatCallbackAt(scheduledAt, now)}`;
+  }
+
   if (bucket === 'never') return 'jamais appelé';
 
   const days = daysSince(prospect.lastAttemptAt, now);
   const age = days === null ? '' : ` · ${String(days)} j`;
-  if (bucket === 'callback') return `rappel${age}`;
+  if (bucket === 'callback') return `rappel sans échéance${age}`;
   if (bucket === 'unreachable') return `injoignable${age}`;
 
   const outcome = prospect.lastOutcome;
@@ -152,17 +342,25 @@ export interface AttemptDraft {
   readonly outcome: CallOutcome;
   readonly method: EnrollmentMethod | null;
   readonly comment: string;
+  readonly callbackAt?: string | null;
 }
 
 /** Miroir de `apps/api/src/modules/phase2/attempt-rules.ts` : un écart sort en 400 sec. */
-export function validateAttempt(draft: AttemptDraft): string | null {
+export function validateAttempt(draft: AttemptDraft, now: number = Date.now()): string | null {
   const comment = draft.comment.trim();
+  const callbackAt = draft.callbackAt ?? null;
 
   if (draft.outcome === 'METHOD_OBTAINED' && draft.method === null) {
     return 'Choisissez la méthode obtenue.';
   }
   if (draft.outcome !== 'METHOD_OBTAINED' && draft.method !== null) {
     return 'Une méthode ne s’enregistre que sur « Méthode obtenue ».';
+  }
+  if (callbackAt !== null && draft.outcome !== 'CALLBACK') {
+    return 'Une échéance ne s’enregistre que sur « À rappeler ».';
+  }
+  if (callbackAt !== null && !(Date.parse(callbackAt) > now)) {
+    return 'Choisissez une échéance à venir.';
   }
   if (draft.outcome === 'OTHER' && comment === '') {
     return 'L’issue « Autre » exige un commentaire.';
@@ -200,6 +398,7 @@ export interface AttemptInput {
 
 export function buildAttemptBatch(input: AttemptInput): SyncPushBody {
   const comment = input.draft.comment.trim();
+  const callbackAt = input.draft.callbackAt ?? null;
 
   return {
     clientBatchId: input.batchId,
@@ -217,6 +416,7 @@ export function buildAttemptBatch(input: AttemptInput): SyncPushBody {
           outcome: input.draft.outcome,
           ...(input.draft.method === null ? {} : { method: input.draft.method }),
           ...(comment === '' ? {} : { comment }),
+          ...(callbackAt === null ? {} : { callbackAt }),
           clientCreatedAt: input.at,
         },
       },

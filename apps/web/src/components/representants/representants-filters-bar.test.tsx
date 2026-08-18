@@ -112,3 +112,34 @@ describe('RepresentantsFiltersBar, cascade région → département', () => {
     expect(screen.queryByRole('option', { name: /Pikine/u })).toBeNull();
   });
 });
+
+describe('RepresentantsFiltersBar, état de la relation', () => {
+  it('porte le choix dans l’URL', async () => {
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsFiltersBar />);
+
+    await choose('Relation', 'Ambassadeur');
+
+    expect(routerMock.push).toHaveBeenCalledWith('/representants?relationStatus=AMBASSADEUR', {
+      scroll: false,
+    });
+  });
+
+  it('relit le choix depuis l’URL', async () => {
+    setUrl('/representants?relationStatus=REFUS');
+    renderWithQuery(<RepresentantsFiltersBar />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: /Relation/u }).textContent).toContain('Refus');
+    });
+  });
+
+  it('« Tous » relâche le filtre au lieu d’en poser un cinquième', async () => {
+    setUrl('/representants?relationStatus=REFUS');
+    renderWithQuery(<RepresentantsFiltersBar />);
+
+    await choose('Relation', 'Tous');
+
+    expect(routerMock.push).toHaveBeenCalledWith('/representants', { scroll: false });
+  });
+});

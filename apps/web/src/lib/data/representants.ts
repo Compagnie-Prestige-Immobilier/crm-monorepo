@@ -10,6 +10,7 @@ type RepresentantQuery = NonNullable<operations['listRepresentants']['parameters
 
 export type CreateRepresentantInput = components['schemas']['CreateRepresentantDto'];
 export type RepresentantLookup = components['schemas']['RepresentantLookupDto'];
+export type RepresentantRelationChange = components['schemas']['RepresentantRelationChangeDto'];
 
 const startOfDay = (isoDate: string): string => `${isoDate}T00:00:00.000Z`;
 const endOfDay = (isoDate: string): string => `${isoDate}T23:59:59.999Z`;
@@ -28,6 +29,7 @@ export function toRepresentantQuery(filters: RepresentantFilters): RepresentantQ
   if (filters.dateFrom !== null) query.dateFrom = startOfDay(filters.dateFrom);
   if (filters.dateTo !== null) query.dateTo = endOfDay(filters.dateTo);
   if (filters.hasProspects !== null) query.hasProspects = filters.hasProspects;
+  if (filters.relationStatus !== null) query.relationStatus = filters.relationStatus;
   if (filters.sortBy !== EMPTY_REPRESENTANT_FILTERS.sortBy) query.sortBy = filters.sortBy;
   if (filters.sortDir !== EMPTY_REPRESENTANT_FILTERS.sortDir) {
     query.sortOrder = filters.sortDir;
@@ -54,6 +56,18 @@ export async function fetchRepresentant(
   client: ApiClient = getApiClient(),
 ): Promise<RepresentantRow> {
   return unwrap(await client.GET('/api/v1/representants/{id}', { params: { path: { id } } }));
+}
+
+export async function fetchRepresentantRelationHistory(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<RepresentantRelationChange[]> {
+  const payload = unwrap(
+    await client.GET('/api/v1/representants/{id}/relation-history', {
+      params: { path: { id } },
+    }),
+  );
+  return payload.items;
 }
 
 export async function createRepresentant(

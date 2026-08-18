@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CopyIcon, SparklesIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
@@ -19,6 +19,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,18 +28,26 @@ import {
   AttemptRefused,
   ALREADY_COMPLETED,
   buildQueue,
+  callbackKeys,
+  callbackSlots,
   consoleKeys,
+  fetchCallbacks,
   fetchConsoleCampaigns,
   fetchConsoleQueue,
+  formatCallbackAt,
   nextAfter,
   newAttemptInput,
   pushCallAttempt,
   queueLabel,
   QUEUE_BUCKET_LABELS,
+  schedulesOf,
+  undatedCallbacks,
   validateAttempt,
   type AttemptDraft,
+  type CallbackSlot,
+  type CallbackSchedules,
 } from '@/lib/data/console';
-import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
+import { dakarLocalToIso, formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { matchesSearch } from '@/lib/search';
 import {
@@ -59,7 +68,6 @@ const METHOD_KEYS: readonly { key: string; method: EnrollmentMethod }[] = [
 
 const OUTCOME_KEYS: readonly { key: string; outcome: CallOutcome }[] = [
   { key: '4', outcome: 'UNREACHABLE' },
-  { key: '5', outcome: 'CALLBACK' },
   { key: '6', outcome: 'REFUSED' },
   { key: '7', outcome: 'WRONG_NUMBER' },
 ];
@@ -67,10 +75,12 @@ const OUTCOME_KEYS: readonly { key: string; outcome: CallOutcome }[] = [
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['1 2 3', 'Méthode obtenue, envoi immédiat'],
   ['4', 'Injoignable'],
-  ['5', 'À rappeler'],
+  ['5', 'À rappeler, puis échéance'],
   ['6', 'Refus'],
   ['7', 'Mauvais numéro'],
   ['8', 'Autre, puis commentaire'],
+  ['1 … 6', 'Échéance proposée, après 5'],
+  ['0', 'Saisir une autre échéance, après 5'],
   ['Entrée', 'Valider, ou passer à la suivante'],
   ['Échap', 'Annuler la saisie en cours'],
   ['↑ ↓', 'Parcourir la file'],
@@ -87,12 +97,17 @@ export function ConsoleView() {
   const queryClient = useQueryClient();
   const live = useLive();
   const commentRef = useRef<HTMLTextAreaElement>(null);
+  const callbackRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
 
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [openedId, setOpenedId] = useState<string | null>(null);
+  const requestedId = searchParams.get('fiche');
+  const [openedId, setOpenedId] = useState<string | null>(requestedId);
   const [comment, setComment] = useState('');
   const [draftOutcome, setDraftOutcome] = useState<CallOutcome | null>(null);
+  const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
+  const [freeCallback, setFreeCallback] = useState('');
   const [done, setDone] = useState<readonly string[]>([]);
   const [log, setLog] = useState<readonly AttemptDraft[]>([]);
   const [refusedIds, setRefusedIds] = useState<readonly string[]>([]);
@@ -114,8 +129,21 @@ export function ConsoleView() {
     refetchInterval: live.refetchInterval,
   });
 
+  const callbacks = useQuery({
+    queryKey: callbackKeys.list('week', null),
+    queryFn: () => fetchCallbacks('week'),
+    refetchInterval: live.refetchInterval,
+    retry: false,
+  });
+
+  const now = queue.dataUpdatedAt === 0 ? Date.now() : queue.dataUpdatedAt;
+  const schedules: CallbackSchedules = useMemo(
+    () => schedulesOf(callbacks.data?.items ?? []),
+    [callbacks.data],
+  );
+
   const loaded = useMemo(() => queue.data?.items ?? [], [queue.data]);
-  const sorted = useMemo(() => buildQueue(loaded), [loaded]);
+  const sorted = useMemo(() => buildQueue(loaded, schedules, now), [loaded, schedules, now]);
   const items = useMemo(
     () => (rawOrder ? loaded : sorted.items).filter((row) => !done.includes(row.id)),
     [rawOrder, loaded, sorted.items, done],
@@ -145,7 +173,9 @@ export function ConsoleView() {
       setSelectedId(next);
       setComment('');
       setDraftOutcome(null);
+      setSlots(null);
       void queryClient.invalidateQueries({ queryKey: consoleKeys.root });
+      void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
     },
     onError: (error, input) => {
       if (error instanceof AttemptRefused && error.code === ALREADY_COMPLETED) {
@@ -162,10 +192,10 @@ export function ConsoleView() {
   });
 
   const record = useCallback(
-    (outcome: CallOutcome, method: EnrollmentMethod | null) => {
+    (outcome: CallOutcome, method: EnrollmentMethod | null, callbackAt: string | null = null) => {
       if (current === undefined || closed || send.isPending) return;
 
-      const draft: AttemptDraft = { outcome, method, comment };
+      const draft: AttemptDraft = { outcome, method, comment, callbackAt };
       const problem = validateAttempt(draft);
       if (problem !== null) {
         toast.error(problem);
@@ -194,6 +224,7 @@ export function ConsoleView() {
     setSelectedId(next);
     setComment('');
     setDraftOutcome(null);
+    setSlots(null);
   }, [current, items]);
 
   const copyPhone = useCallback(() => {
@@ -218,42 +249,73 @@ export function ConsoleView() {
     commentRef.current?.focus();
   }, [current, closed]);
 
+  const startCallback = useCallback(() => {
+    if (current === undefined || closed) return;
+    setDraftOutcome(null);
+    setFreeCallback('');
+    setSlots(callbackSlots(Date.now()));
+  }, [current, closed]);
+
   const validate = useCallback(() => {
+    if (slots !== null) {
+      const iso = dakarLocalToIso(freeCallback);
+      if (iso === null) {
+        toast.error('Choisissez une échéance, ou saisissez sa date et son heure.');
+        return;
+      }
+      record('CALLBACK', null, iso);
+      return;
+    }
     if (draftOutcome !== null) {
       record(draftOutcome, null);
       return;
     }
     skip();
-  }, [draftOutcome, record, skip]);
+  }, [slots, freeCallback, draftOutcome, record, skip]);
+
+  const outcomeShortcuts: Record<string, () => void> = {
+    '1': () => {
+      record('METHOD_OBTAINED', 'PLATFORM');
+    },
+    '2': () => {
+      record('METHOD_OBTAINED', 'PHYSICAL');
+    },
+    '3': () => {
+      record('METHOD_OBTAINED', 'VOICE_OR_ELECTRONIC_MESSAGING');
+    },
+    '4': () => {
+      record('UNREACHABLE', null);
+    },
+    '5': startCallback,
+    '6': () => {
+      record('REFUSED', null);
+    },
+    '7': () => {
+      record('WRONG_NUMBER', null);
+    },
+    '8': startOther,
+  };
+
+  const slotShortcuts: Record<string, () => void> = Object.fromEntries(
+    (slots ?? []).map((slot) => [
+      slot.key,
+      () => {
+        record('CALLBACK', null, slot.at);
+      },
+    ]),
+  );
+  slotShortcuts['0'] = () => {
+    callbackRef.current?.focus();
+  };
 
   useShortcuts(
     {
-      '1': () => {
-        record('METHOD_OBTAINED', 'PLATFORM');
-      },
-      '2': () => {
-        record('METHOD_OBTAINED', 'PHYSICAL');
-      },
-      '3': () => {
-        record('METHOD_OBTAINED', 'VOICE_OR_ELECTRONIC_MESSAGING');
-      },
-      '4': () => {
-        record('UNREACHABLE', null);
-      },
-      '5': () => {
-        record('CALLBACK', null);
-      },
-      '6': () => {
-        record('REFUSED', null);
-      },
-      '7': () => {
-        record('WRONG_NUMBER', null);
-      },
-      '8': startOther,
+      ...(slots === null ? outcomeShortcuts : slotShortcuts),
       Enter: validate,
       Escape: () => {
         setDraftOutcome(null);
         setComment('');
+        setSlots(null);
         commentRef.current?.blur();
       },
       ArrowDown: () => {
@@ -289,6 +351,7 @@ export function ConsoleView() {
   useEffect(() => {
     setComment('');
     setDraftOutcome(null);
+    setSlots(null);
   }, [current?.id]);
 
   if (queue.isPending) return <ConsoleSkeleton />;
@@ -305,7 +368,6 @@ export function ConsoleView() {
     );
   }
 
-  const now = Date.now();
   const total = queue.data.total;
   const methodCount = log.filter((entry) => entry.outcome === 'METHOD_OBTAINED').length;
   const repFiches =
@@ -359,7 +421,7 @@ export function ConsoleView() {
                   </span>
                 </span>
                 <span className="pl-5 text-[0.75rem] text-muted-foreground">
-                  {queueLabel(row, now)}
+                  {queueLabel(row, now, schedules)}
                 </span>
               </button>
             </li>
@@ -375,6 +437,16 @@ export function ConsoleView() {
       </section>
 
       <section aria-label="Fiche courante" className="flex flex-col gap-5">
+        {requestedId !== null && !loaded.some((row) => row.id === requestedId) ? (
+          <p
+            role="alert"
+            className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
+          >
+            La fiche ouverte depuis les rappels n’est pas dans cette file. Retirez le filtre de
+            campagne, ou ouvrez-la depuis les prospects.
+          </p>
+        ) : null}
+
         <div className="flex items-start justify-between gap-4">
           {current === undefined ? (
             <p className="text-[0.9375rem]">
@@ -397,6 +469,9 @@ export function ConsoleView() {
           <SortExplainer
             counts={sorted.counts}
             head={items[0]}
+            now={now}
+            schedules={schedules}
+            undated={undatedCallbacks(loaded, schedules)}
             rawOrder={rawOrder}
             onToggleOrder={() => {
               setRawOrder((raw) => !raw);
@@ -428,52 +503,115 @@ export function ConsoleView() {
               </div>
             ) : (
               <>
-                <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
-                  <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                    Méthode obtenue
-                  </legend>
-                  <div className="flex flex-wrap gap-2">
-                    {METHOD_KEYS.map(({ key, method }) => (
-                      <Button
-                        key={key}
-                        variant="outline"
-                        onClick={() => {
-                          record('METHOD_OBTAINED', method);
-                        }}
-                      >
-                        <Kbd>{key}</Kbd>
-                        {ENROLLMENT_METHOD_LABELS[method]}
-                      </Button>
-                    ))}
-                  </div>
-                </fieldset>
+                {slots === null ? (
+                  <>
+                    <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
+                      <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+                        Méthode obtenue
+                      </legend>
+                      <div className="flex flex-wrap gap-2">
+                        {METHOD_KEYS.map(({ key, method }) => (
+                          <Button
+                            key={key}
+                            variant="outline"
+                            onClick={() => {
+                              record('METHOD_OBTAINED', method);
+                            }}
+                          >
+                            <Kbd>{key}</Kbd>
+                            {ENROLLMENT_METHOD_LABELS[method]}
+                          </Button>
+                        ))}
+                      </div>
+                    </fieldset>
 
-                <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
-                  <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                    Non obtenue
-                  </legend>
-                  <div className="flex flex-wrap gap-2">
-                    {OUTCOME_KEYS.map(({ key, outcome }) => (
-                      <Button
-                        key={key}
-                        variant="outline"
-                        onClick={() => {
-                          record(outcome, null);
-                        }}
+                    <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
+                      <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+                        Non obtenue
+                      </legend>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={startCallback}>
+                          <Kbd>5</Kbd>
+                          {CALL_OUTCOME_LABELS.CALLBACK}
+                        </Button>
+                        {OUTCOME_KEYS.map(({ key, outcome }) => (
+                          <Button
+                            key={key}
+                            variant="outline"
+                            onClick={() => {
+                              record(outcome, null);
+                            }}
+                          >
+                            <Kbd>{key}</Kbd>
+                            {CALL_OUTCOME_LABELS[outcome]}
+                          </Button>
+                        ))}
+                        <Button
+                          variant={draftOutcome === 'OTHER' ? 'default' : 'outline'}
+                          onClick={startOther}
+                        >
+                          <Kbd>8</Kbd>
+                          Autre
+                        </Button>
+                      </div>
+                    </fieldset>
+                  </>
+                ) : (
+                  <fieldset className="flex flex-col gap-3" disabled={send.isPending}>
+                    <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+                      Quand rappeler
+                    </legend>
+                    <div className="flex flex-wrap gap-2">
+                      {slots.map((slot) => (
+                        <Button
+                          key={slot.key}
+                          variant="outline"
+                          className="h-auto flex-col items-start gap-0.5 py-2"
+                          onClick={() => {
+                            record('CALLBACK', null, slot.at);
+                          }}
+                        >
+                          <span className="flex items-center gap-2">
+                            <Kbd>{slot.key}</Kbd>
+                            {slot.label}
+                          </span>
+                          <span className="pl-7 text-[0.75rem] font-[400] text-muted-foreground">
+                            {formatCallbackAt(slot.at, now)}
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label
+                        htmlFor="console-callback-at"
+                        className="flex items-center gap-2 text-[0.875rem] font-[600]"
                       >
-                        <Kbd>{key}</Kbd>
-                        {CALL_OUTCOME_LABELS[outcome]}
-                      </Button>
-                    ))}
-                    <Button
-                      variant={draftOutcome === 'OTHER' ? 'default' : 'outline'}
-                      onClick={startOther}
-                    >
-                      <Kbd>8</Kbd>
-                      Autre
-                    </Button>
-                  </div>
-                </fieldset>
+                        <Kbd>0</Kbd>
+                        Autre échéance
+                      </label>
+                      <Input
+                        id="console-callback-at"
+                        ref={callbackRef}
+                        type="datetime-local"
+                        className="max-w-64"
+                        value={freeCallback}
+                        onChange={(event) => {
+                          setFreeCallback(event.target.value);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter') return;
+                          event.preventDefault();
+                          validate();
+                        }}
+                      />
+                      <p className="text-[0.75rem] text-muted-foreground">
+                        Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste. Échap revient
+                        aux issues.
+                      </p>
+                    </div>
+                  </fieldset>
+                )}
 
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="console-comment" className="text-[0.875rem] font-[600]">
@@ -609,7 +747,7 @@ export function ConsoleView() {
                         {row.nom} {row.prenom}
                       </span>
                       <span className="shrink-0 text-[0.75rem] text-muted-foreground">
-                        {queueLabel(row, now)}
+                        {queueLabel(row, now, schedules)}
                       </span>
                     </CommandItem>
                   ))}
@@ -637,15 +775,21 @@ function Kbd({ children }: { children: ReactNode }) {
 function SortExplainer({
   counts,
   head,
+  now,
+  schedules,
+  undated,
   rawOrder,
   onToggleOrder,
 }: {
   counts: Record<string, number>;
   head: ProspectRow | undefined;
+  now: number;
+  schedules: CallbackSchedules;
+  undated: number;
   rawOrder: boolean;
   onToggleOrder: () => void;
 }) {
-  const rules = (['never', 'callback', 'unreachable', 'other'] as const).filter(
+  const rules = (['due', 'never', 'callback', 'unreachable', 'other'] as const).filter(
     (bucket) => (counts[bucket] ?? 0) > 0,
   );
 
@@ -667,14 +811,21 @@ function SortExplainer({
 
         {head === undefined ? null : (
           <p className="pt-2 text-muted-foreground">
-            En tête : {head.nom} {head.prenom}, {queueLabel(head, Date.now())}.
+            En tête : {head.nom} {head.prenom}, {queueLabel(head, now, schedules)}.
           </p>
         )}
 
         <p className="pt-2 text-muted-foreground">
-          Aucune échéance de rappel n’existe en base. L’ordre suit l’ancienneté du dernier appel, ce
-          n’est pas une date promise.
+          Un rappel daté remonte à l’heure promise, retards en tête. Une échéance à venir attend son
+          heure.
         </p>
+
+        {undated > 0 ? (
+          <p className="pt-2 text-muted-foreground">
+            {formatNumber(undated)} fiche{undated > 1 ? 's' : ''} « à rappeler » sans échéance :
+            l’ordre y suit l’ancienneté du dernier appel, ce n’est pas une date promise.
+          </p>
+        ) : null}
 
         <Button variant="outline" size="sm" className="mt-3 w-full" onClick={onToggleOrder}>
           {rawOrder ? 'Rétablir le tri' : 'Tout défaire'}

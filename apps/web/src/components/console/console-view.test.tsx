@@ -1,16 +1,17 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ConsoleView } from '@/components/console/console-view';
-import { AttemptRefused, type AttemptInput } from '@/lib/data/console';
+import { AttemptRefused, type AttemptInput, type Callback } from '@/lib/data/console';
 import type * as ConsoleData from '@/lib/data/console';
 import type { CallOutcome, ProspectRow } from '@/lib/types';
 import { renderWithQuery } from '@/test/render-query';
-import { routerMock } from '@/test/router-mock';
+import { routerMock, setUrl } from '@/test/router-mock';
 
 const fetchConsoleQueue = vi.fn();
 const fetchConsoleCampaigns = vi.fn();
+const fetchCallbacks = vi.fn();
 const pushCallAttempt = vi.fn();
 const toastError = vi.fn();
 
@@ -20,6 +21,7 @@ vi.mock('@/lib/data/console', async (importOriginal) => {
     ...actual,
     fetchConsoleQueue: (...args: unknown[]) => fetchConsoleQueue(...args) as unknown,
     fetchConsoleCampaigns: (...args: unknown[]) => fetchConsoleCampaigns(...args) as unknown,
+    fetchCallbacks: (...args: unknown[]) => fetchCallbacks(...args) as unknown,
     pushCallAttempt: (...args: unknown[]) => pushCallAttempt(...args) as unknown,
   };
 });
@@ -91,11 +93,47 @@ async function renderConsole(items: readonly ProspectRow[] = [NEUVE, RAPPEL]) {
   return view;
 }
 
-const lastDraft = (): { outcome: CallOutcome; method: string | null; comment: string } =>
-  (pushCallAttempt.mock.calls.at(-1)?.[0] as AttemptInput).draft;
+function slotAt(now: Date, plusDays: number, hour: number): string {
+  const at = new Date(now);
+  at.setUTCDate(at.getUTCDate() + plusDays);
+  at.setUTCHours(hour, 0, 0, 0);
+  return at.toISOString();
+}
+
+const lastDraft = (): {
+  outcome: CallOutcome;
+  method: string | null;
+  comment: string;
+  callbackAt?: string | null;
+} => (pushCallAttempt.mock.calls.at(-1)?.[0] as AttemptInput).draft;
+
+function scheduled(prospectId: string, scheduledAt: string, overdue: boolean): Callback {
+  return {
+    id: `cb-${prospectId}`,
+    prospectId,
+    shortCode: 'AB12CD',
+    phoneE164: '+221771234567',
+    scheduledAt,
+    comment: null,
+    assignedToId: 'u-1',
+    assignedToName: 'Fatou Sow',
+    campaignId: null,
+    taskId: null,
+    overdue,
+  };
+}
+
+function serveCallbacks(items: readonly Callback[]): void {
+  fetchCallbacks.mockResolvedValue({
+    items: [...items],
+    serverTime: new Date().toISOString(),
+  });
+}
 
 beforeEach(() => {
   fetchConsoleQueue.mockClear();
+  fetchCallbacks.mockReset();
+  serveCallbacks([]);
   fetchConsoleCampaigns.mockReset();
   fetchConsoleCampaigns.mockResolvedValue([]);
   pushCallAttempt.mockReset();
@@ -110,11 +148,44 @@ describe('ConsoleView : file', () => {
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Neuve Fiche');
   });
 
-  it('affiche l’ancienneté du rappel, jamais une échéance', async () => {
+  it('dit qu’une fiche « à rappeler » n’a pas d’échéance, plutôt que d’en inventer une', async () => {
     await renderConsole();
 
-    expect(screen.getByText(/^rappel · \d+ j$/)).toBeTruthy();
-    expect(screen.queryByText(/rappel du/i)).toBeNull();
+    expect(await screen.findByText(/^rappel sans échéance · \d+ j$/)).toBeTruthy();
+  });
+
+  it('remonte un rappel dont l’heure est passée avant la fiche jamais appelée', async () => {
+    serveCallbacks([scheduled('p-2', new Date(Date.now() - 7_200_000).toISOString(), true)]);
+    await renderConsole([NEUVE, RAPPEL]);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Rappel Fiche');
+    });
+    expect(screen.getByText('rappel en retard de 2 h')).toBeTruthy();
+  });
+
+  it('ne promet une heure que pour les fiches qui en portent une', async () => {
+    await renderConsole();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Pourquoi cet ordre' }));
+
+    expect(await screen.findByText(/pas une date promise/)).toBeTruthy();
+    expect(screen.queryByText(/Aucune échéance de rappel n’existe en base/)).toBeNull();
+  });
+
+  it('ouvre la fiche demandée par la file des rappels', async () => {
+    setUrl('/console?fiche=p-2');
+    await renderConsole([NEUVE, RAPPEL]);
+
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Rappel Fiche');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('le dit quand la fiche demandée n’est pas dans la file chargée', async () => {
+    setUrl('/console?fiche=p-absente');
+    await renderConsole([NEUVE, RAPPEL]);
+
+    expect(screen.getByRole('alert').textContent).toMatch(/n’est pas dans cette file/);
   });
 
   it('montre le numéro en grand, sans lien d’appel', async () => {
@@ -131,7 +202,6 @@ describe('ConsoleView : une touche, une issue', () => {
     ['2', 'METHOD_OBTAINED', 'PHYSICAL'],
     ['3', 'METHOD_OBTAINED', 'VOICE_OR_ELECTRONIC_MESSAGING'],
     ['4', 'UNREACHABLE', null],
-    ['5', 'CALLBACK', null],
     ['6', 'REFUSED', null],
     ['7', 'WRONG_NUMBER', null],
   ];
@@ -186,6 +256,89 @@ describe('ConsoleView : une touche, une issue', () => {
       expect(pushCallAttempt).toHaveBeenCalledTimes(1);
     });
     expect(lastDraft().outcome).toBe('UNREACHABLE');
+  });
+});
+
+describe('ConsoleView : échéance du rappel', () => {
+  it('demande quand rappeler au lieu d’envoyer aussitôt', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('5');
+
+    expect(screen.getByText('Demain 9 h')).toBeTruthy();
+    expect(pushCallAttempt).not.toHaveBeenCalled();
+  });
+
+  it('consigne l’issue et l’heure promise sur le chiffre de la puce', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('5');
+    const demain = screen.getByRole('button', { name: /Demain 9 h/ });
+    await userEvent.keyboard(within(demain).getByText(/^\d$/).textContent);
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(lastDraft().outcome).toBe('CALLBACK');
+    expect(demain.textContent).toContain('demain à 09:00');
+    expect(lastDraft().callbackAt).toBe(slotAt(new Date(), 1, 9));
+  });
+
+  it('la puce cliquée consigne la même échéance que son chiffre', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('5');
+    await userEvent.click(screen.getByRole('button', { name: /Demain 15 h/ }));
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(lastDraft().callbackAt).toBe(slotAt(new Date(), 1, 15));
+  });
+
+  it('accepte une échéance saisie à la main, à l’heure de Dakar', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('5');
+    await userEvent.type(screen.getByLabelText(/Autre échéance/), '2027-03-04T11:30');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(lastDraft().callbackAt).toBe('2027-03-04T11:30:00.000Z');
+  });
+
+  it('n’envoie rien tant qu’aucune échéance n’est choisie', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('5');
+    await userEvent.keyboard('{Enter}');
+
+    expect(pushCallAttempt).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/échéance/));
+  });
+
+  it('Échap ramène aux issues, sans rien consigner', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('5');
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByText('Demain 9 h')).toBeNull();
+    expect(screen.getByRole('button', { name: /Injoignable/ })).toBeTruthy();
+    expect(pushCallAttempt).not.toHaveBeenCalled();
+  });
+
+  it('aucune autre issue n’emporte de date', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('4');
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(lastDraft().callbackAt).toBeNull();
   });
 });
 
