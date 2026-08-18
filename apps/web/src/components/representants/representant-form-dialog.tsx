@@ -46,14 +46,23 @@ const RELATION_ITEMS = REPRESENTANT_RELATIONS.map((relation) => ({
   label: REPRESENTANT_RELATION_LABELS[relation],
 }));
 
+export interface RepresentantPrefill {
+  fullName: string;
+  phone: string;
+  notes: string;
+}
+
 export function RepresentantFormDialog({
   open,
   onOpenChange,
   representant,
+  prefill = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   representant: RepresentantRow | null;
+  /** Amorce d'une création : un numéro suggéré par un représentant. */
+  prefill?: RepresentantPrefill | null;
 }) {
   const queryClient = useQueryClient();
   const nameId = useId();
@@ -74,15 +83,15 @@ export function RepresentantFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    setFullName(representant?.fullName ?? '');
-    setPhone(representant === null ? '' : formatPhone(representant.phoneE164));
+    setFullName(representant?.fullName ?? prefill?.fullName ?? '');
+    setPhone(representant === null ? (prefill?.phone ?? '') : formatPhone(representant.phoneE164));
     setRegionDraft(null);
     setDepartementId(representant?.departementId ?? null);
     setIefId(representant?.iefId ?? null);
-    setNotes(representant?.notes ?? '');
+    setNotes(representant?.notes ?? prefill?.notes ?? '');
     setRelationStatus(representant?.relationStatus ?? 'INCONNU');
     setConflict(null);
-  }, [open, representant]);
+  }, [open, representant, prefill]);
 
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,

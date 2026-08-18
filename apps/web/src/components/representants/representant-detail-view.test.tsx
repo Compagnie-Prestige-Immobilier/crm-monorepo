@@ -8,6 +8,7 @@ import { renderWithQuery } from '@/test/render-query';
 const fetchRepresentant = vi.hoisted(() => vi.fn());
 const fetchRelationHistory = vi.hoisted(() => vi.fn());
 const fetchProspects = vi.hoisted(() => vi.fn());
+const fetchComments = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/data/representants', async () => {
   const actual = await vi.importActual<typeof RepresentantsModule>('@/lib/data/representants');
@@ -15,6 +16,7 @@ vi.mock('@/lib/data/representants', async () => {
     ...actual,
     fetchRepresentant: () => fetchRepresentant() as unknown,
     fetchRepresentantRelationHistory: () => fetchRelationHistory() as unknown,
+    fetchRepresentantComments: () => fetchComments() as unknown,
   };
 });
 
@@ -45,6 +47,8 @@ const FICHE = {
   updatedAt: '2026-03-04T09:00:00.000Z',
 };
 
+const AUTHOR = { id: 'u-1', fullName: 'Aminata Diallo' };
+
 const change = (
   id: string,
   fromStatus: string,
@@ -67,11 +71,12 @@ beforeEach(() => {
   fetchRepresentant.mockResolvedValue(FICHE);
   fetchRelationHistory.mockResolvedValue([]);
   fetchProspects.mockResolvedValue({ items: [], total: 0, page: 1, pageCount: 0 });
+  fetchComments.mockResolvedValue([]);
 });
 
 describe('RepresentantDetailView', () => {
   it('porte le nom et l’état courant de la relation', async () => {
-    renderWithQuery(<RepresentantDetailView representantId="rep-1" />);
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
 
     expect(await screen.findByText('Ndeye Fall')).toBeTruthy();
     expect(screen.getByText('Ambassadeur')).toBeTruthy();
@@ -83,7 +88,7 @@ describe('RepresentantDetailView', () => {
       change('c-2', 'INCONNU', 'CONTACTE', '2026-03-02T09:00:00.000Z'),
       change('c-1', 'REFUS', 'INCONNU', '2026-03-01T09:00:00.000Z'),
     ]);
-    renderWithQuery(<RepresentantDetailView representantId="rep-1" />);
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
 
     const chronologie = await screen.findByRole('list', { name: /Histoire de la relation/u });
     const bascules = within(chronologie)
@@ -100,15 +105,25 @@ describe('RepresentantDetailView', () => {
     fetchRelationHistory.mockResolvedValue([
       change('c-1', 'AMBASSADEUR', 'REFUS', '2026-03-04T09:00:00.000Z', 'Ne veut plus être appelé'),
     ]);
-    renderWithQuery(<RepresentantDetailView representantId="rep-1" />);
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
 
     expect(await screen.findByText(/Ne veut plus être appelé/u)).toBeTruthy();
   });
 
   it('dit quoi faire quand aucune bascule n’a encore été enregistrée', async () => {
-    renderWithQuery(<RepresentantDetailView representantId="rep-1" />);
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
 
     expect(await screen.findByText(/Aucune bascule enregistrée/u)).toBeTruthy();
+  });
+
+  it('garde la note de fiche DANS la fiche, hors du fil', async () => {
+    fetchRepresentant.mockResolvedValue({ ...FICHE, notes: 'Préfère le samedi matin.' });
+    fetchComments.mockResolvedValue([]);
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
+
+    expect(await screen.findByText('Note de la fiche')).toBeTruthy();
+    const note = screen.getByText('Préfère le samedi matin.');
+    expect(screen.getByText('Fil de la fiche').contains(note)).toBe(false);
   });
 
   it('liste les prospects apportés', async () => {
@@ -129,7 +144,7 @@ describe('RepresentantDetailView', () => {
       page: 1,
       pageCount: 1,
     });
-    renderWithQuery(<RepresentantDetailView representantId="rep-1" />);
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
 
     expect(await screen.findByText('Moussa Sow')).toBeTruthy();
     expect(screen.getByText('Converti')).toBeTruthy();

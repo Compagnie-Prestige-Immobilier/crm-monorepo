@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 /**
  * Tous les écrans panel accessibles à un ADMIN depuis la navigation actuelle.
@@ -23,8 +23,11 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   ['/tableau-de-bord', 'Tableau de bord', null],
   ['/statistiques', 'Statistiques', null],
   ['/prospects', 'Prospects', null],
+  ['/prospects/nouveau', 'Nouveau prospect', 'Enregistrer et suivant'],
   ['/campagnes', 'Campagnes', 'Appels prospects'],
   ['/campagnes/representants', 'Campagnes', 'Appels représentants'],
+  ['/console', 'Console d’appel', 'Carte clavier'],
+  ['/rappels', 'Rappels', 'En retard'],
   ['/dossiers', 'Dossiers', null],
   ['/dossiers/nouveau', 'Nouveau dossier', null],
   ['/dossiers/export', 'Export', null],
@@ -33,14 +36,23 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   ['/representants', 'Représentants', null],
   ['/representants/import', 'Représentants', 'Partir du modèle'],
   ['/commerciaux', 'Utilisateurs', null],
-  ['/supervision', 'Supervision', null],
+  ['/supervision', 'Supervision', 'Activité'],
   ['/referentiels', 'Référentiels', null],
+  ['/imports', 'Imports', 'Déposer un classeur'],
   ['/parametres', 'Paramètres', null],
   ['/notifications', 'Notifications', null],
   // `/banque` n'appartient pas à la navigation d'un ADMIN : `navTitle` ne
   // trouve donc aucune entrée et retombe sur le nom du produit.
   ['/banque', 'CPI GO', null],
 ];
+
+async function analyze(page: Page, where: string): Promise<void> {
+  await page.addStyleTag({
+    content: '* { animation: none !important; transition: none !important; }',
+  });
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations, `${where}: ${JSON.stringify(results.violations)}`).toEqual([]);
+}
 
 test('aucune violation axe sur tous les écrans panel', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
@@ -51,11 +63,32 @@ test('aucune violation axe sur tous les écrans panel', async ({ page }) => {
       await expect(page.getByText(marker).first()).toBeVisible();
     }
     await expect(page.locator('html.light')).toHaveCount(1);
-    await page.addStyleTag({
-      content: '* { animation: none !important; transition: none !important; }',
-    });
 
-    const results = await new AxeBuilder({ page }).analyze();
-    expect(results.violations, `${path}: ${JSON.stringify(results.violations)}`).toEqual([]);
+    await analyze(page, path);
   }
+});
+
+/**
+ * Les deux écrans que la table ne peut pas atteindre.
+ *
+ * La fiche d'un représentant n'a pas d'URL fixe, et le second volet de la
+ * supervision n'est monté qu'une fois son onglet choisi : l'analyser depuis
+ * `/supervision` reviendrait à balayer l'onglet d'activité une seconde fois.
+ */
+test('aucune violation axe sur la fiche représentant et le volet des comptes', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+
+  await page.goto('/representants');
+  // Depuis le TABLEAU : « Import Excel » pointe lui aussi sous `/representants/`.
+  const premier = page.getByRole('table').locator('a[href^="/representants/"]').first();
+  await expect(premier).toBeVisible();
+  await premier.click();
+  await page.waitForURL(/\/representants\/[0-9a-f-]+$/);
+  await expect(page.getByText('Histoire de la relation').first()).toBeVisible();
+  await analyze(page, '/representants/<id>');
+
+  await page.goto('/supervision');
+  await page.getByRole('tab', { name: 'Comptes' }).click();
+  await expect(page.getByText('Présence et dernière activité des comptes.')).toBeVisible();
+  await analyze(page, '/supervision?volet=comptes');
 });

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { DetailBackLink } from '@/components/detail-back-link';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
+import { RepresentantComments } from '@/components/representants/representant-comments';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,7 +25,13 @@ const NO_VALUE = '–';
 
 const SOURCE_LABELS = { WEB: 'Panneau', MOBILE: 'Mobile' } as const;
 
-export function RepresentantDetailView({ representantId }: { representantId: string }) {
+export function RepresentantDetailView({
+  representantId,
+  author,
+}: {
+  representantId: string;
+  author: { id: string; fullName: string };
+}) {
   const fiche = useQuery({
     queryKey: queryKeys.representant(representantId),
     queryFn: () => fetchRepresentant(representantId),
@@ -118,11 +125,23 @@ export function RepresentantDetailView({ representantId }: { representantId: str
             </div>
           </dl>
 
+          {/* La note EST un champ de la fiche : elle reste dans la fiche, sous
+              son intitulé, et non dans le fil qui suit. */}
           {representant.notes === null || representant.notes === '' ? null : (
-            <p className="mt-4 max-w-prose border-t border-border pt-4 text-[0.875rem] text-muted-foreground">
-              {representant.notes}
-            </p>
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-[0.75rem] text-muted-foreground">Note de la fiche</p>
+              <p className="max-w-prose text-[0.875rem]">{representant.notes}</p>
+            </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Fil de la fiche</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RepresentantComments representantId={representantId} author={author} />
         </CardContent>
       </Card>
 

@@ -1,5 +1,5 @@
 import type { ApiClient, components, operations } from '@crm/api-client';
-import { unwrap } from '@crm/api-client/query';
+import { unwrap, type ApiResult } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
@@ -99,4 +99,79 @@ export async function deleteRepresentant(
   client: ApiClient = getApiClient(),
 ): Promise<void> {
   unwrap(await client.DELETE('/api/v1/representants/{id}', { params: { path: { id } } }));
+}
+
+export interface RepresentantComment {
+  id: string;
+  body: string;
+  authorId: string;
+  authorName: string;
+  clientCreatedAt: string;
+  createdAt: string;
+}
+
+export interface NewRepresentantComment {
+  id: string;
+  body: string;
+  clientCreatedAt: string;
+}
+
+export const representantCommentsQueryKey = (representantId: string) =>
+  ['representants', 'detail', representantId, 'comments'] as const;
+
+// Le contrat ne porte pas encore `/representants/{id}/comments` : ce typage
+// local tombe au prochain codegen, avec la conversion ci-dessous.
+interface CommentsEndpoints {
+  GET: (
+    path: string,
+    init: unknown,
+  ) => Promise<ApiResult<{ items: RepresentantComment[] }, unknown>>;
+  POST: (path: string, init: unknown) => Promise<ApiResult<RepresentantComment, unknown>>;
+}
+
+const commentsApi = (client: ApiClient): CommentsEndpoints =>
+  client as unknown as CommentsEndpoints;
+
+export async function fetchRepresentantComments(
+  representantId: string,
+  client: ApiClient = getApiClient(),
+): Promise<RepresentantComment[]> {
+  const payload = unwrap(
+    await commentsApi(client).GET('/api/v1/representants/{id}/comments', {
+      params: { path: { id: representantId } },
+    }),
+  );
+  return payload.items;
+}
+
+export async function createRepresentantComment(
+  representantId: string,
+  comment: NewRepresentantComment,
+  client: ApiClient = getApiClient(),
+): Promise<RepresentantComment> {
+  return unwrap(
+    await commentsApi(client).POST('/api/v1/representants/{id}/comments', {
+      params: { path: { id: representantId } },
+      body: comment,
+    }),
+  );
+}
+
+/**
+ * UUID v7 posé par le CLIENT : il sert de clé d'idempotence, un envoi rejoué
+ * après une coupure ne doit pas doubler le commentaire.
+ */
+export function newCommentId(): string {
+  const at = Date.now().toString(16).padStart(12, '0');
+  const random = Array.from(crypto.getRandomValues(new Uint8Array(10)), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+  const variant = ((Number.parseInt(random.slice(3, 4), 16) & 0x3) | 0x8).toString(16);
+  return [
+    at.slice(0, 8),
+    at.slice(8, 12),
+    `7${random.slice(0, 3)}`,
+    `${variant}${random.slice(4, 7)}`,
+    random.slice(7, 19),
+  ].join('-');
 }

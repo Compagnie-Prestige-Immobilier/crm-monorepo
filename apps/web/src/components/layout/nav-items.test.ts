@@ -31,6 +31,7 @@ describe('navigation d’un agent BANQUE_FINANCE', () => {
       '/campagnes',
       '/notifications',
       '/representants',
+      '/suggestions',
       '/commerciaux',
       '/supervision',
       '/statistiques',
@@ -63,6 +64,7 @@ describe('navigation d’un ADMIN', () => {
       '/demandes-clients',
       '/notifications',
       '/representants',
+      '/suggestions',
       '/commerciaux',
       '/supervision',
       '/referentiels',
@@ -115,6 +117,7 @@ describe('navigation d’un téléconseiller', () => {
       '/console',
       '/rappels',
       '/representants',
+      '/suggestions',
       '/prospects/nouveau',
     ]);
   });
@@ -152,9 +155,16 @@ describe('navigation d’un téléconseiller', () => {
 
   it('n’ouvre le terrain à aucun agent bancaire', () => {
     const visible = hrefs('BANQUE_FINANCE');
-    for (const forbidden of ['/console', '/prospects/nouveau', '/representants']) {
+    for (const forbidden of ['/console', '/prospects/nouveau', '/representants', '/suggestions']) {
       expect(visible).not.toContain(forbidden);
     }
+  });
+
+  it('range les numéros suggérés dans le Terrain, sous son propre titre', () => {
+    const terrain = navSections('COMMERCIAL').find((section) => section.title === 'Terrain');
+    const entry = terrain?.items.find((item) => item.href === '/suggestions');
+    expect(entry?.label).toBe('Numéros suggérés');
+    expect(navTitle('COMMERCIAL', '/suggestions')).toBe('Numéros suggérés');
   });
 
   it('nomme sa console sans employer le mot proscrit', () => {
@@ -227,6 +237,7 @@ describe('navigation d’un SUPERVISEUR', () => {
       '/prospects',
       '/rappels',
       '/representants',
+      '/suggestions',
     ]);
   });
 
