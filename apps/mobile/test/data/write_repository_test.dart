@@ -584,7 +584,7 @@ void main() {
       );
 
       final List<RepresentantComment> fil = await db
-          .commentsForRepresentant(representantId: 'rep-1')
+          .commentsForRepresentant(representantId: 'rep-1', maxRows: 200)
           .get();
       expect(fil, hasLength(2));
       expect(fil.map((RepresentantComment c) => c.body), <String>[
@@ -613,7 +613,7 @@ void main() {
       );
 
       final List<RepresentantComment> fil = await db
-          .commentsForRepresentant(representantId: 'rep-1')
+          .commentsForRepresentant(representantId: 'rep-1', maxRows: 200)
           .get();
       expect(fil.single.body, 'Pour la première fiche.');
     });

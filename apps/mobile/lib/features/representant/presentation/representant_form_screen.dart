@@ -316,6 +316,10 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       final String phoneE164 = Phone.toE164(_phone.text)!;
       final String notes = _notes.text.trim();
 
+      // Le brouillon se jette AVANT l'écriture : sinon le minuteur armé par la
+      // dernière frappe se déclenche pendant la transaction et réécrit la ligne
+      // qu'elle vient de supprimer.
+      discardDraft();
       if (widget.representantId != null) {
         await ref
             .read(writeRepositoryProvider)
@@ -343,7 +347,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
             );
       }
 
-      discardDraft();
       await HapticFeedback.mediumImpact();
       ref.read(syncCoordinatorProvider.notifier).nudge();
 

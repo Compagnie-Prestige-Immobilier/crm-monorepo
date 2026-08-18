@@ -84,6 +84,54 @@ void main() {
   });
 
   // ───────────────────────────────────────────────────────────────────────────
+  // Le champ Syndicat est le DERNIER de la saisie de prospects : clavier ouvert,
+  // une liste qui s'ouvre systématiquement vers le bas tombe hors de l'écran et
+  // le référentiel devient inatteignable.
+  testWidgets('en bas de l\'écran, la liste s\'ouvre vers le haut', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final TextEditingController controller = TextEditingController();
+    final FocusNode focus = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focus.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: Column(
+            children: <Widget>[
+              const Spacer(),
+              LocalTypeahead(
+                controller: controller,
+                focusNode: focus,
+                options: <TypeaheadOption>[option('SUDES'), option('SAEMSS')],
+                label: 'Syndicat',
+                onSelected: (TypeaheadOption _) {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    focus.requestFocus();
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'S');
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getTopLeft(find.byType(ListView)).dy,
+      lessThan(tester.getTopLeft(find.byType(TextField)).dy),
+      reason: 'la liste doit s\'ouvrir du côté où il reste de la place',
+    );
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
   group('message d\'état : il DOIT être à l\'écran', () {
     /// Monte un champ isolé, avec les options qu'on lui donne.
     Future<

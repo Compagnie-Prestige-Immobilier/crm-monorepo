@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/background/background_sync.dart';
@@ -16,6 +17,7 @@ import '../../../core/theme/cpi_typography.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/sync_badge.dart';
 import '../../auth/auth_state.dart';
+import '../../../core/router/single_push.dart';
 
 class ReglagesScreen extends ConsumerStatefulWidget {
   const ReglagesScreen({super.key});
@@ -31,14 +33,37 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
   @override
   void initState() {
     super.initState();
-    BackgroundSync.lastRunAt().then((DateTime? value) {
-      if (mounted) {
-        setState(() {
-          _lastBackgroundRun = value;
-          _loadedBackground = true;
-        });
-      }
+    unawaited(_loadBackgroundRun());
+  }
+
+  Future<void> _loadBackgroundRun() async {
+    DateTime? value;
+    try {
+      value = await BackgroundSync.lastRunAt();
+    } on Object {
+      value = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _lastBackgroundRun = value;
+      _loadedBackground = true;
     });
+  }
+
+  void _persist(Future<void> write) {
+    unawaited(
+      write.onError((Object _, StackTrace _) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Réglage appliqué, mais pas enregistré : il repartira au '
+              'redémarrage.',
+            ),
+          ),
+        );
+      }),
+    );
   }
 
   @override
@@ -128,8 +153,8 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                 onPressed: sync.running
                     ? null
                     : () {
-                        HapticFeedback.selectionClick();
-                        ref.read(syncCoordinatorProvider.notifier).run();
+                        HapticFeedback.selectionClick().ignore();
+                        unawaited(ref.read(syncCoordinatorProvider.notifier).run());
                       },
                 icon: sync.running
                     ? const SizedBox(
@@ -151,8 +176,10 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
               _TextScaleChoice(
                 value: display.textScale,
                 onChanged: (CpiTextScale value) {
-                  HapticFeedback.selectionClick();
-                  ref.read(displaySettingsProvider.notifier).setTextScale(value);
+                  HapticFeedback.selectionClick().ignore();
+                  _persist(
+                    ref.read(displaySettingsProvider.notifier).setTextScale(value),
+                  );
                 },
               ),
               const SizedBox(height: CpiSpacing.xs),
@@ -160,10 +187,12 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                 contentPadding: EdgeInsets.zero,
                 value: display.reduceMotion,
                 onChanged: (bool value) {
-                  HapticFeedback.selectionClick();
-                  ref
-                      .read(displaySettingsProvider.notifier)
-                      .setReduceMotion(value: value);
+                  HapticFeedback.selectionClick().ignore();
+                  _persist(
+                    ref
+                        .read(displaySettingsProvider.notifier)
+                        .setReduceMotion(value: value),
+                  );
                 },
                 title: const Text('Réduire les animations'),
                 subtitle: const Text('Transitions instantanées'),
@@ -194,7 +223,7 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                 leading: const Icon(PhosphorIconsRegular.batteryCharging, size: 26),
                 title: const Text('Autorisations d\'arrière-plan'),
                 trailing: const Icon(PhosphorIconsRegular.caretRight, size: 20),
-                onTap: () => context.push(Routes.batteryHelp),
+                onTap: () => context.pushOnce(Routes.batteryHelp),
               ),
             ],
           ),
@@ -206,9 +235,9 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(PhosphorIconsRegular.info, size: 26),
                 title: const Text('À propos'),
-                subtitle: Text('Version, serveur, support'),
+                subtitle: const Text('Version, serveur, support'),
                 trailing: const Icon(PhosphorIconsRegular.caretRight, size: 20),
-                onTap: () => context.push(Routes.about),
+                onTap: () => context.pushOnce(Routes.about),
               ),
             ],
           ),
@@ -217,7 +246,7 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
             title: 'Session',
             children: <Widget>[
               OutlinedButton.icon(
-                onPressed: () => _signOut(context, pending),
+                onPressed: () => unawaited(_signOut(pending)),
                 icon: const Icon(PhosphorIconsRegular.signOut, size: 20),
                 label: const Text('Se déconnecter'),
               ),
@@ -251,7 +280,7 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
         '${days > 1 ? 's' : ''}. Le téléphone bloque l\'app en arrière-plan.';
   }
 
-  Future<void> _signOut(BuildContext context, int pending) async {
+  Future<void> _signOut(int pending) async {
     if (pending > 0) {
       final bool? force = await showDialog<bool>(
         context: context,
@@ -270,7 +299,7 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop(false);
-                ref.read(syncCoordinatorProvider.notifier).run();
+                unawaited(ref.read(syncCoordinatorProvider.notifier).run());
               },
               child: const Text('Synchroniser'),
             ),
@@ -283,8 +312,17 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
       );
       if (force != true) return;
     }
-    await ref.read(authControllerProvider.notifier).signOut();
-    await ref.read(routeMemoryProvider).clear();
+    try {
+      await ref.read(authControllerProvider.notifier).signOut();
+      await ref.read(routeMemoryProvider).clear();
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Déconnexion impossible. Réessayez.'),
+        ),
+      );
+    }
   }
 
   static const String _pendingTitle = 'Saisies en attente';

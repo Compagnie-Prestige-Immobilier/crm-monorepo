@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +15,7 @@ import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/offline_indicator.dart';
+import '../../../ui/widgets/search_field.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 
 class RepresentantPickerScreen extends ConsumerStatefulWidget {
@@ -24,16 +27,6 @@ class RepresentantPickerScreen extends ConsumerStatefulWidget {
 }
 
 class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScreen> {
-  late final TextEditingController _search = TextEditingController(
-    text: ref.read(representantPickerSearchProvider),
-  );
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
   void _setSearch(String value) {
     ref.read(representantPickerSearchProvider.notifier).set(value);
   }
@@ -66,27 +59,9 @@ class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScr
                   CpiSpacing.md,
                   CpiSpacing.sm,
                 ),
-                child: TextField(
-                  controller: _search,
-                  autofocus: false,
+                child: CpiSearchField(
+                  initial: ref.read(representantPickerSearchProvider),
                   onChanged: _setSearch,
-                  decoration: InputDecoration(
-                    hintText: 'Nom ou numéro',
-                    prefixIcon: const Icon(
-                      PhosphorIconsRegular.magnifyingGlass,
-                      size: 20,
-                    ),
-                    suffixIcon: search.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Effacer la recherche',
-                            icon: const Icon(PhosphorIconsRegular.xCircle, size: 20),
-                            onPressed: () {
-                              _search.clear();
-                              _setSearch('');
-                            },
-                          ),
-                  ),
                 ),
               ),
               Expanded(
@@ -142,7 +117,7 @@ class _RepresentantRow extends StatelessWidget {
         : '${Phone.format(data.phoneE164)} · $departement';
 
     void openDetail() {
-      HapticFeedback.selectionClick();
+      unawaited(HapticFeedback.selectionClick());
       context.pushOnce(Routes.representantDetailFor(data.id));
     }
 
@@ -155,7 +130,7 @@ class _RepresentantRow extends StatelessWidget {
             child: ExcludeSemantics(
               child: InkWell(
                 onTap: () {
-                  HapticFeedback.selectionClick();
+                  unawaited(HapticFeedback.selectionClick());
                   context.pushOnce(Routes.newProspectFor(data.id));
                 },
                 onLongPress: openDetail,
@@ -236,7 +211,7 @@ class _CreateBar extends StatelessWidget {
       ),
       child: OutlinedButton.icon(
         onPressed: () {
-          HapticFeedback.selectionClick();
+          unawaited(HapticFeedback.selectionClick());
           context.pushOnce(Routes.newRepresentantPrefilled(query));
         },
         icon: const Icon(PhosphorIconsRegular.plus, size: 20),

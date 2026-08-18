@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,7 +59,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     }
     if (_lastSearched == parsed.e164) return;
     _lastSearched = parsed.e164;
-    _runSearch(parsed.e164);
+    unawaited(_runSearch(parsed.e164));
   }
 
   Future<void> _runSearch(String e164) async {
@@ -290,8 +292,8 @@ class _DownloadBar extends ConsumerWidget {
         onPressed: downloading
             ? null
             : () {
-                HapticFeedback.selectionClick();
-                ref.read(phase2ControllerProvider.notifier).download();
+                unawaited(HapticFeedback.selectionClick());
+                unawaited(ref.read(phase2ControllerProvider.notifier).download());
               },
         icon: downloading
             ? const SizedBox(
@@ -738,7 +740,7 @@ class _MethodCard extends StatelessWidget {
     final CpiColors cpi = context.cpi;
 
     void choose() {
-      HapticFeedback.selectionClick();
+      unawaited(HapticFeedback.selectionClick());
       onTap(method);
     }
 
@@ -952,7 +954,7 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
       comment: comment,
     );
     if (problem != null) {
-      HapticFeedback.heavyImpact();
+      unawaited(HapticFeedback.heavyImpact());
       setState(() => _error = problem.message);
       return;
     }
@@ -1032,11 +1034,18 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
                             reason: reason,
                             selected: _reason == reason,
                             onTap: () {
-                              HapticFeedback.selectionClick();
+                              unawaited(HapticFeedback.selectionClick());
                               setState(() {
+                                // L'heure ne se remet à zéro que si le
+                                // sélecteur disparaît : entre deux motifs qui
+                                // programment tous deux un rappel il n'est pas
+                                // démonté, sa puce restait allumée sur une
+                                // heure qui venait d'être effacée.
+                                if (_reason?.effect != reason.effect) {
+                                  _callbackAt = null;
+                                }
                                 _reason = reason;
                                 _error = null;
-                                _callbackAt = null;
                               });
                             },
                           ),
@@ -1277,33 +1286,33 @@ class _SpringIn extends StatefulWidget {
 
 class _SpringInState extends State<_SpringIn> with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(vsync: this);
+  late final CurvedAnimation _curved = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.linear,
+  );
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final Duration duration = CpiMotion.of(context).component;
     _controller.duration = duration;
+    _curved.curve = CpiMotion.of(context).easeSpring;
     if (duration == Duration.zero) {
       _controller.value = 1;
     } else if (!_controller.isAnimating && _controller.value == 0) {
-      _controller.forward();
+      unawaited(_controller.forward());
     }
   }
 
   @override
   void dispose() {
+    _curved.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: CurvedAnimation(
-        parent: _controller,
-        curve: CpiMotion.of(context).easeSpring,
-      ),
-      child: widget.child,
-    );
+    return ScaleTransition(scale: _curved, child: widget.child);
   }
 }

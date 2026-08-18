@@ -1,11 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/push/push_message.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../../core/router/back_navigation.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
@@ -43,6 +46,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     ref.read(notificationInboxProvider).refresh(force: true).ignore();
   }
 
+  Future<void> _markAllRead() async {
+    try {
+      await ref.read(pushInboxStoreProvider).markAllRead();
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Marquage impossible. Réessayez.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
@@ -60,9 +74,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             IconButton(
               tooltip: 'Tout marquer comme lu',
               icon: const Icon(PhosphorIconsRegular.checks),
-              onPressed: () {
-                ref.read(pushInboxStoreProvider).markAllRead();
-              },
+              onPressed: _markAllRead,
             ),
             const SizedBox(width: CpiSpacing.xxs),
           ],
@@ -70,7 +82,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         body: Column(
           children: <Widget>[
             ValueListenableBuilder<InboxStatus>(
-              valueListenable: ref.read(notificationInboxProvider).status,
+              valueListenable: ref.watch(notificationInboxProvider).status,
               builder: (BuildContext context, InboxStatus status, Widget? _) {
                 if (status.state != InboxSync.offline) {
                   return const SizedBox.shrink();
@@ -178,25 +190,53 @@ class _StaleStrip extends StatelessWidget {
   }
 }
 
-class _NotificationTile extends ConsumerWidget {
+class _NotificationTile extends ConsumerStatefulWidget {
   const _NotificationTile({required this.data});
 
   final StoredNotification data;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_NotificationTile> createState() => _NotificationTileState();
+}
+
+class _NotificationTileState extends ConsumerState<_NotificationTile> {
+  bool _opening = false;
+
+  /// Un seul verrou pour les deux dégâts du double tap : la lecture remontée
+  /// deux fois au serveur, et la destination empilée deux fois.
+  Future<void> _open() async {
+    if (_opening) return;
+    _opening = true;
+    try {
+      await ref.read(pushInboxStoreProvider).markRead(widget.data.id);
+      ref.read(notificationInboxProvider).markRead(widget.data.id).ignore();
+    } on Object {
+      _opening = false;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Marquage impossible. Réessayez.')),
+      );
+      return;
+    }
+    if (!mounted) {
+      _opening = false;
+      return;
+    }
+    final String? route = widget.data.route;
+    if (PushMessage.isSafeRoute(route)) await context.push<Object?>(route!);
+    _opening = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final StoredNotification data = widget.data;
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
     final bool isUnread = data.readAt == null;
     final bool hasRoute = PushMessage.isSafeRoute(data.route);
 
     return InkWell(
-      onTap: () async {
-        await ref.read(pushInboxStoreProvider).markRead(data.id);
-        ref.read(notificationInboxProvider).markRead(data.id).ignore();
-        if (!context.mounted) return;
-        if (hasRoute) context.push(data.route!);
-      },
+      onTap: () => unawaited(_open()),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 48),
         child: Padding(

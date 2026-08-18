@@ -88,12 +88,13 @@ void main() {
 
   tearDown(() => db.close());
 
-  Widget host({bool disableAnimations = false}) {
+  Widget host({bool disableAnimations = false, Phase2DirectorySync? directory}) {
     return ProviderScope(
       overrides: [
         appDatabaseProvider.overrideWithValue(db),
         apiPortProvider.overrideWithValue(api),
         clockProvider.overrideWithValue(FakeClock(t0)),
+        if (directory != null) phase2DirectoryProvider.overrideWithValue(directory),
         // Session simulée. Sans elle, `recordCallAttempt` n'a pas d'auteur à
         // écrire et refuse la saisie : le test échouerait sur l'absence de
         // session, pas sur ce qu'il prétend vérifier.
@@ -484,6 +485,51 @@ void main() {
     expect(await db.countPhase2Directory().getSingle(), 3);
   });
 
+  // Une lecture de l'annuaire ou un téléchargement qui échoue hors du réseau ne
+  // remontait nulle part : la future partait en arrière-plan sans personne pour
+  // en traiter l'erreur. Sur le terrain il n'y a ni console ni rapport de
+  // plantage, donc l'écran doit le dire lui-même.
+  phase2TestWidgets('un annuaire illisible le dit au lieu de rester muet', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        directory: _BrokenDirectory(database: db, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await type(tester, '771234567');
+
+    expect(find.textContaining('Lecture de l\'annuaire impossible'), findsOneWidget);
+  });
+
+  phase2TestWidgets('un téléchargement qui casse rend la main au bouton', (
+    WidgetTester tester,
+  ) async {
+    await db.delete(db.phase2Directory).go();
+    await tester.pumpWidget(
+      host(
+        directory: _BrokenDirectory(database: db, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Télécharger l\'annuaire'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Téléchargement interrompu'), findsOneWidget);
+    // Le compte-rendu compte moins que ceci : sans remise à zéro de l'état, le
+    // bouton reste désactivé et l'annuaire ne peut plus jamais être téléchargé
+    // sans redémarrer l'application.
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Télécharger l\'annuaire'),
+          )
+          .enabled,
+      isTrue,
+    );
+  });
+
   // ═══ LA FEUILLE NE CITE PLUS AUCUNE ISSUE ═══
   //
   // C'est le point du lot : l'équipe du client ajoute ses motifs depuis le web,
@@ -509,6 +555,60 @@ void main() {
           ),
         );
   }
+
+  // Deux motifs qui programment tous deux un rappel : le sélecteur d'heure n'est
+  // pas démonté entre les deux, sa puce reste allumée, et l'heure était pourtant
+  // remise à zéro. Le rappel enregistré était vide alors que l'écran affirmait
+  // le contraire.
+  phase2TestWidgets('changer de motif de rappel garde l\'heure déjà choisie', (
+    WidgetTester tester,
+  ) async {
+    await seedReason(
+      code: 'NRP',
+      label: 'Ne répond pas',
+      effect: CallEffects.scheduleCallback,
+      sortOrder: 1,
+    );
+    await seedReason(
+      code: 'OCCUPE',
+      label: 'Occupé',
+      effect: CallEffects.scheduleCallback,
+      sortOrder: 2,
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    await type(tester, '771234567');
+    await chooseOutcome(tester, 'Ne répond pas');
+
+    await tester.ensureVisible(find.text('Demain 9 h'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Demain 9 h'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Occupé'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Occupé'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Demain 9 h')).selected,
+      isTrue,
+    );
+
+    await tester.ensureVisible(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+
+    final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+    expect(attempt.reasonCode, 'OCCUPE');
+    expect(
+      attempt.callbackAt,
+      DateTime.utc(2026, 8, 13, 9),
+      reason: 'la puce reste allumée : l\'heure enregistrée doit la suivre',
+    );
+  });
 
   phase2TestWidgets('la feuille rend les motifs du serveur, groupés par effet', (
     WidgetTester tester,
@@ -589,6 +689,21 @@ void main() {
     expect(find.textContaining('commentaire est obligatoire'), findsOneWidget);
     expect(await db.countMyAttempts().getSingle(), 0);
   });
+}
+
+/// Un annuaire dont la base locale refuse aussi bien la lecture que l'écriture.
+class _BrokenDirectory extends Phase2DirectorySync {
+  _BrokenDirectory({required super.database, required super.api});
+
+  @override
+  Future<Phase2DirectoryData?> lookupByPhone(String phoneE164) =>
+      Future<Phase2DirectoryData?>.error(StateError('base illisible'));
+
+  @override
+  Future<int> pull({
+    int maxPages = 300,
+    void Function(int applied, bool hasMore)? onProgress,
+  }) => Future<int>.error(StateError('base illisible'));
 }
 
 /// Un commercial connecté, sans toucher au stockage sécurisé ni au réseau.

@@ -629,15 +629,20 @@ representantsWithStatus:
     WHERE deleted_at IS NULL
     ORDER BY client_created_at DESC;
 
+-- Bornees, et l'ecran DIT quand il coupe. Sans limite, une fiche a deux cents
+-- prospects construit deux cents sous-arbres a chaque reconstruction, sur des
+-- telephones modestes.
 prospectsForRepresentant:
     SELECT * FROM prospect_sync_view
     WHERE representant_id = :representantId AND deleted_at IS NULL
-    ORDER BY client_created_at DESC;
+    ORDER BY client_created_at DESC
+    LIMIT :maxRows;
 
 commentsForRepresentant:
     SELECT * FROM representant_comments
     WHERE representant_id = :representantId
-    ORDER BY client_created_at DESC;
+    ORDER BY client_created_at DESC
+    LIMIT :maxRows;
 
 -- ── Phase 2 ──────────────────────────────────────────────────────────────────
 

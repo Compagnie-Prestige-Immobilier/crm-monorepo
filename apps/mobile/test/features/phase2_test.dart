@@ -38,12 +38,9 @@ void main() {
     clock = FakeClock(t0);
     writes = WriteRepository(db, clock: clock);
     directory = Phase2DirectorySync(database: db, api: api, clock: clock);
-    engine = SyncEngine(
-      database: db,
-      api: api,
-      tokens: InMemoryTokenStore()..save(accessToken: 'a', refreshToken: 'r'),
-      clock: clock,
-    );
+    final InMemoryTokenStore tokens = InMemoryTokenStore();
+    await tokens.save(accessToken: 'a', refreshToken: 'r');
+    engine = SyncEngine(database: db, api: api, tokens: tokens, clock: clock);
   });
 
   tearDown(() => db.close());

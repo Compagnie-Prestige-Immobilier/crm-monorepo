@@ -148,9 +148,11 @@ class NotificationInbox {
 
 final Provider<NotificationInbox> notificationInboxProvider = Provider<NotificationInbox>(
   (Ref ref) {
-    return NotificationInbox(
+    final NotificationInbox inbox = NotificationInbox(
       api: ref.watch(apiClientProvider).client.getNotificationsApi(),
       store: ref.watch(pushInboxStoreProvider),
     );
+    ref.onDispose(inbox.dispose);
+    return inbox;
   },
 );

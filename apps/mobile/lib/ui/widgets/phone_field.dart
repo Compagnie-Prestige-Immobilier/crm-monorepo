@@ -9,25 +9,33 @@ import '../../core/utils/phone.dart';
 class SenegalPhoneFormatter extends TextInputFormatter {
   const SenegalPhoneFormatter();
 
+  static String _digits(String input) => input.replaceAll(RegExp(r'[^0-9]'), '');
+
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final String digits = newValue.text
-        .replaceAll(RegExp(r'[^0-9]'), '')
-        .substring(
-          0,
-          newValue.text
-              .replaceAll(RegExp(r'[^0-9]'), '')
-              .length
-              .clamp(0, kSenegalNationalLength),
-        );
+    final int cursor = newValue.selection.baseOffset.clamp(0, newValue.text.length);
+    String digits = _digits(newValue.text);
+    int digitsBeforeCursor = _digits(newValue.text.substring(0, cursor)).length;
 
-    final int digitsBeforeCursor = newValue.text
-        .substring(0, newValue.selection.baseOffset.clamp(0, newValue.text.length))
-        .replaceAll(RegExp(r'[^0-9]'), '')
-        .length;
+    // Un retour arrière sur un espace de groupement ne retirait rien : le
+    // regroupement le reposait aussitôt et il fallait deux appuis pour avancer
+    // d'un chiffre. C'est le chiffre d'avant qui part.
+    if (newValue.text.length < oldValue.text.length &&
+        digits == _digits(oldValue.text) &&
+        digitsBeforeCursor > 0) {
+      digits =
+          digits.substring(0, digitsBeforeCursor - 1) +
+          digits.substring(digitsBeforeCursor);
+      digitsBeforeCursor--;
+    }
+
+    if (digits.length > kSenegalNationalLength) {
+      digits = digits.substring(0, kSenegalNationalLength);
+      digitsBeforeCursor = digitsBeforeCursor.clamp(0, digits.length);
+    }
 
     final String grouped = Phone.groupNational(digits);
 

@@ -163,10 +163,10 @@ class SyncEngine {
       for (final OutboxData row in expired) {
         reclaimed +=
             await (_db.update(_db.outbox)..where((Outbox o) => _ownedBy(o, row))).write(
-              OutboxCompanion(
-                status: const Value(OutboxStatus.pending),
-                leaseUntil: const Value<DateTime?>(null),
-                claimToken: const Value<String?>(null),
+              const OutboxCompanion(
+                status: Value(OutboxStatus.pending),
+                leaseUntil: Value<DateTime?>(null),
+                claimToken: Value<String?>(null),
               ),
             );
       }
@@ -582,12 +582,12 @@ class SyncEngine {
     await _db.transaction(() async {
       final int closed =
           await (_db.update(_db.outbox)..where((Outbox o) => _ownedBy(o, row))).write(
-            OutboxCompanion(
-              status: const Value(OutboxStatus.done),
-              leaseUntil: const Value<DateTime?>(null),
-              claimToken: const Value<String?>(null),
-              lastErrorCode: const Value<String?>(null),
-              lastErrorMsg: const Value<String?>(null),
+            const OutboxCompanion(
+              status: Value(OutboxStatus.done),
+              leaseUntil: Value<DateTime?>(null),
+              claimToken: Value<String?>(null),
+              lastErrorCode: Value<String?>(null),
+              lastErrorMsg: Value<String?>(null),
             ),
           );
       if (closed == 0) return;
@@ -688,12 +688,12 @@ class SyncEngine {
       if (resolved != null) {
         await remapEntityId(row.entityId, resolved);
         await (_db.update(_db.outbox)..where((Outbox o) => _ownedBy(o, row))).write(
-          OutboxCompanion(
-            status: const Value(OutboxStatus.done),
-            leaseUntil: const Value<DateTime?>(null),
-            claimToken: const Value<String?>(null),
-            lastErrorCode: const Value<String?>(null),
-            lastErrorMsg: const Value<String?>(null),
+          const OutboxCompanion(
+            status: Value(OutboxStatus.done),
+            leaseUntil: Value<DateTime?>(null),
+            claimToken: Value<String?>(null),
+            lastErrorCode: Value<String?>(null),
+            lastErrorMsg: Value<String?>(null),
           ),
         );
         return;
@@ -1319,7 +1319,7 @@ class SyncEngine {
       '  cursor = excluded.cursor, last_pulled_at = excluded.last_pulled_at '
       'WHERE sync_state.cursor IS ?4',
       variables: <Variable<Object>>[
-        Variable<String>(cursorKey),
+        const Variable<String>(cursorKey),
         Variable<String>(to),
         Variable<DateTime>(_clock.now()),
         Variable<String>(from),
