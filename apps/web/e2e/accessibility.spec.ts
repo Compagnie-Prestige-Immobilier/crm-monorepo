@@ -28,6 +28,7 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   ['/campagnes/representants', 'Campagnes', 'Appels représentants'],
   ['/console', 'Console d’appel', 'Carte clavier'],
   ['/rappels', 'Rappels', 'En retard'],
+  ['/suggestions', 'Numéros suggérés', 'Numéros donnés par un représentant'],
   ['/dossiers', 'Dossiers', null],
   ['/dossiers/nouveau', 'Nouveau dossier', null],
   ['/dossiers/export', 'Export', null],
