@@ -41,6 +41,15 @@ const SECTIONS: readonly NavSection[] = [
     title: null,
     items: [
       {
+        // Écran d'accueil du SUPERVISEUR : c'est le seul qui montre le travail
+        // de chaque téléconseiller ligne à ligne.
+        href: '/supervision',
+        label: 'Supervision',
+        icon: ActivityIcon,
+        description: 'Activité et présence des téléconseillers',
+        roles: ['SUPERVISEUR'],
+      },
+      {
         href: '/tableau-de-bord',
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
@@ -59,14 +68,14 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Statistiques',
         icon: ChartColumnIcon,
         description: 'Téléconseil et banques',
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'SUPERVISEUR'],
       },
       {
         href: '/prospects',
         label: 'Prospects',
         icon: UsersIcon,
         description: 'Liste filtrable et export',
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'SUPERVISEUR'],
       },
       {
         href: '/campagnes',
@@ -92,7 +101,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Représentants',
         icon: UsersRoundIcon,
         description: 'Fiches et coordonnées',
-        roles: ['ADMIN', 'COMMERCIAL'],
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
       },
       {
         href: '/prospects/nouveau',
@@ -244,6 +253,8 @@ export function homePathForRole(role: Role): string {
       return '/dossiers';
     case 'COMMERCIAL':
       return '/console';
+    case 'SUPERVISEUR':
+      return '/supervision';
     default:
       return '/connexion';
   }

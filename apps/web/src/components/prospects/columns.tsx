@@ -47,6 +47,8 @@ const PHASE2_VARIANT: Record<Phase2Status, BadgeVariant> = {
 
 export interface ProspectRowActions {
   canAdminister: boolean;
+  /** Le SUPERVISEUR lit les fiches d'autrui : la colonne d'actions disparaît. */
+  readOnly: boolean;
   onEdit: (prospect: ProspectRow) => void;
   onMerge: (prospect: ProspectRow) => void;
   onReassign: (prospect: ProspectRow) => void;
@@ -58,7 +60,7 @@ function Empty() {
 }
 
 export function prospectColumns(actions: ProspectRowActions): ColumnDef<ProspectRow>[] {
-  return [
+  const columns: ColumnDef<ProspectRow>[] = [
     {
       id: 'nom',
       accessorKey: 'nom',
@@ -263,4 +265,6 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       ),
     },
   ];
+
+  return actions.readOnly ? columns.filter((column) => column.id !== 'actions') : columns;
 }

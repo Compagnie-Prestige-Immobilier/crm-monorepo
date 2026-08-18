@@ -45,6 +45,7 @@ export function RepresentantFormDialog({
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [regionDraft, setRegionDraft] = useState<string | null>(null);
   const [departementId, setDepartementId] = useState<string | null>(null);
   const [iefId, setIefId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
@@ -56,6 +57,7 @@ export function RepresentantFormDialog({
     if (!open) return;
     setFullName(representant?.fullName ?? '');
     setPhone(representant === null ? '' : formatPhone(representant.phoneE164));
+    setRegionDraft(null);
     setDepartementId(representant?.departementId ?? null);
     setIefId(representant?.iefId ?? null);
     setNotes(representant?.notes ?? '');
@@ -68,6 +70,10 @@ export function RepresentantFormDialog({
     staleTime: 5 * 60_000,
     enabled: open,
   });
+
+  const departements = reference?.departements ?? [];
+  const regionId =
+    departements.find((departement) => departement.id === departementId)?.regionId ?? regionDraft;
 
   const checkPhone = useMutation({
     mutationFn: (value: string) => lookupRepresentantByPhone(value),
@@ -213,13 +219,30 @@ export function RepresentantFormDialog({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <FilterCombobox
+              label="Région"
+              placeholder="Toutes les régions"
+              value={regionId}
+              options={(reference?.regions ?? []).map((region) => ({
+                value: region.id,
+                label: region.name,
+              }))}
+              onChange={(value) => {
+                setRegionDraft(value);
+                setDepartementId(null);
+                setIefId(null);
+              }}
+            />
+            <FilterCombobox
               label="Département"
               placeholder="Choisir un département"
               value={departementId}
-              options={(reference?.departements ?? []).map((departement) => ({
-                value: departement.id,
-                label: departement.name,
-              }))}
+              options={departements
+                .filter((departement) => regionId === null || departement.regionId === regionId)
+                .map((departement) => ({
+                  value: departement.id,
+                  label: departement.name,
+                  hint: departement.regionName,
+                }))}
               onChange={(value) => {
                 setDepartementId(value);
                 setIefId(null);

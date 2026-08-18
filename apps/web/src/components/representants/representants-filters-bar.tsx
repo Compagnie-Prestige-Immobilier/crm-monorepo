@@ -60,6 +60,12 @@ export function RepresentantsFiltersBar() {
     staleTime: 5 * 60_000,
   });
 
+  const [regionDraft, setRegionDraft] = useState<string | null>(null);
+  const departements = reference?.departements ?? [];
+  const regionId =
+    departements.find((departement) => departement.id === filters.departementId)?.regionId ??
+    regionDraft;
+
   const [searchDraft, setSearchDraft] = useState(filters.search);
   useEffect(() => {
     setSearchDraft(filters.search);
@@ -100,13 +106,33 @@ export function RepresentantsFiltersBar() {
 
         <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
           <FilterCombobox
+            label="Région"
+            placeholder="Toutes les régions"
+            value={regionId}
+            options={(reference?.regions ?? []).map((region) => ({
+              value: region.id,
+              label: region.name,
+            }))}
+            onChange={(value) => {
+              setRegionDraft(value);
+              if (filters.departementId === null && filters.iefId === null) return;
+              setFilters({ departementId: null, iefId: null });
+            }}
+          />
+        </div>
+
+        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
+          <FilterCombobox
             label="Département"
             placeholder="Tous les départements"
             value={filters.departementId}
-            options={(reference?.departements ?? []).map((departement) => ({
-              value: departement.id,
-              label: departement.name,
-            }))}
+            options={departements
+              .filter((departement) => regionId === null || departement.regionId === regionId)
+              .map((departement) => ({
+                value: departement.id,
+                label: departement.name,
+                hint: departement.regionName,
+              }))}
             onChange={(value) => {
               setFilters({ departementId: value, iefId: null });
             }}

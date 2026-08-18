@@ -42,7 +42,13 @@ import { cn } from '@/lib/utils';
 
 const NO_VALUE = '–';
 
-export function RepresentantsView({ canAdminister }: { canAdminister: boolean }) {
+export function RepresentantsView({
+  canAdminister,
+  readOnly = false,
+}: {
+  canAdminister: boolean;
+  readOnly?: boolean;
+}) {
   const { filters, setFilters } = useRepresentantFilters();
   const exporter = useFileDownload();
   const [editing, setEditing] = useState<{ representant: RepresentantRow | null } | null>(null);
@@ -69,15 +75,17 @@ export function RepresentantsView({ canAdminister }: { canAdminister: boolean })
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            onClick={() => {
-              setEditing({ representant: null });
-            }}
-          >
-            <PlusIcon aria-hidden="true" />
-            Nouveau représentant
-          </Button>
+          {readOnly ? null : (
+            <Button
+              type="button"
+              onClick={() => {
+                setEditing({ representant: null });
+              }}
+            >
+              <PlusIcon aria-hidden="true" />
+              Nouveau représentant
+            </Button>
+          )}
 
           {canAdminister ? (
             // Un LIEN habillé en bouton : la primitive `Button` de Base UI
@@ -91,25 +99,27 @@ export function RepresentantsView({ canAdminister }: { canAdminister: boolean })
           {/* L'export part des filtres de l'URL, pas de la page affichée :
               celui qui envoie le fichier doit pouvoir jurer qu'il contient ce
               qu'il avait sous les yeux. */}
-          <Button
-            type="button"
-            variant="outline"
-            disabled={exporter.pending || total === 0}
-            onClick={() => {
-              void exporter.download({
-                url: buildRepresentantsExportUrl(filters),
-                fileName: representantsExportFileName(),
-                failureMessage: 'L’export n’a pas pu être généré.',
-              });
-            }}
-          >
-            {exporter.pending ? (
-              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <FileSpreadsheetIcon aria-hidden="true" />
-            )}
-            Exporter
-          </Button>
+          {readOnly ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={exporter.pending || total === 0}
+              onClick={() => {
+                void exporter.download({
+                  url: buildRepresentantsExportUrl(filters),
+                  fileName: representantsExportFileName(),
+                  failureMessage: 'L’export n’a pas pu être généré.',
+                });
+              }}
+            >
+              {exporter.pending ? (
+                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <FileSpreadsheetIcon aria-hidden="true" />
+              )}
+              Exporter
+            </Button>
+          )}
         </div>
       </div>
 
@@ -147,9 +157,13 @@ export function RepresentantsView({ canAdminister }: { canAdminister: boolean })
               <li key={representant.id}>
                 <RepresentantCard
                   representant={representant}
-                  onEdit={() => {
-                    setEditing({ representant });
-                  }}
+                  onEdit={
+                    readOnly
+                      ? null
+                      : () => {
+                          setEditing({ representant });
+                        }
+                  }
                 />
               </li>
             ))}
@@ -172,9 +186,11 @@ export function RepresentantsView({ canAdminister }: { canAdminister: boolean })
                   <TableHead>Saisi par</TableHead>
                   <TableHead className="text-right">Prospects</TableHead>
                   <TableHead>Première saisie</TableHead>
-                  <TableHead className="w-24">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
+                  {readOnly ? null : (
+                    <TableHead className="w-24">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -200,20 +216,22 @@ export function RepresentantsView({ canAdminister }: { canAdminister: boolean })
                     <TableCell className="text-muted-foreground">
                       {formatDate(representant.clientCreatedAt)}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Modifier la fiche de ${representant.fullName}`}
-                        onClick={() => {
-                          setEditing({ representant });
-                        }}
-                      >
-                        <PencilIcon className="size-4" aria-hidden="true" />
-                        <span aria-hidden="true">Modifier</span>
-                      </Button>
-                    </TableCell>
+                    {readOnly ? null : (
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Modifier la fiche de ${representant.fullName}`}
+                          onClick={() => {
+                            setEditing({ representant });
+                          }}
+                        >
+                          <PencilIcon className="size-4" aria-hidden="true" />
+                          <span aria-hidden="true">Modifier</span>
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -295,7 +313,7 @@ function RepresentantCard({
   onEdit,
 }: {
   representant: RepresentantRow;
-  onEdit: () => void;
+  onEdit: (() => void) | null;
 }) {
   return (
     <article className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
@@ -342,17 +360,19 @@ function RepresentantCard({
         </div>
       </dl>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="w-fit"
-        aria-label={`Modifier la fiche de ${representant.fullName}`}
-        onClick={onEdit}
-      >
-        <PencilIcon className="size-4" aria-hidden="true" />
-        <span aria-hidden="true">Modifier</span>
-      </Button>
+      {onEdit === null ? null : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-fit"
+          aria-label={`Modifier la fiche de ${representant.fullName}`}
+          onClick={onEdit}
+        >
+          <PencilIcon className="size-4" aria-hidden="true" />
+          <span aria-hidden="true">Modifier</span>
+        </Button>
+      )}
     </article>
   );
 }

@@ -44,7 +44,7 @@ export async function fetchConsoleQueue(
   return { items: page.items, total: page.meta.total };
 }
 
-/** Réservée à l'ADMIN côté API : un téléconseiller reçoit 403 et travaille sans filtre. */
+/** Un téléconseiller ne reçoit que ses campagnes, et `progress` compte SES tâches. */
 export async function fetchConsoleCampaigns(
   client: ApiClient = getApiClient(),
 ): Promise<FilterOption[]> {

@@ -128,3 +128,29 @@ describe('RepresentantsView, repli en carte', () => {
     ).toBeTruthy();
   });
 });
+
+describe('RepresentantsView vue par un SUPERVISEUR', () => {
+  beforeEach(() => {
+    fetchRepresentants.mockReturnValue(Promise.resolve(ONE_PAGE));
+  });
+
+  it('affiche les fiches, et AUCUN geste que l’API lui refuserait', async () => {
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister={false} readOnly />);
+
+    await screen.findAllByText('Ndeye Fall');
+
+    expect(screen.queryByRole('button', { name: 'Nouveau représentant' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Modifier la fiche/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Exporter' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Import Excel' })).toBeNull();
+  });
+
+  it('un téléconseiller, lui, garde la saisie et l’export', async () => {
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister={false} />);
+
+    expect(await screen.findByRole('button', { name: 'Nouveau représentant' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Exporter' })).toBeTruthy();
+  });
+});

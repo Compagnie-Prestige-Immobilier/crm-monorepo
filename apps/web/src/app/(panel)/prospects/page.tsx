@@ -19,7 +19,7 @@ export default async function ProspectsPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL']);
+  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="Le suivi des prospects" />;
@@ -44,8 +44,12 @@ export default async function ProspectsPage({
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       {/* La fusion et la réaffectation sont des opérations d'administration :
-          l'API les refuse à un COMMERCIAL, l'écran ne les propose donc pas. */}
-      <ProspectsView canAdminister={session?.role === 'ADMIN'} />
+          l'API les refuse à un COMMERCIAL, l'écran ne les propose donc pas.
+          Le SUPERVISEUR, lui, n'écrit rien du tout. */}
+      <ProspectsView
+        canAdminister={session?.role === 'ADMIN'}
+        readOnly={session?.role === 'SUPERVISEUR'}
+      />
     </HydrationBoundary>
   );
 }

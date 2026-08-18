@@ -70,6 +70,7 @@ export function FiltersBar() {
   });
 
   const [searchDraft, setSearchDraft] = useState(filters.search);
+  const [regionDraft, setRegionDraft] = useState<string | null>(null);
 
   useEffect(() => {
     setSearchDraft(filters.search);
@@ -110,6 +111,10 @@ export function FiltersBar() {
   }
 
   if (isPending) return <FiltersBarSkeleton />;
+
+  const regionId =
+    reference.departements.find((departement) => departement.id === filters.departementId)
+      ?.regionId ?? regionDraft;
 
   return (
     <section
@@ -184,13 +189,29 @@ export function FiltersBar() {
             }}
           />
           <FilterCombobox
+            label="Région"
+            placeholder="Toutes les régions"
+            options={reference.regions.map((region) => ({
+              value: region.id,
+              label: region.name,
+            }))}
+            value={regionId}
+            onChange={(value) => {
+              setRegionDraft(value);
+              if (filters.departementId === null) return;
+              setFilters({ departementId: null });
+            }}
+          />
+          <FilterCombobox
             label="Département"
             placeholder="Tous les départements"
-            options={reference.departements.map((d) => ({
-              value: d.id,
-              label: withRetired(d.name, d.isActive),
-              hint: d.regionName,
-            }))}
+            options={reference.departements
+              .filter((d) => regionId === null || d.regionId === regionId)
+              .map((d) => ({
+                value: d.id,
+                label: withRetired(d.name, d.isActive),
+                hint: d.regionName,
+              }))}
             value={filters.departementId}
             onChange={(value) => {
               setFilters({ departementId: value });

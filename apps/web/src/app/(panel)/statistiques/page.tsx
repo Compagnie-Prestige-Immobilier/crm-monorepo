@@ -10,7 +10,7 @@ import { guardRoles } from '@/lib/session';
 export const metadata: Metadata = { title: 'Statistiques' };
 
 export default async function StatistiquesPage() {
-  const guard = await guardRoles(['ADMIN']);
+  const guard = await guardRoles(['ADMIN', 'SUPERVISEUR']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="Les statistiques" />;
