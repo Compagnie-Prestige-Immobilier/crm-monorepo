@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -62,7 +64,7 @@ class _OfflinePulseState extends State<_OfflinePulse>
       if (_controller.isAnimating) _controller.stop();
       _controller.value = 0;
     } else if (!_controller.isAnimating) {
-      _controller.repeat(reverse: true);
+      unawaited(_controller.repeat(reverse: true));
     }
   }
 

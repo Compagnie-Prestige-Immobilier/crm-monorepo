@@ -158,12 +158,26 @@ class ReferenceRepository {
         .watchSingleOrNull();
   }
 
-  Stream<List<ProspectSyncViewData>> watchProspectsFor(String representantId) {
-    return _db.prospectsForRepresentant(representantId: representantId).watch();
+  /// Un cran au-dessus de ce qu'une fiche porte en pratique: la coupure existe
+  /// pour borner le rendu, pas pour cacher des lignes. L'ecran la signale.
+  static const int ficheRowCap = 200;
+
+  Stream<List<ProspectSyncViewData>> watchProspectsFor(
+    String representantId, {
+    int maxRows = ficheRowCap,
+  }) {
+    return _db
+        .prospectsForRepresentant(representantId: representantId, maxRows: maxRows)
+        .watch();
   }
 
-  Stream<List<RepresentantComment>> watchCommentsFor(String representantId) {
-    return _db.commentsForRepresentant(representantId: representantId).watch();
+  Stream<List<RepresentantComment>> watchCommentsFor(
+    String representantId, {
+    int maxRows = ficheRowCap,
+  }) {
+    return _db
+        .commentsForRepresentant(representantId: representantId, maxRows: maxRows)
+        .watch();
   }
 
   Stream<List<ProspectSyncViewData>> watchAllProspects({String? search}) {

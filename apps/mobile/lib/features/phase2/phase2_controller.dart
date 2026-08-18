@@ -128,7 +128,18 @@ class Phase2Controller extends Notifier<Phase2State> {
       return;
     }
 
-    final Phase2DirectoryData? found = await _directory.lookupByPhone(parsed.e164);
+    final Phase2DirectoryData? found;
+    try {
+      found = await _directory.lookupByPhone(parsed.e164);
+    } on Object catch (e) {
+      state = state.copyWith(
+        stage: Phase2Stage.search,
+        errorMessage: 'Lecture de l\'annuaire impossible. $e',
+        clearEntry: true,
+      );
+      return;
+    }
+
     if (found == null) {
       state = state.copyWith(
         stage: Phase2Stage.notFound,
@@ -212,11 +223,16 @@ class Phase2Controller extends Notifier<Phase2State> {
         },
       );
       state = state.copyWith(downloading: false, downloadHasMore: false);
-    } on ApiException catch (e) {
+    } on Object catch (e) {
+      // Toutes les erreurs, pas seulement celles du réseau : une écriture drift
+      // qui casse laissait `downloading` à vrai, donc le bouton désactivé et
+      // l'annuaire intéléchargeable jusqu'au redémarrage.
       state = state.copyWith(
         downloading: false,
         downloadHasMore: false,
-        downloadError: _downloadMessage(e),
+        downloadError: e is ApiException
+            ? _downloadMessage(e)
+            : 'Téléchargement interrompu. $e',
       );
     }
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/router/app_router.dart';
@@ -6,6 +8,7 @@ import 'package:cpi_go/core/router/single_push.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/data/local/database.dart';
+import 'package:cpi_go/data/repositories/write_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/representant/presentation/representant_detail_screen.dart';
@@ -47,10 +50,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
-  Future<ProviderContainer> makeContainer(WidgetTester tester) async {
+  Future<ProviderContainer> makeContainer(
+    WidgetTester tester, {
+    WriteRepository? writes,
+  }) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final ProviderContainer container = ProviderContainer(
       overrides: [
+        if (writes != null) writeRepositoryProvider.overrideWithValue(writes),
         appDatabaseProvider.overrideWithValue(db),
         apiPortProvider.overrideWithValue(api),
         clockProvider.overrideWithValue(FakeClock(t0)),
@@ -93,7 +100,7 @@ void main() {
       );
 
       final GoRouter router = await mountApp(tester);
-      router.push(Routes.representantDetailFor('rep-1'));
+      unawaited(router.push(Routes.representantDetailFor('rep-1')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
@@ -110,7 +117,7 @@ void main() {
       // `:id` avalerait `nouveau` si la route de détail était déclarée avant :
       // créer un représentant ouvrirait une fiche vide au lieu du formulaire.
       final GoRouter router = await mountApp(tester);
-      router.push(Routes.newRepresentant);
+      unawaited(router.push(Routes.newRepresentant));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
@@ -235,13 +242,13 @@ void main() {
     /// Surface haute : le fil est en bas d'un `ListView`, et un `ListView` ne
     /// construit pas ce qui est hors du viewport. Sur les 600 dp par défaut,
     /// les assertions ne portaient sur rien.
-    Future<void> mountFiche(WidgetTester tester) async {
+    Future<void> mountFiche(WidgetTester tester, {WriteRepository? writes}) async {
       tester.view.physicalSize = const Size(1200, 6000);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final ProviderContainer container = await makeContainer(tester);
+      final ProviderContainer container = await makeContainer(tester, writes: writes);
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
@@ -319,6 +326,31 @@ void main() {
       expect(fil.single.authorId, 'me');
       expect(fil.single.authorName, 'Awa Sy');
       expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
+
+      await teardownTree(tester);
+    });
+
+    // L'écriture partait en arrière-plan depuis `onPressed` : une base qui la
+    // refuse vidait l'erreur dans la zone, le champ se vidait, et le
+    // téléconseiller repartait en croyant avoir publié.
+    testWidgets('une publication qui échoue le dit et garde le texte', (
+      WidgetTester tester,
+    ) async {
+      await mountFiche(tester, writes: _BrokenWrites(db));
+
+      await tester.enterText(find.byType(TextField), 'Passe par le secrétariat.');
+      await tester.pump();
+      await tester.ensureVisible(find.text('Publier'));
+      await tester.pump();
+      await tester.tap(find.text('Publier'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.textContaining('Commentaire non enregistré'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        'Passe par le secrétariat.',
+      );
 
       await teardownTree(tester);
     });
@@ -455,6 +487,19 @@ void main() {
       await teardownTree(tester);
     });
   });
+}
+
+/// Une base qui refuse l'écriture du commentaire.
+class _BrokenWrites extends WriteRepository {
+  _BrokenWrites(super.db);
+
+  @override
+  Future<String> addRepresentantComment({
+    required String representantId,
+    required String body,
+    required String authorId,
+    required String authorName,
+  }) => Future<String>.error(StateError('base en lecture seule'));
 }
 
 class _SignedInController extends AuthController {

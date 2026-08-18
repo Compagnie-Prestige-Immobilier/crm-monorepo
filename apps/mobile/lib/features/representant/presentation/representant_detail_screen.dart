@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../core/utils/relative_time.dart';
@@ -132,8 +135,8 @@ class _Fiche extends ConsumerWidget {
         const SizedBox(height: CpiSpacing.lg),
         FilledButton.icon(
           onPressed: () {
-            HapticFeedback.selectionClick();
-            context.push(Routes.newProspectFor(data.id));
+            unawaited(HapticFeedback.selectionClick());
+            context.pushOnce(Routes.newProspectFor(data.id));
           },
           icon: const Icon(PhosphorIconsRegular.userPlus, size: 20),
           label: const Text('Nouveau prospect'),
@@ -141,8 +144,10 @@ class _Fiche extends ConsumerWidget {
         const SizedBox(height: CpiSpacing.xs),
         OutlinedButton.icon(
           onPressed: () {
-            HapticFeedback.selectionClick();
-            context.push('${Routes.newRepresentant}?id=${Uri.encodeComponent(data.id)}');
+            unawaited(HapticFeedback.selectionClick());
+            context.pushOnce(
+              '${Routes.newRepresentant}?id=${Uri.encodeComponent(data.id)}',
+            );
           },
           icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 20),
           label: const Text('Modifier'),
@@ -178,6 +183,7 @@ class RepresentantCommentThread extends ConsumerStatefulWidget {
 class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentThread> {
   final TextEditingController _controller = TextEditingController();
   bool _sending = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -191,7 +197,10 @@ class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentT
     final String body = _controller.text.trim();
     if (authorId == null || body.isEmpty || _sending) return;
 
-    setState(() => _sending = true);
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
     try {
       await ref
           .read(writeRepositoryProvider)
@@ -203,6 +212,8 @@ class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentT
           );
       _controller.clear();
       await HapticFeedback.selectionClick();
+    } on Object catch (e) {
+      if (mounted) setState(() => _error = 'Commentaire non enregistré. $e');
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -230,6 +241,31 @@ class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentT
             border: OutlineInputBorder(),
           ),
         ),
+        if (_error != null) ...<Widget>[
+          const SizedBox(height: CpiSpacing.xs),
+          Semantics(
+            liveRegion: true,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(
+                  PhosphorIconsRegular.warningCircle,
+                  size: 18,
+                  color: theme.colorScheme.error,
+                ),
+                const SizedBox(width: CpiSpacing.xs),
+                Expanded(
+                  child: Text(
+                    _error!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: CpiSpacing.xs),
         Align(
           alignment: Alignment.centerRight,

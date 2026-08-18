@@ -8,6 +8,7 @@ import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/sync/token_store.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/data/local/database.dart';
+import 'package:cpi_go/data/repositories/write_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/prospect/presentation/prospect_entry_screen.dart';
@@ -72,11 +73,12 @@ void main() {
     });
   }
 
-  Widget host(Widget screen, {AuthState? session}) {
+  Widget host(Widget screen, {AuthState? session, WriteRepository? writes}) {
     return ProviderScope(
       overrides: [
         if (session != null)
           authControllerProvider.overrideWith(() => _FixedSession(session)),
+        if (writes != null) writeRepositoryProvider.overrideWithValue(writes),
         appDatabaseProvider.overrideWithValue(db),
         apiPortProvider.overrideWithValue(api),
         tokenStoreProvider.overrideWithValue(
@@ -502,6 +504,44 @@ void main() {
     });
   });
 
+  // Le brouillon se jetait APRÈS l'écriture. Le minuteur de 400 ms armé par la
+  // dernière frappe se déclenchait pendant l'attente et réécrivait la ligne que
+  // la transaction venait de supprimer : au retour, « Saisie non terminée »
+  // proposait un prospect DÉJÀ enregistré, et le téléconseiller le ressaisissait.
+  formTestWidgets('un enregistrement lent ne laisse pas le brouillon revenir', (
+    WidgetTester tester,
+  ) async {
+    await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
+
+    await tester.pumpWidget(
+      host(const ProspectEntryScreen(representantId: 'rep-1'), writes: _SlowWrites(db)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.widgetWithText(TextField, 'Prénom'), 'Awa');
+    await tester.enterText(find.widgetWithText(TextField, 'Nom'), 'Sow');
+    await tester.enterText(find.widgetWithText(TextField, 'Téléphone'), '771234567');
+    await tester.tap(find.widgetWithText(TextField, 'Banque'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Banque Test').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextField, 'Syndicat'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Syndicat Test').last);
+    await tester.pumpAndSettle();
+
+    // Une frappe juste avant l'appui : le minuteur du brouillon est armé et n'a
+    // pas encore tiré.
+    await tester.enterText(find.widgetWithText(TextField, 'Nom'), 'Sowe');
+    await tester.pump();
+    await tester.tap(find.text('Enregistrer et terminer'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+
+    expect(await db.select(db.prospects).get(), hasLength(1));
+    expect(await drafts(), isEmpty);
+  });
+
   // ───────────────────────────────────────────────────────────────────────────
   group('référentiels absents', () {
     /// Base SANS référentiel : l'état d'une installation neuve dont la première
@@ -924,6 +964,40 @@ class _FixedSession extends AuthController {
 
   @override
   AuthState build() => _state;
+}
+
+/// Une écriture lente : le temps que le minuteur du brouillon se déclenche.
+class _SlowWrites extends WriteRepository {
+  _SlowWrites(super.db);
+
+  @override
+  Future<String> createProspect({
+    required String nom,
+    required String prenom,
+    required String phoneE164,
+    required String banqueId,
+    required String syndicatId,
+    required String representantId,
+    required String createdById,
+    String? id,
+    String? draftId,
+  }) async {
+    final String created = await super.createProspect(
+      nom: nom,
+      prenom: prenom,
+      phoneE164: phoneE164,
+      banqueId: banqueId,
+      syndicatId: syndicatId,
+      representantId: representantId,
+      createdById: createdById,
+      id: id,
+      draftId: draftId,
+    );
+    // La transaction a déjà supprimé le brouillon ; ce qui suit tient lieu du
+    // reste d'un enregistrement lent sur un appareil d'entrée de gamme.
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    return created;
+  }
 }
 
 class _IdleSyncCoordinator extends SyncCoordinator {

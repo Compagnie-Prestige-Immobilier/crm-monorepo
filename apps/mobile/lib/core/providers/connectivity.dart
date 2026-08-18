@@ -18,13 +18,29 @@ const Duration kUnreachableFreshness = Duration(minutes: 3);
 final NotifierProvider<UnreachableEvidence, DateTime?> unreachableEvidenceProvider =
     NotifierProvider<UnreachableEvidence, DateTime?>(UnreachableEvidence.new);
 
+/// La preuve s'efface d'elle-même : lue à la demande, sa fraîcheur ne serait
+/// jamais recalculée et le bandeau « Serveur injoignable » resterait affiché
+/// alors que le réseau est revenu.
 class UnreachableEvidence extends Notifier<DateTime?> {
+  Timer? _expiry;
+
   @override
-  DateTime? build() => null;
+  DateTime? build() {
+    ref.onDispose(() => _expiry?.cancel());
+    return null;
+  }
 
-  void record(DateTime at) => state = at;
+  void record(DateTime at) {
+    _expiry?.cancel();
+    _expiry = Timer(kUnreachableFreshness, clear);
+    state = at;
+  }
 
-  void clear() => state = null;
+  void clear() {
+    _expiry?.cancel();
+    _expiry = null;
+    state = null;
+  }
 }
 
 abstract interface class NetworkValidation {
@@ -149,11 +165,7 @@ final Provider<CpiConnectivity> connectivityProvider = Provider<CpiConnectivity>
   if (validated == false) return CpiConnectivity.unreachable;
 
   final DateTime? failedAt = ref.watch(unreachableEvidenceProvider);
-  if (failedAt == null) return CpiConnectivity.online;
-  final Duration age = DateTime.now().difference(failedAt);
-  return age.isNegative || age > kUnreachableFreshness
-      ? CpiConnectivity.online
-      : CpiConnectivity.unreachable;
+  return failedAt == null ? CpiConnectivity.online : CpiConnectivity.unreachable;
 });
 
 CpiConnectivity _classify(List<ConnectivityResult> results) {

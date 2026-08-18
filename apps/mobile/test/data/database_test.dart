@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:cpi_go/data/local/database.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 /// Instants fixes : un test qui dépend de `DateTime.now()` est un test qui
 /// échouera un jour sans que rien n'ait changé.
@@ -278,7 +281,7 @@ void main() {
 
     Future<String?> statusOfP1() async {
       final ProspectSyncViewData row =
-          (await db.prospectsForRepresentant(representantId: 'r1').get()).single;
+          (await db.prospectsForRepresentant(representantId: 'r1', maxRows: 200).get()).single;
       return row.syncStatus;
     }
 
@@ -530,5 +533,29 @@ void main() {
     // deviendraient indiscernables : or c'est ce que le curseur keyset doit
     // départager.
     expect(row.read<String>('t'), 'text');
+  });
+
+  test('la base du téléphone ouvre avec ses PRAGMAs', () async {
+    // Les autres tests posent `foreign_keys` eux-mêmes : la configuration
+    // réelle, celle de `openAppDatabaseConnection`, n'était vérifiée nulle
+    // part. Sans elle, l'isolat de fond et l'interface se bloquent
+    // mutuellement et les suppressions en cascade ne se font plus.
+    final Directory dir = await Directory.systemTemp.createTemp('cpi_pragmas');
+    // Sur un fichier : le mode journal d'une base en mémoire vaut « memory »
+    // quoi qu'on demande, et le WAL est justement ce qui laisse l'isolat de
+    // fond écrire pendant que l'écran lit.
+    final Database file = sqlite3.open('${dir.path}/cpi_go.sqlite');
+    addTearDown(() async {
+      file.close();
+      await dir.delete(recursive: true);
+    });
+
+    AppDatabase.applyPragmas(file);
+    String pragma(String name) =>
+        '${file.select('PRAGMA $name;').first.values.first}'.toLowerCase();
+
+    expect(pragma('journal_mode'), 'wal');
+    expect(pragma('foreign_keys'), '1');
+    expect(pragma('busy_timeout'), '5000');
   });
 }

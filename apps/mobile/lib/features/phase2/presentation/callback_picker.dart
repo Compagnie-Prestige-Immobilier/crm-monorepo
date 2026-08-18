@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -86,7 +88,7 @@ class _CallbackPickerState extends State<CallbackPicker> {
   bool _wheel = false;
 
   void _pick(DateTime? at, {bool wheel = false}) {
-    HapticFeedback.selectionClick();
+    unawaited(HapticFeedback.selectionClick());
     setState(() {
       _selected = at;
       _wheel = wheel;

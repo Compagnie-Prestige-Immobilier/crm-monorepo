@@ -1,28 +1,53 @@
-# This file configures the analyzer, which statically analyzes Dart code to
-# check for errors, warnings, and lints.
-#
-# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
-# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
-# invoked from the command line by running `flutter analyze`.
-
-# The following line activates a set of recommended lints for Flutter apps,
-# packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
-linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at https://dart.dev/lints.
-  #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
-  rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+# Le reste du dépôt compile en TypeScript strict. Dart restait sur le gabarit
+# d'usine : ni casts implicites signalés, ni futures oubliées, ni abonnements
+# non fermés. Ce sont exactement les défauts qui ne se voient qu'en production,
+# sur un téléphone hors ligne.
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    # Une erreur, pas un avertissement : une fuite d'abonnement sur un écran de
+    # saisie se paie en batterie et en écritures fantômes après démontage.
+    cancel_subscriptions: error
+    close_sinks: error
+    use_build_context_synchronously: error
+    unawaited_futures: error
+  exclude:
+    - lib/**/*.g.dart
+    - lib/**/*.freezed.dart
+    - test/data/generated_migrations/**
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+linter:
+  rules:
+    # ── Asynchrone : la source des plantages qu'aucun test ne reproduit ───────
+    - avoid_slow_async_io
+    - discarded_futures
+    - unawaited_futures
+    - await_only_futures
+    - use_build_context_synchronously
+
+    # ── Cycle de vie : ce qui fuit sur un écran qu'on ouvre cent fois par jour ─
+    - cancel_subscriptions
+    - close_sinks
+    - always_declare_return_types
+
+    # ── Correction ────────────────────────────────────────────────────────────
+    - avoid_dynamic_calls
+    - avoid_type_to_string
+    - collection_methods_unrelated_type
+    - literal_only_boolean_expressions
+    - no_adjacent_strings_in_list
+    - throw_in_finally
+    - unnecessary_statements
+    - test_types_in_equals
+
+    # ── Lisibilité, sans zèle ─────────────────────────────────────────────────
+    - prefer_final_locals
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - unnecessary_parenthesis
+    - use_named_constants

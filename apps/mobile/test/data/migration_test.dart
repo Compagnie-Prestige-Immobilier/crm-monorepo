@@ -53,7 +53,7 @@ void main() {
     await db.close();
   });
 
-  test('le golden couvre toutes les versions déclarées', () {
+  test('le golden couvre toutes les versions déclarées', () async {
     final AppDatabase db = AppDatabase(NativeDatabase.memory());
     expect(
       GeneratedHelper.versions,
@@ -62,7 +62,7 @@ void main() {
           'schemaVersion a bougé sans nouveau dump : '
           'dart run drift_dev schema dump lib/data/local/database.dart drift_schemas/',
     );
-    db.close();
+    await db.close();
   });
 
   // ── v1 → v2 : phase 2 ──────────────────────────────────────────────────────

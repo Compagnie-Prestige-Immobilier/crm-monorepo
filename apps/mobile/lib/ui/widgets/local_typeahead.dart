@@ -204,6 +204,9 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
     return RawAutocomplete<TypeaheadOption>(
       textEditingController: widget.controller,
       focusNode: widget.focusNode,
+      // Le dernier champ d'un formulaire, clavier ouvert, n'a plus rien
+      // au-dessous de lui : la liste s'ouvre du côté où il reste de la place.
+      optionsViewOpenDirection: OptionsViewOpenDirection.mostSpace,
       displayStringForOption: (TypeaheadOption o) => o.label,
       optionsBuilder: (TextEditingValue value) {
         final bool settled =
@@ -216,10 +219,8 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
         // lui des que le champ reprend le focus, et l'utilisateur croit devoir
         // choisir une seconde fois.
         if (settled && !_browsing) return const Iterable<TypeaheadOption>.empty();
-        // Le choix est pose et rien ne le remet en cause: AUCUNE option. Sinon le
-        // libelle retenu se retrouve seul dans la liste, l'overlay se rouvre sur
-        // lui des que le champ reprend le focus, et l'utilisateur croit devoir
-        // choisir une seconde fois.
+        // Revoir le referentiel: le libelle retenu remplit le champ et ne doit
+        // pas filtrer la liste a lui seul.
         if (settled && value.text.trim().isNotEmpty) return widget.options;
         return widget.options.where((TypeaheadOption o) => o.matches(value.text));
       },

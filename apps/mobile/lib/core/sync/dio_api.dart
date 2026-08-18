@@ -270,25 +270,25 @@ class DioApi implements ApiPort {
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.transformTimeout:
-        return ApiException(
+        return const ApiException(
           timeoutCode,
           message: 'Le serveur n\'a pas répondu à temps.',
           kind: FailureKind.unreachable,
         );
       case DioExceptionType.connectionError:
-        return ApiException(
+        return const ApiException(
           networkCode,
           message: 'Réseau indisponible.',
           kind: FailureKind.unreachable,
         );
       case DioExceptionType.cancel:
-        return ApiException(
+        return const ApiException(
           'CANCELLED',
           message: 'Requête annulée.',
           kind: FailureKind.retryable,
         );
       case DioExceptionType.badCertificate:
-        return ApiException(
+        return const ApiException(
           'BAD_CERTIFICATE',
           message: 'Certificat serveur refusé.',
           kind: FailureKind.terminal,

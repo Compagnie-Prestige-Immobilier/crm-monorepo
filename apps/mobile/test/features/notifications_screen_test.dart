@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cpi_go/core/providers/app_providers.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/push/push_message.dart';
 import 'package:cpi_go/core/push/push_transport.dart';
@@ -21,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import '../support/db_fixture.dart';
+import 'package:cpi_go/core/router/single_push.dart';
 
 /// Centre de notifications et navigation par lien profond.
 ///
@@ -274,6 +278,77 @@ void main() {
         findsOneWidget,
       );
     });
+
+    Widget routedHost(GoRouter router) {
+      return ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          notificationInboxProvider.overrideWithValue(inbox),
+          authControllerProvider.overrideWith(_SignedInController.new),
+        ],
+        child: MaterialApp.router(
+          theme: AppTheme.light,
+          locale: const Locale('fr'),
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: const <Locale>[Locale('fr')],
+          routerConfig: router,
+        ),
+      );
+    }
+
+    notificationTestWidgets('un DOUBLE TAP n’empile la destination qu’une fois', (
+      WidgetTester tester,
+    ) async {
+      // Le tap marquait « lu » en base AVANT d'empiler la route : le doigt a
+      // tout le temps de retomber pendant l'écriture, et la destination
+      // s'empilait deux fois. La flèche de retour ramenait alors à la même
+      // page, ce qui ressemble à un téléphone bloqué.
+      // Horloge FIGEE: la garde de `SinglePush` dure 700 ms d'horloge REELLE, et
+      // deux `tap` peuvent etre separes de davantage sur une machine chargee.
+      // Sans cela le test passe a froid et ment sous charge.
+      SinglePush.reset();
+      final DateTime fige = DateTime(2026, 8, 18, 10);
+      SinglePush.now = () => fige;
+      addTearDown(() {
+        SinglePush.now = DateTime.now;
+        SinglePush.reset();
+      });
+
+      await PushInboxHelper(db).seed(message('ntf-1', route: Routes.phase2));
+
+      final GoRouter router = GoRouter(
+        initialLocation: Routes.notifications,
+        routes: <RouteBase>[
+          GoRoute(
+            path: Routes.notifications,
+            builder: (BuildContext context, GoRouterState state) =>
+                const NotificationsScreen(),
+          ),
+          GoRoute(
+            path: Routes.phase2,
+            builder: (BuildContext context, GoRouterState state) =>
+                const Scaffold(body: Center(child: Text('PHASE 2'))),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(routedHost(router));
+      await tester.pumpAndSettle();
+
+      final Finder tile = find.text('Appels en attente');
+      await tester.tap(tile);
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+
+      expect(find.text('PHASE 2'), findsOneWidget);
+      expect(
+        router.routerDelegate.currentConfiguration.matches.length,
+        2,
+        reason: 'un seul empilement pour un seul geste',
+      );
+      expect(inbox.reads, <String>['ntf-1']);
+    });
   });
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -515,7 +590,7 @@ void main() {
 
         // L'utilisateur travaille sur un deuxième écran.
         final GoRouter router = scope.read(routerProvider);
-        router.push(Routes.phase2);
+        unawaited(router.push<Object?>(Routes.phase2));
         await tester.pumpAndSettle();
         expect(find.text('PHASE 2'), findsOneWidget);
 
@@ -549,6 +624,7 @@ class PushInboxHelper {
             body: message.body,
             createdAt: message.sentAt,
             receivedAt: message.sentAt,
+            route: Value<String?>(message.route),
           ),
         );
   }

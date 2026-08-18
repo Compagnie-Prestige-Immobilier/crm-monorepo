@@ -129,7 +129,7 @@ class AboutScreen extends ConsumerWidget {
   }
 
   static String get _environmentLabel {
-    final String url = ApiEnvironment.baseUrl;
+    const String url = ApiEnvironment.baseUrl;
     if (ApiEnvironment.isDevelopmentServer) return 'Développement';
     if (url.contains('demo') || url.contains('staging') || url.contains('recette')) {
       return 'Démonstration';

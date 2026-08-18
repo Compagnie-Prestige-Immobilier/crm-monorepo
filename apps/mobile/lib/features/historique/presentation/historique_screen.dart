@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,12 +9,14 @@ import 'package:flutter/services.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/offline_indicator.dart';
+import '../../../ui/widgets/search_field.dart';
 import '../../../ui/widgets/sync_badge.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 
@@ -43,13 +47,9 @@ class HistoriqueScreen extends ConsumerWidget {
               CpiSpacing.md,
               CpiSpacing.sm,
             ),
-            child: TextField(
-              onChanged: (String value) =>
-                  ref.read(historiqueSearchProvider.notifier).set(value),
-              decoration: const InputDecoration(
-                hintText: 'Nom ou numéro',
-                prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, size: 20),
-              ),
+            child: CpiSearchField(
+              initial: ref.read(historiqueSearchProvider),
+              onChanged: ref.read(historiqueSearchProvider.notifier).set,
             ),
           ),
           Expanded(
@@ -107,14 +107,20 @@ class _NewRepresentantBar extends StatelessWidget {
       ),
       child: FilledButton.icon(
         onPressed: () {
-          HapticFeedback.selectionClick();
-          context.push(Routes.newRepresentant);
+          unawaited(HapticFeedback.selectionClick());
+          context.pushOnce(Routes.newRepresentant);
         },
         icon: const Icon(PhosphorIconsRegular.plus, size: 20),
         label: const Text('Nouveau représentant'),
       ),
     );
   }
+}
+
+void _sayFailed(BuildContext context, Object error) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text('Suppression impossible. $error')));
 }
 
 class _RepresentantTile extends ConsumerWidget {
@@ -136,10 +142,19 @@ class _RepresentantTile extends ConsumerWidget {
         padding: const EdgeInsets.only(right: CpiSpacing.lg),
         child: const Icon(PhosphorIconsRegular.trash, color: Colors.white),
       ),
-      confirmDismiss: (DismissDirection _) => _confirmDelete(context, data.fullName),
-      onDismissed: (DismissDirection _) async {
-        await ref.read(writeRepositoryProvider).deleteRepresentant(data.id);
+      // L'écriture se fait AVANT le retrait de la ligne : dans `onDismissed`
+      // elle partait en arrière-plan, la ligne quittait l'écran quoi qu'il
+      // arrive et un refus de la base ne se voyait nulle part.
+      confirmDismiss: (DismissDirection _) async {
+        if (!await _confirmDelete(context, data.fullName)) return false;
+        try {
+          await ref.read(writeRepositoryProvider).deleteRepresentant(data.id);
+        } on Object catch (e) {
+          if (context.mounted) _sayFailed(context, e);
+          return false;
+        }
         ref.read(syncCoordinatorProvider.notifier).nudge();
+        return true;
       },
       child: ExpansionTile(
         shape: const Border(),
@@ -152,19 +167,19 @@ class _RepresentantTile extends ConsumerWidget {
           children: <Widget>[
             IconButton(
               tooltip: 'Modifier',
-              onPressed: () => context.push(
+              onPressed: () => context.pushOnce(
                 '${Routes.newRepresentant}?id=${Uri.encodeComponent(data.id)}',
               ),
               icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 20),
             ),
             IconButton(
               tooltip: 'Ajouter des prospects',
-              onPressed: () => context.push(Routes.newProspectFor(data.id)),
+              onPressed: () => context.pushOnce(Routes.newProspectFor(data.id)),
               icon: const Icon(PhosphorIconsRegular.userPlus, size: 20),
             ),
             IconButton(
               tooltip: 'Ouvrir la fiche',
-              onPressed: () => context.push(Routes.representantDetailFor(data.id)),
+              onPressed: () => context.pushOnce(Routes.representantDetailFor(data.id)),
               icon: const Icon(PhosphorIconsRegular.caretRight, size: 20),
             ),
           ],
@@ -241,11 +256,16 @@ class _ProspectList extends ConsumerWidget {
                     padding: const EdgeInsets.only(right: CpiSpacing.lg),
                     child: const Icon(PhosphorIconsRegular.trash, color: Colors.white),
                   ),
-                  confirmDismiss: (DismissDirection _) =>
-                      _confirm(context, '${p.prenom} ${p.nom}'),
-                  onDismissed: (DismissDirection _) async {
-                    await ref.read(writeRepositoryProvider).deleteProspect(p.id);
+                  confirmDismiss: (DismissDirection _) async {
+                    if (!await _confirm(context, '${p.prenom} ${p.nom}')) return false;
+                    try {
+                      await ref.read(writeRepositoryProvider).deleteProspect(p.id);
+                    } on Object catch (e) {
+                      if (context.mounted) _sayFailed(context, e);
+                      return false;
+                    }
                     ref.read(syncCoordinatorProvider.notifier).nudge();
+                    return true;
                   },
                   child: ListTile(
                     contentPadding: const EdgeInsets.only(
@@ -360,7 +380,7 @@ class _EmptyHistorique extends StatelessWidget {
           Text('Aucun représentant', style: theme.textTheme.titleSmall),
           const SizedBox(height: CpiSpacing.lg),
           FilledButton.icon(
-            onPressed: () => context.push(Routes.newRepresentant),
+            onPressed: () => context.pushOnce(Routes.newRepresentant),
             icon: const Icon(PhosphorIconsRegular.plus, size: 20),
             label: const Text('Nouveau représentant'),
           ),
