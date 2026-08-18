@@ -17,6 +17,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchReferenceData } from '@/lib/data/reference';
 import {
@@ -27,7 +34,17 @@ import {
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import {
+  REPRESENTANT_RELATION_LABELS,
+  REPRESENTANT_RELATIONS,
+  type RepresentantRelation,
+} from '@/lib/representant-filters';
 import type { RepresentantRow } from '@/lib/types';
+
+const RELATION_ITEMS = REPRESENTANT_RELATIONS.map((relation) => ({
+  value: relation,
+  label: REPRESENTANT_RELATION_LABELS[relation],
+}));
 
 export function RepresentantFormDialog({
   open,
@@ -42,6 +59,7 @@ export function RepresentantFormDialog({
   const nameId = useId();
   const phoneId = useId();
   const notesId = useId();
+  const relationId = useId();
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -49,6 +67,7 @@ export function RepresentantFormDialog({
   const [departementId, setDepartementId] = useState<string | null>(null);
   const [iefId, setIefId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
+  const [relationStatus, setRelationStatus] = useState<RepresentantRelation>('INCONNU');
   const [conflict, setConflict] = useState<{ label: string; owner: string | null } | null>(null);
 
   const isEdit = representant !== null;
@@ -61,6 +80,7 @@ export function RepresentantFormDialog({
     setDepartementId(representant?.departementId ?? null);
     setIefId(representant?.iefId ?? null);
     setNotes(representant?.notes ?? '');
+    setRelationStatus(representant?.relationStatus ?? 'INCONNU');
     setConflict(null);
   }, [open, representant]);
 
@@ -108,6 +128,9 @@ export function RepresentantFormDialog({
           notes: notes.trim(),
         };
         if (iefId !== null) patch.iefId = iefId;
+        // Un statut inchangé n'est PAS renvoyé : le serveur le refuserait sans
+        // rien écrire, et l'écran laisserait croire à une bascule historisée.
+        if (relationStatus !== representant.relationStatus) patch.relationStatus = relationStatus;
         return updateRepresentant(representant.id, patch);
       }
 
@@ -268,6 +291,34 @@ export function RepresentantFormDialog({
             L’IEF est facultative : les fiches saisies avant l’arrivée de ce référentiel n’en
             portent pas, et l’exiger les invaliderait rétroactivement.
           </p>
+
+          {isEdit ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={relationId}>Relation</Label>
+              <Select
+                items={RELATION_ITEMS}
+                value={relationStatus}
+                onValueChange={(value) => {
+                  if (value === null) return;
+                  setRelationStatus(value);
+                }}
+              >
+                <SelectTrigger id={relationId} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RELATION_ITEMS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[0.75rem] text-muted-foreground">
+                Chaque changement est daté et signé dans l’histoire de la fiche.
+              </p>
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={notesId}>Notes</Label>

@@ -111,7 +111,12 @@ describe('navigation d’un ADMIN', () => {
 describe('navigation d’un téléconseiller', () => {
   it('ne montre QUE la section Terrain', () => {
     expect(navSections('COMMERCIAL').map((section) => section.title)).toEqual(['Terrain']);
-    expect(hrefs('COMMERCIAL')).toEqual(['/console', '/representants', '/prospects/nouveau']);
+    expect(hrefs('COMMERCIAL')).toEqual([
+      '/console',
+      '/rappels',
+      '/representants',
+      '/prospects/nouveau',
+    ]);
   });
 
   it('masque entièrement le pilotage et l’administration', () => {
@@ -220,6 +225,7 @@ describe('navigation d’un SUPERVISEUR', () => {
       '/supervision',
       '/statistiques',
       '/prospects',
+      '/rappels',
       '/representants',
     ]);
   });

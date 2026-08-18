@@ -6,16 +6,24 @@ import {
   bucketOf,
   buildAttemptBatch,
   buildQueue,
+  callbackSlots,
   COMMENT_MAX_LENGTH,
   daysSince,
+  fetchCallbacks,
   fetchConsoleQueue,
+  formatCallbackAt,
+  formatDelay,
   nextAfter,
   pushCallAttempt,
   queueLabel,
+  schedulesOf,
+  sortCallbacks,
   sortQueue,
+  undatedCallbacks,
   uuidV7,
   validateAttempt,
   type AttemptInput,
+  type Callback,
 } from '@/lib/data/console';
 import type { CallOutcome, Phase2Status, ProspectRow } from '@/lib/types';
 
@@ -162,9 +170,9 @@ describe('queueLabel', () => {
     expect(queueLabel(prospect({ id: 'a' }), NOW)).toBe('jamais appelé');
   });
 
-  it('donne l’ancienneté en jours, pas une échéance', () => {
+  it('donne l’ancienneté en jours quand aucune échéance n’a été promise', () => {
     expect(queueLabel(attempted('a', 'CALLBACK', '2026-08-04T12:00:00.000Z'), NOW)).toBe(
-      'rappel · 12 j',
+      'rappel sans échéance · 12 j',
     );
     expect(queueLabel(attempted('a', 'UNREACHABLE', '2026-08-13T12:00:00.000Z'), NOW)).toBe(
       'injoignable · 3 j',
@@ -369,5 +377,236 @@ describe('fetchConsoleQueue', () => {
     const [, init] = get.mock.calls[0] as QueryCall;
     expect(init.params.query.campaignId).toBe('c-1');
     expect(page.total).toBe(3);
+  });
+});
+
+const THURSDAY = Date.parse('2026-08-13T10:00:00.000Z');
+
+describe('callbackSlots', () => {
+  it('propose six échéances, calculées sur l’horloge de Dakar', () => {
+    expect(callbackSlots(THURSDAY)).toEqual([
+      { key: '1', label: 'Dans 1 h', at: '2026-08-13T11:00:00.000Z' },
+      { key: '2', label: 'Cet après-midi (15 h)', at: '2026-08-13T15:00:00.000Z' },
+      { key: '3', label: 'Demain 9 h', at: '2026-08-14T09:00:00.000Z' },
+      { key: '4', label: 'Demain 15 h', at: '2026-08-14T15:00:00.000Z' },
+      { key: '5', label: 'Lundi 9 h', at: '2026-08-17T09:00:00.000Z' },
+      { key: '6', label: 'Dans 3 jours', at: '2026-08-16T09:00:00.000Z' },
+    ]);
+  });
+
+  it('retire une proposition déjà passée et renumérote les chiffres', () => {
+    const slots = callbackSlots(Date.parse('2026-08-13T16:00:00.000Z'));
+
+    expect(slots.map((slot) => slot.label)).not.toContain('Cet après-midi (15 h)');
+    expect(slots.map((slot) => slot.key)).toEqual(['1', '2', '3', '4', '5']);
+    expect(slots[0]).toEqual({ key: '1', label: 'Dans 1 h', at: '2026-08-13T17:00:00.000Z' });
+  });
+
+  it('ne propose pas deux fois la même heure', () => {
+    const sunday = callbackSlots(Date.parse('2026-08-16T12:00:00.000Z'));
+
+    expect(sunday.filter((slot) => slot.at === '2026-08-17T09:00:00.000Z')).toHaveLength(1);
+    expect(sunday.map((slot) => slot.label)).not.toContain('Lundi 9 h');
+  });
+});
+
+describe('formatCallbackAt', () => {
+  it('nomme le jour tant qu’il se compte, puis donne la date', () => {
+    expect(formatCallbackAt('2026-08-16T15:00:00.000Z', NOW)).toBe('aujourd’hui à 15:00');
+    expect(formatCallbackAt('2026-08-17T09:00:00.000Z', NOW)).toBe('demain à 09:00');
+    expect(formatCallbackAt('2026-08-19T09:30:00.000Z', NOW)).toBe('le 19/08 à 09:30');
+  });
+});
+
+describe('formatDelay', () => {
+  it('choisit l’unité que le lecteur attend', () => {
+    expect(formatDelay(90_000)).toBe('1 min');
+    expect(formatDelay(7_200_000)).toBe('2 h');
+    expect(formatDelay(3 * 86_400_000)).toBe('3 j');
+  });
+});
+
+function callback(over: Partial<Callback> & { id: string }): Callback {
+  return {
+    prospectId: `p-${over.id}`,
+    shortCode: 'AB12CD',
+    phoneE164: '+221771234567',
+    scheduledAt: '2026-08-16T15:00:00.000Z',
+    comment: null,
+    assignedToId: 'u-1',
+    assignedToName: 'Fatou Sow',
+    campaignId: null,
+    taskId: null,
+    overdue: false,
+    ...over,
+  };
+}
+
+describe('sortCallbacks', () => {
+  it('met les retards en tête, du plus ancien au plus récent', () => {
+    const sorted = sortCallbacks([
+      callback({ id: 'a-venir', scheduledAt: '2026-08-16T18:00:00.000Z' }),
+      callback({ id: 'retard-recent', scheduledAt: '2026-08-16T11:00:00.000Z', overdue: true }),
+      callback({ id: 'retard-ancien', scheduledAt: '2026-08-15T09:00:00.000Z', overdue: true }),
+    ]);
+
+    expect(sorted.map((row) => row.id)).toEqual(['retard-ancien', 'retard-recent', 'a-venir']);
+  });
+});
+
+describe('schedulesOf', () => {
+  it('garde une échéance par prospect, la plus urgente', () => {
+    const schedules = schedulesOf([
+      callback({ id: 'tard', prospectId: 'p-1', scheduledAt: '2026-08-18T09:00:00.000Z' }),
+      callback({
+        id: 'tot',
+        prospectId: 'p-1',
+        scheduledAt: '2026-08-16T09:00:00.000Z',
+        overdue: true,
+      }),
+    ]);
+
+    expect(schedules.get('p-1')).toBe('2026-08-16T09:00:00.000Z');
+  });
+});
+
+describe('file d’appel et échéances', () => {
+  const RETARD = attempted('retard', 'CALLBACK', '2026-08-01T00:00:00.000Z');
+  const A_VENIR = attempted('a-venir', 'CALLBACK', '2026-08-01T00:00:00.000Z');
+  const SANS_DATE = attempted('sans-date', 'CALLBACK', '2026-07-01T00:00:00.000Z');
+  const schedules = new Map([
+    ['retard', '2026-08-16T09:00:00.000Z'],
+    ['a-venir', '2026-08-17T09:00:00.000Z'],
+  ]);
+
+  it('sert le rappel dont l’heure est passée avant tout le reste', () => {
+    const queue = sortQueue([prospect({ id: 'neuf' }), A_VENIR, RETARD], schedules, NOW);
+
+    expect(queue.map((row) => row.id)).toEqual(['retard', 'neuf', 'a-venir']);
+  });
+
+  it('remonte une échéance proche, pas encore atteinte', () => {
+    expect(bucketOf(RETARD, schedules, NOW)).toBe('due');
+    expect(bucketOf(A_VENIR, new Map([['a-venir', '2026-08-16T12:30:00.000Z']]), NOW)).toBe('due');
+    expect(bucketOf(A_VENIR, schedules, NOW)).toBe('callback');
+  });
+
+  it('laisse une fiche « à rappeler » sans échéance à sa place d’avant', () => {
+    const recente = attempted('sans-date', 'CALLBACK', '2026-08-10T00:00:00.000Z');
+    const queue = sortQueue(
+      [attempted('a-venir', 'CALLBACK', '2026-07-01T00:00:00.000Z'), recente],
+      schedules,
+      NOW,
+    );
+
+    expect(queue.map((row) => row.id)).toEqual(['sans-date', 'a-venir']);
+    expect(queueLabel(SANS_DATE, NOW, schedules)).toBe('rappel sans échéance · 46 j');
+    expect(undatedCallbacks([RETARD, A_VENIR, SANS_DATE], schedules)).toBe(1);
+  });
+
+  it('dit le retard en clair, et l’heure promise sinon', () => {
+    expect(queueLabel(RETARD, NOW, schedules)).toBe('rappel en retard de 3 h');
+    expect(queueLabel(A_VENIR, NOW, schedules)).toBe('rappel demain à 09:00');
+  });
+
+  it('compte les rappels dus à part', () => {
+    const queue = buildQueue([prospect({ id: 'neuf' }), A_VENIR, RETARD], schedules, NOW);
+
+    expect(queue.counts.due).toBe(1);
+    expect(queue.counts.callback).toBe(1);
+  });
+});
+
+describe('fetchCallbacks', () => {
+  const answer = () => ({
+    data: { items: [], serverTime: '2026-08-16T12:00:00.000Z' },
+    response: new Response(),
+  });
+
+  it('n’envoie aucun téléconseiller quand la file est celle de l’appelant', async () => {
+    const get = vi.fn().mockResolvedValue(answer());
+
+    await fetchCallbacks('overdue', null, { GET: get } as never);
+
+    const [, init] = get.mock.calls[0] as QueryCall;
+    expect(init.params.query.scope).toBe('overdue');
+    expect(init.params.query).not.toHaveProperty('assignedToId');
+  });
+
+  it('restreint la file au téléconseiller choisi', async () => {
+    const get = vi.fn().mockResolvedValue(answer());
+
+    await fetchCallbacks('week', 'u-2', { GET: get } as never);
+
+    const [, init] = get.mock.calls[0] as QueryCall;
+    expect(init.params.query.assignedToId).toBe('u-2');
+  });
+});
+
+describe('échéance de rappel dans le lot', () => {
+  const base: AttemptInput = {
+    prospectId: 'p-1',
+    draft: { outcome: 'CALLBACK', method: null, comment: '', callbackAt: null },
+    attemptId: 'a-1',
+    batchId: 'b-1',
+    at: '2026-08-16T12:00:00.000Z',
+  };
+
+  it('joint l’échéance choisie à la tentative', () => {
+    const batch = buildAttemptBatch({
+      ...base,
+      draft: { ...base.draft, callbackAt: '2026-08-17T09:00:00.000Z' },
+    });
+
+    expect(batch.operations[0]?.data?.callbackAt).toBe('2026-08-17T09:00:00.000Z');
+  });
+
+  it('n’envoie aucune date quand aucune n’a été choisie', () => {
+    expect(buildAttemptBatch(base).operations[0]?.data).not.toHaveProperty('callbackAt');
+    expect(
+      buildAttemptBatch({
+        ...base,
+        draft: { outcome: 'UNREACHABLE', method: null, comment: '' },
+      }).operations[0]?.data,
+    ).not.toHaveProperty('callbackAt');
+  });
+
+  it('refuse une date sur une autre issue, comme le fera le serveur', () => {
+    expect(
+      validateAttempt(
+        {
+          outcome: 'UNREACHABLE',
+          method: null,
+          comment: '',
+          callbackAt: '2026-08-17T09:00:00.000Z',
+        },
+        NOW,
+      ),
+    ).toMatch(/À rappeler/);
+  });
+
+  it('refuse une échéance déjà passée', () => {
+    expect(
+      validateAttempt(
+        {
+          outcome: 'CALLBACK',
+          method: null,
+          comment: '',
+          callbackAt: '2026-08-16T11:00:00.000Z',
+        },
+        NOW,
+      ),
+    ).toMatch(/à venir/);
+    expect(
+      validateAttempt(
+        {
+          outcome: 'CALLBACK',
+          method: null,
+          comment: '',
+          callbackAt: '2026-08-16T15:00:00.000Z',
+        },
+        NOW,
+      ),
+    ).toBeNull();
   });
 });

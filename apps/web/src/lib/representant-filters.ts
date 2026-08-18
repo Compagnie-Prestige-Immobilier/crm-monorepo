@@ -1,3 +1,5 @@
+import type { components } from '@crm/api-client';
+
 import {
   readEnum,
   readFrenchBoolean,
@@ -9,6 +11,22 @@ import {
 import type { SortDirection } from '@/lib/types';
 
 export const REPRESENTANT_PAGE_SIZE = 25;
+
+export type RepresentantRelation = components['schemas']['RepresentantRelation'];
+
+export const REPRESENTANT_RELATIONS = [
+  'INCONNU',
+  'CONTACTE',
+  'AMBASSADEUR',
+  'REFUS',
+] as const satisfies readonly RepresentantRelation[];
+
+export const REPRESENTANT_RELATION_LABELS: Record<RepresentantRelation, string> = {
+  INCONNU: 'Pas encore contacté',
+  CONTACTE: 'Contacté',
+  AMBASSADEUR: 'Ambassadeur',
+  REFUS: 'Refus',
+};
 
 export const REPRESENTANT_SORT_FIELDS = ['clientCreatedAt', 'fullName', 'prospects'] as const;
 
@@ -28,6 +46,7 @@ export interface RepresentantFilters {
   dateFrom: string | null;
   dateTo: string | null;
   hasProspects: boolean | null;
+  relationStatus: RepresentantRelation | null;
   sortBy: RepresentantSortField;
   sortDir: SortDirection;
   page: number;
@@ -42,6 +61,7 @@ export const EMPTY_REPRESENTANT_FILTERS: RepresentantFilters = {
   dateFrom: null,
   dateTo: null,
   hasProspects: null,
+  relationStatus: null,
   sortBy: 'clientCreatedAt',
   sortDir: 'desc',
   page: 1,
@@ -61,6 +81,11 @@ export function parseRepresentantFilters(
     dateFrom: readIsoDate(params, 'dateFrom'),
     dateTo: readIsoDate(params, 'dateTo'),
     hasProspects: readFrenchBoolean(params, 'hasProspects'),
+    relationStatus: readEnum<RepresentantRelation>(
+      params,
+      'relationStatus',
+      REPRESENTANT_RELATIONS,
+    ),
     sortBy:
       readEnum<RepresentantSortField>(params, 'sortBy', REPRESENTANT_SORT_FIELDS) ??
       EMPTY_REPRESENTANT_FILTERS.sortBy,
@@ -83,6 +108,7 @@ export function serializeRepresentantFilters(filters: RepresentantFilters): URLS
   put('dateFrom', filters.dateFrom);
   put('dateTo', filters.dateTo);
   if (filters.hasProspects !== null) put('hasProspects', filters.hasProspects ? 'oui' : 'non');
+  put('relationStatus', filters.relationStatus);
   if (filters.sortBy !== EMPTY_REPRESENTANT_FILTERS.sortBy) put('sortBy', filters.sortBy);
   if (filters.sortDir !== EMPTY_REPRESENTANT_FILTERS.sortDir) {
     put('sortDir', filters.sortDir);
@@ -116,5 +142,6 @@ export function countActiveRepresentantFilters(filters: RepresentantFilters): nu
   if (filters.commercialId !== null) count += 1;
   if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
   if (filters.hasProspects !== null) count += 1;
+  if (filters.relationStatus !== null) count += 1;
   return count;
 }

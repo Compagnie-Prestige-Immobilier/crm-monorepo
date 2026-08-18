@@ -9,7 +9,10 @@ const fetchRepresentants = vi.fn();
 
 vi.mock('@/lib/data/representants', async () => {
   const actual = await vi.importActual<typeof RepresentantsModule>('@/lib/data/representants');
-  return { ...actual, fetchRepresentants: () => fetchRepresentants() as unknown };
+  return {
+    ...actual,
+    fetchRepresentants: (filters: unknown) => fetchRepresentants(filters) as unknown,
+  };
 });
 
 vi.mock('@/lib/data/reference', () => ({
@@ -152,5 +155,105 @@ describe('RepresentantsView vue par un SUPERVISEUR', () => {
 
     expect(await screen.findByRole('button', { name: 'Nouveau représentant' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Exporter' })).toBeTruthy();
+  });
+});
+
+const fiche = (id: string, fullName: string, relationStatus: string) => ({
+  id,
+  fullName,
+  phoneE164: '+221771234567',
+  departementId: 'd-1',
+  departementName: 'Dakar',
+  iefId: null,
+  iefName: null,
+  createdById: 'u-1',
+  createdByName: 'Aminata Diallo',
+  prospectCount: 3,
+  relationStatus,
+  clientCreatedAt: '2026-03-01T09:00:00.000Z',
+  notes: null,
+  createdAt: '2026-03-01T09:00:00.000Z',
+  updatedAt: '2026-03-01T09:00:00.000Z',
+});
+
+describe('RepresentantsView, état de la relation', () => {
+  it('donne à chacun des quatre états sa propre pastille', async () => {
+    fetchRepresentants.mockReturnValue(
+      Promise.resolve({
+        items: [
+          fiche('r-1', 'Ndeye Fall', 'INCONNU'),
+          fiche('r-2', 'Moussa Sow', 'CONTACTE'),
+          fiche('r-3', 'Awa Ba', 'AMBASSADEUR'),
+          fiche('r-4', 'Ibou Sy', 'REFUS'),
+        ],
+        total: 4,
+        page: 1,
+        pageCount: 1,
+      }),
+    );
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister />);
+
+    const table = (await screen.findAllByRole('table'))[0];
+    if (table === undefined) throw new Error('Aucun tableau.');
+
+    for (const [nom, etat] of [
+      ['Ndeye Fall', 'Pas encore contacté'],
+      ['Moussa Sow', 'Contacté'],
+      ['Awa Ba', 'Ambassadeur'],
+      ['Ibou Sy', 'Refus'],
+    ]) {
+      const ligne = within(table)
+        .getByText(nom as string)
+        .closest('tr');
+      if (ligne === null) throw new Error(`Ligne introuvable pour ${nom as string}.`);
+      expect(within(ligne).getByText(etat as string)).toBeTruthy();
+    }
+  });
+
+  it('mène de chaque nom à sa fiche', async () => {
+    fetchRepresentants.mockReturnValue(
+      Promise.resolve({
+        items: [fiche('r-9', 'Awa Ba', 'AMBASSADEUR')],
+        total: 1,
+        page: 1,
+        pageCount: 1,
+      }),
+    );
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister />);
+
+    const liens = await screen.findAllByRole('link', { name: 'Awa Ba' });
+    expect(liens[0]?.getAttribute('href')).toBe('/representants/r-9');
+  });
+
+  it('compte les ambassadeurs de la sélection, sur le total et non sur la page', async () => {
+    fetchRepresentants.mockImplementation((filters: { relationStatus: string | null }) =>
+      Promise.resolve(
+        filters.relationStatus === 'AMBASSADEUR'
+          ? { items: [], total: 143, page: 1, pageCount: 6 }
+          : { items: [fiche('r-1', 'Ndeye Fall', 'CONTACTE')], total: 900, page: 1, pageCount: 36 },
+      ),
+    );
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsView canAdminister />);
+
+    expect(await screen.findByText(/dont 143 ambassadeurs/u)).toBeTruthy();
+  });
+
+  it('ne redit pas le décompte quand la sélection ne retient QUE les ambassadeurs', async () => {
+    fetchRepresentants.mockReturnValue(
+      Promise.resolve({
+        items: [fiche('r-3', 'Awa Ba', 'AMBASSADEUR')],
+        total: 143,
+        page: 1,
+        pageCount: 6,
+      }),
+    );
+    setUrl('/representants?relationStatus=AMBASSADEUR');
+    renderWithQuery(<RepresentantsView canAdminister />);
+
+    await screen.findAllByText('Awa Ba');
+    expect(screen.queryByText(/ambassadeurs/u)).toBeNull();
   });
 });

@@ -2,6 +2,7 @@ import {
   ActivityIcon,
   BellIcon,
   ChartColumnIcon,
+  ClockIcon,
   FileSpreadsheetIcon,
   FolderOpenIcon,
   HeadsetIcon,
@@ -95,6 +96,13 @@ const SECTIONS: readonly NavSection[] = [
         icon: HeadsetIcon,
         description: 'File d’appels et qualification',
         roles: ['ADMIN', 'COMMERCIAL'],
+      },
+      {
+        href: '/rappels',
+        label: 'Rappels',
+        icon: ClockIcon,
+        description: 'Échéances promises et retards',
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
       },
       {
         href: '/representants',
