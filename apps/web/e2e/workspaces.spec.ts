@@ -170,6 +170,11 @@ test('les filtres de phase 2 vivent dans l’URL et survivent au rechargement', 
   const countLine = page.getByRole('status').filter({ hasText: 'Prospects affichés' });
   await expect(countLine).not.toHaveText('');
 
+  // DÉPLIÉ, pas basculé : `AdvancedPanel` mémorise son état dans
+  // `localStorage`, et l'état de session l'emporte d'une exécution à l'autre.
+  const avances = page.getByRole('button', { name: 'Filtres avancés' });
+  if ((await avances.getAttribute('aria-expanded')) !== 'true') await avances.click();
+  await expect(avances).toHaveAttribute('aria-expanded', 'true');
   await page.getByRole('combobox', { name: 'Statut phase 2' }).click();
   await page.getByRole('option', { name: 'Méthode obtenue' }).click();
   await expect(page).toHaveURL(/phase2Status=METHOD_OBTAINED/);

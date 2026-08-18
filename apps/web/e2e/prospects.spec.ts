@@ -57,6 +57,12 @@ test('filtrage du tableau puis export xlsx', async ({ page }) => {
   await expect(countLine).not.toHaveText('');
 
   // ─── Filtrage ────────────────────────────────────────────────────────────
+  // DÉPLIÉ, pas basculé : `AdvancedPanel` mémorise son état dans
+  // `localStorage`, et l'état de session l'emporte d'une exécution à l'autre.
+  const avances = page.getByRole('button', { name: 'Filtres avancés' });
+  if ((await avances.getAttribute('aria-expanded')) !== 'true') await avances.click();
+  await expect(avances).toHaveAttribute('aria-expanded', 'true');
+
   // Le rôle `combobox` est indispensable : l'en-tête de tri de la colonne
   // porte AUSSI le nom accessible « Statut », mais comme `button`. Viser le
   // bouton triait la colonne au lieu d'ouvrir le filtre.
@@ -114,6 +120,7 @@ test('chaque écran du panel se charge sans état d’erreur', async ({ page }) 
     ['/prospects/nouveau', 'Nouveau prospect', 'Enregistrer et suivant'],
     ['/console', 'Console d’appel', 'Carte clavier'],
     ['/rappels', 'Rappels', 'En retard'],
+    ['/suggestions', 'Numéros suggérés', 'Numéros donnés par un représentant'],
     ['/campagnes', 'Campagnes', 'Appels prospects'],
     ['/campagnes/representants', 'Campagnes', 'Appels représentants'],
     ['/dossiers', 'Dossiers', null],
