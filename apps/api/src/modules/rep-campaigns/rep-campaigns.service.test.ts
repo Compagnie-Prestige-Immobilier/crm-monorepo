@@ -19,6 +19,8 @@ import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { shortCode } from '../../common/short-code.js';
 import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
+import type { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { RepresentantsService } from '../representants/representants.service.js';
 import { REP_CHECKBOX_GROUPS, RepCampaignsService } from './rep-campaigns.service.js';
 import { RepCallAttemptApplyStatus } from './dto.js';
 
@@ -34,6 +36,7 @@ type MockDb = {
   repCallAttempt: Record<'findMany' | 'findUnique' | 'create' | 'createMany', MockFn>;
   representant: Record<'findMany' | 'findFirst' | 'count' | 'updateMany', MockFn>;
   representantRelationChange: Record<'create', MockFn>;
+  representantSuggestion: Record<'create', MockFn>;
   departement: Record<'findUnique', MockFn>;
   ief: Record<'findUnique', MockFn>;
   user: Record<'findMany', MockFn>;
@@ -92,6 +95,7 @@ function prismaStub(): MockDb {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     representantRelationChange: { create: vi.fn() },
+    representantSuggestion: { create: vi.fn() },
     departement: { findUnique: vi.fn() },
     ief: { findUnique: vi.fn() },
     user: { findMany: vi.fn() },
@@ -104,8 +108,15 @@ function prismaStub(): MockDb {
   return db;
 }
 
-const build = (db: MockDb): RepCampaignsService =>
-  new RepCampaignsService(db as unknown as PrismaService, fakeDemoVisibility());
+const build = (
+  db: MockDb,
+  demo: DemoVisibilityService = fakeDemoVisibility(),
+): RepCampaignsService =>
+  new RepCampaignsService(
+    db as unknown as PrismaService,
+    demo,
+    new RepresentantsService(db as unknown as PrismaService, demo),
+  );
 
 const campaignRow = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: 'camp-1',
@@ -215,11 +226,10 @@ describe('RepCampaignsService : création', () => {
     db.$queryRawUnsafe.mockResolvedValue([{ id: 'rep-1' }]);
     db.repCallCampaign.findFirst.mockResolvedValue(campaignRow());
 
-    const service = new RepCampaignsService(
-      db as unknown as PrismaService,
-      fakeDemoVisibility(true),
-    );
-    await service.create(ADMIN, { name: 'Relance', commercialIds: ['com-1'] });
+    await build(db, fakeDemoVisibility(true)).create(ADMIN, {
+      name: 'Relance',
+      commercialIds: ['com-1'],
+    });
 
     const campaign = (
       db.repCallCampaign.create.mock.calls[0] as [{ data: Record<string, unknown> }]
@@ -692,11 +702,7 @@ describe('RepCampaignsService : tentatives', () => {
     db.representant.findFirst.mockResolvedValue({ id: 'rep-1', isDemo: false });
     db.repCallTask.findFirst.mockResolvedValue(null);
 
-    const service = new RepCampaignsService(
-      db as unknown as PrismaService,
-      fakeDemoVisibility(true),
-    );
-    await service.recordAttempt(COMMERCIAL, attempt);
+    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, attempt);
 
     const written = (
       db.repCallAttempt.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }]
@@ -710,11 +716,7 @@ describe('RepCampaignsService : tentatives', () => {
     db.representant.findFirst.mockResolvedValue({ id: 'rep-1', isDemo: true });
     db.repCallTask.findFirst.mockResolvedValue(null);
 
-    const service = new RepCampaignsService(
-      db as unknown as PrismaService,
-      fakeDemoVisibility(true),
-    );
-    await service.recordAttempt(COMMERCIAL, attempt);
+    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, attempt);
 
     const written = (
       db.repCallAttempt.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }]
@@ -840,10 +842,7 @@ describe('RepCampaignsService : tentatives', () => {
   it('la trace suit la fiche fictive, pas le mode en vigueur', async () => {
     const db = readyFor(RepresentantRelation.INCONNU, true);
 
-    await new RepCampaignsService(
-      db as unknown as PrismaService,
-      fakeDemoVisibility(true),
-    ).recordAttempt(COMMERCIAL, {
+    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, {
       ...attempt,
       relationStatus: RepresentantRelation.CONTACTE,
     });
@@ -872,6 +871,179 @@ describe('RepCampaignsService : tentatives', () => {
     await expect(build(db).recordAttempt(COMMERCIAL, attempt)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+});
+
+describe('RepCampaignsService : numéro suggéré', () => {
+  const attempt = {
+    id: '01931f3c-1a2b-7c4d-8e5f-000000000001',
+    representantId: 'rep-1',
+    outcome: RepCallOutcome.REFUSED,
+    clientCreatedAt: date.toISOString(),
+    suggestedPhone: '77 987 65 43',
+  };
+
+  const SUGGESTED_E164 = '+221779876543';
+
+  const knownRow = (): Record<string, unknown> => ({
+    id: 'rep-9',
+    fullName: 'Fatou Ndiaye',
+    phoneE164: SUGGESTED_E164,
+    notes: null,
+    rev: 1,
+    departementId: 'dep-1',
+    departement: { name: 'Dakar' },
+    iefId: null,
+    ief: null,
+    createdById: 'com-2',
+    createdBy: { id: 'com-2', fullName: 'Moussa Sarr' },
+    clientCreatedAt: date,
+    createdAt: date,
+    updatedAt: date,
+    relationStatus: RepresentantRelation.INCONNU,
+    isDemo: false,
+    _count: { prospects: 3 },
+  });
+
+  /** Une seule mesure `representant.findFirst` sert la fiche appelée ET le numéro suggéré. */
+  const ready = (byPhone: Record<string, unknown> | null, isDemo = false): MockDb => {
+    const db = prismaStub();
+    db.repCallAttempt.findUnique.mockResolvedValue(null);
+    db.repCallTask.findFirst.mockResolvedValue(null);
+    db.representant.findFirst.mockImplementation((args: { where: Record<string, unknown> }) =>
+      'phoneE164' in args.where
+        ? byPhone
+        : { id: 'rep-1', isDemo, relationStatus: RepresentantRelation.INCONNU },
+    );
+    return db;
+  };
+
+  const written = (db: MockDb): Record<string, unknown> =>
+    (db.representantSuggestion.create.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+
+  it('recueille le numéro dans le geste même du refus', async () => {
+    const db = ready(null);
+
+    const result = await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      suggestedName: 'Modou Fall',
+      suggestedNote: 'Son adjoint, joignable le matin',
+    });
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.APPLIED);
+    expect(written(db)).toMatchObject({
+      sourceRepresentantId: 'rep-1',
+      suggestedPhoneE164: SUGGESTED_E164,
+      suggestedName: 'Modou Fall',
+      note: 'Son adjoint, joignable le matin',
+      suggestedById: COMMERCIAL.id,
+      sourceAttemptId: attempt.id,
+      resolvedRepresentantId: null,
+      isDemo: false,
+    });
+    expect(result.suggestion?.found).toBe(false);
+    expect(result.suggestion?.phoneE164).toBe(SUGGESTED_E164);
+  });
+
+  it('n’écrit RIEN quand la tentative ne porte aucun numéro', async () => {
+    const db = ready(null);
+
+    const sansNumero = {
+      id: attempt.id,
+      representantId: attempt.representantId,
+      outcome: attempt.outcome,
+      clientCreatedAt: attempt.clientCreatedAt,
+    };
+    const result = await build(db).recordAttempt(COMMERCIAL, sansNumero);
+
+    expect(db.representantSuggestion.create).not.toHaveBeenCalled();
+    expect(result.suggestion).toBeNull();
+  });
+
+  it('rattache le numéro à la fiche qui le porte déjà, et dit à qui elle est', async () => {
+    const db = ready(knownRow());
+
+    const result = await build(db).recordAttempt(COMMERCIAL, attempt);
+
+    expect(written(db).resolvedRepresentantId).toBe('rep-9');
+    expect(result.suggestion).toMatchObject({
+      found: true,
+      phoneE164: SUGGESTED_E164,
+      ownedByCommercialName: 'Moussa Sarr',
+    });
+    // Fiche d'autrui : la bannière nomme le propriétaire, pas le représentant.
+    expect(result.suggestion?.representant).toBeNull();
+  });
+
+  it('ramène trois écritures du même numéro à une seule clé', async () => {
+    for (const saisie of ['77 987 65 43', '00221 77 987 65 43', '221779876543']) {
+      const db = ready(null);
+      await build(db).recordAttempt(COMMERCIAL, { ...attempt, suggestedPhone: saisie });
+      expect(written(db).suggestedPhoneE164, saisie).toBe(SUGGESTED_E164);
+    }
+  });
+
+  it('ACCEPTE le même numéro cité par deux représentants : c’est une priorité, pas un doublon', async () => {
+    const premier = ready(null);
+    await build(premier).recordAttempt(COMMERCIAL, attempt);
+
+    const second = ready(null);
+    second.representant.findFirst.mockImplementation((args: { where: Record<string, unknown> }) =>
+      'phoneE164' in args.where
+        ? null
+        : { id: 'rep-2', isDemo: false, relationStatus: RepresentantRelation.INCONNU },
+    );
+
+    await build(second).recordAttempt(ADMIN, {
+      ...attempt,
+      id: '01931f3c-1a2b-7c4d-8e5f-000000000002',
+      representantId: 'rep-2',
+    });
+
+    expect(written(premier).suggestedPhoneE164).toBe(written(second).suggestedPhoneE164);
+    expect(written(premier).sourceRepresentantId).toBe('rep-1');
+    expect(written(second).sourceRepresentantId).toBe('rep-2');
+  });
+
+  it('un REJEU de la tentative ne recueille pas le numéro une seconde fois', async () => {
+    const db = ready(null);
+    db.repCallAttempt.findUnique.mockResolvedValue({ id: attempt.id, taskId: null });
+
+    const result = await build(db).recordAttempt(COMMERCIAL, attempt);
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
+    expect(db.representantSuggestion.create).not.toHaveBeenCalled();
+    // La réponse reste la même qu'au premier envoi : le mobile qui rejoue a perdu la première.
+    expect(result.suggestion?.phoneE164).toBe(SUGGESTED_E164);
+  });
+
+  it('ni le rejeu écarté par l’unicité, découvert dans la transaction', async () => {
+    const db = ready(null);
+    db.repCallAttempt.createMany.mockResolvedValue({ count: 0 });
+
+    const result = await build(db).recordAttempt(COMMERCIAL, attempt);
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
+    expect(db.representantSuggestion.create).not.toHaveBeenCalled();
+  });
+
+  it('la suggestion suit la fiche fictive, pas le mode en vigueur', async () => {
+    const db = ready(null, true);
+
+    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, attempt);
+
+    expect(written(db).isDemo).toBe(true);
+  });
+
+  it('REFUSE la tentative ENTIÈRE sur un numéro illisible, plutôt que de perdre la piste', async () => {
+    const db = ready(null);
+
+    await expect(
+      build(db).recordAttempt(COMMERCIAL, { ...attempt, suggestedPhone: '000000' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(db.repCallAttempt.createMany).not.toHaveBeenCalled();
+    expect(db.representantSuggestion.create).not.toHaveBeenCalled();
   });
 });
 

@@ -10,6 +10,9 @@ export const PURGE_STEP_ORDER = [
   'callTasks',
   'campaignMembers',
   'campaigns',
+  // Avant `repCallAttempts` : la suggestion pend de la tentative en CASCADE, et
+  // partirait sans figurer au rapport rendu a l'administrateur.
+  'repSuggestions',
   'repCallAttempts',
   'repCallTasks',
   'repCampaignMembers',
@@ -99,8 +102,14 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
   {
     key: 'campagnesRepresentants',
     label: 'Campagnes d’appels aux représentants',
-    hint: 'Campagnes de relance, leur file d’appels et les tentatives enregistrées.',
-    steps: ['repCallAttempts', 'repCallTasks', 'repCampaignMembers', 'repCampaigns'],
+    hint: 'Campagnes de relance, leur file d’appels, les tentatives enregistrées et les numéros suggérés.',
+    steps: [
+      'repSuggestions',
+      'repCallAttempts',
+      'repCallTasks',
+      'repCampaignMembers',
+      'repCampaigns',
+    ],
     requires: [],
   },
   {

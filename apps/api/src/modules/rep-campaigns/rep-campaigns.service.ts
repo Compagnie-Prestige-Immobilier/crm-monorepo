@@ -37,6 +37,8 @@ import {
   representantNotFound,
 } from './errors.js';
 import { applyRelationChange } from '../representants/relation-change.js';
+import { RepresentantsService } from '../representants/representants.service.js';
+import type { RepresentantLookupDto } from '../representants/dto.js';
 import { RepCallAttemptApplyStatus } from './dto.js';
 import type {
   CreateRepCallAttemptDto,
@@ -104,6 +106,7 @@ export class RepCampaignsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly demo: DemoVisibilityService,
+    private readonly representants: RepresentantsService,
   ) {}
 
   async create(user: AuthenticatedUser, body: CreateRepCampaignDto): Promise<RepCampaignDetailDto> {
@@ -539,6 +542,8 @@ export class RepCampaignsService {
     }
     if (comment !== null && comment.length > COMMENT_MAX_LENGTH) throw commentRequired();
 
+    const suggested = await this.resolveSuggested(user, body.suggestedPhone);
+
     const existing = await this.prisma.repCallAttempt.findUnique({
       where: { id: body.id },
       select: { id: true, taskId: true },
@@ -549,6 +554,7 @@ export class RepCampaignsService {
         attemptId: existing.id,
         taskId: existing.taskId,
         taskClosed: false,
+        suggestion: suggested?.lookup ?? null,
       };
     }
 
@@ -588,6 +594,22 @@ export class RepCampaignsService {
 
       if (inserted.count === 0) return false;
 
+      if (suggested) {
+        await tx.representantSuggestion.create({
+          data: {
+            sourceRepresentantId: body.representantId,
+            suggestedName: body.suggestedName?.trim() || null,
+            suggestedPhoneE164: suggested.lookup.phoneE164,
+            note: body.suggestedNote?.trim() || null,
+            suggestedById: user.id,
+            resolvedRepresentantId: suggested.resolvedRepresentantId,
+            sourceAttemptId: body.id,
+            clientCreatedAt: new Date(body.clientCreatedAt),
+            isDemo: representant.isDemo,
+          },
+        });
+      }
+
       if (body.relationStatus !== undefined) {
         // WEB en dur : aucune entrée de synchronisation mobile n'écrit de
         // tentative représentant, et laisser le canal se déclarer depuis le
@@ -623,6 +645,7 @@ export class RepCampaignsService {
         attemptId: body.id,
         taskId: task?.id ?? null,
         taskClosed: false,
+        suggestion: suggested?.lookup ?? null,
       };
     }
 
@@ -631,7 +654,32 @@ export class RepCampaignsService {
       attemptId: body.id,
       taskId: task?.id ?? null,
       taskClosed: Boolean(task) && terminal,
+      suggestion: suggested?.lookup ?? null,
     };
+  }
+
+  /**
+   * Le numéro suggéré n'est PAS enregistré comme représentant : `phoneE164` y
+   * porte un index unique partiel, et une fiche jamais rencontrée le réserverait
+   * au téléconseiller qui rencontrerait un jour cette personne pour de vrai.
+   */
+  private async resolveSuggested(
+    user: AuthenticatedUser,
+    phone: string | undefined,
+  ): Promise<{ lookup: RepresentantLookupDto; resolvedRepresentantId: string | null } | null> {
+    if (phone === undefined) return null;
+
+    const lookup = await this.representants.lookup(user, phone);
+    const known = await this.prisma.representant.findFirst({
+      where: {
+        phoneE164: lookup.phoneE164,
+        deletedAt: null,
+        ...demoScope(await this.demo.enabled()),
+      },
+      select: { id: true },
+    });
+
+    return { lookup, resolvedRepresentantId: known?.id ?? null };
   }
 
   private async scopeLabel(scope: ScopeInput): Promise<string> {

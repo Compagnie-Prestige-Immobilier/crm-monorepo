@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 
+import { AnalyticsModule } from '../analytics/analytics.module.js';
 import { NotificationsController } from './notifications.controller.js';
 import { NotificationTemplatesController } from './templates.controller.js';
 import { NotificationsService } from './notifications.service.js';
@@ -10,7 +11,7 @@ import { BREVO_TRANSPORT, BrevoHttpTransport, NullBrevoTransport } from './brevo
 import { readNotificationsEnv } from './notifications.env.js';
 
 @Module({
-  imports: [ScheduleModule.forRoot()],
+  imports: [ScheduleModule.forRoot(), AnalyticsModule],
   controllers: [NotificationsController, NotificationTemplatesController],
   providers: [
     NotificationsService,

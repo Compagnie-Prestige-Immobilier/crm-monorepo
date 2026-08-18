@@ -145,7 +145,14 @@ export class SyncService {
 
   async push(user: AuthenticatedUser, body: SyncPushDto): Promise<SyncPushOutcome> {
     const env = readEnv();
-    const hash = requestHash(body);
+    // L'empreinte ne couvre QUE ce que le lot écrit. Y mêler `pendingOps` ou
+    // `appVersion` ferait passer un rejeu légitime, dont la file d'attente a
+    // bougé entre-temps, pour un autre contenu : 422 définitif sur cette clé.
+    const hash = requestHash({
+      clientBatchId: body.clientBatchId,
+      payloadVersion: body.payloadVersion,
+      operations: body.operations,
+    });
 
     // NIVEAU 1, le lot. Marqueur posé hors de la transaction de travail.
     const claim = await this.batches.claim(
