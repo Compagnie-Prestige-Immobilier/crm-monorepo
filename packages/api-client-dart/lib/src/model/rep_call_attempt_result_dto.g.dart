@@ -15,6 +15,8 @@ abstract class _$RepCallAttemptResultDtoCWProxy {
 
   RepCallAttemptResultDto taskClosed(bool taskClosed);
 
+  RepCallAttemptResultDto suggestion(RepresentantLookupDto? suggestion);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepCallAttemptResultDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -26,6 +28,7 @@ abstract class _$RepCallAttemptResultDtoCWProxy {
     String attemptId,
     String? taskId,
     bool taskClosed,
+    RepresentantLookupDto? suggestion,
   });
 }
 
@@ -52,6 +55,10 @@ class _$RepCallAttemptResultDtoCWProxyImpl
       this(taskClosed: taskClosed);
 
   @override
+  RepCallAttemptResultDto suggestion(RepresentantLookupDto? suggestion) =>
+      this(suggestion: suggestion);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepCallAttemptResultDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -63,6 +70,7 @@ class _$RepCallAttemptResultDtoCWProxyImpl
     Object? attemptId = const $CopyWithPlaceholder(),
     Object? taskId = const $CopyWithPlaceholder(),
     Object? taskClosed = const $CopyWithPlaceholder(),
+    Object? suggestion = const $CopyWithPlaceholder(),
   }) {
     return RepCallAttemptResultDto(
       status: status == const $CopyWithPlaceholder()
@@ -81,6 +89,10 @@ class _$RepCallAttemptResultDtoCWProxyImpl
           ? _value.taskClosed
           // ignore: cast_nullable_to_non_nullable
           : taskClosed as bool,
+      suggestion: suggestion == const $CopyWithPlaceholder()
+          ? _value.suggestion
+          // ignore: cast_nullable_to_non_nullable
+          : suggestion as RepresentantLookupDto?,
     );
   }
 }
@@ -101,7 +113,13 @@ RepCallAttemptResultDto _$RepCallAttemptResultDtoFromJson(
 ) => $checkedCreate('RepCallAttemptResultDto', json, ($checkedConvert) {
   $checkKeys(
     json,
-    requiredKeys: const ['status', 'attemptId', 'taskId', 'taskClosed'],
+    requiredKeys: const [
+      'status',
+      'attemptId',
+      'taskId',
+      'taskClosed',
+      'suggestion',
+    ],
   );
   final val = RepCallAttemptResultDto(
     status: $checkedConvert(
@@ -115,6 +133,12 @@ RepCallAttemptResultDto _$RepCallAttemptResultDtoFromJson(
     attemptId: $checkedConvert('attemptId', (v) => v as String),
     taskId: $checkedConvert('taskId', (v) => v as String?),
     taskClosed: $checkedConvert('taskClosed', (v) => v as bool),
+    suggestion: $checkedConvert(
+      'suggestion',
+      (v) => v == null
+          ? null
+          : RepresentantLookupDto.fromJson(v as Map<String, dynamic>),
+    ),
   );
   return val;
 });
@@ -126,6 +150,7 @@ Map<String, dynamic> _$RepCallAttemptResultDtoToJson(
   'attemptId': instance.attemptId,
   'taskId': instance.taskId,
   'taskClosed': instance.taskClosed,
+  'suggestion': instance.suggestion?.toJson(),
 };
 
 const _$RepCallAttemptApplyStatusEnumMap = {

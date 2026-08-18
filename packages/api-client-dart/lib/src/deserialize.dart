@@ -148,6 +148,8 @@ import 'package:crm_api_client/src/model/segment_count_dto.dart';
 import 'package:crm_api_client/src/model/segment_list_dto.dart';
 import 'package:crm_api_client/src/model/set_active_dto.dart';
 import 'package:crm_api_client/src/model/set_bank_case_stage_active_dto.dart';
+import 'package:crm_api_client/src/model/suggestion_dto.dart';
+import 'package:crm_api_client/src/model/suggestion_list_dto.dart';
 import 'package:crm_api_client/src/model/supervised_user_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
@@ -174,6 +176,7 @@ import 'package:crm_api_client/src/model/update_departement_dto.dart';
 import 'package:crm_api_client/src/model/update_notification_template_dto.dart';
 import 'package:crm_api_client/src/model/update_prospect_dto.dart';
 import 'package:crm_api_client/src/model/update_representant_dto.dart';
+import 'package:crm_api_client/src/model/update_suggestion_status_dto.dart';
 import 'package:crm_api_client/src/model/update_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/update_user_dto.dart';
 import 'package:crm_api_client/src/model/user_dto.dart';
@@ -675,6 +678,13 @@ ReturnType deserialize<ReturnType, BaseType>(
       return SetBankCaseStageActiveDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SortOrder':
+    case 'SuggestionDto':
+      return SuggestionDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SuggestionListDto':
+      return SuggestionListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SuggestionStatus':
     case 'SupervisedUserDto':
       return SupervisedUserDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -759,6 +769,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'UpdateRepresentantDto':
       return UpdateRepresentantDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'UpdateSuggestionStatusDto':
+      return UpdateSuggestionStatusDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'UpdateSyndicatDto':
       return UpdateSyndicatDto.fromJson(value as Map<String, dynamic>)

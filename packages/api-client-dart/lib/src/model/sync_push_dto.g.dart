@@ -13,6 +13,10 @@ abstract class _$SyncPushDtoCWProxy {
 
   SyncPushDto operations(List<SyncOperationDto> operations);
 
+  SyncPushDto pendingOps(num? pendingOps);
+
+  SyncPushDto appVersion(String? appVersion);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncPushDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -23,6 +27,8 @@ abstract class _$SyncPushDtoCWProxy {
     String clientBatchId,
     num payloadVersion,
     List<SyncOperationDto> operations,
+    num? pendingOps,
+    String? appVersion,
   });
 }
 
@@ -45,6 +51,12 @@ class _$SyncPushDtoCWProxyImpl implements _$SyncPushDtoCWProxy {
       this(operations: operations);
 
   @override
+  SyncPushDto pendingOps(num? pendingOps) => this(pendingOps: pendingOps);
+
+  @override
+  SyncPushDto appVersion(String? appVersion) => this(appVersion: appVersion);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncPushDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -55,6 +67,8 @@ class _$SyncPushDtoCWProxyImpl implements _$SyncPushDtoCWProxy {
     Object? clientBatchId = const $CopyWithPlaceholder(),
     Object? payloadVersion = const $CopyWithPlaceholder(),
     Object? operations = const $CopyWithPlaceholder(),
+    Object? pendingOps = const $CopyWithPlaceholder(),
+    Object? appVersion = const $CopyWithPlaceholder(),
   }) {
     return SyncPushDto(
       clientBatchId: clientBatchId == const $CopyWithPlaceholder()
@@ -69,6 +83,14 @@ class _$SyncPushDtoCWProxyImpl implements _$SyncPushDtoCWProxy {
           ? _value.operations
           // ignore: cast_nullable_to_non_nullable
           : operations as List<SyncOperationDto>,
+      pendingOps: pendingOps == const $CopyWithPlaceholder()
+          ? _value.pendingOps
+          // ignore: cast_nullable_to_non_nullable
+          : pendingOps as num?,
+      appVersion: appVersion == const $CopyWithPlaceholder()
+          ? _value.appVersion
+          // ignore: cast_nullable_to_non_nullable
+          : appVersion as String?,
     );
   }
 }
@@ -98,6 +120,8 @@ SyncPushDto _$SyncPushDtoFromJson(Map<String, dynamic> json) =>
               .map((e) => SyncOperationDto.fromJson(e as Map<String, dynamic>))
               .toList(),
         ),
+        pendingOps: $checkedConvert('pendingOps', (v) => v as num?),
+        appVersion: $checkedConvert('appVersion', (v) => v as String?),
       );
       return val;
     });
@@ -107,4 +131,6 @@ Map<String, dynamic> _$SyncPushDtoToJson(SyncPushDto instance) =>
       'clientBatchId': instance.clientBatchId,
       'payloadVersion': instance.payloadVersion,
       'operations': instance.operations.map((e) => e.toJson()).toList(),
+      if (instance.pendingOps case final value?) 'pendingOps': value,
+      if (instance.appVersion case final value?) 'appVersion': value,
     };
