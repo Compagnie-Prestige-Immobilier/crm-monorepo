@@ -21,6 +21,7 @@ import { CampaignStatus, RepCallOutcome, RepresentantRelation } from '@crm/datab
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { MAX_SPREAD_DAYS, MIN_SPREAD_DAYS } from '../phase2/distribution.js';
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
+import { RepresentantLookupDto } from '../representants/dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
 
 export class CreateRepCampaignDto {
@@ -348,6 +349,39 @@ export class CreateRepCallAttemptDto {
   @IsEnum(RepresentantRelation)
   relationStatus?: RepresentantRelation;
 
+  @ApiPropertyOptional({
+    type: String,
+    minLength: 6,
+    maxLength: 40,
+    description:
+      'Numéro qu’un représentant qui refuse propose d’appeler à sa place. Saisie libre, normalisé par le serveur. Un numéro illisible refuse la tentative entière : le téléconseiller est sur l’écran au moment où il le tape.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  suggestedPhone?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 120,
+    description: 'Nom du contact suggéré, tel que dicté. Ignoré sans `suggestedPhone`.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  suggestedName?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: COMMENT_MAX_LENGTH,
+    description: 'Ce que le représentant dit du contact. Ignoré sans `suggestedPhone`.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMENT_MAX_LENGTH)
+  suggestedNote?: string;
+
   @ApiProperty({
     type: String,
     format: 'date-time',
@@ -381,6 +415,14 @@ export class RepCallAttemptResultDto {
     description: 'Vrai si l’issue a clos la tâche. Les issues « à rappeler » la laissent ouverte.',
   })
   taskClosed!: boolean;
+
+  @ApiProperty({
+    type: () => RepresentantLookupDto,
+    nullable: true,
+    description:
+      'Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas.',
+  })
+  suggestion!: RepresentantLookupDto | null;
 }
 
 export class RepProgrammeQueryDto {

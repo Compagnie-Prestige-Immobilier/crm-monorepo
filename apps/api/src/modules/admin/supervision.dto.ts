@@ -50,6 +50,33 @@ export class SupervisedUserDto {
     format: 'date-time',
     nullable: true,
     description:
+      'Dernière synchronisation descendante. Un appareil ouvert appelle toutes ' +
+      'les minutes, même quand il n’a rien à remonter.',
+  })
+  lastPullAt!: string | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Opérations en attente de remontée dans l’appareil, DÉCLARÉES PAR LUI. ' +
+      '`null` quand l’application ne les annonce pas : le serveur ne voit pas ' +
+      'ce qui dort dans un téléphone.',
+  })
+  pendingOps!: number | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Version de l’application mobile, telle qu’elle s’annonce.',
+  })
+  appVersion!: string | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description:
       'Dernière écriture métier : tentative d’appel ou transition de dossier. ' +
       'Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.',
   })

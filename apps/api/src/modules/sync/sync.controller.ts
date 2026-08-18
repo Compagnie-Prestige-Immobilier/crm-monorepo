@@ -23,13 +23,17 @@ import { DemoWritable } from '../../common/decorators/demo-writable.decorator.js
 import { SyncService } from './sync.service.js';
 import { SyncPullQueryDto, SyncPullResponseDto, SyncPushDto, SyncPushResponseDto } from './dto.js';
 import { MOBILE_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
+import { HeartbeatService } from '../heartbeat/heartbeat.service.js';
 
 @ApiTags('sync')
 @ApiBearerAuth()
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'sync', version: '1' })
 export class SyncController {
-  constructor(private readonly sync: SyncService) {}
+  constructor(
+    private readonly sync: SyncService,
+    private readonly heartbeat: HeartbeatService,
+  ) {}
 
   @DemoWritable('la remontée hors ligne ne doit JAMAIS être refusée')
   @Post('push')
@@ -99,6 +103,7 @@ export class SyncController {
 
     try {
       const outcome = await this.sync.push(user, body);
+      await this.heartbeat.record(user.id, 'push', body);
       if (outcome.replayed) reply.header('Idempotency-Replayed', 'true');
       return outcome.body;
     } catch (error) {
@@ -116,11 +121,13 @@ export class SyncController {
       'Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres lignes ; les référentiels sont communs.',
   })
   @ApiResponse({ status: 200, type: SyncPullResponseDto })
-  pull(
+  async pull(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: SyncPullQueryDto,
   ): Promise<SyncPullResponseDto> {
-    return this.sync.pull(user, query);
+    const changes = await this.sync.pull(user, query);
+    await this.heartbeat.record(user.id, 'pull', query);
+    return changes;
   }
 }
 

@@ -45,6 +45,10 @@ const PURGE_EXEMPT = new Map<string, string>([
     'journal des dépôts d’import : il décrit un GESTE d’administration, pas une donnée métier. Purger le domaine « Prospects » n’efface pas la trace qu’un classeur a été déposé un jour, de la même façon que la purge ne réécrit pas le journal d’audit. Les lignes s’effacent d’elles-mêmes par `expiresAt`, et `requestedById` pointe vers `users` en Restrict : le compte demandeur ne peut pas partir en laissant un travail orphelin',
   ],
   [
+    'agent_heartbeats',
+    'trace de présence, UNE ligne par compte, en `onDelete: Cascade` : elle part avec le compte, et la réécrire suffit à la remettre à jour. Lui donner une étape à elle seule effacerait des lignes qui renaissent au pull suivant, tout en faisant paraître « jamais vu » des comptes toujours en service',
+  ],
+  [
     'device_tokens',
     'sous-système push retiré : aucun code n’écrit plus cette table, conservée une version pour que la mise à jour reste réversible (docs/migrations-en-attente.md), et emportée en cascade avec son compte',
   ],
@@ -226,6 +230,19 @@ describe('séquence d’étapes', () => {
 
   it('emporte les rappels planifiés avec les comptes téléconseillers', () => {
     expect(purgeSteps(['teleconseillers'])).toContain('scheduledCallbacks');
+  });
+
+  it('supprime les numéros suggérés avant la tentative qui les a recueillis', () => {
+    const steps = purgeSteps([...PURGE_DOMAIN_KEYS]);
+    expect(steps.indexOf('repSuggestions')).toBeLessThan(steps.indexOf('repCallAttempts'));
+    expect(steps.indexOf('repSuggestions')).toBeLessThan(steps.indexOf('representants'));
+    expect(steps.indexOf('repSuggestions')).toBeLessThan(steps.indexOf('commercialAccounts'));
+  });
+
+  it('emporte les numéros suggérés avec les comptes téléconseillers', () => {
+    // `suggestedById` pointe vers `users` en Restrict : sans cette étape, la purge
+    // des comptes échouerait sur la contrainte au lieu de s'exécuter.
+    expect(purgeSteps(['teleconseillers'])).toContain('repSuggestions');
   });
 
   it('supprime les départements avant les régions', () => {

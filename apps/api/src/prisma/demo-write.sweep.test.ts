@@ -72,7 +72,11 @@ const SITES: Record<string, Site> = {
   },
   'modules/rep-campaigns/rep-campaigns.service.ts → representant.isDemo': {
     verdict: 'HERITE',
-    note: 'POST /v1/rep-campaigns/attempts, refusé en 409 ; et mode éteint, demoScope écarte les fiches fictives, la fiche lue est donc réelle',
+    note:
+      'POST /v1/rep-campaigns/attempts, refusé en 409 ; et mode éteint, demoScope écarte les fiches fictives, ' +
+      'la fiche lue est donc réelle. DEUX écritures portent la même valeur, la tentative et le numéro suggéré ' +
+      'recueilli dans le même geste : RepresentantSuggestion.sourceRepresentant est en onDelete: Cascade, ' +
+      'une suggestion née sur un représentant fictif part avec lui à la purge',
   },
   'modules/bank-cases/bank-cases.service.ts → prospect.isDemo': {
     verdict: 'HERITE',

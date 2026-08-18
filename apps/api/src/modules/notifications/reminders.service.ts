@@ -14,6 +14,8 @@ import {
 } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
+import { SupervisionActivityService } from '../analytics/supervision.service.js';
 import { dakarDayEnd } from '../callbacks/callbacks.service.js';
 import { isOpenApiGeneration } from '../../env.js';
 import { DELIVERY_RETRY_ERROR, NotificationsService } from './notifications.service.js';
@@ -33,6 +35,8 @@ export const remindersCron = (at: string): string => {
 
 export const REMINDERS_CRON = remindersCron(env.NOTIFICATIONS_REMINDERS_AT);
 
+export const DAILY_REPORT_CRON = remindersCron(env.NOTIFICATIONS_DAILY_REPORT_AT);
+
 export { SENDING_LEASE_MS };
 
 export const ReminderKey = {
@@ -41,6 +45,7 @@ export const ReminderKey = {
   BANK_CASES_PENDING: 'bank-cases-pending',
   BANK_CASES_STALE: 'bank-cases-stale',
   DUE_CALLBACKS: 'due-callbacks',
+  DAILY_REPORT: 'daily-report',
 } as const;
 
 export type ReminderKeyValue = (typeof ReminderKey)[keyof typeof ReminderKey];
@@ -76,6 +81,7 @@ export class RemindersService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly demo: DemoVisibilityService,
+    private readonly activity: SupervisionActivityService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE, { name: 'cpi.notifications.due' })
@@ -224,6 +230,77 @@ export class RemindersService {
     });
   }
 
+  /**
+   * Compte rendu de fin de journée.
+   *
+   * Les chiffres viennent de `GET /v1/supervision/activite`, qui compte sur la
+   * date de l'ACTE et non sur celle de la fiche : un appel passé hors ligne
+   * hier et remonté ce matin reste dans la journée d'hier. Les recopier ici
+   * ferait deux comptages différents du même travail.
+   */
+  @Cron(DAILY_REPORT_CRON, {
+    name: 'cpi.notifications.daily-report',
+    timeZone: env.BUSINESS_TIME_ZONE,
+  })
+  async sendDailyReport(now: Date = new Date()): Promise<ReminderRunDto> {
+    if (isOpenApiGeneration()) return { created: 0, skipped: 0 };
+    if (!this.config.NOTIFICATIONS_DAILY_REPORT_ENABLED) return { created: 0, skipped: 0 };
+
+    const day = periodFor(now, this.config.BUSINESS_TIME_ZONE);
+    const activity = await this.activity.activite({ actFrom: day, actTo: day });
+
+    const [honored, overdue] = await Promise.all([
+      this.prisma.scheduledCallback.count({
+        where: {
+          status: ScheduledCallbackStatus.DONE,
+          updatedAt: { gte: inclusiveDateFrom(day), lte: inclusiveDateTo(day) },
+          ...demoScope(false),
+        },
+      }),
+      this.prisma.scheduledCallback.count({
+        where: {
+          status: ScheduledCallbackStatus.PENDING,
+          scheduledAt: { lte: now },
+          ...demoScope(false),
+        },
+      }),
+    ]);
+
+    const total = (pick: (row: (typeof activity.items)[number]) => number): number =>
+      activity.items.reduce((sum, row) => sum + pick(row), 0);
+
+    const actifs = new Set(activity.items.map((row) => row.teleconseillerId));
+    const muets = activity.teleconseillers
+      .filter((row) => row.isActive && !actifs.has(row.id))
+      .map((row) => row.fullName);
+
+    return this.emit({
+      key: ReminderKey.DAILY_REPORT,
+      now,
+      candidates: await this.roleAudience([Role.ADMIN, Role.SUPERVISEUR], {
+        jour: day,
+        appels: String(total((row) => row.calls)),
+        methodes: String(total((row) => row.methodObtained)),
+        injoignables: String(total((row) => row.unreachable)),
+        fauxNumeros: String(total((row) => row.wrongNumber)),
+        prospects: String(total((row) => row.prospectsCreated)),
+        rappelsHonores: String(honored),
+        rappelsEnRetard: String(overdue),
+        sansActe: muets.length ? muets.join(', ') : 'personne',
+      }),
+      titleTemplate: 'Compte rendu du {{jour}}',
+      bodyTemplate:
+        '{{appels}} appel(s) passé(s) : {{methodes}} méthode(s) obtenue(s), ' +
+        '{{injoignables}} NRP ou injoignable(s), {{fauxNumeros}} faux numéro(s).\n' +
+        'Rappels : {{rappelsHonores}} honoré(s) dans la journée, {{rappelsEnRetard}} ' +
+        'en retard sur l’heure promise.\n' +
+        '{{prospects}} prospect(s) saisi(s).\n' +
+        'Téléconseillers sans acte aujourd’hui : {{sansActe}}.',
+      route: '/supervision',
+      category: NotificationCategory.ANNONCE,
+    });
+  }
+
   private async assignedCandidates(
     groups: readonly { assignedToId: string; _count: { _all: number } }[],
   ): Promise<ReminderCandidate[]> {
@@ -269,7 +346,7 @@ export class RemindersService {
     return this.emit({
       key: ReminderKey.BANK_CASES_PENDING,
       now,
-      candidates: await this.bankAudience({
+      candidates: await this.roleAudience([Role.BANQUE_FINANCE], {
         nombre: String(total),
         jours: String(days),
       }),
@@ -301,7 +378,7 @@ export class RemindersService {
     return this.emit({
       key: ReminderKey.BANK_CASES_STALE,
       now,
-      candidates: await this.bankAudience({
+      candidates: await this.roleAudience([Role.BANQUE_FINANCE], {
         nombre: String(total),
         jours: String(days),
       }),
@@ -313,10 +390,13 @@ export class RemindersService {
     });
   }
 
-  private async bankAudience(variables: Record<string, string>): Promise<ReminderCandidate[]> {
+  private async roleAudience(
+    roles: readonly Role[],
+    variables: Record<string, string>,
+  ): Promise<ReminderCandidate[]> {
     const users = await this.prisma.user.findMany({
       where: {
-        role: Role.BANQUE_FINANCE,
+        role: { in: [...roles] },
         isActive: true,
         deletedAt: null,
         ...demoScope(false),

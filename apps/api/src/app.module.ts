@@ -28,6 +28,7 @@ import { HealthModule } from './modules/health/health.module.js';
 import { ProspectsModule } from './modules/prospects/prospects.module.js';
 import { ReferentielsModule } from './modules/referentiels/referentiels.module.js';
 import { RepresentantsModule } from './modules/representants/representants.module.js';
+import { SuggestionsModule } from './modules/suggestions/suggestions.module.js';
 import { SyncModule } from './modules/sync/sync.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { AppUpdatesModule } from './modules/app-updates/app-updates.module.js';
@@ -83,6 +84,7 @@ const env = readEnv();
     Phase2Module,
     CallbacksModule,
     RepCampaignsModule,
+    SuggestionsModule,
     BankCasesModule,
     ClientRequestsModule,
     DemoModule,
