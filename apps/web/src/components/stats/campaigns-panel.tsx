@@ -41,35 +41,8 @@ import { shouldShowError } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 import type { NamedCount } from '@/lib/types';
 
-/**
- * Volet « Campagnes ».
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Le manque le plus criant du produit, avant ce volet : rien.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * L'avancement d'une campagne était calculé en ligne dans
- * `campaigns.service.ts` et ne remontait jamais dans `/analytics/*`. On pouvait
- * voir qu'une campagne existait, pas si elle avançait, ni quand elle
- * finirait, ni combien d'appels coûtait une méthode obtenue.
- *
- * Le volet prend le MÊME objet de filtre que les prospects : le filtre
- * « Campagne » de la barre en haut d'écran restreint donc ces chiffres à une
- * campagne précise, et son absence les calcule sur toutes les campagnes
- * actives. C'est ce qui permet de comparer une campagne au reste sans changer
- * d'écran.
- */
 export function CampaignsPanel() {
   const { filters } = useProspectFilters();
-  /**
-   * Le volet se rafraîchit comme ses deux voisins, et le DIT.
-   *
-   * Les volets « Téléconseil » et « Banques » portaient un `LiveIndicator`,
-   * celui-ci non. Trois onglets côte à côte, deux vivants et un muet : rien à
-   * l'écran ne permettait de savoir si « Reste à faire » datait de la seconde
-   * ou de la demi-heure précédente. Sur un chiffre d'avancement de campagne,
-   * c'est exactement la question qu'on se pose.
-   */
   const live = useLive();
 
   const pilotage = useQuery({
@@ -131,9 +104,6 @@ export function CampaignsPanel() {
           index={0}
           stat="campaignContactRate"
           label="Fiches touchées"
-          /* `null` signifie « aucune tâche », pas « 0 % de tâches touchées » :
-             les afficher pareil ferait passer une campagne vide pour une
-             campagne en échec. */
           value={data.contactRate === null ? 'Aucune fiche' : formatRate(data.contactRate)}
           hint={`${formatNumber(data.tasksContacted)} sur ${formatNumber(data.tasks)}`}
           icon={PhoneCallIcon}
@@ -145,9 +115,6 @@ export function CampaignsPanel() {
           value={data.reachRate === null ? 'Aucun appel' : formatRate(data.reachRate)}
           hint={`${formatNumber(data.reachableAttempts)} appels aboutis sur ${formatNumber(data.attempts)}`}
           icon={PercentIcon}
-          // Sous la moitié des appels aboutis, ce n'est plus le téléconseil qui
-          // est en cause mais la base : le ton doit le signaler. Un taux absent
-          // n'alerte pas : il n'y a rien à alerter.
           tone={
             data.reachRate !== null && data.reachRate < 50 && data.attempts > 0
               ? 'destructive'
@@ -204,16 +171,6 @@ export function CampaignsPanel() {
           badRate={quality.data?.badRate ?? null}
           attempts={quality.data?.attempts ?? 0}
           isPending={quality.isPending}
-          /**
-           * L'échec de CETTE requête doit voyager jusqu'à la carte.
-           *
-           * Seul `pilotage.isError` était traité, plus haut. La requête de
-           * qualité n'avait aucune branche d'erreur : `data` restait
-           * `undefined`, les valeurs par défaut ci-dessus prenaient le relais,
-           * et la carte affirmait « Aucun appel enregistré sur la sélection »,
-           * c'est-à-dire un FAIT sur l'activité, alors que rien n'avait été
-           * mesuré. Un responsable y lit que ses équipes n'ont pas appelé.
-           */
           showError={shouldShowError({
             isError: quality.isError,
             hasData: quality.data !== undefined,
@@ -228,13 +185,6 @@ export function CampaignsPanel() {
   );
 }
 
-/**
- * Qualité de la base, par représentant apporteur.
- *
- * En TABLEAU et non en graphique : la question n'est pas « quelle est la
- * forme de la distribution » mais « qui, nommément, apporte des numéros
- * inexploitables ». Un nom et un taux se lisent, une barre sans étiquette non.
- */
 function QualityCard({
   rows,
   badRate,

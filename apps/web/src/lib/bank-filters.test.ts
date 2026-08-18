@@ -15,12 +15,6 @@ import {
 } from '@/lib/bank-filters';
 import { buildBankExportUrl } from '@/lib/data/export';
 
-/**
- * Même dispositif que pour les prospects, même raison : UN objet de filtre
- * pilote la liste, le tableau de bord et l'export. Un agent doit pouvoir jurer
- * que son classeur contient ce qu'il avait sous les yeux.
- */
-
 const FULL: BankCaseFilters = {
   search: 'CPI-2026',
   stageId: 'stage-1',
@@ -68,8 +62,6 @@ describe('analyse défensive', () => {
   });
 
   it('écarte une borne de montant qui n’est pas un entier de chiffres', () => {
-    // Une borne « 1 200,50 » relayée telle quelle produirait un 400 sur un
-    // écran que l'agent n'a fait qu'ouvrir depuis un lien.
     expect(parseBankFilters(new URLSearchParams('amountMin=1200,50')).amountMin).toBeNull();
     expect(parseBankFilters(new URLSearchParams('amountMin=-500')).amountMin).toBeNull();
     expect(parseBankFilters(new URLSearchParams('amountMin=1200000')).amountMin).toBe('1200000');
@@ -78,7 +70,6 @@ describe('analyse défensive', () => {
   it('accepte une borne de 18 chiffres : la borne exacte de la colonne', () => {
     const huge = '9'.repeat(18);
     expect(parseBankFilters(new URLSearchParams(`amountMax=${huge}`)).amountMax).toBe(huge);
-    // Et la garde tel quel : aucun passage par un nombre en chemin.
     expect(serializeBankFilters({ ...EMPTY_BANK_FILTERS, amountMax: huge }).get('amountMax')).toBe(
       huge,
     );
@@ -109,8 +100,6 @@ describe('traduction vers les paramètres de l’API', () => {
   });
 
   it('la sélection de la liste est identique à celle des agrégats', () => {
-    // Garantie centrale : le tableau de bord, la liste et l'export ne peuvent
-    // pas décrire trois populations différentes.
     const { page, pageSize, sortBy, sortOrder, ...selection } = toBankCaseQuery(FULL);
     void page;
     void pageSize;
@@ -122,8 +111,6 @@ describe('traduction vers les paramètres de l’API', () => {
 
 describe('vues rapides', () => {
   it('« À traiter » vise l’étape initiale, lue dans la configuration', () => {
-    // L'étape initiale est configurable et renommable : la deviner d'un code en
-    // dur casserait la vue le jour où un administrateur la renomme.
     expect(quickViewPatch('a-traiter', 'stage-init')).toEqual({
       stageId: 'stage-init',
       stageType: null,
@@ -149,8 +136,6 @@ describe('vues rapides', () => {
     expect(activeQuickView({ ...EMPTY_BANK_FILTERS, stageType: 'CASHED' }, 'init')).toBe(
       'encaisses',
     );
-    // Une étape précise qui n'est pas l'initiale ne correspond à aucune vue
-    // rapide : on n'en surligne aucune plutôt que d'en surligner une fausse.
     expect(activeQuickView({ ...EMPTY_BANK_FILTERS, stageId: 'autre' }, 'init')).toBe('tous');
   });
 });

@@ -16,24 +16,6 @@ import {
   type UpdateNotificationTemplateDto,
 } from './dto.js';
 
-/**
- * Gabarits de notification.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI UN GABARIT PORTE `isDemo` COMME LE RESTE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Un gabarit rédigé pendant une démonstration n'a rien à faire dans le
- * compositeur d'une plateforme en service : il y traîne un texte d'exemple que
- * quelqu'un finira par envoyer pour de bon. La colonne existe en base depuis le
- * début ; ce service était le seul à l'ignorer, aussi bien en écriture qu'en
- * lecture.
- *
- * TOUTES les résolutions passent donc par `findVisible`, y compris celles qui
- * portent déjà la clé primaire : un gabarit masqué ne doit pas non plus être
- * relisible, modifiable ni rendu par son identifiant, sans quoi le masquage ne
- * couvrirait que la liste.
- */
 @Injectable()
 export class NotificationTemplatesService {
   constructor(
@@ -56,15 +38,6 @@ export class NotificationTemplatesService {
     return toDto(await this.findVisible(id));
   }
 
-  /**
-   * `variables` n'est JAMAIS saisi par l'auteur : il est recalculé depuis le
-   * texte à chaque écriture.
-   *
-   * Une liste tenue à la main diverge du gabarit à la première correction,
-   * l'auteur ajoute `{{campagne}}` dans le corps, oublie de l'ajouter à la
-   * liste, et le compositeur cesse de proposer le champ. La variable reste
-   * alors éternellement non substituée.
-   */
   async create(
     user: AuthenticatedUser,
     body: CreateNotificationTemplateDto,
@@ -81,7 +54,6 @@ export class NotificationTemplatesService {
           route: body.route ?? null,
           variables: mergedVariables(body.titleTemplate, body.bodyTemplate),
           createdById: user.id,
-          // Aucune ligne source dont hériter : l'interrupteur décide seul.
           isDemo: await this.demo.enabledForWrite(),
         },
       });
@@ -120,13 +92,6 @@ export class NotificationTemplatesService {
     }
   }
 
-  /**
-   * Rend le gabarit pour l'aperçu du compositeur.
-   *
-   * Une variable manquante n'est PAS une erreur : le marqueur reste visible et
-   * son nom remonte dans `missing`, ce qui laisse l'interface avertir avant
-   * l'envoi plutôt que refuser un aperçu à moitié rempli pendant la frappe.
-   */
   async render(id: string, variables: Record<string, string>): Promise<RenderedTemplateDto> {
     const row = await this.findVisible(id);
 
@@ -134,14 +99,6 @@ export class NotificationTemplatesService {
     return { title: rendered.title, body: rendered.body, missing: [...rendered.missing] };
   }
 
-  /**
-   * Le gabarit, s'il est visible dans le mode courant.
-   *
-   * `findFirst` et non `findUnique` : `findUnique` n'accepte qu'une clé
-   * unique, on ne peut donc pas y composer la visibilité. Un gabarit masqué
-   * répond « introuvable », le même refus que s'il n'existait pas, ce qui est
-   * exactement l'effet recherché.
-   */
   private async findVisible(id: string): Promise<TemplateRow> {
     const row = await this.prisma.notificationTemplate.findFirst({
       where: { id, ...demoScope(await this.demo.enabled()) },
@@ -151,7 +108,6 @@ export class NotificationTemplatesService {
   }
 }
 
-/** Union ordonnée des variables du titre puis du corps, sans doublon. */
 export const mergedVariables = (titleTemplate: string, bodyTemplate: string): string[] => {
   const names = extractVariables(titleTemplate);
   for (const name of extractVariables(bodyTemplate)) {

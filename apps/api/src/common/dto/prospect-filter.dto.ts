@@ -19,14 +19,6 @@ import { queryBoolean } from './query-boolean.js';
 import { PROSPECT_ORIGINS } from '../prospect-origin.js';
 import type { ProspectOrigin } from '../prospect-origin.js';
 
-/**
- * Filtre commun à la liste des prospects, aux endpoints analytiques et à
- * l'export Excel. Un DTO unique garantit que le tableau affiché, les
- * graphiques du tableau de bord et le fichier exporté décrivent bien le même
- * sous-ensemble : trois définitions séparées finiraient par diverger, et
- * l'utilisateur exporterait autre chose que ce qu'il voit.
- */
-
 export enum ProspectSortField {
   CREATED_AT = 'createdAt',
   CLIENT_CREATED_AT = 'clientCreatedAt',
@@ -83,12 +75,6 @@ export class ProspectFilterDto {
   @IsEnum(ProspectStatut)
   statut?: ProspectStatut;
 
-  /**
-   * Segment BDD1–BDD4. Le filtre est traduit par `segmentWhere` (@crm/database),
-   * seule définition autorisée du croisement syndicat × banque : écrire ici une
-   * clause `syndicatId`/`banqueId` « équivalente » ferait diverger l'onglet
-   * « BDD1 » du classeur et le graphique « BDD1 » du tableau de bord.
-   */
   @ApiPropertyOptional({
     enum: BddSegment,
     enumName: 'BddSegment',
@@ -126,12 +112,17 @@ export class ProspectFilterDto {
   @IsUUID()
   campaignId?: string;
 
-  /**
-   * Le commercial qui a OBTENU la méthode, distinct de `commercialId` qui
-   * désigne l'auteur de la saisie de phase 1. Confondre les deux attribuerait
-   * le travail d'appel de la phase 2 à celui qui a rempli la fiche sur le
-   * terrain des mois plus tôt.
-   */
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec ' +
+      '`commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui ' +
+      'demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.',
+  })
+  @IsOptional()
+  @IsUUID()
+  assignedToId?: string;
+
   @ApiPropertyOptional({
     format: 'uuid',
     description:
@@ -141,13 +132,6 @@ export class ProspectFilterDto {
   @IsUUID()
   enrollmentCapturedById?: string;
 
-  /**
-   * Provenance, pour isoler ce qui n'entre PAS par la tournée terrain.
-   *
-   * Fermée sur `PROSPECT_ORIGINS` plutôt que libre : la colonne est contrainte
-   * en base au même vocabulaire, et accepter une chaîne quelconque ne ferait
-   * que rendre un ensemble vide indiscernable d'une faute de frappe.
-   */
   @ApiPropertyOptional({
     type: String,
     enum: PROSPECT_ORIGINS,

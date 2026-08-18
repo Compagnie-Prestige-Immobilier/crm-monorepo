@@ -8,14 +8,6 @@ import '../../core/router/route_paths.dart';
 import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
 
-/// Badge global de synchronisation, posé dans l'AppBar.
-///
-/// Il répond à une seule question, celle que le commercial se pose vingt fois
-/// par jour : « est-ce que ce que j'ai saisi est parti ? ». Il compte donc les
-/// opérations **non terminées** de l'outbox, pas les lignes locales.
-///
-/// Sur bordeaux, l'or lisible est `accent-on-dark` (#FFC65A, 8,71:1). L'or de
-/// surface #C8921A y serait illisible.
 class SyncBadge extends ConsumerWidget {
   const SyncBadge({super.key});
 
@@ -35,9 +27,6 @@ class SyncBadge extends ConsumerWidget {
         onTap: () => context.go(Routes.corrections),
         borderRadius: CpiRadius.brFull,
         child: ConstrainedBox(
-          // 48 dp, comme `NotificationBell` juste à côté. La cible faisait
-          // 38 dp : sous le plancher de 44 dp de docs/design.md §1, et la
-          // différence se paie debout, au soleil, avec un pouce.
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -47,8 +36,6 @@ class SyncBadge extends ConsumerWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                // Le basculement « en attente » → « tout est envoyé » est le
-                // seul événement que ce badge a à raconter : il se voit.
                 AnimatedSwitcher(
                   duration: CpiMotion.of(context).micro,
                   switchInCurve: CpiMotion.of(context).easeSpring,

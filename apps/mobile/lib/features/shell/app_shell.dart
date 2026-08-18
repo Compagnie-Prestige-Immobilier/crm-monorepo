@@ -11,13 +11,6 @@ import '../../core/providers/sync_coordinator.dart';
 import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
 
-/// Coque de navigation : quatre destinations, un état par branche.
-///
-/// `StatefulShellRoute.indexedStack` et non quatre routes indépendantes : la
-/// position de défilement et le texte de recherche de l'Historique doivent
-/// survivre à un aller-retour vers Réglages. Avec des routes indépendantes,
-/// chaque retour reconstruit l'écran depuis le haut, ce qui, sur une liste de
-/// 400 lignes, ramène l'utilisateur au début à chaque fois.
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.shell});
 
@@ -30,16 +23,6 @@ class AppShell extends ConsumerWidget {
 
     return Scaffold(
       body: shell,
-      // La bannière est montée DANS LA COQUE, et au-dessus de la barre de
-      // navigation. Elle ne vivait que dans Historique : un commercial qui
-      // saisissait depuis l'accueil, puis passait à Réglages, n'avait aucun
-      // retour sur ce qui restait à envoyer. Ici, elle est vue depuis les
-      // quatre branches.
-      //
-      // En bas et non en haut : posée au-dessus des `AppBar` de chaque écran,
-      // elle décalerait le bandeau de l'écran vers le bas ; posée ici, elle est
-      // en zone de pouce, au contact de la barre que l'utilisateur regarde
-      // déjà.
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
@@ -48,8 +31,6 @@ class AppShell extends ConsumerWidget {
             selectedIndex: shell.currentIndex,
             onDestinationSelected: (int index) => shell.goBranch(
               index,
-              // Retaper l'onglet courant ramène à sa racine : le geste attendu
-              // partout ailleurs sur Android.
               initialLocation: index == shell.currentIndex,
             ),
             destinations: <Widget>[
@@ -91,40 +72,9 @@ class AppShell extends ConsumerWidget {
   }
 }
 
-/// Bandeau d'attente de la coque.
-///
-/// ═══ CE QU'IL RÉPARE ═══
-///
-/// L'envoi automatique au retour du réseau EXISTAIT déjà : le coordinateur
-/// écoute la connectivité et relance un cycle 2 s après un changement
-/// (`sync_coordinator.dart`). Ce qui manquait, c'est le retour visuel : le
-/// commercial rebranchait son réseau et n'avait aucun moyen de savoir que
-/// quelque chose se passait, sinon tirer pour rafraîchir. Il en concluait que
-/// l'application ne l'avait pas fait.
-///
-/// Le compteur vient de [pendingSyncCountProvider], un flux drift : il retombe
-/// **de lui-même**, sans geste ni rechargement, dès que l'outbox se vide.
-///
-/// Quatre états, trois messages :
-///
-///  · file vide, rien ne vient de partir → invisible ;
-///  · file pleine, aucune interface réseau → « Hors ligne » ;
-///  · file pleine, cycle en cours         → « Envoi en cours » ;
-///  · file pleine, à l'arrêt              → « N en attente d'envoi » ;
-///  · file passée à zéro                  → « Tout est envoyé », qui s'efface.
-///
-/// **On ne promet jamais de délai.** WorkManager ne garantit pas les 15 minutes
-/// sur AOSP, et les garantit encore moins sur Transsion ou Xiaomi. « Sera envoyé
-/// dès que possible » est vrai ; « synchronisé sous 15 minutes » ne l'est pas, et
-/// une promesse non tenue au sujet de données saisies détruit la confiance dans
-/// l'app entière.
 class PendingBanner extends ConsumerStatefulWidget {
   const PendingBanner({super.key});
 
-  /// Durée d'affichage de « Tout est envoyé ».
-  ///
-  /// Assez pour être lu debout, au soleil ; assez court pour ne pas devenir un
-  /// meuble. Un bandeau de succès permanent ne dit plus rien au bout d'un jour.
   static const Duration successLinger = Duration(seconds: 4);
 
   @override
@@ -141,9 +91,6 @@ class _PendingBannerState extends ConsumerState<PendingBanner> {
     super.dispose();
   }
 
-  /// Le passage de « il reste des choses » à « plus rien » est le seul événement
-  /// que ce bandeau a à raconter. Il se détecte sur la TRANSITION et non sur la
-  /// valeur : à zéro permanent, il n'y a rien à annoncer.
   void _onPendingChanged(int before, int after) {
     if (before <= 0 || after != 0) return;
     _successTimer?.cancel();
@@ -178,9 +125,6 @@ class _PendingBannerState extends ConsumerState<PendingBanner> {
           icon: network == CpiConnectivity.unreachable
               ? PhosphorIconsRegular.plugsConnected
               : PhosphorIconsRegular.cloudSlash,
-          // « Serveur injoignable » et « hors ligne » ne se réparent pas de la
-          // même façon : l'un demande d'ouvrir le portail Wi-Fi ou de recharger
-          // le forfait, l'autre de retrouver du réseau.
           label: network == CpiConnectivity.unreachable
               ? 'Serveur injoignable : $count attend. '
                     'Vérifiez le portail Wi-Fi ou votre crédit data'
@@ -196,13 +140,6 @@ class _PendingBannerState extends ConsumerState<PendingBanner> {
           surface: cpi.infoSurface,
           border: cpi.info,
         ),
-        // ═══ POURQUOI LA FILE NE DESCEND PAS ═══
-        //
-        // Le coordinateur classait déjà l'échec (lien mort, 500, 429, refus) et
-        // le rangeait dans `lastError`, que RIEN ne lisait. À l'écran, les
-        // quatre cas produisaient la même phrase : « N en attente d'envoi ».
-        // Le commercial ne pouvait pas distinguer « ça va repartir tout seul »
-        // de « il faut ouvrir le portail Wi-Fi » de « allez dans À corriger ».
         (false, false) when sync.failureLabel != null => (
           icon: PhosphorIconsRegular.warningCircle,
           label: '$count en attente : ${sync.failureLabel}',
@@ -231,9 +168,6 @@ class _PendingBannerState extends ConsumerState<PendingBanner> {
     }
 
     final CpiMotion motion = CpiMotion.of(context);
-    // `AnimatedSize` par-dessus `AnimatedSwitcher` : sans lui, l'apparition
-    // décale la barre de navigation d'un coup sec sous le pouce, au moment
-    // exact où l'utilisateur vise un onglet.
     return AnimatedSize(
       duration: motion.component,
       curve: motion.easeOut,

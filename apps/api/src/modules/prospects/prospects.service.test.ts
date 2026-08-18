@@ -29,7 +29,6 @@ interface PrismaMock {
   };
   representant: { findFirst: ReturnType<typeof vi.fn> };
   user: { findFirst: ReturnType<typeof vi.fn> };
-  /** Le `JOIN LATERAL` des dernières tentatives. Compté, pour interdire le N+1. */
   $queryRaw: ReturnType<typeof vi.fn>;
 }
 
@@ -50,14 +49,6 @@ function makePrisma(): PrismaMock {
   };
 }
 
-/**
- * Lit le premier argument d'un appel enregistré.
- *
- * `vi.fn()` type ses appels en `any` ; les traverser directement ferait perdre
- * toute vérification sur ce que le service a réellement transmis à Prisma. Le
- * passage par cette forme ramène l'accès à `unknown`, que les matchers de
- * vitest comparent sans difficulté.
- */
 interface PrismaCallArgs {
   where?: Record<string, unknown>;
   data?: Record<string, unknown>;
@@ -82,8 +73,6 @@ describe('cloisonnement par commercial', () => {
 
     const where = firstArg(prisma.prospect.findMany).where ?? {};
     expect(where.createdById).toBe('com-alice');
-    // Le comptage doit porter le MÊME filtre : sinon la pagination annonce un
-    // total qui inclut les lignes des collègues.
     expect(firstArg(prisma.prospect.count).where).toEqual(where);
   });
 
@@ -211,8 +200,6 @@ describe('conflit de téléphone', () => {
     try {
       await promise;
     } catch (error) {
-      // Contrat exact attendu par l'app mobile : sans `ownedByCommercialName`,
-      // le commercial sur le terrain ne sait pas à qui s'adresser.
       expect((error as ConflictException).getResponse()).toEqual({
         code: 'PROSPECT_PHONE_CONFLICT',
         message: 'Ce numéro a déjà été enregistré par Bob Sarr.',
@@ -323,7 +310,6 @@ describe('fusion', () => {
 describe('surface de phase 2 dans la liste', () => {
   const DATE = new Date('2026-08-05T10:00:00.000Z');
 
-  /** Les quatre cases de la matrice, plus leurs compléments. */
   const MATRICE = [
     { id: 'p-b1', sigle: 'CHUES', shortName: 'CBAO', segment: 'BDD1' },
     { id: 'p-b2', sigle: 'CHUES', shortName: 'BHS', segment: 'BDD2' },
@@ -349,7 +335,6 @@ describe('surface de phase 2 dans la liste', () => {
     expect(page.items.map((item) => [item.id, item.segment])).toEqual(
       MATRICE.map((entry) => [entry.id, entry.segment]),
     );
-    // Le segment n'est pas demandé à Prisma : il n'existe pas en colonne.
     expect(firstArg(prisma.prospect.findMany).where?.segment).toBeUndefined();
   });
 
@@ -380,17 +365,10 @@ describe('surface de phase 2 dans la liste', () => {
       lastOutcome: 'METHOD_OBTAINED',
       lastComment: 'Accepte la plateforme',
       lastAttemptAt: DATE.toISOString(),
-      // L'auteur de la phase 1 reste distinct de celui de la méthode.
       ownedByCommercialId: alice.id,
     });
   });
 
-  /**
-   * La provenance est STOCKÉE et indexée depuis les demandes de création de
-   * client. Absente de la réponse, elle est invisible pour tout client : celui
-   * qui vient de faire approuver une demande relit une fiche indistinguable
-   * d'une fiche de tournée terrain.
-   */
   it('rend la provenance stockée, clé et détail lisible', async () => {
     const prisma = makePrisma();
     prisma.prospect.count.mockResolvedValue(2);
@@ -402,7 +380,6 @@ describe('surface de phase 2 dans la liste', () => {
     const { items } = await service(prisma).list(admin, {});
 
     expect(items[0]).toMatchObject({ origin: 'BANQUE', originLabel: 'CBAO Thiès' });
-    // Une fiche de tournée terrain porte la clé, à null : nullable n'est pas absent.
     expect(items[1]).toMatchObject({ origin: null, originLabel: null });
     expect(Object.keys(items[1] ?? {})).toContain('origin');
   });
@@ -425,10 +402,6 @@ describe('surface de phase 2 dans la liste', () => {
   });
 
   it('lit les dernières tentatives en UNE requête, quel que soit le nombre de lignes', async () => {
-    // Le contrôle porte sur le NOMBRE d'allers-retours, pas sur la forme de la
-    // requête : c'est le seul énoncé qui distingue le `JOIN LATERAL` d'une
-    // boucle de lectures, et une boucle passerait toute vérification de
-    // contenu sans la moindre alerte.
     const prisma = makePrisma();
     const rows = Array.from({ length: 25 }, (_unused, index) =>
       prospectRow({ id: `p-${String(index)}` }),
@@ -468,8 +441,6 @@ describe('surface de phase 2 dans la liste', () => {
       { syndicat: { sigle: 'CHUES' }, banque: { shortName: 'CBAO' } },
       { callTasks: { some: { campaignId: 'camp-1' } } },
     ]);
-    // Le comptage porte le MÊME filtre, sinon le total annoncé et les lignes
-    // affichées décrivent deux populations différentes.
     expect(firstArg(prisma.prospect.count).where).toEqual(where);
   });
 });
@@ -497,8 +468,6 @@ function prospectRow(overrides: Record<string, unknown>): Record<string, unknown
     enrollmentCapturedAt: null,
     enrollmentCapturedById: null,
     enrollmentCapturedBy: null,
-    // `shortName` porte l'axe CBAO : sans lui, `classifySegment` recevrait
-    // `undefined` et rangerait toutes les fixtures du même côté de la matrice.
     banque: { name: 'CBAO Sénégal', shortName: 'CBAO' },
     syndicat: { sigle: 'SUDES' },
     createdBy: { id: alice.id, fullName: alice.fullName },
@@ -512,23 +481,6 @@ function prospectRow(overrides: Record<string, unknown>): Record<string, unknown
   };
 }
 
-/**
- * La nature de la fiche, à la création.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * LE DÉFAUT CORRIGÉ
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `create` n'écrivait pas `isDemo`. La colonne prenait donc son défaut, FALSE,
- * et toute fiche saisie pendant une démonstration devenait une VRAIE fiche :
- * visible après l'extinction du mode, comptée dans les agrégats, sortie dans
- * l'export transmis au siège. Rien ne la désigne alors comme fictive : ni le
- * filtre d'affichage, ni un nettoyage ultérieur par `isDemo`.
- *
- * Le rattachement compte autant que l'interrupteur : la liste des prospects
- * AFFICHE le représentant. Une fiche visible accrochée à un représentant filtré
- * montrerait un nom que l'annuaire ne connaît pas.
- */
 describe('nature de la fiche créée', () => {
   const saisie = {
     nom: 'Fall',
@@ -587,11 +539,55 @@ describe('nature de la fiche créée', () => {
       fakeDemoVisibility(false),
     ).create(alice, saisie);
 
-    // La projection doit demander la colonne : sans elle, `representant.isDemo`
-    // vaudrait `undefined` et l'héritage retomberait silencieusement sur FALSE.
     const select = (
       prisma.representant.findFirst.mock.calls[0]?.[0] as { select?: Record<string, unknown> }
     ).select;
     expect(select?.isDemo).toBe(true);
+  });
+});
+
+describe('lecture du SUPERVISEUR', () => {
+  const superviseur: AuthenticatedUser = {
+    ...alice,
+    id: 'sup-1',
+    username: 'sup',
+    role: Role.SUPERVISEUR,
+  };
+
+  let prisma: PrismaMock;
+
+  beforeEach(() => {
+    prisma = makePrisma();
+  });
+
+  it('sa liste porte sur le portefeuille national', async () => {
+    await service(prisma).list(superviseur, {});
+
+    expect(firstArg(prisma.prospect.findMany).where?.createdById).toBeUndefined();
+  });
+
+  it('son filtre par téléconseiller RÉPOND, au lieu de rendre zéro ligne', async () => {
+    await service(prisma).list(superviseur, { commercialId: 'com-bob' });
+
+    expect(firstArg(prisma.prospect.findMany).where?.createdById).toBe('com-bob');
+  });
+
+  it('ouvre la fiche d’un téléconseiller', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: bob.id }));
+
+    await expect(service(prisma).get(superviseur, 'p-1')).resolves.toMatchObject({ id: 'p-1' });
+    await expect(service(prisma).get(alice, 'p-1')).rejects.toThrow(ForbiddenException);
+  });
+
+  it('n’écrit rien : modification, suppression et réaffectation lui sont refusées', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: bob.id }));
+
+    await expect(service(prisma).update(superviseur, 'p-1', { nom: 'Pirate' })).rejects.toThrow(
+      ForbiddenException,
+    );
+    await expect(service(prisma).remove(superviseur, 'p-1')).rejects.toThrow(ForbiddenException);
+    await expect(
+      service(prisma).reassign(superviseur, { prospectIds: ['p-1'], commercialId: 'com-alice' }),
+    ).rejects.toThrow(ForbiddenException);
   });
 });

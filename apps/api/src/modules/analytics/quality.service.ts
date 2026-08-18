@@ -14,39 +14,19 @@ import type {
   RepresentantProductivityListDto,
   RepresentantProductivityQueryDto,
 } from './quality.dto.js';
-/** Seuil de dormance par défaut, en jours. Un trimestre sans apport. */
+
+/** Seuil de dormance par défaut : un trimestre sans apport. */
 const DORMANT_DAYS = 90;
 
-/**
- * Libellés des provenances connues.
- *
- * `origin` n'est PAS une chaîne libre : la base porte la contrainte
- * `prospects_origin_known`, qui n'accepte que NULL ou une valeur de
- * `PROSPECT_ORIGINS`. Un canal nouveau passe donc toujours par une migration.
- *
- * Le repli « rendu tel quel » reste utile pour autant, et c'est sa seule
- * raison d'être : entre la migration qui étend la contrainte et le déploiement
- * qui ajoute le libellé, l'écran doit montrer le code brut plutôt que
- * « Inconnu », qui effacerait l'apparition du canal au lieu de la signaler.
- */
+/** `origin` est contraint en base par `prospects_origin_known` ; le repli rend le code brut, le temps qu'un canal nouveau reçoive son libellé. */
 const ORIGIN_LABELS: Record<string, string> = { BANQUE: 'Banque' };
 
-/**
- * Une fiche sans provenance n'est pas une fiche de provenance inconnue : c'est
- * le chemin NORMAL, la tournée terrain, où `createdById` dit déjà tout.
- */
 const TERRAIN = 'Saisie terrain';
 
+/** `origin` NULL n'est pas une provenance inconnue : c'est la tournée terrain, le chemin normal. */
 const originLabel = (origin: string | null): string =>
   origin === null ? TERRAIN : (ORIGIN_LABELS[origin] ?? origin);
 
-/**
- * Productivité des représentants, qualité de la base, provenance.
- *
- * Les trois agrégats partagent le filtre commun et le cloisonnement par
- * commercial : un COMMERCIAL lit la qualité de SES fiches, jamais celle des
- * fiches de ses collègues.
- */
 @Injectable()
 export class QualityService {
   constructor(
@@ -54,18 +34,6 @@ export class QualityService {
     private readonly demo: DemoVisibilityService,
   ) {}
 
-  /**
-   * Ce qu'un représentant apporte, et depuis quand il n'apporte plus.
-   *
-   * Le classement par volume seul garde en tête un représentant inactif depuis
-   * huit mois : le drapeau `dormant` est calculé en base, sur le dernier apport
-   * réel, pour qu'aucun écran n'ait à refaire ce calcul avec un fuseau horaire
-   * différent du serveur.
-   *
-   * Le seuil est un paramètre et non une constante : un représentant de zone
-   * dense apporte des fiches toutes les semaines, un représentant de zone
-   * rurale tous les trimestres, et un seuil unique déclarerait le second mort.
-   */
   async representantProductivity(
     user: AuthenticatedUser,
     query: RepresentantProductivityQueryDto,
@@ -92,18 +60,13 @@ export class QualityService {
         COUNT(*)::int AS prospects,
         COUNT(*) FILTER (WHERE p."phase2Status" = 'METHOD_OBTAINED')::int AS methodes,
         MAX(p."clientCreatedAt")                                          AS dernier,
+        -- Dormance calculée en base, jamais côté écran : un client dans un autre
+        -- fuseau que le serveur trancherait la limite un jour à côté.
         (
           MAX(p."clientCreatedAt") < now() - (${dormantDays}::int * interval '1 day')
         )                                                                 AS dormant,
-        -- Total de la POPULATION, pas du haut de classement.
-        --
-        -- Sommer les lignes rendues additionnerait les prospects des dix
-        -- meilleurs représentants et les publierait sous un nom qui se lit
-        -- « nombre total de prospects » : avec 400 représentants, l'écart est
-        -- d'un ordre de grandeur, et rien à l'écran ne le signale.
-        --
-        -- Une fonction de fenêtre est évaluée APRÈS le GROUP BY mais AVANT le
-        -- LIMIT : elle voit donc tous les représentants, sans seconde requête.
+        -- Total de la POPULATION, pas du haut de classement : la fenêtre est
+        -- évaluée après le GROUP BY mais avant le LIMIT.
         SUM(COUNT(*)) OVER ()::int                                        AS population
       ${PROSPECT_FROM}
       INNER JOIN "departements" d ON d."id" = r."departementId"
@@ -129,18 +92,6 @@ export class QualityService {
     };
   }
 
-  /**
-   * Part de numéros inexploitables, par représentant ET par département.
-   *
-   * Les deux listes sortent de la MÊME population de tentatives, comptée deux
-   * fois selon deux axes. Une tentative appartient à un seul représentant, qui
-   * appartient à un seul département : les deux totaux sont donc égaux, et
-   * l'écran peut les rapprocher sans précaution.
-   *
-   * La mesure porte sur les TENTATIVES et non sur les prospects : un numéro
-   * appelé six fois sans réponse coûte six appels, et c'est ce coût que le
-   * téléconseiller supporte.
-   */
   async dataQuality(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<DataQualityDto> {
     const demoEnabled = await this.demo.enabled();
     const where = prospectConditions(user, filter, demoEnabled);
@@ -168,14 +119,6 @@ export class QualityService {
     };
   }
 
-  /**
-   * Répartition par provenance, puis par libellé détaillé.
-   *
-   * Deux niveaux plutôt qu'un seul : la clé `origin` sert à décider (ouvrir un
-   * canal, le fermer), le libellé sert à savoir QUI, et mélanger les deux dans
-   * une même liste donnerait un graphique où « Banque » et « CBAO Thiès »
-   * seraient des parts concurrentes du même total.
-   */
   async originBreakdown(
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
@@ -219,7 +162,7 @@ export class QualityService {
     };
   }
 
-  /** Même comptage, deux axes. Écrit une fois pour que les deux listes ne divergent pas. */
+  /** Compte des TENTATIVES et non des prospects : un numéro appelé six fois coûte six appels. */
   private async qualityBy(
     where: Prisma.Sql,
     scope: Prisma.Sql,

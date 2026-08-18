@@ -2,14 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { DAKAR_TIME_ZONE, formatDakarDate, toDakarCell } from './dakar.js';
 
-/**
- * La cellule écrite doit porter l'heure MURALE de Dakar.
- *
- * Le contrôle ne compare pas à une constante écrite à la main : il recalcule
- * l'heure attendue avec `Intl`, si bien qu'il resterait juste si le fuseau
- * changeait d'offset. Ce qu'il vérifie vraiment, c'est que la valeur remise au
- * tableur ne dépend NI du fuseau du serveur NI de celui de la base.
- */
 const expected = (date: Date): string =>
   new Intl.DateTimeFormat('sv-SE', {
     timeZone: DAKAR_TIME_ZONE,
@@ -33,8 +25,6 @@ describe('horodatage du classeur', () => {
       '2026-12-31T22:15:00.000Z',
     ]) {
       const cell = toDakarCell(new Date(iso));
-      // exceljs sérialise l'instant UTC de l'objet : c'est donc sa lecture UTC
-      // qui doit contenir l'heure de Dakar.
       expect(cell.toISOString().slice(0, 19)).toBe(expected(new Date(iso)));
     }
   });

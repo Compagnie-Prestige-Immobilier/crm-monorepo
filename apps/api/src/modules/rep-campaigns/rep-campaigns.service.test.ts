@@ -5,25 +5,27 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { CallTaskStatus, CampaignStatus, RepCallOutcome, Role } from '@crm/database';
+import {
+  CallTaskStatus,
+  CampaignStatus,
+  ChangeSource,
+  RepCallOutcome,
+  RepresentantRelation,
+  Role,
+} from '@crm/database';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { shortCode } from '../../common/short-code.js';
 import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
+import type { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { RepresentantsService } from '../representants/representants.service.js';
 import { REP_CHECKBOX_GROUPS, RepCampaignsService } from './rep-campaigns.service.js';
 import { RepCallAttemptApplyStatus } from './dto.js';
 
 type MockFn = ReturnType<typeof vi.fn>;
 
-/**
- * Les clés sont énumérées une à une plutôt que `Record<string, MockFn>` :
- * `noUncheckedIndexedAccess` rendrait chaque accès indexé potentiellement
- * `undefined`, et l'énumération fait de surcroît échouer le test quand le
- * service se met à appeler une méthode non prévue, au lieu de laisser
- * `undefined` remonter jusqu'à une assertion qui n'y comprend rien.
- */
 type MockDb = {
   repCallCampaign: Record<'count' | 'findMany' | 'findFirst' | 'create' | 'update', MockFn>;
   repCallCampaignCommercial: Record<'findUnique' | 'createMany', MockFn>;
@@ -32,7 +34,9 @@ type MockDb = {
     MockFn
   >;
   repCallAttempt: Record<'findMany' | 'findUnique' | 'create' | 'createMany', MockFn>;
-  representant: Record<'findMany' | 'findFirst' | 'count', MockFn>;
+  representant: Record<'findMany' | 'findFirst' | 'count' | 'updateMany', MockFn>;
+  representantRelationChange: Record<'create', MockFn>;
+  representantSuggestion: Record<'create', MockFn>;
   departement: Record<'findUnique', MockFn>;
   ief: Record<'findUnique', MockFn>;
   user: Record<'findMany', MockFn>;
@@ -73,10 +77,6 @@ function prismaStub(): MockDb {
       groupBy: vi.fn().mockResolvedValue([]),
       findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue(null),
-      // Le programme borne la journée demandée sur l'étalement EFFECTIF du
-      // commercial, donc sur la taille de sa file. Une file vide ramènerait
-      // toute campagne à une seule journée : le double annonce de quoi tenir
-      // les étalements des cas d'essai.
       count: vi.fn().mockResolvedValue(100),
       updateMany: vi.fn(),
       createMany: vi.fn(),
@@ -86,12 +86,16 @@ function prismaStub(): MockDb {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn(),
       create: vi.fn(),
-      // `createMany({ skipDuplicates })` traduit un ON CONFLICT DO NOTHING :
-      // `count` vaut 0 quand l'identifiant client a déjà été enregistré, et
-      // c'est ce zéro qui fait la réponse DUPLICATE.
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    representant: { findMany: vi.fn(), findFirst: vi.fn(), count: vi.fn() },
+    representant: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      count: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    representantRelationChange: { create: vi.fn() },
+    representantSuggestion: { create: vi.fn() },
     departement: { findUnique: vi.fn() },
     ief: { findUnique: vi.fn() },
     user: { findMany: vi.fn() },
@@ -99,14 +103,20 @@ function prismaStub(): MockDb {
     $executeRawUnsafe: vi.fn(),
     $queryRawUnsafe: vi.fn(),
   };
-  // Le rappel de transaction interactive de Prisma est asynchrone à dessein.
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   db.$transaction.mockImplementation((run: (tx: MockDb) => Promise<unknown>) => run(db));
   return db;
 }
 
-const build = (db: MockDb): RepCampaignsService =>
-  new RepCampaignsService(db as unknown as PrismaService, fakeDemoVisibility());
+const build = (
+  db: MockDb,
+  demo: DemoVisibilityService = fakeDemoVisibility(),
+): RepCampaignsService =>
+  new RepCampaignsService(
+    db as unknown as PrismaService,
+    demo,
+    new RepresentantsService(db as unknown as PrismaService, demo),
+  );
 
 const campaignRow = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: 'camp-1',
@@ -128,11 +138,6 @@ const campaignRow = (over: Record<string, unknown> = {}): Record<string, unknown
 });
 
 describe('RepCampaignsService : création', () => {
-  // 422 et NON 400 : la requête est bien formée, elle est refusée par une règle
-  // métier. Les demandes clients tranchaient déjà ainsi
-  // (`CLIENT_REQUEST_BANQUE_NOT_FOUND` en 422) ; deux statuts pour la même
-  // classe de faute obligeaient le client à savoir de quel module venait
-  // l'erreur avant de décider s'il fallait relire la saisie ou la sélection.
   it('refuse un destinataire introuvable, d’un autre rôle, ou désactivé, en 422', async () => {
     const db = prismaStub();
     const service = build(db);
@@ -153,8 +158,6 @@ describe('RepCampaignsService : création', () => {
   });
 
   it('refuse un périmètre sans aucun représentant éligible', async () => {
-    // Une campagne vide paraît valide à l'écran et sort des programmes blancs :
-    // il vaut mieux la refuser à la création que la découvrir à l'impression.
     const db = prismaStub();
     db.user.findMany.mockResolvedValue([
       { id: 'com-1', fullName: 'Awa', username: 'awa', role: Role.COMMERCIAL, isActive: true },
@@ -168,9 +171,6 @@ describe('RepCampaignsService : création', () => {
   });
 
   it('n’écrit AUCUNE tâche active sur un représentant déjà affecté', async () => {
-    // La clause `repCallTasks: { none: { isActive: true } }` double l'index
-    // unique partiel. Sans elle, on écrirait toute la campagne pour se heurter
-    // au conflit sur la dernière ligne.
     const db = prismaStub();
     db.user.findMany.mockResolvedValue([
       { id: 'com-1', fullName: 'Awa', username: 'awa', role: Role.COMMERCIAL, isActive: true },
@@ -192,13 +192,6 @@ describe('RepCampaignsService : création', () => {
     });
   });
 
-  /**
-   * `isActive` ne suffit pas : la tâche retombe à faux DÈS que l'appel aboutit,
-   * refus compris. Sans cette seconde condition, la personne qui a dit non
-   * redevient éligible le lendemain, entre dans la campagne suivante, redit
-   * non, et recommence indéfiniment : la relance devient du harcèlement, et le
-   * faux numéro se fait recomposer à chaque tirage.
-   */
   it('EXCLUT un représentant dont un appel a déjà abouti à une issue terminale', async () => {
     const db = prismaStub();
     db.user.findMany.mockResolvedValue([
@@ -219,8 +212,6 @@ describe('RepCampaignsService : création', () => {
     expect(terminal).toContain(RepCallOutcome.REFUSED);
     expect(terminal).toContain(RepCallOutcome.WRONG_NUMBER);
     expect(terminal).toContain(RepCallOutcome.REACHED);
-    // Les issues NON terminales décrivent un appel À REFAIRE : ce sont
-    // exactement les représentants qu'une relance doit retrouver.
     expect(terminal).not.toContain(RepCallOutcome.CALLBACK);
     expect(terminal).not.toContain(RepCallOutcome.UNREACHABLE);
   });
@@ -235,11 +226,10 @@ describe('RepCampaignsService : création', () => {
     db.$queryRawUnsafe.mockResolvedValue([{ id: 'rep-1' }]);
     db.repCallCampaign.findFirst.mockResolvedValue(campaignRow());
 
-    const service = new RepCampaignsService(
-      db as unknown as PrismaService,
-      fakeDemoVisibility(true),
-    );
-    await service.create(ADMIN, { name: 'Relance', commercialIds: ['com-1'] });
+    await build(db, fakeDemoVisibility(true)).create(ADMIN, {
+      name: 'Relance',
+      commercialIds: ['com-1'],
+    });
 
     const campaign = (
       db.repCallCampaign.create.mock.calls[0] as [{ data: Record<string, unknown> }]
@@ -278,11 +268,6 @@ describe('RepCampaignsService : création', () => {
     expect(rows.map((row) => row.position)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Les bords de l'étalement et du tourniquet
-  // ───────────────────────────────────────────────────────────────────────────
-
-  /** Monte une campagne de `targets` représentants sur `commerciaux` personnes. */
   const creerCampagne = async (
     targets: number,
     commerciaux: string[],
@@ -301,8 +286,6 @@ describe('RepCampaignsService : création', () => {
     db.repCallCampaign.create.mockResolvedValue({ id: 'camp-1' });
     const ids = Array.from({ length: targets }, (_, index) => ({ id: `rep-${String(index)}` }));
     db.representant.findMany.mockResolvedValue(ids);
-    // Le mélange est rendu à l'identique : ce qui s'éprouve ici est la
-    // RÉPARTITION, pas le tirage.
     db.$queryRawUnsafe.mockResolvedValue(ids);
     db.repCallCampaign.findFirst.mockResolvedValue(campaignRow({ spreadDays: spreadDays ?? 1 }));
 
@@ -319,12 +302,6 @@ describe('RepCampaignsService : création', () => {
     )[0].data;
   };
 
-  /**
-   * `spreadDays = 1` est la borne basse admise (`MIN_SPREAD_DAYS`). C'est aussi
-   * la seule valeur pour laquelle `dayIndexFor` court-circuite : elle ne passe
-   * par AUCUNE des divisions du cas général, si bien qu'une faute dans ce
-   * court-circuit ne se manifeste sur aucune autre valeur.
-   */
   it('spreadDays = 1 : tout le monde au jour 0, positions intactes', async () => {
     const rows = await creerCampagne(5, ['com-1'], 1);
 
@@ -332,12 +309,6 @@ describe('RepCampaignsService : création', () => {
     expect(rows.map((row) => row.position)).toEqual([1, 2, 3, 4, 5]);
   });
 
-  /**
-   * `spreadDays = 31` est la borne haute (`MAX_SPREAD_DAYS`), reprise telle
-   * quelle par la contrainte CHECK en base. Une répartition qui produirait un
-   * indice de 31 ferait échouer l'écriture de TOUTE la campagne, en
-   * transaction, sur la dernière ligne.
-   */
   it('spreadDays = 31 : chaque journée est servie, aucun indice hors bornes', async () => {
     const rows = await creerCampagne(62, ['com-1'], 31);
 
@@ -345,8 +316,6 @@ describe('RepCampaignsService : création', () => {
     expect(Math.min(...indices)).toBe(0);
     expect(Math.max(...indices)).toBe(30);
     expect(new Set(indices).size).toBe(31);
-    // 62 fiches sur 31 journées : exactement deux par jour, sans reliquat
-    // empilé sur la dernière.
     for (let jour = 0; jour < 31; jour += 1) {
       expect(indices.filter((index) => index === jour)).toHaveLength(2);
     }
@@ -355,27 +324,14 @@ describe('RepCampaignsService : création', () => {
   it('spreadDays = 31 avec MOINS de fiches que de journées : rien au delà du réel', async () => {
     const rows = await creerCampagne(4, ['com-1'], 31);
 
-    // Quatre fiches ne remplissent que quatre journées. Les étaler sur les 31
-    // laisserait le commercial avec un appel isolé le trentième jour, longtemps
-    // après que la campagne a cessé d'être d'actualité.
     expect(rows.map((row) => row.dayIndex)).toEqual([0, 1, 2, 3]);
   });
 
-  /**
-   * PLUS DE COMMERCIAUX QUE DE FICHES.
-   *
-   * Le tourniquet distribue par `index % bucketCount` : au-delà du nombre de
-   * fiches, les derniers seaux restent VIDES. Ce qui doit tenir, c'est qu'aucune
-   * tâche fantôme ne soit écrite pour eux, et que ceux qui reçoivent quelque
-   * chose reçoivent une position 1 et un jour 0, et non une position calculée
-   * sur un seau qui n'existe pas.
-   */
   it('plus de commerciaux que de fiches : les seaux en trop restent VIDES', async () => {
     const rows = await creerCampagne(2, ['com-1', 'com-2', 'com-3', 'com-4', 'com-5'], 3);
 
     expect(rows).toHaveLength(2);
     expect(rows.map((row) => row.assignedToId)).toEqual(['com-1', 'com-2']);
-    // Chacun n'a qu'une fiche : première position, première journée.
     expect(rows.map((row) => row.position)).toEqual([1, 1]);
     expect(rows.map((row) => row.dayIndex)).toEqual([0, 0]);
   });
@@ -391,11 +347,6 @@ describe('RepCampaignsService : création', () => {
     expect(rows[0]).toMatchObject({ assignedToId: 'com-1', position: 1, dayIndex: 0 });
   });
 
-  // Régression : la contrainte en base ne borne que `dayIndex >= 0`. Un indice
-  // de 5 sur une campagne de 2 journées passait donc à l'écriture, était écarté
-  // ici du décompte par journée, et la somme des journées devenait inférieure
-  // au nombre de tâches SANS AUCUN SIGNAL. Une réduction légitime de
-  // `spreadDays` et une corruption d'indice avaient la même trace : aucune.
   it('journalise les tâches dont le jour sort des bornes, au lieu de les taire', async () => {
     const db = prismaStub();
     db.repCallCampaign.findFirst.mockResolvedValue(campaignRow({ spreadDays: 2 }));
@@ -409,10 +360,7 @@ describe('RepCampaignsService : création', () => {
     const message = warn.mock.calls.map((call) => String(call[0])).join('\n');
     warn.mockRestore();
 
-    // La ligne hors bornes reste écartée du décompte, comme avant.
     expect(result.perDay).toEqual([4, 0]);
-    // Mais elle laisse désormais une trace nommant la campagne, l'indice fautif
-    // et l'étalement réel.
     expect(message).toContain('camp-1');
     expect(message).toContain('jour 5');
     expect(message).toContain('2 journée(s)');
@@ -458,9 +406,6 @@ describe('RepCampaignsService : lecture', () => {
   });
 
   it('ignore une journée hors bornes plutôt que d’allonger le tableau', async () => {
-    // `spreadDays` réduit après coup laisse des tâches sur des journées qui
-    // n'existent plus : les compter ferait apparaître un bouton PDF qui rendrait
-    // un document vide.
     const db = prismaStub();
     db.repCallCampaign.findFirst.mockResolvedValue(campaignRow({ spreadDays: 2 }));
     db.repCallTask.groupBy
@@ -503,17 +448,10 @@ describe('RepCampaignsService : lecture', () => {
     expect(preview.scopeLabel).toBe('Tous les représentants');
   });
 
-  // Régression : l'aperçu rendait `min(spreadDays, count)` cases et le détail
-  // en rendait `spreadDays`. Les deux s'appellent `perDay` : un graphique
-  // tracé depuis l'un puis redessiné depuis l'autre changeait de forme sans
-  // qu'aucune donnée n'ait bougé. Les deux séries font désormais la même
-  // longueur, quelle que soit la taille de la file.
   it('aperçu et détail publient un perDay de MÊME longueur', async () => {
     const spreadDays = 6;
 
     const previewDb = prismaStub();
-    // Moins de lignes par commercial que de journées : c'est exactement le cas
-    // où l'aperçu se raccourcissait.
     previewDb.representant.count.mockResolvedValue(3);
     const preview = await build(previewDb).preview({ commercialCount: 1, spreadDays });
 
@@ -609,8 +547,6 @@ describe('RepCampaignsService : programme', () => {
   });
 
   it('REFUSE une journée au-delà de l’étalement au lieu de rendre un PDF vide', async () => {
-    // Un programme de zéro ligne se lit « ce commercial n'a rien à faire »,
-    // ce qui est un contresens.
     const db = prismaStub();
     db.repCallCampaignCommercial.findUnique.mockResolvedValue({
       campaign: {
@@ -628,13 +564,6 @@ describe('RepCampaignsService : programme', () => {
     );
   });
 
-  /**
-   * `dayIndexFor` plafonne l'indice à `min(spreadDays, taille de file) - 1`.
-   * Un commercial qui n'a reçu que 3 fiches dans une campagne étalée sur 7
-   * jours n'a donc que trois journées : les jours 4 à 7 ne portent aucune
-   * ligne. Comparer à `spreadDays` laissait passer `?jour=5` et rendait
-   * exactement le PDF vide que ce refus existe pour empêcher.
-   */
   it('REFUSE une journée au-delà de l’étalement EFFECTIF de ce commercial', async () => {
     const db = prismaStub();
     db.repCallCampaignCommercial.findUnique.mockResolvedValue({
@@ -647,17 +576,11 @@ describe('RepCampaignsService : programme', () => {
       },
       user: { fullName: 'Awa' },
     });
-    // Trois fiches seulement : la campagne est étalée sur 7 jours, ce
-    // commercial n'en a que 3.
     db.repCallTask.count.mockResolvedValue(3);
 
     await expect(build(db).programme('camp-1', 'com-1', 5)).rejects.toBeInstanceOf(
       NotFoundException,
     );
-    // Le jour 3 existe bel et bien pour lui. `toBeDefined` ne prouverait rien :
-    // toute valeur rendue par une fonction non nulle le satisfait, y compris un
-    // programme du MAUVAIS jour, ou un programme vide. Ce qui l'atteste, c'est
-    // la journée portée en tête ET la clause qui a servi à tirer les lignes.
     const jour3 = await build(db).programme('camp-1', 'com-1', 3);
     expect(jour3.dayNumber).toBe(3);
 
@@ -666,11 +589,6 @@ describe('RepCampaignsService : programme', () => {
     ];
     expect(dernier[0].where).toMatchObject({ dayIndex: 2, assignedToId: 'com-1' });
 
-    // `dayCount` annonce les journées de CE commercial (3), pas l'étalement de
-    // la campagne (7). Le service rendait `spreadDays`, ce qui imprimait
-    // « Jour 3 sur 7 » sur le programme d'un commercial dont les jours 4 à 7
-    // rendent 404 : le téléconseiller serait allé réclamer quatre feuilles
-    // inexistantes. Le pied de page dit désormais la même chose que le refus.
     expect(jour3.dayCount).toBe(3);
   });
 
@@ -717,10 +635,6 @@ describe('RepCampaignsService : tentatives', () => {
 
     expect(result.status).toBe(RepCallAttemptApplyStatus.APPLIED);
     expect(result.taskClosed).toBe(true);
-    // `updateMany` sur TOUTES les tâches actives du représentant, et non
-    // `update` sur la seule qui vient d'être lue : miroir du chemin prospects.
-    // `isActive: true` dans le `where` interdit en prime de rouvrir une tâche
-    // qu'une clôture de campagne concurrente vient d'annuler.
     const update = (
       db.repCallTask.updateMany.mock.calls[0] as [
         { where: Record<string, unknown>; data: Record<string, unknown> },
@@ -730,13 +644,6 @@ describe('RepCampaignsService : tentatives', () => {
     expect(update.data).toMatchObject({ status: CallTaskStatus.DONE, isActive: false });
   });
 
-  /**
-   * Un rejeu réseau est le cas ORDINAIRE du terrain : la coupure se produit
-   * après l'écriture et avant la réponse. La lecture d'idempotence en tête de
-   * méthode ne suffit pas, deux envois simultanés la franchissent tous les
-   * deux ; c'est `skipDuplicates` qui tranche, et son `count` à zéro doit
-   * produire DUPLICATE et non un P2002 remonté en 500.
-   */
   it('rend DUPLICATE quand l’écriture est écartée par l’unicité', async () => {
     const db = prismaStub();
     db.repCallAttempt.findUnique.mockResolvedValue(null);
@@ -748,7 +655,6 @@ describe('RepCampaignsService : tentatives', () => {
 
     expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
     expect(result.taskClosed).toBe(false);
-    // La tâche NE DOIT PAS être close : l'appel a déjà été compté une fois.
     expect(db.repCallTask.updateMany).not.toHaveBeenCalled();
   });
 
@@ -767,9 +673,6 @@ describe('RepCampaignsService : tentatives', () => {
   });
 
   it('EST IDEMPOTENTE : un rejeu ne compte pas deux appels', async () => {
-    // Le réseau qui coupe entre l'écriture et la réponse est le cas ordinaire
-    // sur le terrain. Sans cette garde, le taux de joignabilité devient faux
-    // sans que personne ne s'en aperçoive.
     const db = prismaStub();
     db.repCallAttempt.findUnique.mockResolvedValue({ id: attempt.id, taskId: 'task-1' });
 
@@ -793,29 +696,13 @@ describe('RepCampaignsService : tentatives', () => {
     expect(db.repCallAttempt.createMany).toHaveBeenCalled();
   });
 
-  /**
-   * LA TENTATIVE SUIT LA FICHE APPELÉE, PAS L'INTERRUPTEUR.
-   *
-   * Le code écrivait `isDemo: demoEnabled` pendant que son propre commentaire
-   * annonçait l'inverse. Un appel RÉEL passé pendant qu'un administrateur
-   * montrait la plateforme partait donc en `isDemo: true`, et deux dégâts
-   * s'ensuivaient : la tentative disparaissait de tous les écrans dès
-   * l'extinction, et surtout `eligibleWhere` excluait le représentant de
-   * TOUTE campagne future, cette clause-là n'étant pas bornée par `isDemo`.
-   * Historique perdu, exclusion perpétuelle, sur un appel légitime.
-   */
   it('écrit isDemo depuis le REPRÉSENTANT, mode démonstration allumé', async () => {
     const db = prismaStub();
     db.repCallAttempt.findUnique.mockResolvedValue(null);
-    // Une vraie fiche, appelée pendant que la démonstration tourne au bureau.
     db.representant.findFirst.mockResolvedValue({ id: 'rep-1', isDemo: false });
     db.repCallTask.findFirst.mockResolvedValue(null);
 
-    const service = new RepCampaignsService(
-      db as unknown as PrismaService,
-      fakeDemoVisibility(true),
-    );
-    await service.recordAttempt(COMMERCIAL, attempt);
+    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, attempt);
 
     const written = (
       db.repCallAttempt.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }]
@@ -829,18 +716,138 @@ describe('RepCampaignsService : tentatives', () => {
     db.representant.findFirst.mockResolvedValue({ id: 'rep-1', isDemo: true });
     db.repCallTask.findFirst.mockResolvedValue(null);
 
-    const service = new RepCampaignsService(
-      db as unknown as PrismaService,
-      fakeDemoVisibility(true),
-    );
-    await service.recordAttempt(COMMERCIAL, attempt);
+    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, attempt);
 
     const written = (
       db.repCallAttempt.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }]
     )[0].data[0];
-    // Une tentative réelle rattachée à une fiche de démonstration fausserait
-    // le taux de joignabilité affiché mode éteint : elle suit la fiche.
     expect(written?.isDemo).toBe(true);
+  });
+
+  const relationOf = (db: MockDb): Record<string, unknown> =>
+    (db.representantRelationChange.create.mock.calls[0]?.[0] as { data: Record<string, unknown> })
+      .data;
+
+  const readyFor = (relationStatus: RepresentantRelation, isDemo = false): MockDb => {
+    const db = prismaStub();
+    db.repCallAttempt.findUnique.mockResolvedValue(null);
+    db.representant.findFirst.mockResolvedValue({ id: 'rep-1', isDemo, relationStatus });
+    db.repCallTask.findFirst.mockResolvedValue(null);
+    return db;
+  };
+
+  it('pose le statut de relation appris pendant l’appel, source WEB', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU);
+
+    await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    const guard = (
+      db.representant.updateMany.mock.calls[0] as [
+        { where: Record<string, unknown>; data: Record<string, unknown> },
+      ]
+    )[0];
+    expect(guard.where).toMatchObject({
+      id: 'rep-1',
+      relationStatus: RepresentantRelation.INCONNU,
+    });
+    expect(guard.data).toMatchObject({ relationStatus: RepresentantRelation.AMBASSADEUR });
+
+    expect(relationOf(db)).toMatchObject({
+      representantId: 'rep-1',
+      fromStatus: RepresentantRelation.INCONNU,
+      toStatus: RepresentantRelation.AMBASSADEUR,
+      changedById: COMMERCIAL.id,
+      source: ChangeSource.WEB,
+      isDemo: false,
+    });
+  });
+
+  it('accepte la RÉGRESSION : un ambassadeur qui cesse redevient un refus', async () => {
+    const db = readyFor(RepresentantRelation.AMBASSADEUR);
+
+    await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      outcome: RepCallOutcome.REFUSED,
+      relationStatus: RepresentantRelation.REFUS,
+    });
+
+    expect(relationOf(db)).toMatchObject({
+      fromStatus: RepresentantRelation.AMBASSADEUR,
+      toStatus: RepresentantRelation.REFUS,
+    });
+  });
+
+  it('n’écrit AUCUNE histoire quand le statut posté est déjà celui de la fiche', async () => {
+    const db = readyFor(RepresentantRelation.AMBASSADEUR);
+
+    await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    expect(db.representant.updateMany).not.toHaveBeenCalled();
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('ne touche à la relation que si la tentative la mentionne', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU);
+
+    await build(db).recordAttempt(COMMERCIAL, attempt);
+
+    expect(db.representant.updateMany).not.toHaveBeenCalled();
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('un REJEU de la même tentative ne rebascule pas la relation', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU);
+    db.repCallAttempt.findUnique.mockResolvedValue({ id: attempt.id, taskId: null });
+
+    const result = await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('ni le rejeu écarté par l’unicité, découvert dans la transaction', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU);
+    db.repCallAttempt.createMany.mockResolvedValue({ count: 0 });
+
+    const result = await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('n’écrit pas l’histoire quand un autre appel a déjà quitté le statut de départ', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU);
+    db.representant.updateMany.mockResolvedValue({ count: 0 });
+
+    await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    expect(db.representantRelationChange.create).not.toHaveBeenCalled();
+  });
+
+  it('la trace suit la fiche fictive, pas le mode en vigueur', async () => {
+    const db = readyFor(RepresentantRelation.INCONNU, true);
+
+    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.CONTACTE,
+    });
+
+    expect(relationOf(db).isDemo).toBe(true);
   });
 
   it('exige un commentaire sur « Autre » et refuse une promesse hors contexte', async () => {
@@ -867,22 +874,180 @@ describe('RepCampaignsService : tentatives', () => {
   });
 });
 
+describe('RepCampaignsService : numéro suggéré', () => {
+  const attempt = {
+    id: '01931f3c-1a2b-7c4d-8e5f-000000000001',
+    representantId: 'rep-1',
+    outcome: RepCallOutcome.REFUSED,
+    clientCreatedAt: date.toISOString(),
+    suggestedPhone: '77 987 65 43',
+  };
+
+  const SUGGESTED_E164 = '+221779876543';
+
+  const knownRow = (): Record<string, unknown> => ({
+    id: 'rep-9',
+    fullName: 'Fatou Ndiaye',
+    phoneE164: SUGGESTED_E164,
+    notes: null,
+    rev: 1,
+    departementId: 'dep-1',
+    departement: { name: 'Dakar' },
+    iefId: null,
+    ief: null,
+    createdById: 'com-2',
+    createdBy: { id: 'com-2', fullName: 'Moussa Sarr' },
+    clientCreatedAt: date,
+    createdAt: date,
+    updatedAt: date,
+    relationStatus: RepresentantRelation.INCONNU,
+    isDemo: false,
+    _count: { prospects: 3 },
+  });
+
+  /** Une seule mesure `representant.findFirst` sert la fiche appelée ET le numéro suggéré. */
+  const ready = (byPhone: Record<string, unknown> | null, isDemo = false): MockDb => {
+    const db = prismaStub();
+    db.repCallAttempt.findUnique.mockResolvedValue(null);
+    db.repCallTask.findFirst.mockResolvedValue(null);
+    db.representant.findFirst.mockImplementation((args: { where: Record<string, unknown> }) =>
+      'phoneE164' in args.where
+        ? byPhone
+        : { id: 'rep-1', isDemo, relationStatus: RepresentantRelation.INCONNU },
+    );
+    return db;
+  };
+
+  const written = (db: MockDb): Record<string, unknown> =>
+    (db.representantSuggestion.create.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+
+  it('recueille le numéro dans le geste même du refus', async () => {
+    const db = ready(null);
+
+    const result = await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      suggestedName: 'Modou Fall',
+      suggestedNote: 'Son adjoint, joignable le matin',
+    });
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.APPLIED);
+    expect(written(db)).toMatchObject({
+      sourceRepresentantId: 'rep-1',
+      suggestedPhoneE164: SUGGESTED_E164,
+      suggestedName: 'Modou Fall',
+      note: 'Son adjoint, joignable le matin',
+      suggestedById: COMMERCIAL.id,
+      sourceAttemptId: attempt.id,
+      resolvedRepresentantId: null,
+      isDemo: false,
+    });
+    expect(result.suggestion?.found).toBe(false);
+    expect(result.suggestion?.phoneE164).toBe(SUGGESTED_E164);
+  });
+
+  it('n’écrit RIEN quand la tentative ne porte aucun numéro', async () => {
+    const db = ready(null);
+
+    const sansNumero = {
+      id: attempt.id,
+      representantId: attempt.representantId,
+      outcome: attempt.outcome,
+      clientCreatedAt: attempt.clientCreatedAt,
+    };
+    const result = await build(db).recordAttempt(COMMERCIAL, sansNumero);
+
+    expect(db.representantSuggestion.create).not.toHaveBeenCalled();
+    expect(result.suggestion).toBeNull();
+  });
+
+  it('rattache le numéro à la fiche qui le porte déjà, et dit à qui elle est', async () => {
+    const db = ready(knownRow());
+
+    const result = await build(db).recordAttempt(COMMERCIAL, attempt);
+
+    expect(written(db).resolvedRepresentantId).toBe('rep-9');
+    expect(result.suggestion).toMatchObject({
+      found: true,
+      phoneE164: SUGGESTED_E164,
+      ownedByCommercialName: 'Moussa Sarr',
+    });
+    // Fiche d'autrui : la bannière nomme le propriétaire, pas le représentant.
+    expect(result.suggestion?.representant).toBeNull();
+  });
+
+  it('ramène trois écritures du même numéro à une seule clé', async () => {
+    for (const saisie of ['77 987 65 43', '00221 77 987 65 43', '221779876543']) {
+      const db = ready(null);
+      await build(db).recordAttempt(COMMERCIAL, { ...attempt, suggestedPhone: saisie });
+      expect(written(db).suggestedPhoneE164, saisie).toBe(SUGGESTED_E164);
+    }
+  });
+
+  it('ACCEPTE le même numéro cité par deux représentants : c’est une priorité, pas un doublon', async () => {
+    const premier = ready(null);
+    await build(premier).recordAttempt(COMMERCIAL, attempt);
+
+    const second = ready(null);
+    second.representant.findFirst.mockImplementation((args: { where: Record<string, unknown> }) =>
+      'phoneE164' in args.where
+        ? null
+        : { id: 'rep-2', isDemo: false, relationStatus: RepresentantRelation.INCONNU },
+    );
+
+    await build(second).recordAttempt(ADMIN, {
+      ...attempt,
+      id: '01931f3c-1a2b-7c4d-8e5f-000000000002',
+      representantId: 'rep-2',
+    });
+
+    expect(written(premier).suggestedPhoneE164).toBe(written(second).suggestedPhoneE164);
+    expect(written(premier).sourceRepresentantId).toBe('rep-1');
+    expect(written(second).sourceRepresentantId).toBe('rep-2');
+  });
+
+  it('un REJEU de la tentative ne recueille pas le numéro une seconde fois', async () => {
+    const db = ready(null);
+    db.repCallAttempt.findUnique.mockResolvedValue({ id: attempt.id, taskId: null });
+
+    const result = await build(db).recordAttempt(COMMERCIAL, attempt);
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
+    expect(db.representantSuggestion.create).not.toHaveBeenCalled();
+    // La réponse reste la même qu'au premier envoi : le mobile qui rejoue a perdu la première.
+    expect(result.suggestion?.phoneE164).toBe(SUGGESTED_E164);
+  });
+
+  it('ni le rejeu écarté par l’unicité, découvert dans la transaction', async () => {
+    const db = ready(null);
+    db.repCallAttempt.createMany.mockResolvedValue({ count: 0 });
+
+    const result = await build(db).recordAttempt(COMMERCIAL, attempt);
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
+    expect(db.representantSuggestion.create).not.toHaveBeenCalled();
+  });
+
+  it('la suggestion suit la fiche fictive, pas le mode en vigueur', async () => {
+    const db = ready(null, true);
+
+    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, attempt);
+
+    expect(written(db).isDemo).toBe(true);
+  });
+
+  it('REFUSE la tentative ENTIÈRE sur un numéro illisible, plutôt que de perdre la piste', async () => {
+    const db = ready(null);
+
+    await expect(
+      build(db).recordAttempt(COMMERCIAL, { ...attempt, suggestedPhone: '000000' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(db.repCallAttempt.createMany).not.toHaveBeenCalled();
+    expect(db.representantSuggestion.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('REP_CHECKBOX_GROUPS', () => {
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * LA CORRESPONDANCE, ET NON LE DÉNOMBREMENT
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * Compter les libellés et vérifier qu'ils sont distincts laisse passer
-   * exactement le défaut qui compte : ÉCHANGER un libellé contre un autre.
-   * Sept libellés uniques restent sept libellés uniques si « Refus » devient
-   * « Rappeler » ; le compte est intact, l'ensemble est intact, et le
-   * commercial coche sur le papier la case qui dit le contraire de ce qu'il a
-   * vécu. La donnée saisie ensuite à l'écran contredira le programme papier
-   * sans que rien ne l'annonce.
-   *
-   * On nomme donc chaque issue.
-   */
   const ATTENDUS: Record<RepCallOutcome, string> = {
     [RepCallOutcome.REACHED]: 'Échange fait',
     [RepCallOutcome.PROSPECTS_PROMISED]: 'Fiches promises',
@@ -900,21 +1065,14 @@ describe('REP_CHECKBOX_GROUPS', () => {
   });
 
   it('n’imprime AUCUNE case qui ne corresponde à une issue', () => {
-    // Le sens inverse : une case en trop se coche, se saisit, et n'a nulle
-    // part où aller dans l'agrégat.
     expect(labels().sort()).toEqual(Object.values(ATTENDUS).sort());
   });
 
   it('la table de correspondance couvre l’énumération en ENTIER', () => {
-    // Sans ce contrôle, une issue ajoutée demain au schéma sortirait de
-    // `ATTENDUS` et les deux épreuves ci-dessus resteraient vertes en ne
-    // couvrant plus rien.
     expect(Object.keys(ATTENDUS).sort()).toEqual(Object.keys(RepCallOutcome).sort());
   });
 
   it('sépare ce que l’appel a DONNÉ de ce qui l’a empêché', () => {
-    // La première rangée est celle des aboutissements, la seconde celle des
-    // empêchements : c'est ce qui permet de remplir la liasse d'un seul geste.
     expect(REP_CHECKBOX_GROUPS.map((group) => group.caption)).toEqual(['Résultat', 'Autre']);
     expect(REP_CHECKBOX_GROUPS[0]?.options).toEqual([
       ATTENDUS[RepCallOutcome.REACHED],

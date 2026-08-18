@@ -37,6 +37,8 @@ abstract class _$RepresentantDtoCWProxy {
 
   RepresentantDto prospectCount(num prospectCount);
 
+  RepresentantDto relationStatus(RepresentantRelation relationStatus);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -59,6 +61,7 @@ abstract class _$RepresentantDtoCWProxy {
     DateTime createdAt,
     DateTime updatedAt,
     num prospectCount,
+    RepresentantRelation relationStatus,
   });
 }
 
@@ -120,6 +123,10 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
       this(prospectCount: prospectCount);
 
   @override
+  RepresentantDto relationStatus(RepresentantRelation relationStatus) =>
+      this(relationStatus: relationStatus);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -142,6 +149,7 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
     Object? createdAt = const $CopyWithPlaceholder(),
     Object? updatedAt = const $CopyWithPlaceholder(),
     Object? prospectCount = const $CopyWithPlaceholder(),
+    Object? relationStatus = const $CopyWithPlaceholder(),
   }) {
     return RepresentantDto(
       id: id == const $CopyWithPlaceholder()
@@ -204,6 +212,10 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
           ? _value.prospectCount
           // ignore: cast_nullable_to_non_nullable
           : prospectCount as num,
+      relationStatus: relationStatus == const $CopyWithPlaceholder()
+          ? _value.relationStatus
+          // ignore: cast_nullable_to_non_nullable
+          : relationStatus as RepresentantRelation,
     );
   }
 }
@@ -239,6 +251,7 @@ RepresentantDto _$RepresentantDtoFromJson(
       'createdAt',
       'updatedAt',
       'prospectCount',
+      'relationStatus',
     ],
   );
   final val = RepresentantDto(
@@ -260,6 +273,14 @@ RepresentantDto _$RepresentantDtoFromJson(
     createdAt: $checkedConvert('createdAt', (v) => DateTime.parse(v as String)),
     updatedAt: $checkedConvert('updatedAt', (v) => DateTime.parse(v as String)),
     prospectCount: $checkedConvert('prospectCount', (v) => v as num),
+    relationStatus: $checkedConvert(
+      'relationStatus',
+      (v) => $enumDecode(
+        _$RepresentantRelationEnumMap,
+        v,
+        unknownValue: RepresentantRelation.unknownDefaultOpenApi,
+      ),
+    ),
   );
   return val;
 });
@@ -281,4 +302,13 @@ Map<String, dynamic> _$RepresentantDtoToJson(RepresentantDto instance) =>
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
       'prospectCount': instance.prospectCount,
+      'relationStatus': _$RepresentantRelationEnumMap[instance.relationStatus]!,
     };
+
+const _$RepresentantRelationEnumMap = {
+  RepresentantRelation.INCONNU: 'INCONNU',
+  RepresentantRelation.CONTACTE: 'CONTACTE',
+  RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
+  RepresentantRelation.REFUS: 'REFUS',
+  RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
+};

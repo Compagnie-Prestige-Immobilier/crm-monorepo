@@ -9,14 +9,6 @@ import {
 import type { LastAttempt } from '../prospects/last-attempt.js';
 import { toDakarCell } from './dakar.js';
 
-/**
- * Colonnes du classeur, définies une seule fois.
- *
- * Les deux modes d'export, vue filtrée et classeur consolidé, partagent cette
- * liste : l'onglet « BDD1 » et l'export filtré sur BDD1 ne peuvent donc pas
- * afficher des colonnes différentes, ni les mêmes colonnes dans un autre ordre.
- */
-
 export const EXPORT_INCLUDE = {
   banque: { select: { name: true, shortName: true } },
   syndicat: { select: { sigle: true, name: true } },
@@ -36,17 +28,19 @@ export const EXPORT_INCLUDE = {
 
 export type ExportRow = Prisma.ProspectGetPayload<{ include: typeof EXPORT_INCLUDE }>;
 
-/** Une cellule vide vaut la chaîne vide : `null` s'écrirait « null » dans le tableur. */
+/** Une cellule vide vaut la chaine vide : `null` s'ecrirait « null » dans le tableur. */
 export type CellValue = string | number | Date;
 
 export interface ColumnSpec {
   header: string;
   key: string;
-  /** Les colonnes de date reçoivent le format d'affichage et l'heure de Dakar. */
+  /** Recoit le format d'affichage date et l'heure de Dakar. */
   isDate?: boolean;
   value: (row: ExportRow, last: LastAttempt | undefined) => CellValue;
 }
 
+// Liste partagee par les deux modes : l'onglet BDD1 et l'export filtre sur BDD1 ne peuvent
+// pas differer de colonnes ni d'ordre.
 export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
   { header: 'Nom', key: 'nom', value: (row) => row.nom },
   { header: 'Prénom', key: 'prenom', value: (row) => row.prenom },
@@ -63,13 +57,11 @@ export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
   { header: 'Commercial', key: 'commercial', value: (row) => row.createdBy.fullName },
   { header: 'Date de saisie', key: 'saisie', isDate: true, value: (row) => row.clientCreatedAt },
 
-  // ── Phase 2 ────────────────────────────────────────────────────────────────
   {
     header: 'Segment',
     key: 'segment',
-    // Recalculé ligne à ligne par le helper partagé, jamais lu depuis une
-    // colonne : c'est ce qui garantit que l'onglet « BDD1 » du classeur
-    // consolidé contient exactement la population du graphique « BDD1 ».
+    // Recalcule ligne a ligne par le helper partage, jamais lu en colonne : c'est ce qui garantit
+    // que l'onglet « BDD1 » du classeur consolide contient la population du graphique « BDD1 ».
     value: (row) =>
       classifySegment({
         syndicatSigle: row.syndicat.sigle,
@@ -115,7 +107,6 @@ export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
   },
 ];
 
-/** Valeur prête pour le tableur : les dates y passent à l'heure de Dakar. */
 export function cellValue(
   column: ColumnSpec,
   row: ExportRow,

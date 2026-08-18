@@ -43,138 +43,19 @@ import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { demoScope } from '../../prisma/demo-visibility.js';
 import { DispatchClaim, SENDING_LEASE_MS } from './dispatch-claim.js';
 
-/**
- * Marqueur d'une livraison LAISSÉE EN FILE après un échec passager.
- *
- * La ligne reste `PENDING`, ce qui la rend éligible au passage suivant de
- * `dispatch()` : c'est tout le mécanisme de réessai, il n'y a pas de file
- * séparée. Le marqueur sert à distinguer « en attente parce qu'il faut
- * réessayer » de « en attente parce qu'il n'y avait rien à envoyer », deux
- * états que le seul statut `PENDING` confondrait.
- */
+/** Motif d'une livraison `PENDING` conservée pour un nouvel essai. */
 export const DELIVERY_RETRY_ERROR = 'EMAIL_RETRY';
 
-/**
- * Marqueur d'une livraison qui ne sera JAMAIS servie par e-mail : le
- * destinataire n'est pas téléconseiller, ou n'a pas d'adresse. Ce n'est pas un
- * échec, la personne verra le message dans sa boîte de réception.
- *
- * IL DÉCRIT LE DESTINATAIRE, JAMAIS L'ÉTAT DU TRANSPORT. Il s'écrivait aussi
- * quand `isConfigured()` rendait `false`, c'est-à-dire sur des téléconseillers
- * parfaitement joignables dès qu'une clé serait branchée, et il écrasait au
- * passage le marqueur de réessai qu'un passage précédent avait posé sur la
- * même ligne. Une absence de clé n'apprend rien sur le destinataire.
- *
- * C'est pourquoi la nature du destinataire est désormais LUE EN BASE avant
- * qu'on ne regarde le transport (voir `EmailLegResult.emailable`) : le rôle et
- * l'adresse ne dépendent pas de la présence d'une clé Brevo. Sans clé, un
- * téléconseiller reste en file SANS marqueur, donc à servir ; un agent du pôle
- * banque reçoit son `INBOX_ONLY`, parce que c'est vrai de lui en toutes
- * circonstances.
- *
- * ═══ CE MARQUEUR EST TERMINAL, ET C'EST `settleNotification` QUI LE LIT ═══
- *
- * Une ligne `PENDING` qui le porte n'attend plus rien : la notification peut se
- * refermer sur SENT sans lui mentir. Une ligne `PENDING` qui ne le porte PAS
- * attend encore un envoi, et retient la notification en SENDING.
- */
+/** Terminal pour les destinataires servis uniquement dans la boîte interne. */
 export const DELIVERY_INBOX_ONLY = 'INBOX_ONLY';
 
-/**
- * Marqueur d'une livraison ABANDONNÉE : le transport n'a pas pu la servir dans
- * le délai que la plateforme s'accorde, et plus personne ne réessaiera.
- *
- * Voir `DISPATCH_DEADLINE_MS`. C'est un ÉCHEC, pas une mise en file : la ligne
- * passe `FAILED`, elle apparaît dans les compteurs de l'écran d'administration
- * comme n'importe quel refus définitif, et le destinataire lit tout de même le
- * message dans l'application.
- */
+/** Motif terminal d'une livraison restée en attente au-delà de la limite. */
 export const DELIVERY_ABANDONED = 'EMAIL_ABANDONED';
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * VINGT-QUATRE HEURES, PUIS ON ARRÊTE D'ESSAYER, ET ON LE DIT
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * ═══ CE QUI ARRIVAIT SANS BORNE ═══
- *
- * Une notification dont au moins une livraison attend encore un e-mail reste
- * `SENDING`, et le bail la fait reprendre à chaque expiration. C'est le bon
- * comportement pour un incident : un 429 de trente secondes ne doit pas
- * enterrer un envoi. Mais RIEN ne l'arrêtait, et l'état le plus banal du dépôt
- * le déclenche : sans clé Brevo, tout téléconseiller visé reste en file sans
- * marqueur terminal, donc la notification repart TOUTES LES QUINZE MINUTES,
- * indéfiniment. Quatre-vingt-seize reprises par jour, pour toujours, sur chaque
- * notification jamais servie.
- *
- * « Mieux que l'ancien SENT silencieux » n'est pas une spécification : une
- * panne de vivacité non bornée reste une panne. Il fallait décider.
- *
- * ═══ CE QUI ARRIVE MAINTENANT, ET LA BORNE ═══
- *
- * Une notification est reprise pendant AU PLUS vingt-quatre heures après son
- * heure d'envoi (`scheduledFor`, à défaut `createdAt`), soit au plus 96
- * tentatives à raison d'une par bail. Passé ce délai, la première reprise qui
- * la trouve encore en attente ÉCRIT L'ÉCHEC : les livraisons encore en file
- * passent `FAILED` avec `EMAIL_ABANDONED`, la notification se referme, et une
- * ligne de journal de niveau ERREUR nomme l'envoi, le nombre de personnes qui
- * n'ont pas été servies et l'état du transport.
- *
- * ═══ POURQUOI VINGT-QUATRE HEURES ═══
- *
- * C'est la durée qui sépare deux passages du balayage de rappels : au-delà, le
- * rappel du jour est de toute façon remplacé par celui du lendemain, et
- * insister ne sert plus personne. C'est aussi une journée ouvrée pleine, de
- * quoi laisser un exploitant provisionner une clé Brevo le matin pour que les
- * envois de la nuit partent quand même.
- *
- * ═══ POURQUOI `FAILED` ET NON UN NOUVEL ÉTAT DE NOTIFICATION ═══
- *
- * Un état `PARTIEL` sur `NotificationStatus` dirait la même chose plus
- * lisiblement, mais il faudrait l'ajouter à l'énumération, donc au schéma et
- * aux deux clients générés. Or le produit sait DÉJÀ décrire cet envoi-là : une
- * notification dont toutes les livraisons sont tranchées se referme, et ses
- * livraisons `FAILED` s'affichent avec leur motif. Un refus définitif de Brevo
- * produit exactement la même forme ; l'abandon n'invente donc rien.
- *
- * ═══ COMMENT UN EXPLOITANT LE DÉCOUVRE, SANS OUVRIR LA BASE ═══
- *
- *   · à chaque reprise, une ligne d'AVERTISSEMENT dit combien de livraisons
- *     attendent encore et dans combien de temps l'envoi sera abandonné ;
- *   · à l'abandon, une ligne d'ERREUR, la seule de tout le module, nomme
- *     l'envoi et le nombre de destinataires perdus ;
- *   · l'écran d'administration montre `transportStatus` (`NOT_CONFIGURED`) et
- *     le compteur d'échecs de l'envoi.
- */
+/** Après 24 heures, les livraisons e-mail en attente passent à `FAILED` sans rejeu. */
 export const DISPATCH_DEADLINE_MS = 24 * 60 * 60 * 1_000;
 
-/**
- * Nombre de destinataires servis AVANT que le sort de leurs livraisons ne soit
- * écrit en base.
- *
- * ═══ POURQUOI ÉCRIRE EN COURS DE ROUTE ET NON À LA FIN ═══
- *
- * Confier un lot à Brevo est IRRÉVERSIBLE : l'e-mail est parti. Tant que la
- * ligne de livraison correspondante n'est pas passée à `SENT`, la base ignore
- * cet envoi, et toute reprise de la notification (bail expiré, processus tué,
- * réessai d'une livraison voisine restée en file) relit la ligne `PENDING` et
- * RENVOIE le même message à quelqu'un qui l'a déjà reçu.
- *
- * En écrivant une seule fois, à la fin, la fenêtre d'exposition couvrait TOUTE
- * l'expédition : quelques milliers d'adresses acceptées pouvaient être renvoyées
- * en bloc parce que le processus est mort sur la dernière. La borner à un groupe
- * la ramène à ce qui est réellement en vol au même instant.
- *
- * ═══ POURQUOI CETTE TAILLE-LÀ ═══
- *
- * `BREVO_MAX_RECIPIENTS_PER_CALL × BREVO_MAX_CONCURRENT_CALLS`, c'est-à-dire
- * exactement une VAGUE d'appels : le transport découpe le groupe en lots de 99
- * et en lance 8 à la fois, donc les issues du groupe entier reviennent
- * ensemble, au bout d'un aller-retour réseau. Découper plus fin ne réduirait
- * pas la fenêtre, puisque les lots d'une même vague sont en vol simultanément ;
- * découper plus gros ferait attendre l'écriture de la première vague derrière
- * la seconde, sans rien gagner.
- */
+/** Écrit une vague du transport avant de lancer la suivante. */
 export const EMAIL_PERSIST_GROUP_SIZE = BREVO_MAX_RECIPIENTS_PER_CALL * BREVO_MAX_CONCURRENT_CALLS;
 
 /**
@@ -322,9 +203,7 @@ export class NotificationsService {
     @Inject(BREVO_TRANSPORT) private readonly email: BrevoTransport,
   ) {}
 
-  // ───────────────────────────────────────────────────────────────────────────
   // Composition
-  // ───────────────────────────────────────────────────────────────────────────
 
   /**
    * Compose un envoi, immédiat ou programmé.
@@ -435,9 +314,7 @@ export class NotificationsService {
     return { recipientCount: recipients.length };
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
   // Éventail
-  // ───────────────────────────────────────────────────────────────────────────
 
   /**
    * Sert une notification à ses destinataires, puis écrit ce qui s'est passé.
@@ -1122,9 +999,7 @@ export class NotificationsService {
     );
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
   // Lectures d'administration
-  // ───────────────────────────────────────────────────────────────────────────
 
   async list(query: NotificationQueryDto): Promise<NotificationListDto> {
     const page = query.page ?? 1;
@@ -1228,9 +1103,7 @@ export class NotificationsService {
     return detail.notification;
   }
 
-  // ───────────────────────────────────────────────────────────────────────────
   // Boîte de réception
-  // ───────────────────────────────────────────────────────────────────────────
 
   async inbox(user: AuthenticatedUser, query: InboxQueryDto): Promise<InboxDto> {
     const page = query.page ?? 1;
@@ -1363,8 +1236,6 @@ export class NotificationsService {
 
     return { ok: true };
   }
-
-  // ───────────────────────────────────────────────────────────────────────────
 
   private async countsFor(ids: readonly string[]): Promise<Map<string, ReturnType<typeof tally>>> {
     const result = new Map<string, ReturnType<typeof tally>>();

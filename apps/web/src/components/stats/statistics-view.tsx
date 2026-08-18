@@ -8,23 +8,6 @@ import { CampaignsPanel } from '@/components/stats/campaigns-panel';
 import { TeleconseilPanel } from '@/components/stats/teleconseil-panel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-/**
- * Écran « Statistiques », trois volets.
- *
- * L'onglet courant vit dans l'URL et non dans un état React. Trois
- * conséquences, toutes voulues : un lien collé dans un message rouvre le bon
- * volet, le bouton « Précédent » revient à l'autre, et un rechargement de page
- * ne ramène pas l'utilisateur au premier onglet après qu'il a filtré.
- *
- * Les volets ne partagent PAS tous leur filtre : les prospects et les campagnes
- * se filtrent par représentant, syndicat et segment, les dossiers par étape,
- * banque et motif de rejet. Forcer un objet de filtre commun obligerait un
- * volet à ignorer la moitié des critères, et un critère ignoré mais affiché est
- * pire qu'un critère absent. Téléconseil et Campagnes partagent en revanche le
- * MÊME filtre prospects, à dessein : le critère « Campagne » de la barre du
- * haut restreint alors le pilotage à une campagne précise.
- */
-
 const VOLET_PARAM = 'volet';
 const TELECONSEIL = 'teleconseil';
 const BANQUES = 'banques';
@@ -45,9 +28,6 @@ export function StatisticsView() {
     if (value === TELECONSEIL) next.delete(VOLET_PARAM);
     else next.set(VOLET_PARAM, value);
     const query = next.toString();
-    // `replace` et non `push` : changer d'onglet n'est pas une étape de
-    // navigation, et empiler chaque bascule rendrait le bouton « Précédent »
-    // inutilisable pour sortir de l'écran.
     router.replace(query === '' ? pathname : `${pathname}?${query}`, { scroll: false });
   }
 

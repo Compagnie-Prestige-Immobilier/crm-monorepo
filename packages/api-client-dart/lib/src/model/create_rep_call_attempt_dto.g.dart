@@ -17,6 +17,14 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
 
   CreateRepCallAttemptDto comment(String? comment);
 
+  CreateRepCallAttemptDto relationStatus(RepresentantRelation? relationStatus);
+
+  CreateRepCallAttemptDto suggestedPhone(String? suggestedPhone);
+
+  CreateRepCallAttemptDto suggestedName(String? suggestedName);
+
+  CreateRepCallAttemptDto suggestedNote(String? suggestedNote);
+
   CreateRepCallAttemptDto clientCreatedAt(DateTime clientCreatedAt);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateRepCallAttemptDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -31,6 +39,10 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
     RepCallOutcome outcome,
     num? promisedProspects,
     String? comment,
+    RepresentantRelation? relationStatus,
+    String? suggestedPhone,
+    String? suggestedName,
+    String? suggestedNote,
     DateTime clientCreatedAt,
   });
 }
@@ -61,6 +73,23 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
   CreateRepCallAttemptDto comment(String? comment) => this(comment: comment);
 
   @override
+  CreateRepCallAttemptDto relationStatus(
+    RepresentantRelation? relationStatus,
+  ) => this(relationStatus: relationStatus);
+
+  @override
+  CreateRepCallAttemptDto suggestedPhone(String? suggestedPhone) =>
+      this(suggestedPhone: suggestedPhone);
+
+  @override
+  CreateRepCallAttemptDto suggestedName(String? suggestedName) =>
+      this(suggestedName: suggestedName);
+
+  @override
+  CreateRepCallAttemptDto suggestedNote(String? suggestedNote) =>
+      this(suggestedNote: suggestedNote);
+
+  @override
   CreateRepCallAttemptDto clientCreatedAt(DateTime clientCreatedAt) =>
       this(clientCreatedAt: clientCreatedAt);
 
@@ -77,6 +106,10 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
     Object? outcome = const $CopyWithPlaceholder(),
     Object? promisedProspects = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
+    Object? relationStatus = const $CopyWithPlaceholder(),
+    Object? suggestedPhone = const $CopyWithPlaceholder(),
+    Object? suggestedName = const $CopyWithPlaceholder(),
+    Object? suggestedNote = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
   }) {
     return CreateRepCallAttemptDto(
@@ -100,6 +133,22 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
           ? _value.comment
           // ignore: cast_nullable_to_non_nullable
           : comment as String?,
+      relationStatus: relationStatus == const $CopyWithPlaceholder()
+          ? _value.relationStatus
+          // ignore: cast_nullable_to_non_nullable
+          : relationStatus as RepresentantRelation?,
+      suggestedPhone: suggestedPhone == const $CopyWithPlaceholder()
+          ? _value.suggestedPhone
+          // ignore: cast_nullable_to_non_nullable
+          : suggestedPhone as String?,
+      suggestedName: suggestedName == const $CopyWithPlaceholder()
+          ? _value.suggestedName
+          // ignore: cast_nullable_to_non_nullable
+          : suggestedName as String?,
+      suggestedNote: suggestedNote == const $CopyWithPlaceholder()
+          ? _value.suggestedNote
+          // ignore: cast_nullable_to_non_nullable
+          : suggestedNote as String?,
       clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -139,6 +188,17 @@ CreateRepCallAttemptDto _$CreateRepCallAttemptDtoFromJson(
     ),
     promisedProspects: $checkedConvert('promisedProspects', (v) => v as num?),
     comment: $checkedConvert('comment', (v) => v as String?),
+    relationStatus: $checkedConvert(
+      'relationStatus',
+      (v) => $enumDecodeNullable(
+        _$RepresentantRelationEnumMap,
+        v,
+        unknownValue: RepresentantRelation.unknownDefaultOpenApi,
+      ),
+    ),
+    suggestedPhone: $checkedConvert('suggestedPhone', (v) => v as String?),
+    suggestedName: $checkedConvert('suggestedName', (v) => v as String?),
+    suggestedNote: $checkedConvert('suggestedNote', (v) => v as String?),
     clientCreatedAt: $checkedConvert(
       'clientCreatedAt',
       (v) => DateTime.parse(v as String),
@@ -155,6 +215,11 @@ Map<String, dynamic> _$CreateRepCallAttemptDtoToJson(
   'outcome': _$RepCallOutcomeEnumMap[instance.outcome]!,
   if (instance.promisedProspects case final value?) 'promisedProspects': value,
   if (instance.comment case final value?) 'comment': value,
+  if (_$RepresentantRelationEnumMap[instance.relationStatus] case final value?)
+    'relationStatus': value,
+  if (instance.suggestedPhone case final value?) 'suggestedPhone': value,
+  if (instance.suggestedName case final value?) 'suggestedName': value,
+  if (instance.suggestedNote case final value?) 'suggestedNote': value,
   'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
 };
 
@@ -167,4 +232,12 @@ const _$RepCallOutcomeEnumMap = {
   RepCallOutcome.WRONG_NUMBER: 'WRONG_NUMBER',
   RepCallOutcome.OTHER: 'OTHER',
   RepCallOutcome.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$RepresentantRelationEnumMap = {
+  RepresentantRelation.INCONNU: 'INCONNU',
+  RepresentantRelation.CONTACTE: 'CONTACTE',
+  RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
+  RepresentantRelation.REFUS: 'REFUS',
+  RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

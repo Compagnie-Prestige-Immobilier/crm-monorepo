@@ -9,16 +9,6 @@ import {
 } from '@/lib/client-request-filters';
 import { originLabelFor } from '@/lib/data/client-requests';
 
-/**
- * Filtre de l'écran d'arbitrage.
- *
- * Le point délicat est le DÉFAUT : l'écran ouvre sur les demandes en attente,
- * parce que c'est la seule liste sur laquelle il y a quelque chose à faire.
- * Cela crée un cas qu'aucun autre filtre du panel n'a : « tous statuts » doit
- * s'exprimer EXPLICITEMENT dans l'URL, une clé absente signifiant déjà « en
- * attente ».
- */
-
 describe('parseClientRequestFilters', () => {
   it('ouvre sur les demandes en attente, filtre absent', () => {
     expect(parseClientRequestFilters(new URLSearchParams()).status).toBe('PENDING');
@@ -40,8 +30,6 @@ describe('parseClientRequestFilters', () => {
   });
 
   it('écarte une valeur inconnue plutôt que de la propager vers l’API', () => {
-    // Une URL bricolée à la main ne doit pas produire un 400 sur un écran que
-    // l'utilisateur n'a fait qu'ouvrir depuis un lien.
     expect(parseClientRequestFilters(new URLSearchParams('statut=ARCHIVE')).status).toBe('PENDING');
   });
 
@@ -72,8 +60,6 @@ describe('serializeClientRequestFilters', () => {
 
 describe('countActiveClientRequestFilters', () => {
   it('ne compte pas le statut par défaut comme un critère posé', () => {
-    // Sinon le bouton « Tout effacer » serait visible à l'ouverture de l'écran,
-    // alors qu'il n'y a rien à effacer.
     expect(countActiveClientRequestFilters(DEFAULT_CLIENT_REQUEST_FILTERS)).toBe(0);
   });
 
@@ -91,8 +77,6 @@ describe('countActiveClientRequestFilters', () => {
 
 describe('originLabelFor', () => {
   it('nomme la banque demandeuse, pas seulement la clé', () => {
-    // `BANQUE` seul ne dit rien ; `CBAO` seul non plus. C'est le couple qui
-    // explique pourquoi ce prospect n'a pas de représentant de terrain.
     expect(originLabelFor('BANQUE', 'CBAO')).toBe('Demande de CBAO');
   });
 
@@ -101,8 +85,6 @@ describe('originLabelFor', () => {
   });
 
   it('dit « tournée terrain » pour une fiche née sur le mobile', () => {
-    // L'absence de provenance N'EST PAS une donnée manquante : c'est le cas
-    // normal, celui de la très grande majorité des fiches.
     expect(originLabelFor(null, null)).toBe('Tournée terrain');
   });
 });

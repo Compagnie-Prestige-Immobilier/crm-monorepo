@@ -1,18 +1,7 @@
-/// Frontière réseau du moteur de synchronisation : **Dart pur**.
-///
-/// Le port est typé avec les modèles du client généré depuis
-/// `apps/api/openapi.json`, et non avec des `Map<String, dynamic>` maison. C'est
-/// délibéré : si le contrat serveur change, la compilation doit casser ici,
-/// pendant le build, plutôt qu'à l'exécution dans un village sans réseau.
-///
-/// Aucun `import 'package:flutter/...'` ici, ni dans aucun fichier de
-/// `lib/core/sync/` : ce code tourne aussi dans l'isolat WorkManager, qui n'a ni
-/// arbre de widgets, ni conteneur Riverpod, ni plugins enregistrés.
 library;
 
 import 'package:crm_api_client/crm_api_client.dart';
 
-/// Couple de jetons renvoyé par l'authentification.
 class AuthTokens {
   const AuthTokens({
     required this.accessToken,
@@ -22,6 +11,7 @@ class AuthTokens {
     required this.fullName,
     this.role,
     this.email,
+    this.departementId,
   });
 
   final String accessToken;
@@ -30,15 +20,13 @@ class AuthTokens {
   final String userId;
   final String fullName;
 
-  /// Rôle serveur, brut (`COMMERCIAL`, `ADMIN`…). Il sert à afficher à
-  /// l'utilisateur **qui il est** ; c'est l'identifiant technique qui, lui, n'a
-  /// rien à faire sur un écran de réglages.
   final String? role;
 
   final String? email;
+
+  final String? departementId;
 }
 
-/// Réponse d'un envoi de lot.
 class PushResult {
   const PushResult({
     required this.batchId,
@@ -51,7 +39,6 @@ class PushResult {
   final DateTime serverTime;
 }
 
-/// Une page de pull delta, paginée en keyset sur `(updatedAt, id)`.
 class PullPage {
   const PullPage({
     required this.changes,
@@ -64,22 +51,11 @@ class PullPage {
   final SyncChangesDto changes;
   final List<SyncDeletionDto> deletions;
 
-  /// Curseur opaque `{t, id}` : jamais un horodatage nu (ADR 0001 §6). Il se
-  /// renvoie tel quel, on ne l'interprète pas côté client.
   final String nextCursor;
   final bool hasMore;
   final DateTime serverTime;
 }
 
-/// Une entrée de l'annuaire de phase 2 : **six champs, jamais un de plus**.
-///
-/// L'annuaire est répliqué hors ligne sur le téléphone personnel de chaque
-/// commercial et couvre tout le portefeuille. Le nom, la banque et le syndicat
-/// en sont absents **délibérément** : le programme de travail est un PDF
-/// imprimé qui ne porte que des numéros, et une perte d'appareil ne doit pas
-/// pouvoir faire fuiter une base nominative. Ce n'est pas une préférence, c'est
-/// la frontière de confidentialité du dispositif : on ne demande pas plus au
-/// serveur, et on ne stocke pas plus localement.
 class Phase2DirectoryEntry {
   const Phase2DirectoryEntry({
     required this.prospectId,
@@ -93,17 +69,14 @@ class Phase2DirectoryEntry {
   final String prospectId;
   final String phoneE164;
 
-  /// `PENDING` · `METHOD_OBTAINED` · `REFUSED` · `WRONG_NUMBER`.
   final String phase2Status;
 
-  /// Non nulle si et seulement si [phase2Status] vaut `METHOD_OBTAINED`.
   final String? enrollmentMethod;
 
   final int rev;
   final DateTime updatedAt;
 }
 
-/// Une page de l'annuaire, paginée en keyset sur `(updatedAt, prospectId)`.
 class Phase2DirectoryPage {
   const Phase2DirectoryPage({
     required this.entries,
@@ -114,20 +87,13 @@ class Phase2DirectoryPage {
 
   final List<Phase2DirectoryEntry> entries;
 
-  /// Curseur opaque. Sur une page vide, le serveur renvoie celui qu'on lui a
-  /// donné : on le réécrit tel quel, on ne l'interprète jamais.
   final String nextCursor;
 
-  /// `hasMore` vaut `entries.length == limit` côté serveur : une dernière page
-  /// pleine annonce donc encore du travail, et coûte un aller-retour à vide.
-  /// C'est le serveur qui a raison, pas notre intuition : on boucle jusqu'à
-  /// `false`.
   final bool hasMore;
 
   final DateTime serverTime;
 }
 
-/// Ce qu'on sait d'un numéro de représentant déjà connu du serveur.
 class RepresentantLookup {
   const RepresentantLookup({
     required this.found,
@@ -141,57 +107,24 @@ class RepresentantLookup {
   final String phoneE164;
   final RepresentantDto? representant;
 
-  /// Attribution. Elle détermine la commission : une fiche appartenant à un
-  /// autre commercial ne se fusionne JAMAIS automatiquement.
   final String? ownedByCommercialId;
   final String? ownedByCommercialName;
 }
 
-/// Comment le moteur doit traiter un échec de transport.
-///
-/// Une énumération et pas un simple booléen `retryable` : « réessayer dans 2 s
-/// sans compter la tentative » et « réessayer dans 4 minutes en comptant la
-/// tentative » sont deux comportements différents, et les confondre fait passer
-/// une opération parfaitement saine en `dead` au bout de huit collisions
-/// d'idempotence.
 enum FailureKind {
-  /// 5xx, 408, 425, corps illisible d'un serveur joignable. Le serveur a
-  /// répondu, mal : la tentative se compte.
   retryable,
 
-  /// **Le lien est mort** : pas de route, plus de crédit data, portail captif,
-  /// DNS muet, délai dépassé. Le serveur n'a rien refusé, il n'a rien reçu.
-  ///
-  /// Distinct de [retryable], et ce n'est pas une nuance : les huit tentatives
-  /// de l'outbox mesurent des REFUS SERVEUR, pas du temps qui passe. Confondus,
-  /// quatre à huit minutes de lien mort suffisaient à épuiser les huit essais
-  /// d'une saisie parfaitement valide, qui partait ensuite en
-  /// `ATTEMPTS_EXHAUSTED` dans « À corriger » : le commercial voyait sa journée
-  /// marquée en échec pour une antenne absente. On remet donc en file **sans
-  /// compter la tentative**, exactement comme pour une session expirée.
   unreachable,
 
-  /// 429. Le serveur dit *quand* revenir : on l'écoute, plutôt que d'appliquer
-  /// notre back-off qui serait soit trop court (on se refait limiter) soit trop
-  /// long (on attend pour rien).
   throttled,
 
-  /// 409 `IDEMPOTENCY_IN_PROGRESS`. Un autre appel traite déjà exactement ce
-  /// lot ; il va aboutir. On repasse dans 2 s **sans compter la tentative** :
-  /// ce n'est pas un échec, c'est une file d'attente.
   idempotencyInProgress,
 
-  /// 400 / 403 / 422. Réessayer produira le même refus jusqu'à la fin des
-  /// temps. L'opération part en `failed` et remonte dans « À corriger ».
   terminal,
 
-  /// Le renouvellement de jeton a échoué. Rien ne repartira tant que
-  /// l'utilisateur ne s'est pas reconnecté.
   sessionExpired,
 }
 
-/// Erreur réseau/protocole normalisée. Le moteur décide à partir de [kind] : il
-/// n'a pas à connaître les codes HTTP.
 class ApiException implements Exception {
   const ApiException(
     this.code, {
@@ -206,7 +139,6 @@ class ApiException implements Exception {
   final int? statusCode;
   final FailureKind kind;
 
-  /// Renseigné pour [FailureKind.throttled], depuis l'en-tête `Retry-After`.
   final Duration? retryAfter;
 
   bool get retryable =>
@@ -215,16 +147,12 @@ class ApiException implements Exception {
       kind == FailureKind.throttled ||
       kind == FailureKind.idempotencyInProgress;
 
-  /// Vrai quand l'échec vient du LIEN et non du serveur. Lu par l'interface
-  /// pour afficher « réseau injoignable » là où `connectivity_plus` annonce
-  /// encore une interface active (voir `core/providers/connectivity.dart`).
   bool get isUnreachable => kind == FailureKind.unreachable;
 
   @override
   String toString() => 'ApiException($code, status: $statusCode, $message)';
 }
 
-/// Le port. Une implémentation = un transport.
 abstract interface class ApiPort {
   Future<AuthTokens> login({required String identifier, required String password});
 
@@ -232,28 +160,15 @@ abstract interface class ApiPort {
 
   Future<void> logout({required String refreshToken});
 
-  /// Une seule page pour toutes les collections : le serveur renvoie un curseur
-  /// unique couvrant référentiels et métier. Un curseur par table divergerait au
-  /// premier pull interrompu.
   Future<PullPage> pull({String? cursor, int limit});
 
-  /// Pousse un lot. [batchId] part **à l'identique** dans l'en-tête
-  /// `Idempotency-Key` et dans `clientBatchId` : le serveur refuse en 422 si les
-  /// deux diffèrent.
   Future<PushResult> push({
     required String batchId,
     required int payloadVersion,
     required List<SyncOperationDto> operations,
   });
 
-  /// Une page de l'annuaire de phase 2.
-  ///
-  /// [cursor] nul **ou vide** veut dire « depuis le début » : l'implémentation
-  /// n'envoie alors pas du tout le paramètre `since`, que le serveur refuse
-  /// vide. C'est le tout premier téléchargement d'annuaire qui en dépend.
   Future<Phase2DirectoryPage> pullPhase2Directory({String? cursor, int limit});
 
-  /// Recherche d'un représentant par téléphone, avant saisie et après un 409.
-  /// Répond même si la fiche appartient à un autre commercial, en le nommant.
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone);
 }

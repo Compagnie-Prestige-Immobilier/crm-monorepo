@@ -13,6 +13,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { ChangeSource, RepresentantRelation } from '@crm/database';
 
 import { PageMetaDto, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
@@ -75,7 +76,28 @@ export class CreateRepresentantDto {
   clientCreatedAt?: string;
 }
 
-export class UpdateRepresentantDto extends PartialType(CreateRepresentantDto) {}
+export class UpdateRepresentantDto extends PartialType(CreateRepresentantDto) {
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    description:
+      'État de la relation. Chaque bascule est historisée ; reposter le même statut n’écrit rien.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation)
+  relationStatus?: RepresentantRelation;
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 500,
+    description:
+      'Motif de la bascule, repris dans la chronologie. Sans effet quand `relationStatus` est absent ou reposte le statut courant.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  relationReason?: string;
+}
 
 export class RepresentantDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -94,6 +116,8 @@ export class RepresentantDto {
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
   @ApiProperty({ type: Number }) prospectCount!: number;
+  @ApiProperty({ enum: RepresentantRelation, enumName: 'RepresentantRelation' })
+  relationStatus!: RepresentantRelation;
 }
 
 export class RepresentantListDto {
@@ -101,7 +125,6 @@ export class RepresentantListDto {
   @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
 }
 
-/** Colonnes de tri admises. Fermée : un nom de colonne libre serait une injection. */
 export enum RepresentantSortField {
   CLIENT_CREATED_AT = 'clientCreatedAt',
   CREATED_AT = 'createdAt',
@@ -109,28 +132,6 @@ export enum RepresentantSortField {
   PROSPECTS = 'prospects',
 }
 
-/**
- * Filtres de la liste des représentants.
- *
- * Les cinq critères ajoutés (dates, tri, présence de prospects) portent
- * exactement les noms attendus par le panneau « Filtres avancés » du web, dont
- * l'état est porté par l'URL : un écart de nommage rendrait une URL partagée
- * impossible à reconstituer dans un autre onglet.
- */
-/**
- * Filtres d'un listing de représentants, SANS pagination ni tri.
- *
- * Séparé de `RepresentantQueryDto` parce que l'export Excel n'a ni page ni
- * tri : `representants-export.service.ts` parcourt la table en keyset sur
- * `id asc` pour rendre la totalité du périmètre en flux, et ne lit donc ni
- * `page`, ni `pageSize`, ni `sortBy`, ni `sortOrder`.
- *
- * Tant que l'export réutilisait le DTO complet, le contrat ANNONÇAIT ces
- * quatre paramètres sur `/export/representants.xlsx`. Un client qui demandait
- * `?page=3&sortBy=prospects` recevait le classeur entier, trié par
- * identifiant, sans le moindre avertissement : le contrat promettait un
- * comportement que le serveur n'a jamais eu.
- */
 export class RepresentantExportQueryDto {
   @ApiPropertyOptional({ maxLength: 120 })
   @IsOptional()
@@ -169,15 +170,6 @@ export class RepresentantExportQueryDto {
   @IsISO8601()
   dateTo?: string;
 
-  /**
-   * Présence de prospects rattachés.
-   *
-   * `true` : au moins un prospect vivant. `false` : aucun, c'est-à-dire le
-   * représentant DORMANT, la population que vise la campagne de relance. Le
-   * filtre ne compte que les prospects non supprimés : un représentant dont
-   * toutes les fiches ont été effacées est redevenu dormant, et le voir compté
-   * comme actif ferait manquer exactement les cas à rappeler.
-   */
   @ApiPropertyOptional({
     type: Boolean,
     description: 'true : au moins un prospect vivant. false : aucun (représentant dormant).',
@@ -188,25 +180,21 @@ export class RepresentantExportQueryDto {
   hasProspects?: boolean;
 }
 
-/**
- * Les mêmes filtres, plus la pagination et le tri du listing paginé.
- *
- * L'héritage garantit qu'un filtre ajouté un jour au listing arrive
- * automatiquement dans l'export, et qu'il n'existe jamais deux définitions
- * d'un même critère susceptibles de diverger.
- */
 export class RepresentantQueryDto extends RepresentantExportQueryDto {
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    description: 'Ne retient que les représentants dans cet état de relation.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation)
+  relationStatus?: RepresentantRelation;
+
   @ApiPropertyOptional({ enum: RepresentantSortField, enumName: 'RepresentantSortField' })
   @IsOptional()
   @IsEnum(RepresentantSortField)
   sortBy?: RepresentantSortField;
 
-  /**
-   * `SortOrder` (commun) et non une énumération propre au module : « asc / desc »
-   * ne dépend pas de ce qu'on trie. Le doublon `RepresentantSortOrder`, de
-   * valeurs identiques, faisait porter à chaque client engendré deux types pour
-   * le même choix, et rendait possible une divergence sans aucun sens.
-   */
   @ApiPropertyOptional({ enum: SortOrder, enumName: 'SortOrder' })
   @IsOptional()
   @IsEnum(SortOrder)
@@ -239,13 +227,6 @@ export class RepresentantLookupQueryDto {
   phone!: string;
 }
 
-/**
- * Réponse du lookup par téléphone.
- *
- * `found: false` plutôt qu'un 404 : « ce numéro est libre » est une réponse
- * métier normale sur le chemin de saisie, pas une erreur. Un 404 obligerait
- * l'app mobile à traiter comme exception le cas le plus fréquent.
- */
 export class RepresentantLookupDto {
   @ApiProperty({ type: Boolean }) found!: boolean;
 
@@ -279,17 +260,6 @@ export class DeleteQueryDto {
   cascade?: boolean;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Import de masse
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Une ligne du classeur qui n'a PAS pu être retenue.
- *
- * Le numéro de ligne est celui du FICHIER, en-tête compris : c'est ce que la
- * personne voit dans Excel. Renvoyer un index de tableau la ferait chercher au
- * mauvais endroit, sur un fichier de mille lignes.
- */
 export class ImportRowErrorDto {
   @ApiProperty({ type: Number, description: 'Numéro de ligne dans le fichier, en-tête compris.' })
   line!: number;
@@ -303,7 +273,6 @@ export class ImportRowErrorDto {
   value!: string | null;
 }
 
-/** Une ligne retenue, telle qu'elle sera écrite. Sert au tableau de prévisualisation. */
 export class ImportRowPreviewDto {
   @ApiProperty({ type: Number }) line!: number;
   @ApiProperty() fullName!: string;
@@ -361,4 +330,97 @@ export class ImportQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   dryRun?: boolean;
+}
+
+export class RepresentantRelationChangeDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ format: 'uuid' }) representantId!: string;
+
+  @ApiProperty({ enum: RepresentantRelation, enumName: 'RepresentantRelation' })
+  fromStatus!: RepresentantRelation;
+
+  @ApiProperty({ enum: RepresentantRelation, enumName: 'RepresentantRelation' })
+  toStatus!: RepresentantRelation;
+
+  @ApiProperty({ type: String, nullable: true }) reason!: string | null;
+
+  @ApiProperty({ format: 'uuid' }) changedById!: string;
+  @ApiProperty() changedByName!: string;
+
+  @ApiProperty({
+    enum: ChangeSource,
+    enumName: 'ChangeSource',
+    description: 'Le canal qui a écrit la bascule.',
+  })
+  source!: ChangeSource;
+
+  @ApiProperty({ type: String, format: 'date-time' }) changedAt!: string;
+}
+
+export class RepresentantRelationChangeListDto {
+  @ApiProperty({
+    type: () => [RepresentantRelationChangeDto],
+    description: 'De la plus récente à la plus ancienne.',
+  })
+  items!: RepresentantRelationChangeDto[];
+}
+
+export class CreateRepresentantCommentDto {
+  @ApiProperty({
+    format: 'uuid',
+    description: 'UUID v7 engendré par le client. Clé d’idempotence : un rejeu ne crée rien.',
+  })
+  @IsUUID()
+  id!: string;
+
+  @ApiProperty({ maxLength: 2000 })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  body!: string;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description: 'Horodatage de la saisie sur le terrain. Défaut : maintenant.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  clientCreatedAt?: string;
+}
+
+export class RepresentantCommentDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ format: 'uuid' }) representantId!: string;
+  @ApiProperty({ format: 'uuid' }) authorId!: string;
+  @ApiProperty() authorName!: string;
+  @ApiProperty() body!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) clientCreatedAt!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
+}
+
+export class RepresentantCommentListDto {
+  @ApiProperty({
+    type: () => [RepresentantCommentDto],
+    description: 'Du plus récent au plus ancien.',
+  })
+  items!: RepresentantCommentDto[];
+
+  @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
+}
+
+export class RepresentantCommentQueryDto {
+  @ApiPropertyOptional({ minimum: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 200, default: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  pageSize?: number;
 }

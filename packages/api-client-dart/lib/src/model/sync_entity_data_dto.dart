@@ -53,6 +53,8 @@ class SyncEntityDataDto {
     this.method,
 
     this.comment,
+
+    this.callbackAt,
   });
 
   /// Représentant : nom complet.
@@ -132,6 +134,10 @@ class SyncEntityDataDto {
   @JsonKey(name: r'comment', required: false, includeIfNull: false)
   final String? comment;
 
+  /// Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut CALLBACK. Une version ancienne de l’application ne l’envoie pas.
+  @JsonKey(name: r'callbackAt', required: false, includeIfNull: false)
+  final DateTime? callbackAt;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SyncEntityDataDto &&
@@ -154,6 +160,7 @@ class SyncEntityDataDto {
                 outcome,
                 method,
                 comment,
+                callbackAt,
               ],
               [
                 other.fullName,
@@ -172,6 +179,7 @@ class SyncEntityDataDto {
                 other.outcome,
                 other.method,
                 other.comment,
+                other.callbackAt,
               ],
             );
   }
@@ -196,6 +204,7 @@ class SyncEntityDataDto {
         outcome,
         method,
         comment,
+        callbackAt,
       ]);
 
   factory SyncEntityDataDto.fromJson(Map<String, dynamic> json) =>

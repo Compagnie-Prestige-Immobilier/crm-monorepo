@@ -314,11 +314,13 @@ RepresentantDto representantDto({
   String? iefName,
   String createdById = 'me',
   int rev = 3,
+  RepresentantRelation relationStatus = RepresentantRelation.INCONNU,
 }) => RepresentantDto(
   id: id,
   fullName: fullName,
   phoneE164: phoneE164,
   notes: null,
+  relationStatus: relationStatus,
   rev: rev,
   departementId: departementId,
   iefId: iefId,

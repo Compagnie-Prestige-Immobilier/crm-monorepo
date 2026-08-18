@@ -2,33 +2,44 @@ import 'package:drift/drift.dart';
 
 import '../local/database.dart';
 
-/// Lectures des référentiels et des listes : **Dart pur**.
-///
-/// Toutes les recherches de l'app (département, banque, syndicat) tapent
-/// **uniquement la base locale**. C'est le point de conception : la saisie doit
-/// être instantanée et fonctionner sans réseau. Une autocomplétion qui
-/// interrogerait le serveur mettrait 4 s à répondre sur un lien EDGE et
-/// afficherait une liste vide dans un village : c'est-à-dire exactement là où
-/// l'app sert.
+typedef Region = ({String id, String name});
+
 class ReferenceRepository {
   ReferenceRepository(this._db);
 
   final AppDatabase _db;
 
-  Stream<List<Departement>> watchDepartements() {
-    return (_db.select(_db.departements)
-          ..where((Departements t) => t.isActive.equals(true) & t.deletedAt.isNull())
-          ..orderBy(<OrderClauseGenerator<Departements>>[
-            (Departements t) => OrderingTerm.asc(t.name),
-          ]))
+  /// Les régions, dérivées des départements : il n'existe pas de table
+  /// `regions` en local, seulement le libellé dénormalisé que porte chaque
+  /// département. Les départements sans libellé sont écartés, sinon la liste
+  /// rendrait une entrée sans nom.
+  Stream<List<Region>> watchRegions() {
+    return _db
+        .customSelect(
+          'SELECT DISTINCT region_id AS id, region_name AS name FROM departements '
+          'WHERE is_active = 1 AND deleted_at IS NULL AND region_name <> \'\' '
+          'ORDER BY name',
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{_db.departements},
+        )
+        .map(
+          (QueryRow row) => (id: row.read<String>('id'), name: row.read<String>('name')),
+        )
         .watch();
   }
 
-  /// Les IEF, éventuellement restreintes à un département.
-  ///
-  /// Le tri est (département, nom) : une liste alphabétique globale placerait
-  /// « Bignona 1 » entre deux IEF de Dakar, et le sélecteur deviendrait
-  /// illisible dès qu'on cherche par zone.
+  Stream<List<Departement>> watchDepartements({String? regionId}) {
+    final SimpleSelectStatement<Departements, Departement> query =
+        _db.select(_db.departements)
+          ..where((Departements t) => t.isActive.equals(true) & t.deletedAt.isNull())
+          ..orderBy(<OrderClauseGenerator<Departements>>[
+            (Departements t) => OrderingTerm.asc(t.name),
+          ]);
+    if (regionId != null) {
+      query.where((Departements t) => t.regionId.equals(regionId));
+    }
+    return query.watch();
+  }
+
   Stream<List<Ief>> watchIefs({String? departementId}) {
     final SimpleSelectStatement<Iefs, Ief> query = _db.select(_db.iefs)
       ..where((Iefs t) => t.isActive.equals(true) & t.deletedAt.isNull())
@@ -66,11 +77,6 @@ class ReferenceRepository {
         .watch();
   }
 
-  /// Recherche locale d'un représentant par téléphone E.164.
-  ///
-  /// Première ligne de défense contre le doublon, et la seule qui marche hors
-  /// ligne. Le serveur reste consulté quand il répond, mais on ne l'attend pas
-  /// pour prévenir l'utilisateur.
   Future<Representant?> findRepresentantByPhone(String phoneE164) {
     return (_db.select(_db.representants)
           ..where(
@@ -93,22 +99,6 @@ class ReferenceRepository {
     )..where((Departements t) => t.id.equals(id))).getSingleOrNull();
   }
 
-  /// Représentants avec leur statut de synchronisation, filtrés côté SQL.
-  ///
-  /// Le filtre est en SQL et pas en Dart : à 400 représentants, filtrer en Dart
-  /// signifie relire et désérialiser 400 lignes à chaque frappe de la recherche.
-  ///
-  /// ## Pourquoi une LIMITE, comme pour les prospects
-  ///
-  /// Cette requête est un FLUX drift adossé à `representants` **et à `outbox`**.
-  /// L'outbox change à chaque écriture, à chaque prise de bail, à chaque
-  /// acquittement : c'est-à-dire des centaines de fois pendant une vidange. À
-  /// chacun de ces changements, la vue entière était rematérialisée : jointure
-  /// sur l'outbox comprise, sans borne. L'équivalent prospect était plafonné à
-  /// 500 depuis le début ; l'omission ici était une omission, pas une décision.
-  ///
-  /// Au-delà de la limite, c'est le champ de recherche qui prend le relais : il
-  /// filtre en SQL, donc il atteint toujours la fiche voulue.
   Stream<List<RepresentantSyncViewData>> watchRepresentants({
     String? search,
     int limit = 500,
@@ -134,8 +124,26 @@ class ReferenceRepository {
         .watch();
   }
 
+  Stream<RepresentantSyncViewData?> watchRepresentant(String id) {
+    return _db
+        .customSelect(
+          'SELECT * FROM representant_sync_view WHERE id = ?1 AND deleted_at IS NULL',
+          variables: <Variable<Object>>[Variable<String>(id)],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.representants,
+            _db.outbox,
+          },
+        )
+        .map((QueryRow row) => _db.representantSyncView.map(row.data))
+        .watchSingleOrNull();
+  }
+
   Stream<List<ProspectSyncViewData>> watchProspectsFor(String representantId) {
     return _db.prospectsForRepresentant(representantId: representantId).watch();
+  }
+
+  Stream<List<RepresentantComment>> watchCommentsFor(String representantId) {
+    return _db.commentsForRepresentant(representantId: representantId).watch();
   }
 
   Stream<List<ProspectSyncViewData>> watchAllProspects({String? search}) {
@@ -157,8 +165,6 @@ class ReferenceRepository {
         .watch();
   }
 
-  /// Nombre de prospects saisis pour un représentant. Alimente le compteur
-  /// « 7 prospects ajoutés » de l'écran de saisie rapide.
   Stream<int> watchProspectCountFor(String representantId) {
     return _db
         .customSelect(
@@ -171,7 +177,6 @@ class ReferenceRepository {
         .watchSingle();
   }
 
-  /// Les opérations qui demandent une action humaine, avec de quoi les décrire.
   Stream<List<OutboxData>> watchNeedsAttention() {
     return (_db.select(_db.outbox)
           ..where((Outbox o) => o.status.isIn(<String>['conflict', 'failed']))

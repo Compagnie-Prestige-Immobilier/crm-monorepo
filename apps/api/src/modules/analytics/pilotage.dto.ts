@@ -1,32 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-/**
- * Pilotage d'une campagne d'appels, et délais de la chaîne.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI CES OBJETS EXISTENT
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Une campagne se pilotait jusqu'ici sur un seul chiffre : la progression,
- * calculée à la volée par `campaigns.service.ts` et jamais remontée dans le
- * tableau de bord. « 42 % faits » ne dit ni si les numéros répondent, ni si la
- * campagne finira avant la fin du trimestre, ni quel commercial décroche.
- *
- * Les trois manques traités ici :
- *
- *   joignabilité : appeler 400 numéros dont la moitié sonnent dans le vide
- *                  n'est pas le même travail que 400 numéros qui répondent ;
- *   cadence      : le reste à faire seul ne dit rien, le reste à faire
- *                  RAPPORTÉ à la cadence observée donne une date ;
- *   délais       : les horodatages de la chaîne sont tous stockés et personne
- *                  ne les lit, alors qu'ils désignent l'étape qui traîne.
- *
- * Les délais sont exposés en MÉDIANE et non en moyenne : un dossier oublié six
- * mois dans un tiroir déplace une moyenne de plusieurs semaines et donnerait
- * une lecture fausse d'un flux par ailleurs sain. Le p90 est joint pour la
- * queue de distribution, et la taille d'échantillon pour savoir si le chiffre
- * mérite d'être lu.
- */
 export class CampaignClosedDayDto {
   @ApiProperty({ type: String, format: 'date', description: 'Journée, au format AAAA-MM-JJ.' })
   day!: string;
@@ -123,14 +96,6 @@ export class CampaignPilotageDto {
   estimatedEndDate!: string | null;
 }
 
-/**
- * Les trois tronçons de la chaîne, dans l'ordre où ils se franchissent.
- *
- * Les bornes sont volontairement celles que le produit horodate déjà :
- * `clientCreatedAt` pour la saisie terrain, `enrollmentCapturedAt` pour la
- * méthode, la création du dossier bancaire, puis la transition vers une étape
- * de type CASHED.
- */
 export enum DelayLeg {
   CREATION_TO_METHOD = 'CREATION_TO_METHOD',
   METHOD_TO_CASE = 'METHOD_TO_CASE',

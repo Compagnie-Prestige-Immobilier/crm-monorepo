@@ -6,6 +6,7 @@ import {
   CampaignStatus,
   EnrollmentMethod,
   Role,
+  ScheduledCallbackStatus,
 } from '@crm/database';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -17,17 +18,12 @@ import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 type MockFn = ReturnType<typeof vi.fn>;
 
-// Les clés sont énumérées une à une plutôt que `Record<string, MockFn>` :
-// `noUncheckedIndexedAccess` rend tout accès indexé potentiellement `undefined`,
-// et chaque `db.callTask.groupBy.mockResolvedValue(...)` deviendrait une erreur
-// de compilation. L'énumération explicite a de surcroît le mérite de faire
-// échouer le test quand le service se met à appeler une méthode non prévue,
-// au lieu de renvoyer silencieusement `undefined`.
 type MockDb = {
   callCampaign: Record<'count' | 'findMany' | 'findFirst' | 'create' | 'update', MockFn>;
   callCampaignCommercial: Record<'findUnique' | 'createMany', MockFn>;
   callTask: Record<'groupBy' | 'findMany' | 'count' | 'updateMany' | 'createMany', MockFn>;
   callAttempt: Record<'findMany', MockFn>;
+  scheduledCallback: Record<'updateMany', MockFn>;
   prospect: Record<'findMany', MockFn>;
   user: Record<'findMany', MockFn>;
   $transaction: MockFn;
@@ -41,6 +37,13 @@ const ADMIN: AuthenticatedUser = {
   username: 'admin',
   fullName: 'Admin CPI',
   role: Role.ADMIN,
+};
+const TELECONSEILLER: AuthenticatedUser = {
+  id: 'com-1',
+  email: 'awa@cpi.sn',
+  username: 'awa',
+  fullName: 'Awa Ndiaye',
+  role: Role.COMMERCIAL,
 };
 const date = new Date('2026-04-08T14:30:00.000Z');
 
@@ -57,20 +60,18 @@ function prismaStub(): MockDb {
     callTask: {
       groupBy: vi.fn(),
       findMany: vi.fn(),
-      // Voir `programme` : la journée demandée est bornée sur l'étalement
-      // EFFECTIF du commercial, donc sur la taille de sa file.
       count: vi.fn().mockResolvedValue(100),
       updateMany: vi.fn(),
       createMany: vi.fn(),
     },
     callAttempt: { findMany: vi.fn() },
+    scheduledCallback: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     prospect: { findMany: vi.fn() },
     user: { findMany: vi.fn() },
     $transaction: vi.fn(),
     $executeRawUnsafe: vi.fn(),
     $queryRawUnsafe: vi.fn(),
   };
-  // Prisma's interactive transaction callback is intentionally asynchronous.
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   db.$transaction.mockImplementation((run: (tx: MockDb) => Promise<unknown>) => run(db));
   return db;
@@ -111,17 +112,19 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
     const result = await new Phase2CampaignsService(
       db as unknown as PrismaService,
       fakeDemoVisibility(),
-    ).list({});
+    ).list(ADMIN, {});
 
     expect(result.items[0]?.progress).toEqual({ total: 6, open: 3, done: 2, cancelled: 1 });
     expect(result.items[0]?.scopeLabel).toContain('CHUES');
     expect(result.meta).toEqual({ total: 1, page: 1, pageSize: 25, pageCount: 1 });
+
+    const where = (db.callCampaign.findMany.mock.calls[0]?.[0] as { where: object }).where;
+    expect(where).not.toHaveProperty('tasks');
+    expect((db.callTask.groupBy.mock.calls[0]?.[0] as { where: object }).where).not.toHaveProperty(
+      'assignedToId',
+    );
   });
 
-  // Régression : une liste vide rendait `pageCount: 0` ici alors que les
-  // campagnes représentants, les dossiers bancaires et les demandes clients
-  // rendaient tous `1`. Chaque écran devait donc savoir de quelle liste il
-  // venait pour décider si « page 1 sur 0 » était normal.
   it('une liste vide reste UNE page vide, comme partout ailleurs', async () => {
     const db = prismaStub();
     db.callCampaign.findMany.mockResolvedValue([]);
@@ -131,10 +134,61 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
     const result = await new Phase2CampaignsService(
       db as unknown as PrismaService,
       fakeDemoVisibility(),
-    ).list({});
+    ).list(ADMIN, {});
 
     expect(result.items).toEqual([]);
     expect(result.meta).toEqual({ total: 0, page: 1, pageSize: 25, pageCount: 1 });
+  });
+
+  it('CLOISONNE la liste d’un téléconseiller sur les campagnes où il a des tâches', async () => {
+    const db = prismaStub();
+    db.callCampaign.count.mockResolvedValue(0);
+    db.callCampaign.findMany.mockResolvedValue([]);
+    db.callTask.groupBy.mockResolvedValue([]);
+
+    await new Phase2CampaignsService(db as unknown as PrismaService, fakeDemoVisibility()).list(
+      TELECONSEILLER,
+      {},
+    );
+
+    for (const call of [db.callCampaign.count, db.callCampaign.findMany]) {
+      const where = (call.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
+      expect(where).toMatchObject({ tasks: { some: { assignedToId: TELECONSEILLER.id } } });
+    }
+  });
+
+  it('ne rend à un téléconseiller que SES compteurs, pas ceux de l’équipe', async () => {
+    const db = prismaStub();
+    db.callCampaign.count.mockResolvedValue(1);
+    db.callCampaign.findMany.mockResolvedValue([
+      {
+        id: 'camp-1',
+        name: 'Avril',
+        scope: CampaignScope.BDD1,
+        status: CampaignStatus.ACTIVE,
+        seed: 'seed',
+        spreadDays: 1,
+        createdById: ADMIN.id,
+        createdAt: date,
+        closedAt: null,
+        createdBy: { fullName: ADMIN.fullName },
+        _count: { commerciaux: 2 },
+      },
+    ]);
+    db.callTask.groupBy.mockResolvedValue([
+      { campaignId: 'camp-1', status: CallTaskStatus.OPEN, _count: { _all: 2 } },
+    ]);
+
+    const result = await new Phase2CampaignsService(
+      db as unknown as PrismaService,
+      fakeDemoVisibility(),
+    ).list(TELECONSEILLER, {});
+
+    // Le décompte est BORNÉ EN BASE : sans cette clause, la campagne rendrait les
+    // tâches de toute l'équipe sous couvert d'un « avancement ».
+    const where = (db.callTask.groupBy.mock.calls[0]?.[0] as { where: object }).where;
+    expect(where).toMatchObject({ assignedToId: TELECONSEILLER.id });
+    expect(result.items[0]?.progress).toEqual({ total: 2, open: 2, done: 0, cancelled: 0 });
   });
 
   it('rend le détail avec progression par commercial et tentative récente', async () => {
@@ -194,19 +248,6 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  /**
-   * UN IDENTIFIANT DE CAMPAGNE SURVIT DANS UN SIGNET.
-   *
-   * `get` et `close` résolvaient la campagne par sa seule clé primaire. Le
-   * mode éteint, l'identifiant d'une campagne de démonstration, conservé dans
-   * l'historique du navigateur ou collé dans une conversation, rouvrait donc
-   * l'écran, et son avancement fictif passait pour un chiffre de production.
-   *
-   * Le balayage de visibilité ne le dénonce pas : il tient une lecture par
-   * `id` pour une résolution d'entité et la dispense. Le module campagnes
-   * REPRÉSENTANTS cloisonnait déjà ; les deux divergeaient sur la même
-   * question.
-   */
   it('CLOISONNE le détail : mode éteint, l’identifiant ne suffit pas', async () => {
     const db = prismaStub();
     db.callCampaign.findFirst.mockResolvedValue(null);
@@ -237,8 +278,6 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
       db.callCampaign.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }]
     )[0].where;
     expect(where).toMatchObject({ id: 'camp-demo', isDemo: false });
-    // Rien n'a été annulé : une campagne que la plateforme prétend ne pas voir
-    // ne doit pas pouvoir être mutée.
     expect(db.callTask.updateMany).not.toHaveBeenCalled();
   });
 
@@ -276,6 +315,36 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
       where: { campaignId: 'camp-1', isActive: true },
       data: { status: CallTaskStatus.CANCELLED, isActive: false },
     });
+    expect(db.scheduledCallback.updateMany).toHaveBeenCalledWith({
+      where: { campaignId: 'camp-1', status: ScheduledCallbackStatus.PENDING },
+      data: { status: ScheduledCallbackStatus.CANCELLED },
+    });
+  });
+
+  it('une campagne déjà close ne réannule pas les rappels', async () => {
+    const db = prismaStub();
+    db.callCampaign.findFirst.mockResolvedValueOnce({ status: CampaignStatus.CLOSED });
+    db.callCampaign.findFirst.mockResolvedValue({
+      id: 'camp-1',
+      name: 'Avril',
+      scope: CampaignScope.ALL,
+      status: CampaignStatus.CLOSED,
+      seed: 'seed',
+      spreadDays: 1,
+      createdById: ADMIN.id,
+      createdAt: date,
+      closedAt: date,
+      createdBy: { fullName: ADMIN.fullName },
+      commerciaux: [],
+    });
+    db.callTask.groupBy.mockResolvedValue([]);
+    db.callAttempt.findMany.mockResolvedValue([]);
+
+    await new Phase2CampaignsService(db as unknown as PrismaService, fakeDemoVisibility()).close(
+      'camp-1',
+    );
+
+    expect(db.scheduledCallback.updateMany).not.toHaveBeenCalled();
   });
 
   it('retourne le programme dans la position persistée, sans nom de prospect', async () => {
@@ -311,10 +380,6 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
       fakeDemoVisibility(),
     );
 
-    // 422 et NON 400 : la requête est bien formée, elle est refusée par une
-    // règle métier. Les demandes clients tranchaient déjà ainsi, et deux
-    // statuts pour la même classe de faute obligeaient le client à savoir de
-    // quel module venait l'erreur avant de pouvoir la traiter.
     await expect(
       service.create(ADMIN, {
         name: 'Avril',
@@ -338,20 +403,8 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
-  /**
-   * L'ADMISSION N'EST PAS UNE LECTURE.
-   *
-   * Le module jumeau des campagnes représentants cloisonnait déjà cette
-   * résolution ; celui-ci ne le faisait pas. Mode ÉTEINT, un POST portant
-   * l'UUID d'un compte de démonstration passait donc : le compte a le rôle
-   * COMMERCIAL et il est actif, rien ne le distinguait. La campagne créée était
-   * RÉELLE, ses adhésions et ses tâches pointaient vers des comptes invisibles,
-   * et `onDelete: Restrict` sur les deux relations bloquait ensuite la purge.
-   */
   it('MODE ÉTEINT, un compte de démonstration n’est pas ADMIS dans une campagne', async () => {
     const db = prismaStub();
-    // La doublure ne connaît que des comptes réels : c'est le `where` du
-    // service qui doit écarter le compte fictif, pas la doublure.
     db.user.findMany.mockResolvedValue([]);
     const service = new Phase2CampaignsService(
       db as unknown as PrismaService,
@@ -366,8 +419,6 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
       }),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
 
-    // Le refus doit venir du CLOISONNEMENT, pas d'un hasard de la doublure :
-    // on vérifie que la requête portait bien la clause.
     const where = (db.user.findMany.mock.calls[0]?.[0] as { where?: Record<string, unknown> })
       .where;
     expect(where).toMatchObject({ isDemo: false });
@@ -393,9 +444,6 @@ describe('Phase2CampaignsService, parcours de campagne', () => {
 
 describe('Phase2CampaignsService, étalement sur N jours', () => {
   it('découpe la file de CHAQUE commercial, pas la liste globale', async () => {
-    // Un découpage avant le tourniquet donnerait des journées de tailles
-    // inégales d'un commercial à l'autre : l'un finirait le jour 2, l'autre le
-    // jour 7, sur la même campagne.
     const db = prismaStub();
     db.user.findMany.mockResolvedValue([
       { id: 'com-1', fullName: 'Awa', username: 'awa', role: Role.COMMERCIAL, isActive: true },
@@ -437,7 +485,6 @@ describe('Phase2CampaignsService, étalement sur N jours', () => {
         .filter((row) => row.assignedToId === commercial)
         .sort((left, right) => left.position - right.position)
         .map((row) => row.dayIndex);
-      // 6 lignes sur 3 jours : 2, 2, 2, et toujours dans l'ordre du programme.
       expect(days).toEqual([0, 0, 1, 1, 2, 2]);
     }
   });

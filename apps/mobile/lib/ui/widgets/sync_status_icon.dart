@@ -4,12 +4,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
 
-/// Les sept états qu'une ligne peut prendre vis-à-vis du serveur.
-///
-/// `blocked` n'existe pas côté serveur : c'est un état **dérivé** propre au
-/// client, celui d'un prospect dont le représentant parent est coincé. Sans lui,
-/// l'utilisateur verrait « en attente » sur une ligne qui, en réalité, ne
-/// partira jamais tant qu'il n'aura pas résolu le parent.
 enum SyncStatus {
   draft,
   pending,
@@ -39,8 +33,6 @@ enum SyncStatus {
     SyncStatus.blocked => 'Bloqué par le représentant',
   };
 
-  /// Icônes figées par docs/design.md §8. Ce sont les seules icônes de l'app qui
-  /// portent du sens métier : elles ne se choisissent pas écran par écran.
   IconData get icon => switch (this) {
     SyncStatus.draft => PhosphorIconsRegular.pencilSimple,
     SyncStatus.pending => PhosphorIconsRegular.cloudSlash,
@@ -52,7 +44,6 @@ enum SyncStatus {
   };
 }
 
-/// Icône d'état, en rotation continue pour le seul état `syncing`.
 class SyncStatusIcon extends StatefulWidget {
   const SyncStatusIcon({super.key, required this.status, this.size = 18});
 
@@ -83,8 +74,6 @@ class _SyncStatusIconState extends State<SyncStatusIcon>
   }
 
   void _syncAnimation() {
-    // Une rotation qui tourne alors que rien ne part n'informe de rien, et elle
-    // consomme une frame par vsync sur un appareil déjà lent.
     final bool shouldSpin =
         widget.status == SyncStatus.syncing &&
         !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
@@ -113,12 +102,6 @@ class _SyncStatusIconState extends State<SyncStatusIcon>
       color: color,
     );
 
-    // Le passage d'un état à l'autre est le moment où cette icône dit quelque
-    // chose : « en attente » qui devient « envoyé » est exactement ce que
-    // l'utilisateur surveille. Un remplacement sec le rend invisible ; un
-    // fondu-échelle court de 150 ms le rend perceptible sans le rendre lent.
-    // `ScaleTransition` et non une opacité sur un grand sous-arbre : ici le
-    // sous-arbre est une icône, la composition est gratuite.
     final Widget switched = AnimatedSwitcher(
       duration: motion.micro,
       switchInCurve: motion.easeSpring,
@@ -133,7 +116,6 @@ class _SyncStatusIconState extends State<SyncStatusIcon>
   }
 }
 
-/// Puce « icône + libellé » pour les listes et les en-têtes de fiche.
 class SyncStatusChip extends StatelessWidget {
   const SyncStatusChip({super.key, required this.status});
 

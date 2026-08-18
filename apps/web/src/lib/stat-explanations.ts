@@ -1,26 +1,4 @@
-/**
- * Ce que dit la bulle « i » de chaque statistique.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Une bulle explique un CHIFFRE, pas un logiciel.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Elle répond à une seule question : que compte ce nombre, et sur quelle
- * population. Elle ne décrit ni les appels d'API, ni le cache, ni la
- * synchronisation, ni la façon dont l'écran est construit : rien de tout cela
- * n'aide un directeur à décider.
- *
- * Une ou deux phrases. Au-delà, personne ne lit, et une bulle qu'on ne lit pas
- * vaut moins qu'une absence de bulle : elle occupe la place où l'on aurait pu
- * nommer la statistique correctement.
- *
- * Elles sont regroupées ici plutôt que semées dans le JSX pour une raison
- * pratique : un test vérifie que CHAQUE statistique affichée en possède une, et
- * qu'aucune ne dérive vers le paragraphe.
- */
-
 export const STAT_KEYS = [
-  // ── Volet téléconseil ────────────────────────────────────────────────────
   'prospects',
   'representants',
   'teleconseillersActifs',
@@ -35,7 +13,6 @@ export const STAT_KEYS = [
   'parMethode',
   'parSegment',
 
-  // ── Volet banques ────────────────────────────────────────────────────────
   'bankVolume',
   'bankCashed',
   'bankRejectionRate',
@@ -47,7 +24,6 @@ export const STAT_KEYS = [
   'bankByStage',
   'bankByRejectionReason',
 
-  // ── Volet campagnes ──────────────────────────────────────────────────────
   'campaignContactRate',
   'campaignReachRate',
   'campaignAttemptsPerMethod',
@@ -56,7 +32,6 @@ export const STAT_KEYS = [
   'campaignClosedPerCommercial',
   'dataQuality',
 
-  // ── Tuiles ajoutées aux volets existants ─────────────────────────────────
   'delayLegs',
   'weeklyCohorts',
   'representantProductivity',
@@ -64,7 +39,6 @@ export const STAT_KEYS = [
   'originBreakdown',
   'bankAging',
 
-  // ── Entonnoir et argent, en tête du tableau de bord ──────────────────────
   'moneyCashed',
   'moneyCashed30Days',
   'moneyAverageCashing',
@@ -154,7 +128,6 @@ export const STAT_EXPLANATIONS: Record<StatKey, string> = {
     'Effectif restant à chaque étape, du prospect saisi au dossier encaissé. Le taux indiqué est celui de l’étape précédente.',
 };
 
-/** Texte de la bulle. Une clé inconnue est impossible : le type l'interdit. */
 export function explain(key: StatKey): string {
   return STAT_EXPLANATIONS[key];
 }

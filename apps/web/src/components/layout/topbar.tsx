@@ -13,32 +13,26 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import type { SessionUser } from '@/lib/types';
 
-/**
- * Barre supérieure. Sous 768 px elle porte le déclencheur du tiroir de
- * navigation : la sidebar fixe mangerait la moitié de la largeur utile sur un
- * téléphone, et le tableau des prospects a besoin de toute la place.
- */
 export function Topbar({ user }: { user: SessionUser }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
-  // Le titre est dérivé de la route ET du rôle, pas passé en prop : le layout
-  // serveur ne connaît pas la page rendue, et deux sources de vérité pour un
-  // même libellé finissent toujours par diverger.
   const title = navTitle(user.role, pathname);
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-4 backdrop-blur-sm">
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            aria-label="Ouvrir la navigation"
-          >
-            <MenuIcon className="size-5" aria-hidden="true" />
-          </Button>
+        <SheetTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              aria-label="Ouvrir la navigation"
+            />
+          }
+        >
+          <MenuIcon className="size-5" aria-hidden="true" />
         </SheetTrigger>
         <SheetContent
           side="left"
@@ -58,12 +52,12 @@ export function Topbar({ user }: { user: SessionUser }) {
         {title}
       </h1>
 
-      {/* La cloche n'est montée que pour les rôles qui reçoivent réellement des
-          notifications dans le panel : l'ADMIN (demandes de création de client,
-          rappels système) et l'agent BANQUE_FINANCE (réponse à ses demandes,
-          dossiers sans mouvement). Un COMMERCIAL n'entre pas dans le panel, et
-          poser une cloche toujours vide serait une promesse non tenue. */}
-      {user.role === 'ADMIN' || user.role === 'BANQUE_FINANCE' ? <NotificationBell /> : null}
+      {/* La cloche n'est montée que pour les rôles dont les notifications
+          pointent vers un écran du panel : l'ADMIN (demandes de création de
+          client, rappels système) et l'agent BANQUE_FINANCE (réponse à ses
+          demandes, dossiers sans mouvement). Celles d'un téléconseiller visent
+          l'application mobile, et sa console n'en affiche aucune. */}
+      {user.role === 'COMMERCIAL' ? null : <NotificationBell />}
       <ThemeToggle />
       <UserMenu user={user} />
     </header>

@@ -2,55 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { DEMO_EXEMPTIONS_SENTENCE } from '../decorators/demo-writable.decorator.js';
 
-/**
- * La forme UNIQUE d'une réponse d'erreur de cette API.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI CET OBJET EXISTE
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Sur 119 opérations, AUCUNE réponse d'erreur ne portait de schéma. Les
- * déclarations `@ApiResponse` ne transportaient qu'une phrase en français, si
- * bien que le contrat publiait, pour chaque 4xx, un corps vide. Les deux
- * clients générés en tiraient la seule conclusion possible : `unknown`. Chacun
- * a donc écrit à la main son propre décodeur d'erreur, et les deux ont dû
- * deviner.
- *
- * Deviner était d'autant plus nécessaire que le serveur émettait QUATRE formes
- * différentes selon le chemin emprunté :
- *
- *   1. le filtre Prisma          `{ statusCode, code, message, target?, requestId? }`
- *   2. une exception métier      `{ code, message, ... }`        sans `statusCode`
- *   3. une exception à message   `{ statusCode, message, error }` sans `code`
- *   4. la validation d'entrée    `{ statusCode, message: [...], error }` message TABLEAU
- *
- * Un client qui lisait `body.code` marchait sur 1 et 2 et rendait `undefined`
- * sur 3 et 4. Un client qui lisait `body.message` recevait tantôt une phrase,
- * tantôt un tableau de phrases, et affichait `[object Object]`.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * CE QUI EST GARANTI
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `statusCode`, `code` et `message` sont TOUJOURS présents, quelle que soit
- * l'origine de l'erreur. La normalisation est faite en un seul endroit, le
- * filtre global, et non répétée dans chaque service : un service continue de
- * lever ses exceptions typées comme avant, c'est le filtre qui complète.
- *
- * `code` est la clé sur laquelle un client DÉCIDE (afficher tel message,
- * proposer telle action, réessayer ou non). `message` est du texte destiné à
- * un humain, en français, et peut changer sans préavis : aucun client ne doit
- * s'en servir pour brancher.
- *
- * `details` remplace le `message: string[]` de la validation. Le champ
- * `message` reste ainsi une chaîne dans TOUS les cas, ce qui était la
- * principale source de code défensif côté client.
- *
- * Les erreurs métier ajoutent librement leurs propres champs (le dossier en
- * conflit, la révision courante, le statut bloquant). Ils ne sont pas
- * énumérés ici : les documenter tous ferait de ce schéma une union illisible,
- * et le contrat resterait faux dès la première erreur ajoutée.
- */
 export class ApiErrorDto {
   @ApiProperty({
     type: Number,

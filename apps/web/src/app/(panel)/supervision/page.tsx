@@ -1,25 +1,24 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 
 import { PermissionDenied } from '@/components/permission-denied';
-import { SupervisionView } from '@/components/supervision/supervision-view';
+import { SupervisionSkeleton } from '@/components/supervision/supervision-view';
+import { SupervisionTabs } from '@/components/supervision/supervision-tabs';
 import { guardRoles } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Supervision' };
 
-/**
- * L'écran n'est PAS préchargé côté serveur, contrairement aux autres.
- *
- * Il se rafraîchit toutes les dix secondes : un rendu serveur produirait une
- * photographie déjà périmée à l'hydratation, et ferait payer au premier
- * affichage cinq agrégats que le client redemanderait aussitôt.
- */
 export default async function SupervisionPage() {
-  const guard = await guardRoles(['ADMIN']);
+  const guard = await guardRoles(['ADMIN', 'SUPERVISEUR']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
-    return <PermissionDenied role={guard.user.role} what="La supervision des comptes" />;
+    return <PermissionDenied role={guard.user.role} what="La supervision" />;
   }
 
-  return <SupervisionView />;
+  return (
+    <Suspense fallback={<SupervisionSkeleton />}>
+      <SupervisionTabs />
+    </Suspense>
+  );
 }

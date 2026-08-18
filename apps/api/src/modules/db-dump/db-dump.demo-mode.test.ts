@@ -19,35 +19,9 @@ import { DbDumpService } from './db-dump.service.js';
 import { DUMP_RUNNER } from './db-dump.runner.js';
 import { FAKE_ADMIN, FakeDumpRunner, FakeDumpStore, FakeNotifications } from './fake-dump-store.js';
 
-/**
- * L'export intégral est REFUSÉ pendant une démonstration.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * POURQUOI CE FICHIER EXISTE SÉPARÉMENT
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Le refus n'est écrit NULLE PART dans le module : il vient de
- * `DemoReadOnlyGuard`, garde globale qui bloque toute méthode mutante tant que
- * l'interrupteur est allumé, et le contrôleur ne porte volontairement pas
- * `@DemoWritable`.
- *
- * Une propriété obtenue par ABSENCE de code est exactement celle qui se perd :
- * il suffira qu'un jour un `@DemoWritable('ce n’est qu’une lecture')` soit posé
- * pour gagner du confort en recette, et l'export redeviendrait possible pendant
- * une démonstration. Il emporterait alors les milliers de lignes fictives du
- * semeur, mêlées aux vraies, dans un fichier qui a par ailleurs toutes les
- * apparences d'un export de production, et que personne ne saurait plus
- * distinguer six mois plus tard.
- *
- * Le montage embarque donc la garde RÉELLE, avec une lecture de réglage
- * doublée. Les autres fichiers d'essai du module ne la montent pas : ils
- * exercent le service, pas la politique.
- */
-
 const STATE_URL = '/api/v1/admin/database-dump';
 const DOWNLOAD_URL = '/api/v1/admin/database-dump/download';
 
-/** Doublure du lecteur de réglage. `state()` est ce que lit la garde. */
 class FakeDemoVisibility {
   current: 'on' | 'off' | 'unknown' = 'off';
 
@@ -74,8 +48,6 @@ beforeAll(() => {
 
 beforeEach(async () => {
   process.env.DB_DUMP_DIR = await mkdtemp(join(tmpdir(), 'cpi-dumps-demo-'));
-  // Ce fichier éprouve la politique de démonstration, pas l'interrupteur de la
-  // fonctionnalité : celui-ci est allumé pour que les routes existent.
   process.env.DB_DUMP_ENABLED = 'true';
   store = new FakeDumpStore();
   runner = new FakeDumpRunner();
@@ -98,7 +70,6 @@ beforeEach(async () => {
       DbDumpService,
       { provide: NotificationsService, useValue: new FakeNotifications().asService() },
       { provide: DUMP_RUNNER, useValue: runner },
-      // La garde RÉELLE, exactement comme dans `app.module.ts`.
       { provide: APP_GUARD, useClass: DemoReadOnlyGuard },
     ],
   }).compile();
@@ -125,10 +96,6 @@ afterEach(async () => {
 });
 
 describe('export intégral et mode démonstration', () => {
-  /**
-   * LE test. Un export pris pendant une démonstration mêlerait des lignes
-   * fictives aux vraies dans un fichier indiscernable d'un export réel.
-   */
   it('refuse la demande d’export tant que la démonstration est allumée', async () => {
     demo.current = 'on';
 
@@ -136,17 +103,10 @@ describe('export intégral et mode démonstration', () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json<{ code: string }>().code).toBe('DEMO_MODE_READ_ONLY');
-    // Et surtout : AUCUN `pg_dump` n'est parti.
     expect(runner.calls).toBe(0);
     expect(store.stored()).toBeNull();
   });
 
-  /**
-   * La garde refuse AUSSI quand la lecture du réglage échoue : dans le doute,
-   * on ne produit pas d'export. Le test l'épingle ici parce que c'est la seule
-   * route du dépôt où « dans le doute, laisse passer » produirait une copie
-   * complète de la clientèle.
-   */
   it('refuse également quand l’état de la démonstration est indéterminé', async () => {
     demo.current = 'unknown';
 
@@ -154,22 +114,12 @@ describe('export intégral et mode démonstration', () => {
     expect(runner.calls).toBe(0);
   });
 
-  /**
-   * Contre-épreuve : sans elle, un contrôleur qui refuserait TOUT ferait passer
-   * les deux tests ci-dessus sans rien prouver.
-   */
   it('accepte la demande quand la démonstration est éteinte', async () => {
     demo.current = 'off';
 
     expect((await app.inject({ method: 'POST', url: STATE_URL })).statusCode).toBe(202);
   });
 
-  /**
-   * La LECTURE reste ouverte, et c'est voulu. Sonder l'état et télécharger sont
-   * des GET, que la garde ignore. Un fichier prêt a nécessairement été produit
-   * alors que l'interrupteur était éteint : rien ne justifie de le retenir
-   * parce qu'une démonstration a commencé entre-temps.
-   */
   it('laisse consulter l’état et télécharger pendant une démonstration', async () => {
     await app.inject({ method: 'POST', url: STATE_URL });
     for (let attempt = 0; attempt < 200; attempt += 1) {

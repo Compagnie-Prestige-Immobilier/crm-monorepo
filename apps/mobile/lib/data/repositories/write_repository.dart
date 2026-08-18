@@ -9,12 +9,8 @@ import '../../core/sync/sync_engine.dart';
 import '../../core/utils/ids.dart';
 import '../local/database.dart';
 
-/// Longueur maximale d'un commentaire de tentative d'appel. Valeur du `CHECK`
-/// PostgreSQL `call_attempts_comment_max_length`, reprise ici pour que le champ
-/// puisse la faire respecter à la frappe.
 const int kCallAttemptCommentMaxLength = 2000;
 
-/// Ce qu'une tentative d'appel peut avoir d'invalide, avec son message.
 enum CallAttemptProblem {
   unknownOutcome,
   unknownMethod,
@@ -37,81 +33,34 @@ enum CallAttemptProblem {
   };
 }
 
-/// Ce qu'un abandon a fait, ou pourquoi il n'a rien fait.
-///
-/// Un simple compteur ne suffisait pas : « zéro opération retirée » recouvrait
-/// deux situations que l'utilisateur doit distinguer, « il n'y avait rien » et
-/// « je refuse parce que c'est en cours d'envoi ». L'écran affichait donc la
-/// même absence de réaction dans les deux cas, et l'utilisateur rappuyait.
 enum DiscardOutcome {
-  /// Les opérations ont été retirées de la file, avec leurs fiches métier.
   discarded,
 
-  /// Refusé : au moins une des lignes visées porte une réservation d'envoi.
   claimed,
 
-  /// Il n'y avait rien à abandonner.
   notFound,
 }
 
-/// Résultat d'un [WriteRepository.discardOperation] ou d'un
-/// [WriteRepository.discardOwnCreateOnly].
 class DiscardResult {
   const DiscardResult(this.outcome, {this.removed = 0});
 
   final DiscardOutcome outcome;
 
-  /// Nombre d'opérations réellement retirées de la file (cascade comprise).
   final int removed;
 }
 
-/// Ce qu'un [WriteRepository.discardOperation] emporterait, compté sans rien
-/// supprimer.
-///
-/// ═══ POURQUOI CE COMPTE N'EST PAS REFAIT DANS L'ÉCRAN ═══
-///
-/// La boîte de confirmation comptait sa cascade en filtrant la liste
-/// « À corriger », qui ne contient que les statuts `conflict` et `failed`. Or
-/// [WriteRepository.discardOperation] prend ses victimes dans
-/// [OutboxStatus.open], qui contient en plus `pending` et `syncing` : et c'est
-/// précisément là que se trouvent les prospects d'un représentant refusé. Le
-/// serveur répond `invalid` sur la tête, qui part en `failed`, et
-/// `skippedDependencyFailed` sur chacun de ses prospects, que
-/// `SyncEngine._requeueBlocked` remet en `pending`. Aucun d'eux n'était donc
-/// visible du compte, et un représentant portant vingt prospects annonçait
-/// « cette saisie » avant d'en détruire vingt-et-une.
-///
-/// Deux prédicats qui doivent décrire le même ensemble et vivent dans deux
-/// fichiers divergent au premier correctif appliqué à un seul des deux. Le
-/// compte est donc fait **ici**, par le même code que la suppression
-/// ([WriteRepository._discardVictims]), et l'écran ne fait plus que rendre la
-/// phrase.
 class DiscardPreview {
   const DiscardPreview({required this.operations, required this.prospects});
 
-  /// Nombre de lignes d'outbox qui seront retirées, tête comprise.
   final int operations;
 
-  /// Nombre de fiches prospect qui disparaîtront de la base avec elles. Ce
-  /// sont des saisies à ressaisir : c'est le nombre que l'utilisateur doit
-  /// lire avant de confirmer, pas le nombre d'opérations, qui ne lui dit rien.
   final int prospects;
 }
 
-/// Une réservation d'envoi est apparue entre la lecture et l'écriture.
-///
-/// Levée pour **annuler la transaction** : c'est le seul moyen, en drift, de
-/// défaire des suppressions déjà émises dans le même bloc. Elle ne sort jamais
-/// de [WriteRepository].
 class _ClaimRace implements Exception {
   const _ClaimRace();
 }
 
-/// Saisie refusée **avant** l'écriture locale.
-///
-/// Une exception et non un `sealed` de résultat, contrairement au téléphone :
-/// ici on ne valide pas à chaque frappe, on valide une fois, au moment
-/// d'enregistrer, et l'écran a besoin d'un chemin d'échec net.
 class CallAttemptInvalid implements Exception {
   const CallAttemptInvalid(this.problem);
 
@@ -123,52 +72,18 @@ class CallAttemptInvalid implements Exception {
   String toString() => 'CallAttemptInvalid(${problem.name})';
 }
 
-/// Toutes les écritures métier de l'app passent par ici : **Dart pur**.
-///
-/// ## L'invariant, et pourquoi il tient dans une transaction
-///
-/// Enregistrer, c'est **une transaction et trois instructions** :
-///
-/// 1. insérer (ou modifier) la ligne métier ;
-/// 2. insérer l'opération d'outbox correspondante ;
-/// 3. supprimer le brouillon de formulaire.
-///
-/// Sans transaction, chacune des trois coupures possibles perd quelque chose :
-///
-/// * après (1), la ligne existe mais ne partira jamais : le commercial la voit
-///   dans sa liste et croit l'avoir envoyée ;
-/// * après (2), le brouillon survit et l'écran propose « reprendre la saisie »
-///   d'une fiche déjà enregistrée, que l'utilisateur va ressaisir, produisant un
-///   doublon ;
-/// * l'ordre inverse (supprimer le brouillon d'abord) perd la saisie entière si
-///   l'insertion échoue.
-///
-/// **Il n'existe aucun état atteignable où la frappe d'un utilisateur est perdue
-/// après qu'il a appuyé sur Enregistrer.** C'est testé.
-///
-/// ## Sur `dependencyKey`
-///
-/// Elle vaut toujours l'identifiant du **représentant**, y compris pour un
-/// prospect. C'est ce qui rend l'ordre structurel : le prospect partage la
-/// partition de son parent et porte un `seq` supérieur, donc il ne peut pas
-/// partir avant lui (ADR 0001 §2).
 class WriteRepository {
   WriteRepository(this._db, {Clock clock = const SystemClock()}) : _clock = clock;
 
   final AppDatabase _db;
   final Clock _clock;
 
-  // ── Représentant ───────────────────────────────────────────────────────────
 
-  /// Crée un représentant. Renvoie son identifiant local, qui est aussi celui
-  /// que le serveur utilisera : les identifiants sont générés par le client
-  /// (ADR 0001 §1).
   Future<String> createRepresentant({
     required String fullName,
     required String phoneE164,
     required String departementId,
     required String createdById,
-    /// IEF de rattachement, facultative. Voir `iefs` dans `schema.drift`.
     String? iefId,
     String? notes,
     String? id,
@@ -244,9 +159,6 @@ class WriteRepository {
         entityType: 'representant',
         entityId: id,
         op: 'update',
-        // `baseRev` transforme une écriture aveugle en écriture conditionnelle :
-        // si le serveur a bougé entre-temps, il répond `REV_CONFLICT` au lieu
-        // d'écraser en silence la modification d'un autre appareil.
         baseRev: current.serverUpdatedAt == null ? null : current.rev,
         amendBlockedHead: true,
         payload: <String, Object?>{
@@ -262,11 +174,6 @@ class WriteRepository {
     });
   }
 
-  /// Suppression **logique**, jamais physique.
-  ///
-  /// Une suppression physique romprait la clé étrangère des prospects
-  /// (`ON DELETE RESTRICT`) et, surtout, ne pourrait plus être synchronisée : il
-  /// ne resterait rien à envoyer au serveur pour lui dire d'effacer sa copie.
   Future<void> deleteRepresentant(String id) async {
     final DateTime now = _clock.now();
     await _db.transaction(() async {
@@ -281,9 +188,6 @@ class WriteRepository {
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
-      // Les prospects rattachés suivent : côté serveur la fiche parente
-      // disparaît, et laisser localement des prospects visibles pointant vers un
-      // représentant supprimé produirait une liste incohérente.
       await (_db.update(_db.prospects)
             ..where((Prospects t) => t.representantId.equals(id) & t.deletedAt.isNull()))
           .write(
@@ -304,7 +208,37 @@ class WriteRepository {
     });
   }
 
-  // ── Prospect ───────────────────────────────────────────────────────────────
+
+  /// Ajout seul. Un commentaire ne se modifie ni ne s'efface : il n'y a donc ni
+  /// `rev` à envoyer ni conflit possible, et deux téléconseillers hors ligne qui
+  /// commentent la même fiche produisent deux lignes distinctes.
+  Future<String> addRepresentantComment({
+    required String representantId,
+    required String body,
+    required String authorId,
+    required String authorName,
+  }) async {
+    final String trimmed = body.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(body, 'body', 'un commentaire vide ne s\'écrit pas');
+    }
+    final String entityId = Ids.newId();
+    final DateTime now = _clock.now();
+    await _db
+        .into(_db.representantComments)
+        .insert(
+          RepresentantCommentsCompanion.insert(
+            id: entityId,
+            representantId: representantId,
+            authorId: authorId,
+            authorName: authorName,
+            body: trimmed,
+            clientCreatedAt: now,
+          ),
+        );
+    return entityId;
+  }
+
 
   Future<String> createProspect({
     required String nom,
@@ -338,8 +272,6 @@ class WriteRepository {
             ),
           );
       await _enqueue(
-        // La clé du PARENT, jamais celle du prospect : c'est toute la garantie
-        // d'ordre du système.
         dependencyKey: representantId,
         entityType: 'prospect',
         entityId: entityId,
@@ -434,37 +366,14 @@ class WriteRepository {
     });
   }
 
-  // ── Phase 2 : tentative d'appel ────────────────────────────────────────────
 
-  /// Enregistre une tentative d'appel et la met en file, **en une transaction**.
-  ///
-  /// Trois écritures indissociables :
-  ///
-  /// 1. la ligne de journal dans `call_attempts` ;
-  /// 2. l'opération d'outbox correspondante ;
-  /// 3. le miroir optimiste sur `phase2_directory`, si l'issue est terminale.
-  ///
-  /// Séparées, elles laisseraient l'écran affirmer « enregistré » sur une saisie
-  /// qui ne partira jamais, ou rendre un numéro déjà traité à nouveau saisissable
-  /// : deux mensonges que l'utilisateur ne peut pas détecter depuis l'app.
-  ///
-  /// ## La validation est locale, et c'est le point
-  ///
-  /// Trois `CHECK` PostgreSQL gouvernent `call_attempts` côté serveur. Les
-  /// découvrir à la synchronisation, c'est les découvrir potentiellement trois
-  /// semaines après l'appel, quand plus personne ne se souvient de ce qui a été
-  /// dit et que la correction est impossible. On refuse donc **avant** d'écrire,
-  /// avec un message que le commercial peut corriger dans la seconde.
-  ///
-  /// Les mêmes règles sont en outre reposées en `CHECK` dans `schema.drift` : la
-  /// validation Dart donne le message, le `CHECK` garantit qu'aucun chemin de
-  /// code ne peut la contourner.
   Future<String> recordCallAttempt({
     required String prospectId,
     required String outcome,
     required String createdById,
     String? method,
     String? comment,
+    DateTime? callbackAt,
     String? id,
   }) async {
     final String? normalizedComment = normalizeComment(comment);
@@ -475,6 +384,8 @@ class WriteRepository {
     );
     if (problem != null) throw CallAttemptInvalid(problem);
 
+    // Le serveur refuse une heure de rappel sur une autre issue que CALLBACK.
+    final DateTime? callback = outcome == CallOutcomes.callback ? callbackAt : null;
     final String entityId = id ?? Ids.newId();
     final DateTime now = _clock.now();
 
@@ -488,15 +399,12 @@ class WriteRepository {
               outcome: outcome,
               method: Value<String?>(method),
               comment: Value<String?>(normalizedComment),
+              callbackAt: Value<DateTime?>(callback),
               clientCreatedAt: now,
               createdById: createdById,
             ),
           );
       await _enqueue(
-        // La clé du PROSPECT, exactement comme le serveur groupe
-        // (`prospect:<id>`). Deux tentatives sur le même numéro partent donc
-        // dans l'ordre où elles ont été saisies, et un rappel après un
-        // « rappeler plus tard » ne double jamais le premier.
         dependencyKey: 'phase2:$prospectId',
         entityType: callAttemptEntity,
         entityId: entityId,
@@ -506,13 +414,12 @@ class WriteRepository {
           'outcome': outcome,
           'method': ?method,
           'comment': ?normalizedComment,
+          'callbackAt': ?callback?.toUtc().toIso8601String(),
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
         now: now,
       );
 
-      // Miroir optimiste. `rev` reste volontairement inchangée : c'est ce qui
-      // permet au pull suivant de corriger si le serveur a tranché autrement.
       if (CallOutcomes.terminal.contains(outcome)) {
         await (_db.update(
           _db.phase2Directory,
@@ -530,18 +437,12 @@ class WriteRepository {
     return entityId;
   }
 
-  /// Un commentaire vide ou fait d'espaces vaut `null`.
-  ///
-  /// Le serveur applique `btrim` dans son `CHECK` et `.trim()` dans son
-  /// normalisateur : sans ce ramené-à-null, un `OTHER` commenté d'une seule
-  /// espace passerait la validation Dart et serait refusé par PostgreSQL.
   static String? normalizeComment(String? raw) {
     if (raw == null) return null;
     final String trimmed = raw.trim();
     return trimmed.isEmpty ? null : trimmed;
   }
 
-  /// Les quatre règles du serveur, vérifiées ici. Renvoie `null` si tout va bien.
   static CallAttemptProblem? validateCallAttempt({
     required String outcome,
     String? method,
@@ -556,7 +457,6 @@ class WriteRepository {
         return CallAttemptProblem.unknownMethod;
       }
     } else if (method != null) {
-      // Le serveur REFUSE une méthode sur une autre issue, il ne l'ignore pas.
       return CallAttemptProblem.methodNotAllowed;
     }
     if (outcome == CallOutcomes.other && (comment == null || comment.isEmpty)) {
@@ -568,13 +468,7 @@ class WriteRepository {
     return null;
   }
 
-  // ── Outbox ─────────────────────────────────────────────────────────────────
 
-  /// L'opération ouverte de plus petit `seq` pour cette entité, ou `null`.
-  ///
-  /// C'est celle qui partira ensuite, donc celle qui décrit l'état visible par
-  /// l'utilisateur : les deux vues SQL de `schema.drift` la définissent
-  /// exactement pareil.
   Future<OutboxData?> headOperation(String entityType, String entityId) {
     return (_db.select(_db.outbox)
           ..where(
@@ -590,45 +484,10 @@ class WriteRepository {
         .getSingleOrNull();
   }
 
-  // ── Réservation d'envoi ────────────────────────────────────────────────────
 
-  /// Vrai si une réservation d'envoi vit encore sur cette ligne.
-  ///
-  /// ═══ UN BAIL EXPIRÉ NE PROUVE PAS QUE PERSONNE N'ENVOIE ═══
-  ///
-  /// C'est toute la raison d'être du jeton de possession. `SyncEngine.claimBatch`
-  /// écrit le bail ET le jeton dans la même instruction ; le bail dit *jusqu'à
-  /// quand* on espérait avoir fini, le jeton dit *que quelqu'un est parti avec
-  /// la ligne*. Sur un lien 2G, un `push` dépasse couramment les deux minutes de
-  /// bail : la ligne est alors `syncing`, bail périmé, jeton posé, **requête en
-  /// vol**. Se fier au bail seul, comme le faisait l'abandon, revenait à
-  /// déclarer sûre exactement la ligne la plus dangereuse de la file.
-  ///
-  /// Le statut est testé en plus du jeton, et pas à la place : c'est la même
-  /// condition vue par ses deux faces, et une ligne `syncing` sans jeton (héritée
-  /// d'un build antérieur au jeton, ou posée à la main) doit être traitée comme
-  /// en vol, pas comme libre.
-  ///
-  /// **Ce que ce verrou ne couvre pas, et qu'aucun verrou local ne peut
-  /// couvrir.** `SyncEngine.reclaimExpiredLeases` efface le jeton d'un isolat
-  /// présumé mort alors que sa requête peut encore être physiquement sur le fil.
-  /// Après cette reprise, la ligne est de nouveau abandonnable alors qu'un
-  /// envoi fantôme peut encore aboutir côté serveur. C'est le risque résiduel
-  /// que la reprise assume déjà par ailleurs (l'idempotence par `opId` le rend
-  /// inoffensif pour un renvoi, pas pour une suppression). Le jeton ferme la
-  /// grande fenêtre, celle qui dure le temps d'un envoi lent ; il ne ferme pas
-  /// celle-là.
   static bool _isClaimed(OutboxData row) =>
       row.claimToken != null || row.status == OutboxStatus.syncing;
 
-  /// La traduction SQL de « personne ne possède cette ligne ».
-  ///
-  /// Jumelle obligatoire de [_isClaimed] : la lire en Dart puis écrire sans la
-  /// reposer dans le `WHERE` laisse précisément la fenêtre qu'on prétend
-  /// fermer. C'est le pendant de `SyncEngine._ownedBy` pour les actions
-  /// manuelles : le moteur écrit « cette ligne, **et si je la possède
-  /// encore** », l'utilisateur écrit « cette ligne, **et si personne ne la
-  /// possède** ». Même mécanisme, polarité opposée.
   static Expression<bool> _unclaimed(Outbox o) =>
       o.claimToken.isNull() & o.status.equals(OutboxStatus.syncing).not();
 
@@ -641,16 +500,6 @@ class WriteRepository {
     required DateTime now,
     int? baseRev,
 
-    /// Corriger sur place au lieu d'empiler, quand la tête est bloquée.
-    ///
-    /// **C'est la seule façon dont une correction peut sortir du téléphone.**
-    /// Une `create` en `conflict` reste la tête de sa `dependencyKey` : le
-    /// sélecteur ignore alors la clé entière (ADR 0001 §2). Empiler un `update`
-    /// derrière elle produisait donc une opération que rien n'émettrait jamais,
-    /// pendant que l'écran « À corriger » continuait d'afficher l'ANCIENNE
-    /// erreur, sur l'ANCIEN contenu. L'utilisateur corrigeait, réessayait, et
-    /// voyait le même refus : il ne pouvait pas savoir que sa correction dormait
-    /// dans une opération inatteignable.
     bool amendBlockedHead = false,
   }) async {
     if (amendBlockedHead) {
@@ -658,11 +507,6 @@ class WriteRepository {
       if (head != null &&
           OutboxStatus.needsAttention.contains(head.status) &&
           head.op != 'delete') {
-        // La possession n'est PAS vérifiée ici. Elle l'est dans le `WHERE` de
-        // l'amendement, et là seulement : deux contrôles, l'un en Dart sur une
-        // ligne déjà lue, l'autre en SQL au moment d'écrire, se contrediraient
-        // un jour, et c'est le contrôle en Dart qui aurait tort. Un amendement
-        // refusé retombe sur l'empilement, voir [_amendInPlace].
         final bool amended = await _amendInPlace(
           head: head,
           payload: payload,
@@ -681,90 +525,16 @@ class WriteRepository {
             entityType: entityType,
             entityId: entityId,
             op: op,
-            // JSON brut, jamais un objet typé sérialisé : une opération peut
-            // rester en file à travers une mise à jour de l'app.
             payload: jsonEncode(payload),
             payloadVersion: const Value<int>(SyncEngine.payloadVersion),
             baseRev: Value<int?>(baseRev),
             status: const Value<String>(OutboxStatus.pending),
-            // Éligible tout de suite : le premier essai ne doit pas attendre.
             nextAttemptAt: now,
             createdAt: now,
           ),
         );
   }
 
-  /// Réécrit le payload d'une opération bloquée et la relance.
-  ///
-  /// Le nouveau contenu est **fusionné** sur l'ancien, il ne le remplace pas :
-  /// une `create` porte des champs qu'un `update` n'envoie pas
-  /// (`clientCreatedAt`), et les perdre ferait refuser la création par le
-  /// serveur pour un champ obligatoire manquant. L'opération garde donc sa
-  /// nature : on corrige ce qu'elle dit, pas ce qu'elle fait.
-  ///
-  /// ═══ UN PAYLOAD CORRIGÉ EST UNE OPÉRATION NEUVE, DONC UN `opId` NEUF ═══
-  ///
-  /// La correction gardait l'`opId` d'origine et n'effaçait que le `batchId`.
-  /// C'était insuffisant, parce que l'idempotence du serveur a DEUX niveaux :
-  /// le lot (`Idempotency-Key`) et **l'opération** (`claimOperation`,
-  /// `sync.service.ts`), qui mémorise un verdict par `opId` et le réémet tel
-  /// quel. La séquence perdait la correction sans laisser de trace :
-  ///
-  /// 1. l'envoi applique le payload P1, le serveur enregistre l'`opId` ;
-  /// 2. la réponse est illisible, le client la classe terminale, la ligne
-  ///    passe en `failed` ;
-  /// 3. l'utilisateur corrige, P2 est écrit sous le MÊME `opId` ;
-  /// 4. au rejeu, `claimOperation` reconnaît l'`opId` et rend le verdict
-  ///    mémorisé, celui de P1 ;
-  /// 5. le client lit un `duplicate` sans erreur, marque la ligne `done`.
-  ///
-  /// P2 n'est jamais parti, il a quitté la file, et un pull ultérieur restaure
-  /// P1 par-dessus. L'utilisateur voit sa correction s'enregistrer, puis
-  /// disparaître.
-  ///
-  /// Le `opId` est donc renouvelé, **dans la même instruction que le payload**,
-  /// donc dans la même transaction : les deux ne peuvent pas diverger. Rien
-  /// n'est à défaire côté serveur : l'ancienne opération a réellement eu lieu,
-  /// et son verdict mémorisé reste juste pour ce qu'elle était.
-  ///
-  /// ═══ ET L'AMENDEMENT NE VOLE JAMAIS UNE RÉSERVATION ═══
-  ///
-  /// L'écriture désignait la ligne par son seul `seq`, et remettait
-  /// inconditionnellement `claim_token` à NULL. Écrite ainsi, elle est la seule
-  /// mutation d'une ligne d'outbox qui **efface la possession de quelqu'un
-  /// d'autre** au lieu de la respecter : si un envoi était parti avec cette
-  /// ligne, l'amendement lui retirait sa ligne sous les pieds, lui donnait un
-  /// `opId` neuf, et la même intention utilisateur pouvait s'appliquer deux fois
-  /// côté serveur, une fois sous l'ancien identifiant encore en vol, une fois
-  /// sous le nouveau.
-  ///
-  /// La condition est donc reposée dans le `WHERE` ([_unclaimed]) et le nombre
-  /// de lignes touchées est relu : le lire en Dart puis écrire sans le reposer
-  /// laisse exactement la fenêtre qu'on prétend fermer.
-  ///
-  /// **Ce qu'on fait quand la ligne est réservée : on empile, on ne refuse
-  /// pas.** Les trois issues possibles étaient attendre, refuser, ou n'amender
-  /// que si la ligne est libre :
-  ///
-  /// * **attendre** demanderait de tenir la transaction d'enregistrement
-  ///   ouverte le temps d'un envoi réseau, c'est-à-dire de bloquer toute la base
-  ///   pendant une minute sur un lien lent ;
-  /// * **refuser** ferait remonter une exception depuis `updateProspect` ou
-  ///   `updateRepresentant`, donc annulerait la transaction appelante, donc
-  ///   **perdrait aussi l'écriture de la fiche métier**. C'est très exactement
-  ///   la promesse que cette classe ne rompt jamais : il n'existe aucun état
-  ///   atteignable où la frappe de l'utilisateur est perdue après qu'il a appuyé
-  ///   sur Enregistrer. Un défaut de concurrence ne justifie pas de la
-  ///   rétablir ;
-  /// * **empiler** est ce qui reste, et c'est correct : une ligne réservée est
-  ///   une ligne en cours d'envoi, donc pas une chaîne empoisonnée, donc rien
-  ///   n'empêche l'opération suivante de partir derrière elle. La correction
-  ///   devient une opération de plus dans la file au lieu d'une réécriture de
-  ///   celle qui vole. Elle n'est ni perdue, ni silencieuse : elle est visible
-  ///   dans le compteur d'attente et repart au prochain cycle.
-  ///
-  /// Renvoie `true` si la ligne a réellement été amendée, `false` s'il faut
-  /// empiler à la place.
   Future<bool> _amendInPlace({
     required OutboxData head,
     required Map<String, Object?> payload,
@@ -781,24 +551,16 @@ class WriteRepository {
               ..where((Outbox o) => o.seq.equals(head.seq) & _unclaimed(o)))
             .write(
       OutboxCompanion(
-        // Contenu neuf, donc opération neuve : voir la doc ci-dessus.
         id: Value<String>(Ids.newId()),
         payload: Value<String>(jsonEncode(merged)),
         payloadVersion: const Value<int>(SyncEngine.payloadVersion),
-        // Une création corrigée reste une création : la fiche n'existe pas
-        // encore côté serveur, donc il n'y a aucune révision à opposer.
         baseRev: head.op == 'create' ? const Value<int?>(null) : Value<int?>(baseRev),
         status: const Value<String>(OutboxStatus.pending),
-        // L'utilisateur vient d'agir : les compteurs repartent de zéro, sinon sa
-        // correction mourrait au premier échec avec huit essais déjà épuisés.
         attempts: const Value<int>(0),
         blockedAttempts: const Value<int>(0),
         nextAttemptAt: Value<DateTime>(now),
         leaseUntil: const Value<DateTime?>(null),
         claimToken: const Value<String?>(null),
-        // Contenu différent, donc clé d'idempotence différente. Rejouer
-        // l'ancienne ferait rendre au serveur le verdict mémorisé du contenu
-        // ERRONÉ, c'est-à-dire le refus que l'utilisateur vient de corriger.
         batchId: const Value<String?>(null),
         lastErrorCode: const Value<String?>(null),
         lastErrorMsg: const Value<String?>(null),
@@ -822,24 +584,7 @@ class WriteRepository {
     )..where((FormDrafts t) => t.draftId.equals(draftId))).go();
   }
 
-  // ── File « À corriger » ────────────────────────────────────────────────────
 
-  /// Remet une opération bloquée en file, immédiatement et compteur remis à zéro.
-  ///
-  /// Le compteur repart de zéro parce que l'utilisateur vient d'agir : soit il a
-  /// corrigé la saisie, soit il sait quelque chose que l'app ignore (le réseau
-  /// est revenu, le doublon a été supprimé côté web). Conserver huit tentatives
-  /// épuisées ferait mourir sa correction au premier échec.
-  /// **Le filtre sur `status` n'est pas une précaution, c'est la correction.**
-  /// Un `seq` désigne aussi bien une ligne en `syncing`, bail vivant, requête en
-  /// vol. La remettre en `pending` et effacer son bail la rend immédiatement
-  /// resélectionnable : le lot repart sous une clé d'idempotence neuve pendant
-  /// que le premier envoi est encore en cours, et le serveur applique deux fois
-  /// une écriture qu'il ne peut plus rapprocher. L'écran « À corriger » ne
-  /// montre que `conflict` et `failed` : ce sont donc les seuls états qu'un
-  /// « Réessayer » a le droit de toucher.
-  ///
-  /// Renvoie `true` si une ligne a réellement été remise en file.
   Future<bool> retryOperation(int seq) async {
     final int changed =
         await (_db.update(_db.outbox)..where(
@@ -861,86 +606,12 @@ class WriteRepository {
     return changed > 0;
   }
 
-  /// Supprime **une seule** opération, sans cascade et sans toucher aux lignes
-  /// métier.
-  ///
-  /// Le seul appelant légitime est la résolution « Rattacher mes prospects » :
-  /// après un remappage, la création du représentant est devenue inutile : la
-  /// fiche existe déjà côté serveur : mais ses prospects, eux, viennent d'être
-  /// repointés vers la bonne fiche et doivent partir. Passer par
-  /// [discardOperation] les emporterait avec elle, ce qui est exactement le
-  /// contraire de ce que l'utilisateur vient de demander.
-  ///
-  /// ═══ UN IDENTIFIANT D'OPÉRATION N'EST PAS UNE AUTORISATION DE SUPPRIMER ═══
-  ///
-  /// La suppression ne portait que sur `id`. Aucune des trois questions qui
-  /// décident d'un abandon n'était posée, alors que [discardOperation] les pose
-  /// toutes les trois à trois mètres d'ici :
-  ///
-  /// * **est-ce bien une création ?** Le contrat de la méthode le dit dans son
-  ///   nom, rien ne l'imposait. Un `id` périmé désignant un `update` ou un
-  ///   `delete` faisait disparaître une intention utilisateur que rien ne
-  ///   reconstruit : ni l'écran « À corriger », ni le prochain tirage, qui
-  ///   ramènerait la valeur d'avant sans que personne puisse dire pourquoi ;
-  /// * **la ligne est-elle libre ?** Non testée. Une création réservée est une
-  ///   création **en vol** : la supprimer pendant que le serveur l'applique
-  ///   laisse côté serveur un représentant que ce téléphone ne sait plus
-  ///   rattacher, et localement plus aucune trace de l'envoi. C'est exactement
-  ///   le défaut que [discardOperation] a fermé, resté ouvert sur cette
-  ///   porte-ci ;
-  /// * **la suppression a-t-elle touché ce qu'on avait lu ?** Non vérifié. Lire
-  ///   en Dart puis écrire sans reposer la condition dans le `WHERE` laisse
-  ///   précisément la fenêtre qu'on prétend fermer, et un `DELETE` qui ne touche
-  ///   rien est indiscernable d'un `DELETE` qui a réussi quand on ne compte pas.
-  ///
-  /// La possession est donc lue ([_isClaimed]) **et** reposée dans le `WHERE`
-  /// ([_unclaimed]), et le compte est relu : à la moindre divergence on annule
-  /// la transaction ([_ClaimRace]) au lieu de supposer que le `DELETE` a frappé
-  /// la ligne qu'on avait sous les yeux.
-  ///
-  /// **Le type d'entité est contraint lui aussi, à `representant`.** Il ne
-  /// l'était pas, au motif qu'ici il n'y a pas de cascade dont il déciderait, et
-  /// que « la fiche existe déjà côté serveur » : mais cette dernière phrase
-  /// n'est vraie que du seul appelant, qui vient de retrouver la fiche par
-  /// `lookupRepresentantByPhone`. Elle n'est vraie d'aucun prospect. Passé le
-  /// `id` d'une création de prospect, cette méthode retirait la ligne d'outbox
-  /// et laissait la ligne `prospects` derrière elle : les deux vues de synchro
-  /// dérivent `sync_status` de la présence d'une opération, donc la fiche
-  /// s'affichait **réglée** alors qu'elle n'a jamais quitté le téléphone, et
-  /// plus rien dans l'app ne pouvait la faire partir. Le défaut était latent,
-  /// pas vivant : le seul appelant passe une création de représentant. On ferme
-  /// la porte plutôt que de compter sur le fait que personne ne la pousse.
-  ///
-  /// La contrainte est posée **et reposée dans le `WHERE`**, comme les deux
-  /// autres, pour la même raison : une condition lue en Dart puis absente de la
-  /// suppression ne contraint rien.
-  ///
-  /// **Un refus est rendu, jamais silencieux**, et c'est ce qui distingue les
-  /// deux façons de ne rien supprimer :
-  ///
-  /// * [DiscardOutcome.claimed] : la création est en vol, l'appelant doit
-  ///   s'arrêter et réessayer plus tard ;
-  /// * [DiscardOutcome.notFound] : il n'y a plus rien à abandonner sous cet
-  ///   `id`, soit qu'un autre chemin l'ait déjà retiré, soit qu'une correction
-  ///   l'ait réécrit sous un `id` neuf ([_amendInPlace]), soit que la ligne ne
-  ///   soit pas une création de représentant. Pour l'appelant, c'est un succès :
-  ///   le but est que
-  ///   la création ne parte pas, et elle ne partira pas.
-  ///
-  /// **Ce que ce verrou ne couvre pas** est ce que [_isClaimed] documente :
-  /// après un `SyncEngine.reclaimExpiredLeases`, la ligne redevient
-  /// abandonnable alors qu'un envoi fantôme peut encore aboutir. L'idempotence
-  /// par `opId` rend ce résidu inoffensif pour un renvoi, pas pour une
-  /// suppression.
   Future<DiscardResult> discardOwnCreateOnly(String opId) async {
     try {
       return await _db.transaction(() async {
         final OutboxData? row = await (_db.select(
           _db.outbox,
         )..where((Outbox o) => o.id.equals(opId))).getSingleOrNull();
-        // Une ligne qui n'est pas une création de représentant n'est pas de
-        // notre ressort : on ne la supprime pas, et on ne prétend pas l'avoir
-        // fait.
         if (row == null ||
             row.op != 'create' ||
             row.entityType != 'representant') {
@@ -958,7 +629,6 @@ class WriteRepository {
                 ))
                 .go();
         if (removed != 1) {
-          // Une réservation est apparue entre la lecture et la suppression.
           throw const _ClaimRace();
         }
         return const DiscardResult(DiscardOutcome.discarded, removed: 1);
@@ -968,45 +638,6 @@ class WriteRepository {
     }
   }
 
-  /// Abandonne une opération.
-  ///
-  /// **Abandonner un `create` supprime en cascade toutes les opérations
-  /// ultérieures de la même `dependencyKey`.** Sans cette cascade, les prospects
-  /// saisis sous ce représentant partiraient vers un parent qui n'existera
-  /// jamais côté serveur : le serveur répondrait `REPRESENTANT_NOT_FOUND` à
-  /// chaque tentative, indéfiniment, et l'utilisateur verrait une file qui ne
-  /// se vide pas sans comprendre pourquoi.
-  ///
-  /// Les lignes métier correspondantes sont supprimées elles aussi : les
-  /// conserver afficherait des fiches que rien ne synchronisera plus jamais,
-  /// avec un badge « en attente » mensonger.
-  ///
-  /// ═══ POURQUOI LE BAIL NE DÉCIDE PLUS RIEN ICI ═══
-  ///
-  /// La garde lisait « `syncing` **et** bail encore valide ». Elle déclarait
-  /// donc abandonnable la ligne la plus dangereuse de la file : celle dont
-  /// l'envoi dure plus longtemps que son bail, ce qui est le cas ordinaire sur
-  /// un lien 2G. La suite est mécanique : la suppression retire la ligne
-  /// d'outbox et la fiche métier pendant que le serveur applique la requête, le
-  /// verdict revient et ne trouve plus de ligne où atterrir, et il reste côté
-  /// serveur un enregistrement que rien sur ce téléphone ne sait plus
-  /// rattacher : ni la liste, ni « À corriger », ni le prochain pull, qui le
-  /// ramènerait comme une fiche neuve que personne n'a demandée. Les données
-  /// locales, elles, sont parties.
-  ///
-  /// On lit donc la **possession** ([_isClaimed]) et non l'échéance, et on la
-  /// repose dans le `WHERE` de la suppression ([_unclaimed]) : lue en Dart puis
-  /// non reposée, elle ne fermerait pas la fenêtre qu'elle prétend fermer.
-  ///
-  /// **La cascade est vérifiée en entier, pas seulement la ligne visée.**
-  /// Abandonner la création d'un représentant emporte tous ses prospects : ils
-  /// sont réservés et envoyés dans le même lot que lui, donc les ignorer
-  /// revenait à ne contrôler qu'une des lignes qu'on supprime.
-  ///
-  /// **Un refus est rendu, pas silencieux.** L'attente est bornée : la reprise
-  /// des baux expirés (`SyncEngine.reclaimExpiredLeases`) tourne en tête de
-  /// chaque tour de vidange, réseau ou pas, et rend la ligne abandonnable dès
-  /// que son porteur est présumé mort.
   Future<DiscardResult> discardOperation(int seq) async {
     try {
       return await _db.transaction(() async {
@@ -1021,15 +652,6 @@ class WriteRepository {
           return const DiscardResult(DiscardOutcome.claimed);
         }
 
-        // L'outbox EN PREMIER, et sous garde de possession. C'est cette
-        // instruction qui décide : tant qu'elle n'a pas retiré exactement les
-        // lignes qu'on a lues, aucune fiche métier ne doit disparaître.
-        //
-        // `seq IN (…) AND non réservé` plutôt qu'une disjonction de
-        // `SyncEngine._ownedBy` ligne à ligne : les victimes viennent d'être
-        // relues non réservées, les deux formes sont donc équivalentes, et
-        // celle-ci ne construit pas un `OR` de deux cents termes qui frôlerait
-        // la profondeur d'expression maximale de SQLite.
         final List<int> seqs = victims
             .map((OutboxData v) => v.seq)
             .toList(growable: false);
@@ -1038,9 +660,6 @@ class WriteRepository {
               _db.outbox,
             )..where((Outbox o) => o.seq.isIn(seqs) & _unclaimed(o))).go();
         if (removed != victims.length) {
-          // Une réservation est apparue entre la lecture et la suppression. On
-          // annule tout : un abandon partiel laisserait une fiche métier sans
-          // opération, ou l'inverse.
           throw const _ClaimRace();
         }
 
@@ -1053,8 +672,6 @@ class WriteRepository {
             }
           }
         }
-        // Les représentants en dernier : `ON DELETE RESTRICT` interdit d'effacer
-        // un parent tant qu'un prospect le référence.
         for (final OutboxData victim in victims) {
           if (victim.op == 'create' && victim.entityType == 'representant') {
             await (_db.delete(
@@ -1070,20 +687,6 @@ class WriteRepository {
     }
   }
 
-  /// Les lignes qu'un abandon de [row] emporterait.
-  ///
-  /// La cascade ne vaut QUE pour la création du représentant, tête de la clé de
-  /// dépendance. Abandonner cette création-là condamne tout ce qui en dépend :
-  /// sans la cascade, les prospects partiraient vers un parent qui n'existera
-  /// jamais côté serveur.
-  ///
-  /// Un prospect abandonné, lui, ne retire que lui-même : ses frères ont leur
-  /// propre existence et le même parent, encore valide.
-  ///
-  /// **Extrait pour que [previewDiscard] compte exactement ce que
-  /// [discardOperation] supprime.** Tant que les deux passent par ici, la
-  /// phrase annoncée à l'utilisateur ne peut plus décrire un autre ensemble
-  /// que celui qui disparaît.
   Future<List<OutboxData>> _discardVictims(OutboxData row) async {
     if (row.op != 'create' ||
         row.entityType != 'representant' ||
@@ -1099,11 +702,6 @@ class WriteRepository {
         .get();
   }
 
-  /// Ce qu'un [discardOperation] sur `seq` détruirait, **sans rien détruire**.
-  ///
-  /// Sert la boîte de confirmation : voir [DiscardPreview] pour ce que le
-  /// compte fait depuis l'écran ratait. Un `seq` inconnu rend un compte nul :
-  /// il n'y a rien à annoncer, et l'abandon rendra `notFound`.
   Future<DiscardPreview> previewDiscard(int seq) async {
     final OutboxData? row = await (_db.select(
       _db.outbox,
@@ -1112,9 +710,6 @@ class WriteRepository {
       return const DiscardPreview(operations: 0, prospects: 0);
     }
     final List<OutboxData> victims = await _discardVictims(row);
-    // Seules les créations de prospect emportent une fiche métier : c'est ce
-    // que `discardOperation` supprime dans `prospects`. Une modification ou une
-    // suppression en file ne fait perdre que l'intention, pas la saisie.
     final int prospects = victims
         .where(
           (OutboxData v) => v.op == 'create' && v.entityType == 'prospect',

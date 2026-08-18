@@ -2,15 +2,6 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import type { DumpStatus } from './db-dump.job.js';
 
-/**
- * L'état d'un export intégral, tel que l'écran des paramètres le sonde.
- *
- * TOUS les champs facultatifs sont déclarés `nullable` et NON optionnels : le
- * serveur envoie toujours la clé. Un champ optionnel ferait engendrer côté Dart
- * un type non-nullable, et la désérialisation échouerait sur le premier `null`
- * reçu, c'est-à-dire immédiatement, puisqu'un travail qui vient d'être créé n'a
- * ni fichier, ni taille, ni échéance.
- */
 export class DatabaseDumpJobDto {
   @ApiProperty({
     description: 'Absent tant qu’aucun export n’a jamais été demandé.',

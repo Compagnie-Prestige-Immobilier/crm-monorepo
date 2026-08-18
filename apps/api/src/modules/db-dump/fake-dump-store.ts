@@ -16,29 +16,6 @@ import { DbDumpController } from './db-dump.controller.js';
 import { DbDumpService } from './db-dump.service.js';
 import { DUMP_RUNNER, type DumpRunner } from './db-dump.runner.js';
 
-/**
- * Montage d'essai de l'export intégral.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * CE QUI EST DOUBLÉ, ET CE QUI NE L'EST PAS
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * DOUBLÉ : `pg_dump` (il exige un binaire et un Postgres), `app_settings` et
- * `audit_logs` (une base), et l'envoi de notification (un compte Brevo).
- *
- * PAS DOUBLÉ, et c'est le point : le service lui-même, le contrôleur, le
- * routage Fastify, l'écriture RÉELLE de fichiers sur le disque, leur
- * destruction, le calcul du sha256, le flux de téléchargement. La doublure de
- * `pg_dump` écrit une VRAIE archive gzip dans le répertoire des exports ; tout
- * ce que le service en fait ensuite est exercé pour de bon.
- *
- * `FakeDumpStore` MÉMORISE ce qu'on lui écrit au lieu de rendre une valeur
- * figée. C'est indispensable : la moitié des tests consiste à écrire un état,
- * puis à vérifier qu'une seconde requête le relit et se comporte en
- * conséquence. Une doublure qui rendrait toujours la même ligne ne saurait pas
- * distinguer « refusé » de « enregistré puis relu ».
- */
-
 const SETTING_KEY = 'admin.database.dump';
 
 export interface AuditRow {
@@ -49,32 +26,10 @@ export interface AuditRow {
   after: unknown;
 }
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * LA DOUBLURE APPLIQUE LES PRÉDICATS. C'EST TOUT L'INTÉRÊT.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `create` refuse une clé déjà présente, et `updateMany` n'écrit QUE si son
- * `where` correspond, en rendant le nombre de lignes touchées. Sans cela, les
- * écritures conditionnelles du service (la prise du travail, la réservation du
- * téléchargement, l'écriture réservée au propriétaire de la ligne) réussiraient
- * toujours dans les tests, et les courses qu'elles existent pour arbitrer
- * seraient exactement les seules choses qu'aucun test ne verrait.
- *
- * Une doublure permissive fait passer les tests d'un verrou qui n'en est pas un.
- */
 export class FakeDumpStore {
   private value: string | null = null;
   readonly audits: AuditRow[] = [];
 
-  /**
-   * Posé pendant l'écriture conditionnelle, pour entrelacer deux appelants.
-   *
-   * C'est ce qui permet d'éprouver une VRAIE course : deux `request()` lancés
-   * ensemble, dont le second lit l'état pendant que le premier est suspendu
-   * juste avant d'écrire. Sans ce crochet, deux appels séquentiels ne
-   * prouveraient rien, la première écriture étant déjà commise.
-   */
   onBeforeConditionalWrite: (() => Promise<void>) | null = null;
 
   readonly appSetting = {
@@ -83,7 +38,6 @@ export class FakeDumpStore {
         where.key === SETTING_KEY && this.value !== null ? { value: this.value } : null,
       ),
 
-    /** La clé est la clé primaire : un second insérant échoue, comme en base. */
     create: ({ data }: { data: { key: string; value: string } }): Promise<{ value: string }> => {
       if (this.value !== null) {
         return Promise.reject(new Error('Unique constraint failed on the fields: (`key`)'));
@@ -101,8 +55,6 @@ export class FakeDumpStore {
     }): Promise<{ count: number }> => {
       const hook = this.onBeforeConditionalWrite;
       if (hook !== null) {
-        // Une seule fois : le crochet sert à ouvrir la fenêtre, pas à suspendre
-        // toutes les écritures qui suivent.
         this.onBeforeConditionalWrite = null;
         await hook();
       }
@@ -135,7 +87,6 @@ export class FakeDumpStore {
     },
   };
 
-  /** Écrit l'état directement, sans passer par les routes. */
   seed(job: Record<string, unknown>): void {
     this.value = JSON.stringify(job);
   }
@@ -149,18 +100,9 @@ export class FakeDumpStore {
   }
 }
 
-/**
- * Doublure de `pg_dump` : elle écrit une VRAIE archive gzip.
- *
- * Le contenu importe peu, sa validité si : le service en calcule le sha256, en
- * lit la taille, puis le sert en flux. Un fichier bidon de zéro octet ferait
- * passer un service qui n'écrirait jamais rien.
- */
 export class FakeDumpRunner implements DumpRunner {
   calls = 0;
-  /** Quand elle est posée, le lanceur échoue avec cette phrase. */
   failWith: string | null = null;
-  /** Retenue jusqu'à ce qu'on la relâche, pour observer l'état « running ». */
   private gate: Promise<void> | null = null;
   private open: (() => void) | null = null;
   private partial = false;
@@ -171,16 +113,6 @@ export class FakeDumpRunner implements DumpRunner {
     });
   }
 
-  /**
-   * Retient l'export APRÈS avoir créé sa sortie, comme le fait `pg_dump`.
-   *
-   * `hold()` seul retient AVANT le premier octet : le répertoire reste vide,
-   * et un balayage déclenché pendant ce temps n'aurait rien à effacer. Il ne
-   * peut donc pas montrer qu'un export en cours est protégé de lui, ce qui est
-   * précisément la propriété à exercer. `pg_dump` crée sa sortie dès le début
-   * et l'alimente pendant toute la durée de l'export ; c'est ce fichier-là,
-   * incomplet et vivant, que la doublure doit poser.
-   */
   holdWithOutput(): void {
     this.partial = true;
     this.hold();
@@ -208,15 +140,19 @@ export class FakeDumpRunner implements DumpRunner {
   }
 }
 
-/** Doublure de l'avis de fin. Elle enregistre ce qui lui a été demandé. */
 export class FakeNotifications {
-  readonly sent: { title: string; body: string; audienceUserIds?: string[] }[] = [];
+  readonly sent: {
+    title: string;
+    body: string;
+    route?: string;
+    audienceUserIds?: string[];
+  }[] = [];
   transportStatus: string | null = 'SENT';
   throwWith: string | null = null;
 
   create(
     _user: AuthenticatedUser,
-    body: { title: string; body: string; audienceUserIds?: string[] },
+    body: { title: string; body: string; route?: string; audienceUserIds?: string[] },
   ): Promise<{ transportStatus: string | null }> {
     if (this.throwWith !== null) return Promise.reject(new Error(this.throwWith));
     this.sent.push(body);
@@ -243,15 +179,6 @@ export interface DumpHarness {
   notifications: FakeNotifications;
 }
 
-/**
- * Monte l'application RÉELLE sur l'adaptateur Fastify, avec le préfixe et la
- * version de production.
- *
- * Le contrôleur est déclaré ici plutôt qu'en important `DbDumpModule` : ce
- * dernier importe `NotificationsModule`, donc l'ordonnanceur de rappels et
- * l'ensemble de la chaîne de notification. On veut exercer CE module, pas
- * démarrer le reste de l'API.
- */
 export async function createDumpApp(harness: {
   store: FakeDumpStore;
   runner: FakeDumpRunner;
@@ -278,8 +205,6 @@ export async function createDumpApp(harness: {
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1', prefix: 'v' });
 
-  // Le montage n'embarque pas les gardes globales : sans cette identité,
-  // `@CurrentUser()` lèverait avant même d'atteindre le service.
   const instance: FastifyInstance = app.getHttpAdapter().getInstance();
   instance.addHook(
     'onRequest',

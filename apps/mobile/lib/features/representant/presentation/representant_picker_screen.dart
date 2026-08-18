@@ -15,32 +15,6 @@ import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 
-/// Choisir un représentant existant.
-///
-/// ═══ POURQUOI CET ÉCRAN EXISTE ═══
-///
-/// Le routeur n'enregistrait que `/representants/nouveau` : depuis l'accueil, un
-/// commercial ne pouvait que **créer**. Ajouter des prospects à un représentant
-/// déjà en base supposait de passer par l'Historique et d'y trouver la bonne
-/// ligne : un détour que personne ne fait, si bien que la seule issue visible
-/// était de ressaisir la fiche. La détection de doublon par téléphone
-/// (`representant_form_screen.dart`) rattrapait ensuite le geste, mais après
-/// coup, et seulement si le numéro était tapé à l'identique.
-///
-/// Le parcours normal devient donc « choisir ». La création reste à un geste,
-/// en bas de cet écran, pour ce qu'elle est réellement : le cas d'une fiche qui
-/// naît en tournée.
-///
-/// ## Pourquoi ce n'est pas l'Historique
-///
-/// L'Historique est une vue d'audit : lignes dépliables vers leurs prospects,
-/// suppression par balayage, état de synchronisation cliquable. Ici, une seule
-/// question est posée et une seule réponse est attendue : quel représentant ?
-/// Un tap mène droit à la saisie de prospects, sans rien d'autre à décider.
-///
-/// **Tout vient de la base locale.** Aucune requête réseau : la sélection doit
-/// être instantanée et fonctionner dans un village sans couverture, c'est-à-dire
-/// là où l'application sert.
 class RepresentantPickerScreen extends ConsumerStatefulWidget {
   const RepresentantPickerScreen({super.key});
 
@@ -50,13 +24,6 @@ class RepresentantPickerScreen extends ConsumerStatefulWidget {
 }
 
 class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScreen> {
-  /// Le champ est PILOTÉ par le provider, il ne se contente pas de l'alimenter.
-  ///
-  /// Sans contrôleur, le terme de recherche vivait dans un `Notifier` de portée
-  /// racine pendant que le `TextField` repartait vide à chaque montage : revenir
-  /// sur cet écran affichait une boîte de recherche vide au-dessus d'une liste
-  /// toujours filtrée, et souvent le message « Aucun résultat » sans que rien
-  /// n'explique pourquoi.
   late final TextEditingController _search = TextEditingController(
     text: ref.read(representantPickerSearchProvider),
   );
@@ -77,11 +44,8 @@ class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScr
       representantPickerListProvider,
     );
     final String search = ref.watch(representantPickerSearchProvider);
-    // Une seule lecture de la liste des départements, transformée en index :
-    // résoudre le libellé ligne par ligne créerait une requête par
-    // représentant affiché.
     final Map<String, String> departements = <String, String>{
-      for (final Departement d in ref.watch(departementsProvider).value ?? const [])
+      for (final Departement d in ref.watch(departementsProvider(null)).value ?? const [])
         d.id: d.name,
     };
 
@@ -177,72 +141,82 @@ class _RepresentantRow extends StatelessWidget {
         ? Phone.format(data.phoneE164)
         : '${Phone.format(data.phoneE164)} · $departement';
 
-    return Semantics(
-      button: true,
-      label: '${data.fullName}, $subtitle. Ajouter des prospects.',
-      child: ExcludeSemantics(
-        child: InkWell(
-          // `push` et non `pushReplacement` : après avoir saisi les prospects
-          // d'un représentant, on revient souvent en choisir un autre dans la
-          // même concession. Remplacer l'écran obligerait à refaire le chemin
-          // depuis l'accueil à chaque fois.
-          onTap: () {
-            HapticFeedback.selectionClick();
-            context.pushOnce(Routes.newProspectFor(data.id));
-          },
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: kCpiMinTouchTarget + 12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: CpiSpacing.md,
-                vertical: CpiSpacing.sm,
-              ),
-              child: Row(
-                children: <Widget>[
-                  SyncStatusIcon(status: status, size: 20),
-                  const SizedBox(width: CpiSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+    void openDetail() {
+      HapticFeedback.selectionClick();
+      context.pushOnce(Routes.representantDetailFor(data.id));
+    }
+
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Semantics(
+            button: true,
+            label: '${data.fullName}, $subtitle. Ajouter des prospects.',
+            child: ExcludeSemantics(
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  context.pushOnce(Routes.newProspectFor(data.id));
+                },
+                onLongPress: openDetail,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: kCpiMinTouchTarget + 12,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      CpiSpacing.md,
+                      CpiSpacing.sm,
+                      CpiSpacing.xs,
+                      CpiSpacing.sm,
+                    ),
+                    child: Row(
                       children: <Widget>[
-                        Text(data.fullName, style: theme.textTheme.titleSmall),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        SyncStatusIcon(status: status, size: 20),
+                        const SizedBox(width: CpiSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Text(data.fullName, style: theme.textTheme.titleSmall),
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
+                        Icon(
+                          PhosphorIconsRegular.userPlus,
+                          size: 20,
+                          color: context.cpi.accentText,
                         ),
                       ],
                     ),
                   ),
-                  Icon(
-                    PhosphorIconsRegular.userPlus,
-                    size: 20,
-                    color: context.cpi.accentText,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
         ),
-      ),
+        IconButton(
+          tooltip: 'Ouvrir la fiche',
+          onPressed: openDetail,
+          icon: const Icon(PhosphorIconsRegular.caretRight, size: 20),
+        ),
+        const SizedBox(width: CpiSpacing.xxs),
+      ],
     );
   }
 }
 
-/// Création, en zone de pouce.
-///
-/// Elle reste pleine largeur et parfaitement visible : « choisir » est le cas
-/// courant, « créer » n'est pas pour autant à cacher : un représentant
-/// rencontré en tournée doit s'enregistrer sans chercher où.
 class _CreateBar extends StatelessWidget {
   const _CreateBar({required this.query});
 
-  /// La recherche en cours. Elle part avec l'utilisateur : chercher « Ousmane »,
-  /// ne pas le trouver, puis retaper « Ousmane » dans l'écran suivant est un
-  /// geste de plus au moment précis où l'on vient d'en faire un pour rien.
   final String query;
 
   @override
@@ -275,9 +249,6 @@ class _CreateBar extends StatelessWidget {
 class _Empty extends StatelessWidget {
   const _Empty({required this.searching});
 
-  /// Une recherche sans résultat et une base vide n'appellent pas le même
-  /// message : dans le premier cas il y a quelque chose à corriger, dans le
-  /// second il n'y a rien à trouver.
   final bool searching;
 
   @override

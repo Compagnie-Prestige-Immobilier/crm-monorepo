@@ -256,5 +256,6 @@ const _$RoleEnumMap = {
   Role.ADMIN: 'ADMIN',
   Role.COMMERCIAL: 'COMMERCIAL',
   Role.BANQUE_FINANCE: 'BANQUE_FINANCE',
+  Role.SUPERVISEUR: 'SUPERVISEUR',
   Role.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

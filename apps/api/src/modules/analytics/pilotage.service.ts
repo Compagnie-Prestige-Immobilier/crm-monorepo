@@ -20,19 +20,6 @@ import {
 import { DelayLeg } from './pilotage.dto.js';
 import type { AnalyticsDelaysDto, CampaignPilotageDto, DelayLegDto } from './pilotage.dto.js';
 
-/**
- * Pilotage de campagne et délais de la chaîne.
- *
- * Deux mesures que le produit possédait sans jamais les rendre : la campagne
- * n'affichait qu'une progression brute, et les horodatages de la chaîne
- * n'étaient lus par personne.
- *
- * Le filtre commun s'applique tel quel, pour qu'un chiffre de campagne
- * corresponde exactement à la population affichée par la liste. La visibilité
- * de démonstration est posée sur CHAQUE table jointe : le prospect ne suffit
- * pas, une tâche ou une tentative fictive accrochée à un prospect réel
- * fausserait le taux de contact.
- */
 @Injectable()
 export class PilotageService {
   constructor(
@@ -40,23 +27,14 @@ export class PilotageService {
     private readonly demo: DemoVisibilityService,
   ) {}
 
-  /**
-   * Tout ce qu'il faut pour savoir si une campagne tiendra ses délais.
-   *
-   * En l'absence de campagne précisée, la mesure porte sur les campagnes
-   * ACTIVES : c'est la question que se pose une direction devant son tableau
-   * de bord, et non le cumul historique de campagnes closes il y a un an.
-   *
-   * La date de fin projetée vaut NULL quand la cadence est nulle. Le rapport
-   * « reste à faire / cadence » n'a alors pas de valeur, et rendre une date
-   * lointaine plutôt que rien laisserait croire que la campagne avance.
-   */
   async campaignPilotage(
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
   ): Promise<CampaignPilotageDto> {
     const demoEnabled = await this.demo.enabled();
     const where = prospectConditions(user, filter, demoEnabled);
+    // Sans campagne précisée, la mesure porte sur les campagnes ACTIVES, pas sur
+    // le cumul historique.
     const scope = filter.campaignId
       ? Prisma.sql`cc."id" = ${filter.campaignId}`
       : Prisma.sql`cc."status" = 'ACTIVE'`;
@@ -138,9 +116,8 @@ export class PilotageService {
     const attempts = row?.tentatives ?? 0;
     const methods = row?.methodes ?? 0;
     const remaining = row?.restantes ?? 0;
-    // Cadence sur une fenêtre glissante de 7 jours : elle suit le rythme réel
-    // de l'équipe, là où une moyenne depuis l'ouverture reste plombée par les
-    // premiers jours de rodage bien après qu'ils sont passés.
+    // Cadence sur une fenêtre glissante de 7 jours : une moyenne depuis l'ouverture
+    // resterait plombée par les premiers jours de rodage.
     const observedPace = Math.round(((row?.closes7 ?? 0) / 7) * 10) / 10;
 
     return {
@@ -165,18 +142,6 @@ export class PilotageService {
     };
   }
 
-  /**
-   * Durées médianes des trois tronçons de la chaîne.
-   *
-   * `percentile_cont` plutôt qu'une moyenne : un dossier oublié six mois
-   * déplace une moyenne de plusieurs semaines et ferait passer un flux sain
-   * pour un flux bloqué. La médiane, elle, ne bouge pas.
-   *
-   * Un couple d'horodatages n'entre dans le calcul que s'il est COMPLET et
-   * dans le bon ordre. `clientCreatedAt` vient de l'horloge du téléphone, qui
-   * peut avancer sur celle du serveur : une durée négative n'est pas un délai
-   * court, c'est une mesure à jeter.
-   */
   async delays(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<AnalyticsDelaysDto> {
     const demoEnabled = await this.demo.enabled();
     const where = prospectConditions(user, filter, demoEnabled);
@@ -243,8 +208,6 @@ export class PilotageService {
     ): DelayLegDto => ({
       leg: key,
       label,
-      // Un tronçon sans échantillon rend NULL, jamais 0 : « aucune mesure » et
-      // « franchi le jour même » ne se lisent pas de la même façon.
       medianDays: taille ? days(milieu ?? null) : null,
       p90Days: taille ? days(queue ?? null) : null,
       sample: taille ?? 0,
@@ -272,14 +235,14 @@ export class PilotageService {
   }
 }
 
-/** Durée en jours entre deux colonnes de la table dérivée. */
 const duration = (from: Prisma.Sql, to: Prisma.Sql): Prisma.Sql =>
   Prisma.sql`EXTRACT(EPOCH FROM (${to} - ${from})) / 86400.0`;
 
-/** Couple exploitable : les deux bornes présentes, et dans l'ordre. */
+/** `clientCreatedAt` vient de l'horloge du téléphone : un couple incomplet ou inversé est une mesure à jeter, pas un délai court. */
 const usable = (from: Prisma.Sql, to: Prisma.Sql): Prisma.Sql =>
   Prisma.sql`${from} IS NOT NULL AND ${to} IS NOT NULL AND ${to} >= ${from}`;
 
+/** Médiane et non moyenne : un dossier oublié six mois déplacerait une moyenne de plusieurs semaines. */
 const median = (from: Prisma.Sql, to: Prisma.Sql): Prisma.Sql =>
   Prisma.sql`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${duration(from, to)})
     FILTER (WHERE ${usable(from, to)})::float8`;
@@ -291,13 +254,7 @@ const ninth = (from: Prisma.Sql, to: Prisma.Sql): Prisma.Sql =>
 const sample = (from: Prisma.Sql, to: Prisma.Sql): Prisma.Sql =>
   Prisma.sql`COUNT(*) FILTER (WHERE ${usable(from, to)})::int`;
 
-/**
- * Date de fin projetée, ou rien.
- *
- * Le calcul est délibérément grossier : reste à faire divisé par la cadence
- * observée, arrondi au jour supérieur. Il ne prétend pas modéliser les
- * week-ends ni les congés, il répond à « à ce rythme, on finit quand ».
- */
+/** Rien quand la cadence est nulle : une date lointaine laisserait croire que la campagne avance. */
 function projectEnd(remaining: number, pace: number): string | null {
   if (pace <= 0) return null;
   const jours = Math.ceil(remaining / pace);

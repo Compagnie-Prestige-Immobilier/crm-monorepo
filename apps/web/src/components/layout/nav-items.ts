@@ -2,15 +2,18 @@ import {
   ActivityIcon,
   BellIcon,
   ChartColumnIcon,
+  ClockIcon,
   FileSpreadsheetIcon,
-  HeadsetIcon,
   FolderOpenIcon,
+  HeadsetIcon,
   LayoutDashboardIcon,
   LibraryIcon,
   ListOrderedIcon,
   MegaphoneIcon,
+  PhoneForwardedIcon,
   PlusCircleIcon,
   SettingsIcon,
+  UploadIcon,
   UserPlusIcon,
   UsersIcon,
   UsersRoundIcon,
@@ -34,28 +37,20 @@ export interface NavSection {
   items: readonly NavItem[];
 }
 
-/**
- * Navigation du panel : DÉPENDANTE DU RÔLE, et pas seulement en apparence.
- *
- * Un agent BANQUE_FINANCE ne voit ni Prospects, ni Représentants, ni
- * Commerciaux, ni Campagnes, ni Référentiels. Ce n'est pas de la cosmétique :
- * l'API lui répondrait 403 sur chacun de ces écrans, et une entrée de menu qui
- * mène à un refus de droits est un défaut de conception, pas une protection.
- * Son métier tient en quatre gestes : regarder ses chiffres, ouvrir la liste de
- * ses dossiers, en créer un, exporter : et le menu ne montre que ceux-là.
- *
- * Le masquage ne remplace évidemment PAS le contrôle : chaque page serveur
- * vérifie le rôle de son côté (voir `lib/session.ts`). Ce fichier décide de ce
- * qui est PROPOSÉ ; la page décide de ce qui est SERVI.
- *
- * L'ordre suit le parcours réel de chaque rôle : on regarde les chiffres, puis
- * on descend vers le détail, puis vers les personnes, et seulement en dernier
- * vers la configuration.
- */
+/** Navigation filtrée par rôle ; l'autorisation serveur reste la règle. */
 const SECTIONS: readonly NavSection[] = [
   {
     title: null,
     items: [
+      {
+        // Écran d'accueil du SUPERVISEUR : c'est le seul qui montre le travail
+        // de chaque téléconseiller ligne à ligne.
+        href: '/supervision',
+        label: 'Supervision',
+        icon: ActivityIcon,
+        description: 'Activité et présence des téléconseillers',
+        roles: ['SUPERVISEUR'],
+      },
       {
         href: '/tableau-de-bord',
         label: 'Tableau de bord',
@@ -75,27 +70,61 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Statistiques',
         icon: ChartColumnIcon,
         description: 'Téléconseil et banques',
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'SUPERVISEUR'],
       },
       {
         href: '/prospects',
         label: 'Prospects',
         icon: UsersIcon,
         description: 'Liste filtrable et export',
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'SUPERVISEUR'],
       },
       {
         href: '/campagnes',
         label: 'Campagnes',
         icon: MegaphoneIcon,
-        /*
-          « programmes » est retiré : dans ce produit, un PROGRAMME est le PDF
-          imprimé qu'un téléconseiller emporte en tournée, et rien d'autre.
-          L'employer aussi pour désigner les campagnes elles-mêmes faisait du
-          même mot deux choses, dont l'une est un fichier.
-        */
         description: 'Campagnes d’appels prospects et représentants',
         roles: ['ADMIN'],
+      },
+    ],
+  },
+  {
+    title: 'Terrain',
+    items: [
+      {
+        href: '/console',
+        label: 'Console d’appel',
+        icon: HeadsetIcon,
+        description: 'File d’appels et qualification',
+        roles: ['ADMIN', 'COMMERCIAL'],
+      },
+      {
+        href: '/rappels',
+        label: 'Rappels',
+        icon: ClockIcon,
+        description: 'Échéances promises et retards',
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
+      },
+      {
+        href: '/representants',
+        label: 'Représentants',
+        icon: UsersRoundIcon,
+        description: 'Fiches et coordonnées',
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
+      },
+      {
+        href: '/suggestions',
+        label: 'Numéros suggérés',
+        icon: PhoneForwardedIcon,
+        description: 'Contacts nommés par les représentants',
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
+      },
+      {
+        href: '/prospects/nouveau',
+        label: 'Nouveau prospect',
+        icon: PlusCircleIcon,
+        description: 'Saisie d’un contact',
+        roles: ['ADMIN', 'COMMERCIAL'],
       },
     ],
   },
@@ -172,17 +201,10 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN'],
       },
       {
-        href: '/representants',
-        label: 'Représentants',
-        icon: UsersRoundIcon,
-        description: 'Fiches et coordonnées',
-        roles: ['ADMIN'],
-      },
-      {
         href: '/commerciaux',
-        label: 'Téléconseillers',
-        icon: HeadsetIcon,
-        description: 'Comptes et activité',
+        label: 'Utilisateurs',
+        icon: UsersIcon,
+        description: 'Comptes, rôles et accès',
         roles: ['ADMIN'],
       },
       {
@@ -197,6 +219,15 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Référentiels',
         icon: LibraryIcon,
         description: 'Départements, banques, syndicats',
+        roles: ['ADMIN'],
+      },
+      {
+        // Après les référentiels : un classeur ne peut nommer que des banques,
+        // syndicats, départements et IEF déjà enregistrés.
+        href: '/imports',
+        label: 'Imports',
+        icon: UploadIcon,
+        description: 'Dépôt de classeurs et suivi des travaux',
         roles: ['ADMIN'],
       },
       {
@@ -226,10 +257,9 @@ export function navItems(role: Role): NavItem[] {
 /**
  * Écran d'atterrissage après connexion.
  *
- * COMMERCIAL n'a pas de panel : il est refusé à la porte (voir
- * `lib/data/auth.ts`). La fonction lui renvoie tout de même la connexion plutôt
- * qu'une exception : un rôle ajouté demain au contrat ne doit pas faire tomber
- * l'écran de login.
+ * Un rôle sans écran d'accueil retombe sur la connexion, que `/connexion`
+ * renvoie aussitôt ici : la valeur par défaut n'existe que pour un rôle ajouté
+ * demain au contrat, jamais pour un rôle admis dans le panel.
  */
 export function homePathForRole(role: Role): string {
   switch (role) {
@@ -237,6 +267,10 @@ export function homePathForRole(role: Role): string {
       return '/tableau-de-bord';
     case 'BANQUE_FINANCE':
       return '/dossiers';
+    case 'COMMERCIAL':
+      return '/console';
+    case 'SUPERVISEUR':
+      return '/supervision';
     default:
       return '/connexion';
   }

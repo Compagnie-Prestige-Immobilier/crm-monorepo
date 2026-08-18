@@ -10,19 +10,7 @@ import { representantFiltersQueryKey, type RepresentantFilters } from '@/lib/rep
 import { userFiltersQueryKey, type UserFilters } from '@/lib/user-filters';
 import type { CampaignScope, ProspectFilters } from '@/lib/types';
 
-/**
- * Toutes les clés de cache en un seul endroit.
- *
- * Le tableau et les graphiques dérivent la leur du MÊME objet de filtre :
- * invalider `prospects` invalide les deux, et il n'existe pas d'état où le
- * graphique montre une période et le tableau une autre.
- *
- * Les clés de liste sont préfixées (`['prospects', …]`) pour qu'une mutation
- * puisse invalider TOUTES les pages et tous les filtres d'une entité d'un seul
- * appel : `invalidateQueries({ queryKey: queryKeys.prospectsRoot })`. Invalider
- * la seule combinaison de filtres affichée laisserait les autres pages en cache
- * avec la donnée d'avant.
- */
+/** Clés de cache des listes, détails et tableaux de bord associés. */
 export const queryKeys = {
   session: ['session'] as const,
   reference: ['reference'] as const,
@@ -34,11 +22,7 @@ export const queryKeys = {
   dashboardRoot: ['dashboard'] as const,
   dashboard: (filters: ProspectFilters) => ['dashboard', filtersQueryKey(filters)] as const,
 
-  /**
-   * L'entonnoir et les montants. Clé DÉRIVÉE du même objet de filtre que le
-   * reste du tableau de bord : le total encaissé décrit forcément la population
-   * des compteurs affichés au-dessus de lui.
-   */
+  /** Dérivée des mêmes filtres que les compteurs du tableau de bord. */
   funnelRoot: ['funnel'] as const,
   funnel: (filters: ProspectFilters) => ['funnel', filtersQueryKey(filters)] as const,
 
@@ -61,21 +45,11 @@ export const queryKeys = {
   campaignsRoot: ['campaigns'] as const,
   campaigns: (filters: CampaignFilters) => ['campaigns', campaignFiltersQueryKey(filters)] as const,
   campaign: (id: string) => ['campaigns', 'detail', id] as const,
-  /**
-   * L'aperçu dépend du périmètre ET du nombre de destinataires : deux clés
-   * distinctes, sinon changer de segment afficherait l'ancien décompte le temps
-   * d'un aller-retour : exactement le chiffre sur lequel l'administrateur va
-   * fonder sa décision.
-   */
+  /** Contient chaque entrée qui modifie le résultat de l'aperçu. */
   campaignPreview: (scope: CampaignScope, commercialCount: number, spreadDays: number) =>
     ['campaigns', 'preview', scope, commercialCount, spreadDays] as const,
 
-  /**
-   * Campagnes REPRÉSENTANTS : module séparé côté API, cache séparé ici.
-   * Partager la racine `campaigns` ferait qu'une création de campagne
-   * prospects invaliderait la liste des représentants, et réciproquement : deux
-   * listes qui se rechargent sans raison sur un écran à onglets.
-   */
+  /** Racine distincte : les campagnes représentants sont une ressource API séparée. */
   repCampaignsRoot: ['rep-campaigns'] as const,
   repCampaigns: (filters: RepCampaignFilters) =>
     ['rep-campaigns', repCampaignFiltersQueryKey(filters)] as const,
@@ -112,46 +86,25 @@ export const queryKeys = {
     ['client-requests', clientRequestFiltersQueryKey(filters)] as const,
 
   // ─── Notifications reçues (cloche de la barre supérieure) ─────────────────
-  /**
-   * La boîte de réception PERSONNELLE, distincte des clés de composition
-   * (`components/notifications/api.ts`) : deux publics, deux caches. Un admin
-   * qui compose une annonce ne doit pas voir sa propre cloche se recharger, et
-   * marquer une ligne lue ne doit pas invalider l'historique d'envoi.
-   */
-  /**
-   * `inboxRoot` sert à INVALIDER, `inbox` à LIRE le panneau de la cloche. Même
-   * valeur aujourd'hui, deux intentions : marquer une notification lue doit
-   * rafraîchir la cloche ET toutes les pages de l'écran complet, sans que
-   * l'appelant ait à connaître leur découpage.
-   */
+  /** La racine invalide la cloche et ses pages ; `inbox` lit la cloche. */
   inboxRoot: ['inbox'] as const,
   inbox: ['inbox'] as const,
-  /**
-   * L'ÉCRAN complet de la boîte, paginé. Préfixé par `inbox` pour qu'un
-   * marquage en lu invalide d'un seul appel la cloche et toutes les pages :
-   * sinon la pastille retomberait à zéro pendant que la liste garderait ses
-   * lignes en gras.
-   */
   inboxPage: (page: number, unreadOnly: boolean) => ['inbox', 'page', page, unreadOnly] as const,
 
   // ─── Mode démonstration ───────────────────────────────────────────────────
   demoStatus: ['demo-status'] as const,
-  /**
-   * Le BANDEAU global, sondé sur tous les écrans du panel.
-   *
-   * Une clé distincte de `demoStatus`, et préfixée par elle. Distincte parce
-   * que les deux lectures n'ont ni la même forme ni le même rythme : la carte
-   * de réglages lit l'état complet (compteurs, `canToggle`, `reason`) une fois
-   * à l'ouverture, le bandeau ne retient que `enabled` et `seededAt` et les
-   * resonde lentement, pour tous les rôles. Préfixée parce qu'une bascule
-   * invalide `demoStatus` : le préfixe fait tomber le bandeau dans le même
-   * appel, sans que l'opérateur attende le cycle suivant.
-   */
+  /** Clé du sondage du bandeau, imbriquée pour partager l'invalidation. */
   demoBanner: ['demo-status', 'banner'] as const,
 
   // ─── Administration ───────────────────────────────────────────────────────
   purgeCatalog: ['purge-catalog'] as const,
   supervision: ['supervision'] as const,
+
+  /** Racine partagée : appliquer une simulation change la ligne du suivi ET de l'historique. */
+  importsRoot: ['imports'] as const,
+  importJobs: (page: number) => ['imports', 'page', page] as const,
+  importJob: (id: string) => ['imports', 'detail', id] as const,
+
   androidUpdate: ['android-update'] as const,
   /** Export intégral de la base : sondé pendant que `pg_dump` tourne. */
   databaseDump: ['database-dump'] as const,
@@ -160,14 +113,7 @@ export const queryKeys = {
   statsRoot: ['stats'] as const,
   statsTeleconseil: (filters: ProspectFilters) =>
     ['stats', 'teleconseil', filtersQueryKey(filters)] as const,
-  /**
-   * Les volets ajoutés (pilotage de campagne, délais, cohortes, qualité de
-   * base, rendement) portent leur PROPRE clé alors qu'ils partagent le même
-   * objet de filtre. C'est voulu : le volet téléconseil se rafraîchit en
-   * continu (`useLive`), et faire dépendre huit requêtes analytiques lourdes du
-   * même cycle multiplierait la charge SQL par huit pour des chiffres qui ne
-   * bougent pas à la minute.
-   */
+  /** Des clés séparées évitent de coupler les volets lourds au rafraîchissement live. */
   statsCampagnes: (filters: ProspectFilters) =>
     ['stats', 'campagnes', filtersQueryKey(filters)] as const,
   statsDelais: (filters: ProspectFilters) => ['stats', 'delais', filtersQueryKey(filters)] as const,

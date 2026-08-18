@@ -18,9 +18,6 @@ export default async function CampagnesPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  // Les campagnes montrent la répartition du travail entre téléconseillers :
-  // l'API les réserve à l'ADMIN, et l'écran coupe en amont plutôt que de se
-  // construire puis d'échouer en 403 sur chaque requête.
   const guard = await guardRoles(['ADMIN']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
@@ -29,8 +26,6 @@ export default async function CampagnesPage({
     );
   }
 
-  // Filtres lus dans l'URL côté serveur : un lien partagé s'ouvre directement
-  // sur la bonne liste, sans état vide intermédiaire.
   const filters = parseCampaignFilters(await searchParams);
   const queryClient = getQueryClient();
   await queryClient.prefetchQuery({

@@ -54,17 +54,10 @@ export class AppUpdatesController {
       'application/vnd.android.package-archive': { schema: { type: 'string', format: 'binary' } },
     },
   })
-  // Les reprises de téléchargement font partie du contrat de cette route : le
-  // DownloadManager Android renvoie un `Range`, le service répond 206, et une
-  // plage impossible à satisfaire donne 416.
   @ApiResponse({ status: 206, description: 'Reprise de téléchargement (en-tête Range).' })
   @ApiResponse({
     status: 416,
     description: 'Plage demandée hors du fichier.',
-    // `@ApiProduces` s'applique à TOUTES les réponses de la route, y compris
-    // aux erreurs : sans ce `content` explicite, le contrat annonçait un corps
-    // d'erreur servi en APK, alors qu'une erreur sort toujours en JSON. Les
-    // générateurs en tiraient un désérialiseur incapable de lire le refus.
     content: { 'application/json': { schema: { $ref: getSchemaPath(ApiErrorDto) } } },
   })
   download(@Res() reply: FastifyReply): Promise<void> {

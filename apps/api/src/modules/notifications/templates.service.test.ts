@@ -6,25 +6,6 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { NotificationTemplatesService } from './templates.service.js';
 
-/**
- * Gabarits de notification, et visibilité de démonstration.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * LE DÉFAUT CORRIGÉ
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `NotificationTemplate` porte `isDemo` dans le schéma. Ce service était le
- * seul à l'ignorer complètement : il créait sans la renseigner, la colonne
- * prenait son défaut FALSE, et il lisait sans cloisonner.
- *
- * Un gabarit rédigé pendant une démonstration restait donc dans le compositeur
- * d'une plateforme en service, avec un texte d'exemple que quelqu'un finit par
- * envoyer pour de bon.
- *
- * Le balayage `demo-visibility.sweep.test.ts` ne le voyait pas : sa liste de
- * modèles ne contenait aucun des trois modèles de notification.
- */
-
 type MockFn = ReturnType<typeof vi.fn>;
 
 interface MockDb {
@@ -116,11 +97,6 @@ describe('cloisonnement des lectures', () => {
     expect(where.isDemo).toBe(false);
   });
 
-  /**
-   * La résolution par identifiant compte autant que la liste : sans elle, un
-   * gabarit masqué reste relisible, modifiable et rendu par son identifiant, et
-   * le masquage ne couvre que l'écran qui l'énumère.
-   */
   it.each([
     ['get', (s: NotificationTemplatesService) => s.get('tpl-1')],
     ['update', (s: NotificationTemplatesService) => s.update('tpl-1', { name: 'Autre' })],
@@ -132,8 +108,6 @@ describe('cloisonnement des lectures', () => {
       response: { code: 'NOTIFICATION_TEMPLATE_NOT_FOUND' },
     });
 
-    // Ce n'est pas l'identifiant qui manque, c'est la portée : la lecture
-    // compose bien `isDemo`, sans quoi la ligne serait rendue.
     expect(whereOf(db.notificationTemplate.findFirst)).toMatchObject({
       id: 'tpl-1',
       isDemo: false,

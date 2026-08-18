@@ -32,26 +32,6 @@ import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
 import type { NamedCount } from '@/lib/types';
 
-/**
- * Les blocs ajoutés au volet téléconseil.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Ils répondent à des questions que le produit stockait sans jamais les poser.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Les horodatages existent depuis toujours ; personne ne les lisait, donc
- * personne ne savait combien de temps met un prospect à devenir un
- * encaissement. Les cohortes hebdomadaires sont la seule mesure qui distingue
- * une amélioration réelle d'un effet de volume : deux mois de suite à
- * « 400 prospects » ne disent rien tant qu'on ne sait pas ce que la cohorte de
- * mars est devenue en juin.
- *
- * Chaque bloc porte sa PROPRE requête, avec le même objet de filtre que la
- * liste : les charger ensemble ferait attendre la tuile la plus rapide derrière
- * la plus lente, à chaque changement de critère.
- */
-
-/** Les trois tronçons de la chaîne, en durées médianes. */
 export function DelaysStrip() {
   const { filters } = useProspectFilters();
 
@@ -61,23 +41,6 @@ export function DelaysStrip() {
     placeholderData: keepPreviousData,
   });
 
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * L'ÉCHEC PASSAIT PAR LA BRANCHE DU CHARGEMENT
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * TanStack pose `isPending: false` ET `data: undefined` quand la requête
-   * échoue. La condition `isPending || data === undefined` attrapait donc les
-   * deux états sans les distinguer, et l'échec s'affichait en squelettes — pour
-   * toujours, puisque plus rien ne les remplacera.
-   *
-   * Devant trois squelettes, personne ne soupçonne une panne : on attend. C'est
-   * la variante silencieuse du défaut corrigé ailleurs par `QueryErrorState`,
-   * et elle est pire, parce qu'elle ne propose même pas de réessayer.
-   *
-   * `shouldShowError` et non `isError` nu : un cycle de sondage raté ne doit pas
-   * effacer des chiffres déjà lisibles à l'écran.
-   */
   if (shouldShowError({ isError, hasData: data !== undefined })) {
     return (
       <QueryErrorInline
@@ -121,7 +84,6 @@ export function DelaysStrip() {
   );
 }
 
-/** Cohortes, productivité des représentants, rendement, provenance. */
 export function PortfolioBlocks() {
   const { filters } = useProspectFilters();
 
@@ -149,24 +111,6 @@ export function PortfolioBlocks() {
     placeholderData: keepPreviousData,
   });
 
-  /**
-   * Le rendement est classé sur la CONVERSION, pas sur le volume : le
-   * classement par volume existe déjà juste au-dessus (« Départements »), et
-   * le répéter n'apprendrait rien. Un département qui apporte peu mais convertit
-   * bien est exactement ce que ce graphique doit faire remonter.
-   */
-  /**
-   * On écarte les départements dont le taux est `null`, et non ceux dont le
-   * nombre de prospects est nul.
-   *
-   * Les deux coïncident aujourd'hui, mais le critère juste est le SECOND :
-   * `null` est exactement ce que l'API rend quand le rapport n'a pas de
-   * dénominateur, donc la seule condition dont dépend réellement la barre. Le
-   * filtre sur `prospects` est une déduction sur la façon dont le taux est
-   * calculé côté serveur : elle tomberait en silence le jour où le calcul
-   * changerait, et le graphique dessinerait des barres à zéro là où il n'y a
-   * rien à dessiner.
-   */
   const yieldItems: NamedCount[] = groupTail(
     (yields.data?.items ?? []).flatMap((row) =>
       row.conversionRate === null
@@ -183,21 +127,6 @@ export function PortfolioBlocks() {
 
   const dormant = (productivity.data?.items ?? []).filter((row) => row.dormant);
 
-  /**
-   * Une par requête, et NON un drapeau commun aux quatre.
-   *
-   * Les quatre blocs portent leur propre requête pour que le plus rapide ne
-   * patiente pas derrière le plus lent ; les fondre dans un seul « une erreur
-   * quelque part » effacerait trois blocs valides pour un seul en panne, ce qui
-   * annulerait l'intérêt de les avoir séparés.
-   *
-   * Sans ces quatre lignes, l'échec se déguisait selon le bloc : un graphique
-   * VIDE pour le rendement et la provenance (`data?.items ?? []` rend un tableau
-   * vide, que le graphique dessine sans broncher), et un « Calcul en cours… »
-   * PERPÉTUEL pour les cohortes et la productivité. Un graphique vide est le
-   * plus grave des deux : il ne se contente pas de cacher la panne, il affirme
-   * qu'il n'y a rien à montrer.
-   */
   const yieldsFailed = shouldShowError({
     isError: yields.isError,
     hasData: yields.data !== undefined,

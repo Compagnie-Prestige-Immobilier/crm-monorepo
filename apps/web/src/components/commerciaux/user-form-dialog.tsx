@@ -31,19 +31,11 @@ import { withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { userFormSchema, type UserFormInput } from '@/lib/schemas';
-import type { CreateUserInput, UpdateUserInput, UserRow } from '@/lib/types';
+import { ROLE_LABELS, type CreateUserInput, type UpdateUserInput, type UserRow } from '@/lib/types';
+import { ROLES } from '@/lib/user-filters';
 
-/** Valeur du `Select` signifiant « aucun département ». */
 const NO_DEPARTEMENT = '__aucun__';
 
-/**
- * Création et modification d'un compte de téléconseiller.
- *
- * Un seul composant pour les deux : les champs sont identiques à un près (le
- * mot de passe, exigé à la création et jamais modifiable ici : la
- * réinitialisation passe par un endpoint dédié). Deux formulaires jumeaux
- * finissent toujours par diverger sur une validation.
- */
 export function UserFormDialog({
   open,
   onOpenChange,
@@ -51,7 +43,6 @@ export function UserFormDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** `undefined` = création. */
   user?: UserRow | undefined;
 }) {
   const isEdit = user !== undefined;
@@ -77,8 +68,6 @@ export function UserFormDialog({
 
   const { register, handleSubmit, reset, setValue, watch, formState } = form;
 
-  // Le formulaire est remonté à chaque ouverture : rouvrir sur un autre compte
-  // ne doit pas laisser traîner les valeurs du précédent.
   useEffect(() => {
     if (!open) return;
     reset({
@@ -88,6 +77,7 @@ export function UserFormDialog({
       phone: user?.phoneE164 ?? '',
       departementId: user?.departementId ?? NO_DEPARTEMENT,
       password: '',
+      ...(user ? { role: user.role } : {}),
     });
   }, [open, user, reset]);
 
@@ -104,13 +94,8 @@ export function UserFormDialog({
           email: values.email,
           username: values.username,
           fullName: values.fullName,
-          // `role` est obligatoire dans le contrat (il porte un défaut). On
-          // renvoie celui du compte plutôt que la constante « COMMERCIAL » :
-          // sinon modifier l'e-mail d'un administrateur le rétrograderait.
-          role: user.role,
+          role: values.role,
         };
-        // `exactOptionalPropertyTypes` : une clé absente ne modifie rien, une
-        // clé à `undefined` serait sérialisée en `null` et effacerait la valeur.
         if (departementId !== undefined) patch.departementId = departementId;
         if (phone !== undefined) patch.phone = phone;
         return updateUser(user.id, patch);
@@ -121,18 +106,14 @@ export function UserFormDialog({
         username: values.username,
         fullName: values.fullName,
         password: values.password,
-        role: 'COMMERCIAL',
+        role: values.role,
       };
       if (departementId !== undefined) body.departementId = departementId;
       if (phone !== undefined) body.phone = phone;
       return createUser(body);
     },
     onSuccess: (saved) => {
-      // Racine de la clé : toutes les pages et tous les filtres de la liste
-      // sont invalidés, pas seulement la combinaison affichée.
       void queryClient.invalidateQueries({ queryKey: queryKeys.commerciauxRoot });
-      // Le nouveau téléconseiller doit apparaître immédiatement dans le combobox de
-      // filtre des prospects, sinon on ne peut pas voir ses saisies.
       void queryClient.invalidateQueries({ queryKey: queryKeys.reference });
       toast.success(
         isEdit ? `Compte de ${saved.fullName} mis à jour.` : `Compte de ${saved.fullName} créé.`,
@@ -148,18 +129,26 @@ export function UserFormDialog({
   });
 
   const departementId = watch('departementId');
+  const role = watch('role') as UserFormInput['role'] | undefined;
+
+  const roleItems = ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }));
+  const departementItems = [
+    { value: NO_DEPARTEMENT, label: 'Aucun' },
+    ...(reference?.departements ?? []).map((departement) => ({
+      value: departement.id,
+      label: withRetired(departement.name, departement.isActive),
+    })),
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>
-            {isEdit ? 'Modifier le téléconseiller' : 'Nouveau téléconseiller'}
-          </DialogTitle>
+          <DialogTitle>{isEdit ? 'Modifier le compte' : 'Nouvel utilisateur'}</DialogTitle>
           <DialogDescription>
             {isEdit
               ? 'Le mot de passe n’est pas modifiable ici.'
-              : 'Compte de connexion à l’application mobile CPI GO.'}
+              : 'Le rôle décide de ce que le compte pourra consulter.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -208,11 +197,64 @@ export function UserFormDialog({
             )}
           </Field>
 
+          {/*
+            LE RÔLE, PLACÉ AVANT LE DÉPARTEMENT parce qu'il commande la suite :
+            c'est lui qui décide de ce que le compte verra en se connectant, et
+            le département n'a de sens que pour un téléconseiller.
+
+            Sans ce champ, la création posait « COMMERCIAL » en dur : aucun
+            compte bancaire ne pouvait naître depuis le panel, alors que tout
+            l'espace « Dossiers » leur est destiné.
+          */}
+          <Field
+            label="Rôle"
+            required
+            description={
+              role === 'BANQUE_FINANCE'
+                ? 'Accède aux dossiers bancaires, pas aux prospects.'
+                : role === 'ADMIN'
+                  ? 'Accès complet, y compris les comptes et les référentiels.'
+                  : role === 'COMMERCIAL'
+                    ? 'Saisit les prospects depuis l’application mobile.'
+                    : role === 'SUPERVISEUR'
+                      ? 'Suit le travail des téléconseillers, en lecture. Ne saisit rien.'
+                      : 'Décide de ce que le compte pourra consulter.'
+            }
+            error={formState.errors.role?.message}
+          >
+            {(props) => (
+              <Select
+                items={roleItems}
+                value={role ?? ''}
+                onValueChange={(value) => {
+                  if (value === null) return;
+                  setValue('role', value as UserFormInput['role'], {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
+                }}
+              >
+                <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
+                  <SelectValue placeholder="Choisir un rôle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roleItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+
           <Field label="Département" error={formState.errors.departementId?.message}>
             {(props) => (
               <Select
+                items={departementItems}
                 value={departementId}
                 onValueChange={(value) => {
+                  if (value === null) return;
                   setValue('departementId', value, { shouldDirty: true });
                 }}
               >
@@ -220,10 +262,9 @@ export function UserFormDialog({
                   <SelectValue placeholder="Aucun" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_DEPARTEMENT}>Aucun</SelectItem>
-                  {(reference?.departements ?? []).map((departement) => (
-                    <SelectItem key={departement.id} value={departement.id}>
-                      {withRetired(departement.name, departement.isActive)}
+                  {departementItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -3,19 +3,6 @@ import { Role } from '@crm/database';
 
 import { PRESENCE_ONLINE_WINDOW_MINUTES, type PresenceState } from './presence.js';
 
-/**
- * Supervision des comptes, téléconseillers et pôle Finances générales.
- *
- * Les dates sont renvoyées BRUTES, en ISO 8601, jamais mises en forme ni
- * transformées en « il y a 4 minutes ». Un libellé relatif calculé côté serveur
- * vieillit dans le cache du navigateur : au bout de dix minutes il annonce
- * encore « il y a 4 minutes ». Le rendu relatif est un travail d'écran.
- *
- * `observedAt` accompagne la réponse pour que l'écran calcule ces écarts contre
- * l'horloge du SERVEUR. Sans lui, un poste dont l'horloge avance de deux
- * minutes afficherait des activités « dans le futur ».
- */
-
 export const PRESENCE_STATES = ['ONLINE', 'RECENT', 'AWAY'] as const;
 
 export class SupervisedUserDto {
@@ -62,7 +49,36 @@ export class SupervisedUserDto {
     type: String,
     format: 'date-time',
     nullable: true,
-    description: 'Dernière écriture métier : tentative d’appel ou transition de dossier.',
+    description:
+      'Dernière synchronisation descendante. Un appareil ouvert appelle toutes ' +
+      'les minutes, même quand il n’a rien à remonter.',
+  })
+  lastPullAt!: string | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Opérations en attente de remontée dans l’appareil, DÉCLARÉES PAR LUI. ' +
+      '`null` quand l’application ne les annonce pas : le serveur ne voit pas ' +
+      'ce qui dort dans un téléphone.',
+  })
+  pendingOps!: number | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Version de l’application mobile, telle qu’elle s’annonce.',
+  })
+  appVersion!: string | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description:
+      'Dernière écriture métier : tentative d’appel ou transition de dossier. ' +
+      'Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.',
   })
   lastWriteAt!: string | null;
 }

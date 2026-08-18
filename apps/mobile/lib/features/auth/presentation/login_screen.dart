@@ -8,11 +8,6 @@ import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../auth_state.dart';
 
-/// Écran de connexion.
-///
-/// Fond bordeaux plein et logo inversé (`cpi-header.png`) : c'est le seul écran
-/// où la marque occupe toute la surface, et le seul où l'on peut se le
-/// permettre : après, chaque pixel sert la saisie.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -47,8 +42,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           password: _password.text,
           staySignedIn: _staySignedIn,
         );
-    // La redirection est faite par le garde de go_router : il connaît le
-    // paramètre `next`, l'écran non.
   }
 
   @override
@@ -58,9 +51,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final CpiColors cpi = context.cpi;
     const Color burgundy = Color(0xFF630210);
 
-    // `colorScheme.error` (#B91C1C) ne fait que 2,10:1 sur le bordeaux : les
-    // messages de validation étaient posés à même le fond plein de cet écran,
-    // donc illisibles. `destructiveOnDark` (#F87171) passe à 4,91:1.
     final TextStyle errorStyle = (theme.textTheme.bodyMedium ?? const TextStyle())
         .copyWith(color: cpi.destructiveOnDark, fontWeight: FontWeight.w600);
     final OutlineInputBorder errorBorder = OutlineInputBorder(
@@ -94,10 +84,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      // Version inversée du logo, réservée aux fonds bordeaux.
-                      // Dimensions imposées : sans `cacheWidth`, Flutter décode
-                      // le PNG à sa taille native et garde le bitmap complet en
-                      // mémoire : coûteux sur un appareil d'entrée de gamme.
                       Center(
                         child: Image.asset(
                           'assets/brand/cpi-header.png',

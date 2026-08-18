@@ -1,24 +1,13 @@
 import { ALL_SEGMENTS, CBAO_SHORT_NAME, CHUES_SIGLE, Prisma, segmentAxes } from '@crm/database';
 import type { BddSegment } from '@crm/database';
 
-import { isAdmin } from '../../common/scope.js';
+import { isAdmin, readsEveryone } from '../../common/scope.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 import { TASK, demoScopeOn } from './pilotage.sql.js';
 
-/**
- * Traduction du filtre commun en conditions SQL, pour les agrégats.
- *
- * Les endpoints analytiques ne renvoient JAMAIS de lignes brutes au navigateur :
- * un panel admin qui télécharge 50 000 prospects pour en compter les
- * départements côté client transporte des données personnelles inutiles, sature
- * la connexion et devient inutilisable. L'agrégation reste donc dans PostgreSQL.
- *
- * Chaque valeur passe par `Prisma.sql`, donc par une requête paramétrée : aucun
- * fragment n'est concaténé à la main.
- */
 export function prospectConditions(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   filter: ProspectFilterDto,
@@ -26,20 +15,16 @@ export function prospectConditions(
 ): Prisma.Sql {
   const conditions: Prisma.Sql[] = [];
 
-  // Cloisonnement d'abord, et non surchargeable par un paramètre de requête.
-  if (!isAdmin(user)) {
+  if (!readsEveryone(user)) {
     conditions.push(Prisma.sql`p."createdById" = ${user.id}`);
   }
 
-  // Visibilité de démonstration. Elle porte sur le PROSPECT, comme du côté
-  // Prisma : c'est lui que l'agrégat compte, et c'est donc lui qui décide si la
-  // ligne entre ou non dans le total.
   if (!demoEnabled) {
     conditions.push(Prisma.sql`p."isDemo" = FALSE`);
   }
 
   if (filter.commercialId) {
-    const target = isAdmin(user)
+    const target = readsEveryone(user)
       ? filter.commercialId
       : filter.commercialId === user.id
         ? user.id
@@ -50,8 +35,7 @@ export function prospectConditions(
   if (!(filter.includeDeleted && isAdmin(user))) {
     conditions.push(Prisma.sql`p."deletedAt" IS NULL`);
   }
-  // Une fiche rattachée à un représentant supprimé ne doit plus compter nulle
-  // part : sinon un total « par département » dépasse le total global.
+  // Sans ce filtre, un total « par département » dépasse le total global.
   conditions.push(Prisma.sql`r."deletedAt" IS NULL`);
 
   if (filter.representantId)
@@ -61,9 +45,6 @@ export function prospectConditions(
   if (filter.statut) {
     conditions.push(Prisma.sql`p."statut" = ${filter.statut}::"ProspectStatut"`);
   }
-  // La provenance suit la liste : un agrégat « par provenance » filtré sur une
-  // provenance doit compter exactement les lignes que l'export contient, sinon
-  // les deux écrans se contredisent sur la même question.
   if (filter.origin) conditions.push(Prisma.sql`p."origin" = ${filter.origin}`);
   if (filter.departementId) {
     conditions.push(Prisma.sql`r."departementId" = ${filter.departementId}`);
@@ -80,18 +61,20 @@ export function prospectConditions(
     conditions.push(Prisma.sql`p."enrollmentCapturedById" = ${filter.enrollmentCapturedById}`);
   }
   if (filter.segment) conditions.push(segmentCondition(filter.segment));
-  if (filter.campaignId) {
-    // `ct."isDemo"` AUSSI, et pas seulement `p."isDemo"` posé plus haut.
-    // `call_tasks` porte sa propre colonne : une tâche de démonstration
-    // accrochée à un prospect réel faisait entrer ce prospect dans le total
-    // d'une campagne alors que la tâche qui l'y rattachait était fictive. Le
-    // balayage SQL reste au niveau du FICHIER et ne pouvait pas le dire, ce
-    // fichier cloisonnant déjà `p` quelques lignes plus haut.
+  if (filter.campaignId ?? filter.assignedToId) {
+    const campagne = filter.campaignId
+      ? Prisma.sql`AND ct."campaignId" = ${filter.campaignId}`
+      : Prisma.empty;
+    const attribuee = filter.assignedToId
+      ? Prisma.sql`AND ct."assignedToId" = ${filter.assignedToId}`
+      : Prisma.empty;
+    // `call_tasks` porte son propre `isDemo` : le `p."isDemo"` posé plus haut ne le couvre pas.
     conditions.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "call_tasks" ct
         WHERE ct."prospectId" = p."id"
-          AND ct."campaignId" = ${filter.campaignId}
+          ${campagne}
+          ${attribuee}
           AND ${demoScopeOn(TASK, demoEnabled)}
       )`,
     );
@@ -116,18 +99,7 @@ export function prospectConditions(
   return Prisma.join(conditions, ' AND ');
 }
 
-/**
- * Jointure commune à tous les agrégats.
- *
- * `representants` est jointe systématiquement, même quand aucun filtre ne la
- * mentionne : c'est elle qui porte le département, et c'est aussi elle qui
- * permet d'exclure les fiches rattachées à un représentant supprimé.
- *
- * `syndicats` et `banques` le sont pour la même raison, côté segment : ce sont
- * leurs clés naturelles (`sigle`, `shortName`) qui portent le sens métier, et
- * les deux jointures sont sans perte puisque les deux clés étrangères sont
- * obligatoires et en `Restrict`.
- */
+/** `representants` porte le département, `syndicats`/`banques` le segment ; les trois FK sont obligatoires, la jointure est sans perte. */
 export const PROSPECT_FROM = Prisma.sql`
   FROM "prospects" p
   INNER JOIN "representants" r ON r."id" = p."representantId"
@@ -135,14 +107,6 @@ export const PROSPECT_FROM = Prisma.sql`
   INNER JOIN "banques" bq ON bq."id" = p."banqueId"
 `;
 
-/**
- * Traduction SQL d'un segment.
- *
- * Les axes ne sont PAS réécrits ici : ils sont lus dans `segmentAxes`, la même
- * source que `segmentWhere` utilisé par la liste et l'export. Ce fichier ne
- * fait que transposer un booléen déjà décidé ailleurs vers une comparaison
- * SQL ; la matrice BDD1–BDD4 reste définie en un seul endroit.
- */
 export function segmentCondition(segment: BddSegment): Prisma.Sql {
   const { isChues, isCbao } = segmentAxes(segment);
   const syndicat = isChues
@@ -154,13 +118,7 @@ export function segmentCondition(segment: BddSegment): Prisma.Sql {
   return Prisma.sql`(${syndicat} AND ${banque})`;
 }
 
-/**
- * Expression qui rend le segment d'une ligne, construite branche par branche à
- * partir de `segmentCondition`. Les quatre segments étant exhaustifs et
- * disjoints, la clause `ELSE` serait morte : son absence est le signal qu'un
- * segment ajouté sans reconstruire cette expression rendrait NULL plutôt que
- * de se ranger silencieusement dans un fourre-tout.
- */
+/** Pas de branche `ELSE` : un segment ajouté sans reconstruire l'expression rend NULL au lieu de se ranger en silence. */
 export const SEGMENT_EXPR: Prisma.Sql = Prisma.sql`CASE ${Prisma.join(
   ALL_SEGMENTS.map(
     (segment) => Prisma.sql`WHEN ${segmentCondition(segment)} THEN ${segment}::text`,

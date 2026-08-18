@@ -1,12 +1,6 @@
 import 'package:crm_api_client/crm_api_client.dart';
 import 'package:flutter/foundation.dart';
 
-/// Trois états, pas deux.
-///
-/// [unknown] existe parce que la lecture du jeton de renouvellement est
-/// asynchrone. Sans lui, le garde de route voit « pas authentifié » pendant les
-/// quelques millisecondes de la lecture et renvoie l'utilisateur sur l'écran de
-/// connexion à chaque démarrage à froid : alors qu'il a une session valide.
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
 @immutable
@@ -17,6 +11,7 @@ class AuthState {
     this.fullName,
     this.role,
     this.email,
+    this.departementId,
     this.errorMessage,
     this.isSubmitting = false,
   });
@@ -27,17 +22,15 @@ class AuthState {
 
   final AuthStatus status;
 
-  /// Identifiant technique. **Il ne s'affiche pas** sur un écran courant : ce
-  /// n'est pas une information, c'est une clé de base de données. Il n'a sa
-  /// place que dans « À propos », derrière les informations de support.
   final String? userId;
 
   final String? fullName;
 
-  /// Rôle brut du serveur (`COMMERCIAL`, `ADMIN`…), traduit à l'affichage.
   final String? role;
 
   final String? email;
+
+  final String? departementId;
 
   final String? errorMessage;
   final bool isSubmitting;
@@ -45,26 +38,6 @@ class AuthState {
   bool get isAuthenticated => status == AuthStatus.authenticated;
   bool get isResolved => status != AuthStatus.unknown;
 
-  /// Rôle en français, pour l'affichage.
-  ///
-  /// ═══ LE MIROIR DIVERGEAIT DU SERVEUR ═══
-  ///
-  /// Cette table était écrite à la main. Elle manquait `BANQUE_FINANCE`, qui
-  /// existe : un utilisateur de banque voyait donc la chaîne brute
-  /// `BANQUE_FINANCE` dans ses réglages, à la place de son rôle. Et elle
-  /// inventait `SUPERVISEUR`, `SUPERVISOR` et `FINANCE`, qui n'existent nulle
-  /// part côté serveur : trois branches mortes qui donnaient l'illusion d'une
-  /// couverture complète.
-  ///
-  /// On part maintenant de l'énumération GÉNÉRÉE depuis `apps/api/openapi.json`.
-  /// Un rôle ajouté côté serveur fait apparaître un cas non traité au prochain
-  /// `build_runner`, ce qu'aucune relecture de `switch` sur chaînes n'aurait
-  /// signalé.
-  ///
-  /// Un rôle que le client généré ne connaît pas encore
-  /// (`unknown_default_open_api`, grâce à `enumUnknownDefaultCase: true`) se rend
-  /// TEL QU'IL EST ARRIVÉ, jamais vide : un mot inattendu se remarque et remonte,
-  /// un champ vide passe inaperçu pendant des mois.
   String? get roleLabel {
     final String? raw = role;
     if (raw == null) return null;
@@ -76,6 +49,7 @@ class AuthState {
       Role.COMMERCIAL => 'Téléconseiller',
       Role.ADMIN => 'Administrateur',
       Role.BANQUE_FINANCE => 'Banque et financement',
+      Role.SUPERVISEUR => 'Supervision',
       Role.unknownDefaultOpenApi => raw,
     };
   }
@@ -86,6 +60,7 @@ class AuthState {
     String? fullName,
     String? role,
     String? email,
+    String? departementId,
     String? errorMessage,
     bool clearError = false,
     bool? isSubmitting,
@@ -96,6 +71,7 @@ class AuthState {
       fullName: fullName ?? this.fullName,
       role: role ?? this.role,
       email: email ?? this.email,
+      departementId: departementId ?? this.departementId,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       isSubmitting: isSubmitting ?? this.isSubmitting,
     );
@@ -110,10 +86,19 @@ class AuthState {
           other.fullName == fullName &&
           other.role == role &&
           other.email == email &&
+          other.departementId == departementId &&
           other.errorMessage == errorMessage &&
           other.isSubmitting == isSubmitting;
 
   @override
-  int get hashCode =>
-      Object.hash(status, userId, fullName, role, email, errorMessage, isSubmitting);
+  int get hashCode => Object.hash(
+    status,
+    userId,
+    fullName,
+    role,
+    email,
+    departementId,
+    errorMessage,
+    isSubmitting,
+  );
 }

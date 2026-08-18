@@ -16,67 +16,13 @@ import {
 } from '@/lib/data/demo';
 import { readSession } from '@/lib/session';
 
-/**
- * Coquille du panel et unique porte d'entrée authentifiée.
- *
- * Le contrôle est fait ICI, dans un composant serveur, et non dans un
- * middleware : la session est lue à la source (le cookie httpOnly) au moment du
- * rendu, donc aucune page enfant ne peut être rendue sans utilisateur valide.
- * Une garde côté client se contenterait de masquer une page déjà envoyée.
- */
-
-/**
- * JAMAIS de prérendu, JAMAIS de cache partagé : pour tout le panel.
- *
- * Défaut observé en production, et le plus grave rencontré sur ce projet :
- * `next build` prérendait ces pages, et Next les servait ensuite depuis le
- * cache pleine-route avec `s-maxage=31536000`, la même réponse pour tout le
- * monde, cookie ou pas.
- *
- * Deux conséquences, de gravité croissante :
- *
- *  1. Au build, l'API n'existe pas. `readSession()` échouait, la branche
- *     « Serveur injoignable » était rendue : et FIGÉE pour un an. L'écran
- *     n'était donc pas une panne passagère : c'était du HTML mort en cache.
- *  2. Si le build AVAIT joint l'API, la page prérendue aurait contenu les
- *     données d'une session, et cette page-là aurait été servie à un visiteur
- *     anonyme. Une coquille authentifiée n'est pas un contenu statique.
- *
- * `force-dynamic` répond aux deux : chaque requête est rendue avec ses propres
- * cookies, et rien n'est mis en cache. Le coût est nul ici : aucune page du
- * panel n'a de sens sans session.
- */
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-/**
- * État du mode démonstration, pour le bandeau global.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Interrogé pour TOUS les rôles, et c'est le point.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Cette fonction ne posait la question que pour un ADMIN, parce que
- * `GET /admin/demo` lui était réservé. Un agent BANQUE_FINANCE ne voyait donc
- * jamais le bandeau : alors qu'il a `/banque` et `/dossiers/export` dans sa
- * barre latérale, et qu'un classeur de chiffres fictifs envoyé à une direction
- * est très exactement l'accident que ce bandeau existe pour éviter.
- * `DemoBanner` sait d'ailleurs déjà se rendre pour ce rôle : seul l'appel
- * manquait.
- *
- * L'endpoint est ouvert à tout utilisateur authentifié côté API. Tout échec
- * reste avalé : un bandeau est une information, jamais une raison de faire
- * tomber l'écran entier ; et une API qui n'aurait pas encore été déployée doit
- * dégrader en « pas de bandeau », pas en page blanche.
- */
 async function demoBanner(): Promise<DemoBannerState> {
   try {
     return demoBannerState(await fetchDemoStatus(getServerApiClient()));
   } catch (error) {
-    // `unstable_rethrow` D'ABORD : Next signale la redirection, le `notFound()`
-    // et la bascule en rendu dynamique en LEVANT une erreur de contrôle. Un
-    // `catch` nu les avale et transforme un signal du framework en « pas de
-    // bandeau » : ou, comme ici en production, en page prérendue à tort.
     unstable_rethrow(error);
     return NO_DEMO_BANNER;
   }
@@ -85,10 +31,6 @@ async function demoBanner(): Promise<DemoBannerState> {
 export default async function PanelLayout({ children }: { children: ReactNode }) {
   const session = await readSession();
 
-  // Seul un REFUS de l'API déconnecte. Une indisponibilité (429 du limiteur de
-  // débit, 5xx, backend redémarré) laissait auparavant croire à une session
-  // absente et renvoyait vers /connexion malgré deux cookies valides : puis la
-  // reconnexion consommait le quota de connexion et le cycle recommençait.
   if (session.status === 'anonymous') redirect('/connexion');
 
   if (session.status === 'unavailable') {

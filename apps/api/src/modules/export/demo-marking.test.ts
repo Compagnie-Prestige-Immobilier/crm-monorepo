@@ -12,17 +12,6 @@ import {
   writeDemoWarningRow,
 } from './demo-marking.js';
 
-/**
- * Le mode démonstration est une bascule d'AFFICHAGE : allumé, les exports
- * mêlent des lignes fictives à des lignes réelles. Le fichier produit survit à
- * la bannière de l'interface, donc il doit porter sa propre mise en garde.
- *
- * Ces tests vérifient les trois marques, et surtout qu'aucune ne subsiste quand
- * le mode est éteint : un classeur de plateforme en service ne doit porter
- * aucune trace de cette mécanique.
- */
-
-/** Rend un classeur d'une feuille et le relit, pour observer ce qui a été écrit. */
 async function roundTrip(demoEnabled: boolean): Promise<ExcelJS.Workbook> {
   const sink = new PassThrough();
   const chunks: Buffer[] = [];
@@ -53,13 +42,6 @@ async function roundTrip(demoEnabled: boolean): Promise<ExcelJS.Workbook> {
   return read;
 }
 
-/**
- * Texte d'une cellule ou d'une métadonnée, quel que soit son type.
- *
- * `ExcelJS.CellValue` couvre les formules et le texte enrichi : les passer à
- * `String()` rendrait « [object Object] », et l'assertion échouerait pour une
- * raison sans rapport avec ce qu'elle vérifie.
- */
 const cellText = (value: unknown): string =>
   typeof value === 'string' ? value : JSON.stringify(value ?? '');
 
@@ -72,8 +54,6 @@ describe('demoFilenameSuffix', () => {
 
 describe('setDemoHeader', () => {
   it('pose l’en-tête dans LES DEUX cas', () => {
-    // Un en-tête absent est ambigu : mode éteint ? proxy qui filtre ? version
-    // d'API antérieure ? Un en-tête explicite se lit sans hypothèse.
     const seen: Record<string, string> = {};
     const response = {
       setHeader: (name: string, value: string) => {
@@ -124,7 +104,6 @@ describe('classeur en mode normal', () => {
     const sheet = workbook.getWorksheet('Prospects');
 
     expect(sheet?.getRow(1).getCell(1).value).toBe('Nom');
-    // La ligne 2 est la première DONNÉE : aucun décalage.
     expect(sheet?.getRow(2).getCell(1).value).toBe('Ndiaye');
     expect(workbook.creator).toBe('CPI GO');
     expect(cellText(workbook.description)).not.toContain('DÉMONSTRATION');

@@ -18,19 +18,12 @@ export default async function ConnexionPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  // Un administrateur déjà connecté n'a rien à faire sur ce formulaire.
   const session = await getSession();
   if (session !== null) redirect(homePathForRole(session.role));
 
   const params = await searchParams;
   const expired = params[SESSION_EXPIRED_PARAM] === SESSION_EXPIRED_VALUE;
 
-  /**
-   * Écran d'origine, pour y revenir après reconnexion. Restreint à un chemin
-   * interne : une URL absolue placée dans `?suite=` transformerait l'écran de
-   * connexion en tremplin de redirection ouverte, c'est-à-dire en page
-   * d'hameçonnage hébergée sur notre propre domaine.
-   */
   const rawNext = params['suite'];
   const candidate = Array.isArray(rawNext) ? rawNext[0] : rawNext;
   const next =
@@ -98,9 +91,6 @@ export default async function ConnexionPage({
           </div>
 
           {expired ? (
-            /* `status` et non `alert` : l'information est contextuelle, pas
-               urgente, et `alert` interromprait la lecture du lecteur d'écran
-               au moment où il annonce le formulaire. */
             <p
               role="status"
               className="mt-8 flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3.5 py-3 text-small text-warning"

@@ -47,6 +47,12 @@ class SupervisedUserDto {
 
     required this.lastSyncAt,
 
+    required this.lastPullAt,
+
+    required this.pendingOps,
+
+    required this.appVersion,
+
     required this.lastWriteAt,
   });
 
@@ -103,7 +109,19 @@ class SupervisedUserDto {
   @JsonKey(name: r'lastSyncAt', required: true, includeIfNull: true)
   final DateTime? lastSyncAt;
 
-  /// Dernière écriture métier : tentative d’appel ou transition de dossier.
+  /// Dernière synchronisation descendante. Un appareil ouvert appelle toutes les minutes, même quand il n’a rien à remonter.
+  @JsonKey(name: r'lastPullAt', required: true, includeIfNull: true)
+  final DateTime? lastPullAt;
+
+  /// Opérations en attente de remontée dans l’appareil, DÉCLARÉES PAR LUI. `null` quand l’application ne les annonce pas : le serveur ne voit pas ce qui dort dans un téléphone.
+  @JsonKey(name: r'pendingOps', required: true, includeIfNull: true)
+  final num? pendingOps;
+
+  /// Version de l’application mobile, telle qu’elle s’annonce.
+  @JsonKey(name: r'appVersion', required: true, includeIfNull: true)
+  final String? appVersion;
+
+  /// Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.
   @JsonKey(name: r'lastWriteAt', required: true, includeIfNull: true)
   final DateTime? lastWriteAt;
 
@@ -126,6 +144,9 @@ class SupervisedUserDto {
                 lastSeenAt,
                 lastLoginAt,
                 lastSyncAt,
+                lastPullAt,
+                pendingOps,
+                appVersion,
                 lastWriteAt,
               ],
               [
@@ -142,6 +163,9 @@ class SupervisedUserDto {
                 other.lastSeenAt,
                 other.lastLoginAt,
                 other.lastSyncAt,
+                other.lastPullAt,
+                other.pendingOps,
+                other.appVersion,
                 other.lastWriteAt,
               ],
             );
@@ -164,6 +188,9 @@ class SupervisedUserDto {
         lastSeenAt,
         lastLoginAt,
         lastSyncAt,
+        lastPullAt,
+        pendingOps,
+        appVersion,
         lastWriteAt,
       ]);
 
