@@ -100,6 +100,20 @@ class ReferenceRepository {
         .watch();
   }
 
+  Stream<RepresentantSyncViewData?> watchRepresentant(String id) {
+    return _db
+        .customSelect(
+          'SELECT * FROM representant_sync_view WHERE id = ?1 AND deleted_at IS NULL',
+          variables: <Variable<Object>>[Variable<String>(id)],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.representants,
+            _db.outbox,
+          },
+        )
+        .map((QueryRow row) => _db.representantSyncView.map(row.data))
+        .watchSingleOrNull();
+  }
+
   Stream<List<ProspectSyncViewData>> watchProspectsFor(String representantId) {
     return _db.prospectsForRepresentant(representantId: representantId).watch();
   }

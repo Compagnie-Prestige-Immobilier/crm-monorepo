@@ -162,6 +162,11 @@ class _RepresentantTile extends ConsumerWidget {
               onPressed: () => context.push(Routes.newProspectFor(data.id)),
               icon: const Icon(PhosphorIconsRegular.userPlus, size: 20),
             ),
+            IconButton(
+              tooltip: 'Ouvrir la fiche',
+              onPressed: () => context.push(Routes.representantDetailFor(data.id)),
+              icon: const Icon(PhosphorIconsRegular.caretRight, size: 20),
+            ),
           ],
         ),
         children: <Widget>[_ProspectList(representantId: data.id)],
