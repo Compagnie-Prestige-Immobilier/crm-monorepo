@@ -61,6 +61,32 @@ Future<void> seedReferentials(AppDatabase db) async {
       );
 }
 
+/// Donne un libellé de région au département du décor et en ajoute un second
+/// dans une AUTRE région : c'est le minimum pour qu'une cascade filtre quelque
+/// chose. Sans libellé, l'étape « Région » se masque, et c'est voulu.
+Future<void> seedRegion(
+  AppDatabase db, {
+  required String regionId,
+  required String regionName,
+  String departementId = 'dep-bakel',
+  String departementName = 'Bakel',
+}) async {
+  await (db.update(db.departements)..where((Departements t) => t.id.equals('dep-1')))
+      .write(const DepartementsCompanion(regionName: Value<String>('Dakar')));
+  await db
+      .into(db.departements)
+      .insert(
+        DepartementsCompanion.insert(
+          id: departementId,
+          code: 'BK',
+          name: departementName,
+          regionId: regionId,
+          regionName: Value<String>(regionName),
+          localUpdatedAt: t0,
+        ),
+      );
+}
+
 Future<void> insertRepresentant(
   AppDatabase db, {
   required String id,
@@ -68,6 +94,7 @@ Future<void> insertRepresentant(
   String fullName = 'Représentant',
   String? notes,
   String createdById = 'me',
+  String relationStatus = 'INCONNU',
   int rev = 1,
   DateTime? serverUpdatedAt,
   DateTime? deletedAt,
@@ -81,6 +108,7 @@ Future<void> insertRepresentant(
           phoneE164: phone,
           notes: Value<String?>(notes),
           departementId: 'dep-1',
+          relationStatus: Value<String>(relationStatus),
           createdById: createdById,
           clientCreatedAt: t0,
           rev: Value<int>(rev),

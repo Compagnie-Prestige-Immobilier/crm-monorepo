@@ -50,6 +50,17 @@ class RepresentantDetailScreen extends ConsumerWidget {
   }
 }
 
+/// Lecture seule : le contrat de synchronisation n'a pas de chemin d'écriture
+/// mobile pour la relation. Une valeur ajoutée côté serveur s'affiche telle
+/// quelle plutôt que de disparaître.
+String relationLabel(String status) => switch (status) {
+  'INCONNU' => 'Inconnue',
+  'CONTACTE' => 'Contacté',
+  'AMBASSADEUR' => 'Ambassadeur',
+  'REFUS' => 'Refus',
+  _ => status,
+};
+
 class _Fiche extends ConsumerWidget {
   const _Fiche({required this.data});
 
@@ -62,7 +73,7 @@ class _Fiche extends ConsumerWidget {
 
     String? departement;
     for (final Departement d
-        in ref.watch(departementsProvider).value ?? const <Departement>[]) {
+        in ref.watch(departementsProvider(null)).value ?? const <Departement>[]) {
       if (d.id == data.departementId) departement = d.name;
     }
 
@@ -83,7 +94,15 @@ class _Fiche extends ConsumerWidget {
       children: <Widget>[
         Text(data.fullName, style: theme.textTheme.titleLarge),
         const SizedBox(height: CpiSpacing.xs),
-        SyncStatusChip(status: status),
+        Wrap(
+          spacing: CpiSpacing.sm,
+          runSpacing: CpiSpacing.xxs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: <Widget>[
+            SyncStatusChip(status: status),
+            _RelationChip(status: data.relationStatus),
+          ],
+        ),
         const SizedBox(height: CpiSpacing.md),
         _CopyableRow(
           icon: PhosphorIconsRegular.phone,
@@ -131,6 +150,45 @@ class _Fiche extends ConsumerWidget {
         const SizedBox(height: CpiSpacing.xxs),
         _ProspectList(representantId: data.id),
       ],
+    );
+  }
+}
+
+/// Affiché en pastille et non en ligne d'information : la relation qualifie la
+/// fiche, elle ne la décrit pas, et l'écran est déjà long.
+class _RelationChip extends StatelessWidget {
+  const _RelationChip({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Semantics(
+      label: 'Relation : ${relationLabel(status)}',
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              PhosphorIconsRegular.handshake,
+              size: 16,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: CpiSpacing.xxs + 2),
+            Flexible(
+              child: Text(
+                relationLabel(status),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

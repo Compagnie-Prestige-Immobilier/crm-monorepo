@@ -18,6 +18,7 @@ import '../../../core/utils/ids.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
 import '../../../data/repositories/draft_repository.dart';
+import '../../../data/repositories/reference_repository.dart';
 import '../../../ui/widgets/local_typeahead.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/phone_field.dart';
@@ -49,11 +50,13 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
 
   final TextEditingController _nom = TextEditingController();
   final TextEditingController _phone = TextEditingController();
+  final TextEditingController _region = TextEditingController();
   final TextEditingController _departement = TextEditingController();
   final TextEditingController _ief = TextEditingController();
   final TextEditingController _notes = TextEditingController();
   final FocusNode _nomFocus = FocusNode();
   final FocusNode _phoneFocus = FocusNode();
+  final FocusNode _regionFocus = FocusNode();
   final FocusNode _departementFocus = FocusNode();
   final FocusNode _iefFocus = FocusNode();
   final FocusNode _notesFocus = FocusNode();
@@ -61,6 +64,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   late String _draftId = widget.draftId ?? Ids.newId();
   late final String _entityId = widget.representantId ?? Ids.newId();
 
+  String? _regionId;
   String? _departementId;
   String? _defaultDepartementId;
   String? _iefId;
@@ -102,6 +106,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   Map<String, Object?> collectDraftValues() => <String, Object?>{
     'fullName': _nom.text,
     'phone': _phone.text,
+    'regionId': _regionId,
+    'regionLabel': _region.text,
     'departementId': _departementId,
     'departementLabel': _departement.text,
     'iefId': _iefId,
@@ -129,6 +135,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     for (final FocusNode node in <FocusNode>[
       _nomFocus,
       _phoneFocus,
+      _regionFocus,
       _departementFocus,
       _iefFocus,
       _notesFocus,
@@ -145,11 +152,13 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     _lookupDebounce?.cancel();
     _nom.dispose();
     _phone.dispose();
+    _region.dispose();
     _departement.dispose();
     _ief.dispose();
     _notes.dispose();
     _nomFocus.dispose();
     _phoneFocus.dispose();
+    _regionFocus.dispose();
     _departementFocus.dispose();
     _iefFocus.dispose();
     _notesFocus.dispose();
@@ -217,6 +226,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       if (adopted) _draftId = snapshot.draftId;
       _nom.text = (snapshot.values['fullName'] as String?) ?? '';
       _phone.text = (snapshot.values['phone'] as String?) ?? '';
+      _regionId = snapshot.values['regionId'] as String?;
+      _region.text = (snapshot.values['regionLabel'] as String?) ?? '';
       _departementId = snapshot.values['departementId'] as String?;
       _departement.text = (snapshot.values['departementLabel'] as String?) ?? '';
       _iefId = snapshot.values['iefId'] as String?;
@@ -232,7 +243,12 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     final Departement? dep = await ref
         .read(referenceRepositoryProvider)
         .departementById(id);
-    if (dep != null && mounted) setState(() => _departement.text = dep.name);
+    if (dep == null || !mounted) return;
+    setState(() {
+      _departement.text = dep.name;
+      _regionId = dep.regionId;
+      _region.text = dep.regionName;
+    });
   }
 
   Future<void> _labelIef(String id) async {
@@ -378,8 +394,9 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
 
   @override
   Widget build(BuildContext context) {
+    final List<Region> regions = ref.watch(regionsProvider).value ?? const <Region>[];
     final List<Departement> departements =
-        ref.watch(departementsProvider).value ?? const <Departement>[];
+        ref.watch(departementsProvider(_regionId)).value ?? const <Departement>[];
     final List<Ief> iefs = ref.watch(iefsProvider(_departementId)).value ?? const <Ief>[];
 
     return CpiPopScope(
@@ -453,11 +470,45 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                       ),
                     ],
                     const SizedBox(height: CpiSpacing.md),
+                    // Masquée tant qu'aucun département ne porte de libellé de
+                    // région : sur un appareil qui n'a pas encore rejoué le pull
+                    // complet du palier v8, l'étape n'aurait rien à proposer.
+                    if (regions.isNotEmpty) ...<Widget>[
+                      LocalTypeahead(
+                        controller: _region,
+                        focusNode: _regionFocus,
+                        label: 'Région',
+                        hint: 'Dakar, Thiès, Tambacounda…',
+                        selectedId: _regionId,
+                        emptyHint: 'Aucun résultat',
+                        options: regions
+                            .map((Region r) => TypeaheadOption(id: r.id, label: r.name))
+                            .toList(growable: false),
+                        onChanged: (String _) {
+                          if (_regionId != null) setState(() => _regionId = null);
+                          markDraftDirty();
+                        },
+                        onSelected: (TypeaheadOption option) {
+                          setState(() {
+                            _regionId = option.id;
+                            _departementId = null;
+                            _departement.text = '';
+                            _iefId = null;
+                            _ief.text = '';
+                          });
+                          markDraftDirty();
+                          unawaited(flushDraft());
+                        },
+                      ),
+                      const SizedBox(height: CpiSpacing.md),
+                    ],
                     LocalTypeahead(
                       controller: _departement,
                       focusNode: _departementFocus,
                       label: 'Département',
-                      hint: 'Dakar, Thiès, Mbour…',
+                      hint: regions.isNotEmpty && _regionId == null
+                          ? 'Choisissez d’abord la région'
+                          : 'Dakar, Thiès, Mbour…',
                       selectedId: _departementId,
                       textInputAction: TextInputAction.done,
                       emptyHint: departements.isEmpty

@@ -45,7 +45,7 @@ class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScr
     );
     final String search = ref.watch(representantPickerSearchProvider);
     final Map<String, String> departements = <String, String>{
-      for (final Departement d in ref.watch(departementsProvider).value ?? const [])
+      for (final Departement d in ref.watch(departementsProvider(null)).value ?? const [])
         d.id: d.name,
     };
 

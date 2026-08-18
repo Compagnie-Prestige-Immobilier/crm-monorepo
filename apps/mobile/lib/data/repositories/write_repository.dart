@@ -342,6 +342,7 @@ class WriteRepository {
     required String createdById,
     String? method,
     String? comment,
+    DateTime? callbackAt,
     String? id,
   }) async {
     final String? normalizedComment = normalizeComment(comment);
@@ -352,6 +353,8 @@ class WriteRepository {
     );
     if (problem != null) throw CallAttemptInvalid(problem);
 
+    // Le serveur refuse une heure de rappel sur une autre issue que CALLBACK.
+    final DateTime? callback = outcome == CallOutcomes.callback ? callbackAt : null;
     final String entityId = id ?? Ids.newId();
     final DateTime now = _clock.now();
 
@@ -365,6 +368,7 @@ class WriteRepository {
               outcome: outcome,
               method: Value<String?>(method),
               comment: Value<String?>(normalizedComment),
+              callbackAt: Value<DateTime?>(callback),
               clientCreatedAt: now,
               createdById: createdById,
             ),
@@ -379,6 +383,7 @@ class WriteRepository {
           'outcome': outcome,
           'method': ?method,
           'comment': ?normalizedComment,
+          'callbackAt': ?callback?.toUtc().toIso8601String(),
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
         now: now,

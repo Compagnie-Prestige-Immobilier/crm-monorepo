@@ -193,10 +193,18 @@ final StreamProvider<List<OutboxData>> needsAttentionProvider =
     });
 
 
-final StreamProvider<List<Departement>> departementsProvider =
-    StreamProvider<List<Departement>>((Ref ref) {
-      return ref.watch(referenceRepositoryProvider).watchDepartements();
-    });
+final StreamProvider<List<Region>> regionsProvider = StreamProvider<List<Region>>((
+  Ref ref,
+) {
+  return ref.watch(referenceRepositoryProvider).watchRegions();
+});
+
+final departementsProvider = StreamProvider.family<List<Departement>, String?>((
+  Ref ref,
+  String? regionId,
+) {
+  return ref.watch(referenceRepositoryProvider).watchDepartements(regionId: regionId);
+});
 
 final iefsProvider = StreamProvider.family<List<Ief>, String?>((
   Ref ref,

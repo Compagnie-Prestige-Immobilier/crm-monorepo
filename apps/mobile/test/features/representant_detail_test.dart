@@ -165,6 +165,72 @@ void main() {
     await teardownTree(tester);
   });
 
+  // Lecture seule : le contrat de synchronisation n'a pas de chemin d'écriture
+  // mobile pour la relation. La fiche l'affiche, elle ne la modifie pas.
+  testWidgets('la fiche montre la relation venue du serveur', (
+    WidgetTester tester,
+  ) async {
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      relationStatus: 'AMBASSADEUR',
+    );
+
+    final ProviderContainer container = await makeContainer(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('fr'),
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: const <Locale>[Locale('fr')],
+          home: const RepresentantDetailScreen(representantId: 'rep-1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Ambassadeur'), findsOneWidget);
+
+    await teardownTree(tester);
+  });
+
+  // `enumUnknownDefaultCase` laisse passer une valeur que ce client ne connaît
+  // pas : l'afficher telle quelle vaut mieux que la faire disparaître.
+  testWidgets('une relation inconnue de ce client s\'affiche quand même', (
+    WidgetTester tester,
+  ) async {
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      relationStatus: 'PARRAIN',
+    );
+
+    final ProviderContainer container = await makeContainer(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('fr'),
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: const <Locale>[Locale('fr')],
+          home: const RepresentantDetailScreen(representantId: 'rep-1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('PARRAIN'), findsOneWidget);
+
+    await teardownTree(tester);
+  });
+
   group('sélecteur', () {
     Future<void> mountPicker(WidgetTester tester) async {
       final ProviderContainer container = await makeContainer(tester);
