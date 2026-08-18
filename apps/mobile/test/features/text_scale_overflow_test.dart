@@ -82,6 +82,18 @@ void main() {
       representantId: 'repFiche',
       phone: '+221780000002',
     );
+    // Le fil dans son état le plus large : une entrée dont le corps ET la ligne
+    // d'auteur passent à la ligne. Un fil vide ne peint que son état vide, et
+    // c'est l'entrée qui porte le risque.
+    await insertComment(
+      db,
+      id: 'comFiche',
+      representantId: 'repFiche',
+      body:
+          'Ne repasse jamais avant la fin des cours. Le secretariat de '
+          'l\'inspection prend les messages entre midi et quatorze heures.',
+      authorName: 'Ndeye Astou Mbengue Sarr',
+    );
 
     // Un brouillon vieux d'une heure sur chaque formulaire : entre 60 s et
     // 7 jours, `DraftRepository` le classe « reprenable » et l'écran affiche le
@@ -245,6 +257,15 @@ void main() {
     'Choisir un représentant': RepresentantPickerScreen.new,
     'Fiche représentant': () =>
         const RepresentantDetailScreen(representantId: 'repFiche'),
+    // Peint à part, comme « Heure de rappel » : le fil est en bas du `ListView`
+    // de la fiche, donc hors des 780 dp peints ici, donc jamais construit. Un
+    // débordement y serait passé sans que rien ne le dise.
+    'Fil de commentaires': () => const Scaffold(
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16),
+        child: RepresentantCommentThread(representantId: 'repFiche'),
+      ),
+    ),
     // ═══ LES DEUX FORMULAIRES SONT DANS LE BALAYAGE, SANS `skip` ═══
     //
     // Ils y sont entrés en portant un débordement réel : « Nouveau

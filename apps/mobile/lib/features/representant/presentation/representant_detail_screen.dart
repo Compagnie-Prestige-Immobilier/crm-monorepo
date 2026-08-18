@@ -9,9 +9,11 @@ import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
+import '../../../core/utils/relative_time.dart';
 import '../../../data/local/database.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
+import '../../auth/auth_state.dart';
 
 class RepresentantDetailScreen extends ConsumerWidget {
   const RepresentantDetailScreen({super.key, required this.representantId});
@@ -149,6 +151,133 @@ class _Fiche extends ConsumerWidget {
         Text('Prospects', style: theme.textTheme.titleSmall),
         const SizedBox(height: CpiSpacing.xxs),
         _ProspectList(representantId: data.id),
+        const SizedBox(height: CpiSpacing.lg),
+        Text('Commentaires', style: theme.textTheme.titleSmall),
+        const SizedBox(height: CpiSpacing.xxs),
+        RepresentantCommentThread(representantId: data.id),
+      ],
+    );
+  }
+}
+
+/// Fil en AJOUT SEUL : rien ne se modifie, rien ne s'efface, donc rien à
+/// arbitrer entre deux appareils.
+///
+/// Public parce qu'il est en bas d'un `ListView` : le balayage de débordement
+/// peint 780 dp de haut et ne l'atteignait jamais.
+class RepresentantCommentThread extends ConsumerStatefulWidget {
+  const RepresentantCommentThread({super.key, required this.representantId});
+
+  final String representantId;
+
+  @override
+  ConsumerState<RepresentantCommentThread> createState() =>
+      _RepresentantCommentThreadState();
+}
+
+class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentThread> {
+  final TextEditingController _controller = TextEditingController();
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _publish() async {
+    final AuthState session = ref.read(authControllerProvider);
+    final String? authorId = session.userId;
+    final String body = _controller.text.trim();
+    if (authorId == null || body.isEmpty || _sending) return;
+
+    setState(() => _sending = true);
+    try {
+      await ref
+          .read(writeRepositoryProvider)
+          .addRepresentantComment(
+            representantId: widget.representantId,
+            body: body,
+            authorId: authorId,
+            authorName: session.fullName ?? 'Téléconseiller',
+          );
+      _controller.clear();
+      await HapticFeedback.selectionClick();
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final AsyncValue<List<RepresentantComment>> rows = ref.watch(
+      representantCommentsProvider(widget.representantId),
+    );
+    final bool canPublish = !_sending && _controller.text.trim().isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        TextField(
+          controller: _controller,
+          minLines: 2,
+          maxLines: 5,
+          textCapitalization: TextCapitalization.sentences,
+          onChanged: (String _) => setState(() {}),
+          decoration: const InputDecoration(
+            hintText: 'Ce qu\'il faut retenir de cette fiche',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: CpiSpacing.xs),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.icon(
+            onPressed: canPublish ? _publish : null,
+            icon: const Icon(PhosphorIconsRegular.paperPlaneTilt, size: 20),
+            label: const Text('Publier'),
+          ),
+        ),
+        const SizedBox(height: CpiSpacing.sm),
+        rows.when(
+          loading: () => const LinearProgressIndicator(),
+          error: (Object e, StackTrace _) => Text('Lecture impossible : $e'),
+          data: (List<RepresentantComment> list) {
+            if (list.isEmpty) {
+              return Text(
+                'Aucun commentaire. Notez ici ce que le prochain téléconseiller '
+                'doit savoir avant d\'appeler.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: list
+                  .map(
+                    (RepresentantComment c) => Padding(
+                      padding: const EdgeInsets.only(bottom: CpiSpacing.sm),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(c.body, style: theme.textTheme.bodyMedium),
+                          Text(
+                            '${c.authorName} · ${relativeTime(c.clientCreatedAt)}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+            );
+          },
+        ),
       ],
     );
   }

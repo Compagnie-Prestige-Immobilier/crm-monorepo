@@ -146,6 +146,29 @@ Future<void> insertProspect(
       );
 }
 
+Future<void> insertComment(
+  AppDatabase db, {
+  required String id,
+  required String representantId,
+  required String body,
+  String authorId = 'me',
+  String authorName = 'Awa Sy',
+  DateTime? clientCreatedAt,
+}) {
+  return db
+      .into(db.representantComments)
+      .insert(
+        RepresentantCommentsCompanion.insert(
+          id: id,
+          representantId: representantId,
+          authorId: authorId,
+          authorName: authorName,
+          body: body,
+          clientCreatedAt: clientCreatedAt ?? t0,
+        ),
+      );
+}
+
 /// Met une opération en file, avec les mêmes conventions que
 /// `WriteRepository._enqueue` : `dependencyKey` = identifiant du REPRÉSENTANT,
 /// y compris pour un prospect.

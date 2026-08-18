@@ -231,6 +231,125 @@ void main() {
     await teardownTree(tester);
   });
 
+  group('fil de commentaires', () {
+    /// Surface haute : le fil est en bas d'un `ListView`, et un `ListView` ne
+    /// construit pas ce qui est hors du viewport. Sur les 600 dp par défaut,
+    /// les assertions ne portaient sur rien.
+    Future<void> mountFiche(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1200, 6000);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final ProviderContainer container = await makeContainer(tester);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: AppTheme.light,
+            locale: const Locale('fr'),
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            supportedLocales: const <Locale>[Locale('fr')],
+            home: const RepresentantDetailScreen(representantId: 'rep-1'),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    setUp(() => insertRepresentant(db, id: 'rep-1', phone: '+221770000001'));
+
+    testWidgets('chaque entrée porte son auteur', (WidgetTester tester) async {
+      await insertComment(
+        db,
+        id: 'c-1',
+        representantId: 'rep-1',
+        body: 'Injoignable le matin.',
+        authorName: 'Modou Fall',
+      );
+      await mountFiche(tester);
+
+      expect(find.text('Injoignable le matin.'), findsOneWidget);
+      expect(find.textContaining('Modou Fall'), findsOneWidget);
+
+      await teardownTree(tester);
+    });
+
+    testWidgets('le fil ne montre que celui de CETTE fiche', (WidgetTester tester) async {
+      await insertRepresentant(db, id: 'rep-2', phone: '+221770000002');
+      await insertComment(
+        db,
+        id: 'c-1',
+        representantId: 'rep-1',
+        body: 'Pour la première fiche.',
+      );
+      await insertComment(
+        db,
+        id: 'c-2',
+        representantId: 'rep-2',
+        body: 'Pour la seconde fiche.',
+      );
+      await mountFiche(tester);
+
+      expect(find.text('Pour la première fiche.'), findsOneWidget);
+      expect(find.text('Pour la seconde fiche.'), findsNothing);
+
+      await teardownTree(tester);
+    });
+
+    // Le commentaire est le seul champ du produit où la saisie libre est
+    // légitime ; elle n'est pour autant jamais obligatoire.
+    testWidgets('publier écrit la ligne et vide le champ', (WidgetTester tester) async {
+      await mountFiche(tester);
+
+      await tester.enterText(find.byType(TextField), '  Passe par le secrétariat.  ');
+      await tester.pump();
+      await tester.ensureVisible(find.text('Publier'));
+      await tester.pump();
+      await tester.tap(find.text('Publier'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final List<RepresentantComment> fil = await db
+          .select(db.representantComments)
+          .get();
+      expect(fil.single.body, 'Passe par le secrétariat.');
+      expect(fil.single.representantId, 'rep-1');
+      expect(fil.single.authorId, 'me');
+      expect(fil.single.authorName, 'Awa Sy');
+      expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
+
+      await teardownTree(tester);
+    });
+
+    testWidgets('rien à publier tant que rien n\'est saisi', (WidgetTester tester) async {
+      await mountFiche(tester);
+
+      expect(
+        tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier')).enabled,
+        isFalse,
+      );
+
+      await tester.enterText(find.byType(TextField), '   ');
+      await tester.pump();
+      expect(
+        tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier')).enabled,
+        isFalse,
+        reason: 'des espaces ne sont pas un commentaire',
+      );
+
+      await tester.enterText(find.byType(TextField), 'Un mot.');
+      await tester.pump();
+      expect(
+        tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier')).enabled,
+        isTrue,
+      );
+
+      await teardownTree(tester);
+    });
+  });
+
   group('sélecteur', () {
     Future<void> mountPicker(WidgetTester tester) async {
       final ProviderContainer container = await makeContainer(tester);

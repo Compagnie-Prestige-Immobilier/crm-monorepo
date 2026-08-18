@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -69,6 +69,10 @@ class AppDatabase extends _$AppDatabase {
         // sur les appareils existants. Effacer le curseur force un pull complet.
         // Le référentiel n'est jamais écrit localement : rien à perdre.
         await customStatement('DELETE FROM sync_state WHERE collection = \'all\'');
+      }
+      if (from < 9 && to >= 9) {
+        await m.createTable(representantComments);
+        await m.createIndex(representantCommentsRepresentantIdx);
       }
     },
     beforeOpen: (OpeningDetails details) async {

@@ -209,6 +209,37 @@ class WriteRepository {
   }
 
 
+  /// Ajout seul. Un commentaire ne se modifie ni ne s'efface : il n'y a donc ni
+  /// `rev` à envoyer ni conflit possible, et deux téléconseillers hors ligne qui
+  /// commentent la même fiche produisent deux lignes distinctes.
+  Future<String> addRepresentantComment({
+    required String representantId,
+    required String body,
+    required String authorId,
+    required String authorName,
+  }) async {
+    final String trimmed = body.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(body, 'body', 'un commentaire vide ne s\'écrit pas');
+    }
+    final String entityId = Ids.newId();
+    final DateTime now = _clock.now();
+    await _db
+        .into(_db.representantComments)
+        .insert(
+          RepresentantCommentsCompanion.insert(
+            id: entityId,
+            representantId: representantId,
+            authorId: authorId,
+            authorName: authorName,
+            body: trimmed,
+            clientCreatedAt: now,
+          ),
+        );
+    return entityId;
+  }
+
+
   Future<String> createProspect({
     required String nom,
     required String prenom,
