@@ -2,12 +2,15 @@ import { BadRequestException } from '@nestjs/common';
 import { CallOutcome, EnrollmentMethod, Phase2Status } from '@crm/database';
 import { describe, expect, it } from 'vitest';
 
+import { CallOutcomeEffect, SYSTEM_OUTCOME_REASONS } from '../referentiels/call-outcome-rules.js';
 import {
   CALLBACK_CLOCK_SKEW_TOLERANCE_MS,
   COMMENT_MAX_LENGTH,
   PHASE2_STATUS_FOR_OUTCOME,
   isTerminalOutcome,
   normalizeAttempt,
+  systemReasonFor,
+  type AttemptReason,
 } from './attempt-rules.js';
 
 function codeOf(run: () => unknown): string {
@@ -234,5 +237,117 @@ describe('normalizeAttempt, commentaire', () => {
       normalizeAttempt({ outcome: CallOutcome.OTHER, comment: 'x'.repeat(COMMENT_MAX_LENGTH) })
         .comment,
     ).toHaveLength(COMMENT_MAX_LENGTH);
+  });
+});
+
+describe('normalizeAttempt, motif du référentiel', () => {
+  const APPEL = '2026-08-18T10:00:00.000Z';
+
+  const reason = (over: Partial<AttemptReason> = {}): AttemptReason => ({
+    id: 'motif-1',
+    code: 'BOITE_VOCALE',
+    label: 'Boîte vocale',
+    effect: CallOutcomeEffect.KEEP_OPEN,
+    requiresComment: false,
+    requiresCallback: false,
+    ...over,
+  });
+
+  it.each(SYSTEM_OUTCOME_REASONS)(
+    '$code : le motif système explicite rend EXACTEMENT le même verdict que l’issue seule',
+    (system) => {
+      const input = {
+        outcome: system.code,
+        ...(system.code === CallOutcome.METHOD_OBTAINED
+          ? { method: EnrollmentMethod.PLATFORM }
+          : {}),
+        ...(system.requiresComment ? { comment: 'motif' } : {}),
+        clientCreatedAt: APPEL,
+      };
+
+      expect(normalizeAttempt(input, systemReasonFor(system.code))).toEqual(
+        normalizeAttempt(input),
+      );
+    },
+  );
+
+  it('reporte l’identifiant du motif sur la tentative', () => {
+    expect(normalizeAttempt({ outcome: CallOutcome.UNREACHABLE }, reason()).reasonId).toBe(
+      'motif-1',
+    );
+  });
+
+  it('sans motif du référentiel, la tentative n’en porte aucun', () => {
+    expect(normalizeAttempt({ outcome: CallOutcome.UNREACHABLE }).reasonId).toBeNull();
+  });
+
+  it('un motif qui exige un commentaire le fait respecter', () => {
+    const exigeant = reason({ requiresComment: true });
+
+    expect(codeOf(() => normalizeAttempt({ outcome: CallOutcome.UNREACHABLE }, exigeant))).toBe(
+      'PHASE2_COMMENT_REQUIRED',
+    );
+    expect(
+      codeOf(() => normalizeAttempt({ outcome: CallOutcome.UNREACHABLE, comment: ' ' }, exigeant)),
+    ).toBe('PHASE2_COMMENT_REQUIRED');
+    expect(
+      normalizeAttempt(
+        { outcome: CallOutcome.UNREACHABLE, comment: 'sonne dans le vide' },
+        exigeant,
+      ).comment,
+    ).toBe('sonne dans le vide');
+  });
+
+  it('un motif qui exige un rappel refuse la saisie sans date', () => {
+    const exigeant = reason({
+      effect: CallOutcomeEffect.SCHEDULE_CALLBACK,
+      requiresCallback: true,
+    });
+
+    expect(
+      codeOf(() =>
+        normalizeAttempt({ outcome: CallOutcome.CALLBACK, clientCreatedAt: APPEL }, exigeant),
+      ),
+    ).toBe('PHASE2_CALLBACK_AT_REQUIRED');
+
+    expect(
+      normalizeAttempt(
+        {
+          outcome: CallOutcome.CALLBACK,
+          callbackAt: '2026-08-19T09:00:00.000Z',
+          clientCreatedAt: APPEL,
+        },
+        exigeant,
+      ).callbackAt?.toISOString(),
+    ).toBe('2026-08-19T09:00:00.000Z');
+  });
+
+  it('un motif ne peut pas ASSOUPLIR son effet : la méthode reste exigée', () => {
+    const laxiste = reason({ effect: CallOutcomeEffect.CLOSE_METHOD, code: 'METHODE_PARTIELLE' });
+
+    expect(codeOf(() => normalizeAttempt({ outcome: CallOutcome.METHOD_OBTAINED }, laxiste))).toBe(
+      'PHASE2_METHOD_REQUIRED',
+    );
+  });
+
+  it('la clôture et le statut de phase 2 sortent de l’EFFET du motif, PAS de l’issue', () => {
+    const clot = normalizeAttempt(
+      { outcome: CallOutcome.UNREACHABLE },
+      reason({ effect: CallOutcomeEffect.CLOSE_REFUSED }),
+    );
+    expect(clot.terminal).toBe(true);
+    expect(clot.phase2Status).toBe(Phase2Status.REFUSED);
+
+    const laisse = normalizeAttempt({ outcome: CallOutcome.REFUSED }, reason());
+    expect(laisse.terminal).toBe(false);
+    expect(laisse.phase2Status).toBeNull();
+
+    const ouvert = normalizeAttempt({ outcome: CallOutcome.UNREACHABLE }, reason());
+    expect(ouvert.terminal).toBe(false);
+    expect(ouvert.phase2Status).toBeNull();
+  });
+
+  it('rompt sur une issue sans motif système, plutôt que de la laisser passer', () => {
+    expect(() => systemReasonFor('INCONNUE' as CallOutcome)).toThrow(/motif système/);
   });
 });

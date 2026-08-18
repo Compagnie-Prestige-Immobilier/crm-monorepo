@@ -584,6 +584,7 @@ export class SyncService {
         id: operation.entityId,
         prospectId: data.prospectId,
         outcome: data.outcome,
+        ...(data.reasonCode === undefined ? {} : { reasonCode: data.reasonCode }),
         ...(data.method === undefined ? {} : { method: data.method }),
         ...(data.comment === undefined ? {} : { comment: data.comment }),
         ...(data.callbackAt === undefined ? {} : { callbackAt: data.callbackAt }),

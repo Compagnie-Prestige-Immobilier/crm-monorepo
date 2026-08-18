@@ -20,6 +20,20 @@ const OPERATION = {
   clientUpdatedAt: '2026-08-18T10:00:00.000Z',
 };
 
+const ATTEMPT = {
+  opId: '01931f3c-1a2b-7c4d-8e5f-000000000020',
+  seq: 0,
+  entity: 'call_attempt',
+  op: 'create',
+  entityId: '01931f3c-1a2b-7c4d-8e5f-000000000021',
+  clientUpdatedAt: '2026-08-18T10:00:00.000Z',
+  data: {
+    prospectId: '01931f3c-1a2b-7c4d-8e5f-000000000022',
+    outcome: 'UNREACHABLE',
+    clientCreatedAt: '2026-08-18T10:00:00.000Z',
+  } as Record<string, unknown>,
+};
+
 const push = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   clientBatchId: '01931f3c-1a2b-7c4d-8e5f-000000000001',
   payloadVersion: 1,
@@ -51,6 +65,22 @@ describe('ce que le lot de synchronisation accepte', () => {
     await expect(asBody(SyncPushDto, push({ batteryLevel: 42 }))).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  it('une tentative d’appel sans reasonCode passe : c’est ce que le parc envoie', async () => {
+    const parsed = await asBody(SyncPushDto, push({ operations: [ATTEMPT] }));
+
+    expect(parsed.operations[0]?.data?.reasonCode).toBeUndefined();
+    expect(parsed.operations[0]?.data?.outcome).toBe('UNREACHABLE');
+  });
+
+  it('une tentative d’appel qui porte son motif passe aussi', async () => {
+    const parsed = await asBody(
+      SyncPushDto,
+      push({ operations: [{ ...ATTEMPT, data: { ...ATTEMPT.data, reasonCode: 'BOITE_VOCALE' } }] }),
+    );
+
+    expect(parsed.operations[0]?.data?.reasonCode).toBe('BOITE_VOCALE');
   });
 
   it('une file d’attente négative est refusée', async () => {

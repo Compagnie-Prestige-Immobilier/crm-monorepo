@@ -3,6 +3,7 @@ import type { Writable } from 'node:stream';
 import PDFDocument from 'pdfkit';
 
 import { CPI_BURGUNDY, CPI_RULE_GREY, CPI_ZEBRA, cpiLogo } from '../../common/brand.js';
+import { outcomeEffectRule } from '../referentiels/call-outcome-rules.js';
 
 export interface ProgrammeRow {
   readonly position: number;
@@ -26,17 +27,29 @@ export interface ProgrammeData {
 
   readonly title?: string;
   readonly scopeCaption?: string;
-  readonly checkboxGroups?: readonly CheckboxGroup[];
+  readonly checkboxGroups: readonly CheckboxGroup[];
 }
 
 const METHOD_LABELS = ['Plateforme', 'Physique', 'Voix ou messagerie électronique'] as const;
 
-const OTHER_OUTCOME_LABELS = ['Injoignable', 'Rappeler', 'Refus', 'Faux numéro', 'Autre'] as const;
-
-export const PROSPECT_CHECKBOX_GROUPS: readonly CheckboxGroup[] = [
-  { caption: 'Méthode', options: METHOD_LABELS },
-  { caption: 'Autre', options: OTHER_OUTCOME_LABELS },
-];
+/**
+ * Les cases « Autre » sortent du référentiel : figées ici, elles mentiraient
+ * dès le premier motif ajouté par l'administration, et le terrain cocherait à
+ * côté. Le motif qui exige une méthode se coche dans le groupe « Méthode ».
+ */
+export function prospectCheckboxGroups(
+  reasons: readonly { readonly label: string; readonly effect: string }[],
+): readonly CheckboxGroup[] {
+  return [
+    { caption: 'Méthode', options: METHOD_LABELS },
+    {
+      caption: 'Autre',
+      options: reasons
+        .filter((reason) => !outcomeEffectRule(reason.effect).requiresMethod)
+        .map((reason) => reason.label),
+    },
+  ];
+}
 
 const MARGIN = 28;
 
@@ -306,7 +319,7 @@ export function writeProgrammePdf(
       resolve();
     });
 
-    const groups = data.checkboxGroups ?? PROSPECT_CHECKBOX_GROUPS;
+    const groups = data.checkboxGroups;
     const bottom = doc.page.height - MARGIN - FOOTER_SPACE;
     const firstTop = MARGIN + BAND_HEIGHT + BAND_GAP;
 

@@ -3,10 +3,18 @@ import { PassThrough } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 
 import { shortCode } from '../../common/short-code.js';
+import type { FastifyReply } from 'fastify';
+
+import { CallOutcomeEffect, SYSTEM_OUTCOME_REASONS } from '../referentiels/call-outcome-rules.js';
+import type { CallOutcomeReasonsService } from '../referentiels/call-outcome-reasons.service.js';
+import type { Phase2CampaignsService } from './campaigns.service.js';
+import type { Phase2DirectoryService } from './directory.service.js';
+import { Phase2Controller } from './phase2.controller.js';
 import { extractPdfText } from './pdf-text.js';
 import {
   formatDakar,
   programmeFilename,
+  prospectCheckboxGroups,
   writeProgrammePdf,
   type ProgrammeData,
   type ProgrammeRow,
@@ -65,6 +73,7 @@ const DATA: ProgrammeData = {
   segmentLabel: 'BDD1, CHUES / CBAO',
   generatedAt: new Date('2026-04-08T14:30:00.000Z'),
   rows: ROWS,
+  checkboxGroups: prospectCheckboxGroups(SYSTEM_OUTCOME_REASONS),
 };
 
 describe('writeProgrammePdf', () => {
@@ -138,8 +147,9 @@ describe('writeProgrammePdf', () => {
     for (const label of ['Plateforme', 'Physique', 'Voix ou messagerie électronique']) {
       expect(occurrences(label)).toBe(ROWS.length);
     }
-    for (const label of ['Injoignable', 'Rappeler', 'Refus', 'Faux numéro', 'Autre']) {
-      expect(occurrences(label)).toBeGreaterThanOrEqual(ROWS.length);
+    for (const reason of SYSTEM_OUTCOME_REASONS) {
+      if (reason.effect === CallOutcomeEffect.CLOSE_METHOD) continue;
+      expect(occurrences(reason.label)).toBeGreaterThanOrEqual(ROWS.length);
     }
     expect(occurrences('Commentaire')).toBe(ROWS.length);
   });
@@ -227,5 +237,82 @@ describe('mise en page refaite', () => {
     const pdf = await render({ ...DATA, campaignName: long });
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
     expect(extractPdfText(pdf)).not.toContain(long);
+  });
+});
+
+describe('prospectCheckboxGroups', () => {
+  it('imprime les motifs du référentiel, et pas une liste figée', async () => {
+    const text = extractPdfText(
+      await render({
+        ...DATA,
+        checkboxGroups: prospectCheckboxGroups([
+          ...SYSTEM_OUTCOME_REASONS,
+          { label: 'Boîte vocale', effect: CallOutcomeEffect.KEEP_OPEN },
+        ]),
+      }),
+    );
+
+    expect(text).toContain('Boîte vocale');
+    for (const reason of SYSTEM_OUTCOME_REASONS) {
+      if (reason.effect === CallOutcomeEffect.CLOSE_METHOD) continue;
+      expect(text).toContain(reason.label);
+    }
+  });
+
+  it('range le motif qui exige une méthode dans le groupe « Méthode », pas dans « Autre »', () => {
+    const [methode, autre] = prospectCheckboxGroups(SYSTEM_OUTCOME_REASONS);
+
+    expect(methode?.caption).toBe('Méthode');
+    expect(autre?.options).not.toContain(
+      SYSTEM_OUTCOME_REASONS.find((reason) => reason.effect === CallOutcomeEffect.CLOSE_METHOD)
+        ?.label,
+    );
+    expect(autre?.options).toHaveLength(SYSTEM_OUTCOME_REASONS.length - 1);
+  });
+});
+
+describe('le programme téléchargé', () => {
+  it('tire ses cases du référentiel EN BASE, pas de la table compilée', async () => {
+    const chunks: Buffer[] = [];
+    const raw = new PassThrough();
+    raw.on('data', (chunk: Buffer) => chunks.push(chunk));
+    Object.assign(raw, { setHeader: () => undefined });
+
+    const campaigns = {
+      programme: () =>
+        Promise.resolve({
+          campaignName: 'Campagne CHUES avril',
+          commercialName: 'Awa Sy',
+          segmentLabel: 'BDD1',
+          rows: ROWS,
+        }),
+    };
+    const reasons = {
+      listAll: () =>
+        Promise.resolve({
+          items: [
+            { label: 'Boîte vocale', effect: CallOutcomeEffect.KEEP_OPEN, isActive: true },
+            { label: 'Motif retiré', effect: CallOutcomeEffect.KEEP_OPEN, isActive: false },
+          ],
+        }),
+    };
+
+    const controller = new Phase2Controller(
+      campaigns as unknown as Phase2CampaignsService,
+      {} as Phase2DirectoryService,
+      reasons as unknown as CallOutcomeReasonsService,
+    );
+
+    await controller.downloadProgramme(
+      '01931f3c-1a2b-7c4d-8e5f-000000000031',
+      '01931f3c-1a2b-7c4d-8e5f-000000000032',
+      {},
+      { hijack: () => undefined, raw } as unknown as FastifyReply,
+    );
+
+    const text = extractPdfText(Buffer.concat(chunks));
+    expect(text).toContain('Boîte vocale');
+    expect(text).not.toContain('Motif retiré');
+    expect(text).not.toContain('Injoignable');
   });
 });
