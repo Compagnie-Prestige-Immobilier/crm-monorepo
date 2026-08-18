@@ -42,6 +42,17 @@ enum Role {
   ADMIN
   COMMERCIAL
   BANQUE_FINANCE
+  SUPERVISEUR
+}
+
+// Où en est la relation avec un représentant, du point de vue de l'équipe qui
+// l'appelle. Pas un booléen : `false` confondrait « jamais appelé » et « a
+// refusé », or c'est exactement cet écart que le pilotage à sept jours compte.
+enum RepresentantRelation {
+  INCONNU
+  CONTACTE
+  AMBASSADEUR
+  REFUS
 }
 
 // Prospection générale (phase 1). NE PAS confondre avec Phase2Status : les deux
@@ -225,13 +236,16 @@ model User {
   /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
+  importJobs     ImportJob[]     @relation("ImportJobRequestedBy")
+  segmentChanges SegmentChange[] @relation("SegmentChangeChangedBy")
+
+  scheduledCallbacks       ScheduledCallback[]          @relation("ScheduledCallbackAssignedTo")
+  representantRelationsSet RepresentantRelationChange[] @relation("RepresentantRelationChangeChangedBy")
+
   @@index([role, isActive])
   @@index([deletedAt])
   @@index([isDemo])
   @@map("users")
-
-  importJobs     ImportJob[]     @relation("ImportJobRequestedBy")
-  segmentChanges SegmentChange[] @relation("SegmentChangeChangedBy")
 }
 
 // Un refresh token n'est jamais stocké en clair : seul son SHA-256 l'est. Une
@@ -391,6 +405,8 @@ model Representant {
   // sur `clientCreatedAt`.
   clientCreatedAt DateTime
 
+  relationStatus RepresentantRelation @default(INCONNU)
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -398,6 +414,7 @@ model Representant {
   prospects       Prospect[]
   repCallTasks    RepCallTask[]
   repCallAttempts RepCallAttempt[]
+  relationChanges RepresentantRelationChange[]
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -418,6 +435,8 @@ model Representant {
   // Index de pagination du pull delta : keyset sur (updatedAt, id).
   @@index([updatedAt, id])
   @@index([deletedAt])
+  @@index([relationStatus])
+  @@index([relationStatus, departementId])
   @@index([isDemo])
   @@map("representants")
 }
@@ -490,10 +509,13 @@ model Prospect {
   /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
-  callTasks      CallTask[]
-  callAttempts   CallAttempt[]
-  bankCases      BankCase[]
-  clientRequests ClientCreationRequest[]
+  callTasks          CallTask[]
+  callAttempts       CallAttempt[]
+  scheduledCallbacks ScheduledCallback[]
+  bankCases          BankCase[]
+  clientRequests     ClientCreationRequest[]
+
+  segmentChanges SegmentChange[]
 
   @@index([phoneE164])
   @@index([representantId])
@@ -518,8 +540,6 @@ model Prospect {
   @@index([enrollmentMethod])
   @@index([isDemo])
   @@map("prospects")
-
-  segmentChanges SegmentChange[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -647,6 +667,7 @@ model CallCampaign {
   commerciaux CallCampaignCommercial[]
   tasks       CallTask[]
   attempts    CallAttempt[]
+  callbacks   ScheduledCallback[]
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -711,7 +732,8 @@ model CallTask {
   updatedAt   DateTime  @updatedAt
   completedAt DateTime?
 
-  attempts CallAttempt[]
+  attempts  CallAttempt[]
+  callbacks ScheduledCallback[]
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -776,6 +798,72 @@ model CallAttempt {
   @@index([campaignId])
   @@index([isDemo])
   @@map("call_attempts")
+}
+
+// Un rappel promis, avec sa date. `CallOutcome.CALLBACK` existait sans qu'aucune
+// date ne soit stockée nulle part : personne ne pouvait savoir quand, donc
+// personne ne saurait jamais si le rappel a eu lieu.
+//
+// Table dédiée, et non une colonne. Sur `CallTask`, la date serait perdue dès
+// qu'un appel se fait hors campagne depuis l'annuaire, et effacée à la clôture
+// de campagne qui passe les tâches à CANCELLED. Sur `Prospect`, deux campagnes
+// et deux téléconseillers se partageraient une seule date, ce que l'index
+// `call_tasks_one_active_per_prospect` existe précisément pour empêcher.
+//
+// Le retard est DÉRIVÉ (`status = 'PENDING' AND scheduledAt < now()`), jamais
+// stocké : un `missedAt` obligerait un cron à réécrire des millions de lignes
+// pour une information calculable.
+model ScheduledCallback {
+  id         String        @id @default(uuid(7))
+  prospectId String
+  prospect   Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  taskId     String?
+  task       CallTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  campaignId String?
+  campaign   CallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  // Le `performedById` de la tentative source, pas l'assigné de la tâche : c'est
+  // celui qui a promis le rappel qui le doit.
+  assignedToId String
+  assignedTo   User   @relation("ScheduledCallbackAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+
+  // Stocké en UTC, saisi en Africa/Dakar.
+  scheduledAt DateTime
+  comment     String?
+
+  /// Une tentative produit AU PLUS un rappel : l'unicité rend le rejeu d'une
+  /// même tentative sans effet, sans compter les lignes au préalable.
+  sourceAttemptId String @unique
+
+  status          ScheduledCallbackStatus @default(PENDING)
+  closedAttemptId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel : elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
+  /// La file du jour d'un téléconseiller, relue à chaque ouverture de l'écran.
+  @@index([assignedToId, status, scheduledAt])
+  @@index([prospectId, status])
+  /// Les rappels dus toutes files confondues, pour la supervision.
+  @@index([scheduledAt, status])
+  @@index([isDemo])
+  @@map("scheduled_callbacks")
+}
+
+enum ScheduledCallbackStatus {
+  PENDING
+  DONE
+  CANCELLED
+  SUPERSEDED
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1628,4 +1716,37 @@ model SegmentChange {
   @@index([changedById, changedAt])
   @@index([isDemo])
   @@map("segment_changes")
+}
+
+// Devenir ambassadeur est le métier : `Representant.relationStatus` ne dit que
+// l'état d'aujourd'hui, et l'écraser efface la date à laquelle un représentant a
+// basculé, et par qui. Sans cette table, « combien d'ambassadeurs gagnés cette
+// semaine, et par qui » n'a pas de réponse, et n'en aura jamais rétroactivement.
+model RepresentantRelationChange {
+  id             String       @id @default(uuid(7))
+  representantId String
+  representant   Representant @relation(fields: [representantId], references: [id], onDelete: Cascade)
+
+  /// Stockés et non recalculés : la règle de classement peut évoluer, l'histoire
+  /// non.
+  fromStatus RepresentantRelation
+  toStatus   RepresentantRelation
+
+  /// Pourquoi, en clair. Un refus se justifie, une promotion en ambassadeur aussi.
+  reason String?
+
+  changedById String
+  changedBy   User         @relation("RepresentantRelationChangeChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  source      ChangeSource
+
+  changedAt DateTime @default(now())
+  isDemo    Boolean  @default(false)
+
+  @@index([representantId, changedAt])
+  /// « Combien de bascules vers AMBASSADEUR sur la période. »
+  @@index([toStatus, changedAt])
+  /// Attribution : qui a converti qui.
+  @@index([changedById, changedAt])
+  @@index([isDemo])
+  @@map("representant_relation_changes")
 }
