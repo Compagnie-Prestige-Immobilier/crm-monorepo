@@ -31,7 +31,8 @@ import {
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { Phase2CampaignsService } from './campaigns.service.js';
 import { Phase2DirectoryService } from './directory.service.js';
-import { programmeFilename, writeProgrammePdf } from './programme-pdf.js';
+import { CallOutcomeReasonsService } from '../referentiels/call-outcome-reasons.service.js';
+import { programmeFilename, prospectCheckboxGroups, writeProgrammePdf } from './programme-pdf.js';
 import {
   CampaignDetailDto,
   CampaignListDto,
@@ -52,6 +53,7 @@ export class Phase2Controller {
   constructor(
     private readonly campaigns: Phase2CampaignsService,
     private readonly directory: Phase2DirectoryService,
+    private readonly reasons: CallOutcomeReasonsService,
   ) {}
 
   @Get('directory')
@@ -169,6 +171,7 @@ export class Phase2Controller {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const programme = await this.campaigns.programme(id, userId, query.jour);
+    const reasons = await this.reasons.listAll();
     const generatedAt = new Date();
 
     reply.hijack();
@@ -180,7 +183,11 @@ export class Phase2Controller {
     reply.raw.setHeader('Cache-Control', 'no-store');
 
     try {
-      await writeProgrammePdf(reply.raw, { ...programme, generatedAt });
+      await writeProgrammePdf(reply.raw, {
+        ...programme,
+        generatedAt,
+        checkboxGroups: prospectCheckboxGroups(reasons.items.filter((reason) => reason.isActive)),
+      });
     } catch (error) {
       reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
       throw error;

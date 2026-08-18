@@ -16468,6 +16468,11 @@
               }
             ]
           },
+          "reasonCode": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Tentative d’appel : code du motif d’issue. FACULTATIF POUR TOUJOURS. Un lot qui ne le porte pas résout le motif système dont le code égale outcome."
+          },
           "method": {
             "description": "Obligatoire si et seulement si outcome vaut METHOD_OBTAINED.",
             "allOf": [

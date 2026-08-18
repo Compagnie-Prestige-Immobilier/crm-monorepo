@@ -805,10 +805,17 @@ model CallAttempt {
   performedById String
   performedBy   User   @relation("CallAttemptPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
 
+  /// L'EFFET de l'appel, dans le vocabulaire figé que les téléphones déployés
+  /// savent émettre. Le motif exact, lui, se lit sur `reasonId`.
   outcome CallOutcome
   method  EnrollmentMethod?
   // Obligatoire quand outcome = OTHER, facultatif sinon. Contrainte CHECK.
   comment String?
+
+  /// Motif saisi sur le terrain. Nul pour les tentatives remontées avant que le
+  /// parc sache l'émettre : `outcome` reste alors la seule qualification.
+  reasonId String?
+  reason   CallOutcomeReason? @relation(fields: [reasonId], references: [id], onDelete: Restrict)
 
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())
@@ -827,6 +834,7 @@ model CallAttempt {
   // La journee de travail se lit sur `clientCreatedAt`, l'heure de l'appel.
   @@index([performedById, clientCreatedAt])
   @@index([campaignId])
+  @@index([reasonId, clientCreatedAt])
   @@index([isDemo])
   @@map("call_attempts")
 }
@@ -1913,6 +1921,8 @@ model CallOutcomeReason {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  attempts CallAttempt[]
 
   @@index([isActive, sortOrder])
   @@index([effect, isActive])

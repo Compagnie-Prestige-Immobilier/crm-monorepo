@@ -146,6 +146,17 @@ export class SyncEntityDataDto {
   outcome?: CallOutcome;
 
   @ApiPropertyOptional({
+    maxLength: 40,
+    description:
+      'Tentative d’appel : code du motif d’issue. FACULTATIF POUR TOUJOURS. Un lot qui ne le ' +
+      'porte pas résout le motif système dont le code égale outcome.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  reasonCode?: string;
+
+  @ApiPropertyOptional({
     enum: EnrollmentMethod,
     enumName: 'EnrollmentMethod',
     description: 'Obligatoire si et seulement si outcome vaut METHOD_OBTAINED.',
