@@ -322,6 +322,87 @@ export interface paths {
     patch: operations['updateDepartement'];
     trace?: never;
   };
+  '/api/v1/call-outcome-reasons': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Vocabulaire d’issues qu’un client de terrain sait émettre.
+     * @description Restreint aux motifs actifs dont `minPayloadVersion` ne dépasse pas la version déclarée. Un motif que l’appelant ne saurait pas émettre ne lui est jamais proposé : sa remontée finirait en PAYLOAD_SCHEMA_MISMATCH, qui ne se rejoue pas.
+     */
+    get: operations['listCallOutcomeReasons'];
+    put?: never;
+    /**
+     * Ajoute un motif d’issue.
+     * @description L’effet est choisi à la création et n’est plus modifiable : l’historique le référence. Le motif naît en version de charge utile 2, donc invisible du parc tant que l’application n’a pas été renouvelée.
+     */
+    post: operations['createCallOutcomeReason'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/call-outcome-reasons/administration': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Tous les motifs, actifs ou non, toutes versions de charge utile. */
+    get: operations['listAllCallOutcomeReasons'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/call-outcome-reasons/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Renomme, recolorie ou réordonne un motif.
+     * @description Ni le code, ni l’effet, ni la version de charge utile. Sur un motif système, les règles de saisie non plus : elles sont compilées dans l’application de terrain.
+     */
+    patch: operations['updateCallOutcomeReason'];
+    trace?: never;
+  };
+  '/api/v1/call-outcome-reasons/{id}/active': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Active ou retire un motif des listes.
+     * @description Jamais de suppression : les tentatives déjà remontées référencent le code. Refusé sur un motif système, que les téléphones en place proposent encore.
+     */
+    post: operations['setCallOutcomeReasonActive'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/representants': {
     parameters: {
       query?: never;
@@ -411,6 +492,44 @@ export interface paths {
     put?: never;
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/representants/{id}/comments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Fil de commentaires d’une fiche, du plus récent au plus ancien. */
+    get: operations['listRepresentantComments'];
+    put?: never;
+    /**
+     * Ajoute un commentaire. L’identifiant fourni sert de clé d’idempotence.
+     * @description Le fil est en AJOUT SEUL : ni édition ni fusion, deux téléconseillers hors ligne produisent deux lignes. Reposter le même identifiant rend la ligne déjà enregistrée.
+     */
+    post: operations['addRepresentantComment'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/representants/{id}/comments/{commentId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Supprime logiquement un commentaire. */
+    delete: operations['deleteRepresentantComment'];
     options?: never;
     head?: never;
     patch?: never;
@@ -2407,6 +2526,62 @@ export interface components {
       isActive: boolean;
     };
     /** @enum {string} */
+    CallOutcomeEffect:
+      'CLOSE_METHOD' | 'CLOSE_REFUSED' | 'CLOSE_WRONG_NUMBER' | 'KEEP_OPEN' | 'SCHEDULE_CALLBACK';
+    CallOutcomeReasonDto: {
+      /** Format: uuid */
+      id: string;
+      /** @description Code stable, jamais modifiable : les tentatives déjà remontées le référencent. */
+      code: string;
+      label: string;
+      effect: components['schemas']['CallOutcomeEffect'];
+      requiresComment: boolean;
+      requiresCallback: boolean;
+      /** @description Compte pour un appel joignable dans le taux de joignabilité. */
+      countsAsReached: boolean;
+      isActive: boolean;
+      /** @description Motif système : porte une règle compilée, ni désactivable ni reconfigurable. */
+      isSystem: boolean;
+      sortOrder: number;
+      color: string | null;
+      /** @description Version de charge utile minimale du client. Un téléphone plus ancien ne reçoit pas ce motif : il ne saurait pas l’émettre. */
+      minPayloadVersion: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    CallOutcomeReasonListDto: {
+      items: components['schemas']['CallOutcomeReasonDto'][];
+    };
+    CreateCallOutcomeReasonDto: {
+      code: string;
+      label: string;
+      effect: components['schemas']['CallOutcomeEffect'];
+      /** @default false */
+      requiresComment: boolean;
+      /**
+       * @description Réservé à l’effet SCHEDULE_CALLBACK.
+       * @default false
+       */
+      requiresCallback: boolean;
+      /** @default true */
+      countsAsReached: boolean;
+      /** @description Rôle du design system. */
+      color?: string;
+      /** @default 100 */
+      sortOrder: number;
+    };
+    UpdateCallOutcomeReasonDto: {
+      label?: string;
+      color?: string;
+      sortOrder?: number;
+      requiresComment?: boolean;
+      requiresCallback?: boolean;
+      countsAsReached?: boolean;
+    };
+    SetCallOutcomeReasonActiveDto: {
+      isActive: boolean;
+    };
+    /** @enum {string} */
     RepresentantRelation: 'INCONNU' | 'CONTACTE' | 'AMBASSADEUR' | 'REFUS';
     /** @enum {string} */
     RepresentantSortField: 'clientCreatedAt' | 'createdAt' | 'fullName' | 'prospects';
@@ -2543,6 +2718,8 @@ export interface components {
       clientCreatedAt?: string;
       /** @description État de la relation. Chaque bascule est historisée ; reposter le même statut n’écrit rien. */
       relationStatus?: components['schemas']['RepresentantRelation'];
+      /** @description Motif de la bascule, repris dans la chronologie. Sans effet quand `relationStatus` est absent ou reposte le statut courant. */
+      relationReason?: string;
     };
     /**
      * @description Le canal qui a écrit la bascule.
@@ -2568,6 +2745,38 @@ export interface components {
     RepresentantRelationChangeListDto: {
       /** @description De la plus récente à la plus ancienne. */
       items: components['schemas']['RepresentantRelationChangeDto'][];
+    };
+    RepresentantCommentDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      representantId: string;
+      /** Format: uuid */
+      authorId: string;
+      authorName: string;
+      body: string;
+      /** Format: date-time */
+      clientCreatedAt: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    RepresentantCommentListDto: {
+      /** @description Du plus récent au plus ancien. */
+      items: components['schemas']['RepresentantCommentDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    CreateRepresentantCommentDto: {
+      /**
+       * Format: uuid
+       * @description UUID v7 engendré par le client. Clé d’idempotence : un rejeu ne crée rien.
+       */
+      id: string;
+      body: string;
+      /**
+       * Format: date-time
+       * @description Horodatage de la saisie sur le terrain. Défaut : maintenant.
+       */
+      clientCreatedAt?: string;
     };
     /** @enum {string} */
     ProspectStatut: 'NOUVEAU' | 'CONTACTE' | 'CONVERTI' | 'PERDU';
@@ -5728,6 +5937,291 @@ export interface operations {
       };
     };
   };
+  listCallOutcomeReasons: {
+    parameters: {
+      query: {
+        /** @description Version de charge utile du client appelant. Obligatoire. */
+        payloadVersion: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallOutcomeReasonListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createCallOutcomeReason: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCallOutcomeReasonDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallOutcomeReasonDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUTCOME_REASON_CODE_CONFLICT, OUTCOME_REASON_LABEL_CONFLICT ou OUTCOME_REASON_CALLBACK_NOT_ALLOWED. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listAllCallOutcomeReasons: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallOutcomeReasonListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateCallOutcomeReason: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateCallOutcomeReasonDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallOutcomeReasonDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUTCOME_REASON_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUTCOME_REASON_SYSTEM_IMMUTABLE ou OUTCOME_REASON_LABEL_CONFLICT. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  setCallOutcomeReasonActive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetCallOutcomeReasonActiveDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallOutcomeReasonDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUTCOME_REASON_SYSTEM_IMMUTABLE. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   listRepresentants: {
     parameters: {
       query?: {
@@ -6173,6 +6667,185 @@ export interface operations {
         };
       };
       /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listRepresentantComments: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepresentantCommentListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  addRepresentantComment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateRepresentantCommentDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepresentantCommentDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description ENTITY_ID_OWNED_BY_ANOTHER_USER · NOT_OWNER. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  deleteRepresentantComment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        commentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OkDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_COMMENT_NOT_FOUND. */
       404: {
         headers: {
           [name: string]: unknown;

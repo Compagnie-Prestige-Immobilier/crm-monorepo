@@ -28,6 +28,8 @@ import 'package:crm_api_client/src/model/bank_rejection_reason_list_dto.dart';
 import 'package:crm_api_client/src/model/bank_stage_count_dto.dart';
 import 'package:crm_api_client/src/model/bank_time_bucket_dto.dart';
 import 'package:crm_api_client/src/model/banque_dto.dart';
+import 'package:crm_api_client/src/model/call_outcome_reason_dto.dart';
+import 'package:crm_api_client/src/model/call_outcome_reason_list_dto.dart';
 import 'package:crm_api_client/src/model/callback_dto.dart';
 import 'package:crm_api_client/src/model/callback_list_dto.dart';
 import 'package:crm_api_client/src/model/campaign_attempt_dto.dart';
@@ -46,6 +48,7 @@ import 'package:crm_api_client/src/model/create_bank_case_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_stage_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_transition_dto.dart';
 import 'package:crm_api_client/src/model/create_banque_dto.dart';
+import 'package:crm_api_client/src/model/create_call_outcome_reason_dto.dart';
 import 'package:crm_api_client/src/model/create_campaign_dto.dart';
 import 'package:crm_api_client/src/model/create_client_request_dto.dart';
 import 'package:crm_api_client/src/model/create_departement_dto.dart';
@@ -54,6 +57,7 @@ import 'package:crm_api_client/src/model/create_notification_template_dto.dart';
 import 'package:crm_api_client/src/model/create_prospect_dto.dart';
 import 'package:crm_api_client/src/model/create_rep_call_attempt_dto.dart';
 import 'package:crm_api_client/src/model/create_rep_campaign_dto.dart';
+import 'package:crm_api_client/src/model/create_representant_comment_dto.dart';
 import 'package:crm_api_client/src/model/create_representant_dto.dart';
 import 'package:crm_api_client/src/model/create_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/create_user_dto.dart';
@@ -130,6 +134,8 @@ import 'package:crm_api_client/src/model/rep_campaign_list_dto.dart';
 import 'package:crm_api_client/src/model/rep_campaign_preview_dto.dart';
 import 'package:crm_api_client/src/model/rep_campaign_progress_dto.dart';
 import 'package:crm_api_client/src/model/rep_campaign_summary_dto.dart';
+import 'package:crm_api_client/src/model/representant_comment_dto.dart';
+import 'package:crm_api_client/src/model/representant_comment_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_dto.dart';
 import 'package:crm_api_client/src/model/representant_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
@@ -148,6 +154,7 @@ import 'package:crm_api_client/src/model/segment_count_dto.dart';
 import 'package:crm_api_client/src/model/segment_list_dto.dart';
 import 'package:crm_api_client/src/model/set_active_dto.dart';
 import 'package:crm_api_client/src/model/set_bank_case_stage_active_dto.dart';
+import 'package:crm_api_client/src/model/set_call_outcome_reason_active_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_list_dto.dart';
 import 'package:crm_api_client/src/model/supervised_user_dto.dart';
@@ -172,6 +179,7 @@ import 'package:crm_api_client/src/model/top_representant_list_dto.dart';
 import 'package:crm_api_client/src/model/update_bank_case_dto.dart';
 import 'package:crm_api_client/src/model/update_bank_case_stage_dto.dart';
 import 'package:crm_api_client/src/model/update_banque_dto.dart';
+import 'package:crm_api_client/src/model/update_call_outcome_reason_dto.dart';
 import 'package:crm_api_client/src/model/update_departement_dto.dart';
 import 'package:crm_api_client/src/model/update_notification_template_dto.dart';
 import 'package:crm_api_client/src/model/update_prospect_dto.dart';
@@ -295,6 +303,13 @@ ReturnType deserialize<ReturnType, BaseType>(
       return BanqueDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'BddSegment':
     case 'CallOutcome':
+    case 'CallOutcomeEffect':
+    case 'CallOutcomeReasonDto':
+      return CallOutcomeReasonDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CallOutcomeReasonListDto':
+      return CallOutcomeReasonListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'CallbackDto':
       return CallbackDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'CallbackListDto':
@@ -353,6 +368,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CreateBanqueDto':
       return CreateBanqueDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'CreateCallOutcomeReasonDto':
+      return CreateCallOutcomeReasonDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'CreateCampaignDto':
       return CreateCampaignDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -378,6 +396,11 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'CreateRepCampaignDto':
       return CreateRepCampaignDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CreateRepresentantCommentDto':
+      return CreateRepresentantCommentDto.fromJson(
+            value as Map<String, dynamic>,
+          )
           as ReturnType;
     case 'CreateRepresentantDto':
       return CreateRepresentantDto.fromJson(value as Map<String, dynamic>)
@@ -615,6 +638,12 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'RepCampaignSummaryDto':
       return RepCampaignSummaryDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'RepresentantCommentDto':
+      return RepresentantCommentDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RepresentantCommentListDto':
+      return RepresentantCommentListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'RepresentantDto':
       return RepresentantDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -676,6 +705,11 @@ ReturnType deserialize<ReturnType, BaseType>(
       return SetActiveDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'SetBankCaseStageActiveDto':
       return SetBankCaseStageActiveDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SetCallOutcomeReasonActiveDto':
+      return SetCallOutcomeReasonActiveDto.fromJson(
+            value as Map<String, dynamic>,
+          )
           as ReturnType;
     case 'SortOrder':
     case 'SuggestionDto':
@@ -755,6 +789,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'UpdateBanqueDto':
       return UpdateBanqueDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'UpdateCallOutcomeReasonDto':
+      return UpdateCallOutcomeReasonDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'UpdateDepartementDto':
       return UpdateDepartementDto.fromJson(value as Map<String, dynamic>)

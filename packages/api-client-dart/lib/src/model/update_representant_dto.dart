@@ -35,6 +35,8 @@ class UpdateRepresentantDto {
     this.clientCreatedAt,
 
     this.relationStatus,
+
+    this.relationReason,
   });
 
   /// Identifiant UUID v7 généré par le client. Fourni par le mobile pour que les prospects saisis hors ligne puissent le référencer avant toute synchronisation.
@@ -71,6 +73,10 @@ class UpdateRepresentantDto {
   )
   final RepresentantRelation? relationStatus;
 
+  /// Motif de la bascule, repris dans la chronologie. Sans effet quand `relationStatus` est absent ou reposte le statut courant.
+  @JsonKey(name: r'relationReason', required: false, includeIfNull: false)
+  final String? relationReason;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is UpdateRepresentantDto &&
@@ -85,6 +91,7 @@ class UpdateRepresentantDto {
                 notes,
                 clientCreatedAt,
                 relationStatus,
+                relationReason,
               ],
               [
                 other.id,
@@ -95,6 +102,7 @@ class UpdateRepresentantDto {
                 other.notes,
                 other.clientCreatedAt,
                 other.relationStatus,
+                other.relationReason,
               ],
             );
   }
@@ -111,6 +119,7 @@ class UpdateRepresentantDto {
         notes,
         clientCreatedAt,
         relationStatus,
+        relationReason,
       ]);
 
   factory UpdateRepresentantDto.fromJson(Map<String, dynamic> json) =>
