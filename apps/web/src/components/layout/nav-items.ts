@@ -10,6 +10,7 @@ import {
   LibraryIcon,
   ListOrderedIcon,
   MegaphoneIcon,
+  PhoneForwardedIcon,
   PlusCircleIcon,
   SettingsIcon,
   UploadIcon,
@@ -109,6 +110,13 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Représentants',
         icon: UsersRoundIcon,
         description: 'Fiches et coordonnées',
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
+      },
+      {
+        href: '/suggestions',
+        label: 'Numéros suggérés',
+        icon: PhoneForwardedIcon,
+        description: 'Contacts nommés par les représentants',
         roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
       },
       {
