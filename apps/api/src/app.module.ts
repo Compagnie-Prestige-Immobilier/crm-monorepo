@@ -14,6 +14,7 @@ import { RolesGuard } from './common/guards/roles.guard.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { BankCasesModule } from './modules/bank-cases/bank-cases.module.js';
+import { CallbacksModule } from './modules/callbacks/callbacks.module.js';
 import { ClientRequestsModule } from './modules/client-requests/client-requests.module.js';
 import { DbDumpModule } from './modules/db-dump/db-dump.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
@@ -80,6 +81,7 @@ const env = readEnv();
     ProspectsModule,
     SyncModule,
     Phase2Module,
+    CallbacksModule,
     RepCampaignsModule,
     BankCasesModule,
     ClientRequestsModule,

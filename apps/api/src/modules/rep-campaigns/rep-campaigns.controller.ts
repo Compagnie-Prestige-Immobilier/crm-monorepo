@@ -93,6 +93,7 @@ export class RepCampaignsController {
   }
 
   @Get()
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'listRepCampaigns',
     summary: 'Liste des campagnes représentants, avec l’avancement de chacune.',
@@ -131,6 +132,7 @@ export class RepCampaignsController {
   }
 
   @Get(':id')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'getRepCampaign',
     summary: 'Détail d’une campagne, ventilé par commercial et par journée.',
@@ -158,6 +160,7 @@ export class RepCampaignsController {
   }
 
   @Get(':id/commerciaux/:userId/programme.pdf')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiProduces(PDF_MIME)
   @ApiOperation({
     operationId: 'downloadRepProgrammePdf',

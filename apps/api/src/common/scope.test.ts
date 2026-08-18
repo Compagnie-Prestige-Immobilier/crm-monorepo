@@ -2,11 +2,12 @@ import { ForbiddenException } from '@nestjs/common';
 import { Role } from '@crm/database';
 import { describe, expect, it } from 'vitest';
 
-import { assertOwnership, isAdmin, ownerScope } from './scope.js';
+import { assertOwnership, assertReadable, isAdmin, ownerScope, readScope } from './scope.js';
 
 const admin = { id: 'admin-1', role: Role.ADMIN };
 const alice = { id: 'com-alice', role: Role.COMMERCIAL };
 const bob = { id: 'com-bob', role: Role.COMMERCIAL };
+const superviseur = { id: 'sup-1', role: Role.SUPERVISEUR };
 
 describe('ownerScope', () => {
   it('restreint un COMMERCIAL à ses propres lignes', () => {
@@ -19,6 +20,21 @@ describe('ownerScope', () => {
 
   it('ne laisse jamais fuir l’identifiant d’un autre commercial', () => {
     expect(ownerScope(bob)).not.toEqual(ownerScope(alice));
+  });
+
+  it('BORNE un SUPERVISEUR, dont la portée large ne passe pas par ici', () => {
+    expect(ownerScope(superviseur)).toEqual({ createdById: 'sup-1' });
+  });
+});
+
+describe('readScope', () => {
+  it('ouvre la lecture nationale au SUPERVISEUR', () => {
+    expect(readScope(superviseur)).toEqual({});
+    expect(readScope(admin)).toEqual({});
+  });
+
+  it('laisse un téléconseiller borné à ses propres lignes', () => {
+    expect(readScope(alice)).toEqual({ createdById: 'com-alice' });
   });
 });
 
@@ -55,5 +71,26 @@ describe('isAdmin', () => {
   it('distingue les deux rôles', () => {
     expect(isAdmin(admin)).toBe(true);
     expect(isAdmin(alice)).toBe(false);
+  });
+
+  it('ne compte PAS le SUPERVISEUR : il lit, il n’écrit pas', () => {
+    expect(isAdmin(superviseur)).toBe(false);
+    expect(() => {
+      assertOwnership(superviseur, { createdById: 'com-bob' });
+    }).toThrow(ForbiddenException);
+  });
+});
+
+describe('assertReadable', () => {
+  it('laisse le SUPERVISEUR ouvrir la fiche d’autrui', () => {
+    expect(() => {
+      assertReadable(superviseur, { createdById: 'com-bob' });
+    }).not.toThrow();
+  });
+
+  it('refuse toujours celle d’un autre téléconseiller', () => {
+    expect(() => {
+      assertReadable(alice, { createdById: 'com-bob' });
+    }).toThrow(ForbiddenException);
   });
 });

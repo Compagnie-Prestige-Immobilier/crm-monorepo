@@ -22,7 +22,7 @@ import {
 import { DemoWritable } from '../../common/decorators/demo-writable.decorator.js';
 import { SyncService } from './sync.service.js';
 import { SyncPullQueryDto, SyncPullResponseDto, SyncPushDto, SyncPushResponseDto } from './dto.js';
-import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
+import { MOBILE_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
 
 @ApiTags('sync')
 @ApiBearerAuth()
@@ -33,7 +33,7 @@ export class SyncController {
 
   @DemoWritable('la remontée hors ligne ne doit JAMAIS être refusée')
   @Post('push')
-  @Roles(...ANY_AUTHENTICATED)
+  @Roles(...MOBILE_ROLES)
   @HttpCode(HttpStatus.OK)
   @ApiHeader({
     name: 'Idempotency-Key',
@@ -108,7 +108,7 @@ export class SyncController {
   }
 
   @Get('pull')
-  @Roles(...ANY_AUTHENTICATED)
+  @Roles(...MOBILE_ROLES)
   @ApiOperation({
     operationId: 'pullSyncChanges',
     summary: 'Récupère les changements depuis un curseur opaque.',

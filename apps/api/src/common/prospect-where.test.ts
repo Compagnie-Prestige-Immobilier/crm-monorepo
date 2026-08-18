@@ -149,3 +149,27 @@ describe('recherche, la clause téléphone ne doit jamais tout matcher', () => {
     expect(phone).toEqual({ phoneE164: { contains: '1234' } });
   });
 });
+
+describe('portée du SUPERVISEUR', () => {
+  const superviseur: AuthenticatedUser = {
+    ...alice,
+    id: 'sup-1',
+    username: 'sup',
+    role: Role.SUPERVISEUR,
+  };
+
+  it('lit le portefeuille national, sans borne sur son propre identifiant', () => {
+    const where = buildProspectWhere(superviseur, {}, false);
+    expect(where.createdById).toBeUndefined();
+  });
+
+  it('son filtre par téléconseiller RÉPOND, au lieu de rendre zéro ligne', () => {
+    const where = buildProspectWhere(superviseur, { commercialId: 'com-alice' }, false);
+    expect(where.createdById).toBe('com-alice');
+  });
+
+  it('un téléconseiller reste enfermé sur lui-même quoi qu’il demande', () => {
+    const where = buildProspectWhere(alice, { commercialId: 'com-bob' }, false);
+    expect(where.createdById).toBe('__aucun__');
+  });
+});

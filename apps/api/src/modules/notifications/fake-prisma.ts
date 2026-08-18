@@ -80,6 +80,14 @@ export interface CallTaskRow {
   isDemo: boolean;
 }
 
+export interface ScheduledCallbackRow {
+  id: string;
+  assignedToId: string;
+  status: string;
+  scheduledAt: Date;
+  isDemo: boolean;
+}
+
 export interface BankCaseRow {
   id: string;
   stageType: BankStageType;
@@ -239,6 +247,7 @@ export class FakePrisma {
   readonly callTasks: CallTaskRow[] = [];
   readonly repCallTasks: CallTaskRow[] = [];
   readonly bankCases: BankCaseRow[] = [];
+  readonly scheduledCallbacks: ScheduledCallbackRow[] = [];
 
   addUser(row: Partial<UserRow> & { id: string }): UserRow {
     const user: UserRow = {
@@ -279,6 +288,20 @@ export class FakePrisma {
     };
     this.repCallTasks.push(task);
     return task;
+  }
+
+  addScheduledCallback(
+    row: Partial<ScheduledCallbackRow> & { assignedToId: string; scheduledAt: Date },
+  ): ScheduledCallbackRow {
+    const callback: ScheduledCallbackRow = {
+      id: row.id ?? nextId('callback'),
+      assignedToId: row.assignedToId,
+      status: row.status ?? 'PENDING',
+      scheduledAt: row.scheduledAt,
+      isDemo: row.isDemo ?? false,
+    };
+    this.scheduledCallbacks.push(callback);
+    return callback;
   }
 
   addBankCase(row: Partial<BankCaseRow> = {}): BankCaseRow {
@@ -509,7 +532,10 @@ export class FakePrisma {
     };
   }
 
-  private groupTasksBy(source: CallTaskRow[], where?: Record<string, unknown>) {
+  private groupTasksBy(
+    source: readonly { assignedToId: string }[],
+    where?: Record<string, unknown>,
+  ) {
     const rows = source.filter((row) =>
       matches(row as unknown as Record<string, unknown>, where, this),
     );
@@ -534,6 +560,13 @@ export class FakePrisma {
     return {
       groupBy: (args: { where?: Record<string, unknown> }) =>
         this.groupTasksBy(this.repCallTasks, args.where),
+    };
+  }
+
+  get scheduledCallback() {
+    return {
+      groupBy: (args: { where?: Record<string, unknown> }) =>
+        this.groupTasksBy(this.scheduledCallbacks, args.where),
     };
   }
 

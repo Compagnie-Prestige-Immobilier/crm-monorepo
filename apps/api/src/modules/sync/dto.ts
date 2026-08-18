@@ -162,6 +162,16 @@ export class SyncEntityDataDto {
   @IsString()
   @MaxLength(2000)
   comment?: string;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description:
+      'Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut ' +
+      'CALLBACK. Une version ancienne de l’application ne l’envoie pas.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  callbackAt?: string;
 }
 
 export class SyncOperationDto {

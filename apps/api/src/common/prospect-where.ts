@@ -2,7 +2,7 @@ import { segmentWhere } from '@crm/database';
 import type { Prisma } from '@crm/database';
 
 import type { AuthenticatedUser } from './decorators/current-user.decorator.js';
-import { isAdmin, ownerScope } from './scope.js';
+import { isAdmin, readScope, readsEveryone } from './scope.js';
 import { tryNormalizePhone } from './phone.js';
 import type { ProspectFilterDto } from './dto/prospect-filter.dto.js';
 import { demoScope } from '../prisma/demo-visibility.js';
@@ -14,12 +14,12 @@ export function buildProspectWhere(
   demoEnabled: boolean,
 ): Prisma.ProspectWhereInput {
   const where: Prisma.ProspectWhereInput = {
-    ...ownerScope(user),
+    ...readScope(user),
     ...demoScope(demoEnabled),
   };
 
   if (filter.commercialId) {
-    where.createdById = isAdmin(user)
+    where.createdById = readsEveryone(user)
       ? filter.commercialId
       : filter.commercialId === user.id
         ? user.id

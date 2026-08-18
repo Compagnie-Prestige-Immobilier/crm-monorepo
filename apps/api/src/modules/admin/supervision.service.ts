@@ -26,7 +26,11 @@ import { demoScope } from '../../prisma/demo-visibility.js';
  * pour un écran qui se rafraîchit toutes les quinze secondes.
  */
 
-/** Les deux rôles supervisés. L'ADMIN se supervise dans le miroir. */
+/**
+ * Les deux rôles supervisés. L'ADMIN se supervise dans le miroir, et le
+ * SUPERVISEUR avec lui : la présence se lit sur des lots de synchronisation et
+ * des tentatives d'appel, qu'aucun des deux ne produit.
+ */
 const SUPERVISED_ROLES: readonly Role[] = [Role.COMMERCIAL, Role.BANQUE_FINANCE];
 
 /** Durée de vie d'une famille de jetons : au-delà, un compte est dormant quoi qu'il arrive. */

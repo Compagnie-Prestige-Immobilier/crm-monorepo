@@ -16,7 +16,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { CampaignStatus, RepCallOutcome } from '@crm/database';
+import { CampaignStatus, RepCallOutcome, RepresentantRelation } from '@crm/database';
 
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { MAX_SPREAD_DAYS, MIN_SPREAD_DAYS } from '../phase2/distribution.js';
@@ -337,6 +337,16 @@ export class CreateRepCallAttemptDto {
   @IsString()
   @MaxLength(COMMENT_MAX_LENGTH)
   comment?: string;
+
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    description:
+      'État de la relation tel que l’appel vient de l’apprendre. Absent : le statut ne bouge pas. Identique au statut courant : rien n’est écrit.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation)
+  relationStatus?: RepresentantRelation;
 
   @ApiProperty({
     type: String,

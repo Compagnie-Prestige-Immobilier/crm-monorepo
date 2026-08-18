@@ -1,5 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CallTaskStatus, CampaignStatus, Prisma, RepCallOutcome, Role } from '@crm/database';
+import {
+  CallTaskStatus,
+  CampaignStatus,
+  ChangeSource,
+  Prisma,
+  RepCallOutcome,
+  Role,
+} from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { shortCode } from '../../common/short-code.js';
@@ -29,6 +36,7 @@ import {
   representantAlreadyAssigned,
   representantNotFound,
 } from './errors.js';
+import { applyRelationChange } from '../representants/relation-change.js';
 import { RepCallAttemptApplyStatus } from './dto.js';
 import type {
   CreateRepCallAttemptDto,
@@ -547,7 +555,7 @@ export class RepCampaignsService {
     const demoEnabled = await this.demo.enabled();
     const representant = await this.prisma.representant.findFirst({
       where: { id: body.representantId, deletedAt: null, ...demoScope(demoEnabled) },
-      select: { id: true, isDemo: true },
+      select: { id: true, isDemo: true, relationStatus: true },
     });
     if (!representant) throw representantNotFound();
 
@@ -579,6 +587,21 @@ export class RepCampaignsService {
       });
 
       if (inserted.count === 0) return false;
+
+      if (body.relationStatus !== undefined) {
+        // WEB en dur : aucune entrée de synchronisation mobile n'écrit de
+        // tentative représentant, et laisser le canal se déclarer depuis le
+        // corps de la requête permettrait à n'importe quel appelant de se faire
+        // passer pour l'autre.
+        await applyRelationChange(tx, {
+          representantId: body.representantId,
+          fromStatus: representant.relationStatus,
+          toStatus: body.relationStatus,
+          changedById: user.id,
+          source: ChangeSource.WEB,
+          isDemo: representant.isDemo,
+        });
+      }
 
       if (task && terminal) {
         await tx.repCallTask.updateMany({

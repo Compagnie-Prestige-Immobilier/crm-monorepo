@@ -4,6 +4,9 @@ export const PURGE_STEP_ORDER = [
   'bankCaseTransitions',
   'bankCases',
   'callAttempts',
+  // Avant `callTasks`, `campaigns` et surtout `commercialAccounts` : un rappel
+  // planifié pointe son téléconseiller en Restrict, et son prospect en cascade.
+  'scheduledCallbacks',
   'callTasks',
   'campaignMembers',
   'campaigns',
@@ -22,6 +25,7 @@ export const PURGE_STEP_ORDER = [
   'auditLogs',
   'commercialAccounts',
   'financeAccounts',
+  'supervisionAccounts',
   'bankCaseStages',
   'bankRejectionReasons',
   'banques',
@@ -36,6 +40,7 @@ export type PurgeStepKey = (typeof PURGE_STEP_ORDER)[number];
 export const PURGE_DOMAIN_KEYS = [
   'teleconseillers',
   'finances',
+  'supervision',
   'representants',
   'prospects',
   'campagnes',
@@ -80,8 +85,8 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
   {
     key: 'fileAppels',
     label: 'File d’appels',
-    hint: 'Numéros attribués, appelés ou non.',
-    steps: ['callTasks'],
+    hint: 'Numéros attribués, appelés ou non, et les rappels planifiés.',
+    steps: ['scheduledCallbacks', 'callTasks'],
     requires: [],
   },
   {
@@ -163,6 +168,14 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     hint: 'Comptes du pôle, dossiers qu’ils ont ouverts et demandes qu’ils ont déposées.',
     steps: ['financeAccounts'],
     requires: ['dossiers', 'demandesClients'],
+  },
+  {
+    // Aucun `requires` : un superviseur lit, il ne possède aucune ligne.
+    key: 'supervision',
+    label: 'Comptes supervision',
+    hint: 'Comptes qui suivent le travail des téléconseillers.',
+    steps: ['supervisionAccounts'],
+    requires: [],
   },
   {
     key: 'referentiels',

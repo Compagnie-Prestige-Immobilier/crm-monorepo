@@ -4,12 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@crm/database';
+import { ChangeSource, Prisma } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { normalizePhone } from '../../common/phone.js';
-import { assertOwnership, isAdmin, ownerScope } from '../../common/scope.js';
+import {
+  assertOwnership,
+  assertReadable,
+  isAdmin,
+  readScope,
+  readsEveryone,
+} from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
 import { RepresentantSortField } from './dto.js';
@@ -21,7 +27,9 @@ import type {
   RepresentantLookupDto,
   RepresentantQueryDto,
   UpdateRepresentantDto,
+  RepresentantRelationChangeListDto,
 } from './dto.js';
+import { applyRelationChange, toRelationChangeDto } from './relation-change.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { demoScope } from '../../prisma/demo-visibility.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
@@ -83,6 +91,7 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     prospectCount: row._count.prospects,
+    relationStatus: row.relationStatus,
   };
 }
 
@@ -101,11 +110,11 @@ export class RepresentantsService {
     // contrôleur, il dépendrait de la discipline de chaque route.
     const where: Prisma.RepresentantWhereInput = {
       deletedAt: null,
-      ...ownerScope(user),
+      ...readScope(user),
       ...demoScope(await this.demo.enabled()),
     };
     if (query.commercialId) {
-      where.createdById = isAdmin(user)
+      where.createdById = readsEveryone(user)
         ? query.commercialId
         : query.commercialId === user.id
           ? user.id
@@ -113,6 +122,7 @@ export class RepresentantsService {
     }
     if (query.departementId) where.departementId = query.departementId;
     if (query.iefId) where.iefId = query.iefId;
+    if (query.relationStatus) where.relationStatus = query.relationStatus;
 
     if (query.dateFrom || query.dateTo) {
       where.clientCreatedAt = {
@@ -163,7 +173,7 @@ export class RepresentantsService {
         message: 'Représentant introuvable.',
       });
     }
-    assertOwnership(user, row);
+    assertReadable(user, row);
     return toRepresentantDto(row);
   }
 
@@ -279,20 +289,73 @@ export class RepresentantsService {
     const phoneE164 = input.phone ? normalizePhone(input.phone) : undefined;
     if (phoneE164 && phoneE164 !== existing.phoneE164) await this.assertPhoneFree(user, phoneE164);
 
-    const updated = await this.prisma.representant.update({
-      where: { id },
-      data: {
-        ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
-        ...(phoneE164 ? { phoneE164 } : {}),
-        ...(input.notes !== undefined ? { notes: input.notes || null } : {}),
-        ...(input.departementId ? { departementId: input.departementId } : {}),
-        ...(input.iefId === undefined ? {} : { iefId: input.iefId }),
-        ...(input.clientCreatedAt ? { clientCreatedAt: new Date(input.clientCreatedAt) } : {}),
-        rev: { increment: 1 },
-      },
-      include: INCLUDE,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // La bascule de relation part AVANT la mise à jour ordinaire : elle porte
+      // sa propre garde sur le statut de départ, et la relecture qui suit doit
+      // rendre la fiche telle que les deux écritures l'ont laissée.
+      if (input.relationStatus !== undefined) {
+        await applyRelationChange(tx, {
+          representantId: id,
+          fromStatus: existing.relationStatus,
+          toStatus: input.relationStatus,
+          changedById: user.id,
+          source: ChangeSource.WEB,
+          isDemo: existing.isDemo,
+        });
+      }
+
+      return tx.representant.update({
+        where: { id },
+        data: {
+          ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
+          ...(phoneE164 ? { phoneE164 } : {}),
+          ...(input.notes !== undefined ? { notes: input.notes || null } : {}),
+          ...(input.departementId ? { departementId: input.departementId } : {}),
+          ...(input.iefId === undefined ? {} : { iefId: input.iefId }),
+          ...(input.clientCreatedAt ? { clientCreatedAt: new Date(input.clientCreatedAt) } : {}),
+          rev: { increment: 1 },
+        },
+        include: INCLUDE,
+      });
     });
     return toRepresentantDto(updated);
+  }
+
+  /**
+   * L'historique d'UNE fiche, du plus récent au plus ancien.
+   *
+   * Sert l'index `(representantId, changedAt)`. Le cloisonnement s'est joué sur
+   * la fiche, résolue par sa clé primaire juste au-dessus.
+   */
+  async relationHistory(
+    user: AuthenticatedUser,
+    id: string,
+  ): Promise<RepresentantRelationChangeListDto> {
+    const representant = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+      select: { id: true, createdById: true },
+    });
+    if (!representant) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_NOT_FOUND',
+        message: 'Représentant introuvable.',
+      });
+    }
+    assertReadable(user, representant);
+
+    // LECTURE GLOBALE délibérée : une trace suit toujours la nature de son
+    // représentant, déjà résolu ci-dessus. Rejouer le filtre ici rendrait soit
+    // le même ensemble, soit une fiche privée de son histoire, ce qui se lit à
+    // l'écran comme une relation jamais entamée.
+    const rows = await this.prisma.representantRelationChange.findMany({
+      where: { representantId: id },
+      include: { changedBy: { select: { fullName: true } } },
+      // `id` en second critère : deux bascules de la même milliseconde
+      // s'échangeraient sinon leur place d'un affichage à l'autre.
+      orderBy: [{ changedAt: 'desc' }, { id: 'desc' }],
+    });
+
+    return { items: rows.map(toRelationChangeDto) };
   }
 
   async remove(user: AuthenticatedUser, id: string, query: DeleteQueryDto): Promise<OkDto> {
