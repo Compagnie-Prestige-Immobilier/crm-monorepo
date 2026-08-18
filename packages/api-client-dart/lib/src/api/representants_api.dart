@@ -10,9 +10,12 @@ import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
 import 'package:crm_api_client/src/model/api_error_dto.dart';
+import 'package:crm_api_client/src/model/create_representant_comment_dto.dart';
 import 'package:crm_api_client/src/model/create_representant_dto.dart';
 import 'package:crm_api_client/src/model/import_report_dto.dart';
 import 'package:crm_api_client/src/model/ok_dto.dart';
+import 'package:crm_api_client/src/model/representant_comment_dto.dart';
+import 'package:crm_api_client/src/model/representant_comment_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_dto.dart';
 import 'package:crm_api_client/src/model/representant_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
@@ -26,6 +29,105 @@ class RepresentantsApi {
   final Dio _dio;
 
   const RepresentantsApi(this._dio);
+
+  /// Ajoute un commentaire. L’identifiant fourni sert de clé d’idempotence.
+  /// Le fil est en AJOUT SEUL : ni édition ni fusion, deux téléconseillers hors ligne produisent deux lignes. Reposter le même identifiant rend la ligne déjà enregistrée.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [createRepresentantCommentDto]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RepresentantCommentDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RepresentantCommentDto>> addRepresentantComment({
+    required String id,
+    required CreateRepresentantCommentDto createRepresentantCommentDto,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/representants/{id}/comments'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(createRepresentantCommentDto);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RepresentantCommentDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<RepresentantCommentDto, RepresentantCommentDto>(
+              rawData,
+              'RepresentantCommentDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RepresentantCommentDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
 
   /// Crée un représentant. L’identifiant peut être fourni par le client.
   ///
@@ -170,6 +272,93 @@ class RepresentantsApi {
       _path,
       options: _options,
       queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    OkDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OkDto, OkDto>(rawData, 'OkDto', growable: true);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<OkDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Supprime logiquement un commentaire.
+  ///
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [commentId]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [OkDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<OkDto>> deleteRepresentantComment({
+    required String id,
+    required String commentId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/representants/{id}/comments/{commentId}'
+        .replaceAll(
+          '{'
+          r'id'
+          '}',
+          id.toString(),
+        )
+        .replaceAll(
+          '{'
+          r'commentId'
+          '}',
+          commentId.toString(),
+        );
+    final _options = Options(
+      method: r'DELETE',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
       cancelToken: cancelToken,
       onSendProgress: onSendProgress,
       onReceiveProgress: onReceiveProgress,
@@ -378,6 +567,98 @@ class RepresentantsApi {
     }
 
     return Response<ImportReportDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Fil de commentaires d’une fiche, du plus récent au plus ancien.
+  ///
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [page]
+  /// * [pageSize]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RepresentantCommentListDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RepresentantCommentListDto>> listRepresentantComments({
+    required String id,
+    num? page = 1,
+    num? pageSize = 50,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/representants/{id}/comments'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (page != null) r'page': page,
+      if (pageSize != null) r'pageSize': pageSize,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RepresentantCommentListDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<RepresentantCommentListDto, RepresentantCommentListDto>(
+              rawData,
+              'RepresentantCommentListDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RepresentantCommentListDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

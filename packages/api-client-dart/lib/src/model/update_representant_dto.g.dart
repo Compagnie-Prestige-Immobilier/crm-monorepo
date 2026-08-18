@@ -23,6 +23,8 @@ abstract class _$UpdateRepresentantDtoCWProxy {
 
   UpdateRepresentantDto relationStatus(RepresentantRelation? relationStatus);
 
+  UpdateRepresentantDto relationReason(String? relationReason);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateRepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -38,6 +40,7 @@ abstract class _$UpdateRepresentantDtoCWProxy {
     String? notes,
     DateTime? clientCreatedAt,
     RepresentantRelation? relationStatus,
+    String? relationReason,
   });
 }
 
@@ -76,6 +79,10 @@ class _$UpdateRepresentantDtoCWProxyImpl
       this(relationStatus: relationStatus);
 
   @override
+  UpdateRepresentantDto relationReason(String? relationReason) =>
+      this(relationReason: relationReason);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateRepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -91,6 +98,7 @@ class _$UpdateRepresentantDtoCWProxyImpl
     Object? notes = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? relationStatus = const $CopyWithPlaceholder(),
+    Object? relationReason = const $CopyWithPlaceholder(),
   }) {
     return UpdateRepresentantDto(
       id: id == const $CopyWithPlaceholder()
@@ -125,6 +133,10 @@ class _$UpdateRepresentantDtoCWProxyImpl
           ? _value.relationStatus
           // ignore: cast_nullable_to_non_nullable
           : relationStatus as RepresentantRelation?,
+      relationReason: relationReason == const $CopyWithPlaceholder()
+          ? _value.relationReason
+          // ignore: cast_nullable_to_non_nullable
+          : relationReason as String?,
     );
   }
 }
@@ -162,6 +174,7 @@ UpdateRepresentantDto _$UpdateRepresentantDtoFromJson(
         unknownValue: RepresentantRelation.unknownDefaultOpenApi,
       ),
     ),
+    relationReason: $checkedConvert('relationReason', (v) => v as String?),
   );
   return val;
 });
@@ -179,6 +192,7 @@ Map<String, dynamic> _$UpdateRepresentantDtoToJson(
     'clientCreatedAt': value,
   if (_$RepresentantRelationEnumMap[instance.relationStatus] case final value?)
     'relationStatus': value,
+  if (instance.relationReason case final value?) 'relationReason': value,
 };
 
 const _$RepresentantRelationEnumMap = {
