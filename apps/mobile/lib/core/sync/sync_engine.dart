@@ -11,7 +11,7 @@ import 'backoff.dart';
 import 'clock.dart';
 import 'outbox_status.dart';
 import 'phase2_directory_sync.dart'
-    show CallOutcomes, EnrollmentMethods, callAttemptEntity;
+    show CallEffects, CallReason, EnrollmentMethods, callAttemptEntity, loadCallReasons;
 import 'token_store.dart';
 
 class SyncEngine {
@@ -40,7 +40,10 @@ class SyncEngine {
   final Clock _clock;
   final Backoff _backoff;
 
-  static const int payloadVersion = 1;
+  /// v2 : la tentative d'appel porte `reasonCode` en plus d'`outcome`. Le
+  /// serveur s'en sert pour ne redescendre à cet appareil que les motifs qu'il
+  /// sait émettre.
+  static const int payloadVersion = 2;
 
   final int maxBatchOps;
 
@@ -315,10 +318,11 @@ class SyncEngine {
     final List<SyncOperationDto> operations = <SyncOperationDto>[];
     final List<OutboxData> accepted = <OutboxData>[];
     final List<OutboxData> undecodable = <OutboxData>[];
+    final Map<String, CallReason> reasons = await loadCallReasons(_db);
 
     for (final OutboxData row in rows) {
       try {
-        operations.add(_toOperation(row));
+        operations.add(_toOperation(row, reasons));
         accepted.add(row);
       } on Object catch (e) {
         undecodable.add(row);
@@ -367,7 +371,14 @@ class SyncEngine {
     _ => throw FormatException('entité inconnue', entityType),
   };
 
-  static void _assertCallAttemptComplete(Map<String, dynamic> decoded, String payload) {
+  /// Résout le motif de la tentative et vérifie sa FORME contre l'EFFET de ce
+  /// motif, jamais contre son code : c'est ce qui laisse l'équipe du client
+  /// ajouter un motif depuis le web sans que le parc ait à être renouvelé.
+  static CallReason _resolveCallAttempt(
+    Map<String, dynamic> decoded,
+    String payload,
+    Map<String, CallReason> reasons,
+  ) {
     for (final String field in const <String>[
       'prospectId',
       'outcome',
@@ -377,21 +388,32 @@ class SyncEngine {
         throw FormatException('tentative d\'appel sans $field', payload);
       }
     }
-    if (!CallOutcomes.all.contains(decoded['outcome'])) {
-      throw FormatException('issue d\'appel inconnue', payload);
+    final Object? code = decoded['reasonCode'] ?? decoded['outcome'];
+    final CallReason? reason = code is String ? reasons[code] : null;
+    if (reason == null) {
+      throw FormatException('motif d\'appel « $code » inconnu de cet appareil', payload);
+    }
+    if (!CallEffects.all.contains(reason.effect)) {
+      throw FormatException('effet « ${reason.effect} » inconnu', payload);
     }
     final Object? method = decoded['method'];
+    if ((reason.effect == CallEffects.closeMethod) != (method != null)) {
+      throw FormatException('méthode incompatible avec l\'effet du motif', payload);
+    }
     if (method != null && !EnrollmentMethods.all.contains(method)) {
       throw FormatException('méthode d\'adhésion inconnue', payload);
     }
+    return reason;
   }
 
+  /// `outcome` n'y figure plus : le vocabulaire des issues vit maintenant dans
+  /// la table locale des motifs, et une valeur qu'elle ignore est refusée par
+  /// [_resolveCallAttempt] avec un message qui nomme le motif.
   static final Map<String, List<String>> _enumVocabulary = <String, List<String>>{
     'statut': ProspectStatut.values
         .where((ProspectStatut s) => s != ProspectStatut.unknownDefaultOpenApi)
         .map((ProspectStatut s) => s.value)
         .toList(growable: false),
-    'outcome': CallOutcomes.all,
     'method': EnrollmentMethods.all,
   };
 
@@ -422,13 +444,22 @@ class SyncEngine {
     return cleared.isEmpty ? null : cleared;
   }
 
-  SyncOperationDto _toOperation(OutboxData row) {
-    final Object? decoded = jsonDecode(row.payload);
-    if (decoded is! Map<String, dynamic>) {
+  SyncOperationDto _toOperation(OutboxData row, Map<String, CallReason> reasons) {
+    final Object? raw = jsonDecode(row.payload);
+    if (raw is! Map<String, dynamic>) {
       throw FormatException('payload non objet', row.payload);
     }
+    Map<String, dynamic> decoded = raw;
     if (row.entityType == callAttemptEntity) {
-      _assertCallAttemptComplete(decoded, row.payload);
+      final CallReason reason = _resolveCallAttempt(decoded, row.payload, reasons);
+      // Le motif fait foi : `outcome` n'est que sa projection sur l'énumération
+      // fermée du contrat, et une opération mise en file avant que le motif ne
+      // change d'effet repart avec l'issue qui lui correspond aujourd'hui.
+      decoded = <String, dynamic>{
+        ...decoded,
+        'outcome': reason.outcome,
+        'reasonCode': reason.code,
+      };
     }
     _assertNoUnknownEnum(decoded, row.payload);
     return SyncOperationDto(
@@ -946,6 +977,7 @@ class SyncEngine {
     if (_pulling) return 0;
     _pulling = true;
     try {
+      await pullCallOutcomeReasons();
       int applied = 0;
       String? cursor = await readCursor();
 
@@ -960,6 +992,46 @@ class SyncEngine {
     } finally {
       _pulling = false;
     }
+  }
+
+  /// Le référentiel des motifs ne voyage PAS par le curseur keyset : il a son
+  /// propre point d'entrée et redescend en entier, filtré sur
+  /// [payloadVersion]. Il n'y a donc aucun curseur à remettre à zéro pour qu'un
+  /// téléphone déjà en service se peuple : la première synchronisation suffit.
+  ///
+  /// Un échec n'interrompt pas le pull des entités : les motifs se replient sur
+  /// les six codes système, alors qu'une page de saisies perdue ne se rattrape
+  /// pas.
+  Future<int> pullCallOutcomeReasons() async {
+    final List<CallOutcomeReasonDto> items;
+    try {
+      items = await _api.pullCallOutcomeReasons(payloadVersion: payloadVersion);
+    } on ApiException {
+      return 0;
+    }
+    if (items.isEmpty) return 0;
+    await _db.transaction(() async {
+      await _db.delete(_db.callOutcomeReasons).go();
+      for (final CallOutcomeReasonDto r in items) {
+        await _db
+            .into(_db.callOutcomeReasons)
+            .insert(
+              CallOutcomeReasonsCompanion.insert(
+                code: r.code,
+                label: r.label,
+                effect: r.effect.value,
+                requiresComment: Value<bool>(r.requiresComment),
+                requiresCallback: Value<bool>(r.requiresCallback),
+                countsAsReached: Value<bool>(r.countsAsReached),
+                isActive: Value<bool>(r.isActive),
+                sortOrder: Value<int>(r.sortOrder.toInt()),
+                color: Value<String?>(r.color),
+                minPayloadVersion: Value<int>(r.minPayloadVersion.toInt()),
+              ),
+            );
+      }
+    });
+    return items.length;
   }
 
   Future<Set<String>> _entitiesWithOpenWrites(String entityType) async {

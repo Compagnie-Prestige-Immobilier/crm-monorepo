@@ -151,6 +151,89 @@ void main() {
       expect(find.textContaining('Aucun résultat'), findsOneWidget);
     });
 
+    testWidgets(
+      'le choix ne rouvre pas la liste quand le formulaire retrecit les options',
+      (WidgetTester tester) async {
+        // ═══ LE DÉFAUT, SIGNALÉ SUR L'APK ═══
+        //
+        // Choisir « Tambacounda » en département en fait DÉDUIRE la région, ce
+        // qui retrecit la liste passee au widget. Le widget se reconstruit,
+        // `RawAutocomplete` recalcule ses options avec le libelle deja pose, et
+        // en trouve UNE : la liste se rouvre sur le choix qu'on vient de faire,
+        // et il faut le retaper. Une liste vide est la seule chose qui ferme le
+        // panneau.
+        const List<TypeaheadOption> tout = <TypeaheadOption>[
+          TypeaheadOption(id: 'tamba', label: 'Tambacounda'),
+          TypeaheadOption(id: 'dakar', label: 'Dakar'),
+          TypeaheadOption(id: 'thies', label: 'Thiès'),
+        ];
+        const List<TypeaheadOption> region = <TypeaheadOption>[
+          TypeaheadOption(id: 'tamba', label: 'Tambacounda'),
+          TypeaheadOption(id: 'bakel', label: 'Bakel'),
+        ];
+
+        final TextEditingController controller = TextEditingController();
+        final FocusNode focus = FocusNode();
+        addTearDown(controller.dispose);
+        addTearDown(focus.dispose);
+
+        String? selectedId;
+        List<TypeaheadOption> options = tout;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: StatefulBuilder(
+                builder: (BuildContext context, StateSetter setState) {
+                  return LocalTypeahead(
+                    controller: controller,
+                    focusNode: focus,
+                    options: options,
+                    selectedId: selectedId,
+                    label: 'Département',
+                    onSelected: (TypeaheadOption o) {
+                      // Ce que fait le vrai formulaire : il pose la valeur ET
+                      // deduit la region, donc il change la liste.
+                      setState(() {
+                        selectedId = o.id;
+                        options = region;
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byType(TextField));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'Tamba');
+        await tester.pumpAndSettle();
+        expect(find.widgetWithText(ListTile, 'Tambacounda'), findsOneWidget);
+
+        await tester.tap(find.widgetWithText(ListTile, 'Tambacounda'));
+        await tester.pumpAndSettle();
+
+        expect(controller.text, 'Tambacounda');
+        expect(focus.hasFocus, isFalse);
+
+        // Le geste qui revele le defaut : revenir sur le champ. La liste est
+        // desormais celle de la region deduite, et le libelle pose y figure
+        // encore : sans la branche « pose », elle se rouvre sur ce seul choix.
+        focus.requestFocus();
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byType(ListTile),
+          findsNothing,
+          reason: 'un choix pose ne se represente pas comme une liste',
+        );
+      },
+    );
+
     testWidgets('une recherche qui aboutit ne dit rien', (WidgetTester tester) async {
       final ({TextEditingController controller, FocusNode focus}) f = await pumpField(
         tester,
@@ -231,7 +314,7 @@ void main() {
       expect(f.focus.hasFocus, isFalse);
     });
 
-    testWidgets('revenir sur le champ sans le toucher ne rouvre pas tout', (
+    testWidgets('revenir sur le champ sans le toucher ne rouvre RIEN', (
       WidgetTester tester,
     ) async {
       final ({FocusNode focus, List<String> chosen}) f = await pumpSelectable(tester);
@@ -248,7 +331,9 @@ void main() {
       f.focus.requestFocus();
       await tester.pumpAndSettle();
 
-      expect(find.byType(ListTile), findsOneWidget);
+      // Une seule ligne suffisait a faire croire a l'utilisateur qu'il doit
+      // choisir une seconde fois: c'est le libelle qu'il vient de poser.
+      expect(find.byType(ListTile), findsNothing);
     });
   });
 }

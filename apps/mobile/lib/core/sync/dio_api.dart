@@ -26,6 +26,7 @@ class DioApi implements ApiPort {
   SyncApi get _sync => _client.getSyncApi();
   Phase2Api get _phase2 => _client.getPhase2Api();
   RepresentantsApi get _representants => _client.getRepresentantsApi();
+  CallOutcomeReasonsApi get _reasons => _client.getCallOutcomeReasonsApi();
 
 
   @override
@@ -159,6 +160,20 @@ class DioApi implements ApiPort {
       rev: dto.rev.toInt(),
       updatedAt: dto.updatedAt,
     );
+  }
+
+  @override
+  Future<List<CallOutcomeReasonDto>> pullCallOutcomeReasons({
+    required int payloadVersion,
+  }) async {
+    return _guard('callOutcomeReasons', () async {
+      final Response<CallOutcomeReasonListDto> response = await _reasons
+          .listCallOutcomeReasons(
+            payloadVersion: payloadVersion,
+            extra: TimeoutProfile.read.extra,
+          );
+      return _body('callOutcomeReasons', response).items;
+    });
   }
 
   @override

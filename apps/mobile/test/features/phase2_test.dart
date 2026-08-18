@@ -578,13 +578,296 @@ void main() {
         await expectLater(
           db.customStatement(
             'INSERT INTO call_attempts '
-            '(id, prospect_id, outcome, method, comment, client_created_at, created_by_id) '
-            'VALUES (?, ?, ?, NULL, NULL, ?, ?)',
+            '(id, prospect_id, outcome, requires_comment, method, comment, '
+            ' client_created_at, created_by_id) '
+            'VALUES (?, ?, ?, 1, NULL, NULL, ?, ?)',
             <Object?>['x', 'pros-1', 'OTHER', t0.toIso8601String(), 'me'],
           ),
           throwsA(isA<SqliteException>()),
         );
       });
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Motifs d'issue administrés par le client
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// Un motif tel que le serveur le rend.
+  CallOutcomeReasonDto reasonDto({
+    required String code,
+    required String label,
+    CallOutcomeEffect effect = CallOutcomeEffect.KEEP_OPEN,
+    bool requiresComment = false,
+    bool isActive = true,
+    int sortOrder = 100,
+  }) => CallOutcomeReasonDto(
+    id: 'id-$code',
+    code: code,
+    label: label,
+    effect: effect,
+    requiresComment: requiresComment,
+    requiresCallback: false,
+    countsAsReached: true,
+    isActive: isActive,
+    isSystem: false,
+    sortOrder: sortOrder,
+    color: null,
+    minPayloadVersion: 2,
+    updatedAt: t0,
+  );
+
+  Future<void> seedReason({
+    required String code,
+    required String label,
+    String effect = CallEffects.keepOpen,
+    bool requiresComment = false,
+    bool isActive = true,
+    int sortOrder = 100,
+  }) {
+    return db
+        .into(db.callOutcomeReasons)
+        .insert(
+          CallOutcomeReasonsCompanion.insert(
+            code: code,
+            label: label,
+            effect: effect,
+            requiresComment: Value<bool>(requiresComment),
+            isActive: Value<bool>(isActive),
+            sortOrder: Value<int>(sortOrder),
+            minPayloadVersion: const Value<int>(2),
+          ),
+        );
+  }
+
+  group('motifs d\'issue', () {
+    test('le référentiel redescend avec le pull et remplace la table', () async {
+      api.callOutcomeReasons.addAll(<CallOutcomeReasonDto>[
+        reasonDto(code: 'NRP', label: 'Ne répond pas', sortOrder: 15),
+        reasonDto(
+          code: 'RDV_PRIS',
+          label: 'Rendez-vous pris',
+          effect: CallOutcomeEffect.SCHEDULE_CALLBACK,
+          sortOrder: 35,
+        ),
+      ]);
+
+      await engine.pullChanges();
+
+      // Le serveur filtre lui-même sur la version de charge utile : l'application
+      // ne reçoit que des motifs qu'elle sait émettre.
+      expect(api.reasonCalls, <int>[SyncEngine.payloadVersion]);
+
+      final List<CallOutcomeReason> rows = await db.select(db.callOutcomeReasons).get();
+      expect(rows.map((CallOutcomeReason r) => r.code).toSet(), <String>{
+        'NRP',
+        'RDV_PRIS',
+      });
+      expect(
+        rows.firstWhere((CallOutcomeReason r) => r.code == 'RDV_PRIS').effect,
+        CallEffects.scheduleCallback,
+      );
+    });
+
+    // Le référentiel est un confort ; la page de saisies, non. Si l'un tombe,
+    // l'autre doit passer quand même.
+    test('un référentiel injoignable n\'arrête pas le pull des entités', () async {
+      api.failNextReasonsPull = const ApiException(
+        'NETWORK',
+        kind: FailureKind.unreachable,
+      );
+
+      await expectLater(engine.pullChanges(), completes);
+      expect(await db.select(db.callOutcomeReasons).get(), isEmpty);
+    });
+
+    test('un motif ajouté par le client se saisit et porte son code', () async {
+      await seedDirectory();
+      await seedReason(code: 'NRP', label: 'Ne répond pas', sortOrder: 15);
+
+      final String attemptId = await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        reasonCode: 'NRP',
+        createdById: 'me',
+      );
+
+      final CallAttempt attempt = await (db.select(
+        db.callAttempts,
+      )..where((CallAttempts a) => a.id.equals(attemptId))).getSingle();
+      expect(attempt.reasonCode, 'NRP');
+      expect(attempt.effect, CallEffects.keepOpen);
+      // L'issue reste celle de l'effet : `outcome` est une énumération FERMÉE du
+      // contrat, et y écrire « NRP » repartirait en `unknown_default_open_api`.
+      expect(attempt.outcome, CallOutcomes.unreachable);
+
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
+      expect(payload['reasonCode'], 'NRP');
+      expect(payload['outcome'], CallOutcomes.unreachable);
+    });
+
+    // C'est le défaut que ce lot corrige : le moteur marquait
+    // PAYLOAD_SCHEMA_MISMATCH, statut TERMINAL, sur toute issue absente d'un
+    // vocabulaire compilé. Un motif neuf n'atteignait jamais le serveur.
+    test('un motif de la table locale traverse le moteur', () async {
+      await seedDirectory();
+      await seedReason(code: 'NRP', label: 'Ne répond pas');
+      // Écrite à la main : « NRP » en guise d'issue, ce qu'aucune version
+      // antérieure n'aurait su relire. Le moteur la résout par le RÉFÉRENTIEL,
+      // et c'est l'effet du motif qui décide de l'issue qui part sur le fil.
+      await queueOp(
+        db,
+        id: 'op-nrp',
+        entityType: callAttemptEntity,
+        entityId: 'att-1',
+        dependencyKey: 'phase2:pros-1',
+        payload: <String, Object?>{
+          'prospectId': 'pros-1',
+          'outcome': 'NRP',
+          'clientCreatedAt': t0.toIso8601String(),
+        },
+      );
+
+      await engine.drain();
+
+      final OutboxData row = await outboxById(db, 'op-nrp');
+      expect(row.status, OutboxStatus.done);
+      expect(row.lastErrorCode, isNot(ClientErrorCodes.payloadSchemaMismatch));
+      final SyncOperationDto sent = api.calls.single.operations.single;
+      expect(sent.data?.outcome, CallOutcome.UNREACHABLE);
+    });
+
+    test('la file d\'aujourd\'hui part en version de charge utile 2', () async {
+      await seedDirectory();
+      await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        createdById: 'me',
+      );
+
+      await engine.drain();
+
+      expect((await allOutbox(db)).single.payloadVersion, 2);
+      expect(api.calls.single.payloadVersion, 2);
+    });
+
+    // Un motif retiré du référentiel entre la saisie et l'envoi ne doit pas
+    // condamner une tentative déjà faite : le téléconseiller ne peut plus rien y
+    // corriger trois semaines plus tard.
+    test('un motif désactivé laisse partir une tentative déjà en file', () async {
+      await seedDirectory();
+      await seedReason(code: 'NRP', label: 'Ne répond pas');
+      await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        reasonCode: 'NRP',
+        createdById: 'me',
+      );
+      await (db.update(db.callOutcomeReasons)
+            ..where((CallOutcomeReasons t) => t.code.equals('NRP')))
+          .write(const CallOutcomeReasonsCompanion(isActive: Value<bool>(false)));
+
+      await engine.drain();
+
+      expect((await allOutbox(db)).single.status, OutboxStatus.done);
+    });
+
+    // Premier lancement : le référentiel n'est pas encore descendu, et la saisie
+    // ne peut pas attendre le réseau.
+    test('table vide, les six motifs système restent saisissables', () async {
+      await seedDirectory();
+      expect(await db.select(db.callOutcomeReasons).get(), isEmpty);
+
+      await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.refused,
+        createdById: 'me',
+      );
+
+      final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+      expect(attempt.effect, CallEffects.closeRefused);
+      expect(attempt.reasonCode, CallOutcomes.refused);
+      final Phase2DirectoryData row =
+          await directory.lookupByPhone('+221771234567') as Phase2DirectoryData;
+      expect(row.phase2Status, Phase2Statuses.refused);
+    });
+
+    test('un motif que même le repli ignore est refusé, avec un message', () async {
+      await seedDirectory();
+      await expectLater(
+        writes.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.unreachable,
+          reasonCode: 'MOTIF_JAMAIS_DESCENDU',
+          createdById: 'me',
+        ),
+        throwsA(
+          isA<CallAttemptInvalid>().having(
+            (CallAttemptInvalid e) => e.problem,
+            'problem',
+            CallAttemptProblem.unknownReason,
+          ),
+        ),
+      );
+      expect(await db.countMyAttempts().getSingle(), 0);
+    });
+
+    test('un motif du serveur qui exige un commentaire l\'obtient', () async {
+      await seedDirectory();
+      await seedReason(code: 'LITIGE', label: 'Litige en cours', requiresComment: true);
+
+      await expectLater(
+        writes.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.unreachable,
+          reasonCode: 'LITIGE',
+          createdById: 'me',
+        ),
+        throwsA(
+          isA<CallAttemptInvalid>().having(
+            (CallAttemptInvalid e) => e.problem,
+            'problem',
+            CallAttemptProblem.commentRequired,
+          ),
+        ),
+      );
+
+      final String id = await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        reasonCode: 'LITIGE',
+        comment: 'Dossier chez l\'avocat.',
+        createdById: 'me',
+      );
+      final CallAttempt attempt = await (db.select(
+        db.callAttempts,
+      )..where((CallAttempts a) => a.id.equals(id))).getSingle();
+      expect(attempt.requiresComment, isTrue);
+      expect(attempt.comment, 'Dossier chez l\'avocat.');
+    });
+
+    // Le CHECK est le filet du filet : la validation Dart donne le message, le
+    // DDL garantit qu'aucun chemin de code ne l'esquive.
+    test('la base refuse un motif exigeant sans commentaire', () async {
+      await expectLater(
+        db.customStatement(
+          'INSERT INTO call_attempts '
+          '(id, prospect_id, outcome, reason_code, effect, requires_comment, '
+          ' client_created_at, created_by_id) '
+          'VALUES (?, ?, ?, ?, ?, 1, ?, ?)',
+          <Object?>[
+            'x',
+            'pros-1',
+            'UNREACHABLE',
+            'LITIGE',
+            CallEffects.keepOpen,
+            t0.toIso8601String(),
+            'me',
+          ],
+        ),
+        throwsA(isA<SqliteException>()),
+      );
     });
   });
 

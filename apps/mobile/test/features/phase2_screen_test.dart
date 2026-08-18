@@ -483,6 +483,112 @@ void main() {
     expect(find.textContaining('3 numéros'), findsOneWidget);
     expect(await db.countPhase2Directory().getSingle(), 3);
   });
+
+  // ═══ LA FEUILLE NE CITE PLUS AUCUNE ISSUE ═══
+  //
+  // C'est le point du lot : l'équipe du client ajoute ses motifs depuis le web,
+  // et le parc les propose sans nouvelle version de l'application.
+
+  Future<void> seedReason({
+    required String code,
+    required String label,
+    String effect = CallEffects.keepOpen,
+    bool requiresComment = false,
+    int sortOrder = 100,
+  }) {
+    return db
+        .into(db.callOutcomeReasons)
+        .insert(
+          CallOutcomeReasonsCompanion.insert(
+            code: code,
+            label: label,
+            effect: effect,
+            requiresComment: Value<bool>(requiresComment),
+            sortOrder: Value<int>(sortOrder),
+            minPayloadVersion: const Value<int>(2),
+          ),
+        );
+  }
+
+  phase2TestWidgets('la feuille rend les motifs du serveur, groupés par effet', (
+    WidgetTester tester,
+  ) async {
+    await seedReason(code: 'NRP', label: 'Ne répond pas', sortOrder: 10);
+    await seedReason(code: 'OCCUPE', label: 'Occupé', sortOrder: 20);
+    await seedReason(
+      code: 'RDV_PRIS',
+      label: 'Rendez-vous pris',
+      effect: CallEffects.scheduleCallback,
+      sortOrder: 30,
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    await type(tester, '771234567');
+
+    await tester.ensureVisible(find.text('Méthode non obtenue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Méthode non obtenue'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ne répond pas'), findsOneWidget);
+    expect(find.text('Occupé'), findsOneWidget);
+    expect(find.text('Rendez-vous pris'), findsOneWidget);
+    expect(find.text('Le dossier reste ouvert'), findsOneWidget);
+    expect(find.text('Un rappel est à programmer'), findsOneWidget);
+    // Les six motifs système ne sont plus servis : la table locale les remplace
+    // en entier, sinon un motif retiré côté serveur resterait proposé à vie.
+    expect(find.text('Injoignable'), findsNothing);
+    expect(find.text('Autre'), findsNothing);
+  });
+
+  phase2TestWidgets('choisir un motif du serveur enregistre son code', (
+    WidgetTester tester,
+  ) async {
+    await seedReason(code: 'NRP', label: 'Ne répond pas', sortOrder: 10);
+
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    await type(tester, '771234567');
+    await chooseOutcome(tester, 'Ne répond pas');
+
+    await tester.ensureVisible(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ne répond pas'), findsOneWidget);
+    final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+    expect(attempt.reasonCode, 'NRP');
+    expect(attempt.effect, CallEffects.keepOpen);
+    // L'issue reste celle de l'effet : `outcome` est l'énumération fermée que le
+    // serveur sait encore lire.
+    expect(attempt.outcome, CallOutcomes.unreachable);
+  });
+
+  phase2TestWidgets('un motif du serveur qui exige un commentaire le réclame', (
+    WidgetTester tester,
+  ) async {
+    await seedReason(
+      code: 'LITIGE',
+      label: 'Litige en cours',
+      requiresComment: true,
+      sortOrder: 10,
+    );
+
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    await type(tester, '771234567');
+    await chooseOutcome(tester, 'Litige en cours');
+
+    await tester.ensureVisible(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('commentaire est obligatoire'), findsOneWidget);
+    expect(await db.countMyAttempts().getSingle(), 0);
+  });
 }
 
 /// Un commercial connecté, sans toucher au stockage sécurisé ni au réseau.

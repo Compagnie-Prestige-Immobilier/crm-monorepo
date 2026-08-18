@@ -12,7 +12,7 @@ import '../local/database.dart';
 const int kCallAttemptCommentMaxLength = 2000;
 
 enum CallAttemptProblem {
-  unknownOutcome,
+  unknownReason,
   unknownMethod,
   methodRequired,
   methodNotAllowed,
@@ -20,14 +20,14 @@ enum CallAttemptProblem {
   commentTooLong;
 
   String get message => switch (this) {
-    CallAttemptProblem.unknownOutcome => 'Issue d\'appel inconnue.',
+    CallAttemptProblem.unknownReason => 'Motif d\'appel inconnu de cet appareil.',
     CallAttemptProblem.unknownMethod => 'Méthode d\'enrôlement inconnue.',
     CallAttemptProblem.methodRequired => 'Choisissez la méthode d\'enrôlement obtenue.',
     CallAttemptProblem.methodNotAllowed =>
       'Une méthode ne se saisit que si elle a été obtenue.',
     CallAttemptProblem.commentRequired =>
-      'Précisez ce qui s\'est passé : le commentaire est obligatoire pour '
-          '« Autre ».',
+      'Précisez ce qui s\'est passé : le commentaire est obligatoire pour ce '
+          'motif.',
     CallAttemptProblem.commentTooLong =>
       'Le commentaire dépasse $kCallAttemptCommentMaxLength caractères.',
   };
@@ -367,25 +367,35 @@ class WriteRepository {
   }
 
 
+  /// [outcome] et [reasonCode] désignent le MÊME motif : le second l'emporte, le
+  /// premier reste le point d'entrée des six codes système, dont le référentiel
+  /// garantit qu'ils portent le code de leur issue.
   Future<String> recordCallAttempt({
     required String prospectId,
     required String outcome,
     required String createdById,
+    String? reasonCode,
     String? method,
     String? comment,
     DateTime? callbackAt,
     String? id,
   }) async {
+    final CallReason? reason = await resolveCallReason(_db, reasonCode ?? outcome);
+    if (reason == null) {
+      throw const CallAttemptInvalid(CallAttemptProblem.unknownReason);
+    }
     final String? normalizedComment = normalizeComment(comment);
     final CallAttemptProblem? problem = validateCallAttempt(
-      outcome: outcome,
+      reason: reason,
       method: method,
       comment: normalizedComment,
     );
     if (problem != null) throw CallAttemptInvalid(problem);
 
-    // Le serveur refuse une heure de rappel sur une autre issue que CALLBACK.
-    final DateTime? callback = outcome == CallOutcomes.callback ? callbackAt : null;
+    // Le serveur refuse une heure de rappel sur une issue qui n'en programme pas.
+    final DateTime? callback = reason.effect == CallEffects.scheduleCallback
+        ? callbackAt
+        : null;
     final String entityId = id ?? Ids.newId();
     final DateTime now = _clock.now();
 
@@ -396,7 +406,10 @@ class WriteRepository {
             CallAttemptsCompanion.insert(
               id: entityId,
               prospectId: prospectId,
-              outcome: outcome,
+              outcome: reason.outcome,
+              reasonCode: Value<String?>(reason.code),
+              effect: Value<String>(reason.effect),
+              requiresComment: Value<bool>(reason.requiresComment),
               method: Value<String?>(method),
               comment: Value<String?>(normalizedComment),
               callbackAt: Value<DateTime?>(callback),
@@ -411,7 +424,8 @@ class WriteRepository {
         op: 'create',
         payload: <String, Object?>{
           'prospectId': prospectId,
-          'outcome': outcome,
+          'outcome': reason.outcome,
+          'reasonCode': reason.code,
           'method': ?method,
           'comment': ?normalizedComment,
           'callbackAt': ?callback?.toUtc().toIso8601String(),
@@ -420,14 +434,15 @@ class WriteRepository {
         now: now,
       );
 
-      if (CallOutcomes.terminal.contains(outcome)) {
+      final String? closed = CallEffects.phase2Status(reason.effect);
+      if (closed != null) {
         await (_db.update(
           _db.phase2Directory,
         )..where((Phase2Directory t) => t.prospectId.equals(prospectId))).write(
           Phase2DirectoryCompanion(
-            phase2Status: Value<String>(outcome),
+            phase2Status: Value<String>(closed),
             enrollmentMethod: Value<String?>(
-              outcome == CallOutcomes.methodObtained ? method : null,
+              reason.effect == CallEffects.closeMethod ? method : null,
             ),
             updatedAt: Value<DateTime>(now),
           ),
@@ -444,14 +459,11 @@ class WriteRepository {
   }
 
   static CallAttemptProblem? validateCallAttempt({
-    required String outcome,
+    required CallReason reason,
     String? method,
     String? comment,
   }) {
-    if (!CallOutcomes.all.contains(outcome)) {
-      return CallAttemptProblem.unknownOutcome;
-    }
-    if (outcome == CallOutcomes.methodObtained) {
+    if (reason.effect == CallEffects.closeMethod) {
       if (method == null) return CallAttemptProblem.methodRequired;
       if (!EnrollmentMethods.all.contains(method)) {
         return CallAttemptProblem.unknownMethod;
@@ -459,7 +471,7 @@ class WriteRepository {
     } else if (method != null) {
       return CallAttemptProblem.methodNotAllowed;
     }
-    if (outcome == CallOutcomes.other && (comment == null || comment.isEmpty)) {
+    if (reason.requiresComment && (comment == null || comment.isEmpty)) {
       return CallAttemptProblem.commentRequired;
     }
     if (comment != null && comment.length > kCallAttemptCommentMaxLength) {

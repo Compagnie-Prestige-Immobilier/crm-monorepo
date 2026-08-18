@@ -87,6 +87,11 @@ class StubApi implements ApiPort {
   }
 
   @override
+  Future<List<CallOutcomeReasonDto>> pullCallOutcomeReasons({
+    required int payloadVersion,
+  }) async => const <CallOutcomeReasonDto>[];
+
+  @override
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone) async {
     return RepresentantLookup(found: false, phoneE164: phone);
   }

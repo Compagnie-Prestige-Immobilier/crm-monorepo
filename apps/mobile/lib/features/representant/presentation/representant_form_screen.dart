@@ -506,9 +506,9 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                       controller: _departement,
                       focusNode: _departementFocus,
                       label: 'Département',
-                      hint: regions.isNotEmpty && _regionId == null
-                          ? 'Choisissez d’abord la région'
-                          : 'Dakar, Thiès, Mbour…',
+                      // La region ne fait que RETRECIR la liste: les 46 departements
+                      // restent choisissables sans elle.
+                      hint: 'Dakar, Thiès, Mbour…',
                       selectedId: _departementId,
                       textInputAction: TextInputAction.done,
                       emptyHint: departements.isEmpty
@@ -545,9 +545,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                       controller: _ief,
                       focusNode: _iefFocus,
                       label: 'IEF (facultatif)',
-                      hint: _departementId == null
-                          ? 'Choisissez d’abord le département'
-                          : 'Almadies, Grand Dakar, Thiaroye…',
+                      hint: 'Almadies, Grand Dakar, Thiaroye…',
                       selectedId: _iefId,
                       textInputAction: TextInputAction.done,
                       emptyHint: iefs.isEmpty
