@@ -16,6 +16,8 @@ import 'package:crm_api_client/src/model/ok_dto.dart';
 import 'package:crm_api_client/src/model/representant_dto.dart';
 import 'package:crm_api_client/src/model/representant_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
+import 'package:crm_api_client/src/model/representant_relation.dart';
+import 'package:crm_api_client/src/model/representant_relation_change_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_sort_field.dart';
 import 'package:crm_api_client/src/model/sort_order.dart';
 import 'package:crm_api_client/src/model/update_representant_dto.dart';
@@ -387,6 +389,88 @@ class RepresentantsApi {
     );
   }
 
+  /// Bascules de relation déjà subies par une fiche, de la plus récente à la plus ancienne.
+  ///
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RepresentantRelationChangeListDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RepresentantRelationChangeListDto>>
+  listRepresentantRelationChanges({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/representants/{id}/relation-history'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RepresentantRelationChangeListDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<
+              RepresentantRelationChangeListDto,
+              RepresentantRelationChangeListDto
+            >(rawData, 'RepresentantRelationChangeListDto', growable: true);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RepresentantRelationChangeListDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Liste paginée. Un COMMERCIAL ne voit que ses propres représentants.
   ///
   ///
@@ -398,6 +482,7 @@ class RepresentantsApi {
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [hasProspects] - true : au moins un prospect vivant. false : aucun (représentant dormant).
+  /// * [relationStatus] - Ne retient que les représentants dans cet état de relation.
   /// * [sortBy]
   /// * [sortOrder]
   /// * [page]
@@ -419,6 +504,7 @@ class RepresentantsApi {
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? hasProspects,
+    RepresentantRelation? relationStatus,
     RepresentantSortField? sortBy,
     SortOrder? sortOrder,
     num? page = 1,
@@ -451,6 +537,7 @@ class RepresentantsApi {
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (hasProspects != null) r'hasProspects': hasProspects,
+      if (relationStatus != null) r'relationStatus': relationStatus,
       if (sortBy != null) r'sortBy': sortBy,
       if (sortOrder != null) r'sortOrder': sortOrder,
       if (page != null) r'page': page,

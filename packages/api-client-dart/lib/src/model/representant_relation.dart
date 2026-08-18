@@ -5,21 +5,19 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-/// Le canal qui a écrit la bascule.
-enum ChangeSource {
-  /// Le canal qui a écrit la bascule.
-  @JsonValue(r'WEB')
-  WEB(r'WEB'),
-
-  /// Le canal qui a écrit la bascule.
-  @JsonValue(r'MOBILE')
-  MOBILE(r'MOBILE'),
-
-  /// Le canal qui a écrit la bascule.
+enum RepresentantRelation {
+  @JsonValue(r'INCONNU')
+  INCONNU(r'INCONNU'),
+  @JsonValue(r'CONTACTE')
+  CONTACTE(r'CONTACTE'),
+  @JsonValue(r'AMBASSADEUR')
+  AMBASSADEUR(r'AMBASSADEUR'),
+  @JsonValue(r'REFUS')
+  REFUS(r'REFUS'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 
-  const ChangeSource(this.value);
+  const RepresentantRelation(this.value);
 
   final String value;
 

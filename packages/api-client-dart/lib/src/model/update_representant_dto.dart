@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -32,6 +33,8 @@ class UpdateRepresentantDto {
     this.notes,
 
     this.clientCreatedAt,
+
+    this.relationStatus,
   });
 
   /// Identifiant UUID v7 généré par le client. Fourni par le mobile pour que les prospects saisis hors ligne puissent le référencer avant toute synchronisation.
@@ -59,6 +62,15 @@ class UpdateRepresentantDto {
   @JsonKey(name: r'clientCreatedAt', required: false, includeIfNull: false)
   final DateTime? clientCreatedAt;
 
+  /// État de la relation. Chaque bascule est historisée ; reposter le même statut n’écrit rien.
+  @JsonKey(
+    name: r'relationStatus',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
+  )
+  final RepresentantRelation? relationStatus;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is UpdateRepresentantDto &&
@@ -72,6 +84,7 @@ class UpdateRepresentantDto {
                 iefId,
                 notes,
                 clientCreatedAt,
+                relationStatus,
               ],
               [
                 other.id,
@@ -81,6 +94,7 @@ class UpdateRepresentantDto {
                 other.iefId,
                 other.notes,
                 other.clientCreatedAt,
+                other.relationStatus,
               ],
             );
   }
@@ -96,6 +110,7 @@ class UpdateRepresentantDto {
         iefId,
         notes,
         clientCreatedAt,
+        relationStatus,
       ]);
 
   factory UpdateRepresentantDto.fromJson(Map<String, dynamic> json) =>

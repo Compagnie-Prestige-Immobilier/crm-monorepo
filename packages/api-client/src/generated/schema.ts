@@ -399,6 +399,23 @@ export interface paths {
     patch: operations['updateRepresentant'];
     trace?: never;
   };
+  '/api/v1/representants/{id}/relation-history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Bascules de relation déjà subies par une fiche, de la plus récente à la plus ancienne. */
+    get: operations['listRepresentantRelationChanges'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/prospects': {
     parameters: {
       query?: never;
@@ -639,6 +656,46 @@ export interface paths {
     get: operations['downloadCallProgrammePdf'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/phase2/callbacks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Rappels promis encore dus.
+     * @description Un téléconseiller ne voit que les rappels qu’il a promis. Les rappels en retard remontent dans la journée courante : le retard se déduit de la date, il n’est jamais écrit.
+     */
+    get: operations['listScheduledCallbacks'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/phase2/callbacks/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Annule un rappel qui n’a plus lieu d’être.
+     * @description Idempotent : un rappel déjà clos ou annulé est rendu tel quel.
+     */
+    post: operations['cancelScheduledCallback'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2070,7 +2127,7 @@ export interface components {
       password: string;
     };
     /** @enum {string} */
-    Role: 'ADMIN' | 'COMMERCIAL' | 'BANQUE_FINANCE';
+    Role: 'ADMIN' | 'COMMERCIAL' | 'BANQUE_FINANCE' | 'SUPERVISEUR';
     AuthUserDto: {
       /** Format: uuid */
       id: string;
@@ -2313,6 +2370,8 @@ export interface components {
       isActive: boolean;
     };
     /** @enum {string} */
+    RepresentantRelation: 'INCONNU' | 'CONTACTE' | 'AMBASSADEUR' | 'REFUS';
+    /** @enum {string} */
     RepresentantSortField: 'clientCreatedAt' | 'createdAt' | 'fullName' | 'prospects';
     /** @enum {string} */
     SortOrder: 'asc' | 'desc';
@@ -2341,6 +2400,7 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
       prospectCount: number;
+      relationStatus: components['schemas']['RepresentantRelation'];
     };
     RepresentantListDto: {
       items: components['schemas']['RepresentantDto'][];
@@ -2444,6 +2504,33 @@ export interface components {
        * @description Horodatage de la saisie sur le terrain. Défaut : maintenant. Distinct de createdAt, qui est l’arrivée en base.
        */
       clientCreatedAt?: string;
+      /** @description État de la relation. Chaque bascule est historisée ; reposter le même statut n’écrit rien. */
+      relationStatus?: components['schemas']['RepresentantRelation'];
+    };
+    /**
+     * @description Le canal qui a écrit la bascule.
+     * @enum {string}
+     */
+    ChangeSource: 'WEB' | 'MOBILE';
+    RepresentantRelationChangeDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      representantId: string;
+      fromStatus: components['schemas']['RepresentantRelation'];
+      toStatus: components['schemas']['RepresentantRelation'];
+      reason: string | null;
+      /** Format: uuid */
+      changedById: string;
+      changedByName: string;
+      /** @description Le canal qui a écrit la bascule. */
+      source: components['schemas']['ChangeSource'];
+      /** Format: date-time */
+      changedAt: string;
+    };
+    RepresentantRelationChangeListDto: {
+      /** @description De la plus récente à la plus ancienne. */
+      items: components['schemas']['RepresentantRelationChangeDto'][];
     };
     /** @enum {string} */
     ProspectStatut: 'NOUVEAU' | 'CONTACTE' | 'CONVERTI' | 'PERDU';
@@ -2648,11 +2735,6 @@ export interface components {
       /** @description Révision attendue. Un écart renvoie PROSPECT_REV_CONFLICT avec la révision réelle. */
       expectedRev: number;
     };
-    /**
-     * @description Le canal qui a écrit la bascule. Le panel écrit WEB.
-     * @enum {string}
-     */
-    ChangeSource: 'WEB' | 'MOBILE';
     SegmentChangeDto: {
       /** Format: uuid */
       id: string;
@@ -2756,6 +2838,11 @@ export interface components {
       method?: components['schemas']['EnrollmentMethod'];
       /** @description Tentative d’appel : obligatoire et non vide si outcome vaut OTHER. */
       comment?: string;
+      /**
+       * Format: date-time
+       * @description Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut CALLBACK. Une version ancienne de l’application ne l’envoie pas.
+       */
+      callbackAt?: string;
     };
     SyncOperationDto: {
       /**
@@ -2978,6 +3065,38 @@ export interface components {
       /** @description Les vingt dernières tentatives, de la plus récente à la plus ancienne. */
       recentAttempts: components['schemas']['CampaignAttemptDto'][];
     };
+    /** @enum {string} */
+    CallbackScope: 'today' | 'overdue' | 'week';
+    CallbackDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      prospectId: string;
+      /** @description Code court à six caractères du prospect. */
+      shortCode: string;
+      phoneE164: string;
+      /** Format: date-time */
+      scheduledAt: string;
+      comment: string | null;
+      /** Format: uuid */
+      assignedToId: string;
+      assignedToName: string;
+      /** Format: uuid */
+      campaignId: string | null;
+      /** Format: uuid */
+      taskId: string | null;
+      /** @description Le rappel est passé. État DÉRIVÉ de scheduledAt et de l’heure du serveur, jamais stocké. */
+      overdue: boolean;
+    };
+    CallbackListDto: {
+      /** @description Du plus ancien au plus récent. */
+      items: components['schemas']['CallbackDto'][];
+      /**
+       * Format: date-time
+       * @description Heure du serveur ayant servi à décider du retard.
+       */
+      serverTime: string;
+    };
     RepCampaignPreviewDto: {
       /** @description Représentants éligibles sur ce périmètre. */
       eligible: number;
@@ -3010,6 +3129,8 @@ export interface components {
       promisedProspects?: number;
       /** @description Obligatoire et non vide si l’issue vaut OTHER. */
       comment?: string;
+      /** @description État de la relation tel que l’appel vient de l’apprendre. Absent : le statut ne bouge pas. Identique au statut courant : rien n’est écrit. */
+      relationStatus?: components['schemas']['RepresentantRelation'];
       /**
        * Format: date-time
        * @description Horodatage de l’appel sur le terrain, distinct de son arrivée en base.
@@ -3701,6 +3822,7 @@ export interface components {
     PurgeDomainKey:
       | 'teleconseillers'
       | 'finances'
+      | 'supervision'
       | 'representants'
       | 'prospects'
       | 'campagnes'
@@ -5523,6 +5645,8 @@ export interface operations {
         dateTo?: string;
         /** @description true : au moins un prospect vivant. false : aucun (représentant dormant). */
         hasProspects?: boolean;
+        /** @description Ne retient que les représentants dans cet état de relation. */
+        relationStatus?: components['schemas']['RepresentantRelation'];
         sortBy?: components['schemas']['RepresentantSortField'];
         sortOrder?: components['schemas']['SortOrder'];
         page?: number;
@@ -5895,6 +6019,63 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listRepresentantRelationChanges: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepresentantRelationChangeListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -6904,6 +7085,114 @@ export interface operations {
         };
       };
       /** @description PHASE2_CAMPAIGN_COMMERCIAL_NOT_FOUND · PHASE2_CAMPAIGN_DAY_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listScheduledCallbacks: {
+    parameters: {
+      query?: {
+        /** @description today : tout ce qui est dû d’ici la fin de la journée, retards compris. overdue : les seuls retards. week : les sept prochaines journées. */
+        scope?: components['schemas']['CallbackScope'];
+        /** @description File d’un téléconseiller donné. Réservé à l’administration et à la supervision ; ignoré pour les autres, qui ne voient que la leur. */
+        assignedToId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallbackListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  cancelScheduledCallback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallbackDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CALLBACK_NOT_FOUND. */
       404: {
         headers: {
           [name: string]: unknown;
