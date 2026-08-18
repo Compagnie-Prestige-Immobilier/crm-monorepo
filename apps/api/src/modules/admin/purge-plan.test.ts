@@ -41,6 +41,10 @@ const PURGE_EXEMPT = new Map<string, string>([
     'histoire des bascules de relation, emportée en CASCADE avec le représentant qu’elle décrit ; `changedById` pointe vers `users` en Restrict, mais le domaine « Comptes téléconseillers » entraîne déjà « Représentants », qui les fait toutes partir avant les comptes',
   ],
   [
+    'representant_comments',
+    'fil de commentaires, emporté en CASCADE avec le représentant qu’il commente ; `authorId` pointe vers `users` en Restrict, mais le domaine « Comptes téléconseillers » entraîne déjà « Représentants », qui les fait tous partir avant les comptes',
+  ],
+  [
     'import_jobs',
     'journal des dépôts d’import : il décrit un GESTE d’administration, pas une donnée métier. Purger le domaine « Prospects » n’efface pas la trace qu’un classeur a été déposé un jour, de la même façon que la purge ne réécrit pas le journal d’audit. Les lignes s’effacent d’elles-mêmes par `expiresAt`, et `requestedById` pointe vers `users` en Restrict : le compte demandeur ne peut pas partir en laissant un travail orphelin',
   ],

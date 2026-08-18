@@ -121,6 +121,9 @@ const MODULES: Record<string, string[]> = {
     'getRepresentant',
     'updateRepresentant',
     'listRepresentantRelationChanges',
+    'listRepresentantComments',
+    'addRepresentantComment',
+    'deleteRepresentantComment',
     'deleteRepresentant',
   ],
   export: [

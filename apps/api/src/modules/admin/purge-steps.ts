@@ -142,6 +142,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.bankCaseStage.count(),
     remove: async (db) => (await db.bankCaseStage.deleteMany({})).count,
   },
+  callOutcomeReasons: {
+    table: 'call_outcome_reasons',
+    count: (db) => db.callOutcomeReason.count(),
+    remove: async (db) => (await db.callOutcomeReason.deleteMany({})).count,
+  },
   bankRejectionReasons: {
     table: 'bank_rejection_reasons',
     count: (db) => db.bankRejectionReason.count(),

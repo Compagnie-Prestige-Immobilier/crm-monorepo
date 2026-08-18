@@ -20,8 +20,12 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import type { OkDto } from '../../common/dto/ok.dto.js';
 import { RepresentantSortField } from './dto.js';
 import type {
+  CreateRepresentantCommentDto,
   CreateRepresentantDto,
   DeleteQueryDto,
+  RepresentantCommentDto,
+  RepresentantCommentListDto,
+  RepresentantCommentQueryDto,
   RepresentantDto,
   RepresentantListDto,
   RepresentantLookupDto,
@@ -92,6 +96,28 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     updatedAt: row.updatedAt.toISOString(),
     prospectCount: row._count.prospects,
     relationStatus: row.relationStatus,
+  };
+}
+
+interface CommentRow {
+  id: string;
+  representantId: string;
+  authorId: string;
+  author: { fullName: string };
+  body: string;
+  clientCreatedAt: Date;
+  createdAt: Date;
+}
+
+export function toRepresentantCommentDto(row: CommentRow): RepresentantCommentDto {
+  return {
+    id: row.id,
+    representantId: row.representantId,
+    authorId: row.authorId,
+    authorName: row.author.fullName,
+    body: row.body,
+    clientCreatedAt: row.clientCreatedAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -298,6 +324,7 @@ export class RepresentantsService {
           representantId: id,
           fromStatus: existing.relationStatus,
           toStatus: input.relationStatus,
+          reason: input.relationReason?.trim() || null,
           changedById: user.id,
           source: ChangeSource.WEB,
           isDemo: existing.isDemo,
@@ -356,6 +383,124 @@ export class RepresentantsService {
     });
 
     return { items: rows.map(toRelationChangeDto) };
+  }
+
+  async listComments(
+    user: AuthenticatedUser,
+    id: string,
+    query: RepresentantCommentQueryDto,
+  ): Promise<RepresentantCommentListDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 50;
+    const demoEnabled = await this.demo.enabled();
+
+    const representant = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null, ...demoScope(demoEnabled) },
+      select: { id: true, createdById: true },
+    });
+    if (!representant) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_NOT_FOUND',
+        message: 'Représentant introuvable.',
+      });
+    }
+    assertReadable(user, representant);
+
+    const where: Prisma.RepresentantCommentWhereInput = {
+      representantId: id,
+      deletedAt: null,
+      ...demoScope(demoEnabled),
+    };
+
+    // `id` en second critère : l'UUID v7 est lexicographiquement ordonné, il
+    // départage deux commentaires hors ligne sans horloge partagée.
+    const [total, rows] = await Promise.all([
+      this.prisma.representantComment.count({ where }),
+      this.prisma.representantComment.findMany({
+        where,
+        include: { author: { select: { fullName: true } } },
+        orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    return {
+      items: rows.map(toRepresentantCommentDto),
+      meta: { total, page, pageSize, pageCount: Math.max(1, Math.ceil(total / pageSize)) },
+    };
+  }
+
+  /**
+   * Ajoute un commentaire. Le fil est en AJOUT SEUL : aucune concurrence à
+   * arbitrer, deux téléconseillers hors ligne produisent deux lignes.
+   *
+   * L'auteur vient de la session, jamais du corps de requête, et aucune route
+   * ne réécrit une ligne posée.
+   */
+  async addComment(
+    user: AuthenticatedUser,
+    id: string,
+    input: CreateRepresentantCommentDto,
+  ): Promise<RepresentantCommentDto> {
+    const representant = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+      select: { id: true, createdById: true, isDemo: true },
+    });
+    if (!representant) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_NOT_FOUND',
+        message: 'Représentant introuvable.',
+      });
+    }
+    assertOwnership(user, representant);
+
+    // `skipDuplicates` plutôt qu'une lecture préalable : le rejeu et la course
+    // se traitent du même geste, c'est PostgreSQL qui arbitre la clé primaire.
+    await this.prisma.representantComment.createMany({
+      data: [
+        {
+          id: input.id,
+          representantId: id,
+          authorId: user.id,
+          body: input.body.trim(),
+          clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
+          isDemo: representant.isDemo,
+        },
+      ],
+      skipDuplicates: true,
+    });
+
+    const posted = await this.prisma.representantComment.findUniqueOrThrow({
+      where: { id: input.id },
+      include: { author: { select: { fullName: true } } },
+    });
+
+    // Un identifiant déjà pris par le commentaire d'un autre : le rejeu rendrait
+    // sinon une ligne que l'appelant n'a pas écrite, et qu'il croirait sienne.
+    if (posted.representantId !== id || posted.authorId !== user.id) {
+      throw new ForbiddenException({
+        code: 'ENTITY_ID_OWNED_BY_ANOTHER_USER',
+        message: 'Cet identifiant appartient à un autre commentaire.',
+      });
+    }
+
+    return toRepresentantCommentDto(posted);
+  }
+
+  /** Suppression douce, réservée à l'ADMIN : l'auteur ne se dédit pas. */
+  async removeComment(id: string, commentId: string): Promise<OkDto> {
+    const removed = await this.prisma.representantComment.updateMany({
+      where: { id: commentId, representantId: id, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+    if (removed.count !== 1) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_COMMENT_NOT_FOUND',
+        message: 'Commentaire introuvable.',
+      });
+    }
+    return { ok: true };
   }
 
   async remove(user: AuthenticatedUser, id: string, query: DeleteQueryDto): Promise<OkDto> {

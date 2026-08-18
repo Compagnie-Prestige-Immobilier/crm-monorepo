@@ -31,6 +31,7 @@ export const PURGE_STEP_ORDER = [
   'supervisionAccounts',
   'bankCaseStages',
   'bankRejectionReasons',
+  'callOutcomeReasons',
   'banques',
   'syndicats',
   'iefs',
@@ -189,10 +190,11 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
   {
     key: 'referentiels',
     label: 'Référentiels',
-    hint: 'Régions, départements, IEF, banques, syndicats, étapes et motifs de rejet.',
+    hint: 'Régions, départements, IEF, banques, syndicats, étapes, motifs de rejet et issues d’appel.',
     steps: [
       'bankCaseStages',
       'bankRejectionReasons',
+      'callOutcomeReasons',
       'banques',
       'syndicats',
       'iefs',
