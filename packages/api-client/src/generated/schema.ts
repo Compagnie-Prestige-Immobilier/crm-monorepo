@@ -733,7 +733,7 @@ export interface paths {
     put?: never;
     /**
      * Enregistre un appel passé à un représentant et clôt la tâche si l’issue aboutit.
-     * @description L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie `duplicate` sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base.
+     * @description L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie `duplicate` sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base. `suggestedPhone` recueille, dans le même geste, le numéro qu’un représentant qui refuse propose d’appeler à sa place : la réponse dit si ce numéro est déjà une fiche connue.
      */
     post: operations['recordRepCallAttempt'];
     delete?: never;
@@ -818,6 +818,43 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/api/v1/suggestions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Numéros donnés par des représentants qui ont refusé.
+     * @description Un numéro cité par deux représentants apparaît deux fois : c’est l’information, pas un doublon.
+     */
+    get: operations['listSuggestions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/suggestions/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Marque un numéro suggéré comme appelé ou abandonné. */
+    patch: operations['updateSuggestionStatus'];
     trace?: never;
   };
   '/api/v1/bank-cases': {
@@ -1321,127 +1358,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/admin/demo': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** État du mode démonstration, compteurs et autorisation de bascule. */
-    get: operations['getDemoStatus'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/demo/enable': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Peuple la plateforme de données de démonstration.
-     * @description Idempotent : activer une seconde fois ne double pas le jeu. Refusé en production tant que DEMO_MODE_ALLOWED ne vaut pas true. CONSÉQUENCE À ANNONCER AVANT LA CONFIRMATION : tant que le mode est actif, la plateforme passe en LECTURE SEULE pour tout le monde. Les écritures interactives (POST, PATCH, PUT, DELETE) sont refusées en 409 `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).
-     */
-    post: operations['enableDemoMode'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/demo/purge': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Supprime définitivement le jeu de démonstration.
-     * @description IRRÉVERSIBLE, et distinct de la désactivation. Supprime exactement les lignes enregistrées à l’ensemencement, dans l’ordre inverse de création. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration. L’interface doit faire confirmer.
-     */
-    post: operations['purgeDemoData'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/demo/disable': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Masque les données de démonstration.
-     * @description NE SUPPRIME RIEN. Les lignes de démonstration restent en base, invisibles pour toute lecture, export Excel compris. Pour les effacer définitivement, utiliser /purge. REND AUSSI L’ÉCRITURE à toute la plateforme : c’est cette route qui lève la lecture seule posée par /enable.
-     */
-    post: operations['disableDemoMode'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/purge': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Domaines purgeables, leurs dépendances et le nombre de lignes concernées.
-     * @description `allowed` vaut false pour tout administrateur autre que le premier : l’écran masque alors la commande, et POST /admin/purge refuse de son côté.
-     */
-    get: operations['getPurgeCatalog'];
-    put?: never;
-    /**
-     * Supprime définitivement les domaines sélectionnés.
-     * @description Réservé au premier compte administrateur, qui ressaisit son identifiant de connexion. Transactionnel, enfants avant parents. Le compte appelant n’est jamais supprimé. Journalisé.
-     */
-    post: operations['purgeDatabase'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/supervision': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Téléconseillers et pôle Finances générales, avec présence et dernière activité.
-     * @description La présence est déduite des traces existantes : familles de jetons, lots de synchronisation, écritures métier. Aucune colonne dédiée.
-     */
-    get: operations['getSupervision'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/analytics/funnel': {
     parameters: {
       query?: never;
@@ -1830,6 +1746,127 @@ export interface paths {
      * @description La fenêtre porte sur la date de l’ACTE, pas sur celle de la fiche : un téléconseiller resté hors ligne trois semaines verrait sinon ses appels du lundi comptés le jeudi de la synchronisation. Les lignes n’existent qu’aux périodes où il s’est passé quelque chose ; `teleconseillers` porte la liste complète et le reste à faire, qu’aucune date ne borne.
      */
     get: operations['getSupervisionActivite'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/demo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** État du mode démonstration, compteurs et autorisation de bascule. */
+    get: operations['getDemoStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/demo/enable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Peuple la plateforme de données de démonstration.
+     * @description Idempotent : activer une seconde fois ne double pas le jeu. Refusé en production tant que DEMO_MODE_ALLOWED ne vaut pas true. CONSÉQUENCE À ANNONCER AVANT LA CONFIRMATION : tant que le mode est actif, la plateforme passe en LECTURE SEULE pour tout le monde. Les écritures interactives (POST, PATCH, PUT, DELETE) sont refusées en 409 `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).
+     */
+    post: operations['enableDemoMode'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/demo/purge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Supprime définitivement le jeu de démonstration.
+     * @description IRRÉVERSIBLE, et distinct de la désactivation. Supprime exactement les lignes enregistrées à l’ensemencement, dans l’ordre inverse de création. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration. L’interface doit faire confirmer.
+     */
+    post: operations['purgeDemoData'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/demo/disable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Masque les données de démonstration.
+     * @description NE SUPPRIME RIEN. Les lignes de démonstration restent en base, invisibles pour toute lecture, export Excel compris. Pour les effacer définitivement, utiliser /purge. REND AUSSI L’ÉCRITURE à toute la plateforme : c’est cette route qui lève la lecture seule posée par /enable.
+     */
+    post: operations['disableDemoMode'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/purge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Domaines purgeables, leurs dépendances et le nombre de lignes concernées.
+     * @description `allowed` vaut false pour tout administrateur autre que le premier : l’écran masque alors la commande, et POST /admin/purge refuse de son côté.
+     */
+    get: operations['getPurgeCatalog'];
+    put?: never;
+    /**
+     * Supprime définitivement les domaines sélectionnés.
+     * @description Réservé au premier compte administrateur, qui ressaisit son identifiant de connexion. Transactionnel, enfants avant parents. Le compte appelant n’est jamais supprimé. Journalisé.
+     */
+    post: operations['purgeDatabase'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/supervision': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Téléconseillers et pôle Finances générales, avec présence et dernière activité.
+     * @description La présence est déduite des traces existantes : familles de jetons, lots de synchronisation, écritures métier. Aucune colonne dédiée.
+     */
+    get: operations['getSupervision'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2876,6 +2913,10 @@ export interface components {
       /** @description Version du format de charge utile. */
       payloadVersion: number;
       operations: components['schemas']['SyncOperationDto'][];
+      /** @description Opérations restant dans la file d’attente de l’appareil APRÈS ce lot. Le serveur ne peut pas la deviner. Facultatif sans limite de temps : une version déjà déployée ne l’envoie pas. */
+      pendingOps?: number;
+      /** @description Version de l’application mobile, telle qu’elle s’annonce. Facultative. */
+      appVersion?: string;
     };
     /** @enum {string} */
     SyncOpStatus: 'applied' | 'duplicate' | 'conflict' | 'invalid' | 'skipped_dependency_failed';
@@ -3131,6 +3172,12 @@ export interface components {
       comment?: string;
       /** @description État de la relation tel que l’appel vient de l’apprendre. Absent : le statut ne bouge pas. Identique au statut courant : rien n’est écrit. */
       relationStatus?: components['schemas']['RepresentantRelation'];
+      /** @description Numéro qu’un représentant qui refuse propose d’appeler à sa place. Saisie libre, normalisé par le serveur. Un numéro illisible refuse la tentative entière : le téléconseiller est sur l’écran au moment où il le tape. */
+      suggestedPhone?: string;
+      /** @description Nom du contact suggéré, tel que dicté. Ignoré sans `suggestedPhone`. */
+      suggestedName?: string;
+      /** @description Ce que le représentant dit du contact. Ignoré sans `suggestedPhone`. */
+      suggestedNote?: string;
       /**
        * Format: date-time
        * @description Horodatage de l’appel sur le terrain, distinct de son arrivée en base.
@@ -3150,6 +3197,8 @@ export interface components {
       taskId: string | null;
       /** @description Vrai si l’issue a clos la tâche. Les issues « à rappeler » la laissent ouverte. */
       taskClosed: boolean;
+      /** @description Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas. */
+      suggestion: components['schemas']['RepresentantLookupDto'] | null;
     };
     RepCampaignProgressDto: {
       /** @description Nombre total de tâches affectées. */
@@ -3285,6 +3334,46 @@ export interface components {
       commerciaux: components['schemas']['RepCampaignCommercialDto'][];
       /** @description Les vingt dernières tentatives, de la plus récente à la plus ancienne. */
       recentAttempts: components['schemas']['RepCampaignAttemptDto'][];
+    };
+    /** @enum {string} */
+    SuggestionStatus: 'A_APPELER' | 'APPELE' | 'ABANDONNE';
+    SuggestionDto: {
+      /** Format: uuid */
+      id: string;
+      /**
+       * Format: uuid
+       * @description Le représentant qui a donné le numéro.
+       */
+      sourceRepresentantId: string;
+      /** @description Code court à six caractères du représentant qui a donné le numéro. */
+      sourceRepresentantShortCode: string;
+      suggestedName: string | null;
+      /** @description Numéro normalisé par le serveur. */
+      suggestedPhoneE164: string;
+      note: string | null;
+      status: components['schemas']['SuggestionStatus'];
+      /**
+       * Format: uuid
+       * @description Téléconseiller qui a recueilli la suggestion.
+       */
+      suggestedById: string;
+      suggestedByName: string;
+      /**
+       * Format: uuid
+       * @description Fiche existante portant ce numéro au moment de la saisie. La piste est déjà connue.
+       */
+      resolvedRepresentantId: string | null;
+      /** Format: date-time */
+      clientCreatedAt: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    SuggestionListDto: {
+      items: components['schemas']['SuggestionDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    UpdateSuggestionStatusDto: {
+      status: components['schemas']['SuggestionStatus'];
     };
     /** @enum {string} */
     BankStageType: 'OPEN' | 'CASHED' | 'REJECTED';
@@ -3793,138 +3882,6 @@ export interface components {
       /** @description Variables citées et non fournies. Le marqueur `{{nom}}` reste visible dans le texte rendu. */
       missing: string[];
     };
-    DemoCountsDto: {
-      users: number;
-      representants: number;
-      prospects: number;
-      campaigns: number;
-      campaignCommerciaux: number;
-      callTasks: number;
-      callAttempts: number;
-      bankCases: number;
-      bankCaseTransitions: number;
-    };
-    DemoStatusDto: {
-      /** @description Vrai si des données de démonstration sont actuellement en place ET visibles. ATTENTION, ce booléen a une SECONDE conséquence, que l’interface doit annoncer avant la bascule : tant qu’il vaut vrai, la plateforme est en LECTURE SEULE. Toute requête POST, PATCH, PUT ou DELETE est refusée en 409 avec le code `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST). Les lignes créées par ces chemins sont du travail RÉEL : elles sont écrites `isDemo: false` et survivent à l’extinction. */
-      enabled: boolean;
-      /**
-       * Format: date-time
-       * @description Date du dernier ensemencement, nulle si le mode n’a jamais été activé.
-       */
-      seededAt: string | null;
-      /** @description Faux quand l’environnement interdit la bascule : en production, tant que DEMO_MODE_ALLOWED ne vaut pas true. L’interface doit afficher `reason`, pas se contenter de griser le bouton. */
-      canToggle: boolean;
-      /** @description Explication lisible quand canToggle est faux. */
-      reason: string | null;
-      counts: components['schemas']['DemoCountsDto'];
-    };
-    /** @enum {string} */
-    PurgeDomainKey:
-      | 'teleconseillers'
-      | 'finances'
-      | 'supervision'
-      | 'representants'
-      | 'prospects'
-      | 'campagnes'
-      | 'campagnesRepresentants'
-      | 'demandesClients'
-      | 'fileAppels'
-      | 'tentatives'
-      | 'dossiers'
-      | 'notifications'
-      | 'synchronisation'
-      | 'journal'
-      | 'referentiels';
-    PurgeDomainDto: {
-      key: components['schemas']['PurgeDomainKey'];
-      label: string;
-      hint: string;
-      /** @description Domaines entraînés par celui-ci, clés étrangères obligent. L’écran les coche avec lui. */
-      requires: string[];
-      /** @description Lignes actuellement concernées. */
-      rows: number;
-    };
-    PurgeCatalogDto: {
-      /** @description Vrai si le compte appelant est le premier administrateur, seul habilité à purger. */
-      allowed: boolean;
-      /** @description Identifiant de connexion à ressaisir pour confirmer. */
-      confirmationHint: string;
-      domains: components['schemas']['PurgeDomainDto'][];
-    };
-    PurgeRequestDto: {
-      /** @description Domaines cochés. Le serveur y ajoute leurs dépendances. */
-      domains: components['schemas']['PurgeDomainKey'][];
-      /** @description Identifiant de connexion de l’administrateur, ressaisi. Comparé à son e-mail ou à son nom d’utilisateur. */
-      confirmation: string;
-    };
-    PurgeDeletionDto: {
-      key: components['schemas']['PurgeDomainKey'];
-      label: string;
-      rows: number;
-    };
-    PurgeResultDto: {
-      deleted: components['schemas']['PurgeDeletionDto'][];
-      total: number;
-      /**
-       * Format: date-time
-       * @description Horodatage serveur de la purge.
-       */
-      purgedAt: string;
-    };
-    /** @enum {string} */
-    PresenceState: 'ONLINE' | 'RECENT' | 'AWAY';
-    SupervisedUserDto: {
-      /** Format: uuid */
-      id: string;
-      fullName: string;
-      username: string;
-      email: string;
-      role: components['schemas']['Role'];
-      isActive: boolean;
-      departementName: string | null;
-      presence: components['schemas']['PresenceState'];
-      /** @description Une famille de jetons est encore vivante : ni révoquée, ni expirée. */
-      hasLiveSession: boolean;
-      /** @description Sessions ouvertes, tous appareils confondus. */
-      sessionCount: number;
-      /**
-       * Format: date-time
-       * @description Trace d’activité la plus récente, toutes sources confondues.
-       */
-      lastSeenAt: string | null;
-      /** Format: date-time */
-      lastLoginAt: string | null;
-      /**
-       * Format: date-time
-       * @description Dernier lot de synchronisation reçu d’un appareil.
-       */
-      lastSyncAt: string | null;
-      /**
-       * Format: date-time
-       * @description Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.
-       */
-      lastWriteAt: string | null;
-    };
-    PresenceCountsDto: {
-      online: number;
-      recent: number;
-      away: number;
-    };
-    SupervisionDto: {
-      /**
-       * Format: date-time
-       * @description Horloge du serveur au moment de la lecture.
-       */
-      observedAt: string;
-      /**
-       * @description Fenêtre, en minutes, en deçà de laquelle un compte est dit connecté.
-       * @default 20
-       */
-      onlineWindowMinutes: number;
-      teleconseillers: components['schemas']['SupervisedUserDto'][];
-      finances: components['schemas']['SupervisedUserDto'][];
-      counts: components['schemas']['PresenceCountsDto'];
-    };
     FunnelStageDto: {
       /** @description Nom de l’étape, prêt à afficher. */
       label: string;
@@ -4368,6 +4325,147 @@ export interface components {
       items: components['schemas']['SupervisionActivityRowDto'][];
       /** @description Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre. */
       teleconseillers: components['schemas']['SupervisionTeleconseillerDto'][];
+    };
+    DemoCountsDto: {
+      users: number;
+      representants: number;
+      prospects: number;
+      campaigns: number;
+      campaignCommerciaux: number;
+      callTasks: number;
+      callAttempts: number;
+      bankCases: number;
+      bankCaseTransitions: number;
+    };
+    DemoStatusDto: {
+      /** @description Vrai si des données de démonstration sont actuellement en place ET visibles. ATTENTION, ce booléen a une SECONDE conséquence, que l’interface doit annoncer avant la bascule : tant qu’il vaut vrai, la plateforme est en LECTURE SEULE. Toute requête POST, PATCH, PUT ou DELETE est refusée en 409 avec le code `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST). Les lignes créées par ces chemins sont du travail RÉEL : elles sont écrites `isDemo: false` et survivent à l’extinction. */
+      enabled: boolean;
+      /**
+       * Format: date-time
+       * @description Date du dernier ensemencement, nulle si le mode n’a jamais été activé.
+       */
+      seededAt: string | null;
+      /** @description Faux quand l’environnement interdit la bascule : en production, tant que DEMO_MODE_ALLOWED ne vaut pas true. L’interface doit afficher `reason`, pas se contenter de griser le bouton. */
+      canToggle: boolean;
+      /** @description Explication lisible quand canToggle est faux. */
+      reason: string | null;
+      counts: components['schemas']['DemoCountsDto'];
+    };
+    /** @enum {string} */
+    PurgeDomainKey:
+      | 'teleconseillers'
+      | 'finances'
+      | 'supervision'
+      | 'representants'
+      | 'prospects'
+      | 'campagnes'
+      | 'campagnesRepresentants'
+      | 'demandesClients'
+      | 'fileAppels'
+      | 'tentatives'
+      | 'dossiers'
+      | 'notifications'
+      | 'synchronisation'
+      | 'journal'
+      | 'referentiels';
+    PurgeDomainDto: {
+      key: components['schemas']['PurgeDomainKey'];
+      label: string;
+      hint: string;
+      /** @description Domaines entraînés par celui-ci, clés étrangères obligent. L’écran les coche avec lui. */
+      requires: string[];
+      /** @description Lignes actuellement concernées. */
+      rows: number;
+    };
+    PurgeCatalogDto: {
+      /** @description Vrai si le compte appelant est le premier administrateur, seul habilité à purger. */
+      allowed: boolean;
+      /** @description Identifiant de connexion à ressaisir pour confirmer. */
+      confirmationHint: string;
+      domains: components['schemas']['PurgeDomainDto'][];
+    };
+    PurgeRequestDto: {
+      /** @description Domaines cochés. Le serveur y ajoute leurs dépendances. */
+      domains: components['schemas']['PurgeDomainKey'][];
+      /** @description Identifiant de connexion de l’administrateur, ressaisi. Comparé à son e-mail ou à son nom d’utilisateur. */
+      confirmation: string;
+    };
+    PurgeDeletionDto: {
+      key: components['schemas']['PurgeDomainKey'];
+      label: string;
+      rows: number;
+    };
+    PurgeResultDto: {
+      deleted: components['schemas']['PurgeDeletionDto'][];
+      total: number;
+      /**
+       * Format: date-time
+       * @description Horodatage serveur de la purge.
+       */
+      purgedAt: string;
+    };
+    /** @enum {string} */
+    PresenceState: 'ONLINE' | 'RECENT' | 'AWAY';
+    SupervisedUserDto: {
+      /** Format: uuid */
+      id: string;
+      fullName: string;
+      username: string;
+      email: string;
+      role: components['schemas']['Role'];
+      isActive: boolean;
+      departementName: string | null;
+      presence: components['schemas']['PresenceState'];
+      /** @description Une famille de jetons est encore vivante : ni révoquée, ni expirée. */
+      hasLiveSession: boolean;
+      /** @description Sessions ouvertes, tous appareils confondus. */
+      sessionCount: number;
+      /**
+       * Format: date-time
+       * @description Trace d’activité la plus récente, toutes sources confondues.
+       */
+      lastSeenAt: string | null;
+      /** Format: date-time */
+      lastLoginAt: string | null;
+      /**
+       * Format: date-time
+       * @description Dernier lot de synchronisation reçu d’un appareil.
+       */
+      lastSyncAt: string | null;
+      /**
+       * Format: date-time
+       * @description Dernière synchronisation descendante. Un appareil ouvert appelle toutes les minutes, même quand il n’a rien à remonter.
+       */
+      lastPullAt: string | null;
+      /** @description Opérations en attente de remontée dans l’appareil, DÉCLARÉES PAR LUI. `null` quand l’application ne les annonce pas : le serveur ne voit pas ce qui dort dans un téléphone. */
+      pendingOps: number | null;
+      /** @description Version de l’application mobile, telle qu’elle s’annonce. */
+      appVersion: string | null;
+      /**
+       * Format: date-time
+       * @description Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.
+       */
+      lastWriteAt: string | null;
+    };
+    PresenceCountsDto: {
+      online: number;
+      recent: number;
+      away: number;
+    };
+    SupervisionDto: {
+      /**
+       * Format: date-time
+       * @description Horloge du serveur au moment de la lecture.
+       */
+      observedAt: string;
+      /**
+       * @description Fenêtre, en minutes, en deçà de laquelle un compte est dit connecté.
+       * @default 20
+       */
+      onlineWindowMinutes: number;
+      teleconseillers: components['schemas']['SupervisedUserDto'][];
+      finances: components['schemas']['SupervisedUserDto'][];
+      counts: components['schemas']['PresenceCountsDto'];
     };
     /** @enum {string} */
     ExportMode: 'filtered' | 'consolidated';
@@ -6697,6 +6795,10 @@ export interface operations {
         /** @description Curseur opaque renvoyé par l’appel précédent. Absent : synchronisation complète. */
         since?: string;
         limit?: number;
+        /** @description Opérations en attente de remontée dans l’appareil. Le serveur ne peut pas la deviner. Facultatif sans limite de temps. */
+        pendingOps?: number;
+        /** @description Version de l’application mobile, telle qu’elle s’annonce. Facultative. */
+        appVersion?: string;
       };
       header?: never;
       path?: never;
@@ -7276,7 +7378,7 @@ export interface operations {
           'application/json': components['schemas']['RepCallAttemptResultDto'];
         };
       };
-      /** @description REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED. */
+      /** @description REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED · PHONE_INVALID. */
       400: {
         headers: {
           [name: string]: unknown;
@@ -7603,6 +7705,117 @@ export interface operations {
         };
       };
       /** @description REP_CAMPAIGN_PROGRAMME_NOT_FOUND · REP_CAMPAIGN_DAY_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listSuggestions: {
+    parameters: {
+      query?: {
+        status?: components['schemas']['SuggestionStatus'];
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SuggestionListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateSuggestionStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateSuggestionStatusDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SuggestionDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description SUGGESTION_NOT_FOUND. */
       404: {
         headers: {
           [name: string]: unknown;
@@ -9471,332 +9684,6 @@ export interface operations {
       };
     };
   };
-  getDemoStatus: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  enableDemoMode: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  purgeDemoData: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  disableDemoMode: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getPurgeCatalog: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['PurgeCatalogDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  purgeDatabase: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['PurgeRequestDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['PurgeResultDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Identifiant de confirmation incorrect. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Compte administrateur autre que le premier. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getSupervision: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SupervisionDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
   getAnalyticsFunnel: {
     parameters: {
       query?: {
@@ -11327,6 +11214,332 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SupervisionActivityDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getDemoStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DemoStatusDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  enableDemoMode: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DemoStatusDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  purgeDemoData: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DemoStatusDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  disableDemoMode: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DemoStatusDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getPurgeCatalog: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurgeCatalogDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  purgeDatabase: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PurgeRequestDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PurgeResultDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Identifiant de confirmation incorrect. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Compte administrateur autre que le premier. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getSupervision: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SupervisionDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */

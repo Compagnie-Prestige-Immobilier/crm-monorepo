@@ -33,6 +33,12 @@ class CreateRepCallAttemptDto {
 
     this.relationStatus,
 
+    this.suggestedPhone,
+
+    this.suggestedName,
+
+    this.suggestedNote,
+
     required this.clientCreatedAt,
   });
 
@@ -70,6 +76,18 @@ class CreateRepCallAttemptDto {
   )
   final RepresentantRelation? relationStatus;
 
+  /// Numéro qu’un représentant qui refuse propose d’appeler à sa place. Saisie libre, normalisé par le serveur. Un numéro illisible refuse la tentative entière : le téléconseiller est sur l’écran au moment où il le tape.
+  @JsonKey(name: r'suggestedPhone', required: false, includeIfNull: false)
+  final String? suggestedPhone;
+
+  /// Nom du contact suggéré, tel que dicté. Ignoré sans `suggestedPhone`.
+  @JsonKey(name: r'suggestedName', required: false, includeIfNull: false)
+  final String? suggestedName;
+
+  /// Ce que le représentant dit du contact. Ignoré sans `suggestedPhone`.
+  @JsonKey(name: r'suggestedNote', required: false, includeIfNull: false)
+  final String? suggestedNote;
+
   /// Horodatage de l’appel sur le terrain, distinct de son arrivée en base.
   @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
   final DateTime clientCreatedAt;
@@ -86,6 +104,9 @@ class CreateRepCallAttemptDto {
                 promisedProspects,
                 comment,
                 relationStatus,
+                suggestedPhone,
+                suggestedName,
+                suggestedNote,
                 clientCreatedAt,
               ],
               [
@@ -95,6 +116,9 @@ class CreateRepCallAttemptDto {
                 other.promisedProspects,
                 other.comment,
                 other.relationStatus,
+                other.suggestedPhone,
+                other.suggestedName,
+                other.suggestedNote,
                 other.clientCreatedAt,
               ],
             );
@@ -110,6 +134,9 @@ class CreateRepCallAttemptDto {
         promisedProspects,
         comment,
         relationStatus,
+        suggestedPhone,
+        suggestedName,
+        suggestedNote,
         clientCreatedAt,
       ]);
 

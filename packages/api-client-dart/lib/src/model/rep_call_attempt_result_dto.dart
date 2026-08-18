@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
 import 'package:crm_api_client/src/model/rep_call_attempt_apply_status.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -27,6 +28,8 @@ class RepCallAttemptResultDto {
     required this.taskId,
 
     required this.taskClosed,
+
+    required this.suggestion,
   });
 
   @JsonKey(
@@ -48,20 +51,30 @@ class RepCallAttemptResultDto {
   @JsonKey(name: r'taskClosed', required: true, includeIfNull: false)
   final bool taskClosed;
 
+  /// Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas.
+  @JsonKey(name: r'suggestion', required: true, includeIfNull: true)
+  final RepresentantLookupDto? suggestion;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is RepCallAttemptResultDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [status, attemptId, taskId, taskClosed],
-              [other.status, other.attemptId, other.taskId, other.taskClosed],
+              [status, attemptId, taskId, taskClosed, suggestion],
+              [
+                other.status,
+                other.attemptId,
+                other.taskId,
+                other.taskClosed,
+                other.suggestion,
+              ],
             );
   }
 
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([status, attemptId, taskId, taskClosed]);
+      mapPropsToHashCode([status, attemptId, taskId, taskClosed, suggestion]);
 
   factory RepCallAttemptResultDto.fromJson(Map<String, dynamic> json) =>
       _$RepCallAttemptResultDtoFromJson(json);

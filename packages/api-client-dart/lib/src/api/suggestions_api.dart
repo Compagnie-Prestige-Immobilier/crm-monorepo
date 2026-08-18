@@ -10,23 +10,23 @@ import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
 import 'package:crm_api_client/src/model/api_error_dto.dart';
-import 'package:crm_api_client/src/model/sync_pull_response_dto.dart';
-import 'package:crm_api_client/src/model/sync_push_dto.dart';
-import 'package:crm_api_client/src/model/sync_push_response_dto.dart';
+import 'package:crm_api_client/src/model/suggestion_dto.dart';
+import 'package:crm_api_client/src/model/suggestion_list_dto.dart';
+import 'package:crm_api_client/src/model/suggestion_status.dart';
+import 'package:crm_api_client/src/model/update_suggestion_status_dto.dart';
 
-class SyncApi {
+class SuggestionsApi {
   final Dio _dio;
 
-  const SyncApi(this._dio);
+  const SuggestionsApi(this._dio);
 
-  /// Récupère les changements depuis un curseur opaque.
-  /// Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres lignes ; les référentiels sont communs.
+  /// Numéros donnés par des représentants qui ont refusé.
+  /// Un numéro cité par deux représentants apparaît deux fois : c’est l’information, pas un doublon.
   ///
   /// Parameters:
-  /// * [since] - Curseur opaque renvoyé par l’appel précédent. Absent : synchronisation complète.
-  /// * [limit]
-  /// * [pendingOps] - Opérations en attente de remontée dans l’appareil. Le serveur ne peut pas la deviner. Facultatif sans limite de temps.
-  /// * [appVersion] - Version de l’application mobile, telle qu’elle s’annonce. Facultative.
+  /// * [status]
+  /// * [page]
+  /// * [pageSize]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -34,13 +34,12 @@ class SyncApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [SyncPullResponseDto] as data
+  /// Returns a [Future] containing a [Response] with a [SuggestionListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SyncPullResponseDto>> pullSyncChanges({
-    String? since,
-    num? limit = 200,
-    num? pendingOps,
-    String? appVersion,
+  Future<Response<SuggestionListDto>> listSuggestions({
+    SuggestionStatus? status,
+    num? page = 1,
+    num? pageSize = 25,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -48,7 +47,7 @@ class SyncApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/sync/pull';
+    final _path = r'/api/v1/suggestions';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{...?headers},
@@ -62,10 +61,9 @@ class SyncApi {
     );
 
     final _queryParameters = <String, dynamic>{
-      if (since != null) r'since': since,
-      if (limit != null) r'limit': limit,
-      if (pendingOps != null) r'pendingOps': pendingOps,
-      if (appVersion != null) r'appVersion': appVersion,
+      if (status != null) r'status': status,
+      if (page != null) r'page': page,
+      if (pageSize != null) r'pageSize': pageSize,
     };
 
     final _response = await _dio.request<Object>(
@@ -77,15 +75,15 @@ class SyncApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    SyncPullResponseDto? _responseData;
+    SuggestionListDto? _responseData;
 
     try {
       final rawData = _response.data;
       _responseData = rawData == null
           ? null
-          : deserialize<SyncPullResponseDto, SyncPullResponseDto>(
+          : deserialize<SuggestionListDto, SuggestionListDto>(
               rawData,
-              'SyncPullResponseDto',
+              'SuggestionListDto',
               growable: true,
             );
     } catch (error, stackTrace) {
@@ -98,7 +96,7 @@ class SyncApi {
       );
     }
 
-    return Response<SyncPullResponseDto>(
+    return Response<SuggestionListDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -110,12 +108,12 @@ class SyncApi {
     );
   }
 
-  /// Envoie un lot d’opérations hors ligne.
+  /// Marque un numéro suggéré comme appelé ou abandonné.
   ///
   ///
   /// Parameters:
-  /// * [idempotencyKey] - Doit valoir exactement clientBatchId.
-  /// * [syncPushDto]
+  /// * [id]
+  /// * [updateSuggestionStatusDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -123,11 +121,11 @@ class SyncApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [SyncPushResponseDto] as data
+  /// Returns a [Future] containing a [Response] with a [SuggestionDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SyncPushResponseDto>> pushSyncBatch({
-    required String idempotencyKey,
-    required SyncPushDto syncPushDto,
+  Future<Response<SuggestionDto>> updateSuggestionStatus({
+    required String id,
+    required UpdateSuggestionStatusDto updateSuggestionStatusDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -135,13 +133,15 @@ class SyncApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/sync/push';
+    final _path = r'/api/v1/suggestions/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
-      method: r'POST',
-      headers: <String, dynamic>{
-        r'Idempotency-Key': idempotencyKey,
-        ...?headers,
-      },
+      method: r'PATCH',
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
@@ -155,7 +155,7 @@ class SyncApi {
     dynamic _bodyData;
 
     try {
-      _bodyData = jsonEncode(syncPushDto);
+      _bodyData = jsonEncode(updateSuggestionStatusDto);
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _options.compose(_dio.options, _path),
@@ -174,15 +174,15 @@ class SyncApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    SyncPushResponseDto? _responseData;
+    SuggestionDto? _responseData;
 
     try {
       final rawData = _response.data;
       _responseData = rawData == null
           ? null
-          : deserialize<SyncPushResponseDto, SyncPushResponseDto>(
+          : deserialize<SuggestionDto, SuggestionDto>(
               rawData,
-              'SyncPushResponseDto',
+              'SuggestionDto',
               growable: true,
             );
     } catch (error, stackTrace) {
@@ -195,7 +195,7 @@ class SyncApi {
       );
     }
 
-    return Response<SyncPushResponseDto>(
+    return Response<SuggestionDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
