@@ -12,6 +12,7 @@ import 'generated_migrations/schema_v4.dart' as v4;
 import 'generated_migrations/schema_v5.dart' as v5;
 import 'generated_migrations/schema_v6.dart' as v6;
 import 'generated_migrations/schema_v7.dart' as v7;
+import 'generated_migrations/schema_v8.dart' as v8;
 
 /// Test doré de migration.
 ///
@@ -681,6 +682,108 @@ void main() {
     await db.close();
   });
 
+  // ── v8 → v9 : le fil de commentaires ───────────────────────────────────────
+  //
+  // Palier purement additif : aucune donnée ne peut être perdue. Ce qui peut
+  // l'être, c'est la clé étrangère et l'index, qu'un `createTable` seul ne
+  // rendrait pas visibles : la table existerait, le fil marcherait en test, et
+  // un commentaire pourrait rester attaché à une fiche disparue.
+
+  test('v8 -> v9 ajoute le fil sans toucher aux saisies en file', () async {
+    final schema = await verifier.schemaAt(8);
+
+    final v8.DatabaseAtV8 old = v8.DatabaseAtV8(schema.newConnection());
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO departements (id, code, name, region_id, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?)',
+      <Object?>['dep-1', 'DK', 'Dakar', 'reg-1', _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, departement_id, created_by_id, '
+      ' client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['rep-1', 'Awa Ndiaye', '+221771234567', 'dep-1', 'me', _iso, _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-1', 'representant', 'rep-1', 'create', '{}', _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 9);
+
+    final List<QueryRow> pending = await db
+        .customSelect('SELECT id FROM outbox WHERE status = \'pending\'')
+        .get();
+    expect(pending, hasLength(1), reason: 'la file ne doit pas être vidée');
+
+    // Le fil démarre vide, et il s'ÉCRIT : « la table existe » se vérifierait
+    // aussi sur une table inutilisable.
+    await db.customStatement(
+      'INSERT INTO representant_comments '
+      '(id, representant_id, author_id, author_name, body, client_created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['c-1', 'rep-1', 'me', 'Awa Sy', 'Rappeler après 15 h.', _iso],
+    );
+    final List<QueryRow> fil = await db
+        .customSelect('SELECT body, server_created_at FROM representant_comments')
+        .get();
+    expect(fil.single.read<String>('body'), 'Rappeler après 15 h.');
+    expect(fil.single.read<String?>('server_created_at'), isNull);
+
+    await expectLater(
+      db.customStatement(
+        'INSERT INTO representant_comments '
+        '(id, representant_id, author_id, author_name, body, client_created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>['c-2', 'fiche-absente', 'me', 'Awa Sy', 'Orphelin.', _iso],
+      ),
+      throwsA(anything),
+      reason: 'la clé étrangère est posée, pas seulement la table',
+    );
+
+    // PAS de colonne `rev` : le fil est en ajout seul. En poser une ferait
+    // écrire un arbitrage dernier-écrivain que rien ne peut déclencher.
+    final List<QueryRow> columns = await db
+        .customSelect('PRAGMA table_info(representant_comments)')
+        .get();
+    expect(columns.map((QueryRow r) => r.read<String>('name')).toSet(), <String>{
+      'id',
+      'representant_id',
+      'author_id',
+      'author_name',
+      'body',
+      'client_created_at',
+      'server_created_at',
+    });
+
+    await db.close();
+  });
+
+  test('v8 -> v9 crée l\'index du fil', () async {
+    final schema = await verifier.schemaAt(8);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 9);
+
+    final List<QueryRow> indexes = await db
+        .customSelect(
+          'SELECT name FROM sqlite_master '
+          'WHERE type = \'index\' AND tbl_name = \'representant_comments\'',
+        )
+        .get();
+    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+
+    // Le fil est relu à chaque ouverture de fiche et à chaque publication.
+    expect(names, contains('representant_comments_representant_idx'));
+
+    await db.close();
+  });
+
   // ── Le saut de plusieurs versions ──────────────────────────────────────────
   //
   // Chaque test ci-dessus ne franchit qu'UN palier. Or un commercial qui n'a pas
@@ -690,7 +793,7 @@ void main() {
   // gardés par `to >= n` précisément parce qu'une composition mal ordonnée
   // produit un schéma qui n'est AUCUNE version déclarée.
 
-  test('v1 -> v8 d\'un seul coup : deux mois sans mise à jour', () async {
+  test('v1 -> v9 d\'un seul coup : deux mois sans mise à jour', () async {
     final schema = await verifier.schemaAt(1);
 
     final v1.DatabaseAtV1 old = v1.DatabaseAtV1(schema.newConnection());
@@ -747,9 +850,9 @@ void main() {
     await old.close();
 
     final AppDatabase db = AppDatabase(schema.newConnection());
-    // UN SEUL appel, de 1 à 8 : c'est le vrai chemin de l'appareil qui a sauté
+    // UN SEUL appel, de 1 à 9 : c'est le vrai chemin de l'appareil qui a sauté
     // les versions intermédiaires.
-    await verifier.migrateAndValidate(db, 8);
+    await verifier.migrateAndValidate(db, 9);
 
     // Les données de v1 ont traversé six paliers, dont une recréation de table.
     final List<QueryRow> prospects = await db
@@ -793,13 +896,26 @@ void main() {
       <Object?>['a-1', 'pro-1', 'CALLBACK', _iso, _iso, 'me'],
     );
 
+    // Le saut long passe aussi par le palier v9 : le fil s'écrit, attaché à la
+    // fiche de v1 qui a traversé huit paliers.
+    await db.customStatement(
+      'INSERT INTO representant_comments '
+      '(id, representant_id, author_id, author_name, body, client_created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['c-1', 'rep-1', 'me', 'Awa Sy', 'Fiche reprise après le saut.', _iso],
+    );
+    final List<QueryRow> fil = await db
+        .customSelect('SELECT representant_id FROM representant_comments')
+        .get();
+    expect(fil.single.read<String>('representant_id'), 'rep-1');
+
     await db.close();
   });
 
-  test('v2 -> v8 : le saut passe aussi par les colonnes ajoutées', () async {
+  test('v2 -> v9 : le saut passe aussi par les colonnes ajoutées', () async {
     final schema = await verifier.schemaAt(2);
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 8);
+    await verifier.migrateAndValidate(db, 9);
 
     // Les colonnes ajoutées en chemin (v4, v5, v7 puis v8) doivent être là
     // toutes : un palier gardé par `from < n` seul, sans `to >= n`, produit un
@@ -816,6 +932,10 @@ void main() {
         .customSelect('SELECT callback_at FROM call_attempts')
         .get();
     expect(attempts, isEmpty);
+    final List<QueryRow> fil = await db
+        .customSelect('SELECT body FROM representant_comments')
+        .get();
+    expect(fil, isEmpty);
 
     await db.close();
   });

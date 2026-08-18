@@ -276,6 +276,14 @@ final prospectsForRepresentantProvider =
       return ref.watch(referenceRepositoryProvider).watchProspectsFor(representantId);
     });
 
+final representantCommentsProvider =
+    StreamProvider.family<List<RepresentantComment>, String>((
+      Ref ref,
+      String representantId,
+    ) {
+      return ref.watch(referenceRepositoryProvider).watchCommentsFor(representantId);
+    });
+
 final prospectCountForProvider = StreamProvider.family<int, String>((
   Ref ref,
   String representantId,

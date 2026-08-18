@@ -173,6 +173,36 @@ CREATE UNIQUE INDEX prospects_phone_unique
 CREATE INDEX prospects_representant_idx ON prospects (representant_id);
 CREATE INDEX prospects_created_idx ON prospects (client_created_at DESC);
 
+-- Fil de commentaires d'un représentant.
+--
+-- Seule table métier SANS `rev`, et c'est structurel : un commentaire s'AJOUTE,
+-- il ne se modifie ni ne s'efface. Rien à arbitrer, donc rien à versionner. Deux
+-- téléconseillers hors ligne qui commentent la même fiche produisent deux lignes
+-- distinctes, jamais une fusion, et le serveur ne peut pas rendre de conflit de
+-- révision sur une écriture qui n'en annonce aucune.
+--
+-- `id` est un UUID v7 engendré par le client : c'est la clé d'idempotence, la
+-- même mécanique que `call_attempts`.
+--
+-- Pas de CHECK sur `body` : c'est du texte libre, et le seul champ du produit où
+-- la saisie au clavier est légitime.
+CREATE TABLE representant_comments (
+    id TEXT NOT NULL PRIMARY KEY,
+    representant_id TEXT NOT NULL
+        REFERENCES representants (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    author_id TEXT NOT NULL,
+    -- Nom dénormalisé : le fil doit nommer son auteur SANS réseau, et il
+    -- n'existe pas de table d'utilisateurs en local.
+    author_name TEXT NOT NULL,
+    body TEXT NOT NULL,
+    client_created_at DATETIME NOT NULL,
+    -- Nul tant que le serveur n'a pas accusé réception.
+    server_created_at DATETIME NULL
+);
+
+CREATE INDEX representant_comments_representant_idx
+    ON representant_comments (representant_id, client_created_at DESC);
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Mécanique de synchronisation
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -568,6 +598,11 @@ representantsWithStatus:
 prospectsForRepresentant:
     SELECT * FROM prospect_sync_view
     WHERE representant_id = :representantId AND deleted_at IS NULL
+    ORDER BY client_created_at DESC;
+
+commentsForRepresentant:
+    SELECT * FROM representant_comments
+    WHERE representant_id = :representantId
     ORDER BY client_created_at DESC;
 
 -- ── Phase 2 ──────────────────────────────────────────────────────────────────

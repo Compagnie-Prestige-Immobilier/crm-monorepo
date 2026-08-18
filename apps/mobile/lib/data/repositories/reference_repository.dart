@@ -142,6 +142,10 @@ class ReferenceRepository {
     return _db.prospectsForRepresentant(representantId: representantId).watch();
   }
 
+  Stream<List<RepresentantComment>> watchCommentsFor(String representantId) {
+    return _db.commentsForRepresentant(representantId: representantId).watch();
+  }
+
   Stream<List<ProspectSyncViewData>> watchAllProspects({String? search}) {
     final String pattern = '%${(search ?? '').trim().toLowerCase()}%';
     return _db
