@@ -208,6 +208,7 @@ model User {
   repCampaignMemberships RepCallCampaignCommercial[] @relation("RepCallCampaignCommercial")
   repCallTasksAssigned   RepCallTask[]               @relation("RepCallTaskAssignedTo")
   repCallAttempts        RepCallAttempt[]            @relation("RepCallAttemptPerformedBy")
+  repSuggestions         RepresentantSuggestion[]    @relation("RepresentantSuggestionSuggestedBy")
 
   // Banque & Finance
   bankCasesCreated    BankCase[]           @relation("BankCaseCreatedBy")
@@ -241,6 +242,8 @@ model User {
 
   scheduledCallbacks       ScheduledCallback[]          @relation("ScheduledCallbackAssignedTo")
   representantRelationsSet RepresentantRelationChange[] @relation("RepresentantRelationChangeChangedBy")
+
+  heartbeat AgentHeartbeat?
 
   @@index([role, isActive])
   @@index([deletedAt])
@@ -411,10 +414,12 @@ model Representant {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  prospects       Prospect[]
-  repCallTasks    RepCallTask[]
-  repCallAttempts RepCallAttempt[]
-  relationChanges RepresentantRelationChange[]
+  prospects           Prospect[]
+  repCallTasks        RepCallTask[]
+  repCallAttempts     RepCallAttempt[]
+  relationChanges     RepresentantRelationChange[]
+  suggestionsGiven    RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
+  suggestionsResolved RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -613,6 +618,30 @@ model SyncOperation {
   @@index([userId, appliedAt])
   @@index([entityId])
   @@map("sync_operations")
+}
+
+/// Dernier échange d'un appareil avec le serveur, UNE ligne par compte.
+///
+/// La colonne équivalente sur `users` a été refusée : une écriture par requête
+/// sur la table la plus lue du produit. Une table étroite, sans index
+/// secondaire ni relation entrante, n'a pas ce défaut.
+///
+/// `pendingOps` vient du CLIENT et de nulle part ailleurs : le serveur ne voit
+/// que ce qui lui est remonté, jamais ce qui attend dans l'outbox du téléphone.
+model AgentHeartbeat {
+  userId String @id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lastPullAt DateTime?
+  lastPushAt DateTime?
+  /// NULLABLE et sans valeur par défaut : un appareil qui ne l'annonce pas
+  /// laisse « inconnu », et non « zéro en attente », qui serait un fait faux.
+  pendingOps Int?
+  appVersion String?
+
+  updatedAt DateTime @updatedAt
+
+  @@map("agent_heartbeats")
 }
 
 model AuditLog {
@@ -998,6 +1027,8 @@ model RepCallAttempt {
 
   /// Ligne appartenant au jeu de démonstration. Voir `User.isDemo`.
   isDemo Boolean @default(false)
+
+  suggestion RepresentantSuggestion?
 
   @@index([representantId, createdAt])
   @@index([performedById, createdAt])
@@ -1749,4 +1780,64 @@ model RepresentantRelationChange {
   @@index([changedById, changedAt])
   @@index([isDemo])
   @@map("representant_relation_changes")
+}
+
+/// Un representant qui refuse peut nommer un collegue a appeler a sa place.
+///
+/// Table dediee et surtout PAS une fiche `Representant` : `phoneE164` y porte un
+/// index unique PARTIEL, si bien qu'une fiche « suggeree » reserverait le numero.
+/// Le teleconseiller qui rencontrerait un jour cette personne pour de vrai
+/// recevrait REPRESENTANT_PHONE_CONFLICT, et la fusion automatique du mobile ne
+/// se declenche que sur une fiche qui lui appartient deja : le conflit serait
+/// definitif, sans geste capable de le resoudre. `Representant.departementId`
+/// est en outre NOT NULL, qu'il faudrait inventer pour un contact dont on ne
+/// connait que le numero.
+model RepresentantSuggestion {
+  id String @id @default(uuid(7))
+
+  /// QUI a donne le numero. C'est ce qui fait de la piste autre chose qu'un numero nu.
+  sourceRepresentantId String
+  sourceRepresentant   Representant @relation("RepresentantSuggestionSource", fields: [sourceRepresentantId], references: [id], onDelete: Cascade)
+
+  suggestedName String?
+
+  /// Normalise par le SERVEUR, sans aucune unicite : deux representants qui citent
+  /// le meme contact disent qu'il faut l'appeler en priorite, pas qu'il y a doublon.
+  suggestedPhoneE164 String
+
+  note String?
+
+  suggestedById String
+  suggestedBy   User   @relation("RepresentantSuggestionSuggestedBy", fields: [suggestedById], references: [id], onDelete: Restrict)
+
+  /// Rempli quand le numero est deja une fiche vivante : la piste est deja connue.
+  resolvedRepresentantId String?
+  resolvedRepresentant   Representant? @relation("RepresentantSuggestionResolved", fields: [resolvedRepresentantId], references: [id], onDelete: SetNull)
+
+  /// La tentative pendant laquelle la suggestion a ete recueillie. Son identifiant
+  /// est la cle d'idempotence du client : l'unicite rend le rejeu sans effet, sans
+  /// compter les lignes au prealable. Meme mecanisme que `ScheduledCallback.sourceAttemptId`.
+  sourceAttemptId String         @unique
+  sourceAttempt   RepCallAttempt @relation(fields: [sourceAttemptId], references: [id], onDelete: Cascade)
+
+  status SuggestionStatus @default(A_APPELER)
+
+  clientCreatedAt DateTime
+  createdAt       DateTime  @default(now())
+  deletedAt       DateTime?
+
+  /// Ligne appartenant au jeu de démonstration. Voir `User.isDemo`.
+  isDemo Boolean @default(false)
+
+  @@index([suggestedPhoneE164])
+  @@index([sourceRepresentantId, createdAt])
+  @@index([status, createdAt])
+  @@index([isDemo])
+  @@map("representant_suggestions")
+}
+
+enum SuggestionStatus {
+  A_APPELER
+  APPELE
+  ABANDONNE
 }
