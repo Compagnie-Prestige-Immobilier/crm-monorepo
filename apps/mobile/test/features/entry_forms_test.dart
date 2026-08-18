@@ -327,6 +327,58 @@ void main() {
       expect(await drafts(), isEmpty);
     });
 
+    // ═══ LA CASCADE RÉGION → DÉPARTEMENT ═══
+    //
+    // « Elle a tapé Tambacounda pour le département » : la liste plate de 46
+    // entrées demande le nom exact d'un découpage que personne ne récite.
+    formTestWidgets('choisir une région ne laisse que ses départements', (
+      WidgetTester tester,
+    ) async {
+      await seedRegion(db, regionId: 'reg-tc', regionName: 'Tambacounda');
+
+      await tester.pumpWidget(host(const RepresentantFormScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(TextField, 'Région'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tambacounda').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(TextField, 'Département'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bakel'), findsOneWidget);
+      // Le département de la région restée en dehors ne doit plus être offert.
+      expect(find.text('Dakar'), findsNothing);
+    });
+
+    // Le même geste que « département → IEF » : garder l'ancien choix laisserait
+    // une fiche rattachée à un département qui n'est plus dans la région
+    // affichée, et personne ne le verrait à la relecture.
+    formTestWidgets('changer de région remet le département à zéro', (
+      WidgetTester tester,
+    ) async {
+      await seedRegion(db, regionId: 'reg-tc', regionName: 'Tambacounda');
+
+      await tester.pumpWidget(host(const RepresentantFormScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(TextField, 'Département'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dakar').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(TextField, 'Région'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tambacounda').last);
+      await tester.pumpAndSettle();
+
+      final TextField departement = tester.widget<TextField>(
+        find.widgetWithText(TextField, 'Département'),
+      );
+      expect(departement.controller?.text, isEmpty);
+    });
+
     formTestWidgets('un département choisi seul est un brouillon, pas du vide', (
       WidgetTester tester,
     ) async {

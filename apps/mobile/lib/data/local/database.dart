@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -45,10 +45,30 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6 && to >= 6) {
         await m.alterTable(TableMigration(prospects));
         await m.alterTable(TableMigration(phase2Directory));
-        await m.alterTable(TableMigration(callAttempts));
+        // `callbackAt` n'existe pas encore à la v6 : sans le déclarer neuf, la
+        // recopie irait le lire dans l'ancienne table.
+        await m.alterTable(
+          TableMigration(
+            callAttempts,
+            newColumns: <GeneratedColumn<Object>>[callAttempts.callbackAt],
+          ),
+        );
       }
       if (from < 7 && to >= 7) {
         await m.addColumn(outbox, outbox.claimToken);
+      }
+      if (from < 8 && to >= 8) {
+        await m.addColumn(departements, departements.regionName);
+        await m.createIndex(departementsRegionIdx);
+        await m.addColumn(representants, representants.relationStatus);
+        // Venu d'avant la v6, `call_attempts` a été RECRÉÉ juste au-dessus, donc
+        // déjà dans sa forme courante : la colonne y est.
+        if (from >= 6) await m.addColumn(callAttempts, callAttempts.callbackAt);
+        // Le pull est un curseur keyset sur `updatedAt` : un département déjà en
+        // base ne redescend plus jamais, et `region_name` resterait vide à vie
+        // sur les appareils existants. Effacer le curseur force un pull complet.
+        // Le référentiel n'est jamais écrit localement : rien à perdre.
+        await customStatement('DELETE FROM sync_state WHERE collection = \'all\'');
       }
     },
     beforeOpen: (OpeningDetails details) async {

@@ -989,6 +989,7 @@ class SyncEngine {
                 code: d.code,
                 name: d.name,
                 regionId: d.regionId,
+                regionName: Value<String>(d.regionName),
                 isActive: Value<bool>(d.isActive),
                 localUpdatedAt: _clock.now(),
                 serverUpdatedAt: Value<DateTime?>(d.updatedAt),
@@ -998,6 +999,7 @@ class SyncEngine {
                   code: const CustomExpression<String>('excluded.code'),
                   name: const CustomExpression<String>('excluded.name'),
                   regionId: const CustomExpression<String>('excluded.region_id'),
+                  regionName: const CustomExpression<String>('excluded.region_name'),
                   isActive: const CustomExpression<bool>('excluded.is_active'),
                   serverUpdatedAt: const CustomExpression<DateTime>(
                     'excluded.server_updated_at',
@@ -1120,6 +1122,7 @@ class SyncEngine {
                 notes: Value<String?>(r.notes),
                 departementId: r.departementId,
                 iefId: Value<String?>(r.iefId),
+                relationStatus: Value<String>(r.relationStatus.value),
                 createdById: r.createdById,
                 clientCreatedAt: r.clientCreatedAt,
                 rev: Value<int>(r.rev.toInt()),
@@ -1135,6 +1138,9 @@ class SyncEngine {
                     'excluded.departement_id',
                   ),
                   iefId: const CustomExpression<String>('excluded.ief_id'),
+                  relationStatus: const CustomExpression<String>(
+                    'excluded.relation_status',
+                  ),
                   rev: const CustomExpression<int>('excluded.rev'),
                   serverUpdatedAt: const CustomExpression<DateTime>(
                     'excluded.server_updated_at',

@@ -22,6 +22,14 @@ CREATE TABLE departements (
     code TEXT NOT NULL,
     name TEXT NOT NULL,
     region_id TEXT NOT NULL,
+    -- Libellé dénormalisé, même patron que `iefs.departement_name` : le
+    -- sélecteur en cascade doit nommer la région SANS réseau, et il n'existe pas
+    -- de table `regions` en local.
+    --
+    -- Vide par défaut : les bases déjà installées portent des départements que
+    -- le pull ne redescendra qu'après la remise à zéro du curseur (palier v8).
+    -- Tant qu'elle est vide, l'étape « Région » se masque.
+    region_name TEXT NOT NULL DEFAULT '',
     is_active BOOLEAN NOT NULL DEFAULT 1,
     rev INTEGER NOT NULL DEFAULT 1,
     local_updated_at DATETIME NOT NULL,
@@ -30,6 +38,8 @@ CREATE TABLE departements (
 );
 
 CREATE INDEX departements_active_idx ON departements (is_active, name);
+
+CREATE INDEX departements_region_idx ON departements (region_id, name);
 
 -- Les IEF : Inspections de l'Éducation et de la Formation.
 --
@@ -102,6 +112,11 @@ CREATE TABLE representants (
     -- référentiel n'en portent pas ; une colonne obligatoire les rendrait
     -- invalides et bloquerait leur synchronisation.
     ief_id TEXT NULL REFERENCES iefs (id) ON UPDATE CASCADE,
+    -- Écrite par le SERVEUR, jamais depuis le terrain, et donc SANS CHECK
+    -- d'énumération : même raison que `prospects.statut` et
+    -- `phase2_directory.phase2_status`, une valeur ajoutée côté serveur ferait
+    -- avorter la page de pull entière.
+    relation_status TEXT NOT NULL DEFAULT 'INCONNU',
     created_by_id TEXT NOT NULL,
     -- Horodatage de la saisie sur le terrain, distinct de l'arrivée en base :
     -- les deux peuvent être séparés de plusieurs jours hors ligne.
@@ -349,6 +364,11 @@ CREATE TABLE call_attempts (
     outcome TEXT NOT NULL,
     method TEXT NULL,
     comment TEXT NULL,
+    -- Heure du rappel demandé, FACULTATIVE même sur CALLBACK. Aucun CHECK ne la
+    -- lie à l'issue : les versions déjà déployées enregistrent des « À rappeler »
+    -- sans date, et un `CHECK ((outcome = 'CALLBACK') = (callback_at IS NOT NULL))`
+    -- ferait échouer leur INSERT LOCAL, hors ligne, sur le terrain.
+    callback_at DATETIME NULL,
     client_created_at DATETIME NOT NULL,
     created_by_id TEXT NOT NULL,
     -- Méthode si et seulement si METHOD_OBTAINED.

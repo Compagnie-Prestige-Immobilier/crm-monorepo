@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/sync/outbox_status.dart';
+import 'package:cpi_go/core/sync/phase2_directory_sync.dart';
 import 'package:cpi_go/core/sync/sync_engine.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/draft_repository.dart';
@@ -492,6 +493,57 @@ void main() {
       expect(payload['departementId'], 'dep-1');
       expect(payload['notes'], 'Marché de Thiaroye');
       expect(payload['clientCreatedAt'], t0.toIso8601String());
+    });
+
+    test('un rappel daté part avec son heure, en UTC', () async {
+      final DateTime demain = DateTime.utc(2026, 8, 13, 9);
+      await repo.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.callback,
+        createdById: 'me',
+        callbackAt: demain,
+      );
+
+      final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+      expect(attempt.callbackAt, demain);
+
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
+      expect(payload['callbackAt'], demain.toIso8601String());
+    });
+
+    // Le champ reste FACULTATIF côté serveur pour cette raison exacte : les
+    // versions déjà déployées poussent des « À rappeler » sans date, et elles
+    // doivent continuer de passer.
+    test('un rappel sans heure s\'enregistre et ne porte pas la clé', () async {
+      await repo.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.callback,
+        createdById: 'me',
+      );
+
+      final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+      expect(attempt.callbackAt, isNull);
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
+      expect(payload.containsKey('callbackAt'), isFalse);
+    });
+
+    // Le serveur refuse une heure sur une autre issue : la retenir localement
+    // fabriquerait une opération vouée au refus, trois semaines plus tard.
+    test('une heure posée sur une autre issue est écartée', () async {
+      await repo.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.refused,
+        createdById: 'me',
+        callbackAt: DateTime.utc(2026, 8, 13, 9),
+      );
+
+      final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+      expect(attempt.callbackAt, isNull);
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
+      expect(payload.containsKey('callbackAt'), isFalse);
     });
 
     test('une note vide n\'est pas envoyée', () async {

@@ -149,7 +149,12 @@ class Phase2Controller extends Notifier<Phase2State> {
     );
   }
 
-  Future<bool> record({required String outcome, String? method, String? comment}) async {
+  Future<bool> record({
+    required String outcome,
+    String? method,
+    String? comment,
+    DateTime? callbackAt,
+  }) async {
     final Phase2DirectoryData? entry = state.entry;
     if (entry == null) return false;
     final String? me = ref.read(authControllerProvider).userId;
@@ -167,6 +172,7 @@ class Phase2Controller extends Notifier<Phase2State> {
         outcome: outcome,
         method: method,
         comment: comment,
+        callbackAt: callbackAt,
         createdById: me,
       );
     } on CallAttemptInvalid catch (e) {

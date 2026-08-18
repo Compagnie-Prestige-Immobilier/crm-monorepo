@@ -16,6 +16,7 @@ import 'package:cpi_go/features/corrections/presentation/corrections_screen.dart
 import 'package:cpi_go/features/historique/presentation/historique_screen.dart';
 import 'package:cpi_go/features/home/presentation/home_screen.dart';
 import 'package:cpi_go/features/permissions/presentation/battery_help_screen.dart';
+import 'package:cpi_go/features/phase2/presentation/callback_picker.dart';
 import 'package:cpi_go/features/phase2/presentation/phase2_screen.dart';
 import 'package:cpi_go/features/prospect/presentation/prospect_entry_screen.dart';
 import 'package:cpi_go/features/reglages/presentation/reglages_screen.dart';
@@ -211,7 +212,9 @@ void main() {
   ///   MODIFICATION (`?id=`), les listes remplies, les états d'erreur ;
   /// * les modales et feuilles : `_NegativeSheet`, `_Capture`, `_MethodCard`,
   ///   `_AlreadyClosed` de la phase 2, `showOwnershipSheet`, la boîte de
-  ///   déconnexion avec saisies en attente.
+  ///   déconnexion avec saisies en attente. Le choix de l'heure de rappel, lui,
+  ///   est peint directement : ses six puces sont la forme la plus large de la
+  ///   feuille, et elles sont arrivées avec un `Wrap` à prouver.
   ///
   /// Ce sont des formes à risque, pas des oublis anodins : une feuille modale
   /// empile des boutons pleine largeur dans une colonne contrainte, c'est-à-dire
@@ -260,6 +263,15 @@ void main() {
     'Connexion': LoginScreen.new,
     'Premier lancement': OnboardingScreen.new,
     'Notifications': NotificationsScreen.new,
+    // Le contenu de la feuille des issues négatives quand l'issue est
+    // « À rappeler » : six puces de largeurs très inégales, dont
+    // « Cet après-midi (15 h) ».
+    'Heure de rappel': () => Scaffold(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: CallbackPicker(now: t0, onChanged: (DateTime? _) {}),
+      ),
+    ),
     // Version longue et notes multi-lignes : c'est l'état le plus haut de
     // l'écran, et `forceUpdate` retire le bouton « Plus tard », ce qui change
     // la barre d'actions.
