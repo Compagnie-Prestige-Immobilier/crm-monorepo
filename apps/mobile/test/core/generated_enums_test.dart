@@ -68,14 +68,19 @@ void main() {
       );
     });
 
-    test('les issues terminales sont exactement les statuts non PENDING', () {
-      expect(CallOutcomes.terminal, <String>{
-        'METHOD_OBTAINED',
-        'REFUSED',
-        'WRONG_NUMBER',
-      });
+    test('les effets qui ferment couvrent exactement les statuts non PENDING', () {
       expect(
-        CallOutcomes.terminal,
+        CallEffects.all.toSet(),
+        CallOutcomeEffect.values
+            .where((CallOutcomeEffect e) => e != CallOutcomeEffect.unknownDefaultOpenApi)
+            .map((CallOutcomeEffect e) => e.value)
+            .toSet(),
+      );
+      // C'est l'EFFET qui ferme un dossier, plus l'issue : un motif ajouté par
+      // le client ferme selon son effet, sans qu'aucune liste d'issues ait à le
+      // connaître.
+      expect(
+        CallEffects.closing.map(CallEffects.phase2Status).toSet(),
         Phase2Status.values
             .where(
               (Phase2Status s) =>
@@ -84,6 +89,8 @@ void main() {
             .map((Phase2Status s) => s.value)
             .toSet(),
       );
+      expect(CallEffects.phase2Status(CallEffects.keepOpen), isNull);
+      expect(CallEffects.phase2Status(CallEffects.scheduleCallback), isNull);
     });
 
     test('une issue non terminale ne se convertit PAS en statut de dossier', () {

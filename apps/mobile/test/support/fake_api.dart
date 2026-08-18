@@ -131,6 +131,28 @@ class FakeApi implements ApiPort {
     return directoryPages.removeAt(0);
   }
 
+  /// Le référentiel des motifs d'issue à servir. Vide par défaut : la plupart
+  /// des tests n'ont que faire des motifs, et le repli système suffit.
+  final List<CallOutcomeReasonDto> callOutcomeReasons = <CallOutcomeReasonDto>[];
+
+  /// Chaque appel à [pullCallOutcomeReasons], avec la version reçue.
+  final List<int> reasonCalls = <int>[];
+
+  ApiException? failNextReasonsPull;
+
+  @override
+  Future<List<CallOutcomeReasonDto>> pullCallOutcomeReasons({
+    required int payloadVersion,
+  }) async {
+    reasonCalls.add(payloadVersion);
+    final ApiException? boom = failNextReasonsPull;
+    if (boom != null) {
+      failNextReasonsPull = null;
+      throw boom;
+    }
+    return callOutcomeReasons;
+  }
+
   @override
   Future<PushResult> push({
     required String batchId,
@@ -364,6 +386,11 @@ class ExplodingApi implements ApiPort {
   @override
   Future<Phase2DirectoryPage> pullPhase2Directory({String? cursor, int limit = 2000}) =>
       _boom();
+
+  @override
+  Future<List<CallOutcomeReasonDto>> pullCallOutcomeReasons({
+    required int payloadVersion,
+  }) => _boom();
 
   @override
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone) => _boom();

@@ -170,5 +170,11 @@ abstract interface class ApiPort {
 
   Future<Phase2DirectoryPage> pullPhase2Directory({String? cursor, int limit});
 
+  /// Le référentiel entier, filtré par le serveur sur `minPayloadVersion` : sans
+  /// pagination ni curseur, il tient en quelques dizaines de lignes.
+  Future<List<CallOutcomeReasonDto>> pullCallOutcomeReasons({
+    required int payloadVersion,
+  });
+
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone);
 }

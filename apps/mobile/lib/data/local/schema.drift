@@ -95,6 +95,33 @@ CREATE TABLE syndicats (
 
 CREATE INDEX syndicats_active_idx ON syndicats (is_active, sort_order, name);
 
+-- Motifs d'issue d'appel, administrés depuis le web par l'équipe du client.
+--
+-- `code` est la clé primaire et il est IMMUABLE côté serveur : les tentatives
+-- déjà remontées le référencent.
+--
+-- Pas de CHECK sur `effect`, même raison que `prospects.statut` : la valeur
+-- vient du SERVEUR et un CHECK figé ferait avorter la transaction de pull
+-- entière le jour où un sixième effet apparaît.
+CREATE TABLE call_outcome_reasons (
+    code TEXT NOT NULL PRIMARY KEY,
+    label TEXT NOT NULL,
+    effect TEXT NOT NULL,
+    requires_comment BOOLEAN NOT NULL DEFAULT 0,
+    requires_callback BOOLEAN NOT NULL DEFAULT 0,
+    counts_as_reached BOOLEAN NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    color TEXT NULL,
+    -- Le serveur ne redescend que les motifs dont cette valeur est inférieure ou
+    -- égale à la version de charge utile demandée : un motif reçu ici est donc
+    -- toujours émettable par cette application.
+    min_payload_version INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE INDEX call_outcome_reasons_active_idx
+    ON call_outcome_reasons (is_active, sort_order, label);
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Métier
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -370,10 +397,12 @@ CREATE INDEX phase2_directory_status_idx ON phase2_directory (phase2_status);
 -- lignes déjà acquittées par le serveur.
 --
 -- Les trois CHECK restants reproduisent les contraintes de FORME de
--- `call_attempts` côté PostgreSQL : « méthode si et seulement si
--- METHOD_OBTAINED », « OTHER exige un commentaire », « commentaire borné ». Ce
--- sont des règles structurelles, pas des listes de vocabulaire : elles restent
--- vraies quelle que soit l'issue que le serveur ajoutera demain.
+-- `call_attempts` côté PostgreSQL : « méthode si et seulement si le motif ferme
+-- sur une méthode », « un motif qui exige un commentaire l'obtient »,
+-- « commentaire borné ». Ce sont des règles structurelles, pas des listes de
+-- vocabulaire : elles s'expriment sur l'EFFET et sur l'exigence recopiés du
+-- motif, donc elles restent vraies quel que soit le motif que l'équipe du
+-- client ajoutera demain depuis le web.
 --
 -- Les répliquer ici n'est pas de la ceinture et des bretelles : sans elles, une
 -- saisie invalide s'enregistre sur le terrain, part dans la file, et n'est
@@ -384,14 +413,19 @@ CREATE TABLE call_attempts (
     -- UUID v7 engendré par le client. C'est la clé d'idempotence du serveur.
     id TEXT NOT NULL PRIMARY KEY,
     prospect_id TEXT NOT NULL,
-    -- Pas de liste d'énumération ici non plus. `CallOutcomes.all` et
-    -- `EnrollmentMethods.all` sont dérivés du client généré et vérifiés par
-    -- `WriteRepository.validateCallAttempt` AVANT l'écriture, avec un message en
-    -- français que le commercial peut corriger dans la seconde. Une liste figée
-    -- dans le DDL n'ajoutait pas de sécurité : elle garantissait qu'une issue
-    -- ajoutée côté serveur, dûment régénérée dans le client, serait refusée par
-    -- SQLite au moment d'enregistrer un appel.
+    -- Issue historique, énumération FERMÉE du contrat : c'est elle que lisent
+    -- les versions du serveur qui ignorent encore les motifs. Conservée telle
+    -- quelle, sans liste dans le DDL : la retirer rendrait illisibles les
+    -- tentatives déjà en file.
     outcome TEXT NOT NULL,
+    -- Motif choisi, code du référentiel serveur. Nul sur les tentatives d'avant
+    -- la v10, qui n'en portaient pas.
+    reason_code TEXT NULL,
+    -- Effet du motif AU MOMENT DE LA SAISIE. Recopié et non joint : SQLite
+    -- n'admet pas de sous-requête dans un CHECK, et un motif reconfiguré plus
+    -- tard ne doit pas invalider rétroactivement une tentative déjà saisie.
+    effect TEXT NOT NULL DEFAULT 'KEEP_OPEN',
+    requires_comment BOOLEAN NOT NULL DEFAULT 0,
     method TEXT NULL,
     comment TEXT NULL,
     -- Heure du rappel demandé, FACULTATIVE même sur CALLBACK. Aucun CHECK ne la
@@ -401,10 +435,10 @@ CREATE TABLE call_attempts (
     callback_at DATETIME NULL,
     client_created_at DATETIME NOT NULL,
     created_by_id TEXT NOT NULL,
-    -- Méthode si et seulement si METHOD_OBTAINED.
-    CHECK ((outcome = 'METHOD_OBTAINED') = (method IS NOT NULL)),
-    -- OTHER exige un commentaire non vide.
-    CHECK (outcome <> 'OTHER' OR (comment IS NOT NULL AND length(trim(comment)) > 0)),
+    -- Méthode si et seulement si le motif ferme sur une méthode obtenue.
+    CHECK ((effect = 'CLOSE_METHOD') = (method IS NOT NULL)),
+    -- Un motif qui exige un commentaire l'obtient, non vide.
+    CHECK (requires_comment = 0 OR (comment IS NOT NULL AND length(trim(comment)) > 0)),
     CHECK (comment IS NULL OR length(comment) <= 2000)
 );
 
@@ -632,15 +666,17 @@ countPhase2Pending:
 countMyAttempts:
     SELECT COUNT(*) AS c FROM call_attempts;
 
+-- Sur l'EFFET et non sur l'issue : un motif ajouté par le client qui ferme sur
+-- une méthode obtenue compte ici, sans que ce fichier ait à connaître son code.
 countMyMethods:
-    SELECT COUNT(*) AS c FROM call_attempts WHERE outcome = 'METHOD_OBTAINED';
+    SELECT COUNT(*) AS c FROM call_attempts WHERE effect = 'CLOSE_METHOD';
 
 -- Dossiers que mes appels ont clos.
 --
 -- Les issues terminales ne sont PAS listées ici : c'était la quatrième copie
 -- d'une règle que le serveur est seul à trancher. Elle vit désormais dans
--- `CallOutcomes.terminal`, dérivée de l'énumération générée, et le compte se
--- fait côté Dart (`Phase2DirectorySync.countClosed`).
+-- `CallEffects.closing`, et le compte se fait côté Dart
+-- (`Phase2DirectorySync.countClosed`).
 
 attemptsForProspect:
     SELECT * FROM call_attempts

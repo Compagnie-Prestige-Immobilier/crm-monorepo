@@ -150,7 +150,7 @@ class Phase2Controller extends Notifier<Phase2State> {
   }
 
   Future<bool> record({
-    required String outcome,
+    required CallReason reason,
     String? method,
     String? comment,
     DateTime? callbackAt,
@@ -169,7 +169,8 @@ class Phase2Controller extends Notifier<Phase2State> {
     try {
       await _writes.recordCallAttempt(
         prospectId: entry.prospectId,
-        outcome: outcome,
+        outcome: reason.outcome,
+        reasonCode: reason.code,
         method: method,
         comment: comment,
         callbackAt: callbackAt,
@@ -183,7 +184,7 @@ class Phase2Controller extends Notifier<Phase2State> {
     state = state.copyWith(
       stage: Phase2Stage.confirmed,
       saving: false,
-      confirmation: labelForOutcome(outcome, method),
+      confirmation: labelForReason(reason, method),
       clearError: true,
     );
     ref.read(syncCoordinatorProvider.notifier).nudge();
@@ -228,15 +229,12 @@ class Phase2Controller extends Notifier<Phase2State> {
     _ => e.message ?? 'Téléchargement impossible pour le moment.',
   };
 
-  static String labelForOutcome(String outcome, [String? method]) => switch (outcome) {
-    CallOutcomes.methodObtained => 'Méthode obtenue : ${labelForMethod(method ?? '')}',
-    CallOutcomes.unreachable => 'Injoignable',
-    CallOutcomes.callback => 'À rappeler',
-    CallOutcomes.refused => 'Refus',
-    CallOutcomes.wrongNumber => 'Mauvais numéro',
-    CallOutcomes.other => 'Autre',
-    _ => outcome,
-  };
+  /// Le libellé vient du motif, jamais d'une table de correspondance : c'est
+  /// l'équipe du client qui le rédige depuis le web.
+  static String labelForReason(CallReason reason, [String? method]) =>
+      reason.effect == CallEffects.closeMethod
+      ? '${reason.label} : ${labelForMethod(method ?? '')}'
+      : reason.label;
 
   static String labelForMethod(String method) => switch (method) {
     EnrollmentMethods.platform => 'Plateforme',

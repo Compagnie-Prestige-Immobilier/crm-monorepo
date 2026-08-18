@@ -1,5 +1,6 @@
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/sync/clock.dart';
+import 'package:cpi_go/core/sync/phase2_directory_sync.dart';
 import 'package:cpi_go/core/settings/display_settings.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/data/local/database.dart';
@@ -293,6 +294,13 @@ void main() {
         child: CallbackPicker(now: t0, onChanged: (DateTime? _) {}),
       ),
     ),
+    // La feuille des issues n'est plus une liste figée de cinq puces : elle rend
+    // ce que l'équipe du client a rédigé depuis le web, sous des en-têtes
+    // d'effet. Ni la longueur des libellés ni leur nombre ne sont désormais
+    // connus à la compilation, et c'est exactement ce qui déborde.
+    'Feuille des issues': () => Scaffold(
+      body: CallOutcomeSheet(now: t0, reasons: _reasons),
+    ),
     // Version longue et notes multi-lignes : c'est l'état le plus haut de
     // l'écran, et `forceUpdate` retire le bouton « Plus tard », ce qui change
     // la barre d'actions.
@@ -387,3 +395,39 @@ class _SignedInController extends AuthController {
     email: 'awa.sy@cpi.sn',
   );
 }
+
+/// Des motifs aussi longs que ce que l'équipe du client peut écrire, sur les
+/// quatre effets que la feuille regroupe.
+const List<CallReason> _reasons = <CallReason>[
+  CallReason(
+    code: 'NRP',
+    label: 'Ne répond pas après trois tentatives espacées',
+    effect: CallEffects.keepOpen,
+    sortOrder: 10,
+  ),
+  CallReason(
+    code: 'OCCUPE',
+    label: 'Ligne occupée ou renvoi vers messagerie vocale',
+    effect: CallEffects.keepOpen,
+    requiresComment: true,
+    sortOrder: 20,
+  ),
+  CallReason(
+    code: 'RDV_PRIS',
+    label: 'Rendez-vous pris pour une présentation détaillée',
+    effect: CallEffects.scheduleCallback,
+    sortOrder: 30,
+  ),
+  CallReason(
+    code: 'REFUS_CONJOINT',
+    label: 'Refus après consultation du conjoint',
+    effect: CallEffects.closeRefused,
+    sortOrder: 40,
+  ),
+  CallReason(
+    code: 'HORS_SERVICE',
+    label: 'Numéro attribué à un autre abonné',
+    effect: CallEffects.closeWrongNumber,
+    sortOrder: 50,
+  ),
+];

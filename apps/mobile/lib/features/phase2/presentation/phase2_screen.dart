@@ -76,19 +76,14 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   }
 
   Future<void> _record({
-    required String outcome,
+    required CallReason reason,
     String? method,
     String? comment,
     DateTime? callbackAt,
   }) async {
     final bool ok = await ref
         .read(phase2ControllerProvider.notifier)
-        .record(
-          outcome: outcome,
-          method: method,
-          comment: comment,
-          callbackAt: callbackAt,
-        );
+        .record(reason: reason, method: method, comment: comment, callbackAt: callbackAt);
     if (!mounted) return;
     if (!ok) {
       await HapticFeedback.heavyImpact();
@@ -101,6 +96,10 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   Widget build(BuildContext context) {
     final Phase2State phase2 = ref.watch(phase2ControllerProvider);
     final CpiMotion motion = CpiMotion.of(context);
+    // Avant la première synchronisation la table est vide et le repli sert les
+    // six motifs système : la saisie ne dépend jamais du réseau.
+    final List<CallReason> reasons =
+        ref.watch(callReasonsProvider).value ?? SystemCallReasons.all;
 
     return CpiPopScope(
       child: Scaffold(
@@ -144,11 +143,9 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                           ),
                           Phase2Stage.capture => _Capture(
                             state: phase2,
-                            onMethod: (String method) => _record(
-                              outcome: CallOutcomes.methodObtained,
-                              method: method,
-                            ),
-                            onNegative: _openNegativeSheet,
+                            onMethod: (String method) =>
+                                _record(reason: methodReasonOf(reasons), method: method),
+                            onNegative: () => _openNegativeSheet(reasons),
                           ),
                           Phase2Stage.confirmed => _Confirmed(
                             label: phase2.confirmation,
@@ -168,22 +165,29 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     );
   }
 
-  Future<void> _openNegativeSheet() async {
-    final _NegativeResult? result = await showModalBottomSheet<_NegativeResult>(
+  Future<void> _openNegativeSheet(List<CallReason> reasons) async {
+    final CallOutcomeChoice? result = await showModalBottomSheet<CallOutcomeChoice>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (BuildContext context) =>
-          _NegativeSheet(now: ref.read(clockProvider).now()),
+          CallOutcomeSheet(now: ref.read(clockProvider).now(), reasons: reasons),
     );
     if (result == null || !mounted) return;
     await _record(
-      outcome: result.outcome,
+      reason: result.reason,
       comment: result.comment,
       callbackAt: result.callbackAt,
     );
   }
 }
+
+/// Le motif qui ferme sur une méthode obtenue. Le serveur en garantit un seul,
+/// et le repli système le porte tant que la table locale est vide.
+CallReason methodReasonOf(List<CallReason> reasons) => reasons.firstWhere(
+  (CallReason r) => r.effect == CallEffects.closeMethod,
+  orElse: () => SystemCallReasons.byCode[CallOutcomes.methodObtained]!,
+);
 
 
 class _StatusStrip extends ConsumerWidget {
@@ -862,26 +866,32 @@ class _Confirmed extends StatelessWidget {
 }
 
 
-class _NegativeResult {
-  const _NegativeResult(this.outcome, this.comment, this.callbackAt);
+class CallOutcomeChoice {
+  const CallOutcomeChoice(this.reason, this.comment, this.callbackAt);
 
-  final String outcome;
+  final CallReason reason;
   final String? comment;
   final DateTime? callbackAt;
 }
 
-class _NegativeSheet extends StatefulWidget {
-  const _NegativeSheet({required this.now});
+/// La feuille des issues autres qu'une méthode obtenue.
+///
+/// Elle ne cite aucun motif : elle rend ce que porte la table locale, groupé par
+/// EFFET, parce que c'est l'effet qui dit au téléconseiller ce que sa réponse
+/// fait au dossier, et trié par l'ordre que l'équipe du client a choisi.
+class CallOutcomeSheet extends StatefulWidget {
+  const CallOutcomeSheet({required this.now, required this.reasons, super.key});
 
   final DateTime now;
+  final List<CallReason> reasons;
 
   @override
-  State<_NegativeSheet> createState() => _NegativeSheetState();
+  State<CallOutcomeSheet> createState() => _CallOutcomeSheetState();
 }
 
-class _NegativeSheetState extends State<_NegativeSheet> {
+class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
   final TextEditingController _comment = TextEditingController();
-  String? _outcome;
+  CallReason? _reason;
   String? _error;
   DateTime? _callbackAt;
 
@@ -891,51 +901,54 @@ class _NegativeSheetState extends State<_NegativeSheet> {
     super.dispose();
   }
 
-  static const List<({String outcome, String title, String subtitle, IconData icon})>
-  _options = <({String outcome, String title, String subtitle, IconData icon})>[
-    (
-      outcome: CallOutcomes.unreachable,
-      title: 'Injoignable',
-      subtitle: 'Pas de réponse, boîte vocale, hors service',
-      icon: PhosphorIconsRegular.phoneSlash,
-    ),
-    (
-      outcome: CallOutcomes.callback,
-      title: 'À rappeler',
-      subtitle: 'Rappel demandé',
-      icon: PhosphorIconsRegular.clockCountdown,
-    ),
-    (
-      outcome: CallOutcomes.refused,
-      title: 'Refus',
-      subtitle: 'Refus définitif',
-      icon: PhosphorIconsRegular.prohibit,
-    ),
-    (
-      outcome: CallOutcomes.wrongNumber,
-      title: 'Mauvais numéro',
-      subtitle: 'Numéro erroné. Définitif',
-      icon: PhosphorIconsRegular.warningCircle,
-    ),
-    (
-      outcome: CallOutcomes.other,
-      title: 'Autre',
-      subtitle: 'Commentaire obligatoire',
-      icon: PhosphorIconsRegular.dotsThreeCircle,
-    ),
+  static const List<String> _effectOrder = <String>[
+    CallEffects.keepOpen,
+    CallEffects.scheduleCallback,
+    CallEffects.closeRefused,
+    CallEffects.closeWrongNumber,
   ];
 
-  bool get _needsComment => _outcome == CallOutcomes.other;
+  static const Map<String, String> _effectHeader = <String, String>{
+    CallEffects.keepOpen: 'Le dossier reste ouvert',
+    CallEffects.scheduleCallback: 'Un rappel est à programmer',
+    CallEffects.closeRefused: 'Refus, le dossier se ferme',
+    CallEffects.closeWrongNumber: 'Numéro hors service, le dossier se ferme',
+  };
+
+  List<({String header, List<CallReason> items})> _groups() {
+    final List<CallReason> sorted =
+        widget.reasons
+            .where((CallReason r) => r.effect != CallEffects.closeMethod)
+            .toList()
+          ..sort((CallReason a, CallReason b) => a.sortOrder.compareTo(b.sortOrder));
+
+    final Map<String, List<CallReason>> byEffect = <String, List<CallReason>>{};
+    for (final CallReason r in sorted) {
+      byEffect.putIfAbsent(r.effect, () => <CallReason>[]).add(r);
+    }
+    // Un effet que cette version ignore passe en fin de liste plutôt que d'être
+    // écarté : un motif invisible est exactement le défaut qu'on corrige.
+    final List<String> effects = <String>[
+      ..._effectOrder.where(byEffect.containsKey),
+      ...byEffect.keys.where((String e) => !_effectOrder.contains(e)),
+    ];
+    return <({String header, List<CallReason> items})>[
+      for (final String effect in effects)
+        (header: _effectHeader[effect] ?? 'Autres motifs', items: byEffect[effect]!),
+    ];
+  }
+
+  bool get _needsComment => _reason?.requiresComment ?? false;
 
   void _submit() {
-    final String? outcome = _outcome;
-    if (outcome == null) {
+    final CallReason? reason = _reason;
+    if (reason == null) {
       setState(() => _error = 'Choisissez une issue.');
       return;
     }
     final String? comment = WriteRepository.normalizeComment(_comment.text);
     final CallAttemptProblem? problem = WriteRepository.validateCallAttempt(
-      outcome: outcome,
+      reason: reason,
       comment: comment,
     );
     if (problem != null) {
@@ -943,7 +956,7 @@ class _NegativeSheetState extends State<_NegativeSheet> {
       setState(() => _error = problem.message);
       return;
     }
-    Navigator.of(context).pop(_NegativeResult(outcome, comment, _callbackAt));
+    Navigator.of(context).pop(CallOutcomeChoice(reason, comment, _callbackAt));
   }
 
   @override
@@ -998,30 +1011,38 @@ class _NegativeSheetState extends State<_NegativeSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    for (final ({
-                          String outcome,
-                          String title,
-                          String subtitle,
-                          IconData icon,
-                        })
-                        option
-                        in _options)
+                    for (final ({String header, List<CallReason> items}) group
+                        in _groups()) ...<Widget>[
                       Padding(
-                        padding: const EdgeInsets.only(bottom: CpiSpacing.xxs),
-                        child: _OutcomeTile(
-                          option: option,
-                          selected: _outcome == option.outcome,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _outcome = option.outcome;
-                              _error = null;
-                              _callbackAt = null;
-                            });
-                          },
+                        padding: const EdgeInsets.only(
+                          top: CpiSpacing.xs,
+                          bottom: CpiSpacing.xxs,
+                        ),
+                        child: Text(
+                          group.header,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
-                    if (_outcome == CallOutcomes.callback) ...<Widget>[
+                      for (final CallReason reason in group.items)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: CpiSpacing.xxs),
+                          child: _OutcomeTile(
+                            reason: reason,
+                            selected: _reason == reason,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _reason = reason;
+                                _error = null;
+                                _callbackAt = null;
+                              });
+                            },
+                          ),
+                        ),
+                    ],
+                    if (_reason?.effect == CallEffects.scheduleCallback) ...<Widget>[
                       const SizedBox(height: CpiSpacing.sm),
                       CallbackPicker(
                         key: const ValueKey<String>('callback-picker'),
@@ -1111,21 +1132,38 @@ class _NegativeSheetState extends State<_NegativeSheet> {
 }
 
 class _OutcomeTile extends StatelessWidget {
-  const _OutcomeTile({required this.option, required this.selected, required this.onTap});
+  const _OutcomeTile({required this.reason, required this.selected, required this.onTap});
 
-  final ({String outcome, String title, String subtitle, IconData icon}) option;
+  final CallReason reason;
   final bool selected;
   final VoidCallback onTap;
+
+  static IconData _icon(String effect) => switch (effect) {
+    CallEffects.scheduleCallback => PhosphorIconsRegular.clockCountdown,
+    CallEffects.closeRefused => PhosphorIconsRegular.prohibit,
+    CallEffects.closeWrongNumber => PhosphorIconsRegular.warningCircle,
+    CallEffects.keepOpen => PhosphorIconsRegular.phoneSlash,
+    _ => PhosphorIconsRegular.dotsThreeCircle,
+  };
+
+  /// La couleur choisie par l'équipe du client, en `#RRGGBB`. Illisible ou
+  /// absente, la puce reprend celle du thème plutôt que de disparaître.
+  static Color? _tint(String? hex) {
+    if (hex == null) return null;
+    final int? rgb = int.tryParse(hex.replaceFirst('#', ''), radix: 16);
+    return rgb == null || rgb > 0xFFFFFF ? null : Color(0xFF000000 | rgb);
+  }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
+    final String hint = reason.requiresComment ? 'Commentaire obligatoire' : '';
     return Semantics(
       button: true,
       selected: selected,
       onTap: onTap,
-      label: '${option.title}. ${option.subtitle}',
+      label: '${reason.label}. $hint',
       child: ExcludeSemantics(
         child: Material(
           color: selected
@@ -1151,11 +1189,11 @@ class _OutcomeTile extends StatelessWidget {
               child: Row(
                 children: <Widget>[
                   Icon(
-                    option.icon,
+                    _icon(reason.effect),
                     size: 20,
                     color: selected
                         ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant,
+                        : (_tint(reason.color) ?? theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(width: CpiSpacing.sm),
                   Expanded(
@@ -1163,13 +1201,14 @@ class _OutcomeTile extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        Text(option.title, style: theme.textTheme.titleSmall),
-                        Text(
-                          option.subtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        Text(reason.label, style: theme.textTheme.titleSmall),
+                        if (hint.isNotEmpty)
+                          Text(
+                            hint,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
