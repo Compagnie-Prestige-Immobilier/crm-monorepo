@@ -242,6 +242,7 @@ model User {
 
   scheduledCallbacks       ScheduledCallback[]          @relation("ScheduledCallbackAssignedTo")
   representantRelationsSet RepresentantRelationChange[] @relation("RepresentantRelationChangeChangedBy")
+  representantComments     RepresentantComment[]        @relation("RepresentantCommentAuthor")
 
   heartbeat AgentHeartbeat?
 
@@ -418,6 +419,7 @@ model Representant {
   repCallTasks        RepCallTask[]
   repCallAttempts     RepCallAttempt[]
   relationChanges     RepresentantRelationChange[]
+  comments            RepresentantComment[]
   suggestionsGiven    RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
   suggestionsResolved RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
 
@@ -1782,6 +1784,34 @@ model RepresentantRelationChange {
   @@map("representant_relation_changes")
 }
 
+/// Fil de commentaires d'une fiche, en AJOUT SEUL : ni `rev` ni edition, donc
+/// deux teleconseillers hors ligne produisent deux lignes, jamais un conflit a
+/// arbitrer. `Representant.notes` reste le champ libre, sans auteur ni date.
+model RepresentantComment {
+  /// UUID v7 engendre par le client : sert aussi de cle d'idempotence.
+  id             String       @id
+  representantId String
+  representant   Representant @relation(fields: [representantId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("RepresentantCommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  body String
+
+  clientCreatedAt DateTime
+  createdAt       DateTime  @default(now())
+  /// Suppression douce, reservee a l'administration.
+  deletedAt       DateTime?
+
+  /// Ligne appartenant au jeu de démonstration. Voir `User.isDemo`.
+  isDemo Boolean @default(false)
+
+  @@index([representantId, clientCreatedAt])
+  @@index([authorId, createdAt])
+  @@index([isDemo])
+  @@map("representant_comments")
+}
+
 /// Un representant qui refuse peut nommer un collegue a appeler a sa place.
 ///
 /// Table dediee et surtout PAS une fiche `Representant` : `phoneE164` y porte un
@@ -1840,4 +1870,51 @@ enum SuggestionStatus {
   A_APPELER
   APPELE
   ABANDONNE
+}
+
+/// Effet d'une issue d'appel sur le cycle de vie du prospect.
+///
+/// Fermee a la compilation, contrairement aux MOTIFS: un effet nouveau change
+/// les regles metier et merite une migration, un motif nouveau n'est qu'un mot
+/// que l'equipe ajoute depuis le panneau.
+enum CallOutcomeEffect {
+  CLOSE_METHOD
+  CLOSE_REFUSED
+  CLOSE_WRONG_NUMBER
+  KEEP_OPEN
+  SCHEDULE_CALLBACK
+}
+
+/// Le vocabulaire des issues d'appel, editable par l'administration.
+///
+/// Les six motifs semes portent les codes de `CallOutcome` A L'IDENTIQUE: une
+/// tentative deja remontee reste resoluble sans conversion.
+model CallOutcomeReason {
+  id     String            @id @default(uuid(7))
+  /// Immuable: l'historique le reference. Voir `BankCaseStage.code`.
+  code   String            @unique
+  label  String            @unique
+  effect CallOutcomeEffect
+
+  requiresComment  Boolean @default(false)
+  requiresCallback Boolean @default(false)
+  /// Compte comme un appel abouti dans le taux de joignabilite.
+  countsAsReached  Boolean @default(true)
+
+  isActive  Boolean @default(true)
+  isSystem  Boolean @default(false)
+  sortOrder Int     @default(100)
+  color     String?
+
+  /// Version de charge utile minimale sachant emettre ce motif. Un telephone
+  /// ne recoit jamais un code qu'il ne sait pas renvoyer: il le rejetterait en
+  /// erreur definitive, hors ligne, sans possibilite de correction.
+  minPayloadVersion Int @default(2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@index([effect, isActive])
+  @@map("call_outcome_reasons")
 }
