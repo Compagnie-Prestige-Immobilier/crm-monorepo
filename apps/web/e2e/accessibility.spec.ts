@@ -47,6 +47,10 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
 ];
 
 async function analyze(page: Page, where: string): Promise<void> {
+  // Le serveur de developpement compile la route a la demande: sans cette
+  // attente, axe audite parfois le document intermediaire, qui n'a ni titre ni
+  // contenu. Le defaut rapporte serait alors celui de l'outillage, pas du produit.
+  await expect(page).toHaveTitle(/\S/);
   await page.addStyleTag({
     content: '* { animation: none !important; transition: none !important; }',
   });

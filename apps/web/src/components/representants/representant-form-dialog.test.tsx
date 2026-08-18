@@ -162,6 +162,72 @@ describe('RepresentantFormDialog, état de la relation', () => {
     });
   });
 
+  it('ne demande le motif que sur une bascule vers le refus', async () => {
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} />);
+
+    await waitFor(() => {
+      expect(trigger('Relation').textContent).toContain('Contacté');
+    });
+    expect(screen.queryByLabelText('Motif du refus')).toBeNull();
+
+    await choose('Relation', 'Ambassadeur');
+    expect(screen.queryByLabelText('Motif du refus')).toBeNull();
+
+    await choose('Relation', 'Refus');
+    expect(screen.getByLabelText('Motif du refus')).toBeTruthy();
+  });
+
+  it('ne redemande pas le motif d’un refus déjà posé', async () => {
+    renderWithQuery(
+      <RepresentantFormDialog
+        open
+        onOpenChange={vi.fn()}
+        representant={{ ...FICHE, relationStatus: 'REFUS' }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(trigger('Relation').textContent).toContain('Refus');
+    });
+    expect(screen.queryByLabelText('Motif du refus')).toBeNull();
+  });
+
+  it('envoie le motif saisi avec la bascule', async () => {
+    const user = userEvent.setup();
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} />);
+
+    await waitFor(() => {
+      expect(trigger('Relation').textContent).toContain('Contacté');
+    });
+    await choose('Relation', 'Refus');
+    await user.type(screen.getByLabelText('Motif du refus'), 'Deja engage ailleurs');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(updateRepresentant).toHaveBeenCalled();
+    });
+    expect(updateRepresentant.mock.calls[0]?.[1]).toMatchObject({
+      relationStatus: 'REFUS',
+      relationReason: 'Deja engage ailleurs',
+    });
+  });
+
+  it('enregistre le refus sans motif : le champ ne bloque rien', async () => {
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} />);
+
+    await waitFor(() => {
+      expect(trigger('Relation').textContent).toContain('Contacté');
+    });
+    await choose('Relation', 'Refus');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(updateRepresentant).toHaveBeenCalled();
+    });
+    expect(updateRepresentant.mock.calls[0]?.[1]).toMatchObject({ relationStatus: 'REFUS' });
+    expect(updateRepresentant.mock.calls[0]?.[1]).not.toHaveProperty('relationReason');
+  });
+
   it('ne propose pas d’état à la création : une fiche neuve n’a pas d’histoire', async () => {
     renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={null} />);
 

@@ -69,6 +69,7 @@ export function RepresentantFormDialog({
   const phoneId = useId();
   const notesId = useId();
   const relationId = useId();
+  const reasonId = useId();
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -77,9 +78,12 @@ export function RepresentantFormDialog({
   const [iefId, setIefId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [relationStatus, setRelationStatus] = useState<RepresentantRelation>('INCONNU');
+  const [relationReason, setRelationReason] = useState('');
   const [conflict, setConflict] = useState<{ label: string; owner: string | null } | null>(null);
 
   const isEdit = representant !== null;
+  const switchingToRefus =
+    representant !== null && relationStatus === 'REFUS' && representant.relationStatus !== 'REFUS';
 
   useEffect(() => {
     if (!open) return;
@@ -90,6 +94,7 @@ export function RepresentantFormDialog({
     setIefId(representant?.iefId ?? null);
     setNotes(representant?.notes ?? prefill?.notes ?? '');
     setRelationStatus(representant?.relationStatus ?? 'INCONNU');
+    setRelationReason('');
     setConflict(null);
   }, [open, representant, prefill]);
 
@@ -140,6 +145,8 @@ export function RepresentantFormDialog({
         // Un statut inchangé n'est PAS renvoyé : le serveur le refuserait sans
         // rien écrire, et l'écran laisserait croire à une bascule historisée.
         if (relationStatus !== representant.relationStatus) patch.relationStatus = relationStatus;
+        const reason = relationReason.trim();
+        if (switchingToRefus && reason !== '') patch.relationReason = reason;
         return updateRepresentant(representant.id, patch);
       }
 
@@ -326,6 +333,25 @@ export function RepresentantFormDialog({
               <p className="text-[0.75rem] text-muted-foreground">
                 Chaque changement est daté et signé dans l’histoire de la fiche.
               </p>
+
+              {switchingToRefus ? (
+                <div className="mt-1 flex flex-col gap-1.5">
+                  <Label htmlFor={reasonId}>Motif du refus</Label>
+                  <Input
+                    id={reasonId}
+                    value={relationReason}
+                    maxLength={500}
+                    autoComplete="off"
+                    placeholder="Ce qu’il a répondu"
+                    onChange={(event) => {
+                      setRelationReason(event.target.value);
+                    }}
+                  />
+                  <p className="text-[0.75rem] text-muted-foreground">
+                    Facultatif. Repris tel quel dans l’histoire de la relation.
+                  </p>
+                </div>
+              ) : null}
             </div>
           ) : null}
 

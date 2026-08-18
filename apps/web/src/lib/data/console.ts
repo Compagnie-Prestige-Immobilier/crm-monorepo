@@ -41,6 +41,11 @@ export async function fetchConsoleQueue(
       params: {
         query: {
           ...(campaignId === null ? {} : { campaignId }),
+          // Une file d'appel ne porte QUE des fiches a appeler. Une fiche close
+          // y ferait perdre un tour a l'operatrice: les touches d'issue y sont
+          // inertes, et rien ne se consigne. Le bandeau lecture seule reste
+          // utile pour une fiche ouverte par lien direct.
+          phase2Status: 'PENDING',
           pageSize: CONSOLE_QUEUE_SIZE,
           sortBy: 'clientCreatedAt',
           sortOrder: 'asc',

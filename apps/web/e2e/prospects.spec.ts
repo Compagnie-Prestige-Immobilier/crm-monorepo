@@ -60,7 +60,6 @@ test('filtrage du tableau puis export xlsx', async ({ page }) => {
   // Le rôle `combobox` est indispensable : l'en-tête de tri de la colonne
   // porte AUSSI le nom accessible « Statut », mais comme `button`. Viser le
   // bouton triait la colonne au lieu d'ouvrir le filtre.
-  await page.getByRole('button', { name: 'Filtres avancés' }).click();
   await page.getByRole('combobox', { name: 'Statut Tous les statuts' }).click();
   await page.getByRole('option', { name: 'Nouveau', exact: true }).click();
 

@@ -28,9 +28,11 @@ const SOURCE_LABELS = { WEB: 'Panneau', MOBILE: 'Mobile' } as const;
 export function RepresentantDetailView({
   representantId,
   author,
+  canAdminister = false,
 }: {
   representantId: string;
   author: { id: string; fullName: string };
+  canAdminister?: boolean;
 }) {
   const fiche = useQuery({
     queryKey: queryKeys.representant(representantId),
@@ -141,7 +143,11 @@ export function RepresentantDetailView({
           <CardTitle>Fil de la fiche</CardTitle>
         </CardHeader>
         <CardContent>
-          <RepresentantComments representantId={representantId} author={author} />
+          <RepresentantComments
+            representantId={representantId}
+            author={author}
+            canAdminister={canAdminister}
+          />
         </CardContent>
       </Card>
 
