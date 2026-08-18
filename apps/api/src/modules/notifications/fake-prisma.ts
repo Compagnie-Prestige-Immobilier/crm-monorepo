@@ -9,6 +9,14 @@ import {
 } from '@crm/database';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import { SupervisionGranularity } from '../analytics/supervision.dto.js';
+import type {
+  SupervisionActivityDto,
+  SupervisionActivityRowDto,
+  SupervisionQueryDto,
+  SupervisionTeleconseillerDto,
+} from '../analytics/supervision.dto.js';
+import type { SupervisionActivityService } from '../analytics/supervision.service.js';
 import type {
   BrevoDispatchResult,
   BrevoMessage,
@@ -77,6 +85,15 @@ export interface CallTaskRow {
   status: string;
   isActive: boolean;
   campaignStatus: string;
+  isDemo: boolean;
+}
+
+export interface ScheduledCallbackRow {
+  id: string;
+  assignedToId: string;
+  status: string;
+  scheduledAt: Date;
+  updatedAt: Date;
   isDemo: boolean;
 }
 
@@ -199,12 +216,16 @@ const matches = (
         in?: unknown[];
         lte?: Date;
         lt?: Date;
+        gte?: Date;
         gt?: number;
         not?: unknown;
       };
       if (filter.in && !filter.in.includes(actual)) return false;
       if (filter.lte !== undefined) {
         if (!(actual instanceof Date) || actual.getTime() > filter.lte.getTime()) return false;
+      }
+      if (filter.gte !== undefined) {
+        if (!(actual instanceof Date) || actual.getTime() < filter.gte.getTime()) return false;
       }
       if (filter.lt !== undefined) {
         if (!(actual instanceof Date) || actual.getTime() >= filter.lt.getTime()) return false;
@@ -239,6 +260,7 @@ export class FakePrisma {
   readonly callTasks: CallTaskRow[] = [];
   readonly repCallTasks: CallTaskRow[] = [];
   readonly bankCases: BankCaseRow[] = [];
+  readonly scheduledCallbacks: ScheduledCallbackRow[] = [];
 
   addUser(row: Partial<UserRow> & { id: string }): UserRow {
     const user: UserRow = {
@@ -279,6 +301,21 @@ export class FakePrisma {
     };
     this.repCallTasks.push(task);
     return task;
+  }
+
+  addScheduledCallback(
+    row: Partial<ScheduledCallbackRow> & { assignedToId: string; scheduledAt: Date },
+  ): ScheduledCallbackRow {
+    const callback: ScheduledCallbackRow = {
+      id: row.id ?? nextId('callback'),
+      assignedToId: row.assignedToId,
+      status: row.status ?? 'PENDING',
+      scheduledAt: row.scheduledAt,
+      updatedAt: row.updatedAt ?? row.scheduledAt,
+      isDemo: row.isDemo ?? false,
+    };
+    this.scheduledCallbacks.push(callback);
+    return callback;
   }
 
   addBankCase(row: Partial<BankCaseRow> = {}): BankCaseRow {
@@ -509,7 +546,10 @@ export class FakePrisma {
     };
   }
 
-  private groupTasksBy(source: CallTaskRow[], where?: Record<string, unknown>) {
+  private groupTasksBy(
+    source: readonly { assignedToId: string }[],
+    where?: Record<string, unknown>,
+  ) {
     const rows = source.filter((row) =>
       matches(row as unknown as Record<string, unknown>, where, this),
     );
@@ -534,6 +574,19 @@ export class FakePrisma {
     return {
       groupBy: (args: { where?: Record<string, unknown> }) =>
         this.groupTasksBy(this.repCallTasks, args.where),
+    };
+  }
+
+  get scheduledCallback() {
+    return {
+      groupBy: (args: { where?: Record<string, unknown> }) =>
+        this.groupTasksBy(this.scheduledCallbacks, args.where),
+      count: (args: { where?: Record<string, unknown> }) =>
+        Promise.resolve(
+          this.scheduledCallbacks.filter((row) =>
+            matches(row as unknown as Record<string, unknown>, args.where, this),
+          ).length,
+        ),
     };
   }
 
@@ -564,6 +617,56 @@ export class FakePrisma {
 
   asService(): PrismaService {
     return this as unknown as PrismaService;
+  }
+}
+
+/** Le module analytics rendu par son service réel ; ici on ne fournit que sa réponse. */
+export class FakeActivity {
+  readonly items: SupervisionActivityRowDto[] = [];
+  readonly teleconseillers: SupervisionTeleconseillerDto[] = [];
+  readonly windows: { from: string | undefined; to: string | undefined }[] = [];
+
+  addRow(row: Partial<SupervisionActivityRowDto> & { teleconseillerId: string }): void {
+    this.items.push({
+      bucket: row.bucket ?? '',
+      teleconseillerName: row.teleconseillerName ?? row.teleconseillerId,
+      calls: row.calls ?? 0,
+      unreachable: row.unreachable ?? 0,
+      wrongNumber: row.wrongNumber ?? 0,
+      refused: row.refused ?? 0,
+      other: row.other ?? 0,
+      methodObtained: row.methodObtained ?? 0,
+      callback: row.callback ?? 0,
+      reachRate: row.reachRate ?? null,
+      prospectsCreated: row.prospectsCreated ?? 0,
+      representantsContacted: row.representantsContacted ?? 0,
+      tasksClosed: row.tasksClosed ?? 0,
+      teleconseillerId: row.teleconseillerId,
+    });
+  }
+
+  addTeleconseiller(row: Partial<SupervisionTeleconseillerDto> & { id: string }): void {
+    this.teleconseillers.push({
+      fullName: row.fullName ?? `Compte ${row.id}`,
+      isActive: row.isActive ?? true,
+      openTasks: row.openTasks ?? 0,
+      id: row.id,
+    });
+  }
+
+  activite(query: SupervisionQueryDto): Promise<SupervisionActivityDto> {
+    this.windows.push({ from: query.actFrom, to: query.actTo });
+    return Promise.resolve({
+      from: null,
+      to: null,
+      granularity: SupervisionGranularity.DAY,
+      items: this.items,
+      teleconseillers: this.teleconseillers,
+    });
+  }
+
+  asService(): SupervisionActivityService {
+    return this as unknown as SupervisionActivityService;
   }
 }
 

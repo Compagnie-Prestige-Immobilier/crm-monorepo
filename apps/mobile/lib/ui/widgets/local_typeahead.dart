@@ -98,6 +98,10 @@ class LocalTypeahead extends StatefulWidget {
 }
 
 class _LocalTypeaheadState extends State<LocalTypeahead> {
+  // Revoir tout le référentiel se demande par un tap sur le champ. L'état
+  // « une valeur est choisie » ne le dit pas : il est posé au moment du choix.
+  bool _browsing = false;
+
   @override
   void initState() {
     super.initState();
@@ -120,8 +124,9 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
   }
 
   void _onFocusChange() {
-    if (mounted) setState(() {});
-    if (!widget.focusNode.hasFocus) return;
+    final bool focused = widget.focusNode.hasFocus;
+    if (mounted) setState(() => _browsing = _browsing && focused);
+    if (!focused) return;
     final String text = widget.controller.text;
     if (text.isEmpty) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -201,7 +206,8 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
       focusNode: widget.focusNode,
       displayStringForOption: (TypeaheadOption o) => o.label,
       optionsBuilder: (TextEditingValue value) {
-        if (widget.selectedId != null &&
+        if (_browsing &&
+            widget.selectedId != null &&
             value.text.trim().isNotEmpty &&
             widget.options.any(
               (TypeaheadOption o) => o.id == widget.selectedId && o.label == value.text,
@@ -210,7 +216,11 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
         }
         return widget.options.where((TypeaheadOption o) => o.matches(value.text));
       },
-      onSelected: widget.onSelected,
+      onSelected: (TypeaheadOption option) {
+        setState(() => _browsing = false);
+        widget.focusNode.unfocus();
+        widget.onSelected(option);
+      },
       fieldViewBuilder:
           (
             BuildContext context,
@@ -226,6 +236,7 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                   controller: textController,
                   focusNode: node,
                   textInputAction: widget.textInputAction,
+                  onTap: () => setState(() => _browsing = true),
                   onChanged: widget.onChanged,
                   onSubmitted: (String _) => onFieldSubmitted(),
                   decoration: InputDecoration(

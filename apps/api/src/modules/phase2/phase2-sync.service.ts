@@ -1,5 +1,11 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { CallTaskStatus, Phase2Status, Prisma, type EnrollmentMethod } from '@crm/database';
+import {
+  CallTaskStatus,
+  Phase2Status,
+  Prisma,
+  ScheduledCallbackStatus,
+  type EnrollmentMethod,
+} from '@crm/database';
 
 import { PHASE2_STATUS_FOR_OUTCOME, isTerminalOutcome, normalizeAttempt } from './attempt-rules.js';
 import {
@@ -116,6 +122,30 @@ export class Phase2SyncService {
       };
     }
 
+    if (attempt.callbackAt) {
+      // L'index unique partiel n'admet qu'un seul rappel PENDING par prospect :
+      // sans cette dépose, l'insertion échouerait sur un appel réel.
+      await tx.scheduledCallback.updateMany({
+        where: { prospectId: op.prospectId, status: ScheduledCallbackStatus.PENDING },
+        data: { status: ScheduledCallbackStatus.SUPERSEDED },
+      });
+      await tx.scheduledCallback.createMany({
+        data: [
+          {
+            prospectId: op.prospectId,
+            taskId: activeTask?.id ?? null,
+            campaignId: activeTask?.campaignId ?? null,
+            assignedToId: userId,
+            scheduledAt: attempt.callbackAt,
+            comment: attempt.comment,
+            sourceAttemptId: op.id,
+            isDemo: prospect.isDemo,
+          },
+        ],
+        skipDuplicates: true,
+      });
+    }
+
     if (!attempt.terminal || !isTerminalOutcome(attempt.outcome)) {
       return {
         status: CallAttemptApplyStatus.APPLIED,
@@ -147,6 +177,11 @@ export class Phase2SyncService {
     await tx.callTask.updateMany({
       where: { prospectId: op.prospectId, isActive: true },
       data: { status: CallTaskStatus.DONE, isActive: false, completedAt },
+    });
+
+    await tx.scheduledCallback.updateMany({
+      where: { prospectId: op.prospectId, status: ScheduledCallbackStatus.PENDING },
+      data: { status: ScheduledCallbackStatus.DONE, closedAttemptId: op.id },
     });
 
     return {

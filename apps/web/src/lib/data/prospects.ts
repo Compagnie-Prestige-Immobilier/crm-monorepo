@@ -1,5 +1,5 @@
-import type { ApiClient } from '@crm/api-client';
-import { unwrap } from '@crm/api-client/query';
+import type { ApiClient, components } from '@crm/api-client';
+import { ApiError, unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage, toProspectQuery } from '@/lib/api/query-params';
@@ -10,6 +10,9 @@ import type {
   ProspectRow,
   UpdateProspectInput,
 } from '@/lib/types';
+
+export type CreateProspectInput = components['schemas']['CreateProspectDto'];
+export type ProspectPhoneConflict = components['schemas']['ProspectConflictExistingDto'];
 
 export async function fetchProspects(
   filters: ProspectFilters,
@@ -26,6 +29,22 @@ export async function fetchProspect(
   client: ApiClient = getApiClient(),
 ): Promise<ProspectRow> {
   return unwrap(await client.GET('/api/v1/prospects/{id}', { params: { path: { id } } }));
+}
+
+export async function createProspect(
+  input: CreateProspectInput,
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
+  return unwrap(await client.POST('/api/v1/prospects', { body: input }));
+}
+
+/** La fiche que le 409 nomme, ou `null` si l'échec est d'une autre nature. */
+export function prospectPhoneConflict(error: unknown): ProspectPhoneConflict | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  const body = error.body as Partial<components['schemas']['ProspectConflictDto']> | null;
+  if (typeof body !== 'object' || body === null) return null;
+  if (body.code !== 'PROSPECT_PHONE_CONFLICT' || body.existing === undefined) return null;
+  return body.existing;
 }
 
 export async function updateProspect(

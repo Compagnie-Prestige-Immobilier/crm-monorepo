@@ -94,7 +94,7 @@ function required<T>(value: T | undefined, what: string): T {
   return value;
 }
 
-async function adminApi(): Promise<APIRequestContext> {
+export async function adminApi(): Promise<APIRequestContext> {
   return request.newContext({ baseURL: WEB_URL, storageState: ADMIN_STORAGE_STATE });
 }
 

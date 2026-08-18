@@ -2,7 +2,7 @@ import { segmentWhere } from '@crm/database';
 import type { Prisma } from '@crm/database';
 
 import type { AuthenticatedUser } from './decorators/current-user.decorator.js';
-import { isAdmin, ownerScope } from './scope.js';
+import { isAdmin, readScope, readsEveryone } from './scope.js';
 import { tryNormalizePhone } from './phone.js';
 import type { ProspectFilterDto } from './dto/prospect-filter.dto.js';
 import { demoScope } from '../prisma/demo-visibility.js';
@@ -14,12 +14,12 @@ export function buildProspectWhere(
   demoEnabled: boolean,
 ): Prisma.ProspectWhereInput {
   const where: Prisma.ProspectWhereInput = {
-    ...ownerScope(user),
+    ...readScope(user),
     ...demoScope(demoEnabled),
   };
 
   if (filter.commercialId) {
-    where.createdById = isAdmin(user)
+    where.createdById = readsEveryone(user)
       ? filter.commercialId
       : filter.commercialId === user.id
         ? user.id
@@ -48,8 +48,15 @@ export function buildProspectWhere(
 
   if (filter.segment) and.push(segmentWhere(filter.segment));
 
-  if (filter.campaignId) {
-    and.push({ callTasks: { some: { campaignId: filter.campaignId } } });
+  if (filter.campaignId ?? filter.assignedToId) {
+    and.push({
+      callTasks: {
+        some: {
+          ...(filter.campaignId ? { campaignId: filter.campaignId } : {}),
+          ...(filter.assignedToId ? { assignedToId: filter.assignedToId } : {}),
+        },
+      },
+    });
   }
 
   if (and.length) where.AND = and;

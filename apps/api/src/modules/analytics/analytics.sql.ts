@@ -1,7 +1,7 @@
 import { ALL_SEGMENTS, CBAO_SHORT_NAME, CHUES_SIGLE, Prisma, segmentAxes } from '@crm/database';
 import type { BddSegment } from '@crm/database';
 
-import { isAdmin } from '../../common/scope.js';
+import { isAdmin, readsEveryone } from '../../common/scope.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
@@ -15,7 +15,7 @@ export function prospectConditions(
 ): Prisma.Sql {
   const conditions: Prisma.Sql[] = [];
 
-  if (!isAdmin(user)) {
+  if (!readsEveryone(user)) {
     conditions.push(Prisma.sql`p."createdById" = ${user.id}`);
   }
 
@@ -24,7 +24,7 @@ export function prospectConditions(
   }
 
   if (filter.commercialId) {
-    const target = isAdmin(user)
+    const target = readsEveryone(user)
       ? filter.commercialId
       : filter.commercialId === user.id
         ? user.id
@@ -61,13 +61,20 @@ export function prospectConditions(
     conditions.push(Prisma.sql`p."enrollmentCapturedById" = ${filter.enrollmentCapturedById}`);
   }
   if (filter.segment) conditions.push(segmentCondition(filter.segment));
-  if (filter.campaignId) {
+  if (filter.campaignId ?? filter.assignedToId) {
+    const campagne = filter.campaignId
+      ? Prisma.sql`AND ct."campaignId" = ${filter.campaignId}`
+      : Prisma.empty;
+    const attribuee = filter.assignedToId
+      ? Prisma.sql`AND ct."assignedToId" = ${filter.assignedToId}`
+      : Prisma.empty;
     // `call_tasks` porte son propre `isDemo` : le `p."isDemo"` posé plus haut ne le couvre pas.
     conditions.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "call_tasks" ct
         WHERE ct."prospectId" = p."id"
-          AND ct."campaignId" = ${filter.campaignId}
+          ${campagne}
+          ${attribuee}
           AND ${demoScopeOn(TASK, demoEnabled)}
       )`,
     );

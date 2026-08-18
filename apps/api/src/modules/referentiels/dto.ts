@@ -2,17 +2,20 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
+  Max,
   MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
 
 import { queryBoolean } from '../../common/dto/query-boolean.js';
+import { CALL_OUTCOME_EFFECT_VALUES, type CallOutcomeEffect } from './call-outcome-rules.js';
 
 export class RegionDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -173,3 +176,162 @@ export class CreateDepartementDto {
 }
 
 export class UpdateDepartementDto extends PartialType(CreateDepartementDto) {}
+
+export class CallOutcomeReasonDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+
+  @ApiProperty({
+    description: 'Code stable, jamais modifiable : les tentatives déjà remontées le référencent.',
+  })
+  code!: string;
+
+  @ApiProperty() label!: string;
+
+  @ApiProperty({ enum: CALL_OUTCOME_EFFECT_VALUES, enumName: 'CallOutcomeEffect' })
+  effect!: CallOutcomeEffect;
+
+  @ApiProperty({ type: Boolean }) requiresComment!: boolean;
+  @ApiProperty({ type: Boolean }) requiresCallback!: boolean;
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'Compte pour un appel joignable dans le taux de joignabilité.',
+  })
+  countsAsReached!: boolean;
+
+  @ApiProperty({ type: Boolean }) isActive!: boolean;
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'Motif système : porte une règle compilée, ni désactivable ni reconfigurable.',
+  })
+  isSystem!: boolean;
+
+  @ApiProperty({ type: Number }) sortOrder!: number;
+  @ApiProperty({ type: String, nullable: true }) color!: string | null;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Version de charge utile minimale du client. Un téléphone plus ancien ne reçoit pas ce motif : il ne saurait pas l’émettre.',
+  })
+  minPayloadVersion!: number;
+
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
+export class CallOutcomeReasonListDto {
+  @ApiProperty({ type: () => [CallOutcomeReasonDto] }) items!: CallOutcomeReasonDto[];
+}
+
+export class FieldVocabularyQueryDto {
+  @ApiProperty({
+    type: Number,
+    minimum: 1,
+    maximum: 1_000,
+    description: 'Version de charge utile du client appelant. Obligatoire.',
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1_000)
+  payloadVersion!: number;
+}
+
+export class CreateCallOutcomeReasonDto {
+  @ApiProperty({ maxLength: 40, pattern: '^[A-Z][A-Z0-9_]*$' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(40)
+  @Matches(/^[A-Z][A-Z0-9_]*$/u, {
+    message: 'code doit être en majuscules, chiffres et tirets bas.',
+  })
+  code!: string;
+
+  @ApiProperty({ maxLength: 80 })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  label!: string;
+
+  @ApiProperty({ enum: CALL_OUTCOME_EFFECT_VALUES, enumName: 'CallOutcomeEffect' })
+  @IsIn(CALL_OUTCOME_EFFECT_VALUES)
+  effect!: CallOutcomeEffect;
+
+  @ApiPropertyOptional({ type: Boolean, default: false })
+  @IsOptional()
+  @IsBoolean()
+  requiresComment?: boolean;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    default: false,
+    description: 'Réservé à l’effet SCHEDULE_CALLBACK.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  requiresCallback?: boolean;
+
+  @ApiPropertyOptional({ type: Boolean, default: true })
+  @IsOptional()
+  @IsBoolean()
+  countsAsReached?: boolean;
+
+  @ApiPropertyOptional({ type: String, maxLength: 40, description: 'Rôle du design system.' })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(40)
+  color?: string;
+
+  @ApiPropertyOptional({ type: Number, default: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+}
+
+export class UpdateCallOutcomeReasonDto {
+  @ApiPropertyOptional({ maxLength: 80 })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  label?: string;
+
+  @ApiPropertyOptional({ type: String, maxLength: 40 })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(40)
+  color?: string;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiPropertyOptional({ type: Boolean })
+  @IsOptional()
+  @IsBoolean()
+  requiresComment?: boolean;
+
+  @ApiPropertyOptional({ type: Boolean })
+  @IsOptional()
+  @IsBoolean()
+  requiresCallback?: boolean;
+
+  @ApiPropertyOptional({ type: Boolean })
+  @IsOptional()
+  @IsBoolean()
+  countsAsReached?: boolean;
+}
+
+export class SetCallOutcomeReasonActiveDto {
+  @ApiProperty({ type: Boolean })
+  @IsBoolean()
+  isActive!: boolean;
+}

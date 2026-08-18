@@ -17,6 +17,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchReferenceData } from '@/lib/data/reference';
 import {
@@ -27,40 +34,64 @@ import {
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import {
+  REPRESENTANT_RELATION_LABELS,
+  REPRESENTANT_RELATIONS,
+  type RepresentantRelation,
+} from '@/lib/representant-filters';
 import type { RepresentantRow } from '@/lib/types';
+
+const RELATION_ITEMS = REPRESENTANT_RELATIONS.map((relation) => ({
+  value: relation,
+  label: REPRESENTANT_RELATION_LABELS[relation],
+}));
+
+export interface RepresentantPrefill {
+  fullName: string;
+  phone: string;
+  notes: string;
+}
 
 export function RepresentantFormDialog({
   open,
   onOpenChange,
   representant,
+  prefill = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   representant: RepresentantRow | null;
+  /** Amorce d'une création : un numéro suggéré par un représentant. */
+  prefill?: RepresentantPrefill | null;
 }) {
   const queryClient = useQueryClient();
   const nameId = useId();
   const phoneId = useId();
   const notesId = useId();
+  const relationId = useId();
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [regionDraft, setRegionDraft] = useState<string | null>(null);
   const [departementId, setDepartementId] = useState<string | null>(null);
   const [iefId, setIefId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
+  const [relationStatus, setRelationStatus] = useState<RepresentantRelation>('INCONNU');
   const [conflict, setConflict] = useState<{ label: string; owner: string | null } | null>(null);
 
   const isEdit = representant !== null;
 
   useEffect(() => {
     if (!open) return;
-    setFullName(representant?.fullName ?? '');
-    setPhone(representant === null ? '' : formatPhone(representant.phoneE164));
+    setFullName(representant?.fullName ?? prefill?.fullName ?? '');
+    setPhone(representant === null ? (prefill?.phone ?? '') : formatPhone(representant.phoneE164));
+    setRegionDraft(null);
     setDepartementId(representant?.departementId ?? null);
     setIefId(representant?.iefId ?? null);
-    setNotes(representant?.notes ?? '');
+    setNotes(representant?.notes ?? prefill?.notes ?? '');
+    setRelationStatus(representant?.relationStatus ?? 'INCONNU');
     setConflict(null);
-  }, [open, representant]);
+  }, [open, representant, prefill]);
 
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,
@@ -68,6 +99,10 @@ export function RepresentantFormDialog({
     staleTime: 5 * 60_000,
     enabled: open,
   });
+
+  const departements = reference?.departements ?? [];
+  const regionId =
+    departements.find((departement) => departement.id === departementId)?.regionId ?? regionDraft;
 
   const checkPhone = useMutation({
     mutationFn: (value: string) => lookupRepresentantByPhone(value),
@@ -102,6 +137,9 @@ export function RepresentantFormDialog({
           notes: notes.trim(),
         };
         if (iefId !== null) patch.iefId = iefId;
+        // Un statut inchangé n'est PAS renvoyé : le serveur le refuserait sans
+        // rien écrire, et l'écran laisserait croire à une bascule historisée.
+        if (relationStatus !== representant.relationStatus) patch.relationStatus = relationStatus;
         return updateRepresentant(representant.id, patch);
       }
 
@@ -213,13 +251,30 @@ export function RepresentantFormDialog({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <FilterCombobox
+              label="Région"
+              placeholder="Toutes les régions"
+              value={regionId}
+              options={(reference?.regions ?? []).map((region) => ({
+                value: region.id,
+                label: region.name,
+              }))}
+              onChange={(value) => {
+                setRegionDraft(value);
+                setDepartementId(null);
+                setIefId(null);
+              }}
+            />
+            <FilterCombobox
               label="Département"
               placeholder="Choisir un département"
               value={departementId}
-              options={(reference?.departements ?? []).map((departement) => ({
-                value: departement.id,
-                label: departement.name,
-              }))}
+              options={departements
+                .filter((departement) => regionId === null || departement.regionId === regionId)
+                .map((departement) => ({
+                  value: departement.id,
+                  label: departement.name,
+                  hint: departement.regionName,
+                }))}
               onChange={(value) => {
                 setDepartementId(value);
                 setIefId(null);
@@ -245,6 +300,34 @@ export function RepresentantFormDialog({
             L’IEF est facultative : les fiches saisies avant l’arrivée de ce référentiel n’en
             portent pas, et l’exiger les invaliderait rétroactivement.
           </p>
+
+          {isEdit ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={relationId}>Relation</Label>
+              <Select
+                items={RELATION_ITEMS}
+                value={relationStatus}
+                onValueChange={(value) => {
+                  if (value === null) return;
+                  setRelationStatus(value);
+                }}
+              >
+                <SelectTrigger id={relationId} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RELATION_ITEMS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[0.75rem] text-muted-foreground">
+                Chaque changement est daté et signé dans l’histoire de la fiche.
+              </p>
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={notesId}>Notes</Label>

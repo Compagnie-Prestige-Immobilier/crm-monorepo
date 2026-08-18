@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import { PURGE_DOMAIN_KEYS } from './purge-plan.js';
 import { PurgeService } from './purge.service.js';
 
 const FIRST_ADMIN = { id: 'admin-1', email: 'direction@cpi.sn', username: 'direction' };
@@ -193,14 +194,14 @@ describe('PurgeService, exécution', () => {
   it('ne vise jamais les comptes administrateurs', async () => {
     const { prisma, trace } = makePrisma();
     await new PurgeService(prisma).purge(actor(), {
-      domains: ['teleconseillers', 'finances'],
+      domains: ['teleconseillers', 'finances', 'supervision'],
       confirmation: 'direction',
     });
 
     const roles = trace.deletes
       .filter((call) => call.model === 'user')
       .map((call) => (call.args as { where: { role: Role } }).where.role);
-    expect(roles).toEqual([Role.COMMERCIAL, Role.BANQUE_FINANCE]);
+    expect(roles).toEqual([Role.COMMERCIAL, Role.BANQUE_FINANCE, Role.SUPERVISEUR]);
     expect(roles).not.toContain(Role.ADMIN);
   });
 
@@ -251,5 +252,26 @@ describe('PurgeService, exécution', () => {
     expect(result.deleted).toEqual([{ key: 'dossiers', label: 'Dossiers bancaires', rows: 10 }]);
     expect(result.total).toBe(10);
     expect(Number.isNaN(Date.parse(result.purgedAt))).toBe(false);
+  });
+});
+
+describe('aucun rôle n’échappe à la purge des comptes', () => {
+  it('chaque rôle non-ADMIN est emporté par un domaine', async () => {
+    const { prisma, trace } = makePrisma();
+    await new PurgeService(prisma).purge(actor(), {
+      domains: [...PURGE_DOMAIN_KEYS],
+      confirmation: 'direction',
+    });
+
+    const roles = new Set(
+      trace.deletes
+        .filter((call) => call.model === 'user')
+        .map((call) => (call.args as { where: { role: Role } }).where.role),
+    );
+
+    for (const role of Object.values(Role)) {
+      if (role === Role.ADMIN) continue;
+      expect(roles, `les comptes ${role} survivraient à une purge totale`).toContain(role);
+    }
   });
 });

@@ -69,14 +69,17 @@ export class Phase2Controller {
   }
 
   @Get('campaigns')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'listCallCampaigns',
     summary: 'Liste des campagnes, avec l’avancement de chacune.',
   })
   @ApiResponse({ status: 200, type: CampaignListDto })
-  listCampaigns(@Query() query: CampaignQueryDto): Promise<CampaignListDto> {
-    return this.campaigns.list(query);
+  listCampaigns(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: CampaignQueryDto,
+  ): Promise<CampaignListDto> {
+    return this.campaigns.list(user, query);
   }
 
   @Post('campaigns')
@@ -110,7 +113,7 @@ export class Phase2Controller {
   }
 
   @Get('campaigns/:id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'getCallCampaign',
     summary: 'Détail d’une campagne, ventilé par commercial.',
@@ -139,7 +142,7 @@ export class Phase2Controller {
   }
 
   @Get('campaigns/:id/commerciaux/:userId/programme.pdf')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiProduces(PDF_MIME)
   @ApiOperation({
     operationId: 'downloadCallProgrammePdf',

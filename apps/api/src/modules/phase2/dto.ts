@@ -373,6 +373,18 @@ export class CallAttemptOpDto {
   })
   @IsISO8601()
   clientCreatedAt!: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    description:
+      'Date du rappel promis. Obligatoire si et seulement si outcome vaut CALLBACK, et ' +
+      'postérieure à clientCreatedAt. Une version ancienne de l’application ne l’envoie pas : ' +
+      'son absence sur les autres issues reste valide indéfiniment.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  callbackAt?: string;
 }
 
 export class ProspectPhase2StateDto {

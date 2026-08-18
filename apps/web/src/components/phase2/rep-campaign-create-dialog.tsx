@@ -51,6 +51,7 @@ export function RepCampaignCreateDialog({
 
   const [step, setStep] = useState<Step>('saisie');
   const [name, setName] = useState('');
+  const [regionDraft, setRegionDraft] = useState<string | null>(null);
   const [departementId, setDepartementId] = useState<string | null>(null);
   const [iefId, setIefId] = useState<string | null>(null);
   const [onlyWithoutProspects, setOnlyWithoutProspects] = useState(false);
@@ -65,6 +66,9 @@ export function RepCampaignCreateDialog({
   });
 
   const commerciaux: readonly FilterOption[] = reference.data?.commerciaux ?? [];
+  const departements = reference.data?.departements ?? [];
+  const regionId =
+    departements.find((departement) => departement.id === departementId)?.regionId ?? regionDraft;
 
   const scope: RepCampaignScope = { departementId, iefId, onlyWithoutProspects };
 
@@ -109,6 +113,7 @@ export function RepCampaignCreateDialog({
   function reset(): void {
     setStep('saisie');
     setName('');
+    setRegionDraft(null);
     setDepartementId(null);
     setIefId(null);
     setOnlyWithoutProspects(false);
@@ -176,15 +181,32 @@ export function RepCampaignCreateDialog({
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <FilterCombobox
+                label="Région"
+                placeholder="Toutes les régions"
+                value={regionId}
+                options={(reference.data?.regions ?? []).map((region) => ({
+                  value: region.id,
+                  label: region.name,
+                }))}
+                onChange={(value) => {
+                  setRegionDraft(value);
+                  setDepartementId(null);
+                  setIefId(null);
+                }}
+              />
               <FilterCombobox
                 label="Département"
                 placeholder="Tous les départements"
                 value={departementId}
-                options={(reference.data?.departements ?? []).map((departement) => ({
-                  value: departement.id,
-                  label: departement.name,
-                }))}
+                options={departements
+                  .filter((departement) => regionId === null || departement.regionId === regionId)
+                  .map((departement) => ({
+                    value: departement.id,
+                    label: departement.name,
+                    hint: departement.regionName,
+                  }))}
                 onChange={(value) => {
                   setDepartementId(value);
                   setIefId(null);

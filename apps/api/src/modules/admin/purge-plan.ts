@@ -4,9 +4,15 @@ export const PURGE_STEP_ORDER = [
   'bankCaseTransitions',
   'bankCases',
   'callAttempts',
+  // Avant `callTasks`, `campaigns` et surtout `commercialAccounts` : un rappel
+  // planifié pointe son téléconseiller en Restrict, et son prospect en cascade.
+  'scheduledCallbacks',
   'callTasks',
   'campaignMembers',
   'campaigns',
+  // Avant `repCallAttempts` : la suggestion pend de la tentative en CASCADE, et
+  // partirait sans figurer au rapport rendu a l'administrateur.
+  'repSuggestions',
   'repCallAttempts',
   'repCallTasks',
   'repCampaignMembers',
@@ -22,8 +28,10 @@ export const PURGE_STEP_ORDER = [
   'auditLogs',
   'commercialAccounts',
   'financeAccounts',
+  'supervisionAccounts',
   'bankCaseStages',
   'bankRejectionReasons',
+  'callOutcomeReasons',
   'banques',
   'syndicats',
   'iefs',
@@ -36,6 +44,7 @@ export type PurgeStepKey = (typeof PURGE_STEP_ORDER)[number];
 export const PURGE_DOMAIN_KEYS = [
   'teleconseillers',
   'finances',
+  'supervision',
   'representants',
   'prospects',
   'campagnes',
@@ -80,8 +89,8 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
   {
     key: 'fileAppels',
     label: 'File d’appels',
-    hint: 'Numéros attribués, appelés ou non.',
-    steps: ['callTasks'],
+    hint: 'Numéros attribués, appelés ou non, et les rappels planifiés.',
+    steps: ['scheduledCallbacks', 'callTasks'],
     requires: [],
   },
   {
@@ -94,8 +103,14 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
   {
     key: 'campagnesRepresentants',
     label: 'Campagnes d’appels aux représentants',
-    hint: 'Campagnes de relance, leur file d’appels et les tentatives enregistrées.',
-    steps: ['repCallAttempts', 'repCallTasks', 'repCampaignMembers', 'repCampaigns'],
+    hint: 'Campagnes de relance, leur file d’appels, les tentatives enregistrées et les numéros suggérés.',
+    steps: [
+      'repSuggestions',
+      'repCallAttempts',
+      'repCallTasks',
+      'repCampaignMembers',
+      'repCampaigns',
+    ],
     requires: [],
   },
   {
@@ -165,12 +180,21 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     requires: ['dossiers', 'demandesClients'],
   },
   {
+    // Aucun `requires` : un superviseur lit, il ne possède aucune ligne.
+    key: 'supervision',
+    label: 'Comptes supervision',
+    hint: 'Comptes qui suivent le travail des téléconseillers.',
+    steps: ['supervisionAccounts'],
+    requires: [],
+  },
+  {
     key: 'referentiels',
     label: 'Référentiels',
-    hint: 'Régions, départements, IEF, banques, syndicats, étapes et motifs de rejet.',
+    hint: 'Régions, départements, IEF, banques, syndicats, étapes, motifs de rejet et issues d’appel.',
     steps: [
       'bankCaseStages',
       'bankRejectionReasons',
+      'callOutcomeReasons',
       'banques',
       'syndicats',
       'iefs',

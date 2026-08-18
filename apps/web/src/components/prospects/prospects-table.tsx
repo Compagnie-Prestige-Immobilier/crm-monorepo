@@ -56,7 +56,13 @@ function isSortField(id: string): id is ProspectSortField {
   return (PROSPECT_SORT_FIELDS as readonly string[]).includes(id);
 }
 
-export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
+export function ProspectsTable({
+  canAdminister,
+  readOnly = false,
+}: {
+  canAdminister: boolean;
+  readOnly?: boolean;
+}) {
   const { filters, setFilters } = useProspectFilters();
   const queryClient = useQueryClient();
 
@@ -87,13 +93,14 @@ export function ProspectsTable({ canAdminister }: { canAdminister: boolean }) {
   const columns = useMemo(
     () =>
       prospectColumns({
-        canAdminister,
+        canAdminister: canAdminister && !readOnly,
+        readOnly,
         onEdit: setEditing,
         onMerge: setMerging,
         onReassign: setReassigning,
         onDelete: setDeleting,
       }),
-    [canAdminister],
+    [canAdminister, readOnly],
   );
 
   const table = useReactTable({

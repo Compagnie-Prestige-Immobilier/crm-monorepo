@@ -162,6 +162,16 @@ export class SyncEntityDataDto {
   @IsString()
   @MaxLength(2000)
   comment?: string;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description:
+      'Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut ' +
+      'CALLBACK. Une version ancienne de l’application ne l’envoie pas.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  callbackAt?: string;
 }
 
 export class SyncOperationDto {
@@ -288,6 +298,30 @@ export class SyncPushDto {
   @ValidateNested({ each: true })
   @Type(() => SyncOperationDto)
   operations!: SyncOperationDto[];
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 0,
+    description:
+      'Opérations restant dans la file d’attente de l’appareil APRÈS ce lot. ' +
+      'Le serveur ne peut pas la deviner. Facultatif sans limite de temps : une ' +
+      'version déjà déployée ne l’envoie pas.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  pendingOps?: number;
+
+  @ApiPropertyOptional({
+    maxLength: 32,
+    description: 'Version de l’application mobile, telle qu’elle s’annonce. Facultative.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  appVersion?: string;
 }
 
 export class SyncOperationResultDto {
@@ -349,6 +383,29 @@ export class SyncPullQueryDto {
   @Min(1)
   @Max(1_000)
   limit?: number;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 0,
+    description:
+      'Opérations en attente de remontée dans l’appareil. Le serveur ne peut pas ' +
+      'la deviner. Facultatif sans limite de temps.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  pendingOps?: number;
+
+  @ApiPropertyOptional({
+    maxLength: 32,
+    description: 'Version de l’application mobile, telle qu’elle s’annonce. Facultative.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  appVersion?: string;
 }
 
 export class SyncChangesDto {

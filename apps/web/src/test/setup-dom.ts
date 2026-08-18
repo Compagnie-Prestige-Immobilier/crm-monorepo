@@ -40,3 +40,9 @@ if (!('ResizeObserver' in globalThis)) {
     disconnect(): void {}
   };
 }
+
+if (typeof Element.prototype.scrollIntoView !== 'function') {
+  // jsdom ne l'implemente pas, et cmdk fait defiler l'option active a chaque rendu:
+  // sans lui la liste de FilterCombobox ne peut pas s'ouvrir.
+  Element.prototype.scrollIntoView = (): void => {};
+}

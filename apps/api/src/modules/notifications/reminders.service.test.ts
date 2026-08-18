@@ -14,23 +14,30 @@ import {
   periodFor,
   remindersCron,
 } from './reminders.service.js';
-import { FakeBrevoTransport, FakePrisma } from './fake-prisma.js';
+import { FakeActivity, FakeBrevoTransport, FakePrisma } from './fake-prisma.js';
 import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const NOW = new Date('2026-08-13T08:00:00Z');
 
 let db: FakePrisma;
 let brevo: FakeBrevoTransport;
+let activite: FakeActivity;
 let reminders: RemindersService;
 
 const restart = (): RemindersService => {
   const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
-  return new RemindersService(db.asService(), notifications, fakeDemoVisibility());
+  return new RemindersService(
+    db.asService(),
+    notifications,
+    fakeDemoVisibility(),
+    activite.asService(),
+  );
 };
 
 beforeEach(() => {
   db = new FakePrisma();
   brevo = new FakeBrevoTransport();
+  activite = new FakeActivity();
   reminders = restart();
 });
 
@@ -435,6 +442,7 @@ describe('expédition des envois programmés', () => {
       db.asService(),
       new NotificationsService(db.asService(), fakeDemoVisibility(), fige),
       fakeDemoVisibility(),
+      activite.asService(),
     );
 
     void moribond.dispatchDue(NOW);
@@ -485,6 +493,7 @@ describe('expédition des envois programmés', () => {
         dispatch: () => new Promise<never>(() => {}),
       } as unknown as NotificationsService,
       fakeDemoVisibility(),
+      activite.asService(),
     );
     void moribond.remindOpenCallTasks(NOW);
     await vi.waitUntil(() => db.notifications.length === 1);
@@ -562,6 +571,7 @@ describe('expédition plus longue que le bail', () => {
             db.asService(),
             new NotificationsService(db.asService(), fakeDemoVisibility(), this),
             fakeDemoVisibility(),
+            activite.asService(),
           ).dispatchDue(APRES_LE_BAIL);
         }
 
@@ -574,7 +584,12 @@ describe('expédition plus longue que le bail', () => {
     })();
 
     const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(), lent);
-    const service = new RemindersService(db.asService(), notifications, fakeDemoVisibility());
+    const service = new RemindersService(
+      db.asService(),
+      notifications,
+      fakeDemoVisibility(),
+      activite.asService(),
+    );
 
     expect(await service.dispatchDue(NOW)).toBe(1);
 
@@ -588,7 +603,12 @@ describe('expédition plus longue que le bail', () => {
 describe('visibilité de démonstration', () => {
   const enDemonstration = (): RemindersService => {
     const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(true), brevo);
-    return new RemindersService(db.asService(), notifications, fakeDemoVisibility(true));
+    return new RemindersService(
+      db.asService(),
+      notifications,
+      fakeDemoVisibility(true),
+      activite.asService(),
+    );
   };
 
   const boiteModeEteint = async (userId: string) => {
@@ -801,6 +821,7 @@ describe('réessai d’un rappel et tick d’échéance qui se croisent', () => 
         db.asService(),
         new NotificationsService(db.asService(), fakeDemoVisibility(), croise),
         fakeDemoVisibility(),
+        activite.asService(),
       );
 
     await passage().remindOpenCallTasks(NOW);
@@ -822,5 +843,180 @@ describe('réessai d’un rappel et tick d’échéance qui se croisent', () => 
     const rappel = db.notifications.find((row) => row.reminderKey?.startsWith('open-call-tasks'));
     expect(rappel?.status).toBe(NotificationStatus.SENT);
     expect(rappel?.dispatchClaim).toBeNull();
+  });
+});
+
+describe('rappel « rappels à passer »', () => {
+  const AUJOURDHUI = new Date('2026-08-13T16:00:00.000Z');
+  const HIER = new Date('2026-08-12T16:00:00.000Z');
+  const DEMAIN = new Date('2026-08-14T09:00:00.000Z');
+
+  beforeEach(() => {
+    db.addUser({ id: 'usr-1', fullName: 'Awa Diop' });
+    db.addUser({ id: 'usr-2', fullName: 'Modou Sarr' });
+  });
+
+  it('compte les rappels du jour de chaque téléconseiller, séparément', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+    db.addScheduledCallback({ assignedToId: 'usr-2', scheduledAt: AUJOURDHUI });
+
+    const run = await reminders.remindDueCallbacks(NOW);
+
+    expect(run.created).toBe(2);
+    expect(db.notifications[0]?.body).toContain('2 rappel(s)');
+    expect(db.notifications[1]?.body).toContain('1 rappel(s)');
+    expect(db.notifications[0]?.route).toBe('/phase2/callbacks');
+  });
+
+  it('un rappel EN RETARD compte dans la relance du jour', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(1);
+    expect(db.notifications[0]?.body).toContain('1 rappel(s)');
+  });
+
+  it('un rappel de demain ne relance personne aujourd’hui', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: DEMAIN });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+  });
+
+  it('un rappel déjà passé ou annulé ne relance plus', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'DONE' });
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'CANCELLED' });
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'SUPERSEDED' });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+  });
+
+  it('ne relance jamais sur une file de démonstration', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI, isDemo: true });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+  });
+
+  it('deux passages le même jour ne donnent qu’une relance', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(1);
+    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
+    expect(db.notifications).toHaveLength(1);
+  });
+
+  it('la clé de rappel lui est propre, elle ne prend pas la place d’une autre', async () => {
+    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI });
+    db.addCallTask({ assignedToId: 'usr-1' });
+
+    await reminders.runAll(NOW);
+
+    const cles = db.deliveries.map((delivery) => delivery.reminderKey);
+    expect(cles).toContain(ReminderKey.DUE_CALLBACKS);
+    expect(cles).toContain(ReminderKey.OPEN_CALL_TASKS);
+  });
+});
+
+describe('compte rendu de fin de journée', () => {
+  const SOIR = new Date('2026-08-13T17:00:00.000Z');
+
+  beforeEach(() => {
+    db.clock = () => SOIR;
+    db.addUser({ id: 'usr-sup', fullName: 'Fatou Ndiaye', role: Role.SUPERVISEUR });
+    db.addUser({ id: 'usr-tc', fullName: 'Awa Diop', role: Role.COMMERCIAL });
+    activite.addTeleconseiller({ id: 'usr-tc', fullName: 'Awa Diop' });
+  });
+
+  it('demande les chiffres de la journée en cours, dans le fuseau métier', async () => {
+    await reminders.sendDailyReport(new Date('2026-08-13T23:30:00.000Z'));
+
+    expect(activite.windows).toEqual([{ from: '2026-08-13', to: '2026-08-13' }]);
+  });
+
+  it('additionne les actes de tous les téléconseillers', async () => {
+    activite.addRow({ teleconseillerId: 'usr-tc', calls: 30, methodObtained: 4, unreachable: 9 });
+    activite.addRow({
+      teleconseillerId: 'usr-2',
+      calls: 12,
+      methodObtained: 1,
+      prospectsCreated: 3,
+    });
+
+    await reminders.sendDailyReport(SOIR);
+
+    const corps = db.notifications[0]?.body ?? '';
+    expect(corps).toContain('42 appel(s)');
+    expect(corps).toContain('5 méthode(s)');
+    expect(corps).toContain('9 NRP');
+    expect(corps).toContain('3 prospect(s)');
+  });
+
+  it('compte les rappels honorés dans la journée et ceux qui traînent', async () => {
+    db.addScheduledCallback({
+      assignedToId: 'usr-tc',
+      scheduledAt: new Date('2026-08-13T10:00:00.000Z'),
+      updatedAt: new Date('2026-08-13T11:00:00.000Z'),
+      status: 'DONE',
+    });
+    // Promis hier, honoré ce matin : c'est la journée de l'ACTE qui compte.
+    db.addScheduledCallback({
+      assignedToId: 'usr-tc',
+      scheduledAt: new Date('2026-08-12T10:00:00.000Z'),
+      updatedAt: new Date('2026-08-13T08:00:00.000Z'),
+      status: 'DONE',
+    });
+    db.addScheduledCallback({
+      assignedToId: 'usr-tc',
+      scheduledAt: new Date('2026-08-12T10:00:00.000Z'),
+      updatedAt: new Date('2026-08-12T11:00:00.000Z'),
+      status: 'DONE',
+    });
+    db.addScheduledCallback({
+      assignedToId: 'usr-tc',
+      scheduledAt: new Date('2026-08-13T09:00:00.000Z'),
+    });
+    db.addScheduledCallback({
+      assignedToId: 'usr-tc',
+      scheduledAt: new Date('2026-08-14T09:00:00.000Z'),
+    });
+
+    await reminders.sendDailyReport(SOIR);
+
+    const corps = db.notifications[0]?.body ?? '';
+    expect(corps).toContain('2 honoré(s)');
+    expect(corps).toContain('1 en retard');
+  });
+
+  it('nomme le téléconseiller qui n’a rien fait de la journée', async () => {
+    activite.addTeleconseiller({ id: 'usr-2', fullName: 'Modou Sarr' });
+    activite.addRow({ teleconseillerId: 'usr-tc', calls: 5 });
+
+    await reminders.sendDailyReport(SOIR);
+
+    const corps = db.notifications[0]?.body ?? '';
+    expect(corps).toContain('Modou Sarr');
+    expect(corps).not.toContain('Awa Diop');
+  });
+
+  it('ne compte pas comme muet un compte désactivé', async () => {
+    activite.addTeleconseiller({ id: 'usr-2', fullName: 'Modou Sarr', isActive: false });
+
+    await reminders.sendDailyReport(SOIR);
+
+    expect(db.notifications[0]?.body).not.toContain('Modou Sarr');
+  });
+
+  it('s’adresse à l’administration et à la supervision, jamais aux téléconseillers', async () => {
+    const run = await reminders.sendDailyReport(SOIR);
+
+    expect(run.created).toBe(2);
+    expect(new Set(db.deliveries.map((row) => row.userId))).toEqual(
+      new Set(['usr-admin', 'usr-sup']),
+    );
+  });
+
+  it('deux passages le même soir ne donnent qu’un compte rendu', async () => {
+    expect((await reminders.sendDailyReport(SOIR)).created).toBe(2);
+    expect((await reminders.sendDailyReport(SOIR)).created).toBe(0);
+    expect(db.notifications).toHaveLength(2);
   });
 });

@@ -72,13 +72,14 @@ export class RepCampaignsController {
     operationId: 'recordRepCallAttempt',
     summary: 'Enregistre un appel passé à un représentant et clôt la tâche si l’issue aboutit.',
     description:
-      'L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie `duplicate` sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base.',
+      'L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie `duplicate` sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base. `suggestedPhone` recueille, dans le même geste, le numéro qu’un représentant qui refuse propose d’appeler à sa place : la réponse dit si ce numéro est déjà une fiche connue.',
   })
   @ApiResponse({ status: 200, type: RepCallAttemptResultDto })
   @ApiResponse({
     status: 400,
     type: ApiErrorDto,
-    description: 'REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED.',
+    description:
+      'REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED · PHONE_INVALID.',
   })
   @ApiResponse({
     status: 404,
@@ -93,6 +94,7 @@ export class RepCampaignsController {
   }
 
   @Get()
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'listRepCampaigns',
     summary: 'Liste des campagnes représentants, avec l’avancement de chacune.',
@@ -131,6 +133,7 @@ export class RepCampaignsController {
   }
 
   @Get(':id')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({
     operationId: 'getRepCampaign',
     summary: 'Détail d’une campagne, ventilé par commercial et par journée.',
@@ -158,6 +161,7 @@ export class RepCampaignsController {
   }
 
   @Get(':id/commerciaux/:userId/programme.pdf')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiProduces(PDF_MIME)
   @ApiOperation({
     operationId: 'downloadRepProgrammePdf',

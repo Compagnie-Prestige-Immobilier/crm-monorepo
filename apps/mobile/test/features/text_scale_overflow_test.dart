@@ -16,9 +16,11 @@ import 'package:cpi_go/features/corrections/presentation/corrections_screen.dart
 import 'package:cpi_go/features/historique/presentation/historique_screen.dart';
 import 'package:cpi_go/features/home/presentation/home_screen.dart';
 import 'package:cpi_go/features/permissions/presentation/battery_help_screen.dart';
+import 'package:cpi_go/features/phase2/presentation/callback_picker.dart';
 import 'package:cpi_go/features/phase2/presentation/phase2_screen.dart';
 import 'package:cpi_go/features/prospect/presentation/prospect_entry_screen.dart';
 import 'package:cpi_go/features/reglages/presentation/reglages_screen.dart';
+import 'package:cpi_go/features/representant/presentation/representant_detail_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_form_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_picker_screen.dart';
 import 'package:flutter/material.dart';
@@ -61,6 +63,36 @@ void main() {
       id: 'repA',
       phone: '+221770000001',
       fullName: 'Mamadou Diallo Ndiaye',
+    );
+
+    // La fiche de représentant dans son état le plus haut : notes multi-lignes,
+    // IEF absente, et un prospect à lister.
+    await insertRepresentant(
+      db,
+      id: 'repFiche',
+      phone: '+221770000002',
+      fullName: 'Abdoulaye Ousseynou Kane Diagne',
+      notes:
+          'Disponible entre midi et quatorze heures, jamais le vendredi '
+          'apres-midi. Passe par le secretariat de l\'inspection.',
+    );
+    await insertProspect(
+      db,
+      id: 'proFiche',
+      representantId: 'repFiche',
+      phone: '+221780000002',
+    );
+    // Le fil dans son état le plus large : une entrée dont le corps ET la ligne
+    // d'auteur passent à la ligne. Un fil vide ne peint que son état vide, et
+    // c'est l'entrée qui porte le risque.
+    await insertComment(
+      db,
+      id: 'comFiche',
+      representantId: 'repFiche',
+      body:
+          'Ne repasse jamais avant la fin des cours. Le secretariat de '
+          'l\'inspection prend les messages entre midi et quatorze heures.',
+      authorName: 'Ndeye Astou Mbengue Sarr',
     );
 
     // Un brouillon vieux d'une heure sur chaque formulaire : entre 60 s et
@@ -192,7 +224,9 @@ void main() {
   ///   MODIFICATION (`?id=`), les listes remplies, les états d'erreur ;
   /// * les modales et feuilles : `_NegativeSheet`, `_Capture`, `_MethodCard`,
   ///   `_AlreadyClosed` de la phase 2, `showOwnershipSheet`, la boîte de
-  ///   déconnexion avec saisies en attente.
+  ///   déconnexion avec saisies en attente. Le choix de l'heure de rappel, lui,
+  ///   est peint directement : ses six puces sont la forme la plus large de la
+  ///   feuille, et elles sont arrivées avec un `Wrap` à prouver.
   ///
   /// Ce sont des formes à risque, pas des oublis anodins : une feuille modale
   /// empile des boutons pleine largeur dans une colonne contrainte, c'est-à-dire
@@ -221,6 +255,17 @@ void main() {
     'Autorisations': BatteryHelpScreen.new,
     'À propos': AboutScreen.new,
     'Choisir un représentant': RepresentantPickerScreen.new,
+    'Fiche représentant': () =>
+        const RepresentantDetailScreen(representantId: 'repFiche'),
+    // Peint à part, comme « Heure de rappel » : le fil est en bas du `ListView`
+    // de la fiche, donc hors des 780 dp peints ici, donc jamais construit. Un
+    // débordement y serait passé sans que rien ne le dise.
+    'Fil de commentaires': () => const Scaffold(
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16),
+        child: RepresentantCommentThread(representantId: 'repFiche'),
+      ),
+    ),
     // ═══ LES DEUX FORMULAIRES SONT DANS LE BALAYAGE, SANS `skip` ═══
     //
     // Ils y sont entrés en portant un débordement réel : « Nouveau
@@ -239,6 +284,15 @@ void main() {
     'Connexion': LoginScreen.new,
     'Premier lancement': OnboardingScreen.new,
     'Notifications': NotificationsScreen.new,
+    // Le contenu de la feuille des issues négatives quand l'issue est
+    // « À rappeler » : six puces de largeurs très inégales, dont
+    // « Cet après-midi (15 h) ».
+    'Heure de rappel': () => Scaffold(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: CallbackPicker(now: t0, onChanged: (DateTime? _) {}),
+      ),
+    ),
     // Version longue et notes multi-lignes : c'est l'état le plus haut de
     // l'écran, et `forceUpdate` retire le bouton « Plus tard », ce qui change
     // la barre d'actions.

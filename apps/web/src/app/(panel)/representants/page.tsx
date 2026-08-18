@@ -19,7 +19,7 @@ export default async function RepresentantsPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  const guard = await guardRoles(['ADMIN']);
+  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="La gestion des représentants" />;
@@ -42,7 +42,10 @@ export default async function RepresentantsPage({
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <RepresentantsView />
+      <RepresentantsView
+        canAdminister={guard.user.role === 'ADMIN'}
+        readOnly={guard.user.role === 'SUPERVISEUR'}
+      />
     </HydrationBoundary>
   );
 }

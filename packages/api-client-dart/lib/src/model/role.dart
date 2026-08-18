@@ -12,6 +12,8 @@ enum Role {
   COMMERCIAL(r'COMMERCIAL'),
   @JsonValue(r'BANQUE_FINANCE')
   BANQUE_FINANCE(r'BANQUE_FINANCE'),
+  @JsonValue(r'SUPERVISEUR')
+  SUPERVISEUR(r'SUPERVISEUR'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

@@ -42,6 +42,17 @@ enum Role {
   ADMIN
   COMMERCIAL
   BANQUE_FINANCE
+  SUPERVISEUR
+}
+
+// Où en est la relation avec un représentant, du point de vue de l'équipe qui
+// l'appelle. Pas un booléen : `false` confondrait « jamais appelé » et « a
+// refusé », or c'est exactement cet écart que le pilotage à sept jours compte.
+enum RepresentantRelation {
+  INCONNU
+  CONTACTE
+  AMBASSADEUR
+  REFUS
 }
 
 // Prospection générale (phase 1). NE PAS confondre avec Phase2Status : les deux
@@ -197,6 +208,7 @@ model User {
   repCampaignMemberships RepCallCampaignCommercial[] @relation("RepCallCampaignCommercial")
   repCallTasksAssigned   RepCallTask[]               @relation("RepCallTaskAssignedTo")
   repCallAttempts        RepCallAttempt[]            @relation("RepCallAttemptPerformedBy")
+  repSuggestions         RepresentantSuggestion[]    @relation("RepresentantSuggestionSuggestedBy")
 
   // Banque & Finance
   bankCasesCreated    BankCase[]           @relation("BankCaseCreatedBy")
@@ -225,13 +237,19 @@ model User {
   /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
+  importJobs     ImportJob[]     @relation("ImportJobRequestedBy")
+  segmentChanges SegmentChange[] @relation("SegmentChangeChangedBy")
+
+  scheduledCallbacks       ScheduledCallback[]          @relation("ScheduledCallbackAssignedTo")
+  representantRelationsSet RepresentantRelationChange[] @relation("RepresentantRelationChangeChangedBy")
+  representantComments     RepresentantComment[]        @relation("RepresentantCommentAuthor")
+
+  heartbeat AgentHeartbeat?
+
   @@index([role, isActive])
   @@index([deletedAt])
   @@index([isDemo])
   @@map("users")
-
-  importJobs     ImportJob[]     @relation("ImportJobRequestedBy")
-  segmentChanges SegmentChange[] @relation("SegmentChangeChangedBy")
 }
 
 // Un refresh token n'est jamais stocké en clair : seul son SHA-256 l'est. Une
@@ -391,13 +409,19 @@ model Representant {
   // sur `clientCreatedAt`.
   clientCreatedAt DateTime
 
+  relationStatus RepresentantRelation @default(INCONNU)
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  prospects       Prospect[]
-  repCallTasks    RepCallTask[]
-  repCallAttempts RepCallAttempt[]
+  prospects           Prospect[]
+  repCallTasks        RepCallTask[]
+  repCallAttempts     RepCallAttempt[]
+  relationChanges     RepresentantRelationChange[]
+  comments            RepresentantComment[]
+  suggestionsGiven    RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
+  suggestionsResolved RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -410,6 +434,7 @@ model Representant {
 
   @@index([phoneE164])
   @@index([createdById])
+  @@index([createdById, clientCreatedAt])
   @@index([departementId])
   // Le périmètre d'une campagne de représentants se borne par IEF : sans cet
   // index, le tirage parcourt séquentiellement toute la table à chaque aperçu.
@@ -417,6 +442,8 @@ model Representant {
   // Index de pagination du pull delta : keyset sur (updatedAt, id).
   @@index([updatedAt, id])
   @@index([deletedAt])
+  @@index([relationStatus])
+  @@index([relationStatus, departementId])
   @@index([isDemo])
   @@map("representants")
 }
@@ -489,10 +516,13 @@ model Prospect {
   /// export réel : elle est invisible dès que le mode est éteint.
   isDemo Boolean @default(false)
 
-  callTasks      CallTask[]
-  callAttempts   CallAttempt[]
-  bankCases      BankCase[]
-  clientRequests ClientCreationRequest[]
+  callTasks          CallTask[]
+  callAttempts       CallAttempt[]
+  scheduledCallbacks ScheduledCallback[]
+  bankCases          BankCase[]
+  clientRequests     ClientCreationRequest[]
+
+  segmentChanges SegmentChange[]
 
   @@index([phoneE164])
   @@index([representantId])
@@ -501,6 +531,8 @@ model Prospect {
   // un index complet porterait les centaines de milliers de lignes sans
   // provenance pour ne jamais servir. Voir `prospects_origin_idx`.
   @@index([createdById])
+  // Activite d'un teleconseiller sur une journee de travail, saisie terrain.
+  @@index([createdById, clientCreatedAt])
   @@index([banqueId])
   @@index([syndicatId])
   @@index([statut])
@@ -515,8 +547,6 @@ model Prospect {
   @@index([enrollmentMethod])
   @@index([isDemo])
   @@map("prospects")
-
-  segmentChanges SegmentChange[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -592,6 +622,30 @@ model SyncOperation {
   @@map("sync_operations")
 }
 
+/// Dernier échange d'un appareil avec le serveur, UNE ligne par compte.
+///
+/// La colonne équivalente sur `users` a été refusée : une écriture par requête
+/// sur la table la plus lue du produit. Une table étroite, sans index
+/// secondaire ni relation entrante, n'a pas ce défaut.
+///
+/// `pendingOps` vient du CLIENT et de nulle part ailleurs : le serveur ne voit
+/// que ce qui lui est remonté, jamais ce qui attend dans l'outbox du téléphone.
+model AgentHeartbeat {
+  userId String @id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lastPullAt DateTime?
+  lastPushAt DateTime?
+  /// NULLABLE et sans valeur par défaut : un appareil qui ne l'annonce pas
+  /// laisse « inconnu », et non « zéro en attente », qui serait un fait faux.
+  pendingOps Int?
+  appVersion String?
+
+  updatedAt DateTime @updatedAt
+
+  @@map("agent_heartbeats")
+}
+
 model AuditLog {
   id       String   @id @default(uuid(7))
   userId   String?
@@ -644,6 +698,7 @@ model CallCampaign {
   commerciaux CallCampaignCommercial[]
   tasks       CallTask[]
   attempts    CallAttempt[]
+  callbacks   ScheduledCallback[]
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -708,7 +763,8 @@ model CallTask {
   updatedAt   DateTime  @updatedAt
   completedAt DateTime?
 
-  attempts CallAttempt[]
+  attempts  CallAttempt[]
+  callbacks ScheduledCallback[]
 
   /// Ligne appartenant au jeu de démonstration.
   ///
@@ -722,6 +778,7 @@ model CallTask {
   @@unique([campaignId, prospectId])
   @@unique([campaignId, assignedToId, position])
   @@index([assignedToId, status])
+  @@index([assignedToId, completedAt])
   @@index([prospectId])
   // Le PDF « jour N » d'un commercial lit exactement cette clé.
   @@index([campaignId, assignedToId, dayIndex])
@@ -767,9 +824,77 @@ model CallAttempt {
 
   @@index([prospectId, createdAt])
   @@index([performedById, createdAt])
+  // La journee de travail se lit sur `clientCreatedAt`, l'heure de l'appel.
+  @@index([performedById, clientCreatedAt])
   @@index([campaignId])
   @@index([isDemo])
   @@map("call_attempts")
+}
+
+// Un rappel promis, avec sa date. `CallOutcome.CALLBACK` existait sans qu'aucune
+// date ne soit stockée nulle part : personne ne pouvait savoir quand, donc
+// personne ne saurait jamais si le rappel a eu lieu.
+//
+// Table dédiée, et non une colonne. Sur `CallTask`, la date serait perdue dès
+// qu'un appel se fait hors campagne depuis l'annuaire, et effacée à la clôture
+// de campagne qui passe les tâches à CANCELLED. Sur `Prospect`, deux campagnes
+// et deux téléconseillers se partageraient une seule date, ce que l'index
+// `call_tasks_one_active_per_prospect` existe précisément pour empêcher.
+//
+// Le retard est DÉRIVÉ (`status = 'PENDING' AND scheduledAt < now()`), jamais
+// stocké : un `missedAt` obligerait un cron à réécrire des millions de lignes
+// pour une information calculable.
+model ScheduledCallback {
+  id         String        @id @default(uuid(7))
+  prospectId String
+  prospect   Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  taskId     String?
+  task       CallTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  campaignId String?
+  campaign   CallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  // Le `performedById` de la tentative source, pas l'assigné de la tâche : c'est
+  // celui qui a promis le rappel qui le doit.
+  assignedToId String
+  assignedTo   User   @relation("ScheduledCallbackAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+
+  // Stocké en UTC, saisi en Africa/Dakar.
+  scheduledAt DateTime
+  comment     String?
+
+  /// Une tentative produit AU PLUS un rappel : l'unicité rend le rejeu d'une
+  /// même tentative sans effet, sans compter les lignes au préalable.
+  sourceAttemptId String @unique
+
+  status          ScheduledCallbackStatus @default(PENDING)
+  closedAttemptId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel : elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
+  /// La file du jour d'un téléconseiller, relue à chaque ouverture de l'écran.
+  @@index([assignedToId, status, scheduledAt])
+  @@index([prospectId, status])
+  /// Les rappels dus toutes files confondues, pour la supervision.
+  @@index([scheduledAt, status])
+  @@index([isDemo])
+  @@map("scheduled_callbacks")
+}
+
+enum ScheduledCallbackStatus {
+  PENDING
+  DONE
+  CANCELLED
+  SUPERSEDED
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -905,8 +1030,11 @@ model RepCallAttempt {
   /// Ligne appartenant au jeu de démonstration. Voir `User.isDemo`.
   isDemo Boolean @default(false)
 
+  suggestion RepresentantSuggestion?
+
   @@index([representantId, createdAt])
   @@index([performedById, createdAt])
+  @@index([performedById, clientCreatedAt])
   @@index([campaignId])
   @@index([isDemo])
   @@map("rep_call_attempts")
@@ -1621,4 +1749,172 @@ model SegmentChange {
   @@index([changedById, changedAt])
   @@index([isDemo])
   @@map("segment_changes")
+}
+
+// Devenir ambassadeur est le métier : `Representant.relationStatus` ne dit que
+// l'état d'aujourd'hui, et l'écraser efface la date à laquelle un représentant a
+// basculé, et par qui. Sans cette table, « combien d'ambassadeurs gagnés cette
+// semaine, et par qui » n'a pas de réponse, et n'en aura jamais rétroactivement.
+model RepresentantRelationChange {
+  id             String       @id @default(uuid(7))
+  representantId String
+  representant   Representant @relation(fields: [representantId], references: [id], onDelete: Cascade)
+
+  /// Stockés et non recalculés : la règle de classement peut évoluer, l'histoire
+  /// non.
+  fromStatus RepresentantRelation
+  toStatus   RepresentantRelation
+
+  /// Pourquoi, en clair. Un refus se justifie, une promotion en ambassadeur aussi.
+  reason String?
+
+  changedById String
+  changedBy   User         @relation("RepresentantRelationChangeChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  source      ChangeSource
+
+  changedAt DateTime @default(now())
+  isDemo    Boolean  @default(false)
+
+  @@index([representantId, changedAt])
+  /// « Combien de bascules vers AMBASSADEUR sur la période. »
+  @@index([toStatus, changedAt])
+  /// Attribution : qui a converti qui.
+  @@index([changedById, changedAt])
+  @@index([isDemo])
+  @@map("representant_relation_changes")
+}
+
+/// Fil de commentaires d'une fiche, en AJOUT SEUL : ni `rev` ni edition, donc
+/// deux teleconseillers hors ligne produisent deux lignes, jamais un conflit a
+/// arbitrer. `Representant.notes` reste le champ libre, sans auteur ni date.
+model RepresentantComment {
+  /// UUID v7 engendre par le client : sert aussi de cle d'idempotence.
+  id             String       @id
+  representantId String
+  representant   Representant @relation(fields: [representantId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("RepresentantCommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  body String
+
+  clientCreatedAt DateTime
+  createdAt       DateTime  @default(now())
+  /// Suppression douce, reservee a l'administration.
+  deletedAt       DateTime?
+
+  /// Ligne appartenant au jeu de démonstration. Voir `User.isDemo`.
+  isDemo Boolean @default(false)
+
+  @@index([representantId, clientCreatedAt])
+  @@index([authorId, createdAt])
+  @@index([isDemo])
+  @@map("representant_comments")
+}
+
+/// Un representant qui refuse peut nommer un collegue a appeler a sa place.
+///
+/// Table dediee et surtout PAS une fiche `Representant` : `phoneE164` y porte un
+/// index unique PARTIEL, si bien qu'une fiche « suggeree » reserverait le numero.
+/// Le teleconseiller qui rencontrerait un jour cette personne pour de vrai
+/// recevrait REPRESENTANT_PHONE_CONFLICT, et la fusion automatique du mobile ne
+/// se declenche que sur une fiche qui lui appartient deja : le conflit serait
+/// definitif, sans geste capable de le resoudre. `Representant.departementId`
+/// est en outre NOT NULL, qu'il faudrait inventer pour un contact dont on ne
+/// connait que le numero.
+model RepresentantSuggestion {
+  id String @id @default(uuid(7))
+
+  /// QUI a donne le numero. C'est ce qui fait de la piste autre chose qu'un numero nu.
+  sourceRepresentantId String
+  sourceRepresentant   Representant @relation("RepresentantSuggestionSource", fields: [sourceRepresentantId], references: [id], onDelete: Cascade)
+
+  suggestedName String?
+
+  /// Normalise par le SERVEUR, sans aucune unicite : deux representants qui citent
+  /// le meme contact disent qu'il faut l'appeler en priorite, pas qu'il y a doublon.
+  suggestedPhoneE164 String
+
+  note String?
+
+  suggestedById String
+  suggestedBy   User   @relation("RepresentantSuggestionSuggestedBy", fields: [suggestedById], references: [id], onDelete: Restrict)
+
+  /// Rempli quand le numero est deja une fiche vivante : la piste est deja connue.
+  resolvedRepresentantId String?
+  resolvedRepresentant   Representant? @relation("RepresentantSuggestionResolved", fields: [resolvedRepresentantId], references: [id], onDelete: SetNull)
+
+  /// La tentative pendant laquelle la suggestion a ete recueillie. Son identifiant
+  /// est la cle d'idempotence du client : l'unicite rend le rejeu sans effet, sans
+  /// compter les lignes au prealable. Meme mecanisme que `ScheduledCallback.sourceAttemptId`.
+  sourceAttemptId String         @unique
+  sourceAttempt   RepCallAttempt @relation(fields: [sourceAttemptId], references: [id], onDelete: Cascade)
+
+  status SuggestionStatus @default(A_APPELER)
+
+  clientCreatedAt DateTime
+  createdAt       DateTime  @default(now())
+  deletedAt       DateTime?
+
+  /// Ligne appartenant au jeu de démonstration. Voir `User.isDemo`.
+  isDemo Boolean @default(false)
+
+  @@index([suggestedPhoneE164])
+  @@index([sourceRepresentantId, createdAt])
+  @@index([status, createdAt])
+  @@index([isDemo])
+  @@map("representant_suggestions")
+}
+
+enum SuggestionStatus {
+  A_APPELER
+  APPELE
+  ABANDONNE
+}
+
+/// Effet d'une issue d'appel sur le cycle de vie du prospect.
+///
+/// Fermee a la compilation, contrairement aux MOTIFS: un effet nouveau change
+/// les regles metier et merite une migration, un motif nouveau n'est qu'un mot
+/// que l'equipe ajoute depuis le panneau.
+enum CallOutcomeEffect {
+  CLOSE_METHOD
+  CLOSE_REFUSED
+  CLOSE_WRONG_NUMBER
+  KEEP_OPEN
+  SCHEDULE_CALLBACK
+}
+
+/// Le vocabulaire des issues d'appel, editable par l'administration.
+///
+/// Les six motifs semes portent les codes de `CallOutcome` A L'IDENTIQUE: une
+/// tentative deja remontee reste resoluble sans conversion.
+model CallOutcomeReason {
+  id     String            @id @default(uuid(7))
+  /// Immuable: l'historique le reference. Voir `BankCaseStage.code`.
+  code   String            @unique
+  label  String            @unique
+  effect CallOutcomeEffect
+
+  requiresComment  Boolean @default(false)
+  requiresCallback Boolean @default(false)
+  /// Compte comme un appel abouti dans le taux de joignabilite.
+  countsAsReached  Boolean @default(true)
+
+  isActive  Boolean @default(true)
+  isSystem  Boolean @default(false)
+  sortOrder Int     @default(100)
+  color     String?
+
+  /// Version de charge utile minimale sachant emettre ce motif. Un telephone
+  /// ne recoit jamais un code qu'il ne sait pas renvoyer: il le rejetterait en
+  /// erreur definitive, hors ligne, sans possibilite de correction.
+  minPayloadVersion Int @default(2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@index([effect, isActive])
+  @@map("call_outcome_reasons")
 }
