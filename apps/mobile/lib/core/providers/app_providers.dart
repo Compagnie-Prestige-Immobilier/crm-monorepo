@@ -252,6 +252,14 @@ final StreamProvider<List<RepresentantSyncViewData>> representantPickerListProvi
           .watchRepresentants(search: ref.watch(representantPickerSearchProvider));
     });
 
+final representantDetailProvider =
+    StreamProvider.family<RepresentantSyncViewData?, String>((
+      Ref ref,
+      String representantId,
+    ) {
+      return ref.watch(referenceRepositoryProvider).watchRepresentant(representantId);
+    });
+
 final prospectsForRepresentantProvider =
     StreamProvider.family<List<ProspectSyncViewData>, String>((
       Ref ref,

@@ -16,6 +16,7 @@ import '../../features/permissions/presentation/battery_help_screen.dart';
 import '../../features/phase2/presentation/phase2_screen.dart';
 import '../../features/prospect/presentation/prospect_entry_screen.dart';
 import '../../features/reglages/presentation/reglages_screen.dart';
+import '../../features/representant/presentation/representant_detail_screen.dart';
 import '../../features/representant/presentation/representant_form_screen.dart';
 import '../../features/representant/presentation/representant_picker_screen.dart';
 import '../../features/shell/app_shell.dart';
@@ -95,6 +96,15 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           prefillName: state.uri.queryParameters[Routes.prefillNameParam],
           prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam],
         ),
+      ),
+      // Après `newRepresentant` : go_router essaie les routes dans l'ordre, et
+      // `:id` avalerait `/representants/nouveau`.
+      GoRoute(
+        path: Routes.representantDetail,
+        name: 'representantDetail',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            RepresentantDetailScreen(representantId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: Routes.newProspect,

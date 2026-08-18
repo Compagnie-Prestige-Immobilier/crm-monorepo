@@ -19,6 +19,7 @@ import 'package:cpi_go/features/permissions/presentation/battery_help_screen.dar
 import 'package:cpi_go/features/phase2/presentation/phase2_screen.dart';
 import 'package:cpi_go/features/prospect/presentation/prospect_entry_screen.dart';
 import 'package:cpi_go/features/reglages/presentation/reglages_screen.dart';
+import 'package:cpi_go/features/representant/presentation/representant_detail_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_form_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_picker_screen.dart';
 import 'package:flutter/material.dart';
@@ -61,6 +62,24 @@ void main() {
       id: 'repA',
       phone: '+221770000001',
       fullName: 'Mamadou Diallo Ndiaye',
+    );
+
+    // La fiche de représentant dans son état le plus haut : notes multi-lignes,
+    // IEF absente, et un prospect à lister.
+    await insertRepresentant(
+      db,
+      id: 'repFiche',
+      phone: '+221770000002',
+      fullName: 'Abdoulaye Ousseynou Kane Diagne',
+      notes:
+          'Disponible entre midi et quatorze heures, jamais le vendredi '
+          'apres-midi. Passe par le secretariat de l\'inspection.',
+    );
+    await insertProspect(
+      db,
+      id: 'proFiche',
+      representantId: 'repFiche',
+      phone: '+221780000002',
     );
 
     // Un brouillon vieux d'une heure sur chaque formulaire : entre 60 s et
@@ -221,6 +240,8 @@ void main() {
     'Autorisations': BatteryHelpScreen.new,
     'À propos': AboutScreen.new,
     'Choisir un représentant': RepresentantPickerScreen.new,
+    'Fiche représentant': () =>
+        const RepresentantDetailScreen(representantId: 'repFiche'),
     // ═══ LES DEUX FORMULAIRES SONT DANS LE BALAYAGE, SANS `skip` ═══
     //
     // Ils y sont entrés en portant un débordement réel : « Nouveau

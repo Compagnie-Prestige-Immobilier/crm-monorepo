@@ -49,6 +49,7 @@ class AuthState {
       Role.COMMERCIAL => 'Téléconseiller',
       Role.ADMIN => 'Administrateur',
       Role.BANQUE_FINANCE => 'Banque et financement',
+      Role.SUPERVISEUR => 'Supervision',
       Role.unknownDefaultOpenApi => raw,
     };
   }
