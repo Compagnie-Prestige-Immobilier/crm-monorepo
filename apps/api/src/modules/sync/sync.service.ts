@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { OperationResult, Prisma } from '@crm/database';
+import { OperationResult, Prisma, WhatsappStatus } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readEnv } from '../../env.js';
@@ -15,6 +15,7 @@ import { isAdmin, ownerScope } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PROSPECT_INCLUDE, toProspectDto } from '../prospects/prospects.service.js';
 import { REPRESENTANT_INCLUDE, toRepresentantDto } from '../representants/representants.service.js';
+import { resolveWhatsappPatch } from '../representants/whatsapp.js';
 import { CallAttemptApplyStatus } from '../phase2/dto.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
 import { SyncBatchStore } from './batch-store.js';
@@ -489,6 +490,13 @@ export class SyncService {
           fullName: data.fullName.trim(),
           phoneE164,
           ...(data.notes ? { notes: data.notes } : {}),
+          // Une fiche neuve part de `NON_DEMANDE`: le resolveur applique la
+          // meme regle que le panneau, donc le CHECK ne peut pas etre viole
+          // par le chemin hors ligne.
+          ...resolveWhatsappPatch(data, {
+            whatsappStatus: WhatsappStatus.NON_DEMANDE,
+            whatsappE164: null,
+          }),
           departementId: data.departementId,
           ...(data.iefId ? { iefId: data.iefId } : {}),
           createdById: user.id,
@@ -541,6 +549,7 @@ export class SyncService {
           : data.notes !== undefined
             ? { notes: data.notes || null }
             : {}),
+        ...resolveWhatsappPatch(this.whatsappInputFor(data, cleared), existing),
         ...(data.departementId ? { departementId: data.departementId } : {}),
         ...(cleared.has('iefId')
           ? { iefId: null }
@@ -551,6 +560,28 @@ export class SyncService {
       },
     });
     return applied(row.id, row.rev, row.updatedAt);
+  }
+
+  /**
+   * Un champ VIDE se declare par `clearedFields`, pas par une cle absente: le
+   * transport JSON supprime les `null`, donc l'absence et le vidage arrivent
+   * identiques. Voir `CLEARABLE_FIELDS`.
+   */
+  private whatsappInputFor(
+    data: SyncEntityDataDto,
+    cleared: ReadonlySet<string>,
+  ): { whatsappStatus?: WhatsappStatus; whatsappE164?: string; profession?: string } {
+    return {
+      ...(data.whatsappStatus === undefined ? {} : { whatsappStatus: data.whatsappStatus }),
+      ...(cleared.has('whatsappE164') || data.whatsappE164 === undefined
+        ? {}
+        : { whatsappE164: data.whatsappE164 }),
+      ...(cleared.has('profession')
+        ? { profession: '' }
+        : data.profession === undefined
+          ? {}
+          : { profession: data.profession }),
+    };
   }
 
   // ─── Tentative d'appel (phase 2) ──────────────────────────────────────────

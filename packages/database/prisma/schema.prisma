@@ -55,6 +55,15 @@ enum RepresentantRelation {
   REFUS
 }
 
+// Pas un booléen non plus : `false` confondrait « il n'a pas WhatsApp » et « on
+// ne lui a pas posé la question », et c'est cet écart qui décide qui rappeler.
+enum WhatsappStatus {
+  NON_DEMANDE
+  MEME_NUMERO
+  AUTRE_NUMERO
+  AUCUN
+}
+
 // Prospection générale (phase 1). NE PAS confondre avec Phase2Status : les deux
 // décrivent des dimensions différentes du même prospect et évoluent
 // séparément.
@@ -411,6 +420,18 @@ model Representant {
 
   relationStatus RepresentantRelation @default(INCONNU)
 
+  // Invariant posé en CHECK dans la migration, pas seulement dans les DTO :
+  // `whatsappE164` est renseigné SI ET SEULEMENT SI `whatsappStatus` vaut
+  // AUTRE_NUMERO. Sur MEME_NUMERO la colonne reste NULLE : recopier
+  // `phoneE164` créerait une seconde vérité qui divergerait à la première
+  // correction du téléphone. La lecture recompose le numéro joignable.
+  whatsappStatus WhatsappStatus @default(NON_DEMANDE)
+  whatsappE164   String?
+
+  /// Texte libre, non normalisé. Pas de référentiel : le besoin de l'administrer
+  /// n'est pas établi, et `CallOutcomeReason` en donne le patron le jour venu.
+  profession String?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -444,6 +465,7 @@ model Representant {
   @@index([deletedAt])
   @@index([relationStatus])
   @@index([relationStatus, departementId])
+  @@index([whatsappStatus])
   @@index([isDemo])
   @@map("representants")
 }

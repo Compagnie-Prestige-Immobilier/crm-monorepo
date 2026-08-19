@@ -1,5 +1,10 @@
-import { ConflictException, ForbiddenException, RequestMethod } from '@nestjs/common';
-import { ChangeSource, RepresentantRelation, Role } from '@crm/database';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  RequestMethod,
+} from '@nestjs/common';
+import { ChangeSource, RepresentantRelation, Role, WhatsappStatus } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -58,6 +63,9 @@ const foreignRow = (): Record<string, unknown> => ({
   createdAt: date,
   updatedAt: date,
   relationStatus: RepresentantRelation.INCONNU,
+  whatsappStatus: WhatsappStatus.NON_DEMANDE,
+  whatsappE164: null,
+  profession: null,
   isDemo: false,
   _count: { prospects: 42 },
 });
@@ -697,5 +705,123 @@ describe('lecture du SUPERVISEUR', () => {
       service.addComment(SUPERVISEUR, 'rep-9', { id: 'cmt-1', body: 'vu' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(db.representantComment.createMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('WhatsApp et profession sur la fiche', () => {
+  const own = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    ...foreignRow(),
+    createdById: COMMERCIAL.id,
+    createdBy: { id: COMMERCIAL.id, fullName: COMMERCIAL.fullName },
+    ...over,
+  });
+
+  const whereOf = (): Record<string, unknown> =>
+    (db.representant.findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
+
+  const patchOf = (): Record<string, unknown> =>
+    (db.representant.update.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+
+  it('recompose le numéro joignable pour les trois cas de lecture', async () => {
+    db.representant.findFirst.mockResolvedValue(
+      own({ whatsappStatus: WhatsappStatus.MEME_NUMERO }),
+    );
+    await expect(service.get(COMMERCIAL, 'rep-9')).resolves.toMatchObject({
+      whatsappNumber: '+221771234567',
+      whatsappE164: null,
+    });
+
+    db.representant.findFirst.mockResolvedValue(
+      own({ whatsappStatus: WhatsappStatus.AUTRE_NUMERO, whatsappE164: '+221780000001' }),
+    );
+    await expect(service.get(COMMERCIAL, 'rep-9')).resolves.toMatchObject({
+      whatsappNumber: '+221780000001',
+    });
+
+    db.representant.findFirst.mockResolvedValue(own({ whatsappStatus: WhatsappStatus.AUCUN }));
+    await expect(service.get(COMMERCIAL, 'rep-9')).resolves.toMatchObject({
+      whatsappNumber: null,
+      whatsappStatus: WhatsappStatus.AUCUN,
+    });
+  });
+
+  it('la correction à froid pose le statut, le numéro et la profession', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+
+    await service.update(COMMERCIAL, 'rep-9', {
+      whatsappStatus: WhatsappStatus.AUTRE_NUMERO,
+      whatsappE164: '78 000 00 01',
+      profession: 'Enseignant',
+    });
+
+    expect(patchOf()).toMatchObject({
+      whatsappStatus: WhatsappStatus.AUTRE_NUMERO,
+      whatsappE164: '+221780000001',
+      profession: 'Enseignant',
+    });
+  });
+
+  it('MEME_NUMERO n’écrit AUCUN numéro dédié', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+
+    await service.update(COMMERCIAL, 'rep-9', { whatsappStatus: WhatsappStatus.MEME_NUMERO });
+
+    expect(patchOf()).toMatchObject({ whatsappStatus: WhatsappStatus.MEME_NUMERO });
+    expect(patchOf()).not.toHaveProperty('whatsappE164');
+  });
+
+  it('refuse un numéro porté par un statut qui l’interdit, sans rien écrire', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+
+    await expect(
+      service.update(COMMERCIAL, 'rep-9', {
+        whatsappStatus: WhatsappStatus.MEME_NUMERO,
+        whatsappE164: '78 000 00 01',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.representant.update).not.toHaveBeenCalled();
+  });
+
+  it('une modification qui ne parle pas de WhatsApp ne touche à rien', async () => {
+    db.representant.findFirst.mockResolvedValue(
+      own({ whatsappStatus: WhatsappStatus.AUTRE_NUMERO, whatsappE164: '+221780000001' }),
+    );
+
+    await service.update(COMMERCIAL, 'rep-9', { notes: 'Rappeler lundi' });
+
+    expect(patchOf()).not.toHaveProperty('whatsappStatus');
+    expect(patchOf()).not.toHaveProperty('whatsappE164');
+    expect(patchOf()).not.toHaveProperty('profession');
+  });
+
+  it('filtre sur un état WhatsApp précis', async () => {
+    await service.list(ADMIN, { whatsappStatus: WhatsappStatus.NON_DEMANDE });
+
+    expect(whereOf().whatsappStatus).toEqual({ in: [WhatsappStatus.NON_DEMANDE] });
+  });
+
+  it('hasWhatsapp sépare les joignables de tous les autres, question non posée comprise', async () => {
+    await service.list(ADMIN, { hasWhatsapp: true });
+    expect(whereOf().whatsappStatus).toEqual({
+      in: [WhatsappStatus.MEME_NUMERO, WhatsappStatus.AUTRE_NUMERO],
+    });
+
+    db.representant.findMany.mockClear();
+    await service.list(ADMIN, { hasWhatsapp: false });
+    expect(whereOf().whatsappStatus).toEqual({
+      in: [WhatsappStatus.NON_DEMANDE, WhatsappStatus.AUCUN],
+    });
+  });
+
+  it('les deux filtres se composent par intersection, aucun n’en écrase un autre', async () => {
+    await service.list(ADMIN, { hasWhatsapp: false, whatsappStatus: WhatsappStatus.AUCUN });
+
+    expect(whereOf().whatsappStatus).toEqual({ in: [WhatsappStatus.AUCUN] });
+  });
+
+  it('ne filtre sur rien quand aucun des deux n’est demandé', async () => {
+    await service.list(ADMIN, {});
+
+    expect(whereOf()).not.toHaveProperty('whatsappStatus');
   });
 });
