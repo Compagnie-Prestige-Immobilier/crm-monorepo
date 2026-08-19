@@ -51,6 +51,13 @@ const MATRICE: { method: string; roles: Role[] }[] = [
   { method: 'getCampaign', roles: [Role.ADMIN, Role.SUPERVISEUR] },
   { method: 'closeCampaign', roles: [Role.ADMIN] },
   { method: 'downloadProgramme', roles: [Role.ADMIN, Role.SUPERVISEUR] },
+  {
+    method: 'downloadRecording',
+    roles: [Role.ADMIN, Role.SUPERVISEUR, Role.COMMERCIAL],
+  },
+  // Le televersement est reserve au teleconseiller qui a passe l'appel: la
+  // direction ecoute, elle ne depose pas a la place du terrain.
+  { method: 'uploadRecording', roles: [Role.COMMERCIAL] },
 ];
 
 describe('matrice d’autorisation des campagnes d’appels', () => {

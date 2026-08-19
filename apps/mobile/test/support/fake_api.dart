@@ -24,16 +24,20 @@ class FakeApi implements ApiPort {
 
   /// Chaque appel à [push], dans l'ordre de réception.
   final List<PushCall> calls = <PushCall>[];
+  final List<String> uploadedRecordings = <String>[];
+  ApiException? failNextRecordingUpload;
 
   /// Les entités effectivement créées côté serveur, par identifiant.
   final Map<String, SyncOperationDto> rows = <String, SyncOperationDto>{};
 
   /// Registre d'idempotence : `opId` → verdict déjà rendu.
-  final Map<String, SyncOperationResultDto> ledger = <String, SyncOperationResultDto>{};
+  final Map<String, SyncOperationResultDto> ledger =
+      <String, SyncOperationResultDto>{};
 
   /// Verdicts forcés, par `opId`. Consommés à la première utilisation quand
   /// [verdictsAreOneShot], sinon persistants.
-  final Map<String, SyncOperationResultDto> verdicts = <String, SyncOperationResultDto>{};
+  final Map<String, SyncOperationResultDto> verdicts =
+      <String, SyncOperationResultDto>{};
 
   bool verdictsAreOneShot = false;
 
@@ -72,13 +76,14 @@ class FakeApi implements ApiPort {
   );
 
   @override
-  Future<AuthTokens> refresh({required String refreshToken}) async => AuthTokens(
-    accessToken: 'access',
-    refreshToken: refreshToken,
-    expiresAt: serverTime.add(const Duration(minutes: 15)),
-    userId: userId,
-    fullName: 'Commercial',
-  );
+  Future<AuthTokens> refresh({required String refreshToken}) async =>
+      AuthTokens(
+        accessToken: 'access',
+        refreshToken: refreshToken,
+        expiresAt: serverTime.add(const Duration(minutes: 15)),
+        userId: userId,
+        fullName: 'Commercial',
+      );
 
   @override
   Future<void> logout({required String refreshToken}) async {}
@@ -133,7 +138,8 @@ class FakeApi implements ApiPort {
 
   /// Le référentiel des motifs d'issue à servir. Vide par défaut : la plupart
   /// des tests n'ont que faire des motifs, et le repli système suffit.
-  final List<CallOutcomeReasonDto> callOutcomeReasons = <CallOutcomeReasonDto>[];
+  final List<CallOutcomeReasonDto> callOutcomeReasons =
+      <CallOutcomeReasonDto>[];
 
   /// Chaque appel à [pullCallOutcomeReasons], avec la version reçue.
   final List<int> reasonCalls = <int>[];
@@ -184,7 +190,22 @@ class FakeApi implements ApiPort {
       throw boom ?? const ApiException('network_timeout', statusCode: 504);
     }
 
-    return PushResult(batchId: batchId, results: results, serverTime: serverTime);
+    return PushResult(
+      batchId: batchId,
+      results: results,
+      serverTime: serverTime,
+    );
+  }
+
+  @override
+  Future<void> uploadCallRecording({
+    required String attemptId,
+    required String path,
+  }) async {
+    final ApiException? failure = failNextRecordingUpload;
+    failNextRecordingUpload = null;
+    if (failure != null) throw failure;
+    uploadedRecordings.add(attemptId);
   }
 
   SyncOperationResultDto _apply(SyncOperationDto op) {
@@ -277,8 +298,9 @@ class PushCall {
   List<String> get opIds =>
       operations.map((SyncOperationDto o) => o.opId).toList(growable: false);
 
-  List<String> get entityIds =>
-      operations.map((SyncOperationDto o) => o.entityId).toList(growable: false);
+  List<String> get entityIds => operations
+      .map((SyncOperationDto o) => o.entityId)
+      .toList(growable: false);
 }
 
 PullPage emptyPullPage({String? cursor}) => PullPage(
@@ -377,8 +399,10 @@ class ExplodingApi implements ApiPort {
   Never _boom() => throw StateError('le réseau ne devait pas être sollicité');
 
   @override
-  Future<AuthTokens> login({required String identifier, required String password}) =>
-      _boom();
+  Future<AuthTokens> login({
+    required String identifier,
+    required String password,
+  }) => _boom();
 
   @override
   Future<AuthTokens> refresh({required String refreshToken}) => _boom();
@@ -397,8 +421,10 @@ class ExplodingApi implements ApiPort {
   }) => _boom();
 
   @override
-  Future<Phase2DirectoryPage> pullPhase2Directory({String? cursor, int limit = 2000}) =>
-      _boom();
+  Future<Phase2DirectoryPage> pullPhase2Directory({
+    String? cursor,
+    int limit = 2000,
+  }) => _boom();
 
   @override
   Future<List<CallOutcomeReasonDto>> pullCallOutcomeReasons({
@@ -407,6 +433,14 @@ class ExplodingApi implements ApiPort {
 
   @override
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone) => _boom();
+
+  @override
+  Future<void> uploadCallRecording({
+    required String attemptId,
+    required String path,
+  }) async {
+    throw const ApiException('exploded');
+  }
 }
 
 /// Statut d'une ligne d'outbox, pour des assertions lisibles.

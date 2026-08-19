@@ -4004,6 +4004,152 @@
         "tags": ["sync"]
       }
     },
+    "/api/v1/phase2/call-attempts/{id}/recording": {
+      "post": {
+        "operationId": "uploadCallRecording",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallRecordingDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Joint une note audio à une tentative déjà synchronisée.",
+        "tags": ["phase2"]
+      },
+      "get": {
+        "operationId": "downloadCallRecording",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "audio/mp4": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lit la note audio jointe à une tentative.",
+        "tags": ["phase2"]
+      }
+    },
     "/api/v1/phase2/directory": {
       "get": {
         "description": "Pagination keyset sur (updatedAt, id), page de 2 000 par défaut, retard de sécurité de 2 secondes. Chaque entrée porte exactement six champs : ni nom, ni banque, ni syndicat.",
@@ -14443,6 +14589,919 @@
         "summary": "Applique une simulation terminée : le même fichier est réécrit en base.",
         "tags": ["imports"]
       }
+    },
+    "/api/v1/visites/referentiels": {
+      "get": {
+        "operationId": "listVisiteReferentiels",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielsBundleDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les quatre listes de l’accueil, en un appel.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/referentiels/{kind}": {
+      "get": {
+        "operationId": "listVisiteReferentiel",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/VisiteReferentielKind"
+            }
+          },
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Une liste, entrées retirées comprises.",
+        "tags": ["visites"]
+      },
+      "post": {
+        "description": "Le code est immuable : les visites déjà enregistrées le désignent.",
+        "operationId": "createVisiteReferentiel",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/VisiteReferentielKind"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVisiteReferentielDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "VISITE_REFERENTIEL_CODE_CONFLICT ou VISITE_REFERENTIEL_LABEL_CONFLICT.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajoute une entrée à une liste.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/referentiels/{kind}/{id}": {
+      "patch": {
+        "operationId": "updateVisiteReferentiel",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/VisiteReferentielKind"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVisiteReferentielDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "VISITE_REFERENTIEL_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renomme ou déplace une entrée.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/referentiels/{kind}/{id}/active": {
+      "post": {
+        "description": "Jamais de suppression : le registre des années passées continue de désigner l’entrée.",
+        "operationId": "setVisiteReferentielActive",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/VisiteReferentielKind"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVisiteReferentielActiveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retire une entrée des listes, ou l’y remet.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/referentiels/{kind}/reorder": {
+      "post": {
+        "operationId": "reorderVisiteReferentiel",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/VisiteReferentielKind"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderVisiteReferentielDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fixe l’ordre d’affichage d’une liste.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/statistiques": {
+      "get": {
+        "description": "Total, répartitions par entreprise, direction, destinataire et objet, puis la marche du mois et du jour. Une répartition liste TOUTES les entrées de sa liste, y compris à zéro ; sa somme peut être inférieure au total, l’écart étant rendu par sansDirection et sansDestinataire.",
+        "operationId": "getVisiteStats",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Premier jour compté, inclus.",
+            "schema": {
+              "example": "2025-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Dernier jour compté, inclus.",
+            "schema": {
+              "example": "2025-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteStatsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VISITE_STATS_RANGE_INVALID ou VISITE_STATS_RANGE_TOO_WIDE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Le registre compté sur une période.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites": {
+      "get": {
+        "operationId": "listVisites",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-01-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "entrepriseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "directionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "destinataireId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "objetId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Nom du visiteur, ou référence du registre.",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Le registre, du plus récent au plus ancien.",
+        "tags": ["visites"]
+      },
+      "post": {
+        "description": "La référence est engendrée par le serveur. Le téléphone est facultatif et accepté sous n’importe quelle forme : un numéro que la normalisation ne reconnaît pas est conservé tel quel, avec phoneE164 nul.",
+        "operationId": "createVisite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVisiteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VISITE_REFERENTIEL_UNAVAILABLE ou VISITE_REFERENCE_EXHAUSTED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Inscrit un visiteur au registre.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/{id}": {
+      "get": {
+        "operationId": "getVisite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "VISITE_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Une ligne du registre.",
+        "tags": ["visites"]
+      },
+      "patch": {
+        "description": "Ni la date ni la référence : elles fixent la ligne dans le registre.",
+        "operationId": "updateVisite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVisiteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "VISITE_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Corrige une ligne du registre.",
+        "tags": ["visites"]
+      }
     }
   },
   "info": {
@@ -16451,7 +17510,7 @@
       },
       "SyncEntity": {
         "type": "string",
-        "enum": ["representant", "prospect", "call_attempt"]
+        "enum": ["representant", "representant_comment", "prospect", "call_attempt"]
       },
       "SyncOp": {
         "type": "string",
@@ -16504,6 +17563,11 @@
             "type": "string",
             "format": "uuid",
             "description": "Prospect : représentant de rattachement. Sert aussi de clé de groupe."
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Commentaire ajouté à une fiche."
           },
           "statut": {
             "allOf": [
@@ -16821,6 +17885,19 @@
           }
         },
         "required": ["changes", "deletions", "nextCursor", "hasMore", "serverTime"]
+      },
+      "CallRecordingDto": {
+        "type": "object",
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bytes": {
+            "type": "number"
+          }
+        },
+        "required": ["attemptId", "bytes"]
       },
       "DirectoryEntryDto": {
         "type": "object",
@@ -20797,6 +21874,7 @@
           "campagnes",
           "campagnesRepresentants",
           "demandesClients",
+          "visites",
           "fileAppels",
           "tentatives",
           "dossiers",
@@ -21433,6 +22511,464 @@
           }
         },
         "required": ["items", "meta"]
+      },
+      "VisiteReferentielDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Code stable, jamais modifiable après création."
+          },
+          "label": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isSystem": {
+            "type": "boolean",
+            "description": "Entrée reprise du classeur d’origine : renommable, désactivable, jamais effacée."
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "code", "label", "isActive", "isSystem", "sortOrder", "updatedAt"]
+      },
+      "VisiteReferentielsBundleDto": {
+        "type": "object",
+        "properties": {
+          "entreprises": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielDto"
+            }
+          },
+          "directions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielDto"
+            }
+          },
+          "destinataires": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielDto"
+            }
+          },
+          "objets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielDto"
+            }
+          }
+        },
+        "required": ["entreprises", "directions", "destinataires", "objets"]
+      },
+      "VisiteReferentielKind": {
+        "type": "string",
+        "enum": ["entreprises", "directions", "destinataires", "objets"]
+      },
+      "VisiteReferentielListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "CreateVisiteReferentielDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 48,
+            "description": "Majuscules, chiffres et tirets bas. Immuable une fois créé."
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "sortOrder": {
+            "type": "number",
+            "default": 100
+          }
+        },
+        "required": ["code", "label"]
+      },
+      "UpdateVisiteReferentielDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        }
+      },
+      "SetVisiteReferentielActiveDto": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": ["isActive"]
+      },
+      "ReorderVisiteReferentielDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "Les entrées dans leur nouvel ordre. Celles omises gardent leur rang.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": ["ids"]
+      },
+      "VisiteStatBucketDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "code", "label", "count"]
+      },
+      "VisiteStatMoisDto": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "example": "2025-01"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["month", "count"]
+      },
+      "VisiteStatJourDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2025-01-06"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["date", "count"]
+      },
+      "VisiteStatsDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2025-01-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2025-12-31"
+          },
+          "total": {
+            "type": "number",
+            "description": "Nombre de visites. La somme d’une répartition peut lui être inférieure : direction et destinataire sont facultatifs."
+          },
+          "parEntreprise": {
+            "description": "Toutes les entrées actives du référentiel, y compris celles à zéro.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatBucketDto"
+            }
+          },
+          "parDirection": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatBucketDto"
+            }
+          },
+          "parDestinataire": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatBucketDto"
+            }
+          },
+          "parObjet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatBucketDto"
+            }
+          },
+          "parMois": {
+            "description": "Chaque mois de la période.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatMoisDto"
+            }
+          },
+          "parJour": {
+            "description": "Seuls les jours ayant reçu au moins une visite.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatJourDto"
+            }
+          },
+          "sansDirection": {
+            "type": "number"
+          },
+          "sansDestinataire": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "total",
+          "parEntreprise",
+          "parDirection",
+          "parDestinataire",
+          "parObjet",
+          "parMois",
+          "parJour",
+          "sansDirection",
+          "sansDestinataire"
+        ]
+      },
+      "VisiteReferentielRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "code", "label"]
+      },
+      "VisiteDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "example": "V-2026-000412",
+            "description": "Le « N° » du registre. Engendré par le serveur, immuable."
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-01-06",
+            "description": "Jour de la visite, à Dakar."
+          },
+          "time": {
+            "type": "string",
+            "nullable": true,
+            "example": "11:08",
+            "description": "Nul quand l’heure n’a pas été relevée."
+          },
+          "visitorName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Le numéro tel qu’il a été donné."
+          },
+          "phoneE164": {
+            "type": "string",
+            "nullable": true,
+            "description": "Forme E.164, nulle quand le numéro donné n’a pas pu être reconnu."
+          },
+          "entreprise": {
+            "$ref": "#/components/schemas/VisiteReferentielRefDto"
+          },
+          "objet": {
+            "$ref": "#/components/schemas/VisiteReferentielRefDto"
+          },
+          "direction": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VisiteReferentielRefDto"
+              }
+            ]
+          },
+          "destinataire": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VisiteReferentielRefDto"
+              }
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "date",
+          "time",
+          "visitorName",
+          "phone",
+          "phoneE164",
+          "entreprise",
+          "objet",
+          "direction",
+          "destinataire",
+          "comment",
+          "createdById",
+          "createdAt"
+        ]
+      },
+      "VisiteListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": ["items", "meta"]
+      },
+      "CreateVisiteDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2026-01-06"
+          },
+          "time": {
+            "type": "string",
+            "example": "11:08",
+            "description": "Omise si elle n’a pas été relevée."
+          },
+          "visitorName": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Accepté sous n’importe quelle forme, y compris étrangère ou incomplète."
+          },
+          "entrepriseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "directionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destinataireId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": ["date", "visitorName", "entrepriseId", "objetId"]
+      },
+      "UpdateVisiteDto": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "example": "11:08",
+            "nullable": true
+          },
+          "visitorName": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "entrepriseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "directionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "destinataireId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 2000,
+            "nullable": true
+          }
+        }
       }
     }
   }

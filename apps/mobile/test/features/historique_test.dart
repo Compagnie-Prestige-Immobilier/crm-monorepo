@@ -143,6 +143,26 @@ void main() {
 
     await teardownTree(tester);
   });
+
+  testWidgets('une recherche sans résultat explique que le filtre est actif', (
+    WidgetTester tester,
+  ) async {
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      fullName: 'Ousmane Fall',
+    );
+    await mount(tester);
+
+    await tester.enterText(find.byType(TextField), 'Aminata');
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Aucun résultat'), findsOneWidget);
+    expect(find.text('Aucun représentant'), findsNothing);
+
+    await teardownTree(tester);
+  });
 }
 
 /// Une base qui refuse la suppression.

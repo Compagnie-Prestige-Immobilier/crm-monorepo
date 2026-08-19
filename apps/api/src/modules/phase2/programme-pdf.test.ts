@@ -301,6 +301,7 @@ describe('le programme téléchargé', () => {
       campaigns as unknown as Phase2CampaignsService,
       {} as Phase2DirectoryService,
       reasons as unknown as CallOutcomeReasonsService,
+      {} as never,
     );
 
     await controller.downloadProgramme(

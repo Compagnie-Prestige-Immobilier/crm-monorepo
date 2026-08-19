@@ -272,6 +272,18 @@ describe('cloisonnement des agrégats', () => {
   });
 });
 
+describe('totaux des téléconseillers', () => {
+  it('compte les téléconseillers encore actifs, pas les auteurs historiques', async () => {
+    const { service, sql } = makePrisma([{ commerciaux: 1 }]);
+
+    await new AnalyticsService(service, fakeDemoVisibility()).totals(admin, {});
+
+    expect(sql()).toContain('COUNT(DISTINCT u."id") FILTER');
+    expect(sql()).toContain('u."role" = \'COMMERCIAL\'');
+    expect(sql()).toContain('u."isActive" = TRUE AND u."deletedAt" IS NULL');
+  });
+});
+
 describe('granularité temporelle', () => {
   it('n’injecte jamais la valeur reçue dans le date_trunc', async () => {
     const { service, sql } = makePrisma([]);

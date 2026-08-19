@@ -51,6 +51,16 @@ export interface CallAttemptRow {
   isDemo: boolean;
 }
 
+interface RepresentantCommentRow {
+  id: string;
+  representantId: string;
+  authorId: string;
+  body: string;
+  clientCreatedAt: Date;
+  createdAt: Date;
+  isDemo: boolean;
+}
+
 export interface CallOutcomeReasonRow {
   id: string;
   code: string;
@@ -116,6 +126,7 @@ export class FakePrisma {
   representants = new Map<string, RepresentantRow>();
   prospects = new Map<string, ProspectRow>();
   callAttempts = new Map<string, CallAttemptRow>();
+  representantComments = new Map<string, RepresentantCommentRow>();
   callOutcomeReasons = new Map<string, CallOutcomeReasonRow>();
   users = new Map<string, { id: string; isDemo: boolean; role?: string }>();
   demoEntities: { entityType: string; entityId: string; sequence: number }[] = [];
@@ -214,6 +225,7 @@ export class FakePrisma {
       representants: new Map([...this.representants].map(([k, v]) => [k, clone(v)])),
       prospects: new Map([...this.prospects].map(([k, v]) => [k, clone(v)])),
       callAttempts: new Map([...this.callAttempts].map(([k, v]) => [k, clone(v)])),
+      representantComments: new Map([...this.representantComments].map(([k, v]) => [k, clone(v)])),
     };
     try {
       return await fn(this);
@@ -222,6 +234,7 @@ export class FakePrisma {
       this.representants = snapshot.representants;
       this.prospects = snapshot.prospects;
       this.callAttempts = snapshot.callAttempts;
+      this.representantComments = snapshot.representantComments;
       this.rollbackCount += 1;
       throw error;
     }
@@ -333,6 +346,20 @@ export class FakePrisma {
       for (const row of args.data) {
         if (this.callAttempts.has(row.id)) continue;
         this.callAttempts.set(row.id, clone(row));
+        count += 1;
+      }
+      return Promise.resolve({ count });
+    },
+  };
+
+  representantComment = {
+    findUnique: (args: { where: { id: string } }) =>
+      Promise.resolve(this.representantComments.get(args.where.id) ?? null),
+    createMany: (args: { data: RepresentantCommentRow[] }) => {
+      let count = 0;
+      for (const row of args.data) {
+        if (this.representantComments.has(row.id)) continue;
+        this.representantComments.set(row.id, clone(row));
         count += 1;
       }
       return Promise.resolve({ count });

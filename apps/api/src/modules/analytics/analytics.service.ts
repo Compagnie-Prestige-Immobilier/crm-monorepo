@@ -53,7 +53,9 @@ export class AnalyticsService {
       SELECT
         COUNT(*)::int                                                              AS prospects,
         COUNT(DISTINCT p."representantId")::int                                    AS representants,
-        COUNT(DISTINCT p."createdById")::int                                       AS commerciaux,
+        COUNT(DISTINCT u."id") FILTER (
+          WHERE u."role" = 'COMMERCIAL' AND u."isActive" = TRUE AND u."deletedAt" IS NULL
+        )::int                                                                      AS commerciaux,
         COUNT(DISTINCT r."departementId")::int                                     AS departements,
         COUNT(*) FILTER (WHERE p."statut" = 'NOUVEAU')::int                        AS nouveau,
         COUNT(*) FILTER (WHERE p."statut" = 'CONTACTE')::int                       AS contacte,
@@ -62,6 +64,7 @@ export class AnalyticsService {
         COUNT(*) FILTER (WHERE p."clientCreatedAt" >= now() - interval '7 days')::int  AS j7,
         COUNT(*) FILTER (WHERE p."clientCreatedAt" >= now() - interval '30 days')::int AS j30
       ${PROSPECT_FROM}
+      LEFT JOIN "users" u ON u."id" = p."createdById"
       WHERE ${where}
     `;
 

@@ -423,6 +423,8 @@ void main() {
     expect(haptics, isEmpty);
 
     // Choix d'une carte : retour de SÉLECTION, exact au moment où il est émis.
+    await tester.ensureVisible(find.text('Plateforme'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Plateforme'));
     await tester.pumpAndSettle();
     expect(haptics, isNotEmpty);

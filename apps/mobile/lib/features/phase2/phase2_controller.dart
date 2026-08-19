@@ -8,17 +8,7 @@ import '../../core/utils/phone.dart';
 import '../../data/local/database.dart';
 import '../../data/repositories/write_repository.dart';
 
-enum Phase2Stage {
-  search,
-
-  notFound,
-
-  alreadyClosed,
-
-  capture,
-
-  confirmed,
-}
+enum Phase2Stage { search, notFound, alreadyClosed, capture, confirmed }
 
 @immutable
 class Phase2State {
@@ -77,7 +67,9 @@ class Phase2State {
       downloading: downloading ?? this.downloading,
       downloaded: downloaded ?? this.downloaded,
       downloadHasMore: downloadHasMore ?? this.downloadHasMore,
-      downloadError: clearDownloadError ? null : (downloadError ?? this.downloadError),
+      downloadError: clearDownloadError
+          ? null
+          : (downloadError ?? this.downloadError),
     );
   }
 
@@ -165,6 +157,7 @@ class Phase2Controller extends Notifier<Phase2State> {
     String? method,
     String? comment,
     DateTime? callbackAt,
+    String? recordingPath,
   }) async {
     final Phase2DirectoryData? entry = state.entry;
     if (entry == null) return false;
@@ -185,6 +178,7 @@ class Phase2Controller extends Notifier<Phase2State> {
         method: method,
         comment: comment,
         callbackAt: callbackAt,
+        recordingPath: recordingPath,
         createdById: me,
       );
     } on CallAttemptInvalid catch (e) {
@@ -238,8 +232,8 @@ class Phase2Controller extends Notifier<Phase2State> {
   }
 
   static String _downloadMessage(ApiException e) => switch (e.code) {
-    'NETWORK' ||
-    'TIMEOUT' => 'Réseau indisponible. L\'annuaire déjà téléchargé reste utilisable.',
+    'NETWORK' || 'TIMEOUT' =>
+      'Réseau indisponible. L\'annuaire déjà téléchargé reste utilisable.',
     'SESSION_EXPIRED' || 'UNAUTHORIZED' => 'Session expirée. Reconnectez-vous.',
     'FORBIDDEN' => 'Votre compte n\'a pas accès à l\'annuaire de phase 2.',
     _ => e.message ?? 'Téléchargement impossible pour le moment.',
