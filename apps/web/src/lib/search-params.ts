@@ -28,7 +28,10 @@ export function readPositiveInt(
 export function readIsoDate(params: RawSearchParams | URLSearchParams, key: string): string | null {
   const value = readString(params, key);
   if (value === null) return null;
-  return /^\d{4}-\d{2}-\d{2}$/u.test(value) ? value : null;
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return null;
+  const [year, month, day] = value.split('-').map(Number) as [number, number, number];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.toISOString().slice(0, 10) === value ? value : null;
 }
 
 export function readEnum<T extends string>(

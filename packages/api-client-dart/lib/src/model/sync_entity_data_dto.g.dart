@@ -25,6 +25,8 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto representantId(String? representantId);
 
+  SyncEntityDataDto body(String? body);
+
   SyncEntityDataDto statut(ProspectStatut? statut);
 
   SyncEntityDataDto notes(String? notes);
@@ -65,6 +67,7 @@ abstract class _$SyncEntityDataDtoCWProxy {
     String? banqueId,
     String? syndicatId,
     String? representantId,
+    String? body,
     ProspectStatut? statut,
     String? notes,
     WhatsappStatus? whatsappStatus,
@@ -115,6 +118,9 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
   @override
   SyncEntityDataDto representantId(String? representantId) =>
       this(representantId: representantId);
+
+  @override
+  SyncEntityDataDto body(String? body) => this(body: body);
 
   @override
   SyncEntityDataDto statut(ProspectStatut? statut) => this(statut: statut);
@@ -176,6 +182,7 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? banqueId = const $CopyWithPlaceholder(),
     Object? syndicatId = const $CopyWithPlaceholder(),
     Object? representantId = const $CopyWithPlaceholder(),
+    Object? body = const $CopyWithPlaceholder(),
     Object? statut = const $CopyWithPlaceholder(),
     Object? notes = const $CopyWithPlaceholder(),
     Object? whatsappStatus = const $CopyWithPlaceholder(),
@@ -226,6 +233,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.representantId
           // ignore: cast_nullable_to_non_nullable
           : representantId as String?,
+      body: body == const $CopyWithPlaceholder()
+          ? _value.body
+          // ignore: cast_nullable_to_non_nullable
+          : body as String?,
       statut: statut == const $CopyWithPlaceholder()
           ? _value.statut
           // ignore: cast_nullable_to_non_nullable
@@ -301,6 +312,7 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
         banqueId: $checkedConvert('banqueId', (v) => v as String?),
         syndicatId: $checkedConvert('syndicatId', (v) => v as String?),
         representantId: $checkedConvert('representantId', (v) => v as String?),
+        body: $checkedConvert('body', (v) => v as String?),
         statut: $checkedConvert(
           'statut',
           (v) => $enumDecodeNullable(
@@ -362,6 +374,7 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(SyncEntityDataDto instance) =>
       if (instance.banqueId case final value?) 'banqueId': value,
       if (instance.syndicatId case final value?) 'syndicatId': value,
       if (instance.representantId case final value?) 'representantId': value,
+      if (instance.body case final value?) 'body': value,
       if (_$ProspectStatutEnumMap[instance.statut] case final value?)
         'statut': value,
       if (instance.notes case final value?) 'notes': value,
