@@ -12,6 +12,10 @@ import {
   REGIONS_SENEGAL,
   Role,
   SYNDICATS_SENEGAL,
+  VISITE_DESTINATAIRES,
+  VISITE_DIRECTIONS,
+  VISITE_ENTREPRISES,
+  VISITE_OBJETS,
 } from './index.js';
 
 const prisma = new PrismaClient({
@@ -156,6 +160,47 @@ async function seedCallOutcomes(): Promise<void> {
   console.info(`  issues d'appel : ${String(CALL_OUTCOME_REASONS.length)} motifs systeme`);
 }
 
+async function seedVisiteReferentiels(): Promise<void> {
+  for (const entreprise of VISITE_ENTREPRISES) {
+    await prisma.visiteEntreprise.upsert({
+      where: { code: entreprise.code },
+      create: { ...entreprise, isSystem: true },
+      update: { label: entreprise.label, sortOrder: entreprise.sortOrder, isSystem: true },
+    });
+  }
+
+  for (const direction of VISITE_DIRECTIONS) {
+    await prisma.visiteDirection.upsert({
+      where: { code: direction.code },
+      create: { ...direction, isSystem: true },
+      update: { label: direction.label, sortOrder: direction.sortOrder, isSystem: true },
+    });
+  }
+
+  for (const destinataire of VISITE_DESTINATAIRES) {
+    await prisma.visiteDestinataire.upsert({
+      where: { code: destinataire.code },
+      create: { ...destinataire, isSystem: true },
+      update: { label: destinataire.label, sortOrder: destinataire.sortOrder, isSystem: true },
+    });
+  }
+
+  for (const objet of VISITE_OBJETS) {
+    await prisma.visiteObjet.upsert({
+      where: { code: objet.code },
+      create: { ...objet, isSystem: true },
+      update: { label: objet.label, sortOrder: objet.sortOrder, isSystem: true },
+    });
+  }
+
+  console.info(
+    `  registre des visites : ${String(VISITE_ENTREPRISES.length)} entreprises · ` +
+      `${String(VISITE_DIRECTIONS.length)} directions · ` +
+      `${String(VISITE_DESTINATAIRES.length)} destinataires · ` +
+      `${String(VISITE_OBJETS.length)} objets`,
+  );
+}
+
 async function seedAdmin(): Promise<void> {
   const email = process.env.SEED_ADMIN_EMAIL;
   const username = process.env.SEED_ADMIN_USERNAME;
@@ -198,6 +243,7 @@ async function main(): Promise<void> {
   await seedSyndicats();
   await seedBankWorkflow();
   await seedCallOutcomes();
+  await seedVisiteReferentiels();
   await seedAdmin();
   console.info('Seed terminé.');
 }
