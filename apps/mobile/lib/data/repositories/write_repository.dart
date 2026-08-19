@@ -21,9 +21,11 @@ enum CallAttemptProblem {
   commentTooLong;
 
   String get message => switch (this) {
-    CallAttemptProblem.unknownReason => 'Motif d\'appel inconnu de cet appareil.',
+    CallAttemptProblem.unknownReason =>
+      'Motif d\'appel inconnu de cet appareil.',
     CallAttemptProblem.unknownMethod => 'Méthode d\'enrôlement inconnue.',
-    CallAttemptProblem.methodRequired => 'Choisissez la méthode d\'enrôlement obtenue.',
+    CallAttemptProblem.methodRequired =>
+      'Choisissez la méthode d\'enrôlement obtenue.',
     CallAttemptProblem.methodNotAllowed =>
       'Une méthode ne se saisit que si elle a été obtenue.',
     CallAttemptProblem.commentRequired =>
@@ -34,13 +36,7 @@ enum CallAttemptProblem {
   };
 }
 
-enum DiscardOutcome {
-  discarded,
-
-  claimed,
-
-  notFound,
-}
+enum DiscardOutcome { discarded, claimed, notFound }
 
 class DiscardResult {
   const DiscardResult(this.outcome, {this.removed = 0});
@@ -74,11 +70,11 @@ class CallAttemptInvalid implements Exception {
 }
 
 class WriteRepository {
-  WriteRepository(this._db, {Clock clock = const SystemClock()}) : _clock = clock;
+  WriteRepository(this._db, {Clock clock = const SystemClock()})
+    : _clock = clock;
 
   final AppDatabase _db;
   final Clock _clock;
-
 
   /// Le numéro WhatsApp n'est retenu que sur `AUTRE_NUMERO`.
   ///
@@ -217,8 +213,9 @@ class WriteRepository {
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
-      await (_db.update(_db.prospects)
-            ..where((Prospects t) => t.representantId.equals(id) & t.deletedAt.isNull()))
+      await (_db.update(_db.prospects)..where(
+            (Prospects t) => t.representantId.equals(id) & t.deletedAt.isNull(),
+          ))
           .write(
             ProspectsCompanion(
               deletedAt: Value<DateTime?>(now),
@@ -237,7 +234,6 @@ class WriteRepository {
     });
   }
 
-
   /// Ajout seul. Un commentaire ne se modifie ni ne s'efface : il n'y a donc ni
   /// `rev` à envoyer ni conflit possible, et deux téléconseillers hors ligne qui
   /// commentent la même fiche produisent deux lignes distinctes.
@@ -249,25 +245,42 @@ class WriteRepository {
   }) async {
     final String trimmed = body.trim();
     if (trimmed.isEmpty) {
-      throw ArgumentError.value(body, 'body', 'un commentaire vide ne s\'écrit pas');
+      throw ArgumentError.value(
+        body,
+        'body',
+        'un commentaire vide ne s\'écrit pas',
+      );
     }
     final String entityId = Ids.newId();
     final DateTime now = _clock.now();
-    await _db
-        .into(_db.representantComments)
-        .insert(
-          RepresentantCommentsCompanion.insert(
-            id: entityId,
-            representantId: representantId,
-            authorId: authorId,
-            authorName: authorName,
-            body: trimmed,
-            clientCreatedAt: now,
-          ),
-        );
+    await _db.transaction(() async {
+      await _db
+          .into(_db.representantComments)
+          .insert(
+            RepresentantCommentsCompanion.insert(
+              id: entityId,
+              representantId: representantId,
+              authorId: authorId,
+              authorName: authorName,
+              body: trimmed,
+              clientCreatedAt: now,
+            ),
+          );
+      await _enqueue(
+        dependencyKey: representantId,
+        entityType: 'representant_comment',
+        entityId: entityId,
+        op: 'create',
+        payload: <String, Object?>{
+          'representantId': representantId,
+          'body': trimmed,
+          'clientCreatedAt': now.toUtc().toIso8601String(),
+        },
+        now: now,
+      );
+    });
     return entityId;
   }
-
 
   Future<String> createProspect({
     required String nom,
@@ -337,7 +350,9 @@ class WriteRepository {
       final Prospect current = await (_db.select(
         _db.prospects,
       )..where((Prospects t) => t.id.equals(id))).getSingle();
-      await (_db.update(_db.prospects)..where((Prospects t) => t.id.equals(id))).write(
+      await (_db.update(
+        _db.prospects,
+      )..where((Prospects t) => t.id.equals(id))).write(
         ProspectsCompanion(
           nom: Value<String>(nom),
           prenom: Value<String>(prenom),
@@ -377,7 +392,9 @@ class WriteRepository {
       final Prospect current = await (_db.select(
         _db.prospects,
       )..where((Prospects t) => t.id.equals(id))).getSingle();
-      await (_db.update(_db.prospects)..where((Prospects t) => t.id.equals(id))).write(
+      await (_db.update(
+        _db.prospects,
+      )..where((Prospects t) => t.id.equals(id))).write(
         ProspectsCompanion(
           deletedAt: Value<DateTime?>(now),
           localUpdatedAt: Value<DateTime>(now),
@@ -395,7 +412,6 @@ class WriteRepository {
     });
   }
 
-
   /// [outcome] et [reasonCode] désignent le MÊME motif : le second l'emporte, le
   /// premier reste le point d'entrée des six codes système, dont le référentiel
   /// garantit qu'ils portent le code de leur issue.
@@ -407,9 +423,13 @@ class WriteRepository {
     String? method,
     String? comment,
     DateTime? callbackAt,
+    String? recordingPath,
     String? id,
   }) async {
-    final CallReason? reason = await resolveCallReason(_db, reasonCode ?? outcome);
+    final CallReason? reason = await resolveCallReason(
+      _db,
+      reasonCode ?? outcome,
+    );
     if (reason == null) {
       throw const CallAttemptInvalid(CallAttemptProblem.unknownReason);
     }
@@ -459,6 +479,7 @@ class WriteRepository {
           'comment': ?normalizedComment,
           'callbackAt': ?callback?.toUtc().toIso8601String(),
           'clientCreatedAt': now.toUtc().toIso8601String(),
+          '_recordingPath': ?recordingPath,
         },
         now: now,
       );
@@ -509,7 +530,6 @@ class WriteRepository {
     return null;
   }
 
-
   Future<OutboxData?> headOperation(String entityType, String entityId) {
     return (_db.select(_db.outbox)
           ..where(
@@ -524,7 +544,6 @@ class WriteRepository {
           ..limit(1))
         .getSingleOrNull();
   }
-
 
   static bool _isClaimed(OutboxData row) =>
       row.claimToken != null || row.status == OutboxStatus.syncing;
@@ -588,25 +607,27 @@ class WriteRepository {
       ...payload,
     };
     final int amended =
-        await (_db.update(_db.outbox)
-              ..where((Outbox o) => o.seq.equals(head.seq) & _unclaimed(o)))
-            .write(
-      OutboxCompanion(
-        id: Value<String>(Ids.newId()),
-        payload: Value<String>(jsonEncode(merged)),
-        payloadVersion: const Value<int>(SyncEngine.payloadVersion),
-        baseRev: head.op == 'create' ? const Value<int?>(null) : Value<int?>(baseRev),
-        status: const Value<String>(OutboxStatus.pending),
-        attempts: const Value<int>(0),
-        blockedAttempts: const Value<int>(0),
-        nextAttemptAt: Value<DateTime>(now),
-        leaseUntil: const Value<DateTime?>(null),
-        claimToken: const Value<String?>(null),
-        batchId: const Value<String?>(null),
-        lastErrorCode: const Value<String?>(null),
-        lastErrorMsg: const Value<String?>(null),
-      ),
-    );
+        await (_db.update(
+          _db.outbox,
+        )..where((Outbox o) => o.seq.equals(head.seq) & _unclaimed(o))).write(
+          OutboxCompanion(
+            id: Value<String>(Ids.newId()),
+            payload: Value<String>(jsonEncode(merged)),
+            payloadVersion: const Value<int>(SyncEngine.payloadVersion),
+            baseRev: head.op == 'create'
+                ? const Value<int?>(null)
+                : Value<int?>(baseRev),
+            status: const Value<String>(OutboxStatus.pending),
+            attempts: const Value<int>(0),
+            blockedAttempts: const Value<int>(0),
+            nextAttemptAt: Value<DateTime>(now),
+            leaseUntil: const Value<DateTime?>(null),
+            claimToken: const Value<String?>(null),
+            batchId: const Value<String?>(null),
+            lastErrorCode: const Value<String?>(null),
+            lastErrorMsg: const Value<String?>(null),
+          ),
+        );
     return amended > 0;
   }
 
@@ -625,12 +646,12 @@ class WriteRepository {
     )..where((FormDrafts t) => t.draftId.equals(draftId))).go();
   }
 
-
   Future<bool> retryOperation(int seq) async {
     final int changed =
         await (_db.update(_db.outbox)..where(
               (Outbox o) =>
-                  o.seq.equals(seq) & o.status.isIn(OutboxStatus.needsAttention),
+                  o.seq.equals(seq) &
+                  o.status.isIn(OutboxStatus.needsAttention),
             ))
             .write(
               OutboxCompanion(
@@ -696,10 +717,9 @@ class WriteRepository {
         final List<int> seqs = victims
             .map((OutboxData v) => v.seq)
             .toList(growable: false);
-        final int removed =
-            await (_db.delete(
-              _db.outbox,
-            )..where((Outbox o) => o.seq.isIn(seqs) & _unclaimed(o))).go();
+        final int removed = await (_db.delete(
+          _db.outbox,
+        )..where((Outbox o) => o.seq.isIn(seqs) & _unclaimed(o))).go();
         if (removed != victims.length) {
           throw const _ClaimRace();
         }
@@ -752,9 +772,7 @@ class WriteRepository {
     }
     final List<OutboxData> victims = await _discardVictims(row);
     final int prospects = victims
-        .where(
-          (OutboxData v) => v.op == 'create' && v.entityType == 'prospect',
-        )
+        .where((OutboxData v) => v.op == 'create' && v.entityType == 'prospect')
         .length;
     return DiscardPreview(operations: victims.length, prospects: prospects);
   }

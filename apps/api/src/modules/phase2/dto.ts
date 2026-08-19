@@ -136,6 +136,11 @@ export class CampaignAttemptDto {
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
 }
 
+export class CallRecordingDto {
+  @ApiProperty({ format: 'uuid' }) attemptId!: string;
+  @ApiProperty({ type: Number }) bytes!: number;
+}
+
 export class CampaignSummaryDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() name!: string;

@@ -28,6 +28,7 @@ class HistoriqueScreen extends ConsumerWidget {
     final AsyncValue<List<RepresentantSyncViewData>> rows = ref.watch(
       representantListProvider,
     );
+    final String search = ref.watch(historiqueSearchProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -58,7 +59,9 @@ class HistoriqueScreen extends ConsumerWidget {
               error: (Object e, StackTrace _) =>
                   Center(child: Text('Lecture impossible : $e')),
               data: (List<RepresentantSyncViewData> list) {
-                if (list.isEmpty) return const _EmptyHistorique();
+                if (list.isEmpty) {
+                  return _EmptyHistorique(searching: search.trim().isNotEmpty);
+                }
                 return RefreshIndicator(
                   onRefresh: () async {
                     await HapticFeedback.selectionClick();
@@ -361,7 +364,9 @@ class _StatusButton extends ConsumerWidget {
 }
 
 class _EmptyHistorique extends StatelessWidget {
-  const _EmptyHistorique();
+  const _EmptyHistorique({this.searching = false});
+
+  final bool searching;
 
   @override
   Widget build(BuildContext context) {
@@ -377,13 +382,25 @@ class _EmptyHistorique extends StatelessWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: CpiSpacing.md),
-          Text('Aucun représentant', style: theme.textTheme.titleSmall),
-          const SizedBox(height: CpiSpacing.lg),
-          FilledButton.icon(
-            onPressed: () => context.pushOnce(Routes.newRepresentant),
-            icon: const Icon(PhosphorIconsRegular.plus, size: 20),
-            label: const Text('Nouveau représentant'),
+          Text(
+            searching ? 'Aucun résultat' : 'Aucun représentant',
+            style: theme.textTheme.titleSmall,
           ),
+          const SizedBox(height: CpiSpacing.lg),
+          if (searching)
+            Text(
+              'Vérifiez le nom ou le numéro, ou effacez la recherche.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            )
+          else
+            FilledButton.icon(
+              onPressed: () => context.pushOnce(Routes.newRepresentant),
+              icon: const Icon(PhosphorIconsRegular.plus, size: 20),
+              label: const Text('Nouveau représentant'),
+            ),
         ],
       ),
     );

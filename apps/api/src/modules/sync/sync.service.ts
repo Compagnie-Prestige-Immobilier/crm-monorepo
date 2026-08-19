@@ -410,6 +410,9 @@ export class SyncService {
       if (operation.entity === SyncEntity.REPRESENTANT) {
         return await this.applyRepresentant(tx, user, operation, authorIsDemo);
       }
+      if (operation.entity === SyncEntity.REPRESENTANT_COMMENT) {
+        return await this.applyRepresentantComment(tx, user, operation);
+      }
       if (operation.entity === SyncEntity.CALL_ATTEMPT) {
         // La tentative hérite de SON PROSPECT, que `phase2-sync` lit déjà :
         // rien à transmettre ici.
@@ -432,6 +435,66 @@ export class SyncService {
       // entier soit annulé proprement.
       throw error;
     }
+  }
+
+  private async applyRepresentantComment(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    operation: SyncOperationDto,
+  ): Promise<OperationOutcome> {
+    if (operation.op !== SyncOp.CREATE) {
+      throw new OperationError(
+        SyncOpStatus.INVALID,
+        'OP_NOT_SUPPORTED',
+        'Un commentaire ne peut être ni modifié ni supprimé hors ligne.',
+      );
+    }
+
+    const data = operation.data ?? {};
+    requireUuid(data.representantId, 'representantId');
+    requireText(data.body, 'body');
+
+    const existing = await tx.representantComment.findUnique({
+      where: { id: operation.entityId },
+    });
+    if (existing) {
+      if (existing.representantId !== data.representantId || existing.authorId !== user.id) {
+        throw new OperationError(
+          SyncOpStatus.CONFLICT,
+          'ENTITY_ID_OWNED_BY_ANOTHER_USER',
+          'Cet identifiant appartient à un autre commentaire.',
+        );
+      }
+      return applied(existing.id, null, existing.createdAt);
+    }
+
+    const representant = await tx.representant.findFirst({
+      where: { id: data.representantId, deletedAt: null, ...ownerScope(user) },
+    });
+    if (!representant) {
+      throw new OperationError(
+        SyncOpStatus.INVALID,
+        'REPRESENTANT_NOT_FOUND',
+        'Représentant introuvable.',
+      );
+    }
+
+    const createdAt = new Date();
+    await tx.representantComment.createMany({
+      data: [
+        {
+          id: operation.entityId,
+          representantId: data.representantId,
+          authorId: user.id,
+          body: data.body.trim(),
+          clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
+          isDemo: representant.isDemo,
+          createdAt,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return applied(operation.entityId, null, createdAt);
   }
 
   // ─── Représentant ─────────────────────────────────────────────────────────
@@ -748,9 +811,10 @@ export class SyncService {
     if (phoneE164 !== existing.phoneE164) {
       await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
     }
-    if (data.representantId && data.representantId !== existing.representantId) {
-      await assertRepresentantUsable(tx, user, data.representantId);
-    }
+    const reassignedRepresentant =
+      data.representantId && data.representantId !== existing.representantId
+        ? await assertRepresentantUsable(tx, user, data.representantId)
+        : null;
 
     const row = await tx.prospect.update({
       where: { id: existing.id },
@@ -762,9 +826,15 @@ export class SyncService {
         ...(data.syndicatId ? { syndicatId: data.syndicatId } : {}),
         ...(data.representantId ? { representantId: data.representantId } : {}),
         ...(data.statut ? { statut: data.statut } : {}),
+        ...(reassignedRepresentant && (authorIsDemo || reassignedRepresentant.isDemo)
+          ? { isDemo: true }
+          : {}),
         rev: { increment: 1 },
       },
     });
+    if (reassignedRepresentant && (authorIsDemo || reassignedRepresentant.isDemo)) {
+      await recordDemoEntity(tx, 'prospect', row.id);
+    }
     return applied(row.id, row.rev, row.updatedAt);
   }
 

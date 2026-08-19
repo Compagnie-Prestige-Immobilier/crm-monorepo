@@ -8,7 +8,10 @@ class StubApi implements ApiPort {
   static const String _marker = 'stub';
 
   @override
-  Future<AuthTokens> login({required String identifier, required String password}) async {
+  Future<AuthTokens> login({
+    required String identifier,
+    required String password,
+  }) async {
     if (identifier.trim().isEmpty || password.isEmpty) {
       throw const ApiException(
         'invalid_credentials',
@@ -71,6 +74,14 @@ class StubApi implements ApiPort {
       message: 'Aucun serveur configuré : ce transport ne pousse rien.',
       kind: FailureKind.retryable,
     );
+  }
+
+  @override
+  Future<void> uploadCallRecording({
+    required String attemptId,
+    required String path,
+  }) async {
+    throw const ApiException('api_not_configured', kind: FailureKind.retryable);
   }
 
   @override

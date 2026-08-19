@@ -75,6 +75,8 @@ dependencies:
   path_provider: ^2.1.5
   shared_preferences: ^2.5.0
   collection: ^1.19.0
+  record: '>=6.1.2 <7.0.0'
+  just_audio: ^0.10.6
   # Ni `firebase_core` ni `firebase_messaging` : le projet Firebase exige un
   # compte Google que CPI n'a pas et ne veut pas ouvrir. Le canal d'annonces est
   # donc l'inbox applicative, tirée depuis `/notifications/mine` (voir

@@ -154,7 +154,10 @@ class ApiException implements Exception {
 }
 
 abstract interface class ApiPort {
-  Future<AuthTokens> login({required String identifier, required String password});
+  Future<AuthTokens> login({
+    required String identifier,
+    required String password,
+  });
 
   Future<AuthTokens> refresh({required String refreshToken});
 
@@ -166,6 +169,11 @@ abstract interface class ApiPort {
     required String batchId,
     required int payloadVersion,
     required List<SyncOperationDto> operations,
+  });
+
+  Future<void> uploadCallRecording({
+    required String attemptId,
+    required String path,
   });
 
   Future<Phase2DirectoryPage> pullPhase2Directory({String? cursor, int limit});

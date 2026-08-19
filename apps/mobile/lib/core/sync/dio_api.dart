@@ -28,9 +28,11 @@ class DioApi implements ApiPort {
   RepresentantsApi get _representants => _client.getRepresentantsApi();
   CallOutcomeReasonsApi get _reasons => _client.getCallOutcomeReasonsApi();
 
-
   @override
-  Future<AuthTokens> login({required String identifier, required String password}) async {
+  Future<AuthTokens> login({
+    required String identifier,
+    required String password,
+  }) async {
     return _guard('login', () async {
       final Response<AuthTokensDto> response = await _auth.login(
         userAgent: ApiEnvironment.userAgent,
@@ -73,7 +75,9 @@ class DioApi implements ApiPort {
     return AuthTokens(
       accessToken: dto.accessToken,
       refreshToken: dto.refreshToken,
-      expiresAt: DateTime.now().toUtc().add(Duration(seconds: dto.expiresIn.toInt())),
+      expiresAt: DateTime.now().toUtc().add(
+        Duration(seconds: dto.expiresIn.toInt()),
+      ),
       userId: dto.user.id,
       fullName: dto.user.fullName,
       role: dto.user.role.value,
@@ -82,15 +86,15 @@ class DioApi implements ApiPort {
     );
   }
 
-
   @override
   Future<PullPage> pull({String? cursor, int limit = 200}) async {
     return _guard('pull', () async {
-      final Response<SyncPullResponseDto> response = await _sync.pullSyncChanges(
-        since: cursor,
-        limit: limit,
-        extra: TimeoutProfile.read.extra,
-      );
+      final Response<SyncPullResponseDto> response = await _sync
+          .pullSyncChanges(
+            since: cursor,
+            limit: limit,
+            extra: TimeoutProfile.read.extra,
+          );
       final SyncPullResponseDto body = _body('pull', response);
       return PullPage(
         changes: body.changes,
@@ -127,6 +131,23 @@ class DioApi implements ApiPort {
     });
   }
 
+  @override
+  Future<void> uploadCallRecording({
+    required String attemptId,
+    required String path,
+  }) async {
+    await _guard('callRecording', () async {
+      await _phase2.uploadCallRecording(
+        id: attemptId,
+        file: await MultipartFile.fromFile(
+          path,
+          filename: '$attemptId.m4a',
+          contentType: DioMediaType('audio', 'mp4'),
+        ),
+        extra: TimeoutProfile.push.extra,
+      );
+    });
+  }
 
   @override
   Future<Phase2DirectoryPage> pullPhase2Directory({
@@ -134,15 +155,17 @@ class DioApi implements ApiPort {
     int limit = 2000,
   }) async {
     return _guard('phase2Directory', () async {
-      final Response<DirectoryPageDto> response = await _phase2.pullPhase2Directory(
-        since: (cursor == null || cursor.isEmpty) ? null : cursor,
-        limit: limit,
-        extra: TimeoutProfile.read.extra,
-      );
+      final Response<DirectoryPageDto> response = await _phase2
+          .pullPhase2Directory(
+            since: (cursor == null || cursor.isEmpty) ? null : cursor,
+            limit: limit,
+            extra: TimeoutProfile.read.extra,
+          );
       final DirectoryPageDto body = _body('phase2Directory', response);
       return Phase2DirectoryPage(
         entries: <Phase2DirectoryEntry>[
-          for (final DirectoryEntryDto entry in body.entries) _toDirectoryEntry(entry),
+          for (final DirectoryEntryDto entry in body.entries)
+            _toDirectoryEntry(entry),
         ],
         nextCursor: body.nextCursor,
         hasMore: body.hasMore,
@@ -180,7 +203,10 @@ class DioApi implements ApiPort {
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone) async {
     return _guard('lookup', () async {
       final Response<RepresentantLookupDto> response = await _representants
-          .lookupRepresentantByPhone(phone: phone, extra: TimeoutProfile.read.extra);
+          .lookupRepresentantByPhone(
+            phone: phone,
+            extra: TimeoutProfile.read.extra,
+          );
       final RepresentantLookupDto body = _body('lookup', response);
       return RepresentantLookup(
         found: body.found,
@@ -191,7 +217,6 @@ class DioApi implements ApiPort {
       );
     });
   }
-
 
   static T _body<T>(String operation, Response<T> response) {
     final T? data = response.data;
@@ -299,7 +324,8 @@ class DioApi implements ApiPort {
     }
 
     final int? status = e.response?.statusCode;
-    final String code = _serverCode(e.response?.data) ?? _defaultCode(status, operation);
+    final String code =
+        _serverCode(e.response?.data) ?? _defaultCode(status, operation);
     final String? message = _serverMessage(e.response?.data);
 
     if (status == null) {

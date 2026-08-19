@@ -19,6 +19,7 @@ import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../phase2_controller.dart';
 import 'callback_picker.dart';
+import 'call_audio_recorder.dart';
 
 class Phase2Screen extends ConsumerStatefulWidget {
   const Phase2Screen({super.key});
@@ -32,6 +33,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   final FocusNode _phoneFocus = FocusNode();
 
   String? _lastSearched;
+  String? _recordingPath;
 
   @override
   void initState() {
@@ -73,6 +75,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   void _resetForNext() {
     _lastSearched = null;
     _phone.clear();
+    _recordingPath = null;
     ref.read(phase2ControllerProvider.notifier).next();
     _phoneFocus.requestFocus();
   }
@@ -85,7 +88,13 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   }) async {
     final bool ok = await ref
         .read(phase2ControllerProvider.notifier)
-        .record(reason: reason, method: method, comment: comment, callbackAt: callbackAt);
+        .record(
+          reason: reason,
+          method: method,
+          comment: comment,
+          callbackAt: callbackAt,
+          recordingPath: _recordingPath,
+        );
     if (!mounted) return;
     if (!ok) {
       await HapticFeedback.heavyImpact();
@@ -105,7 +114,10 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
 
     return CpiPopScope(
       child: Scaffold(
-        appBar: AppBar(title: const Text('Phase 2'), leading: const CpiBackButton()),
+        appBar: AppBar(
+          title: const Text('Phase 2'),
+          leading: const CpiBackButton(),
+        ),
         body: SafeArea(
           child: Column(
             children: <Widget>[
@@ -134,7 +146,9 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                           '${phase2.stage.name}:${phase2.entry?.prospectId ?? ''}',
                         ),
                         child: switch (phase2.stage) {
-                          Phase2Stage.search => _SearchHint(message: phase2.errorMessage),
+                          Phase2Stage.search => _SearchHint(
+                            message: phase2.errorMessage,
+                          ),
                           Phase2Stage.notFound => _NotFound(
                             phone: phase2.searchedPhone,
                             onClear: _resetForNext,
@@ -145,8 +159,12 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                           ),
                           Phase2Stage.capture => _Capture(
                             state: phase2,
-                            onMethod: (String method) =>
-                                _record(reason: methodReasonOf(reasons), method: method),
+                            onRecordingChanged: (String? path) =>
+                                _recordingPath = path,
+                            onMethod: (String method) => _record(
+                              reason: methodReasonOf(reasons),
+                              method: method,
+                            ),
                             onNegative: () => _openNegativeSheet(reasons),
                           ),
                           Phase2Stage.confirmed => _Confirmed(
@@ -168,13 +186,16 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   }
 
   Future<void> _openNegativeSheet(List<CallReason> reasons) async {
-    final CallOutcomeChoice? result = await showModalBottomSheet<CallOutcomeChoice>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (BuildContext context) =>
-          CallOutcomeSheet(now: ref.read(clockProvider).now(), reasons: reasons),
-    );
+    final CallOutcomeChoice? result =
+        await showModalBottomSheet<CallOutcomeChoice>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          builder: (BuildContext context) => CallOutcomeSheet(
+            now: ref.read(clockProvider).now(),
+            reasons: reasons,
+          ),
+        );
     if (result == null || !mounted) return;
     await _record(
       reason: result.reason,
@@ -191,7 +212,6 @@ CallReason methodReasonOf(List<CallReason> reasons) => reasons.firstWhere(
   orElse: () => SystemCallReasons.byCode[CallOutcomes.methodObtained]!,
 );
 
-
 class _StatusStrip extends ConsumerWidget {
   const _StatusStrip();
 
@@ -201,7 +221,9 @@ class _StatusStrip extends ConsumerWidget {
     final CpiColors cpi = context.cpi;
     final Phase2State phase2 = ref.watch(phase2ControllerProvider);
     final int directory = ref.watch(phase2DirectoryCountProvider).value ?? 0;
-    final SyncStateData? syncState = ref.watch(phase2DirectoryStateProvider).value;
+    final SyncStateData? syncState = ref
+        .watch(phase2DirectoryStateProvider)
+        .value;
     final int pending = ref.watch(phase2PendingCountProvider).value ?? 0;
     final ({int attempts, int closed, int methods})? progress = ref
         .watch(phase2ProgressProvider)
@@ -293,7 +315,9 @@ class _DownloadBar extends ConsumerWidget {
             ? null
             : () {
                 unawaited(HapticFeedback.selectionClick());
-                unawaited(ref.read(phase2ControllerProvider.notifier).download());
+                unawaited(
+                  ref.read(phase2ControllerProvider.notifier).download(),
+                );
               },
         icon: downloading
             ? const SizedBox(
@@ -404,7 +428,9 @@ class _DirectoryLine extends ConsumerWidget {
               ? PhosphorIconsRegular.cloudArrowDown
               : PhosphorIconsRegular.addressBook,
           size: 18,
-          color: directory == 0 ? cpi.accentText : theme.colorScheme.onSurfaceVariant,
+          color: directory == 0
+              ? cpi.accentText
+              : theme.colorScheme.onSurfaceVariant,
         ),
         const SizedBox(width: CpiSpacing.xxs),
         Expanded(
@@ -413,7 +439,9 @@ class _DirectoryLine extends ConsumerWidget {
                 ? 'Annuaire non téléchargé'
                 : 'Annuaire : ${_number.format(directory)} numéros · $freshness',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: directory == 0 ? cpi.accentText : theme.colorScheme.onSurfaceVariant,
+              color: directory == 0
+                  ? cpi.accentText
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -421,7 +449,8 @@ class _DirectoryLine extends ConsumerWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             child: TextButton(
-              onPressed: () => ref.read(phase2ControllerProvider.notifier).download(),
+              onPressed: () =>
+                  ref.read(phase2ControllerProvider.notifier).download(),
               child: const Text('Mettre à jour'),
             ),
           ),
@@ -430,9 +459,7 @@ class _DirectoryLine extends ConsumerWidget {
   }
 
   static final NumberFormat _number = NumberFormat.decimalPattern('fr');
-
 }
-
 
 class _PhoneBlock extends ConsumerWidget {
   const _PhoneBlock({
@@ -447,7 +474,9 @@ class _PhoneBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final String? downloadError = ref.watch(phase2ControllerProvider).downloadError;
+    final String? downloadError = ref
+        .watch(phase2ControllerProvider)
+        .downloadError;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -480,7 +509,6 @@ class _PhoneBlock extends ConsumerWidget {
     );
   }
 }
-
 
 class _SearchHint extends StatelessWidget {
   const _SearchHint({this.message});
@@ -596,7 +624,9 @@ class _AlreadyClosed extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Dossier déjà traité',
-                          style: theme.textTheme.titleMedium?.copyWith(color: tone),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: tone,
+                          ),
                         ),
                       ),
                     ],
@@ -645,11 +675,17 @@ class _AlreadyClosed extends StatelessWidget {
 }
 
 class _Capture extends StatelessWidget {
-  const _Capture({required this.state, required this.onMethod, required this.onNegative});
+  const _Capture({
+    required this.state,
+    required this.onMethod,
+    required this.onNegative,
+    required this.onRecordingChanged,
+  });
 
   final Phase2State state;
   final ValueChanged<String> onMethod;
   final VoidCallback onNegative;
+  final ValueChanged<String?> onRecordingChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -659,7 +695,15 @@ class _Capture extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text('Méthode d\'enrôlement obtenue', style: theme.textTheme.titleMedium),
+        CallAudioRecorder(
+          enabled: !state.saving,
+          onChanged: onRecordingChanged,
+        ),
+        const SizedBox(height: CpiSpacing.md),
+        Text(
+          'Méthode d\'enrôlement obtenue',
+          style: theme.textTheme.titleMedium,
+        ),
         const SizedBox(height: CpiSpacing.xxs),
         Text(
           'Une seule réponse.',
@@ -867,7 +911,6 @@ class _Confirmed extends StatelessWidget {
   }
 }
 
-
 class CallOutcomeChoice {
   const CallOutcomeChoice(this.reason, this.comment, this.callbackAt);
 
@@ -922,7 +965,9 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
         widget.reasons
             .where((CallReason r) => r.effect != CallEffects.closeMethod)
             .toList()
-          ..sort((CallReason a, CallReason b) => a.sortOrder.compareTo(b.sortOrder));
+          ..sort(
+            (CallReason a, CallReason b) => a.sortOrder.compareTo(b.sortOrder),
+          );
 
     final Map<String, List<CallReason>> byEffect = <String, List<CallReason>>{};
     for (final CallReason r in sorted) {
@@ -936,7 +981,10 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
     ];
     return <({String header, List<CallReason> items})>[
       for (final String effect in effects)
-        (header: _effectHeader[effect] ?? 'Autres motifs', items: byEffect[effect]!),
+        (
+          header: _effectHeader[effect] ?? 'Autres motifs',
+          items: byEffect[effect]!,
+        ),
     ];
   }
 
@@ -969,7 +1017,9 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -995,7 +1045,10 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
                       ),
                     ),
                   ),
-                  Text('Méthode non obtenue', style: theme.textTheme.titleLarge),
+                  Text(
+                    'Méthode non obtenue',
+                    style: theme.textTheme.titleLarge,
+                  ),
                   const SizedBox(height: CpiSpacing.xxs),
                   Text(
                     'Pourquoi l\'appel n\'a pas abouti à une méthode.',
@@ -1029,7 +1082,9 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
                       ),
                       for (final CallReason reason in group.items)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: CpiSpacing.xxs),
+                          padding: const EdgeInsets.only(
+                            bottom: CpiSpacing.xxs,
+                          ),
                           child: _OutcomeTile(
                             reason: reason,
                             selected: _reason == reason,
@@ -1051,7 +1106,8 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
                           ),
                         ),
                     ],
-                    if (_reason?.effect == CallEffects.scheduleCallback) ...<Widget>[
+                    if (_reason?.effect ==
+                        CallEffects.scheduleCallback) ...<Widget>[
                       const SizedBox(height: CpiSpacing.sm),
                       CallbackPicker(
                         key: const ValueKey<String>('callback-picker'),
@@ -1118,7 +1174,10 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
                     height: 52,
                     child: FilledButton.icon(
                       onPressed: _submit,
-                      icon: const Icon(PhosphorIconsRegular.floppyDisk, size: 20),
+                      icon: const Icon(
+                        PhosphorIconsRegular.floppyDisk,
+                        size: 20,
+                      ),
                       label: const Text('Enregistrer'),
                     ),
                   ),
@@ -1141,7 +1200,11 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
 }
 
 class _OutcomeTile extends StatelessWidget {
-  const _OutcomeTile({required this.reason, required this.selected, required this.onTap});
+  const _OutcomeTile({
+    required this.reason,
+    required this.selected,
+    required this.onTap,
+  });
 
   final CallReason reason;
   final bool selected;
@@ -1191,7 +1254,9 @@ class _OutcomeTile extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: CpiRadius.brMd,
                 border: Border.all(
-                  color: selected ? theme.colorScheme.primary : cpi.borderSubtle,
+                  color: selected
+                      ? theme.colorScheme.primary
+                      : cpi.borderSubtle,
                   width: selected ? 2 : 1,
                 ),
               ),
@@ -1202,7 +1267,8 @@ class _OutcomeTile extends StatelessWidget {
                     size: 20,
                     color: selected
                         ? theme.colorScheme.primary
-                        : (_tint(reason.color) ?? theme.colorScheme.onSurfaceVariant),
+                        : (_tint(reason.color) ??
+                              theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(width: CpiSpacing.sm),
                   Expanded(
@@ -1236,7 +1302,6 @@ class _OutcomeTile extends StatelessWidget {
     );
   }
 }
-
 
 class _Notice extends StatelessWidget {
   const _Notice({
@@ -1284,7 +1349,8 @@ class _SpringIn extends StatefulWidget {
   State<_SpringIn> createState() => _SpringInState();
 }
 
-class _SpringInState extends State<_SpringIn> with SingleTickerProviderStateMixin {
+class _SpringInState extends State<_SpringIn>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(vsync: this);
   late final CurvedAnimation _curved = CurvedAnimation(
     parent: _controller,

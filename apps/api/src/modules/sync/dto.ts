@@ -32,6 +32,7 @@ export const SYNC_MAX_DEPENDENCY_GROUPS = 25;
 
 export enum SyncEntity {
   REPRESENTANT = 'representant',
+  REPRESENTANT_COMMENT = 'representant_comment',
   PROSPECT = 'prospect',
   CALL_ATTEMPT = 'call_attempt',
 }
@@ -115,6 +116,12 @@ export class SyncEntityDataDto {
   @IsOptional()
   @IsUUID()
   representantId?: string;
+
+  @ApiPropertyOptional({ maxLength: 2000, description: 'Commentaire ajouté à une fiche.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  body?: string;
 
   @ApiPropertyOptional({ enum: ProspectStatut, enumName: 'ProspectStatut' })
   @IsOptional()
@@ -302,6 +309,10 @@ export function dependencyKeyOf(operation: {
   data?: { representantId?: string; prospectId?: string } | undefined;
 }): string {
   if (operation.entity === SyncEntity.REPRESENTANT) return `representant:${operation.entityId}`;
+
+  if (operation.entity === SyncEntity.REPRESENTANT_COMMENT) {
+    return `representant:${operation.data?.representantId ?? operation.entityId}`;
+  }
 
   if (operation.entity === SyncEntity.CALL_ATTEMPT) {
     return `prospect:${operation.data?.prospectId ?? operation.entityId}`;

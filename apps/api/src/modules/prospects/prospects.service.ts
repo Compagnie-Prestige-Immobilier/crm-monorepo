@@ -326,7 +326,9 @@ export class ProspectsService {
     });
     if (!rows.length) return { updated: 0, prospectIds: [] };
 
-    if (input.representantId) await this.assertRepresentantUsable(user, input.representantId);
+    const representant = input.representantId
+      ? await this.assertRepresentantUsable(user, input.representantId)
+      : null;
     if (input.commercialId) {
       const owner = await this.prisma.user.findFirst({
         where: { id: input.commercialId, deletedAt: null },
@@ -346,6 +348,9 @@ export class ProspectsService {
       data: {
         ...(input.representantId ? { representantId: input.representantId } : {}),
         ...(input.commercialId ? { createdById: input.commercialId } : {}),
+        ...(representant && ((await this.demo.enabledForWrite()) || representant.isDemo)
+          ? { isDemo: true }
+          : {}),
         rev: { increment: 1 },
       },
     });
