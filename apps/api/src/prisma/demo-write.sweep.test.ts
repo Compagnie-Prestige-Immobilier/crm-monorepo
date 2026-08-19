@@ -55,6 +55,10 @@ const SITES: Record<string, Site> = {
     verdict: 'BLOQUE',
     note: 'POST /v1/client-requests, refusé en 409 pendant une démonstration',
   },
+  'modules/visites/visites.service.ts → await this.demo.enabledForWrite()': {
+    verdict: 'BLOQUE',
+    note: 'POST /v1/visites, refusé en 409 pendant une démonstration ; le registre d’accueil n’a aucun autre chemin d’écriture',
+  },
   'modules/prospects/prospects.service.ts → (await this.demo.enabledForWrite()) || representant.isDemo':
     {
       verdict: 'BLOQUE',
@@ -221,8 +225,12 @@ const SITES: Record<string, Site> = {
     note: 'valeur RENDUE par assertRepresentantUsable à son appelant, qui décide ; aucune écriture ici',
   },
   'modules/sync/sync.service.ts → true': {
-    verdict: 'LECTURE',
-    note: 'projections : select isDemo sur l’auteur et sur le représentant de rattachement',
+    verdict: 'REGISTRE',
+    note:
+      'la clé couvre deux natures : des projections (select isDemo sur l’auteur et sur le ' +
+      'représentant de rattachement) ET une écriture, la mise à jour hors ligne d’un prospect ' +
+      'rattaché à un représentant fictif, que la même transaction inscrit dans demo_entities. ' +
+      'Le verdict prend la plus forte des deux.',
   },
   'modules/sync/sync.service.ts → boolean': {
     verdict: 'LECTURE',

@@ -255,6 +255,8 @@ model User {
 
   heartbeat AgentHeartbeat?
 
+  visitesEnregistrees Visite[] @relation("VisiteCreatedBy")
+
   @@index([role, isActive])
   @@index([deletedAt])
   @@index([isDemo])
@@ -1949,4 +1951,161 @@ model CallOutcomeReason {
   @@index([isActive, sortOrder])
   @@index([effect, isActive])
   @@map("call_outcome_reasons")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Registre des visites (accueil)
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Les trois entreprises du groupe.
+///
+/// Patron des quatre référentiels de visite, calqué sur `BankCaseStage` : `code`
+/// immuable puisque les visites déjà enregistrées le désignent, désactivation
+/// plutôt que suppression, `isSystem` pour ce que l'administration ne peut pas
+/// retirer des listes.
+model VisiteEntreprise {
+  id    String @id @default(uuid(7))
+  /// Immuable : le registre le référence. Voir `BankCaseStage.code`.
+  code  String @unique
+  label String @unique
+
+  isActive  Boolean @default(true)
+  isSystem  Boolean @default(false)
+  sortOrder Int     @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visites Visite[]
+
+  @@index([isActive, sortOrder])
+  @@map("visite_entreprises")
+}
+
+/// Services ET niveaux du bâtiment dans le même référentiel.
+///
+/// Le classeur les mélange sous « DIRECTIONS &/OU NIVEAU » : l'accueil note
+/// tantôt le service demandé, tantôt l'étage où monte le visiteur. Les séparer
+/// obligerait à trancher pour elle sur les 45 lignes où seul l'étage est connu.
+model VisiteDirection {
+  id    String @id @default(uuid(7))
+  code  String @unique
+  label String @unique
+
+  isActive  Boolean @default(true)
+  isSystem  Boolean @default(false)
+  sortOrder Int     @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visites Visite[]
+
+  @@index([isActive, sortOrder])
+  @@map("visite_directions")
+}
+
+/// Les personnes reçues, nommées avec leur rôle.
+///
+/// Référentiel et non lien vers `User` : la caissière, le juriste ou le DG ne
+/// détiennent pas de compte sur la plateforme, et le registre doit continuer de
+/// nommer un destinataire parti depuis des années.
+model VisiteDestinataire {
+  id    String @id @default(uuid(7))
+  code  String @unique
+  label String @unique
+
+  isActive  Boolean @default(true)
+  isSystem  Boolean @default(false)
+  sortOrder Int     @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visites Visite[]
+
+  @@index([isActive, sortOrder])
+  @@map("visite_destinataires")
+}
+
+/// Le motif de la venue.
+model VisiteObjet {
+  id    String @id @default(uuid(7))
+  code  String @unique
+  label String @unique
+
+  isActive  Boolean @default(true)
+  isSystem  Boolean @default(false)
+  sortOrder Int     @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visites Visite[]
+
+  @@index([isActive, sortOrder])
+  @@map("visite_objets")
+}
+
+/// Une personne passée à l'accueil, une ligne.
+model Visite {
+  id String @id @default(uuid(7))
+
+  /// Le « N° » du classeur, engendré par le serveur au format `V-2026-000412`.
+  /// Immuable : c'est par lui que l'accueil retrouve une ligne à l'oral.
+  reference String @unique
+
+  /// Instant de la visite. Minuit Dakar quand l'heure n'a pas été relevée, d'où
+  /// `timeKnown` : sans lui, une visite sans heure s'afficherait « 00:00 ».
+  visitedAt DateTime
+  timeKnown Boolean  @default(true)
+
+  visitorName String
+
+  /// Le numéro TEL QUE DONNÉ, et sa forme E.164 quand elle a pu être obtenue.
+  /// Un visiteur peut laisser un numéro étranger ou incomplet : l'accueil
+  /// l'enregistre quand même, et `phoneE164` reste nul. Voir `tryNormalizePhone`.
+  phone     String?
+  phoneE164 String?
+
+  entrepriseId String
+  entreprise   VisiteEntreprise @relation(fields: [entrepriseId], references: [id], onDelete: Restrict)
+
+  objetId String
+  objet   VisiteObjet @relation(fields: [objetId], references: [id], onDelete: Restrict)
+
+  /// Facultatifs : le classeur compte 45 lignes sans direction et 44 sans
+  /// destinataire, et c'est ce qui explique l'écart entre le total annuel et la
+  /// somme de ses répartitions.
+  directionId String?
+  direction   VisiteDirection? @relation(fields: [directionId], references: [id], onDelete: Restrict)
+
+  destinataireId String?
+  destinataire   VisiteDestinataire? @relation(fields: [destinataireId], references: [id], onDelete: Restrict)
+
+  comment String?
+
+  createdById String
+  createdBy   User   @relation("VisiteCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel : elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
+  @@index([visitedAt])
+  @@index([entrepriseId])
+  @@index([directionId])
+  @@index([destinataireId])
+  @@index([objetId])
+  @@index([createdById])
+  @@index([isDemo])
+  @@map("visites")
 }
