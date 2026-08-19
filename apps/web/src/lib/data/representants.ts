@@ -12,6 +12,67 @@ export type CreateRepresentantInput = components['schemas']['CreateRepresentantD
 export type RepresentantLookup = components['schemas']['RepresentantLookupDto'];
 export type RepresentantRelationChange = components['schemas']['RepresentantRelationChangeDto'];
 
+export const WHATSAPP_STATUSES = ['NON_DEMANDE', 'MEME_NUMERO', 'AUTRE_NUMERO', 'AUCUN'] as const;
+
+export type WhatsappStatus = (typeof WHATSAPP_STATUSES)[number];
+
+export const WHATSAPP_STATUS_LABELS: Record<WhatsappStatus, string> = {
+  NON_DEMANDE: 'Non demandé',
+  MEME_NUMERO: 'Le même que son téléphone',
+  AUTRE_NUMERO: 'Un autre numéro',
+  AUCUN: 'Pas de WhatsApp',
+};
+
+export const PROFESSIONS = [
+  'Instituteur',
+  'Professeur',
+  'Directeur d’école',
+  'Principal',
+  'Proviseur',
+  'Inspecteur',
+  'Personnel administratif',
+] as const;
+
+export interface RepresentantScript {
+  whatsappStatus: WhatsappStatus;
+  /** Renseigné UNIQUEMENT sur `AUTRE_NUMERO` : `MEME_NUMERO` ne duplique rien. */
+  whatsappE164: string | null;
+  whatsappNumber: string | null;
+  profession: string | null;
+}
+
+/**
+ * Le contrat porte desormais les quatre champs. L'alias reste, il nomme
+ * l'intention a l'appel et evite de propager `RepresentantRow` partout.
+ */
+export type ScriptedRepresentant = RepresentantRow;
+
+export function scriptOf(representant: ScriptedRepresentant): RepresentantScript {
+  return {
+    whatsappStatus: representant.whatsappStatus,
+    whatsappE164: representant.whatsappE164,
+    // Calcule par le SERVEUR: ne pas le recalculer ici, les deux definitions
+    // divergeraient au premier changement de regle.
+    whatsappNumber: representant.whatsappNumber,
+    profession: representant.profession,
+  };
+}
+
+export interface RepresentantScriptPatch {
+  whatsappStatus?: WhatsappStatus;
+  whatsappE164?: string;
+  profession?: string;
+}
+
+export type UpdateRepresentantPatch = UpdateRepresentantInput & RepresentantScriptPatch;
+
+export function whatsappLabel(script: RepresentantScript): string {
+  if (script.whatsappStatus === 'AUTRE_NUMERO' && script.whatsappNumber !== null) {
+    return script.whatsappNumber;
+  }
+  return WHATSAPP_STATUS_LABELS[script.whatsappStatus];
+}
+
 const startOfDay = (isoDate: string): string => `${isoDate}T00:00:00.000Z`;
 const endOfDay = (isoDate: string): string => `${isoDate}T23:59:59.999Z`;
 
@@ -86,7 +147,7 @@ export async function lookupRepresentantByPhone(
 
 export async function updateRepresentant(
   id: string,
-  patch: UpdateRepresentantInput,
+  patch: UpdateRepresentantPatch,
   client: ApiClient = getApiClient(),
 ): Promise<RepresentantRow> {
   return unwrap(

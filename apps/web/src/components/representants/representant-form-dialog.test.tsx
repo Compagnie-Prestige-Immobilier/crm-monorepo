@@ -55,6 +55,13 @@ const FICHE = {
   iefName: 'IEF Tambacounda',
   notes: null,
   relationStatus: 'CONTACTE',
+  // Le contrat rend TOUJOURS ces quatre champs, `whatsappStatus` n'etant pas
+  // nullable: une fiche de test qui les omet ne represente aucune reponse
+  // reelle du serveur.
+  whatsappStatus: 'NON_DEMANDE',
+  whatsappE164: null,
+  whatsappNumber: null,
+  profession: null,
 } as RepresentantRow;
 
 beforeEach(() => {
@@ -235,5 +242,114 @@ describe('RepresentantFormDialog, état de la relation', () => {
       expect(screen.getByRole('button', { name: 'Créer la fiche' })).toBeTruthy();
     });
     expect(screen.queryByRole('combobox', { name: /Relation/u })).toBeNull();
+  });
+});
+
+describe('RepresentantFormDialog, correction à froid du script', () => {
+  beforeEach(() => {
+    updateRepresentant.mockReset();
+    updateRepresentant.mockResolvedValue(FICHE);
+  });
+
+  it('affiche « Non demandé » plutôt qu’un WhatsApp vide', async () => {
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} />);
+
+    await waitFor(() => {
+      expect(trigger('WhatsApp').textContent).toContain('Non demandé');
+    });
+    expect(screen.queryByLabelText('Numéro WhatsApp')).toBeNull();
+  });
+
+  it('n’ouvre le champ du numéro que sur « un autre numéro »', async () => {
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} />);
+
+    await waitFor(() => {
+      expect(trigger('WhatsApp').textContent).toContain('Non demandé');
+    });
+
+    await choose('WhatsApp', 'Le même que son téléphone');
+    expect(screen.queryByLabelText('Numéro WhatsApp')).toBeNull();
+
+    await choose('WhatsApp', 'Un autre numéro');
+    expect(screen.getByLabelText('Numéro WhatsApp')).toBeTruthy();
+  });
+
+  it('« le même que son téléphone » n’écrit aucun numéro', async () => {
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} />);
+
+    await waitFor(() => {
+      expect(trigger('WhatsApp').textContent).toContain('Non demandé');
+    });
+    await choose('WhatsApp', 'Le même que son téléphone');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(updateRepresentant).toHaveBeenCalled();
+    });
+    expect(updateRepresentant.mock.calls[0]?.[1]).toMatchObject({
+      whatsappStatus: 'MEME_NUMERO',
+    });
+    expect(updateRepresentant.mock.calls[0]?.[1]).not.toHaveProperty('whatsappE164');
+  });
+
+  it('envoie le numéro distinct avec son statut', async () => {
+    const user = userEvent.setup();
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} />);
+
+    await waitFor(() => {
+      expect(trigger('WhatsApp').textContent).toContain('Non demandé');
+    });
+    await choose('WhatsApp', 'Un autre numéro');
+    await user.type(screen.getByLabelText('Numéro WhatsApp'), '77 987 65 43');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(updateRepresentant).toHaveBeenCalled();
+    });
+    expect(updateRepresentant.mock.calls[0]?.[1]).toMatchObject({
+      whatsappStatus: 'AUTRE_NUMERO',
+      whatsappE164: '77 987 65 43',
+    });
+  });
+
+  it('n’envoie rien sur les champs du script quand ils n’ont pas bougé', async () => {
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} />);
+
+    await waitFor(() => {
+      expect(trigger('WhatsApp').textContent).toContain('Non demandé');
+    });
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(updateRepresentant).toHaveBeenCalled();
+    });
+    expect(updateRepresentant.mock.calls[0]?.[1]).not.toHaveProperty('whatsappStatus');
+    expect(updateRepresentant.mock.calls[0]?.[1]).not.toHaveProperty('profession');
+  });
+
+  it('envoie la profession corrigée', async () => {
+    const user = userEvent.setup();
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Profession')).toBeTruthy();
+    });
+    await user.type(screen.getByLabelText('Profession'), 'Proviseur');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(updateRepresentant).toHaveBeenCalled();
+    });
+    expect(updateRepresentant.mock.calls[0]?.[1]).toMatchObject({ profession: 'Proviseur' });
+  });
+
+  it('ne demande ni WhatsApp ni profession à la création', async () => {
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={null} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Créer la fiche' })).toBeTruthy();
+    });
+    expect(screen.queryByRole('combobox', { name: /WhatsApp/u })).toBeNull();
+    expect(screen.queryByLabelText('Profession')).toBeNull();
   });
 });
