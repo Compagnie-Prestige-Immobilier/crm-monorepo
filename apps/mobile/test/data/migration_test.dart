@@ -14,6 +14,7 @@ import 'generated_migrations/schema_v6.dart' as v6;
 import 'generated_migrations/schema_v7.dart' as v7;
 import 'generated_migrations/schema_v8.dart' as v8;
 import 'generated_migrations/schema_v9.dart' as v9;
+import 'generated_migrations/schema_v10.dart' as v10;
 
 /// Test doré de migration.
 ///
@@ -948,6 +949,116 @@ void main() {
     await db.close();
   });
 
+  // ── v10 → v11 : WhatsApp et profession ─────────────────────────────────────
+  //
+  // Palier additif sur `representants`, qui n'a jamais été recréée : trois
+  // `addColumn` suffisent. Ce qui doit être prouvé n'est donc pas la recopie,
+  // c'est le DÉFAUT posé sur les 12 929 fiches déjà en base. `NON_DEMANDE` et
+  // non `AUCUN` : la migration ne peut pas savoir si la question a été posée, et
+  // poser « pas de WhatsApp » partout ferait cesser les rappels.
+
+  test('v10 -> v11 pose « non demandé » sur les fiches déjà en base', () async {
+    final schema = await verifier.schemaAt(10);
+
+    final v10.DatabaseAtV10 old = v10.DatabaseAtV10(schema.newConnection());
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO departements '
+      '(id, code, name, region_id, region_name, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['dep-1', 'DK', 'Dakar', 'reg-1', 'Dakar', _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, notes, departement_id, relation_status, '
+      ' created_by_id, client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'rep-1',
+        'Awa Ndiaye',
+        '+221771234567',
+        'Rappeler le matin.',
+        'dep-1',
+        'AMBASSADEUR',
+        'me',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-1', 'representant', 'rep-1', 'update', '{"notes":null}', _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 11);
+
+    final List<QueryRow> fiches = await db
+        .customSelect(
+          'SELECT notes, relation_status, whatsapp_status, whatsapp_e164, profession '
+          'FROM representants',
+        )
+        .get();
+    expect(fiches.single.read<String>('whatsapp_status'), 'NON_DEMANDE');
+    expect(fiches.single.read<String?>('whatsapp_e164'), isNull);
+    expect(fiches.single.read<String?>('profession'), isNull);
+    // Le palier v8 ne régresse pas, et la saisie du terrain reste intacte.
+    expect(fiches.single.read<String>('relation_status'), 'AMBASSADEUR');
+    expect(fiches.single.read<String?>('notes'), 'Rappeler le matin.');
+
+    // Une opération en file depuis trois semaines reste lisible : le palier ne
+    // touche pas au payload, et c'est lui que le moteur relit.
+    final List<QueryRow> queue = await db
+        .customSelect('SELECT payload FROM outbox')
+        .get();
+    expect(queue.single.read<String>('payload'), '{"notes":null}');
+
+    await db.close();
+  });
+
+  test('v10 -> v11 accepte un état WhatsApp que ce client ignore', () async {
+    final schema = await verifier.schemaAt(10);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 11);
+
+    await db.customStatement(
+      'INSERT INTO departements '
+      '(id, code, name, region_id, local_updated_at) VALUES (?, ?, ?, ?, ?)',
+      <Object?>['dep-1', 'DK', 'Dakar', 'reg-1', _iso],
+    );
+    // C'est TOUT l'objet de l'absence de CHECK : le jour où le serveur ajoute un
+    // état, un CHECK figé ferait avorter la transaction de pull ENTIÈRE, donc la
+    // page complète de changements, pas seulement cette fiche.
+    await db.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, departement_id, whatsapp_status, profession, '
+      ' created_by_id, client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'rep-2',
+        'Ibrahima Sarr',
+        '+221771234568',
+        'dep-1',
+        'NUMERO_PROFESSIONNEL',
+        'Censeur',
+        'me',
+        _iso,
+        _iso,
+      ],
+    );
+
+    final List<QueryRow> fiches = await db
+        .customSelect('SELECT whatsapp_status, profession FROM representants')
+        .get();
+    expect(fiches.single.read<String>('whatsapp_status'), 'NUMERO_PROFESSIONNEL');
+    expect(fiches.single.read<String?>('profession'), 'Censeur');
+
+    await db.close();
+  });
+
   // ── Le saut de plusieurs versions ──────────────────────────────────────────
   //
   // Chaque test ci-dessus ne franchit qu'UN palier. Or un commercial qui n'a pas
@@ -957,7 +1068,7 @@ void main() {
   // gardés par `to >= n` précisément parce qu'une composition mal ordonnée
   // produit un schéma qui n'est AUCUNE version déclarée.
 
-  test('v1 -> v10 d\'un seul coup : deux mois sans mise à jour', () async {
+  test('v1 -> v11 d\'un seul coup : deux mois sans mise à jour', () async {
     final schema = await verifier.schemaAt(1);
 
     final v1.DatabaseAtV1 old = v1.DatabaseAtV1(schema.newConnection());
@@ -1014,9 +1125,9 @@ void main() {
     await old.close();
 
     final AppDatabase db = AppDatabase(schema.newConnection());
-    // UN SEUL appel, de 1 à 10 : c'est le vrai chemin de l'appareil qui a sauté
+    // UN SEUL appel, de 1 à 11 : c'est le vrai chemin de l'appareil qui a sauté
     // les versions intermédiaires.
-    await verifier.migrateAndValidate(db, 10);
+    await verifier.migrateAndValidate(db, 11);
 
     // Les données de v1 ont traversé six paliers, dont une recréation de table.
     final List<QueryRow> prospects = await db
@@ -1097,19 +1208,33 @@ void main() {
     expect(journal.first.read<String?>('callback_at'), isNotNull);
     expect(journal.last.read<String?>('reason_code'), 'NRP');
 
+    // Le saut long passe aussi par le palier v11 : la fiche de v1 sort en
+    // « non demandé », le seul état qui ne prétende rien sur elle.
+    final List<QueryRow> whatsapp = await db
+        .customSelect(
+          'SELECT whatsapp_status, whatsapp_e164, profession FROM representants',
+        )
+        .get();
+    expect(whatsapp.single.read<String>('whatsapp_status'), 'NON_DEMANDE');
+    expect(whatsapp.single.read<String?>('whatsapp_e164'), isNull);
+    expect(whatsapp.single.read<String?>('profession'), isNull);
+
     await db.close();
   });
 
-  test('v2 -> v10 : le saut passe aussi par les colonnes ajoutées', () async {
+  test('v2 -> v11 : le saut passe aussi par les colonnes ajoutées', () async {
     final schema = await verifier.schemaAt(2);
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 10);
+    await verifier.migrateAndValidate(db, 11);
 
     // Les colonnes ajoutées en chemin (v4, v5, v7 puis v8) doivent être là
     // toutes : un palier gardé par `from < n` seul, sans `to >= n`, produit un
     // schéma intermédiaire qui n'est aucune version déclarée.
     final List<QueryRow> columns = await db
-        .customSelect('SELECT ief_id, relation_status FROM representants')
+        .customSelect(
+          'SELECT ief_id, relation_status, whatsapp_status, whatsapp_e164, '
+          'profession FROM representants',
+        )
         .get();
     expect(columns, isEmpty);
     final List<QueryRow> outbox = await db

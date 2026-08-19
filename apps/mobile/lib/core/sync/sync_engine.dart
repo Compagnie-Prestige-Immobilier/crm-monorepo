@@ -432,7 +432,12 @@ class SyncEngine {
   }
 
   /// Champs que le serveur accepte de mettre à NULL sur demande explicite.
-  static const List<String> _clearableFields = <String>['iefId', 'notes'];
+  static const List<String> _clearableFields = <String>[
+    'iefId',
+    'notes',
+    'whatsappE164',
+    'profession',
+  ];
 
   /// Un champ ABSENT du payload reste inchangé côté serveur ; seul un champ
   /// présent et nul est un effacement voulu, et il faut le nommer pour que la
@@ -1195,6 +1200,9 @@ class SyncEngine {
                 departementId: r.departementId,
                 iefId: Value<String?>(r.iefId),
                 relationStatus: Value<String>(r.relationStatus.value),
+                whatsappStatus: Value<String>(r.whatsappStatus.value),
+                whatsappE164: Value<String?>(r.whatsappE164),
+                profession: Value<String?>(r.profession),
                 createdById: r.createdById,
                 clientCreatedAt: r.clientCreatedAt,
                 rev: Value<int>(r.rev.toInt()),
@@ -1212,6 +1220,15 @@ class SyncEngine {
                   iefId: const CustomExpression<String>('excluded.ief_id'),
                   relationStatus: const CustomExpression<String>(
                     'excluded.relation_status',
+                  ),
+                  whatsappStatus: const CustomExpression<String>(
+                    'excluded.whatsapp_status',
+                  ),
+                  whatsappE164: const CustomExpression<String>(
+                    'excluded.whatsapp_e164',
+                  ),
+                  profession: const CustomExpression<String>(
+                    'excluded.profession',
                   ),
                   rev: const CustomExpression<int>('excluded.rev'),
                   serverUpdatedAt: const CustomExpression<DateTime>(

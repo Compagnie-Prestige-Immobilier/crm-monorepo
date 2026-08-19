@@ -16,6 +16,7 @@ import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/ids.dart';
 import '../../../core/utils/phone.dart';
+import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
 import '../../../data/repositories/draft_repository.dart';
 import '../../../data/repositories/reference_repository.dart';
@@ -53,12 +54,16 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   final TextEditingController _region = TextEditingController();
   final TextEditingController _departement = TextEditingController();
   final TextEditingController _ief = TextEditingController();
+  final TextEditingController _whatsapp = TextEditingController();
+  final TextEditingController _profession = TextEditingController();
   final TextEditingController _notes = TextEditingController();
   final FocusNode _nomFocus = FocusNode();
   final FocusNode _phoneFocus = FocusNode();
   final FocusNode _regionFocus = FocusNode();
   final FocusNode _departementFocus = FocusNode();
   final FocusNode _iefFocus = FocusNode();
+  final FocusNode _whatsappFocus = FocusNode();
+  final FocusNode _professionFocus = FocusNode();
   final FocusNode _notesFocus = FocusNode();
 
   late String _draftId = widget.draftId ?? Ids.newId();
@@ -68,6 +73,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   String? _departementId;
   String? _defaultDepartementId;
   String? _iefId;
+  String _whatsappStatus = WhatsappStatus.nonDemande.code;
+  bool _professionLibre = false;
   bool _saving = false;
   String? _error;
 
@@ -94,6 +101,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       _nom.text.trim().isEmpty &&
       _phone.text.trim().isEmpty &&
       _notes.text.trim().isEmpty &&
+      _profession.text.trim().isEmpty &&
+      _whatsappStatus == WhatsappStatus.nonDemande.code &&
       _departementId == _defaultDepartementId &&
       _iefId == null;
 
@@ -112,6 +121,10 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     'departementLabel': _departement.text,
     'iefId': _iefId,
     'iefLabel': _ief.text,
+    'whatsappStatus': _whatsappStatus,
+    'whatsapp': _whatsapp.text,
+    'profession': _profession.text,
+    'professionLibre': _professionLibre,
     'notes': _notes.text,
   };
 
@@ -138,6 +151,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       _regionFocus,
       _departementFocus,
       _iefFocus,
+      _whatsappFocus,
+      _professionFocus,
       _notesFocus,
     ]) {
       node.addListener(() {
@@ -155,12 +170,16 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     _region.dispose();
     _departement.dispose();
     _ief.dispose();
+    _whatsapp.dispose();
+    _profession.dispose();
     _notes.dispose();
     _nomFocus.dispose();
     _phoneFocus.dispose();
     _regionFocus.dispose();
     _departementFocus.dispose();
     _iefFocus.dispose();
+    _whatsappFocus.dispose();
+    _professionFocus.dispose();
     _notesFocus.dispose();
     super.dispose();
   }
@@ -178,6 +197,14 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
           _phone.text = Phone.groupNational(Phone.digitsOf(existing.phoneE164));
           _departementId = existing.departementId;
           _iefId = existing.iefId;
+          // La valeur brute, et non l'énumération : un état ajouté côté serveur
+          // serait sinon rétrogradé en « non demandé » au premier
+          // enregistrement, sans que personne ne le voie.
+          _whatsappStatus = existing.whatsappStatus;
+          _whatsapp.text = Phone.groupNational(
+            Phone.digitsOf(existing.whatsappE164 ?? ''),
+          );
+          _setProfession(existing.profession ?? '');
           _notes.text = existing.notes ?? '';
         });
         await _labelDepartement(existing.departementId);
@@ -232,6 +259,12 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       _departement.text = (snapshot.values['departementLabel'] as String?) ?? '';
       _iefId = snapshot.values['iefId'] as String?;
       _ief.text = (snapshot.values['iefLabel'] as String?) ?? '';
+      _whatsappStatus =
+          (snapshot.values['whatsappStatus'] as String?) ??
+          WhatsappStatus.nonDemande.code;
+      _whatsapp.text = (snapshot.values['whatsapp'] as String?) ?? '';
+      _profession.text = (snapshot.values['profession'] as String?) ?? '';
+      _professionLibre = (snapshot.values['professionLibre'] as bool?) ?? false;
       _notes.text = (snapshot.values['notes'] as String?) ?? '';
       _pendingRestore = null;
     });
@@ -254,6 +287,33 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   Future<void> _labelIef(String id) async {
     final Ief? ief = await ref.read(referenceRepositoryProvider).iefById(id);
     if (ief != null && mounted) setState(() => _ief.text = ief.name);
+  }
+
+  /// Une profession absente des puces bascule l'écran en saisie libre, sinon la
+  /// valeur enregistrée n'apparaîtrait nulle part.
+  void _setProfession(String value) {
+    _profession.text = value;
+    _professionLibre = value.isNotEmpty && !kProfessionsFrequentes.contains(value);
+  }
+
+  void _pickWhatsapp(String next) {
+    unawaited(HapticFeedback.selectionClick());
+    setState(() {
+      _whatsappStatus = next;
+      if (next != WhatsappStatus.autreNumero.code) _whatsapp.clear();
+    });
+    markDraftDirty();
+    unawaited(flushDraft());
+  }
+
+  void _pickProfession(String value, {bool libre = false}) {
+    unawaited(HapticFeedback.selectionClick());
+    setState(() {
+      _profession.text = value;
+      _professionLibre = libre;
+    });
+    markDraftDirty();
+    unawaited(flushDraft());
   }
 
 
@@ -292,10 +352,17 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   }
 
 
+  /// Un « autre numéro » sans numéro serait un état qui ment : la fiche dirait
+  /// qu'il a WhatsApp ailleurs sans dire où.
+  bool get _whatsappComplete =>
+      _whatsappStatus != WhatsappStatus.autreNumero.code ||
+      Phone.toE164(_whatsapp.text) != null;
+
   bool get _canSave =>
       _nom.text.trim().length >= 2 &&
       Phone.toE164(_phone.text) != null &&
       _departementId != null &&
+      _whatsappComplete &&
       !_saving;
 
   Future<void> _save() async {
@@ -315,6 +382,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       }
       final String phoneE164 = Phone.toE164(_phone.text)!;
       final String notes = _notes.text.trim();
+      final String profession = _profession.text.trim();
 
       // Le brouillon se jette AVANT l'écriture : sinon le minuteur armé par la
       // dernière frappe se déclenche pendant la transaction et réécrit la ligne
@@ -330,6 +398,9 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
               departementId: _departementId!,
               iefId: _iefId,
               notes: notes.isEmpty ? null : notes,
+              whatsappStatus: _whatsappStatus,
+              whatsappE164: Phone.toE164(_whatsapp.text),
+              profession: profession.isEmpty ? null : profession,
               draftId: _draftId,
             );
       } else {
@@ -342,6 +413,9 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
               departementId: _departementId!,
               iefId: _iefId,
               notes: notes.isEmpty ? null : notes,
+              whatsappStatus: _whatsappStatus,
+              whatsappE164: Phone.toE164(_whatsapp.text),
+              profession: profession.isEmpty ? null : profession,
               createdById: userId,
               draftId: _draftId,
             );
@@ -575,6 +649,25 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                       },
                     ),
                     const SizedBox(height: CpiSpacing.md),
+                    _WhatsappPicker(
+                      status: _whatsappStatus,
+                      controller: _whatsapp,
+                      focusNode: _whatsappFocus,
+                      onPick: _pickWhatsapp,
+                      onNumberChanged: (String _) {
+                        markDraftDirty();
+                        setState(() {});
+                      },
+                    ),
+                    const SizedBox(height: CpiSpacing.md),
+                    _ProfessionPicker(
+                      controller: _profession,
+                      focusNode: _professionFocus,
+                      libre: _professionLibre,
+                      onPick: _pickProfession,
+                      onTextChanged: (String _) => markDraftDirty(),
+                    ),
+                    const SizedBox(height: CpiSpacing.md),
                     TextField(
                       controller: _notes,
                       focusNode: _notesFocus,
@@ -614,6 +707,151 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       name: remote.representant!.fullName,
       owner: remote.ownedByCommercialName,
       representantId: remote.representant!.id,
+    );
+  }
+}
+
+const List<String> kProfessionsFrequentes = <String>[
+  'Instituteur',
+  'Professeur',
+  'Directeur d\'école',
+  'Principal',
+  'Proviseur',
+  'Inspecteur',
+  'Personnel administratif',
+];
+
+/// « Le même que son téléphone » est UNE puce, jamais neuf chiffres à
+/// ressaisir. Aucune puce sélectionnée signifie « question non posée » : c'est
+/// l'état de départ des 12 929 fiches, et il ne se confond pas avec « aucun ».
+class _WhatsappPicker extends StatelessWidget {
+  const _WhatsappPicker({
+    required this.status,
+    required this.controller,
+    required this.focusNode,
+    required this.onPick,
+    required this.onNumberChanged,
+  });
+
+  final String status;
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onPick;
+  final ValueChanged<String> onNumberChanged;
+
+  static const List<WhatsappStatus> _choix = <WhatsappStatus>[
+    WhatsappStatus.memeNumero,
+    WhatsappStatus.autreNumero,
+    WhatsappStatus.aucun,
+  ];
+
+  /// Un état ajouté côté serveur prend sa propre puce : le faire disparaître
+  /// reviendrait à le rétrograder en silence au prochain enregistrement.
+  List<String> get _codes => <String>[
+    for (final WhatsappStatus choix in _choix) choix.code,
+    if (WhatsappStatus.parse(status) == null) status,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text('WhatsApp', style: theme.textTheme.titleSmall),
+        const SizedBox(height: CpiSpacing.xs),
+        Wrap(
+          spacing: CpiSpacing.xs,
+          runSpacing: CpiSpacing.xs,
+          children: <Widget>[
+            for (final String code in _codes)
+              ChoiceChip(
+                label: Text(
+                  WhatsappStatus.parse(code)?.label ?? code,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                selected: status == code,
+                onSelected: (bool on) =>
+                    onPick(on ? code : WhatsappStatus.nonDemande.code),
+              ),
+          ],
+        ),
+        if (status == WhatsappStatus.nonDemande.code) ...<Widget>[
+          const SizedBox(height: CpiSpacing.xxs),
+          Text(
+            'Question non posée.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        if (status == WhatsappStatus.autreNumero.code) ...<Widget>[
+          const SizedBox(height: CpiSpacing.xs),
+          PhoneField(
+            controller: controller,
+            focusNode: focusNode,
+            label: 'Numéro WhatsApp',
+            onChanged: onNumberChanged,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ProfessionPicker extends StatelessWidget {
+  const _ProfessionPicker({
+    required this.controller,
+    required this.focusNode,
+    required this.libre,
+    required this.onPick,
+    required this.onTextChanged,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool libre;
+  final void Function(String value, {bool libre}) onPick;
+  final ValueChanged<String> onTextChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text('Profession (facultatif)', style: theme.textTheme.titleSmall),
+        const SizedBox(height: CpiSpacing.xs),
+        Wrap(
+          spacing: CpiSpacing.xs,
+          runSpacing: CpiSpacing.xs,
+          children: <Widget>[
+            for (final String metier in kProfessionsFrequentes)
+              ChoiceChip(
+                label: Text(metier, maxLines: 1, overflow: TextOverflow.ellipsis),
+                selected: !libre && controller.text == metier,
+                onSelected: (bool on) => onPick(on ? metier : ''),
+              ),
+            ChoiceChip(
+              label: const Text('Autre', maxLines: 1, overflow: TextOverflow.ellipsis),
+              selected: libre,
+              onSelected: (bool on) => onPick(on ? controller.text : '', libre: on),
+            ),
+          ],
+        ),
+        if (libre) ...<Widget>[
+          const SizedBox(height: CpiSpacing.xs),
+          TextField(
+            controller: controller,
+            focusNode: focusNode,
+            maxLength: kProfessionMaxLength,
+            textCapitalization: TextCapitalization.sentences,
+            onChanged: onTextChanged,
+            decoration: const InputDecoration(labelText: 'Préciser la profession'),
+          ),
+        ],
+      ],
     );
   }
 }

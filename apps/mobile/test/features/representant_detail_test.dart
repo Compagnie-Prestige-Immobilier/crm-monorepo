@@ -131,6 +131,14 @@ void main() {
   testWidgets('la fiche liste les prospects de CE représentant', (
     WidgetTester tester,
   ) async {
+    // Même raison que `mountFiche` du fil : la liste est en bas d'un `ListView`,
+    // qui ne construit pas ce qui est hors du viewport. Sur les 600 dp par
+    // défaut, la ligne WhatsApp suffit à la repousser dehors.
+    tester.view.physicalSize = const Size(1200, 6000);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
     await insertRepresentant(db, id: 'rep-2', phone: '+221770000002');
     await insertProspect(
@@ -236,6 +244,109 @@ void main() {
     expect(find.text('PARRAIN'), findsOneWidget);
 
     await teardownTree(tester);
+  });
+
+  group('WhatsApp et profession', () {
+    Future<void> mountFiche(WidgetTester tester) async {
+      final ProviderContainer container = await makeContainer(tester);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: AppTheme.light,
+            locale: const Locale('fr'),
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            supportedLocales: const <Locale>[Locale('fr')],
+            home: const RepresentantDetailScreen(representantId: 'rep-1'),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    // Sur 12 929 fiches, c'est cette différence qui décide de qui on rappelle :
+    // une question jamais posée n'est pas une absence constatée.
+    testWidgets('« non demandé » ne s\'affiche pas comme « aucun »', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
+      await mountFiche(tester);
+
+      expect(find.text('Non demandé'), findsOneWidget);
+      expect(find.text('Pas de WhatsApp'), findsNothing);
+
+      await teardownTree(tester);
+    });
+
+    testWidgets('« aucun » est une absence constatée, et le dit', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        whatsappStatus: 'AUCUN',
+      );
+      await mountFiche(tester);
+
+      expect(find.text('Pas de WhatsApp'), findsOneWidget);
+      expect(find.text('Non demandé'), findsNothing);
+
+      await teardownTree(tester);
+    });
+
+    // Le numéro n'est stocké qu'une fois : la fiche dit le lien, pas une copie
+    // qui divergerait du téléphone à la première correction.
+    testWidgets('« même numéro » ne réaffiche pas un second numéro', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        whatsappStatus: 'MEME_NUMERO',
+      );
+      await mountFiche(tester);
+
+      expect(find.text('Même numéro'), findsOneWidget);
+      expect(find.text('+221 77 000 00 01'), findsOneWidget);
+
+      await teardownTree(tester);
+    });
+
+    testWidgets('un autre numéro s\'affiche et se copie', (WidgetTester tester) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        whatsappStatus: 'AUTRE_NUMERO',
+        whatsappE164: '+221781112233',
+        profession: 'Directeur d\'école',
+      );
+      await mountFiche(tester);
+
+      expect(find.text('+221 78 111 22 33'), findsOneWidget);
+      expect(find.text('Directeur d\'école'), findsOneWidget);
+
+      await teardownTree(tester);
+    });
+
+    testWidgets('un état inconnu de ce client s\'affiche quand même', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        whatsappStatus: 'NUMERO_PROFESSIONNEL',
+      );
+      await mountFiche(tester);
+
+      expect(find.text('NUMERO_PROFESSIONNEL'), findsOneWidget);
+
+      await teardownTree(tester);
+    });
   });
 
   group('fil de commentaires', () {

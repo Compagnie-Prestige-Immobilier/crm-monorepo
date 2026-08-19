@@ -337,12 +337,25 @@ RepresentantDto representantDto({
   String createdById = 'me',
   int rev = 3,
   RepresentantRelation relationStatus = RepresentantRelation.INCONNU,
+  WhatsappStatus whatsappStatus = WhatsappStatus.NON_DEMANDE,
+  String? whatsappE164,
+  String? profession,
 }) => RepresentantDto(
   id: id,
   fullName: fullName,
   phoneE164: phoneE164,
   notes: null,
   relationStatus: relationStatus,
+  whatsappStatus: whatsappStatus,
+  whatsappE164: whatsappE164,
+  // Calcule par le SERVEUR: la fabrique reproduit sa regle plutot que d'en
+  // inventer une autre.
+  whatsappNumber: whatsappStatus == WhatsappStatus.MEME_NUMERO
+      ? phoneE164
+      : whatsappStatus == WhatsappStatus.AUTRE_NUMERO
+      ? whatsappE164
+      : null,
+  profession: profession,
   rev: rev,
   departementId: departementId,
   iefId: iefId,

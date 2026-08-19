@@ -7,6 +7,7 @@ import '../../core/sync/outbox_status.dart';
 import '../../core/sync/phase2_directory_sync.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/utils/ids.dart';
+import '../../core/utils/whatsapp.dart';
 import '../local/database.dart';
 
 const int kCallAttemptCommentMaxLength = 2000;
@@ -79,6 +80,14 @@ class WriteRepository {
   final Clock _clock;
 
 
+  /// Le numéro WhatsApp n'est retenu que sur `AUTRE_NUMERO`.
+  ///
+  /// Le choke point est ici et pas dans l'écran : sur `MEME_NUMERO`, recopier
+  /// `phone_e164` donnerait deux numéros à tenir d'accord, et le jour où le
+  /// téléphone est corrigé la copie divergerait sans que rien ne le signale.
+  static String? _whatsappE164For(String status, String? entered) =>
+      status == WhatsappStatus.autreNumero.code ? entered : null;
+
   Future<String> createRepresentant({
     required String fullName,
     required String phoneE164,
@@ -86,11 +95,15 @@ class WriteRepository {
     required String createdById,
     String? iefId,
     String? notes,
+    String whatsappStatus = 'NON_DEMANDE',
+    String? whatsappE164,
+    String? profession,
     String? id,
     String? draftId,
   }) async {
     final String entityId = id ?? Ids.newId();
     final DateTime now = _clock.now();
+    final String? whatsapp = _whatsappE164For(whatsappStatus, whatsappE164);
 
     await _db.transaction(() async {
       await _db
@@ -103,6 +116,9 @@ class WriteRepository {
               notes: Value<String?>(notes),
               departementId: departementId,
               iefId: Value<String?>(iefId),
+              whatsappStatus: Value<String>(whatsappStatus),
+              whatsappE164: Value<String?>(whatsapp),
+              profession: Value<String?>(profession),
               createdById: createdById,
               clientCreatedAt: now,
               localUpdatedAt: now,
@@ -119,6 +135,9 @@ class WriteRepository {
           'departementId': departementId,
           'iefId': ?iefId,
           if (notes != null && notes.isNotEmpty) 'notes': notes,
+          'whatsappStatus': whatsappStatus,
+          'whatsappE164': ?whatsapp,
+          'profession': ?profession,
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
         now: now,
@@ -135,9 +154,13 @@ class WriteRepository {
     required String departementId,
     String? iefId,
     String? notes,
+    String whatsappStatus = 'NON_DEMANDE',
+    String? whatsappE164,
+    String? profession,
     String? draftId,
   }) async {
     final DateTime now = _clock.now();
+    final String? whatsapp = _whatsappE164For(whatsappStatus, whatsappE164);
     await _db.transaction(() async {
       final Representant current = await (_db.select(
         _db.representants,
@@ -151,6 +174,9 @@ class WriteRepository {
           notes: Value<String?>(notes),
           departementId: Value<String>(departementId),
           iefId: Value<String?>(iefId),
+          whatsappStatus: Value<String>(whatsappStatus),
+          whatsappE164: Value<String?>(whatsapp),
+          profession: Value<String?>(profession),
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
@@ -167,6 +193,9 @@ class WriteRepository {
           'departementId': departementId,
           'iefId': iefId,
           'notes': notes,
+          'whatsappStatus': whatsappStatus,
+          'whatsappE164': whatsapp,
+          'profession': profession,
         },
         now: now,
       );

@@ -646,6 +646,78 @@ void main() {
         'Absent le vendredi',
       );
     });
+
+    /// Un téléconseiller ne tape pas. « Le même que son téléphone » et une
+    /// profession fréquente sont DEUX appuis, pas neuf chiffres ressaisis.
+    formTestWidgets('WhatsApp et profession se posent sans rien ressaisir', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(hostRouted(const RepresentantFormScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Nom complet'),
+        'Ousmane Fall',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextField, 'Département'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dakar').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Téléphone'), '77 123 45 67');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Même numéro'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Instituteur'));
+      await tester.pumpAndSettle();
+
+      // Aucun second champ de numéro n'apparaît : il n'y a rien à taper.
+      expect(find.widgetWithText(TextField, 'Numéro WhatsApp'), findsNothing);
+
+      await tester.tap(find.text('Enregistrer et saisir des prospects'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final Representant row = await db.select(db.representants).getSingle();
+      expect(row.whatsappStatus, 'MEME_NUMERO');
+      expect(row.profession, 'Instituteur');
+      // Le numéro n'est pas dupliqué : la correction du téléphone n'aurait
+      // aucune copie à tenir d'accord.
+      expect(row.whatsappE164, isNull);
+    });
+
+    formTestWidgets('un état WhatsApp venu du serveur n\'est pas rétrogradé', (
+      WidgetTester tester,
+    ) async {
+      // Corriger le nom d'une fiche ne doit pas repasser en « non demandé » un
+      // état que le serveur a ajouté après cette version de l'application.
+      await insertRepresentant(
+        db,
+        id: 'rep-9',
+        phone: '+221770000009',
+        whatsappStatus: 'NUMERO_PROFESSIONNEL',
+      );
+
+      await tester.pumpWidget(
+        hostRouted(const RepresentantFormScreen(representantId: 'rep-9')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(ChoiceChip, 'NUMERO_PROFESSIONNEL'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Nom complet'),
+        'Ousmane Fall',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Enregistrer'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final Representant row = await db.select(db.representants).getSingle();
+      expect(row.whatsappStatus, 'NUMERO_PROFESSIONNEL');
+    });
   });
 
   // ───────────────────────────────────────────────────────────────────────────
