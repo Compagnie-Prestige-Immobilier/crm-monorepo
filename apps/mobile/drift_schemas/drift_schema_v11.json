@@ -1,0 +1,2781 @@
+{
+  "_meta": {
+    "description": "This file contains a serialized version of schema entities for drift.",
+    "version": "1.3.0"
+  },
+  "options": {
+    "store_date_time_values_as_text": true
+  },
+  "entities": [
+    {
+      "id": 0,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "departements",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "code",
+            "getter_name": "code",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "name",
+            "getter_name": "name",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "region_id",
+            "getter_name": "regionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "region_name",
+            "getter_name": "regionName",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT ''",
+            "default_dart": "const CustomExpression('\\'\\'')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_active",
+            "getter_name": "isActive",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "rev",
+            "getter_name": "rev",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "local_updated_at",
+            "getter_name": "localUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "server_updated_at",
+            "getter_name": "serverUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "deleted_at",
+            "getter_name": "deletedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 1,
+      "references": [
+        0
+      ],
+      "type": "index",
+      "data": {
+        "on": 0,
+        "name": "departements_active_idx",
+        "sql": "CREATE INDEX departements_active_idx ON departements (is_active, name);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 2,
+      "references": [
+        0
+      ],
+      "type": "index",
+      "data": {
+        "on": 0,
+        "name": "departements_region_idx",
+        "sql": "CREATE INDEX departements_region_idx ON departements (region_id, name);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 3,
+      "references": [
+        0
+      ],
+      "type": "table",
+      "data": {
+        "name": "iefs",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "code",
+            "getter_name": "code",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "name",
+            "getter_name": "name",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "departement_id",
+            "getter_name": "departementId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL REFERENCES departements(id)ON UPDATE CASCADE",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "departements",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": "cascade",
+                  "on_delete": null
+                }
+              }
+            ]
+          },
+          {
+            "name": "departement_name",
+            "getter_name": "departementName",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_active",
+            "getter_name": "isActive",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "rev",
+            "getter_name": "rev",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "local_updated_at",
+            "getter_name": "localUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "server_updated_at",
+            "getter_name": "serverUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "deleted_at",
+            "getter_name": "deletedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 4,
+      "references": [
+        3
+      ],
+      "type": "index",
+      "data": {
+        "on": 3,
+        "name": "iefs_active_idx",
+        "sql": "CREATE INDEX iefs_active_idx ON iefs (is_active, departement_name, name);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 5,
+      "references": [
+        3
+      ],
+      "type": "index",
+      "data": {
+        "on": 3,
+        "name": "iefs_departement_idx",
+        "sql": "CREATE INDEX iefs_departement_idx ON iefs (departement_id);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 6,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "banques",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "name",
+            "getter_name": "name",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "short_name",
+            "getter_name": "shortName",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_active",
+            "getter_name": "isActive",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "sort_order",
+            "getter_name": "sortOrder",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 100",
+            "default_dart": "const CustomExpression('100')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "rev",
+            "getter_name": "rev",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "local_updated_at",
+            "getter_name": "localUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "server_updated_at",
+            "getter_name": "serverUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "deleted_at",
+            "getter_name": "deletedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 7,
+      "references": [
+        6
+      ],
+      "type": "index",
+      "data": {
+        "on": 6,
+        "name": "banques_active_idx",
+        "sql": "CREATE INDEX banques_active_idx ON banques (is_active, sort_order, name);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 8,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "syndicats",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "name",
+            "getter_name": "name",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "sigle",
+            "getter_name": "sigle",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "secteur",
+            "getter_name": "secteur",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_active",
+            "getter_name": "isActive",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "sort_order",
+            "getter_name": "sortOrder",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 100",
+            "default_dart": "const CustomExpression('100')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "rev",
+            "getter_name": "rev",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "local_updated_at",
+            "getter_name": "localUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "server_updated_at",
+            "getter_name": "serverUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "deleted_at",
+            "getter_name": "deletedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 9,
+      "references": [
+        8
+      ],
+      "type": "index",
+      "data": {
+        "on": 8,
+        "name": "syndicats_active_idx",
+        "sql": "CREATE INDEX syndicats_active_idx ON syndicats (is_active, sort_order, name);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 10,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "call_outcome_reasons",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "code",
+            "getter_name": "code",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "label",
+            "getter_name": "label",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "effect",
+            "getter_name": "effect",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "requires_comment",
+            "getter_name": "requiresComment",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 0",
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "requires_callback",
+            "getter_name": "requiresCallback",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 0",
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "counts_as_reached",
+            "getter_name": "countsAsReached",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 0",
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_active",
+            "getter_name": "isActive",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "sort_order",
+            "getter_name": "sortOrder",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 100",
+            "default_dart": "const CustomExpression('100')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "color",
+            "getter_name": "color",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "min_payload_version",
+            "getter_name": "minPayloadVersion",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 11,
+      "references": [
+        10
+      ],
+      "type": "index",
+      "data": {
+        "on": 10,
+        "name": "call_outcome_reasons_active_idx",
+        "sql": "CREATE INDEX call_outcome_reasons_active_idx\n    ON call_outcome_reasons (is_active, sort_order, label);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 12,
+      "references": [
+        0,
+        3
+      ],
+      "type": "table",
+      "data": {
+        "name": "representants",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "full_name",
+            "getter_name": "fullName",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "phone_e164",
+            "getter_name": "phoneE164",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "notes",
+            "getter_name": "notes",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "departement_id",
+            "getter_name": "departementId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL REFERENCES departements(id)ON UPDATE CASCADE",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "departements",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": "cascade",
+                  "on_delete": null
+                }
+              }
+            ]
+          },
+          {
+            "name": "ief_id",
+            "getter_name": "iefId",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL REFERENCES iefs(id)ON UPDATE CASCADE",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "iefs",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": "cascade",
+                  "on_delete": null
+                }
+              }
+            ]
+          },
+          {
+            "name": "relation_status",
+            "getter_name": "relationStatus",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 'INCONNU'",
+            "default_dart": "const CustomExpression('\\'INCONNU\\'')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "whatsapp_status",
+            "getter_name": "whatsappStatus",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 'NON_DEMANDE'",
+            "default_dart": "const CustomExpression('\\'NON_DEMANDE\\'')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "whatsapp_e164",
+            "getter_name": "whatsappE164",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "profession",
+            "getter_name": "profession",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "created_by_id",
+            "getter_name": "createdById",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "client_created_at",
+            "getter_name": "clientCreatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "rev",
+            "getter_name": "rev",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "local_updated_at",
+            "getter_name": "localUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "server_updated_at",
+            "getter_name": "serverUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "deleted_at",
+            "getter_name": "deletedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 13,
+      "references": [
+        12
+      ],
+      "type": "index",
+      "data": {
+        "on": 12,
+        "name": "representants_phone_unique",
+        "sql": "CREATE UNIQUE INDEX representants_phone_unique\n    ON representants (phone_e164) WHERE deleted_at IS NULL;",
+        "unique": true,
+        "columns": []
+      }
+    },
+    {
+      "id": 14,
+      "references": [
+        12
+      ],
+      "type": "index",
+      "data": {
+        "on": 12,
+        "name": "representants_departement_idx",
+        "sql": "CREATE INDEX representants_departement_idx ON representants (departement_id);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 15,
+      "references": [
+        12
+      ],
+      "type": "index",
+      "data": {
+        "on": 12,
+        "name": "representants_created_idx",
+        "sql": "CREATE INDEX representants_created_idx ON representants (client_created_at DESC);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 16,
+      "references": [
+        6,
+        8,
+        12
+      ],
+      "type": "table",
+      "data": {
+        "name": "prospects",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "nom",
+            "getter_name": "nom",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "prenom",
+            "getter_name": "prenom",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "phone_e164",
+            "getter_name": "phoneE164",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "banque_id",
+            "getter_name": "banqueId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL REFERENCES banques(id)ON UPDATE CASCADE",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "banques",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": "cascade",
+                  "on_delete": null
+                }
+              }
+            ]
+          },
+          {
+            "name": "syndicat_id",
+            "getter_name": "syndicatId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL REFERENCES syndicats(id)ON UPDATE CASCADE",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "syndicats",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": "cascade",
+                  "on_delete": null
+                }
+              }
+            ]
+          },
+          {
+            "name": "representant_id",
+            "getter_name": "representantId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL REFERENCES representants(id)ON UPDATE CASCADE ON DELETE RESTRICT",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "representants",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": "cascade",
+                  "on_delete": "restrict"
+                }
+              }
+            ]
+          },
+          {
+            "name": "created_by_id",
+            "getter_name": "createdById",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "statut",
+            "getter_name": "statut",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 'NOUVEAU'",
+            "default_dart": "const CustomExpression('\\'NOUVEAU\\'')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "client_created_at",
+            "getter_name": "clientCreatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "rev",
+            "getter_name": "rev",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "local_updated_at",
+            "getter_name": "localUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "server_updated_at",
+            "getter_name": "serverUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "deleted_at",
+            "getter_name": "deletedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 17,
+      "references": [
+        16
+      ],
+      "type": "index",
+      "data": {
+        "on": 16,
+        "name": "prospects_phone_unique",
+        "sql": "CREATE UNIQUE INDEX prospects_phone_unique\n    ON prospects (phone_e164) WHERE deleted_at IS NULL;",
+        "unique": true,
+        "columns": []
+      }
+    },
+    {
+      "id": 18,
+      "references": [
+        16
+      ],
+      "type": "index",
+      "data": {
+        "on": 16,
+        "name": "prospects_representant_idx",
+        "sql": "CREATE INDEX prospects_representant_idx ON prospects (representant_id);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 19,
+      "references": [
+        16
+      ],
+      "type": "index",
+      "data": {
+        "on": 16,
+        "name": "prospects_created_idx",
+        "sql": "CREATE INDEX prospects_created_idx ON prospects (client_created_at DESC);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 20,
+      "references": [
+        12
+      ],
+      "type": "table",
+      "data": {
+        "name": "representant_comments",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "representant_id",
+            "getter_name": "representantId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL REFERENCES representants(id)ON UPDATE CASCADE ON DELETE CASCADE",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "representants",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": "cascade",
+                  "on_delete": "cascade"
+                }
+              }
+            ]
+          },
+          {
+            "name": "author_id",
+            "getter_name": "authorId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "author_name",
+            "getter_name": "authorName",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "body",
+            "getter_name": "body",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "client_created_at",
+            "getter_name": "clientCreatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "server_created_at",
+            "getter_name": "serverCreatedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 21,
+      "references": [
+        20
+      ],
+      "type": "index",
+      "data": {
+        "on": 20,
+        "name": "representant_comments_representant_idx",
+        "sql": "CREATE INDEX representant_comments_representant_idx\n    ON representant_comments (representant_id, client_created_at DESC);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 22,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "outbox",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "seq",
+            "getter_name": "seq",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY AUTOINCREMENT",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "auto-increment"
+            ]
+          },
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL UNIQUE",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "unique"
+            ]
+          },
+          {
+            "name": "dependency_key",
+            "getter_name": "dependencyKey",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "entity_type",
+            "getter_name": "entityType",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "entity_id",
+            "getter_name": "entityId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "op",
+            "getter_name": "op",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (op IN ('create', 'update', 'delete'))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "payload",
+            "getter_name": "payload",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "payload_version",
+            "getter_name": "payloadVersion",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "base_rev",
+            "getter_name": "baseRev",
+            "moor_type": "int",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "status",
+            "getter_name": "status",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'syncing', 'done', 'conflict', 'failed'))",
+            "default_dart": "const CustomExpression('\\'pending\\'')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "attempts",
+            "getter_name": "attempts",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 0",
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "blocked_attempts",
+            "getter_name": "blockedAttempts",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 0",
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "next_attempt_at",
+            "getter_name": "nextAttemptAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "lease_until",
+            "getter_name": "leaseUntil",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "claim_token",
+            "getter_name": "claimToken",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "batch_id",
+            "getter_name": "batchId",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_error_code",
+            "getter_name": "lastErrorCode",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_error_msg",
+            "getter_name": "lastErrorMsg",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "created_at",
+            "getter_name": "createdAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 23,
+      "references": [
+        22
+      ],
+      "type": "index",
+      "data": {
+        "on": 22,
+        "name": "outbox_ready_idx",
+        "sql": "CREATE INDEX outbox_ready_idx\n    ON outbox (status, next_attempt_at, dependency_key, seq);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 24,
+      "references": [
+        22
+      ],
+      "type": "index",
+      "data": {
+        "on": 22,
+        "name": "outbox_entity_idx",
+        "sql": "CREATE INDEX outbox_entity_idx ON outbox (entity_type, entity_id, status);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 25,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "form_drafts",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "draft_id",
+            "getter_name": "draftId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "form_key",
+            "getter_name": "formKey",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "entity_id",
+            "getter_name": "entityId",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "parent_id",
+            "getter_name": "parentId",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "payload",
+            "getter_name": "payload",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "step",
+            "getter_name": "step",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 0",
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "schema_version",
+            "getter_name": "schemaVersion",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "updated_at",
+            "getter_name": "updatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 26,
+      "references": [
+        25
+      ],
+      "type": "index",
+      "data": {
+        "on": 25,
+        "name": "form_drafts_key_idx",
+        "sql": "CREATE INDEX form_drafts_key_idx ON form_drafts (form_key, updated_at DESC);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 27,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "sync_state",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "collection",
+            "getter_name": "collection",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "cursor",
+            "getter_name": "cursor",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_pulled_at",
+            "getter_name": "lastPulledAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 28,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "phase2_directory",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "prospect_id",
+            "getter_name": "prospectId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "phone_e164",
+            "getter_name": "phoneE164",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "phase2_status",
+            "getter_name": "phase2Status",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 'PENDING'",
+            "default_dart": "const CustomExpression('\\'PENDING\\'')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "enrollment_method",
+            "getter_name": "enrollmentMethod",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "rev",
+            "getter_name": "rev",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "updated_at",
+            "getter_name": "updatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 29,
+      "references": [
+        28
+      ],
+      "type": "index",
+      "data": {
+        "on": 28,
+        "name": "phase2_directory_phone_unique",
+        "sql": "CREATE UNIQUE INDEX phase2_directory_phone_unique ON phase2_directory (phone_e164);",
+        "unique": true,
+        "columns": []
+      }
+    },
+    {
+      "id": 30,
+      "references": [
+        28
+      ],
+      "type": "index",
+      "data": {
+        "on": 28,
+        "name": "phase2_directory_status_idx",
+        "sql": "CREATE INDEX phase2_directory_status_idx ON phase2_directory (phase2_status);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 31,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "call_attempts",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "prospect_id",
+            "getter_name": "prospectId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "outcome",
+            "getter_name": "outcome",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "reason_code",
+            "getter_name": "reasonCode",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "effect",
+            "getter_name": "effect",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 'KEEP_OPEN'",
+            "default_dart": "const CustomExpression('\\'KEEP_OPEN\\'')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "requires_comment",
+            "getter_name": "requiresComment",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 0",
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "method",
+            "getter_name": "method",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "comment",
+            "getter_name": "comment",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "callback_at",
+            "getter_name": "callbackAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "client_created_at",
+            "getter_name": "clientCreatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "created_by_id",
+            "getter_name": "createdById",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "CHECK((effect = 'CLOSE_METHOD')=(method IS NOT NULL))",
+          "CHECK(requires_comment = 0 OR(comment IS NOT NULL AND length(trim(comment)) > 0))",
+          "CHECK(comment IS NULL OR length(comment) <= 2000)"
+        ]
+      }
+    },
+    {
+      "id": 32,
+      "references": [
+        31
+      ],
+      "type": "index",
+      "data": {
+        "on": 31,
+        "name": "call_attempts_prospect_idx",
+        "sql": "CREATE INDEX call_attempts_prospect_idx\n    ON call_attempts (prospect_id, client_created_at DESC);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 33,
+      "references": [
+        31
+      ],
+      "type": "index",
+      "data": {
+        "on": 31,
+        "name": "call_attempts_created_idx",
+        "sql": "CREATE INDEX call_attempts_created_idx ON call_attempts (client_created_at DESC);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 34,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "notifications",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "title",
+            "getter_name": "title",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "body",
+            "getter_name": "body",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "category",
+            "getter_name": "category",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 'ANNONCE'",
+            "default_dart": "const CustomExpression('\\'ANNONCE\\'')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "route",
+            "getter_name": "route",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "payload",
+            "getter_name": "payload",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "read_at",
+            "getter_name": "readAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "created_at",
+            "getter_name": "createdAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "received_at",
+            "getter_name": "receivedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 35,
+      "references": [
+        34
+      ],
+      "type": "index",
+      "data": {
+        "on": 34,
+        "name": "notifications_created_idx",
+        "sql": "CREATE INDEX notifications_created_idx ON notifications (created_at);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 36,
+      "references": [
+        34
+      ],
+      "type": "index",
+      "data": {
+        "on": 34,
+        "name": "notifications_unread_idx",
+        "sql": "CREATE INDEX notifications_unread_idx ON notifications (read_at);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 37,
+      "references": [
+        12,
+        22
+      ],
+      "type": "view",
+      "data": {
+        "name": "representant_sync_view",
+        "sql": "CREATE VIEW representant_sync_view AS SELECT r.*, CASE WHEN o.status IS NOT NULL THEN o.status WHEN r.server_updated_at IS NULL THEN 'draft' ELSE 'synced' END AS sync_status FROM representants AS r LEFT JOIN outbox AS o ON o.entity_type = 'representant' AND o.entity_id = r.id AND o.status IN ('pending', 'syncing', 'conflict', 'failed') AND o.seq = (SELECT MIN(o2.seq) FROM outbox AS o2 WHERE o2.entity_type = 'representant' AND o2.entity_id = r.id AND o2.status IN ('pending', 'syncing', 'conflict', 'failed'))",
+        "dart_info_name": "RepresentantSyncView",
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "full_name",
+            "getter_name": "fullName",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "phone_e164",
+            "getter_name": "phoneE164",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "notes",
+            "getter_name": "notes",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "departement_id",
+            "getter_name": "departementId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "ief_id",
+            "getter_name": "iefId",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "relation_status",
+            "getter_name": "relationStatus",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "whatsapp_status",
+            "getter_name": "whatsappStatus",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "whatsapp_e164",
+            "getter_name": "whatsappE164",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "profession",
+            "getter_name": "profession",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "created_by_id",
+            "getter_name": "createdById",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "client_created_at",
+            "getter_name": "clientCreatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "rev",
+            "getter_name": "rev",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "local_updated_at",
+            "getter_name": "localUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "server_updated_at",
+            "getter_name": "serverUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "deleted_at",
+            "getter_name": "deletedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "sync_status",
+            "getter_name": "syncStatus",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ]
+      }
+    },
+    {
+      "id": 38,
+      "references": [
+        16,
+        22
+      ],
+      "type": "view",
+      "data": {
+        "name": "prospect_sync_view",
+        "sql": "CREATE VIEW prospect_sync_view AS SELECT p.*, CASE WHEN po.status IN ('conflict', 'failed') AND(o.status IS NULL OR o.status NOT IN ('conflict', 'failed'))THEN 'blocked' WHEN o.status IS NOT NULL THEN o.status WHEN p.server_updated_at IS NULL THEN 'draft' ELSE 'synced' END AS sync_status FROM prospects AS p LEFT JOIN outbox AS o ON o.entity_type = 'prospect' AND o.entity_id = p.id AND o.status IN ('pending', 'syncing', 'conflict', 'failed') AND o.seq = (SELECT MIN(o2.seq) FROM outbox AS o2 WHERE o2.entity_type = 'prospect' AND o2.entity_id = p.id AND o2.status IN ('pending', 'syncing', 'conflict', 'failed')) LEFT JOIN outbox AS po ON po.entity_type = 'representant' AND po.entity_id = p.representant_id AND po.status IN ('pending', 'syncing', 'conflict', 'failed') AND po.seq = (SELECT MIN(po2.seq) FROM outbox AS po2 WHERE po2.entity_type = 'representant' AND po2.entity_id = p.representant_id AND po2.status IN ('pending', 'syncing', 'conflict', 'failed'))",
+        "dart_info_name": "ProspectSyncView",
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "nom",
+            "getter_name": "nom",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "prenom",
+            "getter_name": "prenom",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "phone_e164",
+            "getter_name": "phoneE164",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "banque_id",
+            "getter_name": "banqueId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "syndicat_id",
+            "getter_name": "syndicatId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "representant_id",
+            "getter_name": "representantId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "created_by_id",
+            "getter_name": "createdById",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "statut",
+            "getter_name": "statut",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "client_created_at",
+            "getter_name": "clientCreatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "rev",
+            "getter_name": "rev",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "local_updated_at",
+            "getter_name": "localUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "server_updated_at",
+            "getter_name": "serverUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "deleted_at",
+            "getter_name": "deletedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "sync_status",
+            "getter_name": "syncStatus",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ]
+      }
+    }
+  ],
+  "fixed_sql": [
+    {
+      "name": "departements",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"departements\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"code\" TEXT NOT NULL, \"name\" TEXT NOT NULL, \"region_id\" TEXT NOT NULL, \"region_name\" TEXT NOT NULL DEFAULT '', \"is_active\" INTEGER NOT NULL DEFAULT 1, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "departements_active_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX departements_active_idx ON departements (is_active, name)"
+        }
+      ]
+    },
+    {
+      "name": "departements_region_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX departements_region_idx ON departements (region_id, name)"
+        }
+      ]
+    },
+    {
+      "name": "iefs",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"iefs\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"code\" TEXT NOT NULL, \"name\" TEXT NOT NULL, \"departement_id\" TEXT NOT NULL REFERENCES departements(id)ON UPDATE CASCADE, \"departement_name\" TEXT NOT NULL, \"is_active\" INTEGER NOT NULL DEFAULT 1, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "iefs_active_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX iefs_active_idx ON iefs (is_active, departement_name, name)"
+        }
+      ]
+    },
+    {
+      "name": "iefs_departement_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX iefs_departement_idx ON iefs (departement_id)"
+        }
+      ]
+    },
+    {
+      "name": "banques",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"banques\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"name\" TEXT NOT NULL, \"short_name\" TEXT NOT NULL, \"is_active\" INTEGER NOT NULL DEFAULT 1, \"sort_order\" INTEGER NOT NULL DEFAULT 100, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "banques_active_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX banques_active_idx ON banques (is_active, sort_order, name)"
+        }
+      ]
+    },
+    {
+      "name": "syndicats",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"syndicats\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"name\" TEXT NOT NULL, \"sigle\" TEXT NOT NULL, \"secteur\" TEXT NULL, \"is_active\" INTEGER NOT NULL DEFAULT 1, \"sort_order\" INTEGER NOT NULL DEFAULT 100, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "syndicats_active_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX syndicats_active_idx ON syndicats (is_active, sort_order, name)"
+        }
+      ]
+    },
+    {
+      "name": "call_outcome_reasons",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"call_outcome_reasons\" (\"code\" TEXT NOT NULL PRIMARY KEY, \"label\" TEXT NOT NULL, \"effect\" TEXT NOT NULL, \"requires_comment\" INTEGER NOT NULL DEFAULT 0, \"requires_callback\" INTEGER NOT NULL DEFAULT 0, \"counts_as_reached\" INTEGER NOT NULL DEFAULT 0, \"is_active\" INTEGER NOT NULL DEFAULT 1, \"sort_order\" INTEGER NOT NULL DEFAULT 100, \"color\" TEXT NULL, \"min_payload_version\" INTEGER NOT NULL DEFAULT 1);"
+        }
+      ]
+    },
+    {
+      "name": "call_outcome_reasons_active_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX call_outcome_reasons_active_idx ON call_outcome_reasons (is_active, sort_order, label)"
+        }
+      ]
+    },
+    {
+      "name": "representants",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"representants\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"full_name\" TEXT NOT NULL, \"phone_e164\" TEXT NOT NULL, \"notes\" TEXT NULL, \"departement_id\" TEXT NOT NULL REFERENCES departements(id)ON UPDATE CASCADE, \"ief_id\" TEXT NULL REFERENCES iefs(id)ON UPDATE CASCADE, \"relation_status\" TEXT NOT NULL DEFAULT 'INCONNU', \"whatsapp_status\" TEXT NOT NULL DEFAULT 'NON_DEMANDE', \"whatsapp_e164\" TEXT NULL, \"profession\" TEXT NULL, \"created_by_id\" TEXT NOT NULL, \"client_created_at\" TEXT NOT NULL, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "representants_phone_unique",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE UNIQUE INDEX representants_phone_unique ON representants (phone_e164) WHERE deleted_at IS NULL"
+        }
+      ]
+    },
+    {
+      "name": "representants_departement_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX representants_departement_idx ON representants (departement_id)"
+        }
+      ]
+    },
+    {
+      "name": "representants_created_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX representants_created_idx ON representants (client_created_at DESC)"
+        }
+      ]
+    },
+    {
+      "name": "prospects",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"prospects\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"nom\" TEXT NOT NULL, \"prenom\" TEXT NOT NULL, \"phone_e164\" TEXT NOT NULL, \"banque_id\" TEXT NOT NULL REFERENCES banques(id)ON UPDATE CASCADE, \"syndicat_id\" TEXT NOT NULL REFERENCES syndicats(id)ON UPDATE CASCADE, \"representant_id\" TEXT NOT NULL REFERENCES representants(id)ON UPDATE CASCADE ON DELETE RESTRICT, \"created_by_id\" TEXT NOT NULL, \"statut\" TEXT NOT NULL DEFAULT 'NOUVEAU', \"client_created_at\" TEXT NOT NULL, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "prospects_phone_unique",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE UNIQUE INDEX prospects_phone_unique ON prospects (phone_e164) WHERE deleted_at IS NULL"
+        }
+      ]
+    },
+    {
+      "name": "prospects_representant_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX prospects_representant_idx ON prospects (representant_id)"
+        }
+      ]
+    },
+    {
+      "name": "prospects_created_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX prospects_created_idx ON prospects (client_created_at DESC)"
+        }
+      ]
+    },
+    {
+      "name": "representant_comments",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"representant_comments\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"representant_id\" TEXT NOT NULL REFERENCES representants(id)ON UPDATE CASCADE ON DELETE CASCADE, \"author_id\" TEXT NOT NULL, \"author_name\" TEXT NOT NULL, \"body\" TEXT NOT NULL, \"client_created_at\" TEXT NOT NULL, \"server_created_at\" TEXT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "representant_comments_representant_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX representant_comments_representant_idx ON representant_comments (representant_id, client_created_at DESC)"
+        }
+      ]
+    },
+    {
+      "name": "outbox",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"outbox\" (\"seq\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"id\" TEXT NOT NULL UNIQUE, \"dependency_key\" TEXT NULL, \"entity_type\" TEXT NOT NULL, \"entity_id\" TEXT NOT NULL, \"op\" TEXT NOT NULL CHECK (op IN ('create', 'update', 'delete')), \"payload\" TEXT NOT NULL, \"payload_version\" INTEGER NOT NULL DEFAULT 1, \"base_rev\" INTEGER NULL, \"status\" TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'syncing', 'done', 'conflict', 'failed')), \"attempts\" INTEGER NOT NULL DEFAULT 0, \"blocked_attempts\" INTEGER NOT NULL DEFAULT 0, \"next_attempt_at\" TEXT NOT NULL, \"lease_until\" TEXT NULL, \"claim_token\" TEXT NULL, \"batch_id\" TEXT NULL, \"last_error_code\" TEXT NULL, \"last_error_msg\" TEXT NULL, \"created_at\" TEXT NOT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "outbox_ready_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX outbox_ready_idx ON outbox (status, next_attempt_at, dependency_key, seq)"
+        }
+      ]
+    },
+    {
+      "name": "outbox_entity_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX outbox_entity_idx ON outbox (entity_type, entity_id, status)"
+        }
+      ]
+    },
+    {
+      "name": "form_drafts",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"form_drafts\" (\"draft_id\" TEXT NOT NULL PRIMARY KEY, \"form_key\" TEXT NOT NULL, \"entity_id\" TEXT NULL, \"parent_id\" TEXT NULL, \"payload\" TEXT NOT NULL, \"step\" INTEGER NOT NULL DEFAULT 0, \"schema_version\" INTEGER NOT NULL DEFAULT 1, \"updated_at\" TEXT NOT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "form_drafts_key_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX form_drafts_key_idx ON form_drafts (form_key, updated_at DESC)"
+        }
+      ]
+    },
+    {
+      "name": "sync_state",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"sync_state\" (\"collection\" TEXT NOT NULL PRIMARY KEY, \"cursor\" TEXT NULL, \"last_pulled_at\" TEXT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "phase2_directory",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"phase2_directory\" (\"prospect_id\" TEXT NOT NULL PRIMARY KEY, \"phone_e164\" TEXT NOT NULL, \"phase2_status\" TEXT NOT NULL DEFAULT 'PENDING', \"enrollment_method\" TEXT NULL, \"rev\" INTEGER NOT NULL DEFAULT 1, \"updated_at\" TEXT NOT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "phase2_directory_phone_unique",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE UNIQUE INDEX phase2_directory_phone_unique ON phase2_directory (phone_e164)"
+        }
+      ]
+    },
+    {
+      "name": "phase2_directory_status_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX phase2_directory_status_idx ON phase2_directory (phase2_status)"
+        }
+      ]
+    },
+    {
+      "name": "call_attempts",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"call_attempts\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"prospect_id\" TEXT NOT NULL, \"outcome\" TEXT NOT NULL, \"reason_code\" TEXT NULL, \"effect\" TEXT NOT NULL DEFAULT 'KEEP_OPEN', \"requires_comment\" INTEGER NOT NULL DEFAULT 0, \"method\" TEXT NULL, \"comment\" TEXT NULL, \"callback_at\" TEXT NULL, \"client_created_at\" TEXT NOT NULL, \"created_by_id\" TEXT NOT NULL, CHECK((effect = 'CLOSE_METHOD')=(method IS NOT NULL)), CHECK(requires_comment = 0 OR(comment IS NOT NULL AND length(trim(comment)) > 0)), CHECK(comment IS NULL OR length(comment) <= 2000));"
+        }
+      ]
+    },
+    {
+      "name": "call_attempts_prospect_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX call_attempts_prospect_idx ON call_attempts (prospect_id, client_created_at DESC)"
+        }
+      ]
+    },
+    {
+      "name": "call_attempts_created_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX call_attempts_created_idx ON call_attempts (client_created_at DESC)"
+        }
+      ]
+    },
+    {
+      "name": "notifications",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"notifications\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"title\" TEXT NOT NULL, \"body\" TEXT NOT NULL, \"category\" TEXT NOT NULL DEFAULT 'ANNONCE', \"route\" TEXT NULL, \"payload\" TEXT NULL, \"read_at\" TEXT NULL, \"created_at\" TEXT NOT NULL, \"received_at\" TEXT NOT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "notifications_created_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX notifications_created_idx ON notifications (created_at)"
+        }
+      ]
+    },
+    {
+      "name": "notifications_unread_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX notifications_unread_idx ON notifications (read_at)"
+        }
+      ]
+    },
+    {
+      "name": "representant_sync_view",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE VIEW representant_sync_view AS SELECT r.*, CASE WHEN o.status IS NOT NULL THEN o.status WHEN r.server_updated_at IS NULL THEN 'draft' ELSE 'synced' END AS sync_status FROM representants AS r LEFT JOIN outbox AS o ON o.entity_type = 'representant' AND o.entity_id = r.id AND o.status IN ('pending', 'syncing', 'conflict', 'failed') AND o.seq = (SELECT MIN(o2.seq) FROM outbox AS o2 WHERE o2.entity_type = 'representant' AND o2.entity_id = r.id AND o2.status IN ('pending', 'syncing', 'conflict', 'failed'))"
+        }
+      ]
+    },
+    {
+      "name": "prospect_sync_view",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE VIEW prospect_sync_view AS SELECT p.*, CASE WHEN po.status IN ('conflict', 'failed') AND(o.status IS NULL OR o.status NOT IN ('conflict', 'failed'))THEN 'blocked' WHEN o.status IS NOT NULL THEN o.status WHEN p.server_updated_at IS NULL THEN 'draft' ELSE 'synced' END AS sync_status FROM prospects AS p LEFT JOIN outbox AS o ON o.entity_type = 'prospect' AND o.entity_id = p.id AND o.status IN ('pending', 'syncing', 'conflict', 'failed') AND o.seq = (SELECT MIN(o2.seq) FROM outbox AS o2 WHERE o2.entity_type = 'prospect' AND o2.entity_id = p.id AND o2.status IN ('pending', 'syncing', 'conflict', 'failed')) LEFT JOIN outbox AS po ON po.entity_type = 'representant' AND po.entity_id = p.representant_id AND po.status IN ('pending', 'syncing', 'conflict', 'failed') AND po.seq = (SELECT MIN(po2.seq) FROM outbox AS po2 WHERE po2.entity_type = 'representant' AND po2.entity_id = p.representant_id AND po2.status IN ('pending', 'syncing', 'conflict', 'failed'))"
+        }
+      ]
+    }
+  ]
+}

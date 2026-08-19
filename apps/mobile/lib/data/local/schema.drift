@@ -144,6 +144,15 @@ CREATE TABLE representants (
     -- `phase2_directory.phase2_status`, une valeur ajoutée côté serveur ferait
     -- avorter la page de pull entière.
     relation_status TEXT NOT NULL DEFAULT 'INCONNU',
+    -- Trois états et non un booléen, et SANS CHECK pour la même raison que
+    -- `relation_status` : rien d'autre ne distingue « il n'a pas WhatsApp » de
+    -- « la question ne lui a pas été posée ».
+    whatsapp_status TEXT NOT NULL DEFAULT 'NON_DEMANDE',
+    -- Renseigné UNIQUEMENT sur `AUTRE_NUMERO`. Sur `MEME_NUMERO` le numéro
+    -- n'est PAS recopié : `phone_e164` se corrige, la copie divergerait sans
+    -- que rien ne le signale.
+    whatsapp_e164 TEXT NULL,
+    profession TEXT NULL,
     created_by_id TEXT NOT NULL,
     -- Horodatage de la saisie sur le terrain, distinct de l'arrivée en base :
     -- les deux peuvent être séparés de plusieurs jours hors ligne.

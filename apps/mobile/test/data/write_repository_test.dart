@@ -192,6 +192,76 @@ void main() {
       expect((await allOutbox(db)).single.baseRev, isNull);
     });
 
+    test('« même numéro » n\'écrit AUCUN numéro WhatsApp local', () async {
+      await repo.createRepresentant(
+        fullName: 'Awa Sy',
+        phoneE164: '+221770000001',
+        departementId: 'dep-1',
+        createdById: 'me',
+        whatsappStatus: 'MEME_NUMERO',
+        // L'écran ne devrait pas en fournir ; la règle ne peut pas dépendre de
+        // ça. Un second numéro en base, c'est un numéro qui divergera du
+        // téléphone à la première correction, sans que rien ne le signale.
+        whatsappE164: '+221770000001',
+      );
+
+      final Representant rep = (await db.select(db.representants).get()).single;
+      expect(rep.whatsappStatus, 'MEME_NUMERO');
+      expect(rep.whatsappE164, isNull);
+
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
+      expect(payload.containsKey('whatsappE164'), isFalse);
+    });
+
+    test('les trois champs partent dans le lot sortant', () async {
+      await repo.createRepresentant(
+        fullName: 'Awa Sy',
+        phoneE164: '+221770000001',
+        departementId: 'dep-1',
+        createdById: 'me',
+        whatsappStatus: 'AUTRE_NUMERO',
+        whatsappE164: '+221781112233',
+        profession: 'Directeur d\'école',
+      );
+
+      final Representant rep = (await db.select(db.representants).get()).single;
+      expect(rep.whatsappE164, '+221781112233');
+      expect(rep.profession, 'Directeur d\'école');
+
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
+      expect(payload['whatsappStatus'], 'AUTRE_NUMERO');
+      expect(payload['whatsappE164'], '+221781112233');
+      expect(payload['profession'], 'Directeur d\'école');
+    });
+
+    test('revenir à « même numéro » efface le numéro déjà enregistré', () async {
+      await insertRepresentant(
+        db,
+        id: 'repA',
+        phone: '+221770000001',
+        whatsappStatus: 'AUTRE_NUMERO',
+        whatsappE164: '+221781112233',
+      );
+      await repo.updateRepresentant(
+        id: 'repA',
+        fullName: 'Awa Sy',
+        phoneE164: '+221770000001',
+        departementId: 'dep-1',
+        whatsappStatus: 'MEME_NUMERO',
+        whatsappE164: '+221781112233',
+      );
+
+      expect((await db.select(db.representants).get()).single.whatsappE164, isNull);
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload) as Map<String, Object?>;
+      // Présent ET nul : c'est ce qui distingue un effacement voulu du silence
+      // d'une version qui ne connaissait pas le champ.
+      expect(payload.containsKey('whatsappE164'), isTrue);
+      expect(payload['whatsappE164'], isNull);
+    });
+
     test('supprimer un représentant emporte logiquement ses prospects', () async {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
       await insertProspect(db, id: 'p1', representantId: 'repA', phone: '+221780000001');

@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   /// L'effet d'une tentative saisie avant la v10, déduit de son issue. Sans
   /// cette dérivation, la recopie de table poserait le défaut `KEEP_OPEN`
@@ -119,6 +119,13 @@ class AppDatabase extends _$AppDatabase {
             ),
           );
         }
+      }
+      if (from < 11 && to >= 11) {
+        // `representants` n'a jamais été recréée par un palier antérieur : les
+        // trois colonnes s'ajoutent donc sans condition.
+        await m.addColumn(representants, representants.whatsappStatus);
+        await m.addColumn(representants, representants.whatsappE164);
+        await m.addColumn(representants, representants.profession);
       }
     },
     beforeOpen: (OpeningDetails details) async {

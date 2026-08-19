@@ -73,6 +73,11 @@ void main() {
       id: 'repFiche',
       phone: '+221770000002',
       fullName: 'Abdoulaye Ousseynou Kane Diagne',
+      // La fiche dans son état le plus large : un WhatsApp sur un AUTRE numéro
+      // et la profession la plus longue des puces.
+      whatsappStatus: 'AUTRE_NUMERO',
+      whatsappE164: '+221781112233',
+      profession: 'Personnel administratif',
       notes:
           'Disponible entre midi et quatorze heures, jamais le vendredi '
           'apres-midi. Passe par le secretariat de l\'inspection.',
