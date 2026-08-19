@@ -6,6 +6,7 @@
 import 'package:crm_api_client/src/model/call_outcome.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
+import 'package:crm_api_client/src/model/whatsapp_status.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -43,6 +44,12 @@ class SyncEntityDataDto {
     this.statut,
 
     this.notes,
+
+    this.whatsappStatus,
+
+    this.whatsappE164,
+
+    this.profession,
 
     this.clientCreatedAt,
 
@@ -107,6 +114,23 @@ class SyncEntityDataDto {
   @JsonKey(name: r'notes', required: false, includeIfNull: false)
   final String? notes;
 
+  /// Représentant : la question du WhatsApp a-t-elle été posée, et avec quelle réponse.
+  @JsonKey(
+    name: r'whatsappStatus',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: WhatsappStatus.unknownDefaultOpenApi,
+  )
+  final WhatsappStatus? whatsappStatus;
+
+  /// Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO.
+  @JsonKey(name: r'whatsappE164', required: false, includeIfNull: false)
+  final String? whatsappE164;
+
+  /// Représentant : profession déclarée.
+  @JsonKey(name: r'profession', required: false, includeIfNull: false)
+  final String? profession;
+
   /// Horodatage de la saisie terrain.
   @JsonKey(name: r'clientCreatedAt', required: false, includeIfNull: false)
   final DateTime? clientCreatedAt;
@@ -161,6 +185,9 @@ class SyncEntityDataDto {
                 representantId,
                 statut,
                 notes,
+                whatsappStatus,
+                whatsappE164,
+                profession,
                 clientCreatedAt,
                 prospectId,
                 outcome,
@@ -181,6 +208,9 @@ class SyncEntityDataDto {
                 other.representantId,
                 other.statut,
                 other.notes,
+                other.whatsappStatus,
+                other.whatsappE164,
+                other.profession,
                 other.clientCreatedAt,
                 other.prospectId,
                 other.outcome,
@@ -207,6 +237,9 @@ class SyncEntityDataDto {
         representantId,
         statut,
         notes,
+        whatsappStatus,
+        whatsappE164,
+        profession,
         clientCreatedAt,
         prospectId,
         outcome,

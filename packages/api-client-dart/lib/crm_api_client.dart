@@ -262,3 +262,4 @@ export 'package:crm_api_client/src/model/user_dto.dart';
 export 'package:crm_api_client/src/model/user_list_dto.dart';
 export 'package:crm_api_client/src/model/weekly_cohort_dto.dart';
 export 'package:crm_api_client/src/model/weekly_cohort_list_dto.dart';
+export 'package:crm_api_client/src/model/whatsapp_status.dart';

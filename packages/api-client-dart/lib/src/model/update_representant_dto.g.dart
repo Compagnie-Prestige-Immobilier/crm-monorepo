@@ -25,6 +25,12 @@ abstract class _$UpdateRepresentantDtoCWProxy {
 
   UpdateRepresentantDto relationReason(String? relationReason);
 
+  UpdateRepresentantDto whatsappStatus(WhatsappStatus? whatsappStatus);
+
+  UpdateRepresentantDto whatsappE164(String? whatsappE164);
+
+  UpdateRepresentantDto profession(String? profession);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateRepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -41,6 +47,9 @@ abstract class _$UpdateRepresentantDtoCWProxy {
     DateTime? clientCreatedAt,
     RepresentantRelation? relationStatus,
     String? relationReason,
+    WhatsappStatus? whatsappStatus,
+    String? whatsappE164,
+    String? profession,
   });
 }
 
@@ -83,6 +92,18 @@ class _$UpdateRepresentantDtoCWProxyImpl
       this(relationReason: relationReason);
 
   @override
+  UpdateRepresentantDto whatsappStatus(WhatsappStatus? whatsappStatus) =>
+      this(whatsappStatus: whatsappStatus);
+
+  @override
+  UpdateRepresentantDto whatsappE164(String? whatsappE164) =>
+      this(whatsappE164: whatsappE164);
+
+  @override
+  UpdateRepresentantDto profession(String? profession) =>
+      this(profession: profession);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateRepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -99,6 +120,9 @@ class _$UpdateRepresentantDtoCWProxyImpl
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? relationStatus = const $CopyWithPlaceholder(),
     Object? relationReason = const $CopyWithPlaceholder(),
+    Object? whatsappStatus = const $CopyWithPlaceholder(),
+    Object? whatsappE164 = const $CopyWithPlaceholder(),
+    Object? profession = const $CopyWithPlaceholder(),
   }) {
     return UpdateRepresentantDto(
       id: id == const $CopyWithPlaceholder()
@@ -137,6 +161,18 @@ class _$UpdateRepresentantDtoCWProxyImpl
           ? _value.relationReason
           // ignore: cast_nullable_to_non_nullable
           : relationReason as String?,
+      whatsappStatus: whatsappStatus == const $CopyWithPlaceholder()
+          ? _value.whatsappStatus
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappStatus as WhatsappStatus?,
+      whatsappE164: whatsappE164 == const $CopyWithPlaceholder()
+          ? _value.whatsappE164
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappE164 as String?,
+      profession: profession == const $CopyWithPlaceholder()
+          ? _value.profession
+          // ignore: cast_nullable_to_non_nullable
+          : profession as String?,
     );
   }
 }
@@ -175,6 +211,16 @@ UpdateRepresentantDto _$UpdateRepresentantDtoFromJson(
       ),
     ),
     relationReason: $checkedConvert('relationReason', (v) => v as String?),
+    whatsappStatus: $checkedConvert(
+      'whatsappStatus',
+      (v) => $enumDecodeNullable(
+        _$WhatsappStatusEnumMap,
+        v,
+        unknownValue: WhatsappStatus.unknownDefaultOpenApi,
+      ),
+    ),
+    whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
+    profession: $checkedConvert('profession', (v) => v as String?),
   );
   return val;
 });
@@ -193,6 +239,10 @@ Map<String, dynamic> _$UpdateRepresentantDtoToJson(
   if (_$RepresentantRelationEnumMap[instance.relationStatus] case final value?)
     'relationStatus': value,
   if (instance.relationReason case final value?) 'relationReason': value,
+  if (_$WhatsappStatusEnumMap[instance.whatsappStatus] case final value?)
+    'whatsappStatus': value,
+  if (instance.whatsappE164 case final value?) 'whatsappE164': value,
+  if (instance.profession case final value?) 'profession': value,
 };
 
 const _$RepresentantRelationEnumMap = {
@@ -201,4 +251,12 @@ const _$RepresentantRelationEnumMap = {
   RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
   RepresentantRelation.REFUS: 'REFUS',
   RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$WhatsappStatusEnumMap = {
+  WhatsappStatus.NON_DEMANDE: 'NON_DEMANDE',
+  WhatsappStatus.MEME_NUMERO: 'MEME_NUMERO',
+  WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
+  WhatsappStatus.AUCUN: 'AUCUN',
+  WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
