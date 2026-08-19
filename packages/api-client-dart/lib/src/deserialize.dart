@@ -826,6 +826,7 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'WeeklyCohortListDto':
       return WeeklyCohortListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'WhatsappStatus':
     default:
       RegExpMatch? match;
 

@@ -2584,6 +2584,8 @@ export interface components {
     /** @enum {string} */
     RepresentantRelation: 'INCONNU' | 'CONTACTE' | 'AMBASSADEUR' | 'REFUS';
     /** @enum {string} */
+    WhatsappStatus: 'NON_DEMANDE' | 'MEME_NUMERO' | 'AUTRE_NUMERO' | 'AUCUN';
+    /** @enum {string} */
     RepresentantSortField: 'clientCreatedAt' | 'createdAt' | 'fullName' | 'prospects';
     /** @enum {string} */
     SortOrder: 'asc' | 'desc';
@@ -2613,6 +2615,12 @@ export interface components {
       updatedAt: string;
       prospectCount: number;
       relationStatus: components['schemas']['RepresentantRelation'];
+      whatsappStatus: components['schemas']['WhatsappStatus'];
+      /** @description Renseigné avec le seul statut AUTRE_NUMERO. */
+      whatsappE164: string | null;
+      /** @description Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon. */
+      whatsappNumber: string | null;
+      profession: string | null;
     };
     RepresentantListDto: {
       items: components['schemas']['RepresentantDto'][];
@@ -2720,6 +2728,12 @@ export interface components {
       relationStatus?: components['schemas']['RepresentantRelation'];
       /** @description Motif de la bascule, repris dans la chronologie. Sans effet quand `relationStatus` est absent ou reposte le statut courant. */
       relationReason?: string;
+      /** @description Trois états et non un booléen : NON_DEMANDE dit que la question n’a pas été posée, AUCUN qu’elle l’a été et que la réponse est non. */
+      whatsappStatus?: components['schemas']['WhatsappStatus'];
+      /** @description Numéro WhatsApp DISTINCT du téléphone. Saisie libre, normalisé par le serveur. Admis avec le seul statut AUTRE_NUMERO : sur MEME_NUMERO le numéro se relit sur `phoneE164`. */
+      whatsappE164?: string;
+      /** @description Profession, en texte libre. Chaîne vide : la valeur est effacée. */
+      profession?: string;
     };
     /**
      * @description Le canal qui a écrit la bascule.
@@ -3069,6 +3083,12 @@ export interface components {
       statut?: components['schemas']['ProspectStatut'];
       /** @description Représentant : notes libres. */
       notes?: string;
+      /** @description Représentant : la question du WhatsApp a-t-elle été posée, et avec quelle réponse. */
+      whatsappStatus?: components['schemas']['WhatsappStatus'];
+      /** @description Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO. */
+      whatsappE164?: string;
+      /** @description Représentant : profession déclarée. */
+      profession?: string;
       /**
        * Format: date-time
        * @description Horodatage de la saisie terrain.
@@ -3112,7 +3132,7 @@ export interface components {
       /** @description Révision serveur sur laquelle le client s’est basé. Fournie sur update/delete, elle transforme une écriture aveugle en écriture conditionnelle. */
       baseRev?: number;
       data?: components['schemas']['SyncEntityDataDto'];
-      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes. */
+      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession. */
       clearedFields?: string[];
     };
     SyncPushDto: {
@@ -3389,6 +3409,12 @@ export interface components {
       suggestedName?: string;
       /** @description Ce que le représentant dit du contact. Ignoré sans `suggestedPhone`. */
       suggestedNote?: string;
+      /** @description Ce que l’appel apprend du canal WhatsApp. La question ne se pose qu’APRÈS l’engagement : NON_DEMANDE reste donc la réponse honnête tant qu’elle n’a pas été posée. Absent : l’état ne bouge pas. */
+      whatsappStatus?: components['schemas']['WhatsappStatus'];
+      /** @description Numéro WhatsApp DISTINCT du téléphone. Saisie libre, normalisé par le serveur. Admis avec le seul statut AUTRE_NUMERO. */
+      whatsappE164?: string;
+      /** @description Profession, en texte libre. Chaîne vide : la valeur est effacée. */
+      profession?: string;
       /**
        * Format: date-time
        * @description Horodatage de l’appel sur le terrain, distinct de son arrivée en base.
@@ -6241,6 +6267,10 @@ export interface operations {
         hasProspects?: boolean;
         /** @description Ne retient que les représentants dans cet état de relation. */
         relationStatus?: components['schemas']['RepresentantRelation'];
+        /** @description Ne retient que les représentants dans cet état WhatsApp. */
+        whatsappStatus?: components['schemas']['WhatsappStatus'];
+        /** @description true : un numéro WhatsApp joignable (MEME_NUMERO ou AUTRE_NUMERO). false : les autres, question non posée comprise. Se compose avec `whatsappStatus` par intersection. */
+        hasWhatsapp?: boolean;
         sortBy?: components['schemas']['RepresentantSortField'];
         sortOrder?: components['schemas']['SortOrder'];
         page?: number;

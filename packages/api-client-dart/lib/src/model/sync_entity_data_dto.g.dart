@@ -29,6 +29,12 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto notes(String? notes);
 
+  SyncEntityDataDto whatsappStatus(WhatsappStatus? whatsappStatus);
+
+  SyncEntityDataDto whatsappE164(String? whatsappE164);
+
+  SyncEntityDataDto profession(String? profession);
+
   SyncEntityDataDto clientCreatedAt(DateTime? clientCreatedAt);
 
   SyncEntityDataDto prospectId(String? prospectId);
@@ -61,6 +67,9 @@ abstract class _$SyncEntityDataDtoCWProxy {
     String? representantId,
     ProspectStatut? statut,
     String? notes,
+    WhatsappStatus? whatsappStatus,
+    String? whatsappE164,
+    String? profession,
     DateTime? clientCreatedAt,
     String? prospectId,
     CallOutcome? outcome,
@@ -114,6 +123,18 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
   SyncEntityDataDto notes(String? notes) => this(notes: notes);
 
   @override
+  SyncEntityDataDto whatsappStatus(WhatsappStatus? whatsappStatus) =>
+      this(whatsappStatus: whatsappStatus);
+
+  @override
+  SyncEntityDataDto whatsappE164(String? whatsappE164) =>
+      this(whatsappE164: whatsappE164);
+
+  @override
+  SyncEntityDataDto profession(String? profession) =>
+      this(profession: profession);
+
+  @override
   SyncEntityDataDto clientCreatedAt(DateTime? clientCreatedAt) =>
       this(clientCreatedAt: clientCreatedAt);
 
@@ -157,6 +178,9 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? representantId = const $CopyWithPlaceholder(),
     Object? statut = const $CopyWithPlaceholder(),
     Object? notes = const $CopyWithPlaceholder(),
+    Object? whatsappStatus = const $CopyWithPlaceholder(),
+    Object? whatsappE164 = const $CopyWithPlaceholder(),
+    Object? profession = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? prospectId = const $CopyWithPlaceholder(),
     Object? outcome = const $CopyWithPlaceholder(),
@@ -210,6 +234,18 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.notes
           // ignore: cast_nullable_to_non_nullable
           : notes as String?,
+      whatsappStatus: whatsappStatus == const $CopyWithPlaceholder()
+          ? _value.whatsappStatus
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappStatus as WhatsappStatus?,
+      whatsappE164: whatsappE164 == const $CopyWithPlaceholder()
+          ? _value.whatsappE164
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappE164 as String?,
+      profession: profession == const $CopyWithPlaceholder()
+          ? _value.profession
+          // ignore: cast_nullable_to_non_nullable
+          : profession as String?,
       clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -274,6 +310,16 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
           ),
         ),
         notes: $checkedConvert('notes', (v) => v as String?),
+        whatsappStatus: $checkedConvert(
+          'whatsappStatus',
+          (v) => $enumDecodeNullable(
+            _$WhatsappStatusEnumMap,
+            v,
+            unknownValue: WhatsappStatus.unknownDefaultOpenApi,
+          ),
+        ),
+        whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
+        profession: $checkedConvert('profession', (v) => v as String?),
         clientCreatedAt: $checkedConvert(
           'clientCreatedAt',
           (v) => v == null ? null : DateTime.parse(v as String),
@@ -319,6 +365,10 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(SyncEntityDataDto instance) =>
       if (_$ProspectStatutEnumMap[instance.statut] case final value?)
         'statut': value,
       if (instance.notes case final value?) 'notes': value,
+      if (_$WhatsappStatusEnumMap[instance.whatsappStatus] case final value?)
+        'whatsappStatus': value,
+      if (instance.whatsappE164 case final value?) 'whatsappE164': value,
+      if (instance.profession case final value?) 'profession': value,
       if (instance.clientCreatedAt?.toIso8601String() case final value?)
         'clientCreatedAt': value,
       if (instance.prospectId case final value?) 'prospectId': value,
@@ -338,6 +388,14 @@ const _$ProspectStatutEnumMap = {
   ProspectStatut.CONVERTI: 'CONVERTI',
   ProspectStatut.PERDU: 'PERDU',
   ProspectStatut.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$WhatsappStatusEnumMap = {
+  WhatsappStatus.NON_DEMANDE: 'NON_DEMANDE',
+  WhatsappStatus.MEME_NUMERO: 'MEME_NUMERO',
+  WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
+  WhatsappStatus.AUCUN: 'AUCUN',
+  WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$CallOutcomeEnumMap = {

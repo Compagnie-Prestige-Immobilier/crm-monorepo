@@ -25,6 +25,12 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
 
   CreateRepCallAttemptDto suggestedNote(String? suggestedNote);
 
+  CreateRepCallAttemptDto whatsappStatus(WhatsappStatus? whatsappStatus);
+
+  CreateRepCallAttemptDto whatsappE164(String? whatsappE164);
+
+  CreateRepCallAttemptDto profession(String? profession);
+
   CreateRepCallAttemptDto clientCreatedAt(DateTime clientCreatedAt);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateRepCallAttemptDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -43,6 +49,9 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
     String? suggestedPhone,
     String? suggestedName,
     String? suggestedNote,
+    WhatsappStatus? whatsappStatus,
+    String? whatsappE164,
+    String? profession,
     DateTime clientCreatedAt,
   });
 }
@@ -90,6 +99,18 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
       this(suggestedNote: suggestedNote);
 
   @override
+  CreateRepCallAttemptDto whatsappStatus(WhatsappStatus? whatsappStatus) =>
+      this(whatsappStatus: whatsappStatus);
+
+  @override
+  CreateRepCallAttemptDto whatsappE164(String? whatsappE164) =>
+      this(whatsappE164: whatsappE164);
+
+  @override
+  CreateRepCallAttemptDto profession(String? profession) =>
+      this(profession: profession);
+
+  @override
   CreateRepCallAttemptDto clientCreatedAt(DateTime clientCreatedAt) =>
       this(clientCreatedAt: clientCreatedAt);
 
@@ -110,6 +131,9 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
     Object? suggestedPhone = const $CopyWithPlaceholder(),
     Object? suggestedName = const $CopyWithPlaceholder(),
     Object? suggestedNote = const $CopyWithPlaceholder(),
+    Object? whatsappStatus = const $CopyWithPlaceholder(),
+    Object? whatsappE164 = const $CopyWithPlaceholder(),
+    Object? profession = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
   }) {
     return CreateRepCallAttemptDto(
@@ -149,6 +173,18 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
           ? _value.suggestedNote
           // ignore: cast_nullable_to_non_nullable
           : suggestedNote as String?,
+      whatsappStatus: whatsappStatus == const $CopyWithPlaceholder()
+          ? _value.whatsappStatus
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappStatus as WhatsappStatus?,
+      whatsappE164: whatsappE164 == const $CopyWithPlaceholder()
+          ? _value.whatsappE164
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappE164 as String?,
+      profession: profession == const $CopyWithPlaceholder()
+          ? _value.profession
+          // ignore: cast_nullable_to_non_nullable
+          : profession as String?,
       clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -199,6 +235,16 @@ CreateRepCallAttemptDto _$CreateRepCallAttemptDtoFromJson(
     suggestedPhone: $checkedConvert('suggestedPhone', (v) => v as String?),
     suggestedName: $checkedConvert('suggestedName', (v) => v as String?),
     suggestedNote: $checkedConvert('suggestedNote', (v) => v as String?),
+    whatsappStatus: $checkedConvert(
+      'whatsappStatus',
+      (v) => $enumDecodeNullable(
+        _$WhatsappStatusEnumMap,
+        v,
+        unknownValue: WhatsappStatus.unknownDefaultOpenApi,
+      ),
+    ),
+    whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
+    profession: $checkedConvert('profession', (v) => v as String?),
     clientCreatedAt: $checkedConvert(
       'clientCreatedAt',
       (v) => DateTime.parse(v as String),
@@ -220,6 +266,10 @@ Map<String, dynamic> _$CreateRepCallAttemptDtoToJson(
   if (instance.suggestedPhone case final value?) 'suggestedPhone': value,
   if (instance.suggestedName case final value?) 'suggestedName': value,
   if (instance.suggestedNote case final value?) 'suggestedNote': value,
+  if (_$WhatsappStatusEnumMap[instance.whatsappStatus] case final value?)
+    'whatsappStatus': value,
+  if (instance.whatsappE164 case final value?) 'whatsappE164': value,
+  if (instance.profession case final value?) 'profession': value,
   'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
 };
 
@@ -240,4 +290,12 @@ const _$RepresentantRelationEnumMap = {
   RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
   RepresentantRelation.REFUS: 'REFUS',
   RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$WhatsappStatusEnumMap = {
+  WhatsappStatus.NON_DEMANDE: 'NON_DEMANDE',
+  WhatsappStatus.MEME_NUMERO: 'MEME_NUMERO',
+  WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
+  WhatsappStatus.AUCUN: 'AUCUN',
+  WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
