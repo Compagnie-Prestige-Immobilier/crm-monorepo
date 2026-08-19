@@ -104,3 +104,68 @@ describe('ce que la requête de pull accepte', () => {
     expect(parsed.appVersion).toBe('1.4.2');
   });
 });
+
+describe('WhatsApp et profession sur le lot de synchronisation', () => {
+  const repOp = (data: Record<string, unknown>) => ({
+    clientBatchId: '01931f3c-1a2b-7c4d-8e5f-0000000000a0',
+    payloadVersion: 1,
+    operations: [
+      {
+        opId: '01931f3c-1a2b-7c4d-8e5f-0000000000a1',
+        seq: 0,
+        entity: 'representant',
+        op: 'create',
+        entityId: '01931f3c-1a2b-7c4d-8e5f-0000000000a2',
+        clientUpdatedAt: '2026-08-19T10:00:00.000Z',
+        data: {
+          fullName: 'Mamadou Diallo',
+          phone: '+221781000900',
+          departementId: '01931f3c-1a2b-7c4d-8e5f-0000000000a3',
+          clientCreatedAt: '2026-08-19T10:00:00.000Z',
+          ...data,
+        },
+      },
+    ],
+  });
+
+  it('accepte les trois champs sur une entite representant', async () => {
+    const body = await asBody(
+      SyncPushDto,
+      repOp({
+        whatsappStatus: 'AUTRE_NUMERO',
+        whatsappE164: '78 100 09 01',
+        profession: 'Instituteur',
+      }),
+    );
+
+    expect(body.operations[0]?.data?.whatsappStatus).toBe('AUTRE_NUMERO');
+    expect(body.operations[0]?.data?.whatsappE164).toBe('78 100 09 01');
+    expect(body.operations[0]?.data?.profession).toBe('Instituteur');
+  });
+
+  it('accepte encore un lot d ancien telephone qui ne les porte PAS', async () => {
+    // `forbidNonWhitelisted` rejette le LOT ENTIER sur un champ inconnu: le
+    // parc deploye n envoie pas ces cles et doit continuer de pousser.
+    const body = await asBody(SyncPushDto, repOp({}));
+
+    expect(body.operations[0]?.data?.whatsappStatus).toBeUndefined();
+    expect(body.operations[0]?.data?.profession).toBeUndefined();
+  });
+
+  it('refuse un etat WhatsApp hors du vocabulaire', async () => {
+    await expect(
+      asBody(SyncPushDto, repOp({ whatsappStatus: 'PEUT_ETRE' })),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('declare les deux champs comme videmment effacables', async () => {
+    const body = await asBody(SyncPushDto, {
+      ...repOp({}),
+      operations: [
+        { ...repOp({}).operations[0], op: 'update', clearedFields: ['whatsappE164', 'profession'] },
+      ],
+    });
+
+    expect(body.operations[0]?.clearedFields).toEqual(['whatsappE164', 'profession']);
+  });
+});

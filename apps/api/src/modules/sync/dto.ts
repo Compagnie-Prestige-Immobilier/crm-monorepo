@@ -20,7 +20,7 @@ import {
   type ValidatorConstraintInterface,
 } from 'class-validator';
 import { ValidatorConstraint } from 'class-validator';
-import { CallOutcome, EnrollmentMethod, ProspectStatut } from '@crm/database';
+import { CallOutcome, EnrollmentMethod, ProspectStatut, WhatsappStatus } from '@crm/database';
 
 import { BanqueDto, DepartementDto, IefDto, SyndicatDto } from '../referentiels/dto.js';
 import { ProspectDto } from '../prospects/dto.js';
@@ -50,7 +50,7 @@ export enum SyncOpStatus {
   SKIPPED_DEPENDENCY_FAILED = 'skipped_dependency_failed',
 }
 
-export const CLEARABLE_FIELDS = ['iefId', 'notes'] as const;
+export const CLEARABLE_FIELDS = ['iefId', 'notes', 'whatsappE164', 'profession'] as const;
 
 export type ClearableField = (typeof CLEARABLE_FIELDS)[number];
 
@@ -126,6 +126,32 @@ export class SyncEntityDataDto {
   @IsString()
   @MaxLength(2000)
   notes?: string;
+
+  @ApiPropertyOptional({
+    enum: WhatsappStatus,
+    enumName: 'WhatsappStatus',
+    description:
+      'Représentant : la question du WhatsApp a-t-elle été posée, et avec quelle réponse.',
+  })
+  @IsOptional()
+  @IsEnum(WhatsappStatus)
+  whatsappStatus?: WhatsappStatus;
+
+  @ApiPropertyOptional({
+    maxLength: 40,
+    description: 'Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  whatsappE164?: string;
+
+  @ApiPropertyOptional({ maxLength: 120, description: 'Représentant : profession déclarée.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  profession?: string;
 
   @ApiPropertyOptional({ format: 'date-time', description: 'Horodatage de la saisie terrain.' })
   @IsOptional()

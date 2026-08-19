@@ -2044,6 +2044,24 @@
             }
           },
           {
+            "name": "whatsappStatus",
+            "required": false,
+            "in": "query",
+            "description": "Ne retient que les représentants dans cet état WhatsApp.",
+            "schema": {
+              "$ref": "#/components/schemas/WhatsappStatus"
+            }
+          },
+          {
+            "name": "hasWhatsapp",
+            "required": false,
+            "in": "query",
+            "description": "true : un numéro WhatsApp joignable (MEME_NUMERO ou AUTRE_NUMERO). false : les autres, question non posée comprise. Se compose avec `whatsappStatus` par intersection.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "sortBy",
             "required": false,
             "in": "query",
@@ -15304,6 +15322,10 @@
         "type": "string",
         "enum": ["INCONNU", "CONTACTE", "AMBASSADEUR", "REFUS"]
       },
+      "WhatsappStatus": {
+        "type": "string",
+        "enum": ["NON_DEMANDE", "MEME_NUMERO", "AUTRE_NUMERO", "AUCUN"]
+      },
       "RepresentantSortField": {
         "type": "string",
         "enum": ["clientCreatedAt", "createdAt", "fullName", "prospects"]
@@ -15378,6 +15400,27 @@
                 "$ref": "#/components/schemas/RepresentantRelation"
               }
             ]
+          },
+          "whatsappStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "whatsappE164": {
+            "type": "string",
+            "nullable": true,
+            "description": "Renseigné avec le seul statut AUTRE_NUMERO."
+          },
+          "whatsappNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon."
+          },
+          "profession": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -15396,7 +15439,11 @@
           "createdAt",
           "updatedAt",
           "prospectCount",
-          "relationStatus"
+          "relationStatus",
+          "whatsappStatus",
+          "whatsappE164",
+          "whatsappNumber",
+          "profession"
         ]
       },
       "RepresentantListDto": {
@@ -15642,6 +15689,25 @@
             "type": "string",
             "maxLength": 500,
             "description": "Motif de la bascule, repris dans la chronologie. Sans effet quand `relationStatus` est absent ou reposte le statut courant."
+          },
+          "whatsappStatus": {
+            "description": "Trois états et non un booléen : NON_DEMANDE dit que la question n’a pas été posée, AUCUN qu’elle l’a été et que la réponse est non.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "whatsappE164": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 40,
+            "description": "Numéro WhatsApp DISTINCT du téléphone. Saisie libre, normalisé par le serveur. Admis avec le seul statut AUTRE_NUMERO : sur MEME_NUMERO le numéro se relit sur `phoneE164`."
+          },
+          "profession": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Profession, en texte libre. Chaîne vide : la valeur est effacée."
           }
         }
       },
@@ -16451,6 +16517,24 @@
             "maxLength": 2000,
             "description": "Représentant : notes libres."
           },
+          "whatsappStatus": {
+            "description": "Représentant : la question du WhatsApp a-t-elle été posée, et avec quelle réponse.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "whatsappE164": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO."
+          },
+          "profession": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Représentant : profession déclarée."
+          },
           "clientCreatedAt": {
             "type": "string",
             "format": "date-time",
@@ -16537,7 +16621,7 @@
             "$ref": "#/components/schemas/SyncEntityDataDto"
           },
           "clearedFields": {
-            "description": "Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes.",
+            "description": "Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession.",
             "type": "array",
             "items": {
               "type": "string"
@@ -17335,6 +17419,25 @@
             "type": "string",
             "maxLength": 2000,
             "description": "Ce que le représentant dit du contact. Ignoré sans `suggestedPhone`."
+          },
+          "whatsappStatus": {
+            "description": "Ce que l’appel apprend du canal WhatsApp. La question ne se pose qu’APRÈS l’engagement : NON_DEMANDE reste donc la réponse honnête tant qu’elle n’a pas été posée. Absent : l’état ne bouge pas.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "whatsappE164": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 40,
+            "description": "Numéro WhatsApp DISTINCT du téléphone. Saisie libre, normalisé par le serveur. Admis avec le seul statut AUTRE_NUMERO."
+          },
+          "profession": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Profession, en texte libre. Chaîne vide : la valeur est effacée."
           },
           "clientCreatedAt": {
             "type": "string",
