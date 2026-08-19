@@ -3,6 +3,13 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import {
+  fetchRepresentants,
+  type RepresentantScriptPatch,
+  type ScriptedRepresentant,
+  type WhatsappStatus,
+} from '@/lib/data/representants';
+import { EMPTY_REPRESENTANT_FILTERS, type RepresentantRelation } from '@/lib/representant-filters';
+import {
   CALL_OUTCOME_LABELS,
   PHASE2_STATUS_LABELS,
   type CallOutcome,
@@ -301,7 +308,7 @@ export function undatedCallbacks(
   ).length;
 }
 
-export function nextAfter(items: readonly ProspectRow[], id: string): string | null {
+export function nextAfter(items: readonly { id: string }[], id: string): string | null {
   const at = items.findIndex((prospect) => prospect.id === id);
   if (at === -1) return items[0]?.id ?? null;
   return items[at + 1]?.id ?? items[at - 1]?.id ?? null;
@@ -481,4 +488,91 @@ export async function pushCallAttempt(
     result.errorCode ?? 'CALL_ATTEMPT_INVALID',
     result.error ?? 'L’appel n’a pas été enregistré.',
   );
+}
+
+export const REP_QUEUE_SIZE = 200;
+
+export const repScriptKeys = {
+  root: ['console', 'representants'] as const,
+  queue: ['console', 'representants', 'queue'] as const,
+};
+
+export interface RepScriptPage {
+  readonly items: ScriptedRepresentant[];
+  readonly total: number;
+}
+
+export async function fetchRepScriptQueue(
+  client: ApiClient = getApiClient(),
+): Promise<RepScriptPage> {
+  const page = await fetchRepresentants(
+    { ...EMPTY_REPRESENTANT_FILTERS, pageSize: REP_QUEUE_SIZE, sortDir: 'asc' },
+    client,
+  );
+  return { items: page.items, total: page.total };
+}
+
+/** Une relation tranchée n'a plus rien à donner au script : elle passe en queue de file. */
+const REP_RELATION_RANK: Record<RepresentantRelation, number> = {
+  INCONNU: 0,
+  CONTACTE: 1,
+  AMBASSADEUR: 2,
+  REFUS: 2,
+};
+
+export function repRelationSettled(representant: ScriptedRepresentant): boolean {
+  return REP_RELATION_RANK[representant.relationStatus] === 2;
+}
+
+export function buildRepQueue(items: readonly ScriptedRepresentant[]): ScriptedRepresentant[] {
+  return [...items].sort((left, right) => {
+    const gap = REP_RELATION_RANK[left.relationStatus] - REP_RELATION_RANK[right.relationStatus];
+    if (gap !== 0) return gap;
+    if (left.clientCreatedAt !== right.clientCreatedAt) {
+      return left.clientCreatedAt < right.clientCreatedAt ? -1 : 1;
+    }
+    return left.id < right.id ? -1 : 1;
+  });
+}
+
+export type RepCallOutcome = components['schemas']['RepCallOutcome'];
+
+type RepAttemptBody = components['schemas']['CreateRepCallAttemptDto'];
+
+export type RepCallAttemptResult = components['schemas']['RepCallAttemptResultDto'];
+
+/**
+ * Une réponse, et une seule. Chaque champ voyage seul pour qu'un appel coupé
+ * après « non » laisse quand même le refus en base.
+ */
+export interface RepAnswer {
+  readonly outcome: RepCallOutcome;
+  readonly relationStatus?: RepresentantRelation;
+  readonly whatsappStatus?: WhatsappStatus;
+  readonly whatsappE164?: string;
+  readonly profession?: string;
+  readonly suggestedName?: string;
+  readonly suggestedPhone?: string;
+  readonly suggestedNote?: string;
+  readonly comment?: string;
+}
+
+export function buildRepAttempt(
+  representantId: string,
+  answer: RepAnswer,
+  now: number = Date.now(),
+): RepAttemptBody & RepresentantScriptPatch {
+  return {
+    ...answer,
+    id: uuidV7(now),
+    representantId,
+    clientCreatedAt: new Date(now).toISOString(),
+  };
+}
+
+export async function pushRepCallAttempt(
+  body: RepAttemptBody & RepresentantScriptPatch,
+  client: ApiClient = getApiClient(),
+): Promise<RepCallAttemptResult> {
+  return unwrap(await client.POST('/api/v1/rep-campaigns/attempts', { body }));
 }

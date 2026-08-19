@@ -15,6 +15,8 @@ import { fetchProspects } from '@/lib/data/prospects';
 import {
   fetchRepresentant,
   fetchRepresentantRelationHistory,
+  scriptOf,
+  whatsappLabel,
   type RepresentantRelationChange,
 } from '@/lib/data/representants';
 import { queryKeys } from '@/lib/query-keys';
@@ -76,6 +78,7 @@ export function RepresentantDetailView({
   }
 
   const representant = fiche.data;
+  const script = scriptOf(representant);
 
   return (
     <div className="flex flex-col gap-6">
@@ -124,6 +127,14 @@ export function RepresentantDetailView({
                   {formatDate(representant.clientCreatedAt)}
                 </time>
               </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">WhatsApp</dt>
+              <dd className="truncate font-[600]">{whatsappLabel(script)}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">Profession</dt>
+              <dd className="truncate font-[600]">{script.profession ?? 'Non demandée'}</dd>
             </div>
           </dl>
 
