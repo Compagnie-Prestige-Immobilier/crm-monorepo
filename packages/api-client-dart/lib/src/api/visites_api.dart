@@ -9,29 +9,31 @@ import 'dart:convert';
 import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
-import 'dart:typed_data';
 import 'package:crm_api_client/src/model/api_error_dto.dart';
-import 'package:crm_api_client/src/model/call_recording_dto.dart';
-import 'package:crm_api_client/src/model/callback_dto.dart';
-import 'package:crm_api_client/src/model/callback_list_dto.dart';
-import 'package:crm_api_client/src/model/callback_scope.dart';
-import 'package:crm_api_client/src/model/campaign_detail_dto.dart';
-import 'package:crm_api_client/src/model/campaign_list_dto.dart';
-import 'package:crm_api_client/src/model/campaign_scope.dart';
-import 'package:crm_api_client/src/model/campaign_status.dart';
-import 'package:crm_api_client/src/model/create_campaign_dto.dart';
-import 'package:crm_api_client/src/model/directory_page_dto.dart';
+import 'package:crm_api_client/src/model/create_visite_dto.dart';
+import 'package:crm_api_client/src/model/create_visite_referentiel_dto.dart';
+import 'package:crm_api_client/src/model/reorder_visite_referentiel_dto.dart';
+import 'package:crm_api_client/src/model/set_visite_referentiel_active_dto.dart';
+import 'package:crm_api_client/src/model/update_visite_dto.dart';
+import 'package:crm_api_client/src/model/update_visite_referentiel_dto.dart';
+import 'package:crm_api_client/src/model/visite_dto.dart';
+import 'package:crm_api_client/src/model/visite_list_dto.dart';
+import 'package:crm_api_client/src/model/visite_referentiel_dto.dart';
+import 'package:crm_api_client/src/model/visite_referentiel_kind.dart';
+import 'package:crm_api_client/src/model/visite_referentiel_list_dto.dart';
+import 'package:crm_api_client/src/model/visite_referentiels_bundle_dto.dart';
+import 'package:crm_api_client/src/model/visite_stats_dto.dart';
 
-class Phase2Api {
+class VisitesApi {
   final Dio _dio;
 
-  const Phase2Api(this._dio);
+  const VisitesApi(this._dio);
 
-  /// Annule un rappel qui n’a plus lieu d’être.
-  /// Idempotent : un rappel déjà clos ou annulé est rendu tel quel.
+  /// Inscrit un visiteur au registre.
+  /// La référence est engendrée par le serveur. Le téléphone est facultatif et accepté sous n’importe quelle forme : un numéro que la normalisation ne reconnaît pas est conservé tel quel, avec phoneE164 nul.
   ///
   /// Parameters:
-  /// * [id]
+  /// * [createVisiteDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -39,10 +41,10 @@ class Phase2Api {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [CallbackDto] as data
+  /// Returns a [Future] containing a [Response] with a [VisiteDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<CallbackDto>> cancelScheduledCallback({
-    required String id,
+  Future<Response<VisiteDto>> createVisite({
+    required CreateVisiteDto createVisiteDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -50,171 +52,7 @@ class Phase2Api {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/phase2/callbacks/{id}/cancel'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
-    final _options = Options(
-      method: r'POST',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    CallbackDto? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<CallbackDto, CallbackDto>(
-              rawData,
-              'CallbackDto',
-              growable: true,
-            );
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<CallbackDto>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
-  /// Clôt la campagne et annule toutes les tâches encore ouvertes.
-  /// Idempotent. Les tâches annulées redeviennent inactives : sans quoi leurs prospects resteraient inéligibles à toute campagne future.
-  ///
-  /// Parameters:
-  /// * [id]
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [CampaignDetailDto] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<CampaignDetailDto>> closeCallCampaign({
-    required String id,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/phase2/campaigns/{id}/close'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
-    final _options = Options(
-      method: r'POST',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    CampaignDetailDto? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<CampaignDetailDto, CampaignDetailDto>(
-              rawData,
-              'CampaignDetailDto',
-              growable: true,
-            );
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<CampaignDetailDto>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
-  /// Crée une campagne, tire l’ensemble éligible et fige la répartition.
-  /// Le tirage est mélangé par PostgreSQL à partir d’une graine persistée, puis réparti en tourniquet dans l’ordre des commerciaux fournis. Les affectations sont matérialisées : consulter la campagne ou retélécharger un PDF ne retire jamais au sort.
-  ///
-  /// Parameters:
-  /// * [createCampaignDto]
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [CampaignDetailDto] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<CampaignDetailDto>> createCallCampaign({
-    required CreateCampaignDto createCampaignDto,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/phase2/campaigns';
+    final _path = r'/api/v1/visites';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{...?headers},
@@ -231,7 +69,7 @@ class Phase2Api {
     dynamic _bodyData;
 
     try {
-      _bodyData = jsonEncode(createCampaignDto);
+      _bodyData = jsonEncode(createVisiteDto);
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _options.compose(_dio.options, _path),
@@ -250,15 +88,15 @@ class Phase2Api {
       onReceiveProgress: onReceiveProgress,
     );
 
-    CampaignDetailDto? _responseData;
+    VisiteDto? _responseData;
 
     try {
       final rawData = _response.data;
       _responseData = rawData == null
           ? null
-          : deserialize<CampaignDetailDto, CampaignDetailDto>(
+          : deserialize<VisiteDto, VisiteDto>(
               rawData,
-              'CampaignDetailDto',
+              'VisiteDto',
               growable: true,
             );
     } catch (error, stackTrace) {
@@ -271,7 +109,7 @@ class Phase2Api {
       );
     }
 
-    return Response<CampaignDetailDto>(
+    return Response<VisiteDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -283,13 +121,12 @@ class Phase2Api {
     );
   }
 
-  /// Programme d’appels imprimable d’un commercial.
-  /// Ordre identique aux positions persistées. AUCUN nom de prospect n’y figure : chaque ligne se rapproche de sa fiche par son code court à six caractères. Le paramètre &#x60;jour&#x60; restreint la liasse à une journée d’étalement ; sans lui, tout le programme est rendu.
+  /// Ajoute une entrée à une liste.
+  /// Le code est immuable : les visites déjà enregistrées le désignent.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [userId]
-  /// * [jour] - Journée d’étalement, à partir de 1. Absent : tout le programme du commercial.
+  /// * [kind]
+  /// * [createVisiteReferentielDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -297,12 +134,11 @@ class Phase2Api {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [Uint8List] as data
+  /// Returns a [Future] containing a [Response] with a [VisiteReferentielDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> downloadCallProgrammePdf({
-    required String id,
-    required String userId,
-    num? jour,
+  Future<Response<VisiteReferentielDto>> createVisiteReferentiel({
+    required VisiteReferentielKind kind,
+    required CreateVisiteReferentielDto createVisiteReferentielDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -310,23 +146,111 @@ class Phase2Api {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path =
-        r'/api/v1/phase2/campaigns/{id}/commerciaux/{userId}/programme.pdf'
-            .replaceAll(
-              '{'
-              r'id'
-              '}',
-              id.toString(),
-            )
-            .replaceAll(
-              '{'
-              r'userId'
-              '}',
-              userId.toString(),
+    final _path = r'/api/v1/visites/referentiels/{kind}'.replaceAll(
+      '{'
+      r'kind'
+      '}',
+      kind.toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(createVisiteReferentielDto);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    VisiteReferentielDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<VisiteReferentielDto, VisiteReferentielDto>(
+              rawData,
+              'VisiteReferentielDto',
+              growable: true,
             );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<VisiteReferentielDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Une ligne du registre.
+  ///
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [VisiteDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<VisiteDto>> getVisite({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/visites/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'GET',
-      responseType: ResponseType.bytes,
       headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
@@ -337,7 +261,86 @@ class Phase2Api {
       validateStatus: validateStatus,
     );
 
-    final _queryParameters = <String, dynamic>{if (jour != null) r'jour': jour};
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    VisiteDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<VisiteDto, VisiteDto>(
+              rawData,
+              'VisiteDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<VisiteDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Le registre compté sur une période.
+  /// Total, répartitions par entreprise, direction, destinataire et objet, puis la marche du mois et du jour. Une répartition liste TOUTES les entrées de sa liste, y compris à zéro ; sa somme peut être inférieure au total, l’écart étant rendu par sansDirection et sansDestinataire.
+  ///
+  /// Parameters:
+  /// * [from] - Premier jour compté, inclus.
+  /// * [to] - Dernier jour compté, inclus.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [VisiteStatsDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<VisiteStatsDto>> getVisiteStats({
+    required String from,
+    required String to,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/visites/statistiques';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{r'from': from, r'to': to};
 
     final _response = await _dio.request<Object>(
       _path,
@@ -348,168 +351,15 @@ class Phase2Api {
       onReceiveProgress: onReceiveProgress,
     );
 
-    Uint8List? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null ? null : rawData as Uint8List;
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<Uint8List>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
-  /// Lit la note audio jointe à une tentative.
-  ///
-  ///
-  /// Parameters:
-  /// * [id]
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [Uint8List] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> downloadCallRecording({
-    required String id,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/phase2/call-attempts/{id}/recording'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
-    final _options = Options(
-      method: r'GET',
-      responseType: ResponseType.bytes,
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    Uint8List? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null ? null : rawData as Uint8List;
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<Uint8List>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
-  /// Détail d’une campagne, ventilé par commercial.
-  ///
-  ///
-  /// Parameters:
-  /// * [id]
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [CampaignDetailDto] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<CampaignDetailDto>> getCallCampaign({
-    required String id,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/phase2/campaigns/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
-    final _options = Options(
-      method: r'GET',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    CampaignDetailDto? _responseData;
+    VisiteStatsDto? _responseData;
 
     try {
       final rawData = _response.data;
       _responseData = rawData == null
           ? null
-          : deserialize<CampaignDetailDto, CampaignDetailDto>(
+          : deserialize<VisiteStatsDto, VisiteStatsDto>(
               rawData,
-              'CampaignDetailDto',
+              'VisiteStatsDto',
               growable: true,
             );
     } catch (error, stackTrace) {
@@ -522,7 +372,7 @@ class Phase2Api {
       );
     }
 
-    return Response<CampaignDetailDto>(
+    return Response<VisiteStatsDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -534,18 +384,12 @@ class Phase2Api {
     );
   }
 
-  /// Liste des campagnes, avec l’avancement de chacune.
+  /// Une liste, entrées retirées comprises.
   ///
   ///
   /// Parameters:
-  /// * [status]
-  /// * [search] - Recherche libre sur le nom de la campagne.
-  /// * [scope] - Périmètre du tirage.
-  /// * [createdById] - Administrateur qui a créé la campagne.
-  /// * [dateFrom] - Borne basse sur la date de création, incluse.
-  /// * [dateTo] - Borne haute sur la date de création, incluse.
-  /// * [page]
-  /// * [pageSize]
+  /// * [kind]
+  /// * [activeOnly]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -553,17 +397,11 @@ class Phase2Api {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [CampaignListDto] as data
+  /// Returns a [Future] containing a [Response] with a [VisiteReferentielListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<CampaignListDto>> listCallCampaigns({
-    CampaignStatus? status,
-    String? search,
-    CampaignScope? scope,
-    String? createdById,
-    DateTime? dateFrom,
-    DateTime? dateTo,
-    num? page = 1,
-    num? pageSize = 25,
+  Future<Response<VisiteReferentielListDto>> listVisiteReferentiel({
+    required VisiteReferentielKind kind,
+    bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -571,7 +409,12 @@ class Phase2Api {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/phase2/campaigns';
+    final _path = r'/api/v1/visites/referentiels/{kind}'.replaceAll(
+      '{'
+      r'kind'
+      '}',
+      kind.toString(),
+    );
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{...?headers},
@@ -585,12 +428,192 @@ class Phase2Api {
     );
 
     final _queryParameters = <String, dynamic>{
-      if (status != null) r'status': status,
+      if (activeOnly != null) r'activeOnly': activeOnly,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    VisiteReferentielListDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<VisiteReferentielListDto, VisiteReferentielListDto>(
+              rawData,
+              'VisiteReferentielListDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<VisiteReferentielListDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Les quatre listes de l’accueil, en un appel.
+  ///
+  ///
+  /// Parameters:
+  /// * [activeOnly]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [VisiteReferentielsBundleDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<VisiteReferentielsBundleDto>> listVisiteReferentiels({
+    bool? activeOnly = true,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/visites/referentiels';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (activeOnly != null) r'activeOnly': activeOnly,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    VisiteReferentielsBundleDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<
+              VisiteReferentielsBundleDto,
+              VisiteReferentielsBundleDto
+            >(rawData, 'VisiteReferentielsBundleDto', growable: true);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<VisiteReferentielsBundleDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Le registre, du plus récent au plus ancien.
+  ///
+  ///
+  /// Parameters:
+  /// * [from]
+  /// * [to]
+  /// * [entrepriseId]
+  /// * [directionId]
+  /// * [destinataireId]
+  /// * [objetId]
+  /// * [search] - Nom du visiteur, ou référence du registre.
+  /// * [page]
+  /// * [pageSize]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [VisiteListDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<VisiteListDto>> listVisites({
+    String? from,
+    String? to,
+    String? entrepriseId,
+    String? directionId,
+    String? destinataireId,
+    String? objetId,
+    String? search,
+    num? page = 1,
+    num? pageSize = 25,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/visites';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (from != null) r'from': from,
+      if (to != null) r'to': to,
+      if (entrepriseId != null) r'entrepriseId': entrepriseId,
+      if (directionId != null) r'directionId': directionId,
+      if (destinataireId != null) r'destinataireId': destinataireId,
+      if (objetId != null) r'objetId': objetId,
       if (search != null) r'search': search,
-      if (scope != null) r'scope': scope,
-      if (createdById != null) r'createdById': createdById,
-      if (dateFrom != null) r'dateFrom': dateFrom,
-      if (dateTo != null) r'dateTo': dateTo,
       if (page != null) r'page': page,
       if (pageSize != null) r'pageSize': pageSize,
     };
@@ -604,15 +627,15 @@ class Phase2Api {
       onReceiveProgress: onReceiveProgress,
     );
 
-    CampaignListDto? _responseData;
+    VisiteListDto? _responseData;
 
     try {
       final rawData = _response.data;
       _responseData = rawData == null
           ? null
-          : deserialize<CampaignListDto, CampaignListDto>(
+          : deserialize<VisiteListDto, VisiteListDto>(
               rawData,
-              'CampaignListDto',
+              'VisiteListDto',
               growable: true,
             );
     } catch (error, stackTrace) {
@@ -625,7 +648,7 @@ class Phase2Api {
       );
     }
 
-    return Response<CampaignListDto>(
+    return Response<VisiteListDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -637,12 +660,12 @@ class Phase2Api {
     );
   }
 
-  /// Rappels promis encore dus.
-  /// Un téléconseiller ne voit que les rappels qu’il a promis. Les rappels en retard remontent dans la journée courante : le retard se déduit de la date, il n’est jamais écrit.
+  /// Fixe l’ordre d’affichage d’une liste.
+  ///
   ///
   /// Parameters:
-  /// * [scope] - today : tout ce qui est dû d’ici la fin de la journée, retards compris. overdue : les seuls retards. week : les sept prochaines journées.
-  /// * [assignedToId] - File d’un téléconseiller donné. Réservé à l’administration et à la supervision ; ignoré pour les autres, qui ne voient que la leur.
+  /// * [kind]
+  /// * [reorderVisiteReferentielDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -650,11 +673,11 @@ class Phase2Api {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [CallbackListDto] as data
+  /// Returns a [Future] containing a [Response] with a [VisiteReferentielListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<CallbackListDto>> listScheduledCallbacks({
-    CallbackScope? scope,
-    String? assignedToId,
+  Future<Response<VisiteReferentielListDto>> reorderVisiteReferentiel({
+    required VisiteReferentielKind kind,
+    required ReorderVisiteReferentielDto reorderVisiteReferentielDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -662,181 +685,11 @@ class Phase2Api {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/phase2/callbacks';
-    final _options = Options(
-      method: r'GET',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _queryParameters = <String, dynamic>{
-      if (scope != null) r'scope': scope,
-      if (assignedToId != null) r'assignedToId': assignedToId,
-    };
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      queryParameters: _queryParameters,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    CallbackListDto? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<CallbackListDto, CallbackListDto>(
-              rawData,
-              'CallbackListDto',
-              growable: true,
-            );
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<CallbackListDto>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
-  /// Annuaire hors ligne : téléphone et état de phase 2, rien d’autre.
-  /// Pagination keyset sur (updatedAt, id), page de 2 000 par défaut, retard de sécurité de 2 secondes. Chaque entrée porte exactement six champs : ni nom, ni banque, ni syndicat.
-  ///
-  /// Parameters:
-  /// * [since] - Curseur renvoyé par l’appel précédent. Absent : annuaire complet.
-  /// * [limit]
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [DirectoryPageDto] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<DirectoryPageDto>> pullPhase2Directory({
-    String? since,
-    num? limit = 2000,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/phase2/directory';
-    final _options = Options(
-      method: r'GET',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _queryParameters = <String, dynamic>{
-      if (since != null) r'since': since,
-      if (limit != null) r'limit': limit,
-    };
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      queryParameters: _queryParameters,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    DirectoryPageDto? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<DirectoryPageDto, DirectoryPageDto>(
-              rawData,
-              'DirectoryPageDto',
-              growable: true,
-            );
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<DirectoryPageDto>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
-  /// Joint une note audio à une tentative déjà synchronisée.
-  ///
-  ///
-  /// Parameters:
-  /// * [id]
-  /// * [file]
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [CallRecordingDto] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<CallRecordingDto>> uploadCallRecording({
-    required String id,
-    required MultipartFile file,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/phase2/call-attempts/{id}/recording'.replaceAll(
+    final _path = r'/api/v1/visites/referentiels/{kind}/reorder'.replaceAll(
       '{'
-      r'id'
+      r'kind'
       '}',
-      id.toString(),
+      kind.toString(),
     );
     final _options = Options(
       method: r'POST',
@@ -847,14 +700,14 @@ class Phase2Api {
         ],
         ...?extra,
       },
-      contentType: 'multipart/form-data',
+      contentType: 'application/json',
       validateStatus: validateStatus,
     );
 
     dynamic _bodyData;
 
     try {
-      _bodyData = FormData.fromMap(<String, dynamic>{r'file': file});
+      _bodyData = jsonEncode(reorderVisiteReferentielDto);
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _options.compose(_dio.options, _path),
@@ -873,15 +726,15 @@ class Phase2Api {
       onReceiveProgress: onReceiveProgress,
     );
 
-    CallRecordingDto? _responseData;
+    VisiteReferentielListDto? _responseData;
 
     try {
       final rawData = _response.data;
       _responseData = rawData == null
           ? null
-          : deserialize<CallRecordingDto, CallRecordingDto>(
+          : deserialize<VisiteReferentielListDto, VisiteReferentielListDto>(
               rawData,
-              'CallRecordingDto',
+              'VisiteReferentielListDto',
               growable: true,
             );
     } catch (error, stackTrace) {
@@ -894,7 +747,322 @@ class Phase2Api {
       );
     }
 
-    return Response<CallRecordingDto>(
+    return Response<VisiteReferentielListDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Retire une entrée des listes, ou l’y remet.
+  /// Jamais de suppression : le registre des années passées continue de désigner l’entrée.
+  ///
+  /// Parameters:
+  /// * [kind]
+  /// * [id]
+  /// * [setVisiteReferentielActiveDto]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [VisiteReferentielDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<VisiteReferentielDto>> setVisiteReferentielActive({
+    required VisiteReferentielKind kind,
+    required String id,
+    required SetVisiteReferentielActiveDto setVisiteReferentielActiveDto,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/visites/referentiels/{kind}/{id}/active'
+        .replaceAll(
+          '{'
+          r'kind'
+          '}',
+          kind.toString(),
+        )
+        .replaceAll(
+          '{'
+          r'id'
+          '}',
+          id.toString(),
+        );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(setVisiteReferentielActiveDto);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    VisiteReferentielDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<VisiteReferentielDto, VisiteReferentielDto>(
+              rawData,
+              'VisiteReferentielDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<VisiteReferentielDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Corrige une ligne du registre.
+  /// Ni la date ni la référence : elles fixent la ligne dans le registre.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [updateVisiteDto]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [VisiteDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<VisiteDto>> updateVisite({
+    required String id,
+    required UpdateVisiteDto updateVisiteDto,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/visites/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'PATCH',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(updateVisiteDto);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    VisiteDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<VisiteDto, VisiteDto>(
+              rawData,
+              'VisiteDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<VisiteDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Renomme ou déplace une entrée.
+  ///
+  ///
+  /// Parameters:
+  /// * [kind]
+  /// * [id]
+  /// * [updateVisiteReferentielDto]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [VisiteReferentielDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<VisiteReferentielDto>> updateVisiteReferentiel({
+    required VisiteReferentielKind kind,
+    required String id,
+    required UpdateVisiteReferentielDto updateVisiteReferentielDto,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/visites/referentiels/{kind}/{id}'
+        .replaceAll(
+          '{'
+          r'kind'
+          '}',
+          kind.toString(),
+        )
+        .replaceAll(
+          '{'
+          r'id'
+          '}',
+          id.toString(),
+        );
+    final _options = Options(
+      method: r'PATCH',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(updateVisiteReferentielDto);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    VisiteReferentielDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<VisiteReferentielDto, VisiteReferentielDto>(
+              rawData,
+              'VisiteReferentielDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<VisiteReferentielDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

@@ -110,6 +110,7 @@ const _$PurgeDomainKeyEnumMap = {
   PurgeDomainKey.campagnes: 'campagnes',
   PurgeDomainKey.campagnesRepresentants: 'campagnesRepresentants',
   PurgeDomainKey.demandesClients: 'demandesClients',
+  PurgeDomainKey.visites: 'visites',
   PurgeDomainKey.fileAppels: 'fileAppels',
   PurgeDomainKey.tentatives: 'tentatives',
   PurgeDomainKey.dossiers: 'dossiers',

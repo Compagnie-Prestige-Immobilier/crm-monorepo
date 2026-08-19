@@ -41,6 +41,8 @@ class SyncEntityDataDto {
 
     this.representantId,
 
+    this.body,
+
     this.statut,
 
     this.notes,
@@ -101,6 +103,10 @@ class SyncEntityDataDto {
   /// Prospect : représentant de rattachement. Sert aussi de clé de groupe.
   @JsonKey(name: r'representantId', required: false, includeIfNull: false)
   final String? representantId;
+
+  /// Commentaire ajouté à une fiche.
+  @JsonKey(name: r'body', required: false, includeIfNull: false)
+  final String? body;
 
   @JsonKey(
     name: r'statut',
@@ -183,6 +189,7 @@ class SyncEntityDataDto {
                 banqueId,
                 syndicatId,
                 representantId,
+                body,
                 statut,
                 notes,
                 whatsappStatus,
@@ -206,6 +213,7 @@ class SyncEntityDataDto {
                 other.banqueId,
                 other.syndicatId,
                 other.representantId,
+                other.body,
                 other.statut,
                 other.notes,
                 other.whatsappStatus,
@@ -235,6 +243,7 @@ class SyncEntityDataDto {
         banqueId,
         syndicatId,
         representantId,
+        body,
         statut,
         notes,
         whatsappStatus,

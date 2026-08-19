@@ -29,6 +29,7 @@ import 'package:crm_api_client/src/api/suggestions_api.dart';
 import 'package:crm_api_client/src/api/supervision_api.dart';
 import 'package:crm_api_client/src/api/sync_api.dart';
 import 'package:crm_api_client/src/api/users_api.dart';
+import 'package:crm_api_client/src/api/visites_api.dart';
 
 class CrmApiClient {
   static const String basePath = r'http://localhost';
@@ -283,5 +284,11 @@ class CrmApiClient {
   /// by doing that all interceptors will not be executed
   UsersApi getUsersApi() {
     return UsersApi(dio);
+  }
+
+  /// Get VisitesApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  VisitesApi getVisitesApi() {
+    return VisitesApi(dio);
   }
 }
