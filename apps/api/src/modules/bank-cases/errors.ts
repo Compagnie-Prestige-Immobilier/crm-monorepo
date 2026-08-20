@@ -4,6 +4,7 @@ export const BankCaseError = {
   PROSPECT_NOT_FOUND: 'BANK_CASE_PROSPECT_NOT_FOUND',
   PROSPECT_NOT_ENROLLED: 'BANK_CASE_PROSPECT_NOT_ENROLLED',
   BANK_NOT_FOUND: 'BANK_CASE_BANK_NOT_FOUND',
+  BANK_REQUIRED: 'BANK_CASE_BANK_REQUIRED',
   NOT_FOUND: 'BANK_CASE_NOT_FOUND',
   REFERENCE_CONFLICT: 'BANK_CASE_REFERENCE_CONFLICT',
   REV_CONFLICT: 'BANK_CASE_REV_CONFLICT',
@@ -51,6 +52,14 @@ export const prospectNotEnrolled = (
     message: `Un dossier bancaire ne peut être ouvert que sur un prospect dont la méthode d’enrôlement est obtenue. Statut phase 2 actuel : ${phase2Status}.`,
     prospectId,
     phase2Status,
+  });
+
+/** Le prospect n'a pas de banque et l'ouverture n'en designe pas : rien a traiter. */
+export const bankRequired = (): UnprocessableEntityException =>
+  new UnprocessableEntityException({
+    code: BankCaseError.BANK_REQUIRED,
+    message:
+      'Ce prospect n’a pas de banque renseignée : choisissez la banque de traitement du dossier.',
   });
 
 export const bankNotFound = (banqueId: string): UnprocessableEntityException =>

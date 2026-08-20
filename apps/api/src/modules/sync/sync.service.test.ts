@@ -472,6 +472,43 @@ describe('garde anti-squat d’identifiant', () => {
   });
 });
 
+describe('une fiche naît sans banque, sans syndicat et sans représentant', () => {
+  const PROSPECT_NU = '0198a000-0000-7000-8000-00000000000a';
+
+  const saisirNu = (extra: Record<string, unknown> = {}): SyncOperationDto => ({
+    opId: opId(),
+    seq: 0,
+    entity: SyncEntity.PROSPECT,
+    op: SyncOp.CREATE,
+    entityId: PROSPECT_NU,
+    clientUpdatedAt: new Date().toISOString(),
+    data: { nom: 'Diop', prenom: 'Awa', phone: '77 000 00 10', ...extra },
+  });
+
+  it('un prospect sans aucun rattachement s’enregistre', async () => {
+    const result = await sync.push(alice, batch([saisirNu()]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    const row = db.prospects.get(PROSPECT_NU);
+    expect(row?.banqueId ?? null).toBeNull();
+    expect(row?.syndicatId ?? null).toBeNull();
+    expect(row?.representantId ?? null).toBeNull();
+  });
+
+  it('le projet et le type du Grand Public voyagent', async () => {
+    const result = await sync.push(
+      alice,
+      batch([saisirNu({ projet: 'GRAND_PUBLIC', type: 'INFORMEL', profession: 'Mécanicien' })]),
+    );
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    const row = db.prospects.get(PROSPECT_NU) as unknown as Record<string, unknown>;
+    expect(row.projet).toBe('GRAND_PUBLIC');
+    expect(row.type).toBe('INFORMEL');
+    expect(row.profession).toBe('Mécanicien');
+  });
+});
+
 describe('une campagne ouvre l’écriture sur la fiche d’un autre', () => {
   const PROSPECT_DE_BOB = '0198a000-0000-7000-8000-000000000009';
 

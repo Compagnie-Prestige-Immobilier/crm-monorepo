@@ -20,7 +20,9 @@ import {
   ChangeSource,
   EnrollmentMethod,
   Phase2Status,
+  Projet,
   ProspectStatut,
+  ProspectType,
 } from '@crm/database';
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
@@ -88,24 +90,61 @@ export class ProspectDto {
   @ApiProperty() phoneE164!: string;
   @ApiProperty({ type: Number }) rev!: number;
   @ApiProperty({ enum: ProspectStatut, enumName: 'ProspectStatut' }) statut!: ProspectStatut;
-  @ApiProperty({ format: 'uuid' }) banqueId!: string;
-  @ApiProperty() banqueName!: string;
-  @ApiProperty({ format: 'uuid' }) syndicatId!: string;
-  @ApiProperty() syndicatSigle!: string;
-  @ApiProperty({ format: 'uuid' }) representantId!: string;
-  @ApiProperty() representantName!: string;
-  @ApiProperty() representantPhoneE164!: string;
-  @ApiProperty({ format: 'uuid' }) departementId!: string;
-  @ApiProperty() departementName!: string;
+  @ApiProperty({ enum: Projet, enumName: 'Projet' }) projet!: Projet;
+
+  /**
+   * Nuls sur une fiche Grand Public, et nuls sur une fiche CHUES dont le
+   * téléconseiller n'a pas obtenu la réponse. Le panneau doit rendre l'absence,
+   * pas la remplacer par un tiret qui se lirait comme une valeur.
+   */
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) banqueId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) banqueName!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) syndicatId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) syndicatSigle!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) representantId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) representantName!: string | null;
+  @ApiProperty({ type: String, nullable: true }) representantPhoneE164!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) departementId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) departementName!: string | null;
   @ApiProperty({ format: 'uuid' }) ownedByCommercialId!: string;
   @ApiProperty() ownedByCommercialName!: string;
 
   @ApiProperty({
+    enum: ProspectType,
+    enumName: 'ProspectType',
+    nullable: true,
+    description: 'Hors CHUES : ce qu’est le prospect. Nul si la question n’a pas été posée.',
+  })
+  type!: ProspectType | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'Métier déclaré, en clair.' })
+  profession!: string | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Durée du système de paiement retenue, en MOIS.',
+  })
+  dureeSystemeMois!: number | null;
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  canalProvenanceId!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Par où le prospect est arrivé. Référentiel ouvert.',
+  })
+  canalProvenanceLabel!: string | null;
+
+  @ApiProperty({
     enum: BddSegment,
     enumName: 'BddSegment',
-    description: 'Calculé par croisement syndicat × banque. Jamais stocké en base.',
+    nullable: true,
+    description:
+      'Calculé par croisement syndicat × banque, jamais stocké. NUL dès qu’il manque l’un des deux : le segment ne se devine pas.',
   })
-  segment!: BddSegment;
+  segment!: BddSegment | null;
 
   @ApiProperty({ enum: Phase2Status, enumName: 'Phase2Status' }) phase2Status!: Phase2Status;
 
@@ -174,8 +213,8 @@ export class ProspectConflictExistingDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() nom!: string;
   @ApiProperty() prenom!: string;
-  @ApiProperty({ format: 'uuid' }) representantId!: string;
-  @ApiProperty() representantName!: string;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) representantId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) representantName!: string | null;
   @ApiProperty({ format: 'uuid' }) ownedByCommercialId!: string;
   @ApiProperty() ownedByCommercialName!: string;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;

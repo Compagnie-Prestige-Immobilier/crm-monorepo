@@ -99,6 +99,43 @@ export function prospectConditions(
   return Prisma.join(conditions, ' AND ');
 }
 
+/**
+ * Périmètre de l'annuaire, sur l'alias `r`.
+ *
+ * Sans bornes de date : un agrégat de représentants se date sur l'ACTE mesuré,
+ * pas sur la fiche, et la colonne qui le porte change d'un agrégat à l'autre.
+ */
+export function representantConditions(
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+  filter: ProspectFilterDto,
+  demoEnabled: boolean,
+): Prisma.Sql {
+  const conditions: Prisma.Sql[] = [Prisma.sql`r."deletedAt" IS NULL`];
+
+  if (!readsEveryone(user)) {
+    conditions.push(Prisma.sql`r."createdById" = ${user.id}`);
+  }
+  if (!demoEnabled) {
+    conditions.push(Prisma.sql`r."isDemo" = FALSE`);
+  }
+
+  if (filter.commercialId) {
+    const target = readsEveryone(user)
+      ? filter.commercialId
+      : filter.commercialId === user.id
+        ? user.id
+        : '__aucun__';
+    conditions.push(Prisma.sql`r."createdById" = ${target}`);
+  }
+
+  if (filter.representantId) conditions.push(Prisma.sql`r."id" = ${filter.representantId}`);
+  if (filter.departementId) {
+    conditions.push(Prisma.sql`r."departementId" = ${filter.departementId}`);
+  }
+
+  return Prisma.join(conditions, ' AND ');
+}
+
 /** `representants` porte le département, `syndicats`/`banques` le segment ; les trois FK sont obligatoires, la jointure est sans perte. */
 export const PROSPECT_FROM = Prisma.sql`
   FROM "prospects" p

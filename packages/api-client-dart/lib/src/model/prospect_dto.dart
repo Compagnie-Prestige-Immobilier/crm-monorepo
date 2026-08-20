@@ -3,6 +3,8 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/projet.dart';
+import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/call_outcome.dart';
 import 'package:crm_api_client/src/model/bdd_segment.dart';
 import 'package:crm_api_client/src/model/phase2_status.dart';
@@ -36,6 +38,8 @@ class ProspectDto {
 
     required this.statut,
 
+    required this.projet,
+
     required this.banqueId,
 
     required this.banqueName,
@@ -57,6 +61,16 @@ class ProspectDto {
     required this.ownedByCommercialId,
 
     required this.ownedByCommercialName,
+
+    required this.type,
+
+    required this.profession,
+
+    required this.dureeSystemeMois,
+
+    required this.canalProvenanceId,
+
+    required this.canalProvenanceLabel,
 
     required this.segment,
 
@@ -112,32 +126,40 @@ class ProspectDto {
   )
   final ProspectStatut statut;
 
-  @JsonKey(name: r'banqueId', required: true, includeIfNull: false)
-  final String banqueId;
+  @JsonKey(
+    name: r'projet',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: Projet.unknownDefaultOpenApi,
+  )
+  final Projet projet;
 
-  @JsonKey(name: r'banqueName', required: true, includeIfNull: false)
-  final String banqueName;
+  @JsonKey(name: r'banqueId', required: true, includeIfNull: true)
+  final String? banqueId;
 
-  @JsonKey(name: r'syndicatId', required: true, includeIfNull: false)
-  final String syndicatId;
+  @JsonKey(name: r'banqueName', required: true, includeIfNull: true)
+  final String? banqueName;
 
-  @JsonKey(name: r'syndicatSigle', required: true, includeIfNull: false)
-  final String syndicatSigle;
+  @JsonKey(name: r'syndicatId', required: true, includeIfNull: true)
+  final String? syndicatId;
 
-  @JsonKey(name: r'representantId', required: true, includeIfNull: false)
-  final String representantId;
+  @JsonKey(name: r'syndicatSigle', required: true, includeIfNull: true)
+  final String? syndicatSigle;
 
-  @JsonKey(name: r'representantName', required: true, includeIfNull: false)
-  final String representantName;
+  @JsonKey(name: r'representantId', required: true, includeIfNull: true)
+  final String? representantId;
 
-  @JsonKey(name: r'representantPhoneE164', required: true, includeIfNull: false)
-  final String representantPhoneE164;
+  @JsonKey(name: r'representantName', required: true, includeIfNull: true)
+  final String? representantName;
 
-  @JsonKey(name: r'departementId', required: true, includeIfNull: false)
-  final String departementId;
+  @JsonKey(name: r'representantPhoneE164', required: true, includeIfNull: true)
+  final String? representantPhoneE164;
 
-  @JsonKey(name: r'departementName', required: true, includeIfNull: false)
-  final String departementName;
+  @JsonKey(name: r'departementId', required: true, includeIfNull: true)
+  final String? departementId;
+
+  @JsonKey(name: r'departementName', required: true, includeIfNull: true)
+  final String? departementName;
 
   @JsonKey(name: r'ownedByCommercialId', required: true, includeIfNull: false)
   final String ownedByCommercialId;
@@ -145,14 +167,38 @@ class ProspectDto {
   @JsonKey(name: r'ownedByCommercialName', required: true, includeIfNull: false)
   final String ownedByCommercialName;
 
-  /// Calculé par croisement syndicat × banque. Jamais stocké en base.
+  /// Hors CHUES : ce qu’est le prospect. Nul si la question n’a pas été posée.
+  @JsonKey(
+    name: r'type',
+    required: true,
+    includeIfNull: true,
+    unknownEnumValue: ProspectType.unknownDefaultOpenApi,
+  )
+  final ProspectType? type;
+
+  /// Métier déclaré, en clair.
+  @JsonKey(name: r'profession', required: true, includeIfNull: true)
+  final String? profession;
+
+  /// Durée du système de paiement retenue, en MOIS.
+  @JsonKey(name: r'dureeSystemeMois', required: true, includeIfNull: true)
+  final num? dureeSystemeMois;
+
+  @JsonKey(name: r'canalProvenanceId', required: true, includeIfNull: true)
+  final String? canalProvenanceId;
+
+  /// Par où le prospect est arrivé. Référentiel ouvert.
+  @JsonKey(name: r'canalProvenanceLabel', required: true, includeIfNull: true)
+  final String? canalProvenanceLabel;
+
+  /// Calculé par croisement syndicat × banque, jamais stocké. NUL dès qu’il manque l’un des deux : le segment ne se devine pas.
   @JsonKey(
     name: r'segment',
     required: true,
-    includeIfNull: false,
+    includeIfNull: true,
     unknownEnumValue: BddSegment.unknownDefaultOpenApi,
   )
-  final BddSegment segment;
+  final BddSegment? segment;
 
   @JsonKey(
     name: r'phase2Status',
@@ -233,6 +279,7 @@ class ProspectDto {
                 phoneE164,
                 rev,
                 statut,
+                projet,
                 banqueId,
                 banqueName,
                 syndicatId,
@@ -244,6 +291,11 @@ class ProspectDto {
                 departementName,
                 ownedByCommercialId,
                 ownedByCommercialName,
+                type,
+                profession,
+                dureeSystemeMois,
+                canalProvenanceId,
+                canalProvenanceLabel,
                 segment,
                 phase2Status,
                 enrollmentMethod,
@@ -267,6 +319,7 @@ class ProspectDto {
                 other.phoneE164,
                 other.rev,
                 other.statut,
+                other.projet,
                 other.banqueId,
                 other.banqueName,
                 other.syndicatId,
@@ -278,6 +331,11 @@ class ProspectDto {
                 other.departementName,
                 other.ownedByCommercialId,
                 other.ownedByCommercialName,
+                other.type,
+                other.profession,
+                other.dureeSystemeMois,
+                other.canalProvenanceId,
+                other.canalProvenanceLabel,
                 other.segment,
                 other.phase2Status,
                 other.enrollmentMethod,
@@ -307,6 +365,7 @@ class ProspectDto {
         phoneE164,
         rev,
         statut,
+        projet,
         banqueId,
         banqueName,
         syndicatId,
@@ -318,6 +377,11 @@ class ProspectDto {
         departementName,
         ownedByCommercialId,
         ownedByCommercialName,
+        type,
+        profession,
+        dureeSystemeMois,
+        canalProvenanceId,
+        canalProvenanceLabel,
         segment,
         phase2Status,
         enrollmentMethod,

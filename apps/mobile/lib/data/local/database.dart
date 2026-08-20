@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   /// L'effet d'une tentative saisie avant la v10, déduit de son issue. Sans
   /// cette dérivation, la recopie de table poserait le défaut `KEEP_OPEN`
@@ -32,6 +32,24 @@ class AppDatabase extends _$AppDatabase {
 
   static const CustomExpression<bool> _commentRequiredFromOutcome =
       CustomExpression<bool>('CASE WHEN outcome = \'OTHER\' THEN 1 ELSE 0 END');
+
+  /// La recopie de `prospects`, quel que soit le palier qui la declenche.
+  ///
+  /// `alterTable` engendre TOUJOURS la forme COURANTE de la table. Toute colonne
+  /// ajoutee APRES le palier d'origine doit donc etre declaree ici, sinon la
+  /// recopie va la chercher dans une table qui ne l'a pas encore et la migration
+  /// echoue. Ce piege a deja coute trois fois sur ce fichier.
+  static TableMigration _prospectsCopy(Prospects prospects) => TableMigration(
+    prospects,
+    newColumns: <GeneratedColumn<Object>>[
+      prospects.projet,
+      prospects.type,
+      prospects.profession,
+    ],
+    columnTransformer: <GeneratedColumn<Object>, Expression<Object>>{
+      prospects.projet: const Constant<String>('CHUES'),
+    },
+  );
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -60,7 +78,7 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(outbox, outbox.blockedAttempts);
       }
       if (from < 6 && to >= 6) {
-        await m.alterTable(TableMigration(prospects));
+        await m.alterTable(_prospectsCopy(prospects));
         await m.alterTable(TableMigration(phase2Directory));
         // `callbackAt` et `reasonCode` n'existent pas encore à la v6 : sans les
         // déclarer neufs, la recopie irait les lire dans l'ancienne table.
@@ -137,6 +155,10 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(callTasks);
         await m.createIndex(callTasksCampaignIdx);
         await m.createIndex(callTasksProspectIdx);
+      }
+      if (from < 13 && to >= 13) {
+        // Trois liens relaches et trois colonnes ajoutees : SQLite recree la table.
+        await m.alterTable(_prospectsCopy(prospects));
       }
     },
     beforeOpen: (OpeningDetails details) async {

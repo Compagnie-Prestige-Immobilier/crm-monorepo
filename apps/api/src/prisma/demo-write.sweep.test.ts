@@ -217,12 +217,13 @@ const SITES: Record<string, Site> = {
       'colonne prenait auparavant son défaut false, ce qui faisait entrer la fiche fictive dans l’annuaire réel. ' +
       'Inscrite au registre par recordDemoEntity, dans la transaction du groupe',
   },
-  'modules/sync/sync.service.ts → authorIsDemo || parent.isDemo': {
+  'modules/sync/sync.service.ts → authorIsDemo || (parent?.isDemo ?? false)': {
     verdict: 'REGISTRE',
     note:
       'création d’un prospect par la synchronisation. MÊME COMPOSITION que prospects.service.ts, auteur ET ' +
       'représentant de rattachement : l’annuaire de phase 2 n’est pas cloisonné par commercial, aucune des deux ' +
-      'sources ne suffit seule. Inscrite au registre',
+      'sources ne suffit seule. Le rattachement est désormais facultatif : sans représentant, seul l’auteur ' +
+      'décide, et une fiche Grand Public saisie par un compte réel naît réelle. Inscrite au registre',
   },
   'modules/sync/sync.service.ts → representant.isDemo': {
     verdict: 'LECTURE',

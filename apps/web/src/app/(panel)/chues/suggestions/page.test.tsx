@@ -20,38 +20,36 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/session', () => ({ guardRoles }));
 
-const RepresentantPage = (await import('@/app/(panel)/representants/[id]/page')).default;
-
-const params = Promise.resolve({ id: 'rep-1' });
+const SuggestionsPage = (await import('@/app/(panel)/chues/suggestions/page')).default;
 
 beforeEach(() => {
   guardRoles.mockReset();
   redirect.mockClear();
 });
 
-describe('garde de la fiche représentant', () => {
+describe('garde des numéros suggérés', () => {
   it('renvoie un visiteur sans session vers la connexion', async () => {
     guardRoles.mockResolvedValue({ status: 'anonymous' });
 
-    await expect(RepresentantPage({ params })).rejects.toThrow('REDIRECT /connexion');
+    await expect(SuggestionsPage()).rejects.toThrow('REDIRECT /connexion');
   });
 
-  it('refuse un rôle hors périmètre au lieu de lui servir la fiche', async () => {
+  it('refuse un agent bancaire au lieu de lui servir les numéros', async () => {
     guardRoles.mockResolvedValue({
       status: 'denied',
       user: { id: 'u-1', role: 'BANQUE_FINANCE' },
     });
 
-    render(await RepresentantPage({ params }));
+    render(await SuggestionsPage());
 
     expect(screen.getByRole('alert').textContent).toContain('Accès refusé');
     expect(redirect).not.toHaveBeenCalled();
   });
 
-  it('n’ouvre la fiche qu’aux rôles qui suivent le terrain', async () => {
+  it('n’ouvre l’écran qu’aux rôles qui suivent le terrain', async () => {
     guardRoles.mockResolvedValue({ status: 'anonymous' });
 
-    await RepresentantPage({ params }).catch(() => undefined);
+    await SuggestionsPage().catch(() => undefined);
 
     expect(guardRoles).toHaveBeenCalledWith(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
   });

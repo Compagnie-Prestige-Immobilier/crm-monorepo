@@ -35,10 +35,20 @@ export const SEGMENT_LABELS: Readonly<Record<BddSegment, string>> = {
   BDD4: 'BDD4 : autre syndicat / autre banque',
 };
 
+/**
+ * Le segment se calcule sur DEUX axes. Il en manque un, il n'y a pas de segment.
+ *
+ * Rendre `BDD4` par defaut serait le pire choix : « autre syndicat / autre
+ * banque » est une reponse, et une fiche Grand Public ou une fiche dont la
+ * question n'a pas ete posee se retrouverait comptee dans un segment CHUES,
+ * dans les listes, les campagnes et les exports.
+ */
 export function classifySegment(input: {
-  syndicatSigle: string;
-  banqueShortName: string;
-}): BddSegment {
+  syndicatSigle: string | null;
+  banqueShortName: string | null;
+}): BddSegment | null {
+  if (input.syndicatSigle === null || input.banqueShortName === null) return null;
+
   const isChues = input.syndicatSigle === CHUES_SIGLE;
   const isCbao = input.banqueShortName === CBAO_SHORT_NAME;
 

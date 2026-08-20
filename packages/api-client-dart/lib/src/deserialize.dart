@@ -1,3 +1,4 @@
+import 'package:crm_api_client/src/model/ambassador_conversion_dto.dart';
 import 'package:crm_api_client/src/model/analytics_delays_dto.dart';
 import 'package:crm_api_client/src/model/analytics_finance_dto.dart';
 import 'package:crm_api_client/src/model/analytics_funnel_dto.dart';
@@ -233,6 +234,9 @@ ReturnType deserialize<ReturnType, BaseType>(
       return (valueString == 'true' || valueString == '1') as ReturnType;
     case 'double':
       return (value is double ? value : double.parse('$value')) as ReturnType;
+    case 'AmbassadorConversionDto':
+      return AmbassadorConversionDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'AnalyticsDelaysDto':
       return AnalyticsDelaysDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -578,6 +582,7 @@ ReturnType deserialize<ReturnType, BaseType>(
       return PresenceCountsDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'PresenceState':
+    case 'Projet':
     case 'ProspectConflictDto':
       return ProspectConflictDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -597,6 +602,7 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'ProspectSortField':
     case 'ProspectStatut':
+    case 'ProspectType':
     case 'PurgeCatalogDto':
       return PurgeCatalogDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;

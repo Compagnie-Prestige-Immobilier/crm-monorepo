@@ -76,7 +76,9 @@ const segmentCases = syndicates.flatMap((syndicatSigle) =>
 
 describe('segmentation BDD, chaque combinaison réelle a un seul segment', () => {
   it.each(segmentCases)('%s × %s est classé et filtré de façon cohérente', (syndicat, banque) => {
+    // Les deux axes sont toujours fournis ici : le segment ne peut pas etre nul.
     const segment = classifySegment({ syndicatSigle: syndicat, banqueShortName: banque });
+    if (segment === null) throw new Error('les deux axes sont fournis : un segment est attendu');
     const axes = segmentWhere(segment) as Record<string, unknown>;
     expect(['BDD1', 'BDD2', 'BDD3', 'BDD4'] as BddSegment[]).toContain(segment);
     expect(axes.syndicat).toBeDefined();

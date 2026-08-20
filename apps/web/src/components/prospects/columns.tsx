@@ -90,11 +90,18 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       id: 'segment',
       accessorKey: 'segment',
       header: 'Segment',
-      cell: ({ row }) => (
-        <Badge variant="outline" title={SEGMENT_LABELS[row.original.segment]}>
-          {row.original.segment}
-        </Badge>
-      ),
+      // Une fiche sans banque ni syndicat n'est dans aucun BDD. On l'ecrit,
+      // plutot que de la ranger dans BDD4 qui est une reponse, pas une absence.
+      cell: ({ row }) => {
+        const segment = row.original.segment;
+        return segment === null ? (
+          <span className="text-muted-foreground">Aucun</span>
+        ) : (
+          <Badge variant="outline" title={SEGMENT_LABELS[segment]}>
+            {segment}
+          </Badge>
+        );
+      },
     },
     {
       id: 'phase2Status',

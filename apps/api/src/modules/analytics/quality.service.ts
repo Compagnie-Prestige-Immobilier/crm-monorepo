@@ -5,9 +5,11 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { PROSPECT_FROM, prospectConditions } from './analytics.sql.js';
-import { ATTEMPT, UNUSABLE_OUTCOMES, demoScopeOn, rate } from './pilotage.sql.js';
+import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
+import { PROSPECT_FROM, prospectConditions, representantConditions } from './analytics.sql.js';
+import { ATTEMPT, RELATION_CHANGE, UNUSABLE_OUTCOMES, demoScopeOn, rate } from './pilotage.sql.js';
 import type {
+  AmbassadorConversionDto,
   DataQualityDto,
   DataQualityRowDto,
   OriginBreakdownDto,
@@ -89,6 +91,64 @@ export class QualityService {
       })),
       total: rows[0]?.population ?? 0,
       dormantDays,
+    };
+  }
+
+  /**
+   * Conversion en ambassadeur, datée sur la BASCULE et non sur l'arrivée en
+   * base : la fiche ne garde que son dernier état, `representant_relation_changes`
+   * garde l'acte et sa date.
+   */
+  async ambassadorConversion(
+    user: AuthenticatedUser,
+    filter: ProspectFilterDto,
+  ): Promise<AmbassadorConversionDto> {
+    const demoEnabled = await this.demo.enabled();
+    const perimetre = representantConditions(user, filter, demoEnabled);
+    const traceVisible = demoScopeOn(RELATION_CHANGE, demoEnabled);
+
+    const bornes: Prisma.Sql[] = [perimetre, traceVisible];
+    if (filter.dateFrom) {
+      bornes.push(Prisma.sql`rc."changedAt" >= ${inclusiveDateFrom(filter.dateFrom)}`);
+    }
+    if (filter.dateTo) {
+      bornes.push(Prisma.sql`rc."changedAt" <= ${inclusiveDateTo(filter.dateTo)}`);
+    }
+
+    const [bascules, jamaisTravailles] = await Promise.all([
+      this.prisma.$queryRaw<{ contactes: number; ambassadeurs: number; revenus: number }[]>`
+        SELECT
+          COUNT(DISTINCT rc."representantId")::int AS contactes,
+          COUNT(DISTINCT rc."representantId") FILTER (
+            WHERE rc."toStatus" = 'AMBASSADEUR'
+          )::int AS ambassadeurs,
+          COUNT(DISTINCT rc."representantId") FILTER (
+            WHERE rc."toStatus" = 'AMBASSADEUR' AND r."relationStatus" <> 'AMBASSADEUR'
+          )::int AS revenus
+        FROM "representant_relation_changes" rc
+        INNER JOIN "representants" r ON r."id" = rc."representantId"
+        WHERE ${Prisma.join(bornes, ' AND ')}
+      `,
+      this.prisma.$queryRaw<{ orphelins: number }[]>`
+        SELECT COUNT(*)::int AS orphelins
+        FROM "representants" r
+        WHERE ${perimetre}
+          AND NOT EXISTS (
+            SELECT 1 FROM "representant_relation_changes" rc
+            WHERE rc."representantId" = r."id" AND ${traceVisible}
+          )
+      `,
+    ]);
+
+    const contacted = bascules[0]?.contactes ?? 0;
+    const ambassadors = bascules[0]?.ambassadeurs ?? 0;
+
+    return {
+      contacted,
+      ambassadors,
+      conversionRate: rate(ambassadors, contacted),
+      reverted: bascules[0]?.revenus ?? 0,
+      untracked: jamaisTravailles[0]?.orphelins ?? 0,
     };
   }
 

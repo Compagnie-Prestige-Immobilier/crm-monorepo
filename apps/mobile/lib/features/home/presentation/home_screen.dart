@@ -33,7 +33,12 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CPI GO'),
+        leading: IconButton(
+          icon: const Icon(PhosphorIconsRegular.squaresFour),
+          tooltip: 'Projets',
+          onPressed: () => context.go(Routes.home),
+        ),
+        title: const Text('Projet CHUES'),
         actions: const <Widget>[
           OfflineIndicator(),
           NotificationBell(),

@@ -179,6 +179,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.visiteObjet.count(),
     remove: async (db) => (await db.visiteObjet.deleteMany({})).count,
   },
+  canauxProvenance: {
+    table: 'canaux_provenance',
+    count: (db) => db.canalProvenance.count(),
+    remove: async (db) => (await db.canalProvenance.deleteMany({})).count,
+  },
   banques: {
     table: 'banques',
     count: (db) => db.banque.count(),

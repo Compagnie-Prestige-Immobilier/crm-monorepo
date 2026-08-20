@@ -203,3 +203,120 @@ describe('provenance des fiches', () => {
     expect(result).toEqual({ items: [], byLabel: [], total: 0 });
   });
 });
+
+describe('conversion des représentants en ambassadeurs', () => {
+  const direction: AuthenticatedUser = {
+    ...admin,
+    id: 'dir-1',
+    username: 'direction',
+    role: Role.DIRECTION,
+  };
+
+  it('date la conversion sur la BASCULE, jamais sur l’arrivée en base', async () => {
+    const { service, sql } = makeAnalyticsPrisma();
+    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(admin, {
+      dateFrom: '2026-03-02',
+      dateTo: '2026-03-08',
+    });
+
+    expect(sql()).toContain('"representant_relation_changes"');
+    expect(sql()).toContain('rc."changedAt" >= "2026-03-02T00:00:00.000Z"');
+    expect(sql()).toContain('rc."changedAt" <= "2026-03-08T23:59:59.999Z"');
+    expect(sql()).not.toContain('rc."id"');
+    expect(sql()).not.toContain('r."clientCreatedAt"');
+    expect(sql()).not.toContain('r."createdAt"');
+  });
+
+  it('rapporte les ambassadeurs aux SEULS représentants travaillés', async () => {
+    const { service } = makeAnalyticsPrisma(
+      [{ contactes: 40, ambassadeurs: 10, revenus: 3 }],
+      [{ orphelins: 460 }],
+    );
+
+    const result = await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(
+      admin,
+      {},
+    );
+
+    expect(result).toEqual({
+      contacted: 40,
+      ambassadors: 10,
+      conversionRate: 25,
+      reverted: 3,
+      untracked: 460,
+    });
+  });
+
+  it('un représentant redevenu non ambassadeur reste au numérateur, et se compte à part', async () => {
+    const { service } = makeAnalyticsPrisma(
+      [{ contactes: 10, ambassadeurs: 4, revenus: 4 }],
+      [{ orphelins: 0 }],
+    );
+
+    const result = await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(
+      admin,
+      {},
+    );
+
+    expect(result.conversionRate).toBe(40);
+    expect(result.reverted).toBe(4);
+  });
+
+  it('aucun représentant travaillé : taux NUL, jamais un faux 0 %', async () => {
+    const { service } = makeAnalyticsPrisma(
+      [{ contactes: 0, ambassadeurs: 0, revenus: 0 }],
+      [{ orphelins: 120 }],
+    );
+
+    const result = await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(
+      admin,
+      {},
+    );
+
+    expect(result.conversionRate).toBeNull();
+    expect(result.untracked).toBe(120);
+  });
+
+  it('l’annuaire jamais travaillé se compte hors du taux, sur les DEUX requêtes', async () => {
+    const { service, queries } = makeAnalyticsPrisma();
+    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(admin, {});
+
+    expect(queries()).toHaveLength(2);
+    expect(queries()[1]).toContain('NOT EXISTS');
+    expect(queries()[1]).not.toContain('rc."changedAt"');
+  });
+
+  it('un COMMERCIAL ne lit que ses propres représentants, sur les DEUX requêtes', async () => {
+    const { service, queries } = makeAnalyticsPrisma();
+    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(alice, {});
+
+    for (const query of queries()) {
+      expect(query).toContain('r."createdById" = "com-alice"');
+    }
+  });
+
+  it('une DIRECTION lit TOUT : la borner sur son compte rendrait un écran à zéro', async () => {
+    const { service, sql } = makeAnalyticsPrisma();
+    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(direction, {});
+
+    expect(sql()).not.toContain('dir-1');
+  });
+
+  it('un COMMERCIAL qui demande le périmètre d’un autre n’obtient rien', async () => {
+    const { service, sql } = makeAnalyticsPrisma();
+    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(alice, {
+      commercialId: 'com-bineta',
+    });
+
+    expect(sql()).toContain('"__aucun__"');
+    expect(sql()).not.toContain('"com-bineta"');
+  });
+
+  it('la visibilité de démonstration est posée sur la trace comme sur la fiche', async () => {
+    const { service, sql } = makeAnalyticsPrisma();
+    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(admin, {});
+
+    expect(sql()).toContain('r."isDemo" = FALSE');
+    expect(sql()).toContain('rc."isDemo" = FALSE');
+  });
+});

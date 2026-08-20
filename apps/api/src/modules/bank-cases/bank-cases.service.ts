@@ -28,6 +28,7 @@ import { assertReachable, planTransitionEffect } from './workflow.js';
 import {
   BankCaseError,
   bankNotFound,
+  bankRequired,
   caseNotFound,
   prospectNotEnrolled,
   prospectNotFound,
@@ -142,7 +143,10 @@ export class BankCasesService {
       throw prospectNotEnrolled(prospect.phase2Status, prospect.id);
     }
 
+    // La banque du prospect est desormais facultative : un dossier ne peut pas
+    // s'ouvrir sans en designer une, explicitement ou par heritage.
     const processingBankId = input.processingBankId ?? prospect.banqueId;
+    if (processingBankId === null) throw bankRequired();
     const bank = await this.prisma.banque.findUnique({
       where: { id: processingBankId },
       select: { id: true },

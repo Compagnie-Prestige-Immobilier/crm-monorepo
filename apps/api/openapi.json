@@ -12249,6 +12249,224 @@
         "tags": ["analytics"]
       }
     },
+    "/api/v1/analytics/ambassador-conversion": {
+      "get": {
+        "description": "La période borne la DATE DE LA BASCULE, pas l’arrivée en base : un statut poussé avec trois jours de retard reste compté le jour où il a été décidé. Le dénominateur ne retient que les représentants dont la relation a bougé dans la période ; `untracked` compte, hors période, ceux de l’annuaire sans aucune trace, qui ne sont donc mesurés ni au numérateur ni au dénominateur. Seuls `dateFrom`, `dateTo`, `commercialId`, `departementId` et `representantId` agissent : les autres filtres qualifient un prospect, pas un représentant.",
+        "operationId": "getAmbassadorConversion",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Recherche libre sur le nom, le prénom ou le téléphone.",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "representantId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "banqueId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "syndicatId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "departementId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "commercialId",
+            "required": false,
+            "in": "query",
+            "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "statut",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectStatut"
+            }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "description": "Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.",
+            "schema": {
+              "$ref": "#/components/schemas/BddSegment"
+            }
+          },
+          {
+            "name": "phase2Status",
+            "required": false,
+            "in": "query",
+            "description": "Avancement de la phase 2. Dimension indépendante de `statut`.",
+            "schema": {
+              "$ref": "#/components/schemas/Phase2Status"
+            }
+          },
+          {
+            "name": "enrollmentMethod",
+            "required": false,
+            "in": "query",
+            "description": "Méthode d’enrôlement obtenue en phase 2.",
+            "schema": {
+              "$ref": "#/components/schemas/EnrollmentMethod"
+            }
+          },
+          {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "enrollmentCapturedById",
+            "required": false,
+            "in": "query",
+            "description": "Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "origin",
+            "required": false,
+            "in": "query",
+            "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
+            "schema": {
+              "type": "string",
+              "enum": ["BANQUE"]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "required": false,
+            "in": "query",
+            "description": "Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmbassadorConversionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Part des représentants travaillés devenus ambassadeurs.",
+        "tags": ["analytics"]
+      }
+    },
     "/api/v1/analytics/data-quality": {
       "get": {
         "description": "Se branche sur les issues d’appel UNREACHABLE et WRONG_NUMBER. Les deux listes comptent la même population de tentatives selon deux axes.",
@@ -15939,9 +16157,6 @@
           "phone": {
             "type": "string",
             "description": "Téléphone, normalisé en E.164 par le serveur."
-          },
-          "isActive": {
-            "type": "boolean"
           }
         }
       },
@@ -17048,6 +17263,15 @@
         "type": "string",
         "enum": ["createdAt", "clientCreatedAt", "nom", "prenom", "statut"]
       },
+      "Projet": {
+        "type": "string",
+        "enum": ["CHUES", "GRAND_PUBLIC"]
+      },
+      "ProspectType": {
+        "type": "string",
+        "enum": ["FONCTIONNAIRE", "SECTEUR_PRIVE", "INFORMEL", "DIASPORA"],
+        "description": "Hors CHUES : ce qu’est le prospect. Nul si la question n’a pas été posée."
+      },
       "CallOutcome": {
         "type": "string",
         "enum": ["METHOD_OBTAINED", "UNREACHABLE", "CALLBACK", "REFUSED", "WRONG_NUMBER", "OTHER"],
@@ -17079,36 +17303,52 @@
               }
             ]
           },
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
           "banqueId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "banqueName": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "syndicatId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "syndicatSigle": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "representantId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "representantName": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "representantPhoneE164": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "departementId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "departementName": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "ownedByCommercialId": {
             "type": "string",
@@ -17117,8 +17357,38 @@
           "ownedByCommercialName": {
             "type": "string"
           },
+          "type": {
+            "nullable": true,
+            "description": "Hors CHUES : ce qu’est le prospect. Nul si la question n’a pas été posée.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProspectType"
+              }
+            ]
+          },
+          "profession": {
+            "type": "string",
+            "nullable": true,
+            "description": "Métier déclaré, en clair."
+          },
+          "dureeSystemeMois": {
+            "type": "number",
+            "nullable": true,
+            "description": "Durée du système de paiement retenue, en MOIS."
+          },
+          "canalProvenanceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "canalProvenanceLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Par où le prospect est arrivé. Référentiel ouvert."
+          },
           "segment": {
-            "description": "Calculé par croisement syndicat × banque. Jamais stocké en base.",
+            "nullable": true,
+            "description": "Calculé par croisement syndicat × banque, jamais stocké. NUL dès qu’il manque l’un des deux : le segment ne se devine pas.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/BddSegment"
@@ -17210,6 +17480,7 @@
           "phoneE164",
           "rev",
           "statut",
+          "projet",
           "banqueId",
           "banqueName",
           "syndicatId",
@@ -17221,6 +17492,11 @@
           "departementName",
           "ownedByCommercialId",
           "ownedByCommercialName",
+          "type",
+          "profession",
+          "dureeSystemeMois",
+          "canalProvenanceId",
+          "canalProvenanceLabel",
           "segment",
           "phase2Status",
           "enrollmentMethod",
@@ -17317,10 +17593,12 @@
           },
           "representantId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "representantName": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "ownedByCommercialId": {
             "type": "string",
@@ -17700,7 +17978,39 @@
           "profession": {
             "type": "string",
             "maxLength": 120,
-            "description": "Représentant : profession déclarée."
+            "description": "Profession déclarée. Sert au représentant comme au prospect."
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Représentant : l’établissement où il exerce. Ni l’IEF ni le département."
+          },
+          "projet": {
+            "description": "Prospect : le projet dont il relève. CHUES par défaut côté serveur.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "type": {
+            "description": "Prospect hors CHUES : ce qu’il est. Jamais obligatoire.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProspectType"
+              }
+            ]
+          },
+          "dureeSystemeMois": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 600,
+            "description": "Prospect : durée du système de paiement, en MOIS."
+          },
+          "canalProvenanceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Prospect : canal de provenance, choisi dans le référentiel."
           },
           "clientCreatedAt": {
             "type": "string",
@@ -17788,7 +18098,7 @@
             "$ref": "#/components/schemas/SyncEntityDataDto"
           },
           "clearedFields": {
-            "description": "Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession.",
+            "description": "Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement.",
             "type": "array",
             "items": {
               "type": "string"
@@ -21603,6 +21913,33 @@
           }
         },
         "required": ["items", "total", "dormantDays"]
+      },
+      "AmbassadorConversionDto": {
+        "type": "object",
+        "properties": {
+          "contacted": {
+            "type": "number",
+            "description": "Représentants dont la relation a bougé au moins une fois dans la période. Dénominateur : un taux rapporté à l’annuaire entier mesurerait la taille du fichier, pas le travail."
+          },
+          "ambassadors": {
+            "type": "number",
+            "description": "Parmi eux, ceux passés au moins une fois AMBASSADEUR dans la période. Comptés une seule fois, quel que soit le nombre d’allers-retours."
+          },
+          "conversionRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Ambassadeurs rapportés aux représentants travaillés, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %."
+          },
+          "reverted": {
+            "type": "number",
+            "description": "Parmi les convertis de la période, ceux dont le statut COURANT n’est plus AMBASSADEUR. Ils restent au numérateur : la bascule a eu lieu et elle est datée. Les retirer ferait bouger le taux d’un mois clos à chaque changement de statut d’aujourd’hui."
+          },
+          "untracked": {
+            "type": "number",
+            "description": "Représentants du périmètre sans AUCUNE trace de relation, à aucune date. Hors du taux dans les deux termes : ils mesurent ce que la période ne dit pas."
+          }
+        },
+        "required": ["contacted", "ambassadors", "conversionRate", "reverted", "untracked"]
       },
       "DataQualityRowDto": {
         "type": "object",

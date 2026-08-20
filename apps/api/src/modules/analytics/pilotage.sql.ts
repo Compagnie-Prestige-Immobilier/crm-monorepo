@@ -12,6 +12,7 @@ export const ATTEMPT = Prisma.sql`ca`;
 export const CAMPAIGN = Prisma.sql`cc`;
 export const BANK_CASE = Prisma.sql`bc`;
 export const TRANSITION = Prisma.sql`tr`;
+export const RELATION_CHANGE = Prisma.sql`rc`;
 
 /** Clés de `CallOutcome` comptant pour un numéro inexploitable. */
 export const UNUSABLE_OUTCOMES = Prisma.sql`('UNREACHABLE', 'WRONG_NUMBER')`;

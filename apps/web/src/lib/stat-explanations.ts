@@ -35,6 +35,7 @@ export const STAT_KEYS = [
   'delayLegs',
   'weeklyCohorts',
   'representantProductivity',
+  'ambassadorConversion',
   'departementYield',
   'originBreakdown',
   'bankAging',
@@ -111,6 +112,8 @@ export const STAT_EXPLANATIONS: Record<StatKey, string> = {
     'Suivi des prospects par semaine d’entrée, jusqu’à l’encaissement. La seule mesure qui distingue une amélioration réelle d’un simple effet de volume.',
   representantProductivity:
     'Prospects apportés par représentant et part convertie. Un représentant dormant n’a rien apporté depuis le seuil indiqué.',
+  ambassadorConversion:
+    'Part des représentants passés ambassadeurs, rapportée aux seuls représentants dont la relation a bougé sur la période. La date retenue est celle de la bascule, pas celle de son enregistrement.',
   departementYield:
     'Rendement par département : conversion et montant encaissé, pas seulement volume de fiches.',
   originBreakdown:

@@ -25,7 +25,9 @@ import {
   CallTaskStatus,
   CampaignStatus,
   EnrollmentMethod,
+  Projet,
   ProspectStatut,
+  ProspectType,
   WhatsappStatus,
 } from '@crm/database';
 
@@ -58,7 +60,14 @@ export enum SyncOpStatus {
   SKIPPED_DEPENDENCY_FAILED = 'skipped_dependency_failed',
 }
 
-export const CLEARABLE_FIELDS = ['iefId', 'notes', 'whatsappE164', 'profession'] as const;
+export const CLEARABLE_FIELDS = [
+  'iefId',
+  'notes',
+  'whatsappE164',
+  'profession',
+  'prenom',
+  'etablissement',
+] as const;
 
 export type ClearableField = (typeof CLEARABLE_FIELDS)[number];
 
@@ -161,11 +170,61 @@ export class SyncEntityDataDto {
   @MaxLength(40)
   whatsappE164?: string;
 
-  @ApiPropertyOptional({ maxLength: 120, description: 'Représentant : profession déclarée.' })
+  @ApiPropertyOptional({
+    maxLength: 120,
+    description: 'Profession déclarée. Sert au représentant comme au prospect.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(120)
   profession?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 160,
+    description: 'Représentant : l’établissement où il exerce. Ni l’IEF ni le département.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  etablissement?: string;
+
+  @ApiPropertyOptional({
+    enum: Projet,
+    enumName: 'Projet',
+    description: 'Prospect : le projet dont il relève. CHUES par défaut côté serveur.',
+  })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
+
+  @ApiPropertyOptional({
+    enum: ProspectType,
+    enumName: 'ProspectType',
+    description: 'Prospect hors CHUES : ce qu’il est. Jamais obligatoire.',
+  })
+  @IsOptional()
+  @IsEnum(ProspectType)
+  type?: ProspectType;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: 600,
+    description: 'Prospect : durée du système de paiement, en MOIS.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(600)
+  dureeSystemeMois?: number;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Prospect : canal de provenance, choisi dans le référentiel.',
+  })
+  @IsOptional()
+  @IsUUID()
+  canalProvenanceId?: string;
 
   @ApiPropertyOptional({ format: 'date-time', description: 'Horodatage de la saisie terrain.' })
   @IsOptional()

@@ -150,12 +150,14 @@ describe('clés locales : aucune référence pendante', () => {
 describe('segments BDD : la répartition annoncée est la répartition réelle', () => {
   const counts: Record<BddSegment, number> = { BDD1: 0, BDD2: 0, BDD3: 0, BDD4: 0 };
   for (const prospect of DEMO_PROSPECTS) {
-    counts[
-      classifySegment({
-        syndicatSigle: prospect.syndicatSigle,
-        banqueShortName: prospect.banqueShortName,
-      })
-    ] += 1;
+    // Le jeu de demonstration renseigne toujours les deux axes : un segment nul
+    // y serait une erreur de donnee, pas un cas a compter.
+    const segment = classifySegment({
+      syndicatSigle: prospect.syndicatSigle,
+      banqueShortName: prospect.banqueShortName,
+    });
+    if (segment === null) throw new Error(`Prospect de demonstration sans segment : ${prospect.nom}`);
+    counts[segment] += 1;
   }
 
   it('recalcule 42 / 24 / 30 / 24, soit 35 % / 20 % / 25 % / 20 %', () => {

@@ -684,7 +684,13 @@ export class SyncService {
   private whatsappInputFor(
     data: SyncEntityDataDto,
     cleared: ReadonlySet<string>,
-  ): { whatsappStatus?: WhatsappStatus; whatsappE164?: string; profession?: string } {
+  ): {
+    whatsappStatus?: WhatsappStatus;
+    whatsappE164?: string;
+    profession?: string;
+    prenom?: string;
+    etablissement?: string;
+  } {
     return {
       ...(data.whatsappStatus === undefined ? {} : { whatsappStatus: data.whatsappStatus }),
       ...(cleared.has('whatsappE164') || data.whatsappE164 === undefined
@@ -695,6 +701,19 @@ export class SyncService {
         : data.profession === undefined
           ? {}
           : { profession: data.profession }),
+      // `prenom` sert au prospect ailleurs : c'est l'entite de l'operation qui
+      // leve l'ambiguite, pas une seconde cle qu'un ancien telephone n'enverrait
+      // jamais.
+      ...(cleared.has('prenom')
+        ? { prenom: '' }
+        : data.prenom === undefined
+          ? {}
+          : { prenom: data.prenom }),
+      ...(cleared.has('etablissement')
+        ? { etablissement: '' }
+        : data.etablissement === undefined
+          ? {}
+          : { etablissement: data.etablissement }),
     };
   }
 
@@ -824,10 +843,12 @@ export class SyncService {
     if (!existing || existing.deletedAt) {
       requireText(data.nom, 'nom');
       requireText(data.prenom, 'prenom');
-      requireUuid(data.banqueId, 'banqueId');
-      requireUuid(data.syndicatId, 'syndicatId');
-      requireUuid(data.representantId, 'representantId');
-      const parent = await assertRepresentantUsable(tx, user, data.representantId);
+      // Banque, syndicat et representant sont FACULTATIFS. Un teleconseiller au
+      // telephone ne les obtient pas toujours, et une fiche Grand Public n'en a
+      // aucun : les exiger faisait abandonner la saisie entiere.
+      const parent = data.representantId
+        ? await assertRepresentantUsable(tx, user, data.representantId)
+        : null;
       await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
 
       const row = await tx.prospect.upsert({
@@ -837,10 +858,19 @@ export class SyncService {
           nom: data.nom.trim(),
           prenom: data.prenom.trim(),
           phoneE164,
-          banqueId: data.banqueId,
-          syndicatId: data.syndicatId,
-          representantId: data.representantId,
+          banqueId: data.banqueId ?? null,
+          syndicatId: data.syndicatId ?? null,
+          representantId: data.representantId ?? null,
           createdById: user.id,
+          ...(data.projet ? { projet: data.projet } : {}),
+          ...(data.type ? { type: data.type } : {}),
+          ...(data.profession === undefined ? {} : { profession: data.profession }),
+          ...(data.dureeSystemeMois === undefined
+            ? {}
+            : { dureeSystemeMois: data.dureeSystemeMois }),
+          ...(data.canalProvenanceId === undefined
+            ? {}
+            : { canalProvenanceId: data.canalProvenanceId }),
           ...(data.statut ? { statut: data.statut } : {}),
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
           // DEUX SOURCES, EXACTEMENT COMME `prospects.service.ts`. La route
@@ -856,21 +886,30 @@ export class SyncService {
           // L'auteur ET le parent, parce qu'aucun des deux ne suffit :
           // l'annuaire de phase 2 n'est pas cloisonné par commercial, un
           // commercial réel peut donc rattacher au représentant d'un autre.
-          isDemo: authorIsDemo || parent.isDemo,
+          isDemo: authorIsDemo || (parent?.isDemo ?? false),
         },
         update: {
           nom: data.nom.trim(),
           prenom: data.prenom.trim(),
           phoneE164,
-          banqueId: data.banqueId,
-          syndicatId: data.syndicatId,
-          representantId: data.representantId,
+          banqueId: data.banqueId ?? null,
+          syndicatId: data.syndicatId ?? null,
+          representantId: data.representantId ?? null,
+          ...(data.projet ? { projet: data.projet } : {}),
+          ...(data.type ? { type: data.type } : {}),
+          ...(data.profession === undefined ? {} : { profession: data.profession }),
+          ...(data.dureeSystemeMois === undefined
+            ? {}
+            : { dureeSystemeMois: data.dureeSystemeMois }),
+          ...(data.canalProvenanceId === undefined
+            ? {}
+            : { canalProvenanceId: data.canalProvenanceId }),
           ...(data.statut ? { statut: data.statut } : {}),
           deletedAt: null,
           rev: { increment: 1 },
         },
       });
-      if (authorIsDemo || parent.isDemo) await recordDemoEntity(tx, 'prospect', row.id);
+      if (authorIsDemo || (parent?.isDemo ?? false)) await recordDemoEntity(tx, 'prospect', row.id);
       return applied(row.id, row.rev, row.updatedAt);
     }
 
@@ -892,6 +931,15 @@ export class SyncService {
         ...(data.banqueId ? { banqueId: data.banqueId } : {}),
         ...(data.syndicatId ? { syndicatId: data.syndicatId } : {}),
         ...(data.representantId ? { representantId: data.representantId } : {}),
+        ...(data.projet ? { projet: data.projet } : {}),
+        ...(data.type ? { type: data.type } : {}),
+        ...(data.profession === undefined ? {} : { profession: data.profession }),
+        ...(data.dureeSystemeMois === undefined
+          ? {}
+          : { dureeSystemeMois: data.dureeSystemeMois }),
+        ...(data.canalProvenanceId === undefined
+          ? {}
+          : { canalProvenanceId: data.canalProvenanceId }),
         ...(data.statut ? { statut: data.statut } : {}),
         ...(reassignedRepresentant && (authorIsDemo || reassignedRepresentant.isDemo)
           ? { isDemo: true }

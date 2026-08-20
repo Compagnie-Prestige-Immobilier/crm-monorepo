@@ -3,6 +3,8 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/projet.dart';
+import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/call_outcome.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
@@ -52,6 +54,16 @@ class SyncEntityDataDto {
     this.whatsappE164,
 
     this.profession,
+
+    this.etablissement,
+
+    this.projet,
+
+    this.type,
+
+    this.dureeSystemeMois,
+
+    this.canalProvenanceId,
 
     this.clientCreatedAt,
 
@@ -133,9 +145,41 @@ class SyncEntityDataDto {
   @JsonKey(name: r'whatsappE164', required: false, includeIfNull: false)
   final String? whatsappE164;
 
-  /// Représentant : profession déclarée.
+  /// Profession déclarée. Sert au représentant comme au prospect.
   @JsonKey(name: r'profession', required: false, includeIfNull: false)
   final String? profession;
+
+  /// Représentant : l’établissement où il exerce. Ni l’IEF ni le département.
+  @JsonKey(name: r'etablissement', required: false, includeIfNull: false)
+  final String? etablissement;
+
+  /// Prospect : le projet dont il relève. CHUES par défaut côté serveur.
+  @JsonKey(
+    name: r'projet',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: Projet.unknownDefaultOpenApi,
+  )
+  final Projet? projet;
+
+  /// Prospect hors CHUES : ce qu’il est. Jamais obligatoire.
+  @JsonKey(
+    name: r'type',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: ProspectType.unknownDefaultOpenApi,
+  )
+  final ProspectType? type;
+
+  /// Prospect : durée du système de paiement, en MOIS.
+  // minimum: 1
+  // maximum: 600
+  @JsonKey(name: r'dureeSystemeMois', required: false, includeIfNull: false)
+  final num? dureeSystemeMois;
+
+  /// Prospect : canal de provenance, choisi dans le référentiel.
+  @JsonKey(name: r'canalProvenanceId', required: false, includeIfNull: false)
+  final String? canalProvenanceId;
 
   /// Horodatage de la saisie terrain.
   @JsonKey(name: r'clientCreatedAt', required: false, includeIfNull: false)
@@ -195,6 +239,11 @@ class SyncEntityDataDto {
                 whatsappStatus,
                 whatsappE164,
                 profession,
+                etablissement,
+                projet,
+                type,
+                dureeSystemeMois,
+                canalProvenanceId,
                 clientCreatedAt,
                 prospectId,
                 outcome,
@@ -219,6 +268,11 @@ class SyncEntityDataDto {
                 other.whatsappStatus,
                 other.whatsappE164,
                 other.profession,
+                other.etablissement,
+                other.projet,
+                other.type,
+                other.dureeSystemeMois,
+                other.canalProvenanceId,
                 other.clientCreatedAt,
                 other.prospectId,
                 other.outcome,
@@ -249,6 +303,11 @@ class SyncEntityDataDto {
         whatsappStatus,
         whatsappE164,
         profession,
+        etablissement,
+        projet,
+        type,
+        dureeSystemeMois,
+        canalProvenanceId,
         clientCreatedAt,
         prospectId,
         outcome,

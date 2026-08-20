@@ -129,4 +129,6 @@ export const queryKeys = {
     ['stats', 'provenance', filtersQueryKey(filters)] as const,
   statsVieillissement: (filters: ProspectFilters) =>
     ['stats', 'vieillissement', filtersQueryKey(filters)] as const,
+  statsAmbassadeurs: (filters: ProspectFilters) =>
+    ['stats', 'ambassadeurs', filtersQueryKey(filters)] as const,
 };

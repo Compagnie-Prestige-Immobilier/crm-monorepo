@@ -450,7 +450,9 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
         where: { phoneE164: { in: slice }, deletedAt: null },
         select: { phoneE164: true, representantId: true },
       });
-      for (const row of rows) found.set(row.phoneE164, row.representantId);
+      // Un doublon sans representant existe desormais (Grand Public) : la chaine
+      // vide dit « deja en base, rattache a personne ».
+      for (const row of rows) found.set(row.phoneE164, row.representantId ?? '');
     }
 
     return found;

@@ -294,17 +294,22 @@ export class ExportService {
           .commit();
         rows += 1;
 
-        const known = representants.get(row.representant.id);
-        if (known) known.prospects += 1;
-        else {
-          representants.set(row.representant.id, {
-            fullName: row.representant.fullName,
-            phoneE164: row.representant.phoneE164,
-            departement: row.representant.departement.name,
-            commercial: row.representant.createdBy.fullName,
-            clientCreatedAt: row.representant.clientCreatedAt,
-            prospects: 1,
-          });
+        // Une fiche sans representant ne peuple pas l'onglet Representants : il
+        // n'y a personne a y nommer. Elle reste comptee dans l'onglet Prospects.
+        const representant = row.representant;
+        if (representant) {
+          const known = representants.get(representant.id);
+          if (known) known.prospects += 1;
+          else {
+            representants.set(representant.id, {
+              fullName: representant.fullName,
+              phoneE164: representant.phoneE164,
+              departement: representant.departement.name,
+              commercial: representant.createdBy.fullName,
+              clientCreatedAt: representant.clientCreatedAt,
+              prospects: 1,
+            });
+          }
         }
       }
       if (page.length < PAGE_SIZE) break;
