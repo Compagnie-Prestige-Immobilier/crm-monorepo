@@ -100,7 +100,7 @@ describe('SuggestionsView', () => {
 
     expect(await screen.findByText('Déjà une fiche')).toBeTruthy();
     const lien = screen.getByRole('link', { name: 'Ouvrir la fiche existante' });
-    expect(lien.getAttribute('href')).toBe('/representants/rep-42');
+    expect(lien.getAttribute('href')).toBe('/chues/representants/rep-42');
     expect(screen.queryByRole('button', { name: /Créer la fiche/u })).toBeNull();
   });
 

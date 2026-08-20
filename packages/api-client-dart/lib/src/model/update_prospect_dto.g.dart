@@ -21,6 +21,16 @@ abstract class _$UpdateProspectDtoCWProxy {
 
   UpdateProspectDto representantId(String? representantId);
 
+  UpdateProspectDto projet(Projet? projet);
+
+  UpdateProspectDto type(ProspectType? type);
+
+  UpdateProspectDto profession(String? profession);
+
+  UpdateProspectDto dureeSystemeMois(num? dureeSystemeMois);
+
+  UpdateProspectDto canalProvenanceId(String? canalProvenanceId);
+
   UpdateProspectDto statut(ProspectStatut? statut);
 
   UpdateProspectDto clientCreatedAt(DateTime? clientCreatedAt);
@@ -39,6 +49,11 @@ abstract class _$UpdateProspectDtoCWProxy {
     String? banqueId,
     String? syndicatId,
     String? representantId,
+    Projet? projet,
+    ProspectType? type,
+    String? profession,
+    num? dureeSystemeMois,
+    String? canalProvenanceId,
     ProspectStatut? statut,
     DateTime? clientCreatedAt,
   });
@@ -74,6 +89,24 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
       this(representantId: representantId);
 
   @override
+  UpdateProspectDto projet(Projet? projet) => this(projet: projet);
+
+  @override
+  UpdateProspectDto type(ProspectType? type) => this(type: type);
+
+  @override
+  UpdateProspectDto profession(String? profession) =>
+      this(profession: profession);
+
+  @override
+  UpdateProspectDto dureeSystemeMois(num? dureeSystemeMois) =>
+      this(dureeSystemeMois: dureeSystemeMois);
+
+  @override
+  UpdateProspectDto canalProvenanceId(String? canalProvenanceId) =>
+      this(canalProvenanceId: canalProvenanceId);
+
+  @override
   UpdateProspectDto statut(ProspectStatut? statut) => this(statut: statut);
 
   @override
@@ -95,6 +128,11 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
     Object? banqueId = const $CopyWithPlaceholder(),
     Object? syndicatId = const $CopyWithPlaceholder(),
     Object? representantId = const $CopyWithPlaceholder(),
+    Object? projet = const $CopyWithPlaceholder(),
+    Object? type = const $CopyWithPlaceholder(),
+    Object? profession = const $CopyWithPlaceholder(),
+    Object? dureeSystemeMois = const $CopyWithPlaceholder(),
+    Object? canalProvenanceId = const $CopyWithPlaceholder(),
     Object? statut = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
   }) {
@@ -127,6 +165,26 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
           ? _value.representantId
           // ignore: cast_nullable_to_non_nullable
           : representantId as String?,
+      projet: projet == const $CopyWithPlaceholder()
+          ? _value.projet
+          // ignore: cast_nullable_to_non_nullable
+          : projet as Projet?,
+      type: type == const $CopyWithPlaceholder()
+          ? _value.type
+          // ignore: cast_nullable_to_non_nullable
+          : type as ProspectType?,
+      profession: profession == const $CopyWithPlaceholder()
+          ? _value.profession
+          // ignore: cast_nullable_to_non_nullable
+          : profession as String?,
+      dureeSystemeMois: dureeSystemeMois == const $CopyWithPlaceholder()
+          ? _value.dureeSystemeMois
+          // ignore: cast_nullable_to_non_nullable
+          : dureeSystemeMois as num?,
+      canalProvenanceId: canalProvenanceId == const $CopyWithPlaceholder()
+          ? _value.canalProvenanceId
+          // ignore: cast_nullable_to_non_nullable
+          : canalProvenanceId as String?,
       statut: statut == const $CopyWithPlaceholder()
           ? _value.statut
           // ignore: cast_nullable_to_non_nullable
@@ -160,6 +218,28 @@ UpdateProspectDto _$UpdateProspectDtoFromJson(Map<String, dynamic> json) =>
         banqueId: $checkedConvert('banqueId', (v) => v as String?),
         syndicatId: $checkedConvert('syndicatId', (v) => v as String?),
         representantId: $checkedConvert('representantId', (v) => v as String?),
+        projet: $checkedConvert(
+          'projet',
+          (v) => $enumDecodeNullable(
+            _$ProjetEnumMap,
+            v,
+            unknownValue: Projet.unknownDefaultOpenApi,
+          ),
+        ),
+        type: $checkedConvert(
+          'type',
+          (v) => $enumDecodeNullable(
+            _$ProspectTypeEnumMap,
+            v,
+            unknownValue: ProspectType.unknownDefaultOpenApi,
+          ),
+        ),
+        profession: $checkedConvert('profession', (v) => v as String?),
+        dureeSystemeMois: $checkedConvert('dureeSystemeMois', (v) => v as num?),
+        canalProvenanceId: $checkedConvert(
+          'canalProvenanceId',
+          (v) => v as String?,
+        ),
         statut: $checkedConvert(
           'statut',
           (v) => $enumDecodeNullable(
@@ -176,20 +256,40 @@ UpdateProspectDto _$UpdateProspectDtoFromJson(Map<String, dynamic> json) =>
       return val;
     });
 
-Map<String, dynamic> _$UpdateProspectDtoToJson(UpdateProspectDto instance) =>
-    <String, dynamic>{
-      if (instance.id case final value?) 'id': value,
-      if (instance.nom case final value?) 'nom': value,
-      if (instance.prenom case final value?) 'prenom': value,
-      if (instance.phone case final value?) 'phone': value,
-      if (instance.banqueId case final value?) 'banqueId': value,
-      if (instance.syndicatId case final value?) 'syndicatId': value,
-      if (instance.representantId case final value?) 'representantId': value,
-      if (_$ProspectStatutEnumMap[instance.statut] case final value?)
-        'statut': value,
-      if (instance.clientCreatedAt?.toIso8601String() case final value?)
-        'clientCreatedAt': value,
-    };
+Map<String, dynamic> _$UpdateProspectDtoToJson(
+  UpdateProspectDto instance,
+) => <String, dynamic>{
+  if (instance.id case final value?) 'id': value,
+  if (instance.nom case final value?) 'nom': value,
+  if (instance.prenom case final value?) 'prenom': value,
+  if (instance.phone case final value?) 'phone': value,
+  if (instance.banqueId case final value?) 'banqueId': value,
+  if (instance.syndicatId case final value?) 'syndicatId': value,
+  if (instance.representantId case final value?) 'representantId': value,
+  if (_$ProjetEnumMap[instance.projet] case final value?) 'projet': value,
+  if (_$ProspectTypeEnumMap[instance.type] case final value?) 'type': value,
+  if (instance.profession case final value?) 'profession': value,
+  if (instance.dureeSystemeMois case final value?) 'dureeSystemeMois': value,
+  if (instance.canalProvenanceId case final value?) 'canalProvenanceId': value,
+  if (_$ProspectStatutEnumMap[instance.statut] case final value?)
+    'statut': value,
+  if (instance.clientCreatedAt?.toIso8601String() case final value?)
+    'clientCreatedAt': value,
+};
+
+const _$ProjetEnumMap = {
+  Projet.CHUES: 'CHUES',
+  Projet.GRAND_PUBLIC: 'GRAND_PUBLIC',
+  Projet.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$ProspectTypeEnumMap = {
+  ProspectType.FONCTIONNAIRE: 'FONCTIONNAIRE',
+  ProspectType.SECTEUR_PRIVE: 'SECTEUR_PRIVE',
+  ProspectType.INFORMEL: 'INFORMEL',
+  ProspectType.DIASPORA: 'DIASPORA',
+  ProspectType.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
 
 const _$ProspectStatutEnumMap = {
   ProspectStatut.NOUVEAU: 'NOUVEAU',

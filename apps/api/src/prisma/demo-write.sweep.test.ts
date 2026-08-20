@@ -59,10 +59,11 @@ const SITES: Record<string, Site> = {
     verdict: 'BLOQUE',
     note: 'POST /v1/visites, refusé en 409 pendant une démonstration ; le registre d’accueil n’a aucun autre chemin d’écriture',
   },
-  'modules/prospects/prospects.service.ts → (await this.demo.enabledForWrite()) || representant.isDemo':
+  'modules/prospects/prospects.service.ts → (await this.demo.enabledForWrite()) || (representant?.isDemo ?? false)':
     {
       verdict: 'BLOQUE',
-      note: 'POST /v1/prospects, refusé en 409 ; le terme de gauche ne peut donc jamais valoir true, et celui de droite hérite du représentant',
+      note:
+        'POST /v1/prospects, refusé en 409 ; le terme de gauche ne peut donc jamais valoir true, et celui de droite hérite du représentant QUAND IL Y EN A UN : une fiche Grand Public n’en a aucun et naît réelle',
     },
 
   'modules/phase2/phase2-sync.service.ts → prospect.isDemo': {
@@ -101,6 +102,10 @@ const SITES: Record<string, Site> = {
   'modules/imports/prospects-import.adapter.ts → false': {
     verdict: 'REEL',
     note: 'idem pour les prospects ; un import de démonstration passe par l’ensemenceur, jamais par ce chemin',
+  },
+  'modules/imports/prospects-grand-public.adapter.ts → false': {
+    verdict: 'REEL',
+    note: 'idem pour les prospects Grand Public ; le classeur vient d’une campagne réelle',
   },
   'modules/imports/visites.adapter.ts → false': {
     verdict: 'REEL',

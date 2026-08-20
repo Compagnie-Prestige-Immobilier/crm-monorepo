@@ -199,7 +199,7 @@ function SuggestionCard({
             <Badge variant="info">{sameNumberCount} fois dans cette liste</Badge>
           ) : null}
           {known === null ? null : (
-            <Badge variant="success" render={<Link href={`/representants/${known}`} />}>
+            <Badge variant="success" render={<Link href={`/chues/representants/${known}`} />}>
               <LinkIcon aria-hidden="true" />
               Déjà une fiche
             </Badge>
@@ -261,7 +261,7 @@ function SuggestionCard({
             </Button>
           ) : (
             <Link
-              href={`/representants/${known}`}
+              href={`/chues/representants/${known}`}
               className="self-center text-[0.8125rem] underline underline-offset-4"
             >
               Ouvrir la fiche existante

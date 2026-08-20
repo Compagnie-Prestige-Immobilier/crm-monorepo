@@ -97,7 +97,7 @@ export function RepresentantsImportView() {
       {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI poserait
           `role="button"` sur le `<a>` et lui retirerait sa sémantique de lien. */}
       <Link
-        href="/representants"
+        href="/chues/representants"
         className={cn(buttonVariants({ variant: 'ghost' }), 'w-fit -ml-2')}
       >
         <ArrowLeftIcon aria-hidden="true" />

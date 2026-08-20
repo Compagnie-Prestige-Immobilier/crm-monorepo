@@ -24,11 +24,13 @@ setup('authentifier l’administrateur', async ({ page }) => {
   await page.getByLabel('Mot de passe').fill(PASSWORD);
   await page.getByRole('button', { name: 'Se connecter' }).click();
 
-  await page.waitForURL('**/tableau-de-bord');
+  // Le hub des quatre espaces, seul atterrissage d'après connexion depuis le
+  // découpage en coques : aucun rôle ne tombe plus directement sur un écran.
+  await page.waitForURL('**/espaces');
   // On attend un élément RENDU PAR LE SERVEUR avec la session : si le layout
   // avait renvoyé vers /connexion, l'état sauvegardé serait inutilisable et
   // tous les tests suivants échoueraient sans raison lisible.
-  await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choisissez un espace', level: 1 })).toBeVisible();
 
   await page.context().storageState({ path: STORAGE_STATE });
 

@@ -120,6 +120,40 @@ export class ExportController {
     }
   }
 
+  /** ADMIN seul, comme `POST /v1/imports/prospects-grand-public` qu'il sert. */
+  @Get('prospects-grand-public-modele.xlsx')
+  @Roles(Role.ADMIN)
+  @ApiProduces(XLSX_MIME)
+  @ApiOperation({
+    operationId: 'downloadProspectsGrandPublicTemplateXlsx',
+    summary: 'Modèle vide pour l’import de prospects Grand Public.',
+    description:
+      'Syndicat, banque de domiciliation, fonctionnaire et canal de provenance sont des listes déroulantes, tirées des référentiels VIVANTS. Seuls le nom et le téléphone sont exigés : toute autre colonne peut rester vide, ou même manquer du fichier, car les colonnes sont retrouvées par le texte de leur en-tête et non par leur rang.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Classeur Excel à trois feuilles : Prospects Grand Public, Instructions, Listes (masquée).',
+    // Binaire explicite : sinon le générateur Dart désérialise le classeur en JSON.
+    content: { [XLSX_MIME]: { schema: { type: 'string', format: 'binary' } } },
+  })
+  async prospectsGrandPublicTemplate(@Res() reply: FastifyReply): Promise<void> {
+    const filename = `modele-import-prospects-grand-public-${formatDakarDate(new Date())}.xlsx`;
+
+    reply.hijack();
+    reply.raw.setHeader('Content-Type', XLSX_MIME);
+    reply.raw.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    reply.raw.setHeader('Cache-Control', 'no-store');
+
+    try {
+      await this.exports.writeProspectsGrandPublicImportTemplate(reply.raw);
+    } catch (error) {
+      // Les en-têtes sont partis : couper vaut mieux qu'un classeur tronqué.
+      reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
   // ADMIN seul comme `POST /v1/representants/import` qu'il sert : un modèle que son
   // destinataire ne pourra pas déposer n'a pas à lui être proposé.
   @Get('representants-modele.xlsx')

@@ -130,16 +130,20 @@ Future<void> insertProspect(
   required String id,
   required String representantId,
   required String phone,
+  String nom = 'Nom',
+  String prenom = 'Prénom',
   String createdById = 'me',
   DateTime? serverUpdatedAt,
+  DateTime? deletedAt,
 }) {
   return db
       .into(db.prospects)
       .insert(
         ProspectsCompanion.insert(
           id: id,
-          nom: 'Nom',
-          prenom: 'Prénom',
+          nom: nom,
+          prenom: prenom,
+          deletedAt: Value<DateTime?>(deletedAt),
           phoneE164: phone,
           banqueId: const Value<String?>('bq-1'),
           syndicatId: const Value<String?>('sy-1'),
@@ -148,6 +152,53 @@ Future<void> insertProspect(
           clientCreatedAt: t0,
           localUpdatedAt: t0,
           serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
+        ),
+      );
+}
+
+Future<void> insertCampagne(
+  AppDatabase db, {
+  required String id,
+  String name = 'Campagne',
+  String status = 'ACTIVE',
+  int spreadDays = 1,
+  DateTime? closedAt,
+  DateTime? updatedAt,
+}) {
+  return db
+      .into(db.callCampaigns)
+      .insert(
+        CallCampaignsCompanion.insert(
+          id: id,
+          name: name,
+          status: Value<String>(status),
+          spreadDays: Value<int>(spreadDays),
+          closedAt: Value<DateTime?>(closedAt),
+          updatedAt: updatedAt ?? t0,
+        ),
+      );
+}
+
+Future<void> insertTache(
+  AppDatabase db, {
+  required String id,
+  required String campaignId,
+  required String prospectId,
+  required int position,
+  int dayIndex = 0,
+  String status = 'OPEN',
+}) {
+  return db
+      .into(db.callTasks)
+      .insert(
+        CallTasksCompanion.insert(
+          id: id,
+          campaignId: campaignId,
+          prospectId: prospectId,
+          position: position,
+          dayIndex: Value<int>(dayIndex),
+          status: Value<String>(status),
+          updatedAt: t0,
         ),
       );
 }

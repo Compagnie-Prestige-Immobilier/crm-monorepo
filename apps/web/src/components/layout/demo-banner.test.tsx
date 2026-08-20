@@ -36,7 +36,7 @@ describe('DemoBanner', () => {
 
   it('n’offre le raccourci « Gérer » qu’à un ADMIN', () => {
     const { unmount } = render(<DemoBanner seededAt={null} role="ADMIN" />);
-    expect(screen.getByRole('link', { name: 'Gérer' }).getAttribute('href')).toBe('/parametres');
+    expect(screen.getByRole('link', { name: 'Gérer' }).getAttribute('href')).toBe('/admin/parametres');
     unmount();
 
     render(<DemoBanner seededAt={null} role="BANQUE_FINANCE" />);

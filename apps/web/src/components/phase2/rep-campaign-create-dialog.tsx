@@ -103,7 +103,7 @@ export function RepCampaignCreateDialog({
       );
       reset();
       onOpenChange(false);
-      router.push(`/campagnes/representants/${campaign.id}`);
+      router.push(`/chues/campagnes/representants/${campaign.id}`);
     },
     onError: (error) => {
       toastApiError(error, 'La campagne n’a pas pu être créée.');

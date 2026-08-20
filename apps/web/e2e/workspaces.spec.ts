@@ -498,7 +498,9 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
     await bankPage.getByLabel('E-mail ou identifiant').fill(BANK_IDENTIFIER);
     await bankPage.getByLabel('Mot de passe').fill(BANK_PASSWORD);
     await bankPage.getByRole('button', { name: 'Se connecter' }).click();
-    await bankPage.waitForURL(/\/dossiers/, { timeout: 30_000 });
+    // Le hub, atterrissage de tous les rôles : la session est posée dès qu'il
+    // est rendu, et l'écran d'ouverture se demande ensuite par son adresse.
+    await bankPage.waitForURL('**/espaces', { timeout: 30_000 });
 
     await bankPage.goto('/dossiers/nouveau');
     await bankPage.getByLabel('Rechercher un client').fill(`${prenom} ${nom}`);

@@ -370,11 +370,11 @@ function ProspectConsole() {
       // nulle part plutot que vers une adresse construite sur du vide.
       n: () => {
         const rep = current?.representantId;
-        if (rep) router.push(`/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
+        if (rep) router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
       },
       r: () => {
         const rep = current?.representantId;
-        if (rep) router.push(`/representants/${encodeURIComponent(rep)}`);
+        if (rep) router.push(`/chues/representants/${encodeURIComponent(rep)}`);
       },
       'mod+k': () => {
         setPalette(true);

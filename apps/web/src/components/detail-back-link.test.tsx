@@ -41,7 +41,7 @@ describe('sortie de secours des écrans de détail', () => {
     renderWithQuery(<CampaignDetailView campaignId="inconnue" canManage={false} />);
 
     const back = await screen.findByRole('link', { name: /Toutes les campagnes/ });
-    expect(back.getAttribute('href')).toBe('/campagnes');
+    expect(back.getAttribute('href')).toBe('/chues/campagnes');
     expect(await screen.findByRole('alert')).toBeTruthy();
   });
 
@@ -49,7 +49,7 @@ describe('sortie de secours des écrans de détail', () => {
     renderWithQuery(<RepCampaignDetailView campaignId="inconnue" canManage={false} />);
 
     const back = await screen.findByRole('link', { name: /Toutes les campagnes/ });
-    expect(back.getAttribute('href')).toBe('/campagnes/representants');
+    expect(back.getAttribute('href')).toBe('/chues/campagnes/representants');
     expect(await screen.findByRole('alert')).toBeTruthy();
   });
 
@@ -57,7 +57,7 @@ describe('sortie de secours des écrans de détail', () => {
     renderWithQuery(<BankCaseDetailView caseId="inconnu" role="BANQUE_FINANCE" />);
 
     const back = await screen.findByRole('link', { name: /Tous les dossiers/ });
-    expect(back.getAttribute('href')).toBe('/dossiers');
+    expect(back.getAttribute('href')).toBe('/chues/dossiers');
     expect(await screen.findByRole('alert')).toBeTruthy();
   });
 });

@@ -267,4 +267,91 @@ describe('projection des onglets d’un classeur tenu à la main', () => {
 
     await expect(project([sansEntete])).rejects.toThrow(/ligne 3/);
   });
+
+  it('refuse un classeur dont AUCUN onglet ne porte de données, plutôt que d’annoncer zéro ligne', async () => {
+    const listes = fakeSheet('Listes', [[1, ['Banques']]]);
+    const instructions = fakeSheet('Instructions', [[1, ['Colonne']]]);
+
+    await expect(project([listes, instructions])).rejects.toThrow(UnreadableWorkbookError);
+    await expect(project([listes, instructions])).rejects.toThrow(/Instructions/);
+  });
+});
+
+/** Le modèle Grand Public : en-tête en ligne 1, exemple en ligne 2, données en 3. */
+const MODELE_LAYOUT: SheetLayout = { sheetPattern: /prospect/i, headerRow: 1 };
+
+const MODELE_COLUMNS: readonly ImportColumn[] = [
+  { ...column('Nom'), required: true },
+  { ...column('Téléphone'), required: true, aliases: ['Numéro'] },
+  { ...column('Canal de provenance'), required: false, aliases: ['Canal', 'Source'] },
+];
+
+async function projectModele(sheets: readonly SheetLike[]): Promise<SheetRow[]> {
+  const stream: AsyncIterable<SheetLike> = {
+    [Symbol.asyncIterator]: () => {
+      let cursor = 0;
+      return {
+        next: () => {
+          const sheet = sheets[cursor];
+          cursor += 1;
+          return Promise.resolve(
+            sheet === undefined ? { done: true, value: undefined } : { done: false, value: sheet },
+          );
+        },
+      };
+    },
+  };
+
+  const collected: SheetRow[] = [];
+  for await (const row of projectSheets(stream, MODELE_COLUMNS, MODELE_LAYOUT)) collected.push(row);
+  return collected;
+}
+
+describe('projection d’un modèle engendré, en-tête en ligne 1', () => {
+  it('saute la ligne d’exemple et commence en ligne 3', async () => {
+    const feuille = fakeSheet('Prospects Grand Public', [
+      [1, ['Nom', 'Téléphone', 'Canal de provenance']],
+      [2, ['Ndiaye', '77 123 45 67', 'TikTok']],
+      [3, ['Fall', '78 111 22 33', 'Bouche à oreille']],
+    ]);
+
+    const rows = await projectModele([feuille]);
+
+    expect(rows.map((row) => row.rowNumber)).toEqual([3]);
+    expect(rows[0]?.cells.Nom).toBe('Fall');
+  });
+
+  it('retrouve une colonne sous un synonyme, et malgré un ordre bousculé', async () => {
+    const feuille = fakeSheet('Prospects', [
+      [1, ['Source', 'Commentaire libre', 'Numéro', 'Nom']],
+      [3, ['TikTok', 'sans objet', '78 111 22 33', 'Fall']],
+    ]);
+
+    const rows = await projectModele([feuille]);
+
+    expect(rows[0]?.cells.Nom).toBe('Fall');
+    expect(rows[0]?.cells['Téléphone']).toBe('78 111 22 33');
+    expect(rows[0]?.cells['Canal de provenance']).toBe('TikTok');
+  });
+
+  it('lit vide une colonne FACULTATIVE absente du fichier, sans refuser le classeur', async () => {
+    const feuille = fakeSheet('Prospects', [
+      [1, ['Nom', 'Téléphone']],
+      [3, ['Fall', '78 111 22 33']],
+    ]);
+
+    const rows = await projectModele([feuille]);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.cells['Canal de provenance']).toBe('');
+  });
+
+  it('mais refuse le classeur quand c’est une colonne OBLIGATOIRE qui manque', async () => {
+    const feuille = fakeSheet('Prospects', [
+      [1, ['Nom', 'Canal de provenance']],
+      [3, ['Fall', 'TikTok']],
+    ]);
+
+    await expect(projectModele([feuille])).rejects.toThrow(/Téléphone/);
+  });
 });

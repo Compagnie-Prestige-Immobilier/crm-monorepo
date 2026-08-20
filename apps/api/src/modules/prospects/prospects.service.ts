@@ -158,19 +158,31 @@ export class ProspectsService {
     const id = input.id ?? uuidv7();
 
     await this.assertIdAvailable(user, id);
-    const representant = await this.assertRepresentantUsable(user, input.representantId);
+    // Le rattachement est facultatif : une fiche Grand Public n'en a aucun.
+    const representant = input.representantId
+      ? await this.assertRepresentantUsable(user, input.representantId)
+      : null;
     await this.assertPhoneFree(phoneE164);
 
     const created = await this.prisma.prospect.create({
       data: {
         id,
         nom: input.nom.trim(),
-        prenom: input.prenom.trim(),
+        prenom: input.prenom?.trim() ?? '',
         phoneE164,
-        banqueId: input.banqueId,
-        syndicatId: input.syndicatId,
-        representantId: input.representantId,
+        banqueId: input.banqueId ?? null,
+        syndicatId: input.syndicatId ?? null,
+        representantId: input.representantId ?? null,
         createdById: user.id,
+        ...(input.projet ? { projet: input.projet } : {}),
+        ...(input.type ? { type: input.type } : {}),
+        ...(input.profession === undefined ? {} : { profession: input.profession.trim() }),
+        ...(input.dureeSystemeMois === undefined
+          ? {}
+          : { dureeSystemeMois: input.dureeSystemeMois }),
+        ...(input.canalProvenanceId === undefined
+          ? {}
+          : { canalProvenanceId: input.canalProvenanceId }),
         // DEUX SOURCES, ET IL FAUT LES DEUX.
         //
         // Le mode allumé d'abord : une fiche saisie pendant une démonstration
@@ -181,7 +193,7 @@ export class ProspectsService {
         // représentant. Un prospect visible accroché à une fiche de
         // rattachement filtrée montrerait un représentant que l'annuaire ne
         // connaît pas, et la paire se désolidariserait à l'extinction.
-        isDemo: (await this.demo.enabledForWrite()) || representant.isDemo,
+        isDemo: (await this.demo.enabledForWrite()) || (representant?.isDemo ?? false),
         ...(input.statut ? { statut: input.statut } : {}),
         clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
       },
@@ -216,6 +228,15 @@ export class ProspectsService {
         ...(input.banqueId ? { banqueId: input.banqueId } : {}),
         ...(input.syndicatId ? { syndicatId: input.syndicatId } : {}),
         ...(input.representantId ? { representantId: input.representantId } : {}),
+        ...(input.projet ? { projet: input.projet } : {}),
+        ...(input.type ? { type: input.type } : {}),
+        ...(input.profession === undefined ? {} : { profession: input.profession.trim() }),
+        ...(input.dureeSystemeMois === undefined
+          ? {}
+          : { dureeSystemeMois: input.dureeSystemeMois }),
+        ...(input.canalProvenanceId === undefined
+          ? {}
+          : { canalProvenanceId: input.canalProvenanceId }),
         ...(input.statut ? { statut: input.statut } : {}),
         ...(input.clientCreatedAt ? { clientCreatedAt: new Date(input.clientCreatedAt) } : {}),
         rev: { increment: 1 },

@@ -57,7 +57,7 @@ export function RepresentantDetailView({
   if (fiche.isPending) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/representants">Tous les représentants</DetailBackLink>
+        <DetailBackLink href="/chues/representants">Tous les représentants</DetailBackLink>
         <Skeleton className="h-48 w-full" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -67,7 +67,7 @@ export function RepresentantDetailView({
   if (fiche.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/representants">Tous les représentants</DetailBackLink>
+        <DetailBackLink href="/chues/representants">Tous les représentants</DetailBackLink>
         <QueryErrorState
           error={fiche.error}
           onRetry={() => {
@@ -84,7 +84,7 @@ export function RepresentantDetailView({
 
   return (
     <div className="flex flex-col gap-6">
-      <DetailBackLink href="/representants">Tous les représentants</DetailBackLink>
+      <DetailBackLink href="/chues/representants">Tous les représentants</DetailBackLink>
 
       <Card className="animate-rise">
         <CardHeader>

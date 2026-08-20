@@ -313,7 +313,7 @@ describe('RepScript : le clavier suffit', () => {
 
     await userEvent.keyboard('r');
 
-    expect(routerMock.push).toHaveBeenCalledWith('/representants/r-1');
+    expect(routerMock.push).toHaveBeenCalledWith('/chues/representants/r-1');
   });
 
   it('affiche la carte clavier sur ?', async () => {

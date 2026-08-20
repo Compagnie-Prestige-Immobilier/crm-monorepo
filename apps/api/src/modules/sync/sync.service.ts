@@ -842,7 +842,9 @@ export class SyncService {
 
     if (!existing || existing.deletedAt) {
       requireText(data.nom, 'nom');
-      requireText(data.prenom, 'prenom');
+      // Le prenom est facultatif, comme tout le reste sauf le nom et le
+      // telephone : une chaine vide s'enregistre, un refus ferait abandonner
+      // la fiche entiere.
       // Banque, syndicat et representant sont FACULTATIFS. Un teleconseiller au
       // telephone ne les obtient pas toujours, et une fiche Grand Public n'en a
       // aucun : les exiger faisait abandonner la saisie entiere.
@@ -856,7 +858,7 @@ export class SyncService {
         create: {
           id: operation.entityId,
           nom: data.nom.trim(),
-          prenom: data.prenom.trim(),
+          prenom: data.prenom?.trim() ?? '',
           phoneE164,
           banqueId: data.banqueId ?? null,
           syndicatId: data.syndicatId ?? null,
@@ -890,7 +892,7 @@ export class SyncService {
         },
         update: {
           nom: data.nom.trim(),
-          prenom: data.prenom.trim(),
+          prenom: data.prenom?.trim() ?? '',
           phoneE164,
           banqueId: data.banqueId ?? null,
           syndicatId: data.syndicatId ?? null,
