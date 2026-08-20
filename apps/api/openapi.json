@@ -17899,6 +17899,92 @@
         },
         "required": ["batchId", "serverTime", "results", "nextCursor"]
       },
+      "CampaignStatus": {
+        "type": "string",
+        "enum": ["ACTIVE", "CLOSED"]
+      },
+      "SyncCallCampaignDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CampaignStatus"
+              }
+            ]
+          },
+          "spreadDays": {
+            "type": "number",
+            "description": "Journees d’etalement de la file."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["id", "name", "status", "spreadDays", "updatedAt"]
+      },
+      "CallTaskStatus": {
+        "type": "string",
+        "enum": ["OPEN", "DONE", "CANCELLED"]
+      },
+      "SyncCallTaskDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "campaignId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prospectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "position": {
+            "type": "number",
+            "description": "Rang dans le programme, a partir de 1."
+          },
+          "dayIndex": {
+            "type": "number",
+            "description": "Journee d’etalement, a partir de 0."
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CallTaskStatus"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "campaignId",
+          "prospectId",
+          "position",
+          "dayIndex",
+          "status",
+          "updatedAt"
+        ]
+      },
       "SyncChangesDto": {
         "type": "object",
         "properties": {
@@ -17937,9 +18023,30 @@
             "items": {
               "$ref": "#/components/schemas/ProspectDto"
             }
+          },
+          "callCampaigns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncCallCampaignDto"
+            }
+          },
+          "callTasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncCallTaskDto"
+            }
           }
         },
-        "required": ["departements", "iefs", "banques", "syndicats", "representants", "prospects"]
+        "required": [
+          "departements",
+          "iefs",
+          "banques",
+          "syndicats",
+          "representants",
+          "prospects",
+          "callCampaigns",
+          "callTasks"
+        ]
       },
       "SyncDeletionDto": {
         "type": "object",
@@ -18070,10 +18177,6 @@
           }
         },
         "required": ["entries", "nextCursor", "hasMore", "serverTime"]
-      },
-      "CampaignStatus": {
-        "type": "string",
-        "enum": ["ACTIVE", "CLOSED"]
       },
       "CampaignScope": {
         "type": "string",

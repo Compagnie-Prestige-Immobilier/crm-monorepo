@@ -855,6 +855,8 @@ PullPage pullPageWithRepresentant(RepresentantDto dto) {
       syndicats: const <SyndicatDto>[],
       representants: <RepresentantDto>[dto],
       prospects: const <ProspectDto>[],
+      callCampaigns: const <SyncCallCampaignDto>[],
+      callTasks: const <SyncCallTaskDto>[],
     ),
     deletions: const <SyncDeletionDto>[],
     nextCursor: 'c1',

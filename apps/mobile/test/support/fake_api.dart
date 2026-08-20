@@ -311,6 +311,8 @@ PullPage emptyPullPage({String? cursor}) => PullPage(
     syndicats: const <SyndicatDto>[],
     representants: const <RepresentantDto>[],
     prospects: const <ProspectDto>[],
+    callCampaigns: const <SyncCallCampaignDto>[],
+    callTasks: const <SyncCallTaskDto>[],
   ),
   deletions: const <SyncDeletionDto>[],
   nextCursor: cursor ?? '',

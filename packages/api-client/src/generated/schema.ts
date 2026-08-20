@@ -3368,6 +3368,37 @@ export interface components {
       /** @description Toujours null : le serveur ignore la position de pull du client, et en fabriquer une lui ferait sauter les écritures des autres appareils. Le client conserve son propre curseur. */
       nextCursor: string | null;
     };
+    /** @enum {string} */
+    CampaignStatus: 'ACTIVE' | 'CLOSED';
+    SyncCallCampaignDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      status: components['schemas']['CampaignStatus'];
+      /** @description Journees d’etalement de la file. */
+      spreadDays: number;
+      /** Format: date-time */
+      updatedAt: string;
+      /** Format: date-time */
+      closedAt?: string | null;
+    };
+    /** @enum {string} */
+    CallTaskStatus: 'OPEN' | 'DONE' | 'CANCELLED';
+    SyncCallTaskDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      campaignId: string;
+      /** Format: uuid */
+      prospectId: string;
+      /** @description Rang dans le programme, a partir de 1. */
+      position: number;
+      /** @description Journee d’etalement, a partir de 0. */
+      dayIndex: number;
+      status: components['schemas']['CallTaskStatus'];
+      /** Format: date-time */
+      updatedAt: string;
+    };
     SyncChangesDto: {
       departements: components['schemas']['DepartementDto'][];
       iefs: components['schemas']['IefDto'][];
@@ -3375,6 +3406,8 @@ export interface components {
       syndicats: components['schemas']['SyndicatDto'][];
       representants: components['schemas']['RepresentantDto'][];
       prospects: components['schemas']['ProspectDto'][];
+      callCampaigns: components['schemas']['SyncCallCampaignDto'][];
+      callTasks: components['schemas']['SyncCallTaskDto'][];
     };
     SyncDeletionDto: {
       entity: components['schemas']['SyncEntity'];
@@ -3420,8 +3453,6 @@ export interface components {
       /** Format: date-time */
       serverTime: string;
     };
-    /** @enum {string} */
-    CampaignStatus: 'ACTIVE' | 'CLOSED';
     /** @enum {string} */
     CampaignScope: 'BDD1' | 'BDD2' | 'BDD3' | 'BDD4' | 'ALL';
     CampaignProgressDto: {

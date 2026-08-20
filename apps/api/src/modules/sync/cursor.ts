@@ -14,6 +14,8 @@ export const SYNC_STREAMS = [
   'syndicats',
   'representants',
   'prospects',
+  'callCampaigns',
+  'callTasks',
 ] as const;
 
 export type SyncStream = (typeof SYNC_STREAMS)[number];

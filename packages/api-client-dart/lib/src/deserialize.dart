@@ -167,6 +167,8 @@ import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
 import 'package:crm_api_client/src/model/supervision_dto.dart';
 import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
+import 'package:crm_api_client/src/model/sync_call_campaign_dto.dart';
+import 'package:crm_api_client/src/model/sync_call_task_dto.dart';
 import 'package:crm_api_client/src/model/sync_changes_dto.dart';
 import 'package:crm_api_client/src/model/sync_deletion_dto.dart';
 import 'package:crm_api_client/src/model/sync_entity_data_dto.dart';
@@ -330,6 +332,7 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CallRecordingDto':
       return CallRecordingDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'CallTaskStatus':
     case 'CallbackDto':
       return CallbackDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'CallbackListDto':
@@ -770,6 +773,12 @@ ReturnType deserialize<ReturnType, BaseType>(
       return SupervisionTeleconseillerDto.fromJson(
             value as Map<String, dynamic>,
           )
+          as ReturnType;
+    case 'SyncCallCampaignDto':
+      return SyncCallCampaignDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SyncCallTaskDto':
+      return SyncCallTaskDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SyncChangesDto':
       return SyncChangesDto.fromJson(value as Map<String, dynamic>)
