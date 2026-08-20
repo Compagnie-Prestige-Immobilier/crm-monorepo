@@ -13,6 +13,8 @@ const PANEL_LABELS: Record<Role, string> = {
   BANQUE_FINANCE: 'Espace Banque & Finance',
   COMMERCIAL: 'Espace téléconseiller',
   SUPERVISEUR: 'Espace supervision',
+  DIRECTION: 'Espace direction',
+  ACCUEIL: 'Espace accueil',
 };
 
 export function SidebarNav({

@@ -91,6 +91,8 @@ const ROLES = [
   'COMMERCIAL',
   'BANQUE_FINANCE',
   'SUPERVISEUR',
+  'DIRECTION',
+  'ACCUEIL',
 ] as const satisfies readonly Role[];
 
 export function knownRole(value: string): Role {

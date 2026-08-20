@@ -3,7 +3,14 @@ import { type Role } from '@/lib/types';
 
 export const USER_PAGE_SIZE = 25;
 
-export const ROLES: readonly Role[] = ['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE', 'SUPERVISEUR'];
+export const ROLES: readonly Role[] = [
+  'ADMIN',
+  'COMMERCIAL',
+  'BANQUE_FINANCE',
+  'SUPERVISEUR',
+  'DIRECTION',
+  'ACCUEIL',
+];
 
 export interface UserFilters {
   search: string;
