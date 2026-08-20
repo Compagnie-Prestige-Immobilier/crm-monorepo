@@ -16,7 +16,9 @@ import 'package:crm_api_client/src/model/bdd_segment.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
 import 'package:crm_api_client/src/model/export_mode.dart';
 import 'package:crm_api_client/src/model/phase2_status.dart';
+import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
+import 'package:crm_api_client/src/model/prospect_type.dart';
 
 class ExportApi {
   final Dio _dio;
@@ -277,6 +279,9 @@ class ExportApi {
   /// * [syndicatId]
   /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
+  /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
+  /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
+  /// * [canalProvenanceId] - Grand Public : canal de provenance.
   /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
@@ -305,6 +310,9 @@ class ExportApi {
     String? syndicatId,
     String? departementId,
     String? commercialId,
+    Projet? projet,
+    ProspectType? type,
+    String? canalProvenanceId,
     ProspectStatut? statut,
     BddSegment? segment,
     Phase2Status? phase2Status,
@@ -345,6 +353,9 @@ class ExportApi {
       if (syndicatId != null) r'syndicatId': syndicatId,
       if (departementId != null) r'departementId': departementId,
       if (commercialId != null) r'commercialId': commercialId,
+      if (projet != null) r'projet': projet,
+      if (type != null) r'type': type,
+      if (canalProvenanceId != null) r'canalProvenanceId': canalProvenanceId,
       if (statut != null) r'statut': statut,
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,

@@ -4,7 +4,10 @@ import type { Banque, Departement, Ief, Prisma, Region, Syndicat } from '@crm/da
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type {
   BanqueDto,
+  CanalProvenanceDto,
   CreateBanqueDto,
+  CreateCanalProvenanceDto,
+  UpdateCanalProvenanceDto,
   CreateDepartementDto,
   CreateSyndicatDto,
   DepartementDto,
@@ -27,6 +30,22 @@ const toBanque = (row: Banque): BanqueDto => ({
   shortName: row.shortName,
   isActive: row.isActive,
   sortOrder: row.sortOrder,
+  updatedAt: row.updatedAt.toISOString(),
+});
+
+const toCanal = (row: {
+  id: string;
+  code: string;
+  label: string;
+  position: number;
+  isActive: boolean;
+  updatedAt: Date;
+}): CanalProvenanceDto => ({
+  id: row.id,
+  code: row.code,
+  label: row.label,
+  position: row.position,
+  isActive: row.isActive,
   updatedAt: row.updatedAt.toISOString(),
 });
 
@@ -153,6 +172,26 @@ export class ReferentielsService {
   async updateBanque(id: string, input: UpdateBanqueDto): Promise<BanqueDto> {
     await this.assertExists('banque', id);
     return toBanque(await this.prisma.banque.update({ where: { id }, data: input }));
+  }
+
+  async listCanauxProvenance(query: ReferentielQueryDto): Promise<CanalProvenanceDto[]> {
+    const rows = await this.prisma.canalProvenance.findMany({
+      where: activeFilter(query),
+      orderBy: [{ position: 'asc' }, { label: 'asc' }],
+    });
+    return rows.map(toCanal);
+  }
+
+  async createCanalProvenance(input: CreateCanalProvenanceDto): Promise<CanalProvenanceDto> {
+    return toCanal(await this.prisma.canalProvenance.create({ data: input }));
+  }
+
+  async updateCanalProvenance(
+    id: string,
+    input: UpdateCanalProvenanceDto,
+  ): Promise<CanalProvenanceDto> {
+    // Le `code` n'est pas modifiable : les fiches deja saisies le designent.
+    return toCanal(await this.prisma.canalProvenance.update({ where: { id }, data: input }));
   }
 
   async createSyndicat(input: CreateSyndicatDto): Promise<SyndicatDto> {

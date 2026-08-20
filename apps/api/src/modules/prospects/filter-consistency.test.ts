@@ -36,6 +36,9 @@ const CHAMPS: Readonly<Record<keyof ProspectFilterDto, ProspectFilterDto>> = {
   syndicatId: { syndicatId: 's-1' },
   departementId: { departementId: 'd-1' },
   commercialId: { commercialId: 'com-bob' },
+  projet: { projet: 'GRAND_PUBLIC' },
+  type: { type: 'INFORMEL' },
+  canalProvenanceId: { canalProvenanceId: 'canal-1' },
   statut: { statut: 'CONVERTI' },
   origin: { origin: 'BANQUE' },
   segment: { segment: 'BDD2' },
@@ -66,6 +69,7 @@ describe('un filtre, la même population sur les trois surfaces', () => {
       'assignedToId',
       'banqueId',
       'campaignId',
+      'canalProvenanceId',
       'commercialId',
       'dateFrom',
       'dateTo',
@@ -75,11 +79,13 @@ describe('un filtre, la même population sur les trois surfaces', () => {
       'includeDeleted',
       'origin',
       'phase2Status',
+      'projet',
       'representantId',
       'search',
       'segment',
       'statut',
       'syndicatId',
+      'type',
     ];
     expect(declares).toEqual(attendus);
   });

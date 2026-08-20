@@ -199,6 +199,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/referentiels/canaux-provenance': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Canaux de provenance du Grand Public. */
+    get: operations['listCanauxProvenance'];
+    put?: never;
+    /** Ajoute un canal. Le code est immuable : les fiches le désignent. */
+    post: operations['createCanalProvenance'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/referentiels/canaux-provenance/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Renomme un canal, ou le retire des listes via isActive. */
+    patch: operations['updateCanalProvenance'];
+    trace?: never;
+  };
   '/api/v1/referentiels/departements': {
     parameters: {
       query?: never;
@@ -2664,6 +2699,29 @@ export interface components {
       departements: components['schemas']['DepartementDto'][];
       regions: components['schemas']['RegionDto'][];
     };
+    CanalProvenanceDto: {
+      /** Format: uuid */
+      id: string;
+      /** @description Clé stable, jamais réécrite : les fiches la désignent. */
+      code: string;
+      label: string;
+      position: number;
+      isActive: boolean;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    CreateCanalProvenanceDto: {
+      /** @description Immuable une fois posé. */
+      code: string;
+      label: string;
+      position?: number;
+    };
+    UpdateCanalProvenanceDto: {
+      label?: string;
+      position?: number;
+      /** @description Le retirer des listes, jamais le supprimer. */
+      isActive?: boolean;
+    };
     IefDto: {
       /** Format: uuid */
       id: string;
@@ -3004,6 +3062,10 @@ export interface components {
       clientCreatedAt?: string;
     };
     /** @enum {string} */
+    Projet: 'CHUES' | 'GRAND_PUBLIC';
+    /** @enum {string} */
+    ProspectType: 'FONCTIONNAIRE' | 'SECTEUR_PRIVE' | 'INFORMEL' | 'DIASPORA';
+    /** @enum {string} */
     ProspectStatut: 'NOUVEAU' | 'CONTACTE' | 'CONVERTI' | 'PERDU';
     /** @enum {string} */
     BddSegment: 'BDD1' | 'BDD2' | 'BDD3' | 'BDD4';
@@ -3013,13 +3075,6 @@ export interface components {
     EnrollmentMethod: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING';
     /** @enum {string} */
     ProspectSortField: 'createdAt' | 'clientCreatedAt' | 'nom' | 'prenom' | 'statut';
-    /** @enum {string} */
-    Projet: 'CHUES' | 'GRAND_PUBLIC';
-    /**
-     * @description Hors CHUES : ce qu’est le prospect. Nul si la question n’a pas été posée.
-     * @enum {string}
-     */
-    ProspectType: 'FONCTIONNAIRE' | 'SECTEUR_PRIVE' | 'INFORMEL' | 'DIASPORA';
     /**
      * @description Résultat de la dernière tentative d’appel enregistrée.
      * @enum {string}
@@ -6016,6 +6071,157 @@ export interface operations {
       };
     };
   };
+  listCanauxProvenance: {
+    parameters: {
+      query?: {
+        /** @description Ne renvoyer que les entrées actives. */
+        activeOnly?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanalProvenanceDto'][];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createCanalProvenance: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCanalProvenanceDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanalProvenanceDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateCanalProvenance: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateCanalProvenanceDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanalProvenanceDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   listDepartements: {
     parameters: {
       query?: {
@@ -7350,6 +7556,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -10954,6 +11166,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11030,6 +11248,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11106,6 +11330,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11183,6 +11413,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11260,6 +11496,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11336,6 +11578,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11412,6 +11660,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11488,6 +11742,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11564,6 +11824,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11640,6 +11906,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11716,6 +11988,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11793,6 +12071,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11869,6 +12153,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11945,6 +12235,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12021,6 +12317,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12097,6 +12399,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12173,6 +12481,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12252,6 +12566,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12328,6 +12648,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12463,6 +12789,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12917,6 +13249,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
