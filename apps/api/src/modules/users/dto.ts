@@ -68,10 +68,6 @@ export class CreateUserDto {
 }
 
 export class UpdateUserDto extends PartialType(OmitType(CreateUserDto, ['password'] as const)) {
-  @ApiPropertyOptional({ type: Boolean })
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
 }
 
 export class ResetPasswordDto {
