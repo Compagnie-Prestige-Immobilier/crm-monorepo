@@ -25,6 +25,8 @@ type UserRow = Prisma.UserGetPayload<{
   include: { departement: { select: { name: true } }; _count: { select: { prospects: true } } };
 }>;
 
+type UserChanges = UpdateUserDto & Partial<SetActiveDto>;
+
 const INCLUDE = {
   departement: { select: { name: true } },
   _count: { select: { prospects: true } },
@@ -92,7 +94,7 @@ export class UsersService {
 
   async get(id: string): Promise<UserDto> {
     const user = await this.prisma.user.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
       include: INCLUDE,
     });
     if (!user)
@@ -126,8 +128,10 @@ export class UsersService {
     return toDto(user);
   }
 
-  async update(id: string, input: UpdateUserDto): Promise<UserDto> {
-    const existing = await this.prisma.user.findFirst({ where: { id, deletedAt: null } });
+  async update(id: string, input: UserChanges): Promise<UserDto> {
+    const existing = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+    });
     if (!existing) {
       throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'Compte introuvable.' });
     }
@@ -184,7 +188,9 @@ export class UsersService {
   }
 
   async resetPassword(id: string, input: ResetPasswordDto): Promise<{ ok: boolean }> {
-    const existing = await this.prisma.user.findFirst({ where: { id, deletedAt: null } });
+    const existing = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+    });
     if (!existing) {
       throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'Compte introuvable.' });
     }
@@ -205,7 +211,9 @@ export class UsersService {
         message: 'Un administrateur ne peut pas supprimer son propre compte.',
       });
     }
-    const existing = await this.prisma.user.findFirst({ where: { id, deletedAt: null } });
+    const existing = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+    });
     if (!existing) {
       throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'Compte introuvable.' });
     }

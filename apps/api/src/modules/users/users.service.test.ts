@@ -111,3 +111,27 @@ describe('sessions et changement de rôle', () => {
     expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
   });
 });
+
+describe('cloisonnement des comptes réels', () => {
+  beforeEach(() => {
+    db.user.findFirst.mockResolvedValue(createdRow(false));
+  });
+
+  it('filtre aussi les accès directs quand le mode démonstration est éteint', async () => {
+    const users = service(false);
+
+    await users.get('usr-1');
+    await users.update('usr-1', { fullName: 'Awa Ndiaye' });
+    await users.resetPassword('usr-1', { password: 'nouveau-mot-de-passe' });
+    await users.remove('usr-1', 'usr-admin');
+
+    expect(db.user.findFirst).toHaveBeenCalledTimes(4);
+    for (const [args] of db.user.findFirst.mock.calls) {
+      expect((args as { where: Record<string, unknown> }).where).toMatchObject({
+        id: 'usr-1',
+        deletedAt: null,
+        isDemo: false,
+      });
+    }
+  });
+});
