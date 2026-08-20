@@ -273,7 +273,11 @@ describe('ImportsView', () => {
     await waitFor(() => {
       expect(createImportJob).toHaveBeenCalledWith('VISITES', expect.any(File));
     });
-    expect(await screen.findByRole('button', { name: 'Créer 800 visites' })).toBeTruthy();
+    await user.click(await screen.findByRole('button', { name: 'Créer 800 visites' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.textContent).toContain('écrit les visites en base');
+    expect(dialog.textContent).not.toContain('index d’unicité');
+    expect(dialog.textContent).not.toContain('lignes sera');
   });
 
   it('présente un travail échu sans le traiter comme une panne', async () => {
