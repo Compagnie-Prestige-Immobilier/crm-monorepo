@@ -234,6 +234,7 @@ Map<String, dynamic> _$ImportJobReportDtoToJson(ImportJobReportDto instance) =>
 const _$ImportKindEnumMap = {
   ImportKind.REPRESENTANTS: 'REPRESENTANTS',
   ImportKind.PROSPECTS: 'PROSPECTS',
+  ImportKind.VISITES: 'VISITES',
   ImportKind.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

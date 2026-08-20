@@ -2247,6 +2247,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/imports/visites': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Dépose le classeur des visites de l’accueil et inscrit le travail. Rend immédiatement.
+     * @description NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Seuls les onglets « BDD VISITES » sont lus, en-tête en ligne 3, données à partir de la colonne C. La colonne « N° » n’est pas reprise : elle repart à 1 chaque mois. CET IMPORT NE CRÉE AUCUNE ENTRÉE DE RÉFÉRENTIEL : une entreprise, une direction, un destinataire ou un objet absent des quatre listes fait refuser la ligne, avec sa valeur exacte, son onglet et son numéro de ligne au rapport.
+     */
+    post: operations['createVisitesImport'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/imports/{id}': {
     parameters: {
       query?: never;
@@ -4931,7 +4951,7 @@ export interface components {
       downloadable: boolean;
     };
     /** @enum {string} */
-    ImportKind: 'REPRESENTANTS' | 'PROSPECTS';
+    ImportKind: 'REPRESENTANTS' | 'PROSPECTS' | 'VISITES';
     /** @enum {string} */
     ImportStatus: 'queued' | 'running' | 'succeeded' | 'failed' | 'expired';
     /**
@@ -13370,6 +13390,86 @@ export interface operations {
     };
   };
   createProspectsImport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** Format: binary */
+          file: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportJobDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille. */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Trop de requêtes : réessayez plus tard. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createVisitesImport: {
     parameters: {
       query?: never;
       header?: never;

@@ -10,6 +10,7 @@ import { readImportsEnv } from './imports.env.js';
 import { ImportsService } from './imports.service.js';
 import { ProspectsImportAdapter } from './prospects-import.adapter.js';
 import { RepresentantsImportAdapter } from './representants.adapter.js';
+import { VisitesImportAdapter } from './visites.adapter.js';
 import { ExcelStreamRowReader, IMPORT_ROW_READER } from './xlsx-rows.js';
 
 @Module({
@@ -21,13 +22,15 @@ import { ExcelStreamRowReader, IMPORT_ROW_READER } from './xlsx-rows.js';
     ImportsCron,
     RepresentantsImportAdapter,
     ProspectsImportAdapter,
+    VisitesImportAdapter,
     {
       provide: IMPORT_ADAPTERS,
       useFactory: (
         representants: RepresentantsImportAdapter,
         prospects: ProspectsImportAdapter,
-      ): readonly ImportAdapter<unknown>[] => [representants, prospects],
-      inject: [RepresentantsImportAdapter, ProspectsImportAdapter],
+        visites: VisitesImportAdapter,
+      ): readonly ImportAdapter<unknown>[] => [representants, prospects, visites],
+      inject: [RepresentantsImportAdapter, ProspectsImportAdapter, VisitesImportAdapter],
     },
     { provide: IMPORT_ROW_READER, useFactory: () => new ExcelStreamRowReader() },
     {

@@ -102,6 +102,10 @@ const SITES: Record<string, Site> = {
     verdict: 'REEL',
     note: 'idem pour les prospects ; un import de démonstration passe par l’ensemenceur, jamais par ce chemin',
   },
+  'modules/imports/visites.adapter.ts → false': {
+    verdict: 'REEL',
+    note: 'le classeur de l’accueil est un historique réel ; une visite fictive vient de l’ensemenceur, jamais d’ici',
+  },
   'modules/prospects/segment-change.service.ts → existing.isDemo': {
     verdict: 'HERITE',
     note:

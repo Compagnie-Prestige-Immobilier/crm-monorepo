@@ -118,8 +118,8 @@ export function CallRecordingPlayer({ attemptId }: { attemptId: string }) {
           setPlaying(false);
         }}
       />
-      <div className="relative h-14" aria-hidden="true">
-        <div className="absolute inset-0 flex items-center gap-px">
+      <div className="relative h-14">
+        <div className="absolute inset-0 flex items-center gap-px" aria-hidden="true">
           {peaks.map((peak, index) => (
             <span
               key={index}
