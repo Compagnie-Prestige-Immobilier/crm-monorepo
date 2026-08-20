@@ -7,7 +7,12 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import { isPrismaKnownError } from '../../common/filters/prisma-exception.filter.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { BANK_CASE_FROM, bankCaseConditions, bankCaseOrderBy } from './bank-cases.sql.js';
+import {
+  BANK_CASE_FROM,
+  bankCaseConditions,
+  bankCaseOrderBy,
+  bankProspectDemoCondition,
+} from './bank-cases.sql.js';
 import {
   BANK_CASE_INCLUDE,
   BANK_TRANSITION_INCLUDE,
@@ -45,6 +50,7 @@ import type {
   UpdateBankCaseDto,
 } from './dto.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { demoScope } from '../../prisma/demo-visibility.js';
 
 const DEFAULT_PAGE_SIZE = 25;
 const DEFAULT_SEARCH_PAGE_SIZE = 20;
@@ -116,7 +122,11 @@ export class BankCasesService {
     await this.assertReferenceFree(referenceKey);
 
     const prospect = await this.prisma.prospect.findFirst({
-      where: { id: input.prospectId, deletedAt: null },
+      where: {
+        id: input.prospectId,
+        deletedAt: null,
+        ...demoScope(await this.demo.enabled()),
+      },
       select: {
         id: true,
         nom: true,
@@ -340,6 +350,7 @@ export class BankCasesService {
     const pageSize = query.pageSize ?? DEFAULT_SEARCH_PAGE_SIZE;
     const term = query.search.trim();
     const like = `%${term.toLowerCase()}%`;
+    const demoEnabled = await this.demo.enabled();
 
     // Téléphone cherché sous sa forme NORMALISÉE : les quatre écritures d'un même
     // abonné doivent répondre. Une saisie partielle retombe sur les chiffres bruts.
@@ -354,6 +365,7 @@ export class BankCasesService {
 
     const where = Prisma.sql`
       p."deletedAt" IS NULL
+      AND ${bankProspectDemoCondition(demoEnabled)}
       AND p."phase2Status" = 'METHOD_OBTAINED'::"Phase2Status"
       AND (
         (lower(p."nom") || ' ' || lower(p."prenom")) LIKE ${like}

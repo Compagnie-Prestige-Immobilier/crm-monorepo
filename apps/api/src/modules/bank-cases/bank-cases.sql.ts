@@ -14,6 +14,9 @@ export const BANK_CASE_FROM = Prisma.sql`
   INNER JOIN "bank_case_stages" s ON s."id" = c."currentStageId"
 `;
 
+export const bankProspectDemoCondition = (demoEnabled: boolean): Prisma.Sql =>
+  demoEnabled ? Prisma.sql`TRUE` : Prisma.sql`p."isDemo" = FALSE`;
+
 // Date d'ENTRÉE en étape terminale, lue dans l'historique : `updatedAt` bougerait
 // à toute correction ultérieure. `MAX` car après réouverture la dernière issue fait foi.
 export const closedAtLateral = (caseAlias: Prisma.Sql): Prisma.Sql => Prisma.sql`
