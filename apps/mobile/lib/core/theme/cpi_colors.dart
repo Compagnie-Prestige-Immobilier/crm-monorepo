@@ -82,6 +82,47 @@ class CpiColors extends ThemeExtension<CpiColors> {
     syncBlocked: Color(0xFF6B4A52),
   );
 
+  /// Identité de l'Union des Enseignants du Sénégal : noir massif, filet bleu.
+  static const CpiColors chues = CpiColors(
+    success: Color(0xFF1A6B44),
+    onSuccess: Color(0xFFFFFFFF),
+    successSurface: Color(0xFFE8F0EC),
+    warning: Color(0xFF856011),
+    onWarning: Color(0xFFFFFFFF),
+    warningSurface: Color(0xFFFAF4E8),
+    info: Color(0xFF1D4ED8),
+    onInfo: Color(0xFFFFFFFF),
+    infoSurface: Color(0xFFE8EEFB),
+    accent: Color(0xFF1D4ED8),
+    accentForeground: Color(0xFFFFFFFF),
+    accentText: Color(0xFF1D4ED8),
+    accentBorder: Color(0xFF1D4ED8),
+    accentOnDark: Color(0xFF8FB8FF),
+    accentSurface: Color(0xFFE8EEFB),
+    destructiveOnDark: Color(0xFFFCA5A5),
+    navSurface: Color(0xFF0B0D12),
+    navForeground: Color(0xFFC3CFE6),
+    navActive: Color(0xFF16233D),
+    navActiveForeground: Color(0xFFFFFFFF),
+    navBorder: Color(0x14FFFFFF),
+    navRing: Color(0xFF5B9BFF),
+    inputBackground: Color(0xFFEEF1F7),
+    switchTrack: Color(0xFF9AA6BF),
+    borderSubtle: Color(0x1F0B2E6F),
+    chart1: Color(0xFF0B2E6F),
+    chart2: Color(0xFF1D4ED8),
+    chart3: Color(0xFF1A6B44),
+    chart4: Color(0xFF5B9BFF),
+    chart5: Color(0xFF8B5CF6),
+    syncDraft: Color(0xFF44506A),
+    syncPending: Color(0xFF44506A),
+    syncSyncing: Color(0xFF1D4ED8),
+    syncSynced: Color(0xFF1A6B44),
+    syncConflict: Color(0xFF856011),
+    syncFailed: Color(0xFFB91C1C),
+    syncBlocked: Color(0xFF44506A),
+  );
+
   final Color success;
   final Color onSuccess;
   final Color successSurface;

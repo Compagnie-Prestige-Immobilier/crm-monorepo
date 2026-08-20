@@ -178,15 +178,18 @@ CREATE TABLE prospects (
     nom TEXT NOT NULL,
     prenom TEXT NOT NULL,
     phone_e164 TEXT NOT NULL,
-    banque_id TEXT NOT NULL REFERENCES banques (id) ON UPDATE CASCADE,
-    syndicat_id TEXT NOT NULL REFERENCES syndicats (id) ON UPDATE CASCADE,
+    -- FACULTATIFS. Un teleconseiller au telephone ne les obtient pas toujours,
+    -- et une fiche Grand Public n'en a aucun : les exiger faisait abandonner la
+    -- saisie entiere. Le segment BDD1-4 vaut alors « aucun », il ne se devine pas.
+    banque_id TEXT REFERENCES banques (id) ON UPDATE CASCADE,
+    syndicat_id TEXT REFERENCES syndicats (id) ON UPDATE CASCADE,
     -- ON UPDATE CASCADE est PORTEUR, pas décoratif. Quand un représentant saisi
     -- hors ligne s'avère être un doublon d'une fiche déjà en base, la résolution
     -- consiste à réécrire l'identifiant local vers l'identifiant serveur. La
     -- cascade fait suivre tous les prospects rattachés en UNE instruction, au
     -- lieu d'une boucle de rattrapage manuelle qui laisserait des orphelins si
     -- elle était interrompue.
-    representant_id TEXT NOT NULL
+    representant_id TEXT
         REFERENCES representants (id) ON UPDATE CASCADE ON DELETE RESTRICT,
     created_by_id TEXT NOT NULL,
     -- Pas de CHECK d'énumération : la valeur vient du SERVEUR, par le pull.
@@ -195,6 +198,10 @@ CREATE TABLE prospects (
     -- et un CHECK figé ABORTAIT la transaction de pull entière : la page était
     -- perdue, le curseur n'avançait pas, et la synchronisation s'arrêtait sur
     -- une valeur que ce client n'avait pas à comprendre pour la stocker.
+    -- Pas de CHECK : la valeur vient du SERVEUR. Voir `statut` juste dessous.
+    projet TEXT NOT NULL DEFAULT 'CHUES',
+    type TEXT,
+    profession TEXT,
     statut TEXT NOT NULL DEFAULT 'NOUVEAU',
     client_created_at DATETIME NOT NULL,
     rev INTEGER NOT NULL DEFAULT 1,

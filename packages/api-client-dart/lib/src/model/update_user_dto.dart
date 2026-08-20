@@ -31,8 +31,6 @@ class UpdateUserDto {
     this.departementId,
 
     this.phone,
-
-    this.isActive,
   });
 
   @JsonKey(name: r'email', required: false, includeIfNull: false)
@@ -61,15 +59,12 @@ class UpdateUserDto {
   @JsonKey(name: r'phone', required: false, includeIfNull: false)
   final String? phone;
 
-  @JsonKey(name: r'isActive', required: false, includeIfNull: false)
-  final bool? isActive;
-
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is UpdateUserDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [email, username, fullName, role, departementId, phone, isActive],
+              [email, username, fullName, role, departementId, phone],
               [
                 other.email,
                 other.username,
@@ -77,7 +72,6 @@ class UpdateUserDto {
                 other.role,
                 other.departementId,
                 other.phone,
-                other.isActive,
               ],
             );
   }
@@ -92,7 +86,6 @@ class UpdateUserDto {
         role,
         departementId,
         phone,
-        isActive,
       ]);
 
   factory UpdateUserDto.fromJson(Map<String, dynamic> json) =>

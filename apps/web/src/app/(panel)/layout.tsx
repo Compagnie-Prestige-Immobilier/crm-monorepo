@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { CoqueShell } from '@/components/layout/coque-shell';
 import { DemoBannerLive } from '@/components/layout/demo-banner-live';
 import { SIDEBAR_COOKIE } from '@/components/layout/sidebar-cookie';
 import { SidebarShell } from '@/components/layout/sidebar-shell';
@@ -49,7 +50,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   const sidebarCollapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === '1';
 
   return (
-    <div className="flex min-h-dvh">
+    <CoqueShell>
       {/* Sidebar fixe à partir de 768 px ; en dessous elle devient un Sheet
           déclenché depuis la Topbar. Son état de repli est lu ICI, côté
           serveur : le premier octet de HTML porte déjà la bonne largeur, et la
@@ -68,6 +69,6 @@ export default async function PanelLayout({ children }: { children: ReactNode })
           {children}
         </main>
       </div>
-    </div>
+    </CoqueShell>
   );
 }

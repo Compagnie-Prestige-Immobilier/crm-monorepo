@@ -136,3 +136,24 @@ describe('eligibleForCampaignWhere', () => {
     }
   });
 });
+
+describe('un axe manquant n’est pas un segment', () => {
+  // Rendre BDD4 par defaut serait le pire choix : « autre syndicat / autre
+  // banque » est une reponse, et une fiche Grand Public s'y retrouverait comptee.
+  it('sans syndicat, il n’y a pas de segment', () => {
+    expect(classifySegment({ syndicatSigle: null, banqueShortName: 'CBAO' })).toBeNull();
+  });
+
+  it('sans banque, il n’y a pas de segment', () => {
+    expect(classifySegment({ syndicatSigle: 'CHUES', banqueShortName: null })).toBeNull();
+  });
+
+  it('sans rien, il n’y a pas de segment', () => {
+    expect(classifySegment({ syndicatSigle: null, banqueShortName: null })).toBeNull();
+  });
+
+  it('les deux axes presents rendent toujours un segment', () => {
+    expect(classifySegment({ syndicatSigle: 'CHUES', banqueShortName: 'CBAO' })).toBe('BDD1');
+    expect(classifySegment({ syndicatSigle: 'AUTRE', banqueShortName: 'AUTRE' })).toBe('BDD4');
+  });
+});

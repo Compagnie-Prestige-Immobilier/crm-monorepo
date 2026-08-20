@@ -126,12 +126,14 @@ class _RepresentantRow extends StatelessWidget {
         Expanded(
           child: Semantics(
             button: true,
-            label: '${data.fullName}, $subtitle. Ajouter des prospects.',
+            label: '${data.fullName}, $subtitle. Compléter la fiche.',
             child: ExcludeSemantics(
               child: InkWell(
+                // Les fiches sont importées : choisir mène au formulaire
+                // prérempli, jamais directement aux prospects.
                 onTap: () {
                   unawaited(HapticFeedback.selectionClick());
-                  context.pushOnce(Routes.newProspectFor(data.id));
+                  context.pushOnce(Routes.representantFormFor(data.id));
                 },
                 onLongPress: openDetail,
                 child: ConstrainedBox(
@@ -166,7 +168,7 @@ class _RepresentantRow extends StatelessWidget {
                           ),
                         ),
                         Icon(
-                          PhosphorIconsRegular.userPlus,
+                          PhosphorIconsRegular.pencilSimple,
                           size: 20,
                           color: context.cpi.accentText,
                         ),

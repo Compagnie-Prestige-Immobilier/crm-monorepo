@@ -207,7 +207,7 @@ beforeAll(async () => {
       segment: classifySegment({
         syndicatSigle: entry.sigle,
         banqueShortName: entry.shortName,
-      }),
+      }) as BddSegment,
     });
   }
 

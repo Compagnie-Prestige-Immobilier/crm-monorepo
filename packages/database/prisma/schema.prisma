@@ -113,6 +113,29 @@ enum BddSegment {
   BDD4
 }
 
+/// Le projet commercial dont releve une fiche.
+///
+/// Meme finalite : vendre du terrain et enroler. Processus incompatibles :
+/// CHUES part d'un representant syndical qui rassemble des enseignants, le
+/// Grand Public part du particulier lui-meme. Les deux ne se melangent nulle
+/// part, ni dans une campagne, ni dans un ecran, ni dans un export.
+enum Projet {
+  CHUES
+  GRAND_PUBLIC
+}
+
+/// Ce qu'est le prospect, quand il ne vient pas d'un syndicat d'enseignants.
+///
+/// Nul sur une fiche CHUES : le syndicat le dit deja. Nul aussi tant que la
+/// question n'a pas ete posee, ce qui n'est pas la meme chose que de ne pas
+/// savoir : rien ici n'est obligatoire.
+enum ProspectType {
+  FONCTIONNAIRE
+  SECTEUR_PRIVE
+  INFORMEL
+  DIASPORA
+}
+
 enum CampaignScope {
   BDD1
   BDD2
@@ -395,6 +418,15 @@ model Syndicat {
 model Representant {
   id        String  @id // UUID v7 généré par le client, jamais par la base
   fullName  String
+  /// Le prenom, quand il a ete recueilli separement.
+  ///
+  /// `fullName` reste la verite affichee : les fiches importees ne portent
+  /// qu'un nom complet, et le decouper apres coup se trompe sur les noms
+  /// composes. Ce champ ne fait que garder ce que le terrain a precise.
+  prenom    String?
+  /// L'etablissement ou il exerce. Ni l'IEF, qui est une circonscription
+  /// administrative, ni le departement.
+  etablissement String?
   // Unicité posée en index partiel dans la migration, pas ici. Voir l'en-tête.
   phoneE164 String
   notes     String?
@@ -474,6 +506,28 @@ model Representant {
   @@map("representants")
 }
 
+/// D'ou vient un prospect : TikTok, LinkedIn, bouche a oreille, salon.
+///
+/// Un referentiel et non une enumeration : les canaux se creent au fil des
+/// campagnes, et une valeur figee dans le schema couterait une migration a
+/// chaque fois. Jamais supprime, seulement desactive : les fiches des annees
+/// passees continuent de le designer.
+model CanalProvenance {
+  id       String  @id @default(uuid(7))
+  code     String  @unique
+  label    String  @unique
+  position Int     @default(0)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prospects Prospect[]
+
+  @@index([isActive, position])
+  @@map("canaux_provenance")
+}
+
 model Prospect {
   id        String @id // UUID v7 généré par le client
   nom       String
@@ -483,18 +537,52 @@ model Prospect {
 
   rev Int @default(1)
 
-  banqueId   String
-  banque     Banque   @relation(fields: [banqueId], references: [id], onDelete: Restrict)
-  syndicatId String
-  syndicat   Syndicat @relation(fields: [syndicatId], references: [id], onDelete: Restrict)
+  /// Le projet dont releve la fiche. `CHUES` par defaut : les 12 929 lignes
+  /// deja en base en viennent toutes, et une colonne sans defaut les aurait
+  /// laissees sans projet.
+  projet Projet @default(CHUES)
+
+  /// Facultatifs, et c'est le point.
+  ///
+  /// Un teleconseiller au telephone n'obtient pas toujours la banque ni le
+  /// syndicat, et une colonne obligatoire lui faisait abandonner la fiche
+  /// entiere. Une fiche Grand Public n'en a simplement pas : elle ne vient
+  /// d'aucun syndicat. Le segment BDD1-4 se calcule alors a `null`, il ne se
+  /// devine pas.
+  banqueId   String?
+  banque     Banque?   @relation(fields: [banqueId], references: [id], onDelete: Restrict)
+  syndicatId String?
+  syndicat   Syndicat? @relation(fields: [syndicatId], references: [id], onDelete: Restrict)
+
+  /// Hors CHUES seulement. Voir `ProspectType`.
+  type ProspectType?
+
+  /// Le metier declare, en clair. Pas un referentiel : la variete du secteur
+  /// informel n'en supporterait pas un, et une liste fermee ferait saisir
+  /// « autre » partout.
+  profession String?
+
+  /// Duree du systeme de paiement retenue, en mois.
+  ///
+  /// Un entier et non un libelle : c'est un nombre de mois, et le stocker en
+  /// texte interdirait de le sommer ou de le comparer. Nul tant que la question
+  /// n'a pas ete posee.
+  dureeSystemeMois Int?
+
+  /// Par ou le prospect est arrive. Referentiel ouvert : TikTok aujourd'hui,
+  /// autre chose demain, et une enumeration figee obligerait une migration a
+  /// chaque canal ajoute.
+  canalProvenanceId String?
+  canalProvenance   CanalProvenance? @relation(fields: [canalProvenanceId], references: [id], onDelete: Restrict)
 
   // onUpdate: Cascade est porteur. Quand un représentant saisi hors ligne
   // s'avère être un doublon d'une fiche déjà en base, la résolution consiste à
   // réécrire l'identifiant local vers l'identifiant serveur. La cascade fait
   // suivre les prospects rattachés en une instruction au lieu d'une boucle de
   // rattrapage manuelle.
-  representantId String
-  representant   Representant @relation(fields: [representantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  /// Facultatif : une fiche Grand Public ne passe par aucun representant.
+  representantId String?
+  representant   Representant? @relation(fields: [representantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Restrict)

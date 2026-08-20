@@ -1228,7 +1228,7 @@ void main() {
     final AppDatabase db = AppDatabase(schema.newConnection());
     // UN SEUL appel, de 1 à 11 : c'est le vrai chemin de l'appareil qui a sauté
     // les versions intermédiaires.
-    await verifier.migrateAndValidate(db, 11);
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
     // Les données de v1 ont traversé six paliers, dont une recréation de table.
     final List<QueryRow> prospects = await db
@@ -1343,10 +1343,10 @@ void main() {
     await db.close();
   });
 
-  test('v2 -> v11 : le saut passe aussi par les colonnes ajoutées', () async {
+  test('v2 -> dernier palier : le saut passe aussi par les colonnes ajoutées', () async {
     final schema = await verifier.schemaAt(2);
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 11);
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
     // Les colonnes ajoutées en chemin (v4, v5, v7 puis v8) doivent être là
     // toutes : un palier gardé par `from < n` seul, sans `to >= n`, produit un

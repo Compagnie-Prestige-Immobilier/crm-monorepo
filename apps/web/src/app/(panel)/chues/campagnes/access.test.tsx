@@ -10,10 +10,11 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/lib/session', () => ({ guardRoles }));
 
-const CampaignsPage = (await import('@/app/(panel)/campagnes/page')).default;
-const CampaignPage = (await import('@/app/(panel)/campagnes/[id]/page')).default;
-const RepCampaignsPage = (await import('@/app/(panel)/campagnes/representants/page')).default;
-const RepCampaignPage = (await import('@/app/(panel)/campagnes/representants/[id]/page')).default;
+const CampaignsPage = (await import('@/app/(panel)/chues/campagnes/page')).default;
+const CampaignPage = (await import('@/app/(panel)/chues/campagnes/[id]/page')).default;
+const RepCampaignsPage = (await import('@/app/(panel)/chues/campagnes/representants/page')).default;
+const RepCampaignPage = (await import('@/app/(panel)/chues/campagnes/representants/[id]/page'))
+  .default;
 
 beforeEach(() => {
   guardRoles.mockReset();

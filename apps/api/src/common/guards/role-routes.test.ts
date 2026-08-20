@@ -75,6 +75,7 @@ const CONTROLLERS: readonly Controller[] = [
 const ADMISES: readonly string[] = [
   'AdminController.supervisionOverview',
 
+  'AnalyticsController.ambassadorConversion',
   'AnalyticsController.bankAging',
   'AnalyticsController.byBanque',
   'AnalyticsController.byDepartement',

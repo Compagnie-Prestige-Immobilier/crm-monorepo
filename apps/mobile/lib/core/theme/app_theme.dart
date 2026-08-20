@@ -79,10 +79,86 @@ abstract final class AppTheme {
     systemNavigationBarIconBrightness: Brightness.dark,
   );
 
-  static ThemeData get light {
-    final ColorScheme scheme = colorScheme;
+  static const Color chuesSeed = Color(0xFF0B2E6F);
+
+  static const Color _chuesBlue = Color(0xFF0B2E6F);
+  static const Color _chuesBlack = Color(0xFF0B0D12);
+  static const Color _chuesBackground = Color(0xFFF6F7FA);
+  static const Color _chuesMuted = Color(0xFFE4E8F0);
+  static const Color _chuesMutedForeground = Color(0xFF44506A);
+  static const Color _chuesBorderFlattened = Color(0xFFDDE2EC);
+
+  /// Union des Enseignants du Sénégal : le bleu porte les aplats, le noir le
+  /// texte et la barre de navigation.
+  static ColorScheme get chuesColorScheme {
+    return ColorScheme.fromSeed(
+      seedColor: chuesSeed,
+      brightness: Brightness.light,
+    ).copyWith(
+      primary: _chuesBlue,
+      onPrimary: _onPrimary,
+      primaryContainer: const Color(0xFFE8ECF5),
+      onPrimaryContainer: _chuesBlue,
+
+      secondary: _chuesMutedForeground,
+      onSecondary: const Color(0xFFFFFFFF),
+      secondaryContainer: _chuesMuted,
+      onSecondaryContainer: _chuesMutedForeground,
+
+      tertiary: const Color(0xFF1D4ED8),
+      onTertiary: const Color(0xFFFFFFFF),
+      tertiaryContainer: const Color(0xFFE8EEFB),
+      onTertiaryContainer: const Color(0xFF1D4ED8),
+
+      error: _destructive,
+      onError: const Color(0xFFFFFFFF),
+      errorContainer: _destructiveSurface,
+      onErrorContainer: _destructive,
+
+      surface: _chuesBackground,
+      onSurface: _chuesBlack,
+      onSurfaceVariant: _chuesMutedForeground,
+      surfaceContainerLowest: _card,
+      surfaceContainerLow: _chuesBackground,
+      surfaceContainer: const Color(0xFFEEF1F7),
+      surfaceContainerHigh: _chuesMuted,
+      surfaceContainerHighest: _chuesMuted,
+      surfaceDim: _chuesMuted,
+      surfaceBright: _card,
+      surfaceTint: _chuesBlue,
+
+      outline: _chuesMutedForeground,
+      outlineVariant: _chuesBorderFlattened,
+
+      inverseSurface: _chuesBlack,
+      onInverseSurface: const Color(0xFFC3CFE6),
+      inversePrimary: const Color(0xFF8FB8FF),
+
+      shadow: _chuesBlack,
+      scrim: _chuesBlack,
+    );
+  }
+
+  static final ThemeData light = _build(colorScheme, CpiColors.light, systemOverlay);
+
+  static final ThemeData chues = _build(
+    chuesColorScheme,
+    CpiColors.chues,
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: _chuesBackground,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
+
+  static ThemeData _build(
+    ColorScheme scheme,
+    CpiColors cpi,
+    SystemUiOverlayStyle overlay,
+  ) {
     final TextTheme text = CpiTypography.textTheme(scheme.onSurface);
-    const CpiColors cpi = CpiColors.light;
 
     return ThemeData(
       useMaterial3: true,
@@ -94,7 +170,7 @@ abstract final class AppTheme {
       fontFamily: CpiFonts.body,
       splashFactory: InkSparkle.splashFactory,
       visualDensity: VisualDensity.standard,
-      extensions: const <ThemeExtension<dynamic>>[cpi, CpiMotion.standard],
+      extensions: <ThemeExtension<dynamic>>[cpi, CpiMotion.standard],
 
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.primary,
@@ -103,7 +179,7 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        systemOverlayStyle: systemOverlay,
+        systemOverlayStyle: overlay,
         titleTextStyle: text.titleMedium?.copyWith(color: scheme.onPrimary),
       ),
 

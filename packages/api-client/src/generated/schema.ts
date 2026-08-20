@@ -1811,6 +1811,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/analytics/ambassador-conversion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Part des représentants travaillés devenus ambassadeurs.
+     * @description La période borne la DATE DE LA BASCULE, pas l’arrivée en base : un statut poussé avec trois jours de retard reste compté le jour où il a été décidé. Le dénominateur ne retient que les représentants dont la relation a bougé dans la période ; `untracked` compte, hors période, ceux de l’annuaire sans aucune trace, qui ne sont donc mesurés ni au numérateur ni au dénominateur. Seuls `dateFrom`, `dateTo`, `commercialId`, `departementId` et `representantId` agissent : les autres filtres qualifient un prospect, pas un représentant.
+     */
+    get: operations['getAmbassadorConversion'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/analytics/data-quality': {
     parameters: {
       query?: never;
@@ -2588,7 +2608,6 @@ export interface components {
       departementId?: string;
       /** @description Téléphone, normalisé en E.164 par le serveur. */
       phone?: string;
-      isActive?: boolean;
     };
     SetActiveDto: {
       isActive: boolean;
@@ -2994,6 +3013,13 @@ export interface components {
     EnrollmentMethod: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING';
     /** @enum {string} */
     ProspectSortField: 'createdAt' | 'clientCreatedAt' | 'nom' | 'prenom' | 'statut';
+    /** @enum {string} */
+    Projet: 'CHUES' | 'GRAND_PUBLIC';
+    /**
+     * @description Hors CHUES : ce qu’est le prospect. Nul si la question n’a pas été posée.
+     * @enum {string}
+     */
+    ProspectType: 'FONCTIONNAIRE' | 'SECTEUR_PRIVE' | 'INFORMEL' | 'DIASPORA';
     /**
      * @description Résultat de la dernière tentative d’appel enregistrée.
      * @enum {string}
@@ -3008,24 +3034,35 @@ export interface components {
       phoneE164: string;
       rev: number;
       statut: components['schemas']['ProspectStatut'];
+      projet: components['schemas']['Projet'];
       /** Format: uuid */
-      banqueId: string;
-      banqueName: string;
+      banqueId: string | null;
+      banqueName: string | null;
       /** Format: uuid */
-      syndicatId: string;
-      syndicatSigle: string;
+      syndicatId: string | null;
+      syndicatSigle: string | null;
       /** Format: uuid */
-      representantId: string;
-      representantName: string;
-      representantPhoneE164: string;
+      representantId: string | null;
+      representantName: string | null;
+      representantPhoneE164: string | null;
       /** Format: uuid */
-      departementId: string;
-      departementName: string;
+      departementId: string | null;
+      departementName: string | null;
       /** Format: uuid */
       ownedByCommercialId: string;
       ownedByCommercialName: string;
-      /** @description Calculé par croisement syndicat × banque. Jamais stocké en base. */
-      segment: components['schemas']['BddSegment'];
+      /** @description Hors CHUES : ce qu’est le prospect. Nul si la question n’a pas été posée. */
+      type: components['schemas']['ProspectType'] | null;
+      /** @description Métier déclaré, en clair. */
+      profession: string | null;
+      /** @description Durée du système de paiement retenue, en MOIS. */
+      dureeSystemeMois: number | null;
+      /** Format: uuid */
+      canalProvenanceId: string | null;
+      /** @description Par où le prospect est arrivé. Référentiel ouvert. */
+      canalProvenanceLabel: string | null;
+      /** @description Calculé par croisement syndicat × banque, jamais stocké. NUL dès qu’il manque l’un des deux : le segment ne se devine pas. */
+      segment: components['schemas']['BddSegment'] | null;
       phase2Status: components['schemas']['Phase2Status'];
       /** @description Renseignée si et seulement si `phase2Status` vaut METHOD_OBTAINED. */
       enrollmentMethod: components['schemas']['EnrollmentMethod'] | null;
@@ -3092,8 +3129,8 @@ export interface components {
       nom: string;
       prenom: string;
       /** Format: uuid */
-      representantId: string;
-      representantName: string;
+      representantId: string | null;
+      representantName: string | null;
       /** Format: uuid */
       ownedByCommercialId: string;
       ownedByCommercialName: string;
@@ -3281,8 +3318,21 @@ export interface components {
       whatsappStatus?: components['schemas']['WhatsappStatus'];
       /** @description Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO. */
       whatsappE164?: string;
-      /** @description Représentant : profession déclarée. */
+      /** @description Profession déclarée. Sert au représentant comme au prospect. */
       profession?: string;
+      /** @description Représentant : l’établissement où il exerce. Ni l’IEF ni le département. */
+      etablissement?: string;
+      /** @description Prospect : le projet dont il relève. CHUES par défaut côté serveur. */
+      projet?: components['schemas']['Projet'];
+      /** @description Prospect hors CHUES : ce qu’il est. Jamais obligatoire. */
+      type?: components['schemas']['ProspectType'];
+      /** @description Prospect : durée du système de paiement, en MOIS. */
+      dureeSystemeMois?: number;
+      /**
+       * Format: uuid
+       * @description Prospect : canal de provenance, choisi dans le référentiel.
+       */
+      canalProvenanceId?: string;
       /**
        * Format: date-time
        * @description Horodatage de la saisie terrain.
@@ -3326,7 +3376,7 @@ export interface components {
       /** @description Révision serveur sur laquelle le client s’est basé. Fournie sur update/delete, elle transforme une écriture aveugle en écriture conditionnelle. */
       baseRev?: number;
       data?: components['schemas']['SyncEntityDataDto'];
-      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession. */
+      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement. */
       clearedFields?: string[];
     };
     SyncPushDto: {
@@ -4660,6 +4710,18 @@ export interface components {
       total: number;
       /** @description Seuil de dormance retenu, en jours. */
       dormantDays: number;
+    };
+    AmbassadorConversionDto: {
+      /** @description Représentants dont la relation a bougé au moins une fois dans la période. Dénominateur : un taux rapporté à l’annuaire entier mesurerait la taille du fichier, pas le travail. */
+      contacted: number;
+      /** @description Parmi eux, ceux passés au moins une fois AMBASSADEUR dans la période. Comptés une seule fois, quel que soit le nombre d’allers-retours. */
+      ambassadors: number;
+      /** @description Ambassadeurs rapportés aux représentants travaillés, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %. */
+      conversionRate: number | null;
+      /** @description Parmi les convertis de la période, ceux dont le statut COURANT n’est plus AMBASSADEUR. Ils restent au numérateur : la bascule a eu lieu et elle est datée. Les retirer ferait bouger le taux d’un mois clos à chaque changement de statut d’aujourd’hui. */
+      reverted: number;
+      /** @description Représentants du périmètre sans AUCUNE trace de relation, à aucune date. Hors du taux dans les deux termes : ils mesurent ce que la période ne dit pas. */
+      untracked: number;
     };
     DataQualityRowDto: {
       /** Format: uuid */
@@ -12148,6 +12210,82 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['RepresentantProductivityListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getAmbassadorConversion: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AmbassadorConversionDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */

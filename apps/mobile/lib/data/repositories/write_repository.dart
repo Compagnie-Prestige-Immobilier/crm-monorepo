@@ -283,14 +283,16 @@ class WriteRepository {
     return entityId;
   }
 
+  /// Banque, syndicat et representant sont FACULTATIFS : un teleconseiller ne
+  /// les obtient pas toujours, et une fiche Grand Public n'en a aucun.
   Future<String> createProspect({
     required String nom,
     required String prenom,
     required String phoneE164,
-    required String banqueId,
-    required String syndicatId,
-    required String representantId,
     required String createdById,
+    String? banqueId,
+    String? syndicatId,
+    String? representantId,
     String? id,
     String? draftId,
   }) async {
@@ -306,16 +308,18 @@ class WriteRepository {
               nom: nom,
               prenom: prenom,
               phoneE164: phoneE164,
-              banqueId: banqueId,
-              syndicatId: syndicatId,
-              representantId: representantId,
+              banqueId: Value<String?>(banqueId),
+              syndicatId: Value<String?>(syndicatId),
+              representantId: Value<String?>(representantId),
               createdById: createdById,
               clientCreatedAt: now,
               localUpdatedAt: now,
             ),
           );
       await _enqueue(
-        dependencyKey: representantId,
+        // Sans representant, la fiche ne depend de personne : elle se chaine sur
+        // elle-meme plutot que de bloquer derriere une cle vide.
+        dependencyKey: representantId ?? entityId,
         entityType: 'prospect',
         entityId: entityId,
         op: 'create',
@@ -340,9 +344,9 @@ class WriteRepository {
     required String nom,
     required String prenom,
     required String phoneE164,
-    required String banqueId,
-    required String syndicatId,
-    required String representantId,
+    String? banqueId,
+    String? syndicatId,
+    String? representantId,
     String? statut,
     String? draftId,
   }) async {
@@ -358,15 +362,15 @@ class WriteRepository {
           nom: Value<String>(nom),
           prenom: Value<String>(prenom),
           phoneE164: Value<String>(phoneE164),
-          banqueId: Value<String>(banqueId),
-          syndicatId: Value<String>(syndicatId),
-          representantId: Value<String>(representantId),
+          banqueId: Value<String?>(banqueId),
+          syndicatId: Value<String?>(syndicatId),
+          representantId: Value<String?>(representantId),
           statut: statut == null ? const Value.absent() : Value<String>(statut),
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
       await _enqueue(
-        dependencyKey: representantId,
+        dependencyKey: representantId ?? id,
         entityType: 'prospect',
         entityId: id,
         op: 'update',
@@ -402,7 +406,9 @@ class WriteRepository {
         ),
       );
       await _enqueue(
-        dependencyKey: current.representantId,
+        // Sans representant, la fiche ne depend de personne : elle se chaine sur
+        // elle-meme plutot que de bloquer derriere une cle vide.
+        dependencyKey: current.representantId ?? id,
         entityType: 'prospect',
         entityId: id,
         op: 'delete',

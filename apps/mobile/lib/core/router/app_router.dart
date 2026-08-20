@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/about/presentation/about_screen.dart';
+import '../../features/accueil/presentation/registre_screen.dart';
 import '../../features/auth/auth_state.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/corrections/presentation/corrections_screen.dart';
@@ -20,6 +21,9 @@ import '../../features/representant/presentation/representant_detail_screen.dart
 import '../../features/representant/presentation/representant_form_screen.dart';
 import '../../features/representant/presentation/representant_picker_screen.dart';
 import '../../features/shell/app_shell.dart';
+import '../../features/shell/grand_public_screen.dart';
+import '../../features/shell/hub_screen.dart';
+import '../../features/shell/projects.dart';
 import '../providers/app_providers.dart';
 import '../theme/cpi_tokens.dart';
 import 'route_memory.dart';
@@ -36,6 +40,11 @@ class _AuthRefreshNotifier extends ChangeNotifier {
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
+
+GoRouterWidgetBuilder _chues(Widget Function(GoRouterState state) screen) {
+  return (BuildContext context, GoRouterState state) =>
+      ProjectScope(project: CpiProject.chues, child: screen(state));
+}
 
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   final RouteMemory memory = ref.watch(routeMemoryProvider);
@@ -80,21 +89,47 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       ),
 
       GoRoute(
+        path: Routes.home,
+        name: 'hub',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const HubScreen(),
+      ),
+      GoRoute(
+        path: Routes.accueil,
+        name: 'accueil',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const ProjectScope(
+          project: CpiProject.accueil,
+          child: RegistreScreen(),
+        ),
+      ),
+      GoRoute(
+        path: Routes.grandPublic,
+        name: 'grandPublic',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const ProjectScope(
+          project: CpiProject.grandPublic,
+          child: GrandPublicScreen(),
+        ),
+      ),
+
+      GoRoute(
         path: Routes.representants,
         name: 'representants',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) =>
-            const RepresentantPickerScreen(),
+        builder: _chues((GoRouterState state) => const RepresentantPickerScreen()),
       ),
       GoRoute(
         path: Routes.newRepresentant,
         name: 'newRepresentant',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => RepresentantFormScreen(
-          draftId: state.uri.queryParameters[Routes.draftParam],
-          representantId: state.uri.queryParameters['id'],
-          prefillName: state.uri.queryParameters[Routes.prefillNameParam],
-          prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam],
+        builder: _chues(
+          (GoRouterState state) => RepresentantFormScreen(
+            draftId: state.uri.queryParameters[Routes.draftParam],
+            representantId: state.uri.queryParameters['id'],
+            prefillName: state.uri.queryParameters[Routes.prefillNameParam],
+            prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam],
+          ),
         ),
       ),
       // Après `newRepresentant` : go_router essaie les routes dans l'ordre, et
@@ -103,53 +138,56 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: Routes.representantDetail,
         name: 'representantDetail',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) =>
-            RepresentantDetailScreen(representantId: state.pathParameters['id'] ?? ''),
+        builder: _chues(
+          (GoRouterState state) =>
+              RepresentantDetailScreen(representantId: state.pathParameters['id'] ?? ''),
+        ),
       ),
       GoRoute(
         path: Routes.newProspect,
         name: 'newProspect',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => ProspectEntryScreen(
-          representantId: state.uri.queryParameters[Routes.repParam],
-          draftId: state.uri.queryParameters[Routes.draftParam],
+        builder: _chues(
+          (GoRouterState state) => ProspectEntryScreen(
+            representantId: state.uri.queryParameters[Routes.repParam],
+            draftId: state.uri.queryParameters[Routes.draftParam],
+          ),
         ),
       ),
       GoRoute(
         path: Routes.phase2,
         name: 'phase2',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => const Phase2Screen(),
+        builder: _chues((GoRouterState state) => const Phase2Screen()),
       ),
       GoRoute(
         path: Routes.notifications,
         name: 'notifications',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) =>
-            const NotificationsScreen(),
+        builder: _chues((GoRouterState state) => const NotificationsScreen()),
       ),
       GoRoute(
         path: Routes.batteryHelp,
         name: 'batteryHelp',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => const BatteryHelpScreen(),
+        builder: _chues((GoRouterState state) => const BatteryHelpScreen()),
       ),
       GoRoute(
         path: Routes.about,
         name: 'about',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => const AboutScreen(),
+        builder: _chues((GoRouterState state) => const AboutScreen()),
       ),
 
       StatefulShellRoute.indexedStack(
         builder:
             (BuildContext context, GoRouterState state, StatefulNavigationShell shell) =>
-                AppShell(shell: shell),
+                ProjectScope(project: CpiProject.chues, child: AppShell(shell: shell)),
         branches: <StatefulShellBranch>[
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.home,
+                path: Routes.chues,
                 name: 'home',
                 builder: (BuildContext context, GoRouterState state) =>
                     const HomeScreen(),

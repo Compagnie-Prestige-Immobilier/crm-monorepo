@@ -154,9 +154,7 @@ class _Fiche extends ConsumerWidget {
         OutlinedButton.icon(
           onPressed: () {
             unawaited(HapticFeedback.selectionClick());
-            context.pushOnce(
-              '${Routes.newRepresentant}?id=${Uri.encodeComponent(data.id)}',
-            );
+            context.pushOnce(Routes.representantFormFor(data.id));
           },
           icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 20),
           label: const Text('Modifier'),

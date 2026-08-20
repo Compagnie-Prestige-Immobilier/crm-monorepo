@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { PANEL_ROLES } from '@/lib/data/auth';
+
 const getSession = vi.fn();
 
 vi.mock('@/lib/session', () => ({
@@ -14,21 +16,15 @@ const renderNotFound = async (): Promise<void> => {
 };
 
 describe('page introuvable', () => {
-  it('renvoie un ADMIN vers son tableau de bord', async () => {
-    getSession.mockReturnValue(Promise.resolve({ id: 'u1', role: 'ADMIN' }));
+  // Sur PANEL_ROLES et non sur deux rôles choisis : aucun d'eux ne doit
+  // atterrir sur un écran que son rôle ne peut pas ouvrir, et le hub est le
+  // seul que tous peuvent ouvrir.
+  it.each([...PANEL_ROLES])('renvoie un %s vers le hub des espaces', async (role) => {
+    getSession.mockReturnValue(Promise.resolve({ id: 'u1', role }));
     await renderNotFound();
 
-    expect(screen.getByRole('link', { name: /Retour à l’accueil/ }).getAttribute('href')).toBe(
-      '/tableau-de-bord',
-    );
-  });
-
-  it('renvoie un agent BANQUE_FINANCE vers les dossiers, pas vers un refus de droits', async () => {
-    getSession.mockReturnValue(Promise.resolve({ id: 'u2', role: 'BANQUE_FINANCE' }));
-    await renderNotFound();
-
-    expect(screen.getByRole('link', { name: /Retour à l’accueil/ }).getAttribute('href')).toBe(
-      '/dossiers',
+    expect(screen.getByRole('link', { name: /Revenir aux espaces/ }).getAttribute('href')).toBe(
+      '/espaces',
     );
   });
 

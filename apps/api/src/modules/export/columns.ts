@@ -45,15 +45,15 @@ export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
   { header: 'Nom', key: 'nom', value: (row) => row.nom },
   { header: 'Prénom', key: 'prenom', value: (row) => row.prenom },
   { header: 'Téléphone', key: 'phone', value: (row) => row.phoneE164 },
-  { header: 'Banque', key: 'banque', value: (row) => row.banque.name },
-  { header: 'Syndicat', key: 'syndicat', value: (row) => row.syndicat.sigle },
-  { header: 'Représentant', key: 'representant', value: (row) => row.representant.fullName },
+  { header: 'Banque', key: 'banque', value: (row) => row.banque?.name ?? '' },
+  { header: 'Syndicat', key: 'syndicat', value: (row) => row.syndicat?.sigle ?? '' },
+  { header: 'Représentant', key: 'representant', value: (row) => row.representant?.fullName ?? '' },
   {
     header: 'Tél. représentant',
     key: 'representantPhone',
-    value: (row) => row.representant.phoneE164,
+    value: (row) => row.representant?.phoneE164 ?? '',
   },
-  { header: 'Département', key: 'departement', value: (row) => row.representant.departement.name },
+  { header: 'Département', key: 'departement', value: (row) => row.representant?.departement.name ?? '' },
   { header: 'Commercial', key: 'commercial', value: (row) => row.createdBy.fullName },
   { header: 'Date de saisie', key: 'saisie', isDate: true, value: (row) => row.clientCreatedAt },
 
@@ -64,9 +64,9 @@ export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
     // que l'onglet « BDD1 » du classeur consolide contient la population du graphique « BDD1 ».
     value: (row) =>
       classifySegment({
-        syndicatSigle: row.syndicat.sigle,
-        banqueShortName: row.banque.shortName,
-      }),
+        syndicatSigle: row.syndicat?.sigle ?? null,
+        banqueShortName: row.banque?.shortName ?? null,
+      }) ?? '',
   },
   {
     header: 'Méthode d’enrôlement',

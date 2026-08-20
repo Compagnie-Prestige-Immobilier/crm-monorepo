@@ -28,7 +28,7 @@ const SUPERVISEUR: AuthenticatedUser = {
   role: Role.SUPERVISEUR,
 };
 
-const MINIMUM_ROUTES = 20;
+const MINIMUM_ROUTES = 21;
 
 /**
  * Double qui garde la TRACE de chaque interrogation, brute ou passée par
