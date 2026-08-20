@@ -888,6 +888,7 @@ void main() {
         prospects: const <ProspectDto>[],
         callCampaigns: const <SyncCallCampaignDto>[],
         callTasks: const <SyncCallTaskDto>[],
+        visites: const <SyncVisiteDto>[],
       ),
       deletions: <SyncDeletionDto>[
         SyncDeletionDto(entity: SyncEntity.prospect, id: id, deletedAt: t0),
@@ -1490,6 +1491,7 @@ PullPage _page({required String cursor, bool hasMore = false}) => PullPage(
     prospects: const <ProspectDto>[],
     callCampaigns: const <SyncCallCampaignDto>[],
     callTasks: const <SyncCallTaskDto>[],
+    visites: const <SyncVisiteDto>[],
   ),
   deletions: const <SyncDeletionDto>[],
   nextCursor: cursor,
@@ -1509,6 +1511,7 @@ PullPage pullPageWithRepresentant(RepresentantDto dto) => PullPage(
     prospects: const <ProspectDto>[],
     callCampaigns: const <SyncCallCampaignDto>[],
     callTasks: const <SyncCallTaskDto>[],
+    visites: const <SyncVisiteDto>[],
   ),
   deletions: const <SyncDeletionDto>[],
   nextCursor: 'c1',
@@ -1590,7 +1593,7 @@ class _GatedPullApi extends FakeApi {
   void release(PullPage page) => _gate.complete(page);
 
   @override
-  Future<PullPage> pull({String? cursor, int limit = 200}) async {
+  Future<PullPage> pull({String? cursor, int limit = 200, required int payloadVersion}) async {
     if (!entered.isCompleted) entered.complete();
     return _gate.future;
   }

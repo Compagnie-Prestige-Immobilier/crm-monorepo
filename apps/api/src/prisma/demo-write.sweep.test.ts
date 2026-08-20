@@ -55,9 +55,19 @@ const SITES: Record<string, Site> = {
     verdict: 'BLOQUE',
     note: 'POST /v1/client-requests, refusé en 409 pendant une démonstration',
   },
-  'modules/visites/visites.service.ts → await this.demo.enabledForWrite()': {
-    verdict: 'BLOQUE',
-    note: 'POST /v1/visites, refusé en 409 pendant une démonstration ; le registre d’accueil n’a aucun autre chemin d’écriture',
+  'modules/visites/visites.service.ts → boolean': {
+    verdict: 'LECTURE',
+    note: 'déclaration de type du paramètre isDemo de createRow et createForSync',
+  },
+  'modules/visites/visites.service.ts → isDemo (abrégé)': {
+    verdict: 'REGISTRE',
+    note:
+      'l’écriture partagée des deux appelants de createRow : create(), POST /v1/visites, refusé en ' +
+      '409 pendant une démonstration (le registre d’accueil n’a aucun autre chemin d’écriture, donc ' +
+      'cet appelant ne peut jamais la faire valoir true) ; createForSync() la reçoit d’authorIsDemo, ' +
+      'la même dispense que representant/prospect. La visite est inscrite dans demo_entities par ' +
+      'sync.service.ts, sans quoi elle retiendrait à la purge le compte semé qui l’a créée ' +
+      '(createdById en onDelete: Restrict).',
   },
   'modules/prospects/prospects.service.ts → (await this.demo.enabledForWrite()) || (representant?.isDemo ?? false)':
     {

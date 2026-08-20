@@ -61,6 +61,20 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto callbackAt(DateTime? callbackAt);
 
+  SyncEntityDataDto visitorName(String? visitorName);
+
+  SyncEntityDataDto visitDate(String? visitDate);
+
+  SyncEntityDataDto visitTime(String? visitTime);
+
+  SyncEntityDataDto entrepriseId(String? entrepriseId);
+
+  SyncEntityDataDto objetId(String? objetId);
+
+  SyncEntityDataDto directionId(String? directionId);
+
+  SyncEntityDataDto destinataireId(String? destinataireId);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncEntityDataDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -95,6 +109,13 @@ abstract class _$SyncEntityDataDtoCWProxy {
     EnrollmentMethod? method,
     String? comment,
     DateTime? callbackAt,
+    String? visitorName,
+    String? visitDate,
+    String? visitTime,
+    String? entrepriseId,
+    String? objetId,
+    String? directionId,
+    String? destinataireId,
   });
 }
 
@@ -199,6 +220,31 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
       this(callbackAt: callbackAt);
 
   @override
+  SyncEntityDataDto visitorName(String? visitorName) =>
+      this(visitorName: visitorName);
+
+  @override
+  SyncEntityDataDto visitDate(String? visitDate) => this(visitDate: visitDate);
+
+  @override
+  SyncEntityDataDto visitTime(String? visitTime) => this(visitTime: visitTime);
+
+  @override
+  SyncEntityDataDto entrepriseId(String? entrepriseId) =>
+      this(entrepriseId: entrepriseId);
+
+  @override
+  SyncEntityDataDto objetId(String? objetId) => this(objetId: objetId);
+
+  @override
+  SyncEntityDataDto directionId(String? directionId) =>
+      this(directionId: directionId);
+
+  @override
+  SyncEntityDataDto destinataireId(String? destinataireId) =>
+      this(destinataireId: destinataireId);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncEntityDataDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -233,6 +279,13 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? method = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
     Object? callbackAt = const $CopyWithPlaceholder(),
+    Object? visitorName = const $CopyWithPlaceholder(),
+    Object? visitDate = const $CopyWithPlaceholder(),
+    Object? visitTime = const $CopyWithPlaceholder(),
+    Object? entrepriseId = const $CopyWithPlaceholder(),
+    Object? objetId = const $CopyWithPlaceholder(),
+    Object? directionId = const $CopyWithPlaceholder(),
+    Object? destinataireId = const $CopyWithPlaceholder(),
   }) {
     return SyncEntityDataDto(
       fullName: fullName == const $CopyWithPlaceholder()
@@ -343,6 +396,34 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.callbackAt
           // ignore: cast_nullable_to_non_nullable
           : callbackAt as DateTime?,
+      visitorName: visitorName == const $CopyWithPlaceholder()
+          ? _value.visitorName
+          // ignore: cast_nullable_to_non_nullable
+          : visitorName as String?,
+      visitDate: visitDate == const $CopyWithPlaceholder()
+          ? _value.visitDate
+          // ignore: cast_nullable_to_non_nullable
+          : visitDate as String?,
+      visitTime: visitTime == const $CopyWithPlaceholder()
+          ? _value.visitTime
+          // ignore: cast_nullable_to_non_nullable
+          : visitTime as String?,
+      entrepriseId: entrepriseId == const $CopyWithPlaceholder()
+          ? _value.entrepriseId
+          // ignore: cast_nullable_to_non_nullable
+          : entrepriseId as String?,
+      objetId: objetId == const $CopyWithPlaceholder()
+          ? _value.objetId
+          // ignore: cast_nullable_to_non_nullable
+          : objetId as String?,
+      directionId: directionId == const $CopyWithPlaceholder()
+          ? _value.directionId
+          // ignore: cast_nullable_to_non_nullable
+          : directionId as String?,
+      destinataireId: destinataireId == const $CopyWithPlaceholder()
+          ? _value.destinataireId
+          // ignore: cast_nullable_to_non_nullable
+          : destinataireId as String?,
     );
   }
 }
@@ -439,6 +520,13 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
           'callbackAt',
           (v) => v == null ? null : DateTime.parse(v as String),
         ),
+        visitorName: $checkedConvert('visitorName', (v) => v as String?),
+        visitDate: $checkedConvert('visitDate', (v) => v as String?),
+        visitTime: $checkedConvert('visitTime', (v) => v as String?),
+        entrepriseId: $checkedConvert('entrepriseId', (v) => v as String?),
+        objetId: $checkedConvert('objetId', (v) => v as String?),
+        directionId: $checkedConvert('directionId', (v) => v as String?),
+        destinataireId: $checkedConvert('destinataireId', (v) => v as String?),
       );
       return val;
     });
@@ -479,6 +567,13 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(
   if (instance.comment case final value?) 'comment': value,
   if (instance.callbackAt?.toIso8601String() case final value?)
     'callbackAt': value,
+  if (instance.visitorName case final value?) 'visitorName': value,
+  if (instance.visitDate case final value?) 'visitDate': value,
+  if (instance.visitTime case final value?) 'visitTime': value,
+  if (instance.entrepriseId case final value?) 'entrepriseId': value,
+  if (instance.objetId case final value?) 'objetId': value,
+  if (instance.directionId case final value?) 'directionId': value,
+  if (instance.destinataireId case final value?) 'destinataireId': value,
 };
 
 const _$ProspectStatutEnumMap = {

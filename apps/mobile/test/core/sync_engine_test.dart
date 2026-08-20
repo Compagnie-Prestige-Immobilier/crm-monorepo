@@ -1541,6 +1541,7 @@ void main() {
             prospects: const <ProspectDto>[],
             callCampaigns: const <SyncCallCampaignDto>[],
             callTasks: const <SyncCallTaskDto>[],
+            visites: const <SyncVisiteDto>[],
           ),
           deletions: const <SyncDeletionDto>[],
           nextCursor: 'cur-2',
@@ -1591,6 +1592,7 @@ void main() {
             prospects: const <ProspectDto>[],
             callCampaigns: const <SyncCallCampaignDto>[],
             callTasks: const <SyncCallTaskDto>[],
+            visites: const <SyncVisiteDto>[],
           ),
           deletions: const <SyncDeletionDto>[],
           nextCursor: 'cur-9',
@@ -1628,6 +1630,7 @@ void main() {
             prospects: const <ProspectDto>[],
             callCampaigns: const <SyncCallCampaignDto>[],
             callTasks: const <SyncCallTaskDto>[],
+            visites: const <SyncVisiteDto>[],
           ),
           deletions: <SyncDeletionDto>[
             SyncDeletionDto(
@@ -1660,6 +1663,7 @@ void main() {
             prospects: const <ProspectDto>[],
             callCampaigns: const <SyncCallCampaignDto>[],
             callTasks: const <SyncCallTaskDto>[],
+            visites: const <SyncVisiteDto>[],
           ),
           deletions: const <SyncDeletionDto>[],
           nextCursor: '',
@@ -1704,6 +1708,7 @@ void main() {
                   updatedAt: t0,
                 ),
               ],
+              visites: const <SyncVisiteDto>[],
             ),
             deletions: const <SyncDeletionDto>[],
             nextCursor: 'cur-2',
@@ -1723,6 +1728,81 @@ void main() {
         final List<CallTask> file = await db.select(db.callTasks).get();
         expect(file.single.prospectId, 'pro-1');
         expect(file.single.position, 1);
+      },
+    );
+
+    test(
+      'une visite tirée complète la ligne posée hors ligne, référence comprise',
+      () async {
+        await db
+            .into(db.visites)
+            .insert(
+              VisitesCompanion.insert(
+                id: 'visite-1',
+                date: '2026-08-12',
+                time: const Value<String?>('09:12'),
+                visitorName: 'Awa Ndiaye',
+                entrepriseId: 'e1',
+                entrepriseLabel: 'CPI',
+                objetId: 'o1',
+                objetLabel: 'Achat terrain',
+                createdById: 'me',
+                createdAt: t0,
+                updatedAt: t0,
+              ),
+            );
+
+        api.pullPages.add(
+          PullPage(
+            changes: SyncChangesDto(
+              departements: const <DepartementDto>[],
+              iefs: const <IefDto>[],
+              banques: const <BanqueDto>[],
+              syndicats: const <SyndicatDto>[],
+              representants: const <RepresentantDto>[],
+              prospects: const <ProspectDto>[],
+              callCampaigns: const <SyncCallCampaignDto>[],
+              callTasks: const <SyncCallTaskDto>[],
+              visites: <SyncVisiteDto>[
+                SyncVisiteDto(
+                  id: 'visite-1',
+                  reference: 'V-2026-000412',
+                  date: '2026-08-12',
+                  time: '09:12',
+                  visitorName: 'Awa Ndiaye',
+                  phone: null,
+                  phoneE164: null,
+                  entreprise: VisiteReferentielRefDto(
+                    id: 'e1',
+                    code: 'CPI',
+                    label: 'CPI',
+                  ),
+                  objet: VisiteReferentielRefDto(
+                    id: 'o1',
+                    code: 'ACHAT_TERRAIN',
+                    label: 'Achat terrain',
+                  ),
+                  direction: null,
+                  destinataire: null,
+                  comment: null,
+                  createdById: 'me',
+                  createdAt: t0,
+                  updatedAt: t0,
+                ),
+              ],
+            ),
+            deletions: const <SyncDeletionDto>[],
+            nextCursor: 'cur-2',
+            hasMore: false,
+            serverTime: t0,
+          ),
+        );
+
+        await engine.pullChanges();
+
+        final List<Visite> lignes = await db.select(db.visites).get();
+        expect(lignes.single.reference, 'V-2026-000412');
+        expect(lignes.single.visitorName, 'Awa Ndiaye');
       },
     );
   });

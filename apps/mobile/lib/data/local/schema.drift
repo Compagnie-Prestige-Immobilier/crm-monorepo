@@ -768,3 +768,44 @@ campaignsWithOpenWork:
     JOIN prospects p ON p.id = t.prospect_id AND p.deleted_at IS NULL
     GROUP BY c.id
     ORDER BY c.updated_at DESC;
+
+-- ── Registre des visites ─────────────────────────────────────────────────────
+--
+-- Le tirage descend le registre comme call_campaigns/call_tasks : le serveur
+-- est seul à l'écrire, un pull rejoué recopie la même ligne, `updated_at` seul
+-- arbitre. Les entreprise/objet/direction/destinataire voyagent DÉNORMALISÉS
+-- (id + libellé), même patron que `departements.region_name` : cette table
+-- n'a pas de miroir local des référentiels de visite, le tirage étant la seule
+-- source. `reference` est NULL tant que l'inscription reste en file : le
+-- serveur seul l'attribue, et le tirage qui suit la poussée la complète.
+--
+-- AUCUNE clé étrangère, AUCUN CHECK d'énumération : voir le commentaire de
+-- call_tasks, la même raison vaut ici à l'identique.
+CREATE TABLE visites (
+    id TEXT NOT NULL PRIMARY KEY,
+    reference TEXT NULL,
+    date TEXT NOT NULL,
+    time TEXT NULL,
+    visitor_name TEXT NOT NULL,
+    phone TEXT NULL,
+    phone_e164 TEXT NULL,
+    entreprise_id TEXT NOT NULL,
+    entreprise_label TEXT NOT NULL,
+    objet_id TEXT NOT NULL,
+    objet_label TEXT NOT NULL,
+    direction_id TEXT NULL,
+    direction_label TEXT NULL,
+    destinataire_id TEXT NULL,
+    destinataire_label TEXT NULL,
+    comment TEXT NULL,
+    created_by_id TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
+);
+
+CREATE INDEX visites_date_idx ON visites (date, time);
+
+-- Le registre du jour, le plus récent d'abord ; les entrées sans heure
+-- (saisies hors ligne pas encore relevées par le serveur) ferment la liste.
+registreDuJour:
+    SELECT * FROM visites WHERE date = :jour ORDER BY time DESC, created_at DESC;

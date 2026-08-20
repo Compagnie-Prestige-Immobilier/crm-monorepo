@@ -180,6 +180,7 @@ import 'package:crm_api_client/src/model/sync_operation_result_dto.dart';
 import 'package:crm_api_client/src/model/sync_pull_response_dto.dart';
 import 'package:crm_api_client/src/model/sync_push_dto.dart';
 import 'package:crm_api_client/src/model/sync_push_response_dto.dart';
+import 'package:crm_api_client/src/model/sync_visite_dto.dart';
 import 'package:crm_api_client/src/model/syndicat_dto.dart';
 import 'package:crm_api_client/src/model/time_bucket_dto.dart';
 import 'package:crm_api_client/src/model/top_commercial_dto.dart';
@@ -820,6 +821,9 @@ ReturnType deserialize<ReturnType, BaseType>(
       return SyncPushDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'SyncPushResponseDto':
       return SyncPushResponseDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SyncVisiteDto':
+      return SyncVisiteDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SyndicatDto':
       return SyndicatDto.fromJson(value as Map<String, dynamic>) as ReturnType;

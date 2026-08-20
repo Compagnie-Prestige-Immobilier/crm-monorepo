@@ -135,6 +135,25 @@ void main() {
       dayIndex: 3,
     );
 
+    // Le registre dans son état le plus large : les intitulés les plus longs
+    // du classeur, une référence, un téléphone et les quatre listes remplies.
+    await insertVisite(
+      db,
+      id: 'v1',
+      date: '2026-08-12',
+      time: '11:08',
+      visitorName: 'Abdoulaye Ousseynou Kane Diagne',
+      phone: '+33 6 12 34 56 78',
+      entrepriseId: 'e1',
+      entrepriseLabel: 'MAKE-UP ADDICTION',
+      objetId: 'o1',
+      objetLabel: 'ACHAT PRODUITS SANTARGILE ET/OU MAKE-UP',
+      directionId: 'd1',
+      directionLabel: 'MARKETING COMMUNICATION',
+      destinataireId: 't1',
+      destinataireLabel: 'MME. DIOUM YAMA (Ass Rh et Commerciale Argile)',
+    );
+
     // Un brouillon vieux d'une heure sur chaque formulaire : entre 60 s et
     // 7 jours, `DraftRepository` le classe « reprenable » et l'écran affiche le
     // bandeau de reprise. Ce bandeau porte deux `TextButton` dans la même ligne
@@ -534,43 +553,4 @@ class _VisitesFigees implements VisitesPort {
         ],
       );
 
-  @override
-  Future<List<VisiteDto>> registre({required String jour}) async => <VisiteDto>[
-    VisiteDto(
-      id: 'v1',
-      reference: 'V-2026-000412',
-      date: jour,
-      time: '11:08',
-      visitorName: 'Abdoulaye Ousseynou Kane Diagne',
-      phone: '+33 6 12 34 56 78',
-      phoneE164: null,
-      entreprise: VisiteReferentielRefDto(
-        id: 'e1',
-        code: 'MAKE_UP_ADDICTION',
-        label: 'MAKE-UP ADDICTION',
-      ),
-      objet: VisiteReferentielRefDto(
-        id: 'o1',
-        code: 'ACHAT_PRODUITS',
-        label: 'ACHAT PRODUITS SANTARGILE ET/OU MAKE-UP',
-      ),
-      direction: VisiteReferentielRefDto(
-        id: 'd1',
-        code: 'MARKETING_COMMUNICATION',
-        label: 'MARKETING COMMUNICATION',
-      ),
-      destinataire: VisiteReferentielRefDto(
-        id: 't1',
-        code: 'DIOUM_YAMA',
-        label: 'MME. DIOUM YAMA (Ass Rh et Commerciale Argile)',
-      ),
-      comment: null,
-      createdById: 'u-1',
-      createdAt: DateTime.utc(2026),
-    ),
-  ];
-
-  @override
-  Future<VisiteDto> inscrire(CreateVisiteDto visite) =>
-      throw UnimplementedError('le balayage ne fait que peindre');
 }

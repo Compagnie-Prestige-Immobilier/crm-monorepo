@@ -971,6 +971,7 @@ PullPage pullPageWithRepresentant(RepresentantDto dto) {
       prospects: const <ProspectDto>[],
       callCampaigns: const <SyncCallCampaignDto>[],
       callTasks: const <SyncCallTaskDto>[],
+      visites: const <SyncVisiteDto>[],
     ),
     deletions: const <SyncDeletionDto>[],
     nextCursor: 'c1',

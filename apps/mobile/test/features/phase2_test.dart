@@ -782,7 +782,7 @@ void main() {
       expect(sent.data?.outcome, CallOutcome.UNREACHABLE);
     });
 
-    test('la file d\'aujourd\'hui part en version de charge utile 3', () async {
+    test('la file d\'aujourd\'hui part en version de charge utile courante', () async {
       await seedDirectory();
       await writes.recordCallAttempt(
         prospectId: 'pros-1',
@@ -792,8 +792,8 @@ void main() {
 
       await engine.drain();
 
-      expect((await allOutbox(db)).single.payloadVersion, 3);
-      expect(api.calls.single.payloadVersion, 3);
+      expect((await allOutbox(db)).single.payloadVersion, SyncEngine.payloadVersion);
+      expect(api.calls.single.payloadVersion, SyncEngine.payloadVersion);
     });
 
     test('la note vocale reste en file jusqu’à son envoi', () async {

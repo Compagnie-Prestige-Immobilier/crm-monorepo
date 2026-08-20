@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   /// L'effet d'une tentative saisie avant la v10, déduit de son issue. Sans
   /// cette dérivation, la recopie de table poserait le défaut `KEEP_OPEN`
@@ -159,6 +159,12 @@ class AppDatabase extends _$AppDatabase {
       if (from < 13 && to >= 13) {
         // Trois liens relaches et trois colonnes ajoutees : SQLite recree la table.
         await m.alterTable(_prospectsCopy(prospects));
+      }
+      if (from < 14 && to >= 14) {
+        // Table neuve, aucune recopie : rien ici ne peut lire une colonne qui
+        // n'existait pas encore au palier d'origine.
+        await m.createTable(visites);
+        await m.createIndex(visitesDateIdx);
       }
     },
     beforeOpen: (OpeningDetails details) async {

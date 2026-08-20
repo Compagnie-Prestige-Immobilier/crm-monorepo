@@ -85,6 +85,76 @@ class WriteRepository {
   static String? _whatsappE164For(String status, String? entered) =>
       status == WhatsappStatus.autreNumero.code ? entered : null;
 
+  /// `reference` reste absente en local : c'est le serveur qui l'attribue, à
+  /// la poussée. Elle apparaît au pull suivant, qui recopie la ligne en place
+  /// grâce au même `id`.
+  Future<String> inscrireVisite({
+    required String visitorName,
+    required String date,
+    required String entrepriseId,
+    required String entrepriseLabel,
+    required String objetId,
+    required String objetLabel,
+    required String createdById,
+    String? time,
+    String? phone,
+    String? directionId,
+    String? directionLabel,
+    String? destinataireId,
+    String? destinataireLabel,
+    String? comment,
+    String? id,
+  }) async {
+    final String entityId = id ?? Ids.newId();
+    final DateTime now = _clock.now();
+    await _db.transaction(() async {
+      await _db
+          .into(_db.visites)
+          .insert(
+            VisitesCompanion.insert(
+              id: entityId,
+              date: date,
+              time: Value<String?>(time),
+              visitorName: visitorName,
+              phone: Value<String?>(phone),
+              entrepriseId: entrepriseId,
+              entrepriseLabel: entrepriseLabel,
+              objetId: objetId,
+              objetLabel: objetLabel,
+              directionId: Value<String?>(directionId),
+              directionLabel: Value<String?>(directionLabel),
+              destinataireId: Value<String?>(destinataireId),
+              destinataireLabel: Value<String?>(destinataireLabel),
+              comment: Value<String?>(comment),
+              createdById: createdById,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await _enqueue(
+        // Une inscription ne depend de rien : chaque visite est sa propre
+        // partition, comme cote serveur (voir dependencyKeyOf).
+        dependencyKey: entityId,
+        entityType: 'visite',
+        entityId: entityId,
+        op: 'create',
+        payload: <String, Object?>{
+          'visitorName': visitorName,
+          'visitDate': date,
+          'visitTime': ?time,
+          'phone': ?phone,
+          'entrepriseId': entrepriseId,
+          'objetId': objetId,
+          'directionId': ?directionId,
+          'destinataireId': ?destinataireId,
+          'comment': ?comment,
+        },
+        now: now,
+      );
+    });
+    return entityId;
+  }
+
   Future<String> createRepresentant({
     required String fullName,
     required String phoneE164,

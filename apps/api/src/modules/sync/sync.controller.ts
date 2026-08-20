@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   HttpCode,
+  HttpException,
   HttpStatus,
   Post,
   Query,
@@ -24,6 +25,11 @@ import { SyncService } from './sync.service.js';
 import { SyncPullQueryDto, SyncPullResponseDto, SyncPushDto, SyncPushResponseDto } from './dto.js';
 import { MOBILE_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
 import { HeartbeatService } from '../heartbeat/heartbeat.service.js';
+
+/** Palier où les liens banque, syndicat et représentant d’un prospect sont devenus nuls. */
+export const MIN_PULL_PAYLOAD_VERSION = 4;
+
+const UPGRADE_REQUIRED = 426;
 
 @ApiTags('sync')
 @ApiBearerAuth()
@@ -114,6 +120,17 @@ export class SyncController {
 
   @Get('pull')
   @Roles(...MOBILE_ROLES)
+  @ApiHeader({
+    name: 'X-CPI-Payload-Version',
+    required: true,
+    description:
+      'Format de données que le client sait lire. En dessous de ' +
+      String(MIN_PULL_PAYLOAD_VERSION) +
+      ', le tirage est refusé au lieu d’être servi : les liens banque, syndicat et ' +
+      'représentant d’un prospect peuvent être nuls, et un client plus ancien ' +
+      'échoue à les décoder.',
+    schema: { type: 'integer', minimum: MIN_PULL_PAYLOAD_VERSION },
+  })
   @ApiOperation({
     operationId: 'pullSyncChanges',
     summary: 'Récupère les changements depuis un curseur opaque.',
@@ -121,10 +138,34 @@ export class SyncController {
       'Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres lignes ; les référentiels sont communs.',
   })
   @ApiResponse({ status: 200, type: SyncPullResponseDto })
+  @ApiResponse({
+    status: UPGRADE_REQUIRED,
+    type: ApiErrorDto,
+    description:
+      'APP_UPDATE_REQUIRED. Le client n’annonce pas de format, ou en annonce un que ' +
+      'cette réponse dépasse. La remontée par `pushSyncBatch` reste ouverte : rien ' +
+      'de ce qui est saisi hors ligne n’est perdu pendant que l’appareil se met à jour.',
+  })
   async pull(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: SyncPullQueryDto,
+    @Headers('x-cpi-payload-version') payloadVersion: string | undefined,
   ): Promise<SyncPullResponseDto> {
+    // Un APK d’avant ce palier n’envoie rien : l’absence vaut format trop ancien.
+    const declared = Number(payloadVersion);
+    if (!Number.isInteger(declared) || declared < MIN_PULL_PAYLOAD_VERSION) {
+      throw new HttpException(
+        {
+          code: 'APP_UPDATE_REQUIRED',
+          message:
+            'Cette version de CPI GO ne sait plus lire les données du serveur. ' +
+            'Vos saisies continuent de partir. Installez la mise à jour pour ' +
+            'recevoir de nouveau les fiches.',
+        },
+        UPGRADE_REQUIRED,
+      );
+    }
+
     const changes = await this.sync.pull(user, query);
     await this.heartbeat.record(user.id, 'pull', query);
     return changes;

@@ -71,6 +71,32 @@ export interface CallOutcomeReasonRow {
   isActive: boolean;
 }
 
+export interface VisiteReferentielRow {
+  id: string;
+  code: string;
+  label: string;
+  isActive: boolean;
+}
+
+export interface VisiteRow {
+  id: string;
+  reference: string;
+  visitedAt: Date;
+  timeKnown: boolean;
+  visitorName: string;
+  phone: string | null;
+  phoneE164: string | null;
+  entrepriseId: string;
+  objetId: string;
+  directionId: string | null;
+  destinataireId: string | null;
+  comment: string | null;
+  createdById: string;
+  createdAt: Date;
+  updatedAt: Date;
+  isDemo: boolean;
+}
+
 export interface ProspectRow {
   id: string;
   nom: string;
@@ -128,6 +154,11 @@ export class FakePrisma {
   callAttempts = new Map<string, CallAttemptRow>();
   representantComments = new Map<string, RepresentantCommentRow>();
   callOutcomeReasons = new Map<string, CallOutcomeReasonRow>();
+  visites = new Map<string, VisiteRow>();
+  visiteEntreprises = new Map<string, VisiteReferentielRow>();
+  visiteObjets = new Map<string, VisiteReferentielRow>();
+  visiteDirections = new Map<string, VisiteReferentielRow>();
+  visiteDestinataires = new Map<string, VisiteReferentielRow>();
   users = new Map<string, { id: string; isDemo: boolean; role?: string }>();
   demoEntities: { entityType: string; entityId: string; sequence: number }[] = [];
 
@@ -226,6 +257,7 @@ export class FakePrisma {
       prospects: new Map([...this.prospects].map(([k, v]) => [k, clone(v)])),
       callAttempts: new Map([...this.callAttempts].map(([k, v]) => [k, clone(v)])),
       representantComments: new Map([...this.representantComments].map(([k, v]) => [k, clone(v)])),
+      visites: new Map([...this.visites].map(([k, v]) => [k, clone(v)])),
     };
     try {
       return await fn(this);
@@ -235,6 +267,7 @@ export class FakePrisma {
       this.prospects = snapshot.prospects;
       this.callAttempts = snapshot.callAttempts;
       this.representantComments = snapshot.representantComments;
+      this.visites = snapshot.visites;
       this.rollbackCount += 1;
       throw error;
     }
@@ -430,6 +463,78 @@ export class FakePrisma {
         count += 1;
       }
       return Promise.resolve({ count });
+    },
+  };
+
+  private hydrateVisite(row: VisiteRow): Row {
+    return {
+      ...row,
+      entreprise: this.visiteEntreprises.get(row.entrepriseId) ?? null,
+      objet: this.visiteObjets.get(row.objetId) ?? null,
+      direction: row.directionId ? (this.visiteDirections.get(row.directionId) ?? null) : null,
+      destinataire: row.destinataireId
+        ? (this.visiteDestinataires.get(row.destinataireId) ?? null)
+        : null,
+    };
+  }
+
+  visiteEntreprise = {
+    findUnique: (args: { where: { id: string } }) =>
+      Promise.resolve(this.visiteEntreprises.get(args.where.id) ?? null),
+  };
+
+  visiteObjet = {
+    findUnique: (args: { where: { id: string } }) =>
+      Promise.resolve(this.visiteObjets.get(args.where.id) ?? null),
+  };
+
+  visiteDirection = {
+    findUnique: (args: { where: { id: string } }) =>
+      Promise.resolve(this.visiteDirections.get(args.where.id) ?? null),
+  };
+
+  visiteDestinataire = {
+    findUnique: (args: { where: { id: string } }) =>
+      Promise.resolve(this.visiteDestinataires.get(args.where.id) ?? null),
+  };
+
+  visite = {
+    findUnique: (args: { where: { id: string } }) =>
+      Promise.resolve(this.visites.get(args.where.id) ?? null),
+    findFirst: (args: { where?: Row }) => {
+      const where = args.where ?? {};
+      const reference = where.reference as { startsWith: string } | undefined;
+      if (reference) {
+        const rows = [...this.visites.values()]
+          .filter((row) => row.reference.startsWith(reference.startsWith))
+          .sort((a, b) => (a.reference < b.reference ? 1 : -1));
+        return Promise.resolve(rows[0] ? { reference: rows[0].reference } : null);
+      }
+      const rows = [...this.visites.values()].filter((row) =>
+        matches(row as unknown as Row, where),
+      );
+      return Promise.resolve(rows[0] ?? null);
+    },
+    create: (args: { data: Row }) => {
+      const data = args.data;
+      const id = (data.id as string | undefined) ?? `fake-visite-${String(this.visites.size + 1)}`;
+      if (this.visites.has(id)) {
+        throw Object.assign(new Error('unique violation'), { code: 'P2002' });
+      }
+      const row = {
+        phone: null,
+        phoneE164: null,
+        directionId: null,
+        destinataireId: null,
+        comment: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isDemo: false,
+        ...data,
+        id,
+      } as VisiteRow;
+      this.visites.set(row.id, row);
+      return Promise.resolve(this.hydrateVisite(row));
     },
   };
 }

@@ -78,6 +78,20 @@ class SyncEntityDataDto {
     this.comment,
 
     this.callbackAt,
+
+    this.visitorName,
+
+    this.visitDate,
+
+    this.visitTime,
+
+    this.entrepriseId,
+
+    this.objetId,
+
+    this.directionId,
+
+    this.destinataireId,
   });
 
   /// Représentant : nom complet.
@@ -218,6 +232,34 @@ class SyncEntityDataDto {
   @JsonKey(name: r'callbackAt', required: false, includeIfNull: false)
   final DateTime? callbackAt;
 
+  /// Visite : nom et prénom du visiteur.
+  @JsonKey(name: r'visitorName', required: false, includeIfNull: false)
+  final String? visitorName;
+
+  /// Visite : jour, à Dakar.
+  @JsonKey(name: r'visitDate', required: false, includeIfNull: false)
+  final String? visitDate;
+
+  /// Visite : heure, omise si elle n’a pas été relevée.
+  @JsonKey(name: r'visitTime', required: false, includeIfNull: false)
+  final String? visitTime;
+
+  /// Visite : entreprise du visiteur.
+  @JsonKey(name: r'entrepriseId', required: false, includeIfNull: false)
+  final String? entrepriseId;
+
+  /// Visite : objet de la visite.
+  @JsonKey(name: r'objetId', required: false, includeIfNull: false)
+  final String? objetId;
+
+  /// Visite : direction ou étage visé.
+  @JsonKey(name: r'directionId', required: false, includeIfNull: false)
+  final String? directionId;
+
+  /// Visite : destinataire visé.
+  @JsonKey(name: r'destinataireId', required: false, includeIfNull: false)
+  final String? destinataireId;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SyncEntityDataDto &&
@@ -251,6 +293,13 @@ class SyncEntityDataDto {
                 method,
                 comment,
                 callbackAt,
+                visitorName,
+                visitDate,
+                visitTime,
+                entrepriseId,
+                objetId,
+                directionId,
+                destinataireId,
               ],
               [
                 other.fullName,
@@ -280,6 +329,13 @@ class SyncEntityDataDto {
                 other.method,
                 other.comment,
                 other.callbackAt,
+                other.visitorName,
+                other.visitDate,
+                other.visitTime,
+                other.entrepriseId,
+                other.objetId,
+                other.directionId,
+                other.destinataireId,
               ],
             );
   }
@@ -315,6 +371,13 @@ class SyncEntityDataDto {
         method,
         comment,
         callbackAt,
+        visitorName,
+        visitDate,
+        visitTime,
+        entrepriseId,
+        objetId,
+        directionId,
+        destinataireId,
       ]);
 
   factory SyncEntityDataDto.fromJson(Map<String, dynamic> json) =>

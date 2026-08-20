@@ -50,7 +50,9 @@ class SyncEngine {
   /// serveur s'en sert pour ne redescendre à cet appareil que les motifs qu'il
   /// sait émettre.
   /// v3 : les commentaires d'une fiche remontent depuis la file hors ligne.
-  static const int payloadVersion = 3;
+  /// v4 : les liens banque, syndicat et représentant d'un prospect peuvent
+  /// être nuls ; le tirage exige ce numéro en en-tête et refuse en dessous.
+  static const int payloadVersion = 4;
 
   final int maxBatchOps;
 
@@ -1118,7 +1120,11 @@ class SyncEngine {
       String? cursor = await readCursor();
 
       for (int page = 0; page < maxPages; page++) {
-        final PullPage result = await _api.pull(cursor: cursor, limit: 200);
+        final PullPage result = await _api.pull(
+          cursor: cursor,
+          limit: 200,
+          payloadVersion: payloadVersion,
+        );
         applied += await _applyPage(result);
         final bool advanced = await advanceCursor(
           from: cursor,
@@ -1481,6 +1487,37 @@ class SyncEngine {
                 dayIndex: Value<int>(t.dayIndex.toInt()),
                 status: Value<String>(t.status.value),
                 updatedAt: t.updatedAt,
+              ),
+            );
+        count++;
+      }
+
+      // Le registre : aucune revision, le serveur seul l'ecrit. Un rejeu de
+      // pull recopie donc la meme ligne sans arbitrage.
+      for (final SyncVisiteDto v in page.changes.visites) {
+        await _db
+            .into(_db.visites)
+            .insertOnConflictUpdate(
+              VisitesCompanion.insert(
+                id: v.id,
+                reference: Value<String?>(v.reference),
+                date: v.date,
+                time: Value<String?>(v.time),
+                visitorName: v.visitorName,
+                phone: Value<String?>(v.phone),
+                phoneE164: Value<String?>(v.phoneE164),
+                entrepriseId: v.entreprise.id,
+                entrepriseLabel: v.entreprise.label,
+                objetId: v.objet.id,
+                objetLabel: v.objet.label,
+                directionId: Value<String?>(v.direction?.id),
+                directionLabel: Value<String?>(v.direction?.label),
+                destinataireId: Value<String?>(v.destinataire?.id),
+                destinataireLabel: Value<String?>(v.destinataire?.label),
+                comment: Value<String?>(v.comment),
+                createdById: v.createdById,
+                createdAt: v.createdAt,
+                updatedAt: v.updatedAt,
               ),
             );
         count++;

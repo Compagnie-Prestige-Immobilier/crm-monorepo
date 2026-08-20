@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
+import { VisitesService } from '../visites/visites.service.js';
 import { SYSTEM_OUTCOME_REASONS } from '../referentiels/call-outcome-rules.js';
 import { SyncBatchStore } from './batch-store.js';
 import { SyncService } from './sync.service.js';
@@ -81,6 +82,7 @@ beforeEach(() => {
     new SyncBatchStore(prisma),
     new Phase2SyncService(),
     fakeDemoVisibility(),
+    new VisitesService(prisma, fakeDemoVisibility()),
   );
 });
 

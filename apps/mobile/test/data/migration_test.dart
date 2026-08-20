@@ -16,6 +16,7 @@ import 'generated_migrations/schema_v8.dart' as v8;
 import 'generated_migrations/schema_v9.dart' as v9;
 import 'generated_migrations/schema_v10.dart' as v10;
 import 'generated_migrations/schema_v11.dart' as v11;
+import 'generated_migrations/schema_v13.dart' as v13;
 
 /// Test doré de migration.
 ///
@@ -1465,6 +1466,49 @@ void main() {
 
     await db.close();
   });
+
+  // ── v13 → v14 : le registre des visites descend sur l'appareil ─────────────
+  //
+  // Table NEUVE, aucune recopie. Ce qui doit être prouvé : la saisie déjà en
+  // file survit, et la table neuve s'ouvre vide plutôt que de faire échouer
+  // l'ouverture.
+
+  test(
+    'v13 -> v14 ajoute le registre des visites sans toucher à la file en attente',
+    () async {
+      final schema = await verifier.schemaAt(13);
+
+      final v13.DatabaseAtV13 old = v13.DatabaseAtV13(schema.newConnection());
+      await old.customStatement('PRAGMA foreign_keys = ON;');
+      await old.customStatement(
+        'INSERT INTO outbox '
+        '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'op-visite-1',
+          'representant',
+          'rep-1',
+          'create',
+          '{"x":1}',
+          _iso,
+          _iso,
+        ],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 14);
+
+      final List<QueryRow> enFile = await db
+          .customSelect('SELECT id FROM outbox')
+          .get();
+      expect(enFile.single.read<String>('id'), 'op-visite-1');
+
+      expect(await db.customSelect('SELECT * FROM visites').get(), isEmpty);
+
+      await db.close();
+    },
+  );
 }
 
 /// Instant fixe, en texte ISO-8601 : c'est ainsi que drift stocke les DATETIME

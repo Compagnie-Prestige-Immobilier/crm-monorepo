@@ -1,4 +1,3 @@
-import 'package:crm_api_client/crm_api_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +6,10 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
+import '../../../data/local/database.dart';
+import '../../../ui/async_value_x.dart';
+import '../../../ui/widgets/offline_indicator.dart';
+import '../../../ui/widgets/sync_badge.dart';
 import '../../auth/auth_state.dart';
 import '../visites_repository.dart';
 import 'visite_form_screen.dart';
@@ -18,7 +21,7 @@ class RegistreScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final AuthState auth = ref.watch(authControllerProvider);
-    final AsyncValue<List<VisiteDto>> registre = ref.watch(registreDuJourProvider);
+    final AsyncValue<List<Visite>> registre = ref.watch(registreDuJourProvider);
 
     if (!peutTenirLeRegistre(auth.role)) {
       return Scaffold(
@@ -40,71 +43,65 @@ class RegistreScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Registre des visites'),
-        actions: <Widget>[
-          IconButton(
-            onPressed: () => ref.invalidate(registreDuJourProvider),
-            tooltip: 'Actualiser',
-            icon: const Icon(PhosphorIconsRegular.arrowClockwise),
-          ),
-          const SizedBox(width: CpiSpacing.xxs),
+        actions: const <Widget>[
+          OfflineIndicator(),
+          SyncBadge(),
+          SizedBox(width: CpiSpacing.xs),
         ],
       ),
       body: SafeArea(
         child: Column(
           children: <Widget>[
             Expanded(
-              child: RefreshIndicator(
-                color: theme.colorScheme.primary,
-                onRefresh: () async {
-                  await HapticFeedback.selectionClick();
-                  ref.invalidate(registreDuJourProvider);
-                  await ref.read(registreDuJourProvider.future);
-                },
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(
-                    CpiSpacing.md,
-                    CpiSpacing.md,
-                    CpiSpacing.md,
-                    CpiSpacing.md,
-                  ),
-                  physics: const AlwaysScrollableScrollPhysics(),
+              child: registre.whenEchecDAbord(
+                loading: () => const _RegistreEnCours(),
+                error: (Object error, StackTrace _) => ListView(
+                  padding: const EdgeInsets.all(CpiSpacing.md),
                   children: <Widget>[
-                    const RegistreEnLigneSeulement(),
-                    ...switch (registre) {
-                      AsyncError<List<VisiteDto>>(:final Object error) =>
-                        <Widget>[
-                          BandeauEchec(
-                            message:
-                                'Le registre du jour n\'a pas pu être lu. '
-                                '${messageErreur(error)}',
-                          ),
-                          const SizedBox(height: CpiSpacing.xs),
-                          OutlinedButton.icon(
-                            onPressed: () => ref.invalidate(registreDuJourProvider),
-                            icon: const Icon(
-                              PhosphorIconsRegular.arrowClockwise,
-                              size: 20,
-                            ),
-                            label: const Text('Réessayer'),
-                          ),
-                        ],
-                      AsyncData<List<VisiteDto>>(:final List<VisiteDto> value) =>
-                        value.isEmpty
-                            ? const <Widget>[_RegistreVide()]
-                            : <Widget>[
-                                _Compte(nombre: value.length),
-                                const SizedBox(height: CpiSpacing.xs),
-                                for (final VisiteDto visite in value)
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                      bottom: CpiSpacing.xs,
-                                    ),
-                                    child: _LigneVisite(visite: visite),
-                                  ),
-                              ],
-                      _ => const <Widget>[_RegistreEnCours()],
-                    },
+                    BandeauEchec(
+                      message:
+                          'Le registre du jour n\'a pas pu être lu. '
+                          '${messageErreur(error)}',
+                    ),
+                    const SizedBox(height: CpiSpacing.xs),
+                    OutlinedButton.icon(
+                      onPressed: () => ref.invalidate(registreDuJourProvider),
+                      icon: const Icon(
+                        PhosphorIconsRegular.arrowClockwise,
+                        size: 20,
+                      ),
+                      label: const Text('Réessayer'),
+                    ),
                   ],
+                ),
+                data: (List<Visite> value) => RefreshIndicator(
+                  color: theme.colorScheme.primary,
+                  onRefresh: () async {
+                    await HapticFeedback.selectionClick();
+                    await ref.read(syncCoordinatorProvider.notifier).run();
+                  },
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(
+                      CpiSpacing.md,
+                      CpiSpacing.md,
+                      CpiSpacing.md,
+                      CpiSpacing.md,
+                    ),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: value.isEmpty
+                        ? const <Widget>[_RegistreVide()]
+                        : <Widget>[
+                            _Compte(nombre: value.length),
+                            const SizedBox(height: CpiSpacing.xs),
+                            for (final Visite visite in value)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: CpiSpacing.xs,
+                                ),
+                                child: _LigneVisite(visite: visite),
+                              ),
+                          ],
+                  ),
                 ),
               ),
             ),
@@ -159,17 +156,17 @@ class _Compte extends StatelessWidget {
 class _LigneVisite extends StatelessWidget {
   const _LigneVisite({required this.visite});
 
-  final VisiteDto visite;
+  final Visite visite;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final String heure = visite.time ?? '--:--';
     final List<String> details = <String>[
-      visite.entreprise.label,
-      visite.objet.label,
-      if (visite.destinataire != null) visite.destinataire!.label,
-      if (visite.direction != null) visite.direction!.label,
+      visite.entrepriseLabel,
+      visite.objetLabel,
+      if (visite.destinataireLabel != null) visite.destinataireLabel!,
+      if (visite.directionLabel != null) visite.directionLabel!,
     ];
 
     return Container(
@@ -191,7 +188,7 @@ class _LigneVisite extends StatelessWidget {
               const SizedBox(width: CpiSpacing.xs),
               Expanded(
                 child: Text(
-                  visite.reference,
+                  visite.reference ?? 'En attente d\'envoi',
                   textAlign: TextAlign.end,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,

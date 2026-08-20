@@ -834,6 +834,160 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/visites/referentiels': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Les quatre listes de l’accueil, en un appel. */
+    get: operations['listVisiteReferentiels'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites/referentiels/{kind}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Une liste, entrées retirées comprises. */
+    get: operations['listVisiteReferentiel'];
+    put?: never;
+    /**
+     * Ajoute une entrée à une liste.
+     * @description Le code est immuable : les visites déjà enregistrées le désignent.
+     */
+    post: operations['createVisiteReferentiel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites/referentiels/{kind}/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Renomme ou déplace une entrée. */
+    patch: operations['updateVisiteReferentiel'];
+    trace?: never;
+  };
+  '/api/v1/visites/referentiels/{kind}/{id}/active': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Retire une entrée des listes, ou l’y remet.
+     * @description Jamais de suppression : le registre des années passées continue de désigner l’entrée.
+     */
+    post: operations['setVisiteReferentielActive'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites/referentiels/{kind}/reorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Fixe l’ordre d’affichage d’une liste. */
+    post: operations['reorderVisiteReferentiel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites/statistiques': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Le registre compté sur une période.
+     * @description Total, répartitions par entreprise, direction, destinataire et objet, puis la marche du mois et du jour. Une répartition liste TOUTES les entrées de sa liste, y compris à zéro ; sa somme peut être inférieure au total, l’écart étant rendu par sansDirection et sansDestinataire.
+     */
+    get: operations['getVisiteStats'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Le registre, du plus récent au plus ancien. */
+    get: operations['listVisites'];
+    put?: never;
+    /**
+     * Inscrit un visiteur au registre.
+     * @description La référence est engendrée par le serveur. Le téléphone est facultatif et accepté sous n’importe quelle forme : un numéro que la normalisation ne reconnaît pas est conservé tel quel, avec phoneE164 nul.
+     */
+    post: operations['createVisite'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Une ligne du registre. */
+    get: operations['getVisite'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Corrige une ligne du registre.
+     * @description Ni la date ni la référence : elles fixent la ligne dans le registre.
+     */
+    patch: operations['updateVisite'];
+    trace?: never;
+  };
   '/api/v1/phase2/callbacks': {
     parameters: {
       query?: never;
@@ -2402,160 +2556,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/visites/referentiels': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Les quatre listes de l’accueil, en un appel. */
-    get: operations['listVisiteReferentiels'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites/referentiels/{kind}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Une liste, entrées retirées comprises. */
-    get: operations['listVisiteReferentiel'];
-    put?: never;
-    /**
-     * Ajoute une entrée à une liste.
-     * @description Le code est immuable : les visites déjà enregistrées le désignent.
-     */
-    post: operations['createVisiteReferentiel'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites/referentiels/{kind}/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Renomme ou déplace une entrée. */
-    patch: operations['updateVisiteReferentiel'];
-    trace?: never;
-  };
-  '/api/v1/visites/referentiels/{kind}/{id}/active': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Retire une entrée des listes, ou l’y remet.
-     * @description Jamais de suppression : le registre des années passées continue de désigner l’entrée.
-     */
-    post: operations['setVisiteReferentielActive'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites/referentiels/{kind}/reorder': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Fixe l’ordre d’affichage d’une liste. */
-    post: operations['reorderVisiteReferentiel'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites/statistiques': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Le registre compté sur une période.
-     * @description Total, répartitions par entreprise, direction, destinataire et objet, puis la marche du mois et du jour. Une répartition liste TOUTES les entrées de sa liste, y compris à zéro ; sa somme peut être inférieure au total, l’écart étant rendu par sansDirection et sansDestinataire.
-     */
-    get: operations['getVisiteStats'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Le registre, du plus récent au plus ancien. */
-    get: operations['listVisites'];
-    put?: never;
-    /**
-     * Inscrit un visiteur au registre.
-     * @description La référence est engendrée par le serveur. Le téléphone est facultatif et accepté sous n’importe quelle forme : un numéro que la normalisation ne reconnaît pas est conservé tel quel, avec phoneE164 nul.
-     */
-    post: operations['createVisite'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Une ligne du registre. */
-    get: operations['getVisite'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /**
-     * Corrige une ligne du registre.
-     * @description Ni la date ni la référence : elles fixent la ligne dans le registre.
-     */
-    patch: operations['updateVisite'];
-    trace?: never;
-  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3391,7 +3391,7 @@ export interface components {
       prospectIds: string[];
     };
     /** @enum {string} */
-    SyncEntity: 'representant' | 'representant_comment' | 'prospect' | 'call_attempt';
+    SyncEntity: 'representant' | 'representant_comment' | 'prospect' | 'call_attempt' | 'visite';
     /** @enum {string} */
     SyncOp: 'create' | 'update' | 'delete';
     SyncEntityDataDto: {
@@ -3474,6 +3474,38 @@ export interface components {
        * @description Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut CALLBACK. Une version ancienne de l’application ne l’envoie pas.
        */
       callbackAt?: string;
+      /** @description Visite : nom et prénom du visiteur. */
+      visitorName?: string;
+      /**
+       * @description Visite : jour, à Dakar.
+       * @example 2026-01-06
+       */
+      visitDate?: string;
+      /**
+       * @description Visite : heure, omise si elle n’a pas été relevée.
+       * @example 11:08
+       */
+      visitTime?: string;
+      /**
+       * Format: uuid
+       * @description Visite : entreprise du visiteur.
+       */
+      entrepriseId?: string;
+      /**
+       * Format: uuid
+       * @description Visite : objet de la visite.
+       */
+      objetId?: string;
+      /**
+       * Format: uuid
+       * @description Visite : direction ou étage visé.
+       */
+      directionId?: string;
+      /**
+       * Format: uuid
+       * @description Visite : destinataire visé.
+       */
+      destinataireId?: string;
     };
     SyncOperationDto: {
       /**
@@ -3568,6 +3600,36 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    VisiteReferentielRefDto: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      label: string;
+    };
+    SyncVisiteDto: {
+      /** Format: uuid */
+      id: string;
+      /** @example V-2026-000412 */
+      reference: string;
+      /** @example 2026-01-06 */
+      date: string;
+      /** @example 11:08 */
+      time: string | null;
+      visitorName: string;
+      phone: string | null;
+      phoneE164: string | null;
+      entreprise: components['schemas']['VisiteReferentielRefDto'];
+      objet: components['schemas']['VisiteReferentielRefDto'];
+      direction: components['schemas']['VisiteReferentielRefDto'] | null;
+      destinataire: components['schemas']['VisiteReferentielRefDto'] | null;
+      comment: string | null;
+      /** Format: uuid */
+      createdById: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
     SyncChangesDto: {
       departements: components['schemas']['DepartementDto'][];
       iefs: components['schemas']['IefDto'][];
@@ -3577,6 +3639,7 @@ export interface components {
       prospects: components['schemas']['ProspectDto'][];
       callCampaigns: components['schemas']['SyncCallCampaignDto'][];
       callTasks: components['schemas']['SyncCallTaskDto'][];
+      visites: components['schemas']['SyncVisiteDto'][];
     };
     SyncDeletionDto: {
       entity: components['schemas']['SyncEntity'];
@@ -3735,6 +3798,157 @@ export interface components {
       commerciaux: components['schemas']['CampaignCommercialDto'][];
       /** @description Les vingt dernières tentatives, de la plus récente à la plus ancienne. */
       recentAttempts: components['schemas']['CampaignAttemptDto'][];
+    };
+    VisiteReferentielDto: {
+      /** Format: uuid */
+      id: string;
+      /** @description Code stable, jamais modifiable après création. */
+      code: string;
+      label: string;
+      isActive: boolean;
+      /** @description Entrée reprise du classeur d’origine : renommable, désactivable, jamais effacée. */
+      isSystem: boolean;
+      sortOrder: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    VisiteReferentielsBundleDto: {
+      entreprises: components['schemas']['VisiteReferentielDto'][];
+      directions: components['schemas']['VisiteReferentielDto'][];
+      destinataires: components['schemas']['VisiteReferentielDto'][];
+      objets: components['schemas']['VisiteReferentielDto'][];
+    };
+    /** @enum {string} */
+    VisiteReferentielKind: 'entreprises' | 'directions' | 'destinataires' | 'objets';
+    VisiteReferentielListDto: {
+      items: components['schemas']['VisiteReferentielDto'][];
+    };
+    CreateVisiteReferentielDto: {
+      /** @description Majuscules, chiffres et tirets bas. Immuable une fois créé. */
+      code: string;
+      label: string;
+      /** @default 100 */
+      sortOrder: number;
+    };
+    UpdateVisiteReferentielDto: {
+      label?: string;
+      sortOrder?: number;
+    };
+    SetVisiteReferentielActiveDto: {
+      isActive: boolean;
+    };
+    ReorderVisiteReferentielDto: {
+      /** @description Les entrées dans leur nouvel ordre. Celles omises gardent leur rang. */
+      ids: string[];
+    };
+    VisiteStatBucketDto: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      label: string;
+      count: number;
+    };
+    VisiteStatMoisDto: {
+      /** @example 2025-01 */
+      month: string;
+      count: number;
+    };
+    VisiteStatJourDto: {
+      /** @example 2025-01-06 */
+      date: string;
+      count: number;
+    };
+    VisiteStatsDto: {
+      /** @example 2025-01-01 */
+      from: string;
+      /** @example 2025-12-31 */
+      to: string;
+      /** @description Nombre de visites. La somme d’une répartition peut lui être inférieure : direction et destinataire sont facultatifs. */
+      total: number;
+      /** @description Toutes les entrées actives du référentiel, y compris celles à zéro. */
+      parEntreprise: components['schemas']['VisiteStatBucketDto'][];
+      parDirection: components['schemas']['VisiteStatBucketDto'][];
+      parDestinataire: components['schemas']['VisiteStatBucketDto'][];
+      parObjet: components['schemas']['VisiteStatBucketDto'][];
+      /** @description Chaque mois de la période. */
+      parMois: components['schemas']['VisiteStatMoisDto'][];
+      /** @description Seuls les jours ayant reçu au moins une visite. */
+      parJour: components['schemas']['VisiteStatJourDto'][];
+      sansDirection: number;
+      sansDestinataire: number;
+    };
+    VisiteDto: {
+      /** Format: uuid */
+      id: string;
+      /**
+       * @description Le « N° » du registre. Engendré par le serveur, immuable.
+       * @example V-2026-000412
+       */
+      reference: string;
+      /**
+       * @description Jour de la visite, à Dakar.
+       * @example 2026-01-06
+       */
+      date: string;
+      /**
+       * @description Nul quand l’heure n’a pas été relevée.
+       * @example 11:08
+       */
+      time: string | null;
+      visitorName: string;
+      /** @description Le numéro tel qu’il a été donné. */
+      phone: string | null;
+      /** @description Forme E.164, nulle quand le numéro donné n’a pas pu être reconnu. */
+      phoneE164: string | null;
+      entreprise: components['schemas']['VisiteReferentielRefDto'];
+      objet: components['schemas']['VisiteReferentielRefDto'];
+      direction: components['schemas']['VisiteReferentielRefDto'] | null;
+      destinataire: components['schemas']['VisiteReferentielRefDto'] | null;
+      comment: string | null;
+      /** Format: uuid */
+      createdById: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    VisiteListDto: {
+      items: components['schemas']['VisiteDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    CreateVisiteDto: {
+      /** @example 2026-01-06 */
+      date: string;
+      /**
+       * @description Omise si elle n’a pas été relevée.
+       * @example 11:08
+       */
+      time?: string;
+      visitorName: string;
+      /** @description Accepté sous n’importe quelle forme, y compris étrangère ou incomplète. */
+      phone?: string;
+      /** Format: uuid */
+      entrepriseId: string;
+      /** Format: uuid */
+      objetId: string;
+      /** Format: uuid */
+      directionId?: string;
+      /** Format: uuid */
+      destinataireId?: string;
+      comment?: string;
+    };
+    UpdateVisiteDto: {
+      /** @example 11:08 */
+      time?: string | null;
+      visitorName?: string;
+      phone?: string | null;
+      /** Format: uuid */
+      entrepriseId?: string;
+      /** Format: uuid */
+      objetId?: string;
+      /** Format: uuid */
+      directionId?: string | null;
+      /** Format: uuid */
+      destinataireId?: string | null;
+      comment?: string | null;
     };
     /** @enum {string} */
     CallbackScope: 'today' | 'overdue' | 'week';
@@ -5239,163 +5453,6 @@ export interface components {
     ImportJobListDto: {
       items: components['schemas']['ImportJobDto'][];
       meta: components['schemas']['PageMetaDto'];
-    };
-    VisiteReferentielDto: {
-      /** Format: uuid */
-      id: string;
-      /** @description Code stable, jamais modifiable après création. */
-      code: string;
-      label: string;
-      isActive: boolean;
-      /** @description Entrée reprise du classeur d’origine : renommable, désactivable, jamais effacée. */
-      isSystem: boolean;
-      sortOrder: number;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    VisiteReferentielsBundleDto: {
-      entreprises: components['schemas']['VisiteReferentielDto'][];
-      directions: components['schemas']['VisiteReferentielDto'][];
-      destinataires: components['schemas']['VisiteReferentielDto'][];
-      objets: components['schemas']['VisiteReferentielDto'][];
-    };
-    /** @enum {string} */
-    VisiteReferentielKind: 'entreprises' | 'directions' | 'destinataires' | 'objets';
-    VisiteReferentielListDto: {
-      items: components['schemas']['VisiteReferentielDto'][];
-    };
-    CreateVisiteReferentielDto: {
-      /** @description Majuscules, chiffres et tirets bas. Immuable une fois créé. */
-      code: string;
-      label: string;
-      /** @default 100 */
-      sortOrder: number;
-    };
-    UpdateVisiteReferentielDto: {
-      label?: string;
-      sortOrder?: number;
-    };
-    SetVisiteReferentielActiveDto: {
-      isActive: boolean;
-    };
-    ReorderVisiteReferentielDto: {
-      /** @description Les entrées dans leur nouvel ordre. Celles omises gardent leur rang. */
-      ids: string[];
-    };
-    VisiteStatBucketDto: {
-      /** Format: uuid */
-      id: string;
-      code: string;
-      label: string;
-      count: number;
-    };
-    VisiteStatMoisDto: {
-      /** @example 2025-01 */
-      month: string;
-      count: number;
-    };
-    VisiteStatJourDto: {
-      /** @example 2025-01-06 */
-      date: string;
-      count: number;
-    };
-    VisiteStatsDto: {
-      /** @example 2025-01-01 */
-      from: string;
-      /** @example 2025-12-31 */
-      to: string;
-      /** @description Nombre de visites. La somme d’une répartition peut lui être inférieure : direction et destinataire sont facultatifs. */
-      total: number;
-      /** @description Toutes les entrées actives du référentiel, y compris celles à zéro. */
-      parEntreprise: components['schemas']['VisiteStatBucketDto'][];
-      parDirection: components['schemas']['VisiteStatBucketDto'][];
-      parDestinataire: components['schemas']['VisiteStatBucketDto'][];
-      parObjet: components['schemas']['VisiteStatBucketDto'][];
-      /** @description Chaque mois de la période. */
-      parMois: components['schemas']['VisiteStatMoisDto'][];
-      /** @description Seuls les jours ayant reçu au moins une visite. */
-      parJour: components['schemas']['VisiteStatJourDto'][];
-      sansDirection: number;
-      sansDestinataire: number;
-    };
-    VisiteReferentielRefDto: {
-      /** Format: uuid */
-      id: string;
-      code: string;
-      label: string;
-    };
-    VisiteDto: {
-      /** Format: uuid */
-      id: string;
-      /**
-       * @description Le « N° » du registre. Engendré par le serveur, immuable.
-       * @example V-2026-000412
-       */
-      reference: string;
-      /**
-       * @description Jour de la visite, à Dakar.
-       * @example 2026-01-06
-       */
-      date: string;
-      /**
-       * @description Nul quand l’heure n’a pas été relevée.
-       * @example 11:08
-       */
-      time: string | null;
-      visitorName: string;
-      /** @description Le numéro tel qu’il a été donné. */
-      phone: string | null;
-      /** @description Forme E.164, nulle quand le numéro donné n’a pas pu être reconnu. */
-      phoneE164: string | null;
-      entreprise: components['schemas']['VisiteReferentielRefDto'];
-      objet: components['schemas']['VisiteReferentielRefDto'];
-      direction: components['schemas']['VisiteReferentielRefDto'] | null;
-      destinataire: components['schemas']['VisiteReferentielRefDto'] | null;
-      comment: string | null;
-      /** Format: uuid */
-      createdById: string;
-      /** Format: date-time */
-      createdAt: string;
-    };
-    VisiteListDto: {
-      items: components['schemas']['VisiteDto'][];
-      meta: components['schemas']['PageMetaDto'];
-    };
-    CreateVisiteDto: {
-      /** @example 2026-01-06 */
-      date: string;
-      /**
-       * @description Omise si elle n’a pas été relevée.
-       * @example 11:08
-       */
-      time?: string;
-      visitorName: string;
-      /** @description Accepté sous n’importe quelle forme, y compris étrangère ou incomplète. */
-      phone?: string;
-      /** Format: uuid */
-      entrepriseId: string;
-      /** Format: uuid */
-      objetId: string;
-      /** Format: uuid */
-      directionId?: string;
-      /** Format: uuid */
-      destinataireId?: string;
-      comment?: string;
-    };
-    UpdateVisiteDto: {
-      /** @example 11:08 */
-      time?: string | null;
-      visitorName?: string;
-      phone?: string | null;
-      /** Format: uuid */
-      entrepriseId?: string;
-      /** Format: uuid */
-      objetId?: string;
-      /** Format: uuid */
-      directionId?: string | null;
-      /** Format: uuid */
-      destinataireId?: string | null;
-      comment?: string | null;
     };
   };
   responses: never;
@@ -8232,7 +8289,10 @@ export interface operations {
         /** @description Version de l’application mobile, telle qu’elle s’annonce. Facultative. */
         appVersion?: string;
       };
-      header?: never;
+      header: {
+        /** @description Format de données que le client sait lire. En dessous de 4, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder. */
+        'X-CPI-Payload-Version': number;
+      };
       path?: never;
       cookie?: never;
     };
@@ -8266,6 +8326,15 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description APP_UPDATE_REQUIRED. Le client n’annonce pas de format, ou en annonce un que cette réponse dépasse. La remontée par `pushSyncBatch` reste ouverte : rien de ce qui est saisi hors ligne n’est perdu pendant que l’appareil se met à jour. */
+      426: {
         headers: {
           [name: string]: unknown;
         };
@@ -8722,6 +8791,608 @@ export interface operations {
         };
       };
       /** @description PHASE2_CAMPAIGN_COMMERCIAL_NOT_FOUND · PHASE2_CAMPAIGN_DAY_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listVisiteReferentiels: {
+    parameters: {
+      query?: {
+        activeOnly?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielsBundleDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listVisiteReferentiel: {
+    parameters: {
+      query?: {
+        activeOnly?: boolean;
+      };
+      header?: never;
+      path: {
+        kind: components['schemas']['VisiteReferentielKind'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createVisiteReferentiel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kind: components['schemas']['VisiteReferentielKind'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateVisiteReferentielDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description VISITE_REFERENTIEL_CODE_CONFLICT ou VISITE_REFERENTIEL_LABEL_CONFLICT. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateVisiteReferentiel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kind: components['schemas']['VisiteReferentielKind'];
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateVisiteReferentielDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description VISITE_REFERENTIEL_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  setVisiteReferentielActive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kind: components['schemas']['VisiteReferentielKind'];
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetVisiteReferentielActiveDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  reorderVisiteReferentiel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kind: components['schemas']['VisiteReferentielKind'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReorderVisiteReferentielDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getVisiteStats: {
+    parameters: {
+      query: {
+        /** @description Premier jour compté, inclus. */
+        from: string;
+        /** @description Dernier jour compté, inclus. */
+        to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteStatsDto'];
+        };
+      };
+      /** @description VISITE_STATS_RANGE_INVALID ou VISITE_STATS_RANGE_TOO_WIDE. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listVisites: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+        entrepriseId?: string;
+        directionId?: string;
+        destinataireId?: string;
+        objetId?: string;
+        /** @description Nom du visiteur, ou référence du registre. */
+        search?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createVisite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateVisiteDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteDto'];
+        };
+      };
+      /** @description VISITE_REFERENTIEL_UNAVAILABLE ou VISITE_REFERENCE_EXHAUSTED. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getVisite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description VISITE_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateVisite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateVisiteDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description VISITE_NOT_FOUND. */
       404: {
         headers: {
           [name: string]: unknown;
@@ -14362,608 +15033,6 @@ export interface operations {
       };
       /** @description IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée. DEMO_MODE_READ_ONLY · le mode démonstration est actif. */
       409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listVisiteReferentiels: {
-    parameters: {
-      query?: {
-        activeOnly?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielsBundleDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listVisiteReferentiel: {
-    parameters: {
-      query?: {
-        activeOnly?: boolean;
-      };
-      header?: never;
-      path: {
-        kind: components['schemas']['VisiteReferentielKind'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  createVisiteReferentiel: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        kind: components['schemas']['VisiteReferentielKind'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateVisiteReferentielDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description VISITE_REFERENTIEL_CODE_CONFLICT ou VISITE_REFERENTIEL_LABEL_CONFLICT. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  updateVisiteReferentiel: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        kind: components['schemas']['VisiteReferentielKind'];
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateVisiteReferentielDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description VISITE_REFERENTIEL_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  setVisiteReferentielActive: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        kind: components['schemas']['VisiteReferentielKind'];
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SetVisiteReferentielActiveDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  reorderVisiteReferentiel: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        kind: components['schemas']['VisiteReferentielKind'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ReorderVisiteReferentielDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getVisiteStats: {
-    parameters: {
-      query: {
-        /** @description Premier jour compté, inclus. */
-        from: string;
-        /** @description Dernier jour compté, inclus. */
-        to: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteStatsDto'];
-        };
-      };
-      /** @description VISITE_STATS_RANGE_INVALID ou VISITE_STATS_RANGE_TOO_WIDE. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listVisites: {
-    parameters: {
-      query?: {
-        from?: string;
-        to?: string;
-        entrepriseId?: string;
-        directionId?: string;
-        destinataireId?: string;
-        objetId?: string;
-        /** @description Nom du visiteur, ou référence du registre. */
-        search?: string;
-        page?: number;
-        pageSize?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  createVisite: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateVisiteDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteDto'];
-        };
-      };
-      /** @description VISITE_REFERENTIEL_UNAVAILABLE ou VISITE_REFERENCE_EXHAUSTED. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getVisite: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description VISITE_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  updateVisite: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateVisiteDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description VISITE_NOT_FOUND. */
-      404: {
         headers: {
           [name: string]: unknown;
         };
