@@ -165,6 +165,17 @@ describe('ouverture d’un dossier', () => {
     ).toBe(BankCaseError.PROSPECT_NOT_FOUND);
   });
 
+  it('refuse un prospect fictif quand le mode démonstration est éteint', async () => {
+    db.addProspect({ id: 'psp-demo', isDemo: true });
+
+    const error = await refusal(() =>
+      service.create(agent, { prospectId: 'psp-demo', reference: 'REF-DEMO' }),
+    );
+
+    expect(bodyOf(error).code).toBe(BankCaseError.PROSPECT_NOT_FOUND);
+    expect(db.cases).toHaveLength(0);
+  });
+
   it('refuse une banque de traitement inconnue, en 422 et sous le nom banqueId', async () => {
     const error = await refusal(() =>
       service.create(agent, {
@@ -699,5 +710,24 @@ describe('autocomplétion prospect', () => {
 
     const valeurs = requetes.flat().flatMap((sql) => (sql as { values?: unknown[] }).values ?? []);
     expect(valeurs).toContain('%ndiaye%');
+  });
+
+  it('masque les prospects fictifs quand le mode démonstration est éteint', async () => {
+    const requetes: unknown[][] = [];
+    const prisma = {
+      $queryRaw: (...args: unknown[]) => {
+        requetes.push(args);
+        return Promise.resolve([]);
+      },
+    } as unknown as ReturnType<FakePrisma['asService']>;
+
+    const isole = new BankCasesService(prisma, fakeDemoVisibility(false));
+    await isole.prospectSearch({ search: 'Ndiaye' });
+
+    const sql = requetes
+      .flat()
+      .flatMap((query) => (query as { strings?: string[] }).strings ?? [])
+      .join(' ');
+    expect(sql).toContain('p."isDemo" = FALSE');
   });
 });

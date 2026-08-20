@@ -39,6 +39,7 @@ export interface FakeProspect {
   banqueId: string;
   phase2Status: Phase2Status;
   deletedAt: Date | null;
+  isDemo: boolean;
 }
 
 export interface FakeCase {
@@ -218,6 +219,7 @@ export class FakePrisma {
       banqueId: 'bnq-cbao',
       phase2Status: Phase2Status.METHOD_OBTAINED,
       deletedAt: null,
+      isDemo: false,
       ...over,
     };
     this.prospects.push(row);
@@ -513,7 +515,10 @@ export class FakePrisma {
   readonly prospect = {
     findFirst: ({ where }: { where: Where }): Promise<unknown> => {
       const row = this.prospects.find(
-        (item) => item.id === where.id && (item.deletedAt ?? null) === (where.deletedAt ?? null),
+        (item) =>
+          item.id === where.id &&
+          (item.deletedAt ?? null) === (where.deletedAt ?? null) &&
+          (where.isDemo === undefined || item.isDemo === where.isDemo),
       );
       return Promise.resolve(row ? { ...row } : null);
     },
