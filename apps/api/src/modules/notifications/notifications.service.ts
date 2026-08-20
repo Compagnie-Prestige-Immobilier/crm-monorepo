@@ -1085,14 +1085,15 @@ export class NotificationsService {
    */
   async cancel(id: string): Promise<NotificationDto> {
     const now = new Date();
+    const visibility = demoScope(await this.demo.enabled());
     const updated = await this.prisma.notification.updateMany({
-      where: { id, status: NotificationStatus.SCHEDULED },
+      where: { id, status: NotificationStatus.SCHEDULED, ...visibility },
       data: { status: NotificationStatus.CANCELLED, cancelledAt: now },
     });
 
     if (updated.count === 0) {
-      const exists = await this.prisma.notification.findUnique({
-        where: { id },
+      const exists = await this.prisma.notification.findFirst({
+        where: { id, ...visibility },
         select: { id: true },
       });
       if (!exists) throw notificationNotFound();
