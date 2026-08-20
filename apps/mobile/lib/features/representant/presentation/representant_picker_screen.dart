@@ -17,6 +17,7 @@ import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/search_field.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
+import '../../../ui/async_value_x.dart';
 
 class RepresentantPickerScreen extends ConsumerStatefulWidget {
   const RepresentantPickerScreen({super.key});
@@ -65,7 +66,7 @@ class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScr
                 ),
               ),
               Expanded(
-                child: rows.when(
+                child: rows.whenEchecDAbord(
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (Object e, StackTrace _) =>
                       Center(child: Text('Lecture impossible : $e')),

@@ -1245,6 +1245,11 @@ class _SlowWrites extends WriteRepository {
     String? banqueId,
     String? syndicatId,
     String? representantId,
+    String? projet,
+    String? type,
+    String? profession,
+    int? dureeSystemeMois,
+    String? canalProvenanceId,
     String? id,
     String? draftId,
   }) async {

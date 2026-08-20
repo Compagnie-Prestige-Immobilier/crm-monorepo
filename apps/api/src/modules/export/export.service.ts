@@ -23,7 +23,18 @@ import {
   PROSPECTS_IMPORT_COLUMNS,
   PROSPECTS_IMPORT_SHEET_NAME,
 } from '../imports/prospects-import-template.js';
-import { COMMON_TEMPLATE_RULES, writeImportTemplate } from './import-template.workbook.js';
+import {
+  FONCTIONNAIRE_CHOICES,
+  GRAND_PUBLIC_IMPORT_COLUMNS,
+  GRAND_PUBLIC_IMPORT_HEADERS,
+  GRAND_PUBLIC_SHEET_NAME,
+} from '../imports/prospects-grand-public-template.js';
+import {
+  COLUMNS_BY_HEADER_RULE,
+  COLUMNS_BY_POSITION_RULE,
+  COMMON_TEMPLATE_RULES,
+  writeImportTemplate,
+} from './import-template.workbook.js';
 
 /** ARGB sans le dièse : exceljs n'accepte pas la notation CSS. */
 const CPI_BURGUNDY = CPI_BURGUNDY_ARGB;
@@ -87,6 +98,66 @@ export class ExportService {
         'Le téléphone du prospect est la clé de déduplication : un numéro déjà en base, ou répété dans le fichier, est signalé et non écrit.',
         'Ce fichier ne crée AUCUN représentant. Chaque « Téléphone du représentant » doit déjà exister : importez les représentants d’abord.',
         'Banque et Syndicat se choisissent dans la liste déroulante. Leur croisement détermine le segment BDD de la fiche : une valeur saisie à la main range la ligne dans le mauvais segment, ou la fait refuser.',
+      ],
+    });
+  }
+
+  /** Grand Public : seuls le nom et le téléphone sont exigés, tout le reste peut rester vide. */
+  async writeProspectsGrandPublicImportTemplate(stream: Writable): Promise<void> {
+    const [banques, syndicats, canaux] = await Promise.all([
+      this.prisma.banque.findMany({
+        where: { isActive: true },
+        select: { shortName: true },
+        orderBy: [{ sortOrder: 'asc' }, { shortName: 'asc' }],
+      }),
+      this.prisma.syndicat.findMany({
+        where: { isActive: true },
+        select: { sigle: true },
+        orderBy: [{ sortOrder: 'asc' }, { sigle: 'asc' }],
+      }),
+      // Même ordre que `ProspectsGrandPublicImportAdapter.prepare`, qui énumère
+      // les valeurs admises dans ses messages de refus.
+      this.prisma.canalProvenance.findMany({
+        where: { isActive: true },
+        select: { label: true },
+        orderBy: [{ position: 'asc' }, { label: 'asc' }],
+      }),
+    ]);
+
+    const rankOf = (header: string): number =>
+      GRAND_PUBLIC_IMPORT_COLUMNS.findIndex((column) => column.header === header) + 1;
+
+    await writeImportTemplate(stream, {
+      sheetName: GRAND_PUBLIC_SHEET_NAME,
+      columns: GRAND_PUBLIC_IMPORT_COLUMNS,
+      dropdowns: [
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.syndicat),
+          label: 'Syndicats',
+          values: syndicats.map((row) => row.sigle),
+        },
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.banque),
+          label: 'Banques',
+          values: banques.map((row) => row.shortName),
+        },
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.fonctionnaire),
+          label: 'Fonctionnaire',
+          values: [...FONCTIONNAIRE_CHOICES],
+        },
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.canal),
+          label: 'Canaux de provenance',
+          values: canaux.map((row) => row.label),
+        },
+      ],
+      rules: [
+        COLUMNS_BY_HEADER_RULE,
+        ...COMMON_TEMPLATE_RULES.filter((rule) => rule !== COLUMNS_BY_POSITION_RULE),
+        'Seuls le Nom et le Téléphone sont exigés. Une cellule vide n’est pas une erreur : c’est une information qu’on n’a pas encore, et la ligne est écrite quand même.',
+        'Le téléphone est la clé de déduplication, tous projets confondus : un numéro déjà porté par une fiche, CHUES comprise, est signalé et non écrit.',
+        '« Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE. À « non », le type reste VIDE : le fichier ne dit pas s’il s’agit du secteur privé, de l’informel ou de la diaspora, et rien ne se devine ici.',
       ],
     });
   }

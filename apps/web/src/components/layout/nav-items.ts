@@ -244,7 +244,7 @@ const SECTIONS: readonly NavSection[] = [
          * Le SUIVI de ses propres demandes, pour un agent bancaire.
          *
          * Refuser une demande lui envoie une notification dont la route est
-         * `/demandes-clients` : sans cette entrée, le seul chemin vers l'écran
+         * `/chues/demandes-clients` : sans cette entrée, le seul chemin vers l'écran
          * était ce lien-là, et rien ne permettait d'y revenir ensuite. L'API
          * restreint la liste à `requestedById = user.id` : il n'y voit que ses
          * demandes, et l'écran ne lui propose aucun geste d'arbitrage.

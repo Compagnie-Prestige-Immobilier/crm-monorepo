@@ -87,7 +87,7 @@ export function BankExportView() {
             </Button>
             {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
                 poserait `role="button"` sur le `<a>`. */}
-            <Link href="/dossiers" className={buttonVariants({ variant: 'ghost' })}>
+            <Link href="/chues/dossiers" className={buttonVariants({ variant: 'ghost' })}>
               Voir la liste
             </Link>
           </div>

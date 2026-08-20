@@ -74,6 +74,7 @@ const ACCEPTED = '.xlsx,application/vnd.openxmlformats-officedocument.spreadshee
 /** `items` est obligatoire sur le Select Base UI, sinon la gâchette montre la valeur brute. */
 const KIND_OPTIONS = [
   { value: 'PROSPECTS', label: IMPORT_KIND_LABELS.PROSPECTS },
+  { value: 'PROSPECTS_GRAND_PUBLIC', label: IMPORT_KIND_LABELS.PROSPECTS_GRAND_PUBLIC },
   { value: 'REPRESENTANTS', label: IMPORT_KIND_LABELS.REPRESENTANTS },
   { value: 'VISITES', label: IMPORT_KIND_LABELS.VISITES },
 ] as const satisfies readonly { value: ImportKind; label: string }[];
@@ -81,16 +82,30 @@ const KIND_OPTIONS = [
 const IMPORT_HINTS: Readonly<Record<ImportKind, string>> = {
   PROSPECTS:
     'Banque et Syndicat se choisissent dans les listes déroulantes du modèle : leur croisement détermine le segment BDD. Ce fichier ne crée aucun représentant, importez-les d’abord.',
+  PROSPECTS_GRAND_PUBLIC:
+    'Seuls le nom et le téléphone sont exigés : profession, syndicat, banque, durée du système et canal de provenance peuvent rester vides. Les colonnes sont retrouvées par le texte de leur en-tête, pas par leur rang.',
   REPRESENTANTS:
     'Département et IEF se choisissent dans les listes déroulantes du modèle, tirées des référentiels du jour.',
   VISITES: 'Seuls les onglets « BDD VISITES » sont lus, avec l’en-tête en ligne 3.',
 };
 
-const IMPORT_NOUNS: Readonly<Record<ImportKind, string>> = {
-  PROSPECTS: 'prospect',
-  REPRESENTANTS: 'représentant',
-  VISITES: 'visite',
-};
+/** « Grand Public » ne prend pas la marque du pluriel : elle ne peut pas être ajoutée au vol. */
+const IMPORT_NOUNS: Readonly<Record<ImportKind, { readonly un: string; readonly plusieurs: string }>> =
+  {
+    PROSPECTS: { un: 'prospect', plusieurs: 'prospects' },
+    PROSPECTS_GRAND_PUBLIC: {
+      un: 'prospect Grand Public',
+      plusieurs: 'prospects Grand Public',
+    },
+    REPRESENTANTS: { un: 'représentant', plusieurs: 'représentants' },
+    VISITES: { un: 'visite', plusieurs: 'visites' },
+  };
+
+const nounFor = (job: ImportJob): string =>
+  job.createdRows > 1 ? IMPORT_NOUNS[job.kind].plusieurs : IMPORT_NOUNS[job.kind].un;
+
+const createdPast = (job: ImportJob): string =>
+  `créé${job.kind === 'VISITES' ? 'e' : ''}${job.createdRows > 1 ? 's' : ''}`;
 
 function isRunning(job: ImportJob | undefined): boolean {
   return job?.status === 'queued' || job?.status === 'running';
@@ -139,13 +154,11 @@ function canApply(job: ImportJob, now = new Date()): boolean {
 
 /** Le bouton porte le chiffre : « Appliquer » ne se relit pas, « Créer 12 480 prospects » si. */
 function applyLabel(job: ImportJob): string {
-  const noun = IMPORT_NOUNS[job.kind];
-  return `Créer ${formatNumber(job.createdRows)} ${noun}${job.createdRows > 1 ? 's' : ''}`;
+  return `Créer ${formatNumber(job.createdRows)} ${nounFor(job)}`;
 }
 
 function createdVerb(job: ImportJob): string {
-  if (job.kind === 'VISITES') return job.createdRows > 1 ? 'seront créées' : 'sera créée';
-  return job.createdRows > 1 ? 'seront créés' : 'sera créé';
+  return `${job.createdRows > 1 ? 'seront' : 'sera'} ${createdPast(job)}`;
 }
 
 /** `errorRows` reste exact, `errors` est bornée : la troncature doit se dire. */
@@ -462,14 +475,14 @@ function JobPanel({
           <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
           <div className="min-w-0 text-[0.875rem]">
             <p className="font-[600]">
-              {formatNumber(job.createdRows)} {job.kind === 'VISITES' ? 'visite' : 'fiche'}
-              {job.createdRows > 1 ? 's' : ''} créée
-              {job.createdRows > 1 ? 's' : ''}.
+              {formatNumber(job.createdRows)} {nounFor(job)} {createdPast(job)}.
             </p>
             <p className="mt-1 text-muted-foreground">
-              Corrigez les lignes refusées dans le classeur et redéposez-le : les{' '}
-              {job.kind === 'VISITES' ? 'visites déjà au registre' : 'fiches déjà en base'} seront
-              de nouveau ignorées, sans doublon.
+              Corrigez les lignes refusées dans le classeur et redéposez-le :{' '}
+              {job.kind === 'VISITES'
+                ? 'les visites déjà au registre seront de nouveau ignorées'
+                : `les ${IMPORT_NOUNS[job.kind].plusieurs} déjà en base seront de nouveau ignorés`}
+              , sans doublon.
             </p>
           </div>
         </div>
@@ -817,8 +830,7 @@ function ApplyDialog({
                 <span className="font-display text-[1.5rem] font-[800] tabular-nums">
                   {formatNumber(job.createdRows)}
                 </span>{' '}
-                {IMPORT_NOUNS[job.kind]}
-                {job.createdRows > 1 ? 's' : ''} {createdVerb(job)} à partir de « {job.fileName} ».
+                {nounFor(job)} {createdVerb(job)} à partir de « {job.fileName} ».
               </p>
 
               <p className="text-[0.8125rem] text-muted-foreground">

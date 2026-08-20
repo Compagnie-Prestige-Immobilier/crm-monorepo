@@ -10,6 +10,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -42,11 +43,19 @@ export class CreateProspectDto {
   @MaxLength(120)
   nom!: string;
 
-  @ApiProperty({ maxLength: 120 })
+  /**
+   * Facultatif, comme tout le reste sauf le nom et le téléphone.
+   *
+   * La colonne reste NOT NULL : un prénom absent s'enregistre en chaîne vide,
+   * ce que les écrans savent déjà rendre. La rendre nullable ferait porter à
+   * tout le code la distinction entre « pas de prénom » et « prénom vide »,
+   * pour une différence qu'aucun métier ne fait ici.
+   */
+  @ApiPropertyOptional({ maxLength: 120 })
+  @IsOptional()
   @IsString()
-  @MinLength(1)
   @MaxLength(120)
-  prenom!: string;
+  prenom?: string;
 
   @ApiProperty({
     maxLength: 40,
@@ -58,17 +67,65 @@ export class CreateProspectDto {
   @MaxLength(40)
   phone!: string;
 
-  @ApiProperty({ format: 'uuid' })
+  /**
+   * FACULTATIFS, et c'est le point.
+   *
+   * Un téléconseiller au téléphone n'obtient pas toujours la banque ni le
+   * syndicat, et un champ requis lui faisait abandonner la fiche entière. Une
+   * fiche Grand Public n'en a simplement aucun : elle ne passe par aucun
+   * représentant et ne relève d'aucun syndicat.
+   */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
   @IsUUID()
-  banqueId!: string;
+  banqueId?: string;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
   @IsUUID()
-  syndicatId!: string;
+  syndicatId?: string;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
   @IsUUID()
-  representantId!: string;
+  representantId?: string;
+
+  @ApiPropertyOptional({
+    enum: Projet,
+    enumName: 'Projet',
+    description: 'CHUES par défaut. Les deux projets ne se mélangent nulle part.',
+  })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
+
+  @ApiPropertyOptional({ enum: ProspectType, enumName: 'ProspectType' })
+  @IsOptional()
+  @IsEnum(ProspectType)
+  type?: ProspectType;
+
+  @ApiPropertyOptional({ maxLength: 120, description: 'Métier déclaré, en clair.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  profession?: string;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: 600,
+    description: 'Durée du système de paiement, en MOIS.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(600)
+  dureeSystemeMois?: number;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Canal de provenance, choisi dans le référentiel.' })
+  @IsOptional()
+  @IsUUID()
+  canalProvenanceId?: string;
 
   @ApiPropertyOptional({ enum: ProspectStatut, enumName: 'ProspectStatut' })
   @IsOptional()

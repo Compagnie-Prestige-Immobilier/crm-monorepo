@@ -104,7 +104,7 @@ describe('RappelsView', () => {
     await renderView();
 
     const lien = await screen.findByRole('link', { name: /console/ });
-    expect(lien.getAttribute('href')).toBe('/console?fiche=p-9');
+    expect(lien.getAttribute('href')).toBe('/chues/console?fiche=p-9');
   });
 
   it('annule le rappel choisi', async () => {

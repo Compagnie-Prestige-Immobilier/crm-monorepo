@@ -19,7 +19,7 @@ export function DemoBanner({ seededAt, role }: { seededAt: string | null; role: 
       </span>
       {role === 'ADMIN' ? (
         <Link
-          href="/parametres"
+          href="/admin/parametres"
           className="rounded-sm font-[600] underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           Gérer

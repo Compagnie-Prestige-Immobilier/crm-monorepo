@@ -1,32 +1,52 @@
+import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
+import { GrandPublicProspectsView } from '@/components/grand-public/prospects-view';
 import { PermissionDenied } from '@/components/permission-denied';
-import { Card } from '@/components/ui/card';
+import { getServerApiClient } from '@/lib/api/server';
+import {
+  fetchCanauxProvenance,
+  fetchGrandPublicProspects,
+  grandPublicKeys,
+  parseGrandPublicFilters,
+} from '@/lib/data/grand-public';
+import { getQueryClient } from '@/lib/query-client';
+import type { RawSearchParams } from '@/lib/search-params';
 import { guardRoles } from '@/lib/session';
+import { readsOnly } from '@/lib/types';
 
-export const metadata: Metadata = { title: 'Projet Grand Public' };
+export const metadata: Metadata = { title: 'Prospects Grand Public' };
 
-export default async function GrandPublicPage() {
+export default async function GrandPublicPage({
+  searchParams,
+}: {
+  searchParams: Promise<RawSearchParams>;
+}) {
   const guard = await guardRoles(['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="Le projet Grand Public" />;
   }
 
+  const filters = parseGrandPublicFilters(await searchParams);
+  const client = getServerApiClient();
+
+  const queryClient = getQueryClient();
+  await Promise.all([
+    queryClient.prefetchQuery({
+      queryKey: grandPublicKeys.prospects(filters),
+      queryFn: () => fetchGrandPublicProspects(filters, client),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: grandPublicKeys.canaux,
+      queryFn: () => fetchCanauxProvenance(client),
+    }),
+  ]);
+
   return (
-    <Card className="animate-rise mx-auto max-w-2xl gap-4 px-6 py-10">
-      <h2 className="font-display text-h2 font-[700] tracking-[-0.02em]">
-        Le projet Grand Public n’est pas encore ouvert
-      </h2>
-      <p className="text-body text-muted-foreground">
-        Son modèle de données est en cours de pose. Aucun prospect, aucune campagne et aucun écran
-        n’existent pour l’instant.
-      </p>
-      <p className="text-body text-muted-foreground">
-        Il ne partagera rien avec le projet CHUES : la vente est la même, l’acquisition et le
-        programme d’appels ne le sont pas.
-      </p>
-    </Card>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <GrandPublicProspectsView canCreate={!readsOnly(guard.user.role)} />
+    </HydrationBoundary>
   );
 }

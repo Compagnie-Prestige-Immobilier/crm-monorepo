@@ -87,7 +87,7 @@ export function CampaignDetailView({
   if (isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/campagnes">Toutes les campagnes</DetailBackLink>
+        <DetailBackLink href="/chues/campagnes">Toutes les campagnes</DetailBackLink>
         <QueryErrorState
           error={error}
           onRetry={() => {
@@ -103,7 +103,7 @@ export function CampaignDetailView({
 
   return (
     <div className="flex flex-col gap-6">
-      <DetailBackLink href="/campagnes">Toutes les campagnes</DetailBackLink>
+      <DetailBackLink href="/chues/campagnes">Toutes les campagnes</DetailBackLink>
 
       <Card className="animate-rise">
         <CardHeader>

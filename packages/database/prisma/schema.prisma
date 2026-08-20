@@ -1737,6 +1737,7 @@ enum ImportKind {
   REPRESENTANTS
   PROSPECTS
   VISITES
+  PROSPECTS_GRAND_PUBLIC
 }
 
 /// `expired` n'est PAS un échec : le fichier et le rapport ont simplement passé

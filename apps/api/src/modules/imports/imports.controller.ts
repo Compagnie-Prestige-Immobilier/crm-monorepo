@@ -52,7 +52,8 @@ import { ImportsService } from './imports.service.js';
  * l'interrupteur était éteint.
  *
  * LES MODÈLES DE CLASSEUR ne sont PAS servis ici : ils le sont par
- * `GET /export/representants-modele.xlsx` et `GET /export/prospects-modele.xlsx`,
+ * `GET /export/representants-modele.xlsx`, `GET /export/prospects-modele.xlsx` et
+ * `GET /export/prospects-grand-public-modele.xlsx`,
  * dans le module d'export, qui est le seul endroit à savoir écrire un classeur.
  * Les dupliquer ferait exister deux modèles capables de diverger d'une colonne,
  * ce que `import-template.ts` et `prospects-import-template.ts` existent
@@ -160,6 +161,44 @@ export class ImportsController {
     @Req() request: FastifyRequest,
   ): Promise<ImportJobDto> {
     return this.imports.create(user, request, ImportKind.PROSPECTS);
+  }
+
+  @Post('prospects-grand-public')
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    operationId: 'createProspectsGrandPublicImport',
+    summary: 'Dépose un classeur de prospects Grand Public et inscrit le travail. Rend immédiatement.',
+    description:
+      'NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, ' +
+      'et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que ' +
+      '`POST /imports/{id}/apply` n’a pas été appelé. Les colonnes sont retrouvées par le TEXTE ' +
+      'de leur en-tête, en ligne 1, jamais par leur rang. SEULS le nom et le téléphone sont ' +
+      'exigés : profession, syndicat, banque, fonctionnaire, durée du système et canal de ' +
+      'provenance se lisent vides sans faire refuser la ligne, et leur colonne peut même manquer ' +
+      'du fichier. « Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE ; à « non », le ' +
+      'type reste vide, car le fichier ne dit pas lequel des trois autres il serait. Le modèle de ' +
+      'classeur se télécharge par `GET /export/prospects-grand-public-modele.xlsx`.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiResponse({ status: 201, type: ImportJobDto })
+  @ApiErrors({
+    409: 'DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé.',
+    413: 'IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.',
+    429: true,
+  })
+  createProspectsGrandPublic(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: FastifyRequest,
+  ): Promise<ImportJobDto> {
+    return this.imports.create(user, request, ImportKind.PROSPECTS_GRAND_PUBLIC);
   }
 
   /**

@@ -293,6 +293,11 @@ class WriteRepository {
     String? banqueId,
     String? syndicatId,
     String? representantId,
+    String? projet,
+    String? type,
+    String? profession,
+    int? dureeSystemeMois,
+    String? canalProvenanceId,
     String? id,
     String? draftId,
   }) async {
@@ -311,6 +316,11 @@ class WriteRepository {
               banqueId: Value<String?>(banqueId),
               syndicatId: Value<String?>(syndicatId),
               representantId: Value<String?>(representantId),
+              projet: projet == null
+                  ? const Value<String>.absent()
+                  : Value<String>(projet),
+              type: Value<String?>(type),
+              profession: Value<String?>(profession),
               createdById: createdById,
               clientCreatedAt: now,
               localUpdatedAt: now,
@@ -323,13 +333,22 @@ class WriteRepository {
         entityType: 'prospect',
         entityId: entityId,
         op: 'create',
+        // Une cle absente n'est PAS un vidage : le transport JSON supprime les
+        // `null`, et le serveur refuse le lot entier sur un champ inconnu. On
+        // n'ecrit donc que ce qui a une valeur.
         payload: <String, Object?>{
           'nom': nom,
           'prenom': prenom,
           'phone': phoneE164,
-          'banqueId': banqueId,
-          'syndicatId': syndicatId,
-          'representantId': representantId,
+          'banqueId': ?banqueId,
+          'syndicatId': ?syndicatId,
+          'representantId': ?representantId,
+          'projet': ?projet,
+          'type': ?type,
+          if (profession != null && profession.isNotEmpty)
+            'profession': profession,
+          'dureeSystemeMois': ?dureeSystemeMois,
+          'canalProvenanceId': ?canalProvenanceId,
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
         now: now,

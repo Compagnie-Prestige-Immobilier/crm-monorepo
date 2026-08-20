@@ -8,6 +8,8 @@ import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/draft_repository.dart';
 import 'package:cpi_go/core/updates/app_update_controller.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
+import 'package:cpi_go/features/campagnes/presentation/campagne_file_screen.dart';
+import 'package:cpi_go/features/campagnes/presentation/campagnes_screen.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/auth/presentation/login_screen.dart';
 import 'package:cpi_go/features/notifications/presentation/notifications_screen.dart';
@@ -105,6 +107,32 @@ void main() {
           'Ne repasse jamais avant la fin des cours. Le secretariat de '
           'l\'inspection prend les messages entre midi et quatorze heures.',
       authorName: 'Ndeye Astou Mbengue Sarr',
+    );
+
+    // Une campagne dans son état le plus large : un nom rédigé depuis le web,
+    // une file étalée sur assez de jours pour que l'en-tête porte deux nombres,
+    // et un rang à trois chiffres devant un nom complet.
+    await insertCampagne(
+      db,
+      id: 'campFiche',
+      name: 'Enseignants du moyen secondaire, region de Ziguinchor',
+      spreadDays: 7,
+    );
+    await insertProspect(
+      db,
+      id: 'proCampagne',
+      representantId: 'repFiche',
+      phone: '+221780000003',
+      nom: 'Kane Diagne',
+      prenom: 'Abdoulaye Ousseynou',
+    );
+    await insertTache(
+      db,
+      id: 'tacheCampagne',
+      campaignId: 'campFiche',
+      prospectId: 'proCampagne',
+      position: 128,
+      dayIndex: 3,
     );
 
     // Un brouillon vieux d'une heure sur chaque formulaire : entre 60 s et
@@ -312,6 +340,11 @@ void main() {
     'Connexion': LoginScreen.new,
     'Premier lancement': OnboardingScreen.new,
     'Notifications': NotificationsScreen.new,
+    // Les campagnes : le nom que l'équipe du client a rédigé, suivi d'un compte
+    // et d'un nombre de jours sur la même ligne de sous-titre. La file, elle,
+    // porte un en-tête de jour et un rang collé au nom de la fiche.
+    'Campagnes': CampagnesScreen.new,
+    'File de campagne': () => const CampagneFileScreen(campaignId: 'campFiche'),
     // Le contenu de la feuille des issues négatives quand l'issue est
     // « À rappeler » : six puces de largeurs très inégales, dont
     // « Cet après-midi (15 h) ».

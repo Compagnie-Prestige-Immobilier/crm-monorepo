@@ -53,7 +53,7 @@ export function BankDashboardView() {
   const drillTo =
     (patch: Parameters<typeof hrefWith>[0]): (() => void) =>
     () => {
-      router.push(hrefWith(patch, '/dossiers'));
+      router.push(hrefWith(patch, '/chues/dossiers'));
     };
 
   const agentOptions: FilterOption[] = (data?.byAgent ?? []).map((agent) => ({

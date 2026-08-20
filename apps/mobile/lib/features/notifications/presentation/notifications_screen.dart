@@ -15,6 +15,7 @@ import '../../../core/theme/cpi_tokens.dart';
 import '../../../data/local/database.dart';
 import '../notification_inbox.dart';
 import '../notifications_controller.dart';
+import '../../../ui/async_value_x.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -91,7 +92,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               },
             ),
             Expanded(
-              child: notifications.when(
+              child: notifications.whenEchecDAbord(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (Object error, StackTrace stack) => _Empty(
                   icon: PhosphorIconsDuotone.warningCircle,

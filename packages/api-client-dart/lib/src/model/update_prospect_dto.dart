@@ -3,6 +3,8 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/projet.dart';
+import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -34,6 +36,16 @@ class UpdateProspectDto {
 
     this.representantId,
 
+    this.projet,
+
+    this.type,
+
+    this.profession,
+
+    this.dureeSystemeMois,
+
+    this.canalProvenanceId,
+
     this.statut,
 
     this.clientCreatedAt,
@@ -62,6 +74,37 @@ class UpdateProspectDto {
   @JsonKey(name: r'representantId', required: false, includeIfNull: false)
   final String? representantId;
 
+  /// CHUES par défaut. Les deux projets ne se mélangent nulle part.
+  @JsonKey(
+    name: r'projet',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: Projet.unknownDefaultOpenApi,
+  )
+  final Projet? projet;
+
+  @JsonKey(
+    name: r'type',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: ProspectType.unknownDefaultOpenApi,
+  )
+  final ProspectType? type;
+
+  /// Métier déclaré, en clair.
+  @JsonKey(name: r'profession', required: false, includeIfNull: false)
+  final String? profession;
+
+  /// Durée du système de paiement, en MOIS.
+  // minimum: 1
+  // maximum: 600
+  @JsonKey(name: r'dureeSystemeMois', required: false, includeIfNull: false)
+  final num? dureeSystemeMois;
+
+  /// Canal de provenance, choisi dans le référentiel.
+  @JsonKey(name: r'canalProvenanceId', required: false, includeIfNull: false)
+  final String? canalProvenanceId;
+
   @JsonKey(
     name: r'statut',
     required: false,
@@ -87,6 +130,11 @@ class UpdateProspectDto {
                 banqueId,
                 syndicatId,
                 representantId,
+                projet,
+                type,
+                profession,
+                dureeSystemeMois,
+                canalProvenanceId,
                 statut,
                 clientCreatedAt,
               ],
@@ -98,6 +146,11 @@ class UpdateProspectDto {
                 other.banqueId,
                 other.syndicatId,
                 other.representantId,
+                other.projet,
+                other.type,
+                other.profession,
+                other.dureeSystemeMois,
+                other.canalProvenanceId,
                 other.statut,
                 other.clientCreatedAt,
               ],
@@ -115,6 +168,11 @@ class UpdateProspectDto {
         banqueId,
         syndicatId,
         representantId,
+        projet,
+        type,
+        profession,
+        dureeSystemeMois,
+        canalProvenanceId,
         statut,
         clientCreatedAt,
       ]);

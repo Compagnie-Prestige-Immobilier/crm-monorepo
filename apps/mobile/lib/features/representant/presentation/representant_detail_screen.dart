@@ -18,6 +18,7 @@ import '../../../data/local/database.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../auth/auth_state.dart';
+import '../../../ui/async_value_x.dart';
 
 class RepresentantDetailScreen extends ConsumerWidget {
   const RepresentantDetailScreen({super.key, required this.representantId});
@@ -41,7 +42,7 @@ class RepresentantDetailScreen extends ConsumerWidget {
           ],
         ),
         body: SafeArea(
-          child: fiche.when(
+          child: fiche.whenEchecDAbord(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (Object e, StackTrace _) =>
                 Center(child: Text('Lecture impossible : $e')),
@@ -283,7 +284,7 @@ class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentT
           ),
         ),
         const SizedBox(height: CpiSpacing.sm),
-        rows.when(
+        rows.whenEchecDAbord(
           loading: () => const LinearProgressIndicator(),
           error: (Object e, StackTrace _) => Text('Lecture impossible : $e'),
           data: (List<RepresentantComment> list) {
@@ -414,7 +415,7 @@ class _ProspectList extends ConsumerWidget {
       prospectsForRepresentantProvider(representantId),
     );
 
-    return rows.when(
+    return rows.whenEchecDAbord(
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: CpiSpacing.sm),
         child: LinearProgressIndicator(),

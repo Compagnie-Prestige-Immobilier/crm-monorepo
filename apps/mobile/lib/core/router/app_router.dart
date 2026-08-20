@@ -14,6 +14,9 @@ import '../../features/historique/presentation/historique_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/permissions/presentation/battery_help_screen.dart';
+import '../../features/campagnes/campagnes.dart';
+import '../../features/campagnes/presentation/campagne_file_screen.dart';
+import '../../features/campagnes/presentation/campagnes_screen.dart';
 import '../../features/phase2/presentation/phase2_screen.dart';
 import '../../features/prospect/presentation/prospect_entry_screen.dart';
 import '../../features/reglages/presentation/reglages_screen.dart';
@@ -158,7 +161,25 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: Routes.phase2,
         name: 'phase2',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: _chues((GoRouterState state) => const Phase2Screen()),
+        builder: _chues(
+          (GoRouterState state) =>
+              Phase2Screen(prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam]),
+        ),
+      ),
+      GoRoute(
+        path: CampagnesRoutes.liste,
+        name: 'campagnes',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: _chues((GoRouterState state) => const CampagnesScreen()),
+      ),
+      GoRoute(
+        path: CampagnesRoutes.file,
+        name: 'campagneFile',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: _chues(
+          (GoRouterState state) =>
+              CampagneFileScreen(campaignId: state.pathParameters[CampagnesRoutes.idParam] ?? ''),
+        ),
       ),
       GoRoute(
         path: Routes.notifications,

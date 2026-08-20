@@ -20,7 +20,8 @@ export const IMPORT_HISTORY_PAGE_SIZE = 10;
 
 export const IMPORT_KIND_LABELS: Readonly<Record<ImportKind, string>> = {
   REPRESENTANTS: 'Représentants',
-  PROSPECTS: 'Prospects',
+  PROSPECTS: 'Prospects CHUES',
+  PROSPECTS_GRAND_PUBLIC: 'Prospects Grand Public',
   VISITES: 'Visites',
 };
 
@@ -28,6 +29,7 @@ export const IMPORT_KIND_LABELS: Readonly<Record<ImportKind, string>> = {
 export const IMPORT_MAX_ROWS: Readonly<Record<ImportKind, number>> = {
   REPRESENTANTS: 50_000,
   PROSPECTS: 150_000,
+  PROSPECTS_GRAND_PUBLIC: 50_000,
   VISITES: 20_000,
 };
 
@@ -41,6 +43,10 @@ export const IMPORT_TEMPLATES: Readonly<
   PROSPECTS: {
     url: '/api/v1/export/prospects-modele.xlsx',
     fileName: 'cpi-prospects-modele.xlsx',
+  },
+  PROSPECTS_GRAND_PUBLIC: {
+    url: '/api/v1/export/prospects-grand-public-modele.xlsx',
+    fileName: 'cpi-prospects-grand-public-modele.xlsx',
   },
 };
 
@@ -79,6 +85,7 @@ export async function applyImportJob(
 const UPLOAD_PATHS: Readonly<Record<ImportKind, string>> = {
   REPRESENTANTS: '/api/v1/imports/representants',
   PROSPECTS: '/api/v1/imports/prospects',
+  PROSPECTS_GRAND_PUBLIC: '/api/v1/imports/prospects-grand-public',
   VISITES: '/api/v1/imports/visites',
 };
 

@@ -110,7 +110,7 @@ export function CampaignsView({ canManage }: { canManage: boolean }) {
                               sélection de texte et n'annonce aucun nom
                               accessible utile. */}
                           <Link
-                            href={`/campagnes/${campaign.id}`}
+                            href={`/chues/campagnes/${campaign.id}`}
                             className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                           >
                             {campaign.name}

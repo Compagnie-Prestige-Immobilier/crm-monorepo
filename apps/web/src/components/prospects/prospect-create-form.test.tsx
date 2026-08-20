@@ -199,7 +199,7 @@ describe('la saisie en rafale', () => {
     await user.click(screen.getByRole('button', { name: 'Enregistrer et terminer' }));
 
     await waitFor(() => {
-      expect(routerMock.push).toHaveBeenCalledWith('/prospects?search=%2B221771234567');
+      expect(routerMock.push).toHaveBeenCalledWith('/chues/prospects?search=%2B221771234567');
     });
   });
 });
@@ -250,7 +250,7 @@ describe('le numéro déjà pris', () => {
     await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
 
     const link = await screen.findByRole('link', { name: 'Ouvrir la fiche existante' });
-    expect(link.getAttribute('href')).toBe('/prospects?search=%2B221771234567');
+    expect(link.getAttribute('href')).toBe('/chues/prospects?search=%2B221771234567');
   });
 
   it('efface le conflit dès que le numéro change', async () => {

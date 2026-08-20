@@ -604,3 +604,69 @@ describe('lecture du SUPERVISEUR', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 });
+
+describe('le panneau sait saisir une fiche Grand Public', () => {
+  let prisma: PrismaMock;
+
+  beforeEach(() => {
+    prisma = makePrisma();
+  });
+
+  it('un prospect naît sans banque, sans syndicat et sans représentant', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(null);
+    prisma.prospect.create.mockResolvedValue(prospectRow({}));
+
+    await service(prisma).create(alice, {
+      nom: 'Diop',
+      prenom: 'Awa',
+      phone: '771234567',
+      projet: 'GRAND_PUBLIC',
+      type: 'INFORMEL',
+      profession: 'Couturière',
+      dureeSystemeMois: 24,
+      canalProvenanceId: 'canal-tiktok',
+    });
+
+    const data = firstArg(prisma.prospect.create).data ?? {};
+    expect(data.banqueId).toBeNull();
+    expect(data.syndicatId).toBeNull();
+    expect(data.representantId).toBeNull();
+    expect(data.projet).toBe('GRAND_PUBLIC');
+    expect(data.type).toBe('INFORMEL');
+    expect(data.profession).toBe('Couturière');
+    expect(data.dureeSystemeMois).toBe(24);
+    expect(data.canalProvenanceId).toBe('canal-tiktok');
+  });
+
+  it('sans représentant, l’annuaire n’est pas interrogé du tout', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(null);
+    prisma.prospect.create.mockResolvedValue(prospectRow({}));
+
+    await service(prisma).create(alice, { nom: 'Diop', prenom: 'Awa', phone: '771234567' });
+
+    // Une lecture du representant sur un identifiant vide ferait echouer la
+    // saisie la ou le metier veut qu'elle passe.
+    expect(prisma.representant.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('une fiche CHUES garde son projet par défaut, sans le demander', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(null);
+    prisma.representant.findFirst.mockResolvedValue({
+      id: 'r-1',
+      createdById: alice.id,
+      isDemo: false,
+    });
+    prisma.prospect.create.mockResolvedValue(prospectRow({}));
+
+    await service(prisma).create(alice, {
+      nom: 'Fall',
+      prenom: 'Moussa',
+      phone: '771234567',
+      banqueId: 'b-1',
+      syndicatId: 's-1',
+      representantId: 'r-1',
+    });
+
+    expect(firstArg(prisma.prospect.create).data?.projet).toBeUndefined();
+  });
+});
