@@ -11,6 +11,7 @@ import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { parseRepresentantFilters, type RawSearchParams } from '@/lib/representant-filters';
 import { guardRoles } from '@/lib/session';
+import { readsOnly } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Représentants' };
 
@@ -19,7 +20,7 @@ export default async function RepresentantsPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR']);
+  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="La gestion des représentants" />;
@@ -44,7 +45,7 @@ export default async function RepresentantsPage({
     <HydrationBoundary state={dehydrate(queryClient)}>
       <RepresentantsView
         canAdminister={guard.user.role === 'ADMIN'}
-        readOnly={guard.user.role === 'SUPERVISEUR'}
+        readOnly={readsOnly(guard.user.role)}
       />
     </HydrationBoundary>
   );

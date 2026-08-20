@@ -11,6 +11,7 @@ import { parseProspectFilters, type RawSearchParams } from '@/lib/filters';
 import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { getSession, guardRoles } from '@/lib/session';
+import { readsOnly } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Prospects' };
 
@@ -19,7 +20,7 @@ export default async function ProspectsPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR']);
+  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="Le suivi des prospects" />;
@@ -48,7 +49,7 @@ export default async function ProspectsPage({
           Le SUPERVISEUR, lui, n'écrit rien du tout. */}
       <ProspectsView
         canAdminister={session?.role === 'ADMIN'}
-        readOnly={session?.role === 'SUPERVISEUR'}
+        readOnly={readsOnly(session?.role)}
       />
     </HydrationBoundary>
   );

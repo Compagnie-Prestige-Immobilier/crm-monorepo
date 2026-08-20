@@ -31,10 +31,12 @@ export function RepresentantDetailView({
   representantId,
   author,
   canAdminister = false,
+  readOnly = false,
 }: {
   representantId: string;
   author: { id: string; fullName: string };
   canAdminister?: boolean;
+  readOnly?: boolean;
 }) {
   const fiche = useQuery({
     queryKey: queryKeys.representant(representantId),
@@ -158,6 +160,7 @@ export function RepresentantDetailView({
             representantId={representantId}
             author={author}
             canAdminister={canAdminister}
+            readOnly={readOnly}
           />
         </CardContent>
       </Card>
