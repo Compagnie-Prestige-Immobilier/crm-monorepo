@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -7,7 +8,9 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/connectivity.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../core/router/single_push.dart';
 import '../../../core/sync/api_port.dart';
 import '../../../core/sync/outbox_status.dart';
 import '../../../core/theme/cpi_colors.dart';
@@ -50,8 +53,17 @@ class CorrectionsScreen extends ConsumerWidget {
   ) {
     return rows.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (Object e, StackTrace _) =>
-          Center(child: Text('Lecture impossible : $e')),
+      error: (Object e, StackTrace _) => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(CpiSpacing.xl),
+          child: Text(
+            'La file d\'envoi de cet appareil est illisible. Redémarrez '
+            'l\'application ; si le message revient, prévenez votre '
+            'responsable avant de saisir autre chose.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
       data: (List<OutboxData> list) {
         if (list.isEmpty) return const _Empty();
         return RefreshIndicator(
@@ -117,13 +129,22 @@ class _LastCycleFailure extends ConsumerWidget {
   }
 }
 
-class _CorrectionCard extends ConsumerWidget {
+class _CorrectionCard extends ConsumerStatefulWidget {
   const _CorrectionCard({required this.row});
 
   final OutboxData row;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CorrectionCard> createState() => _CorrectionCardState();
+}
+
+class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
+  bool _busy = false;
+
+  OutboxData get row => widget.row;
+
+  @override
+  Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
     final bool isConflict = row.status == OutboxStatus.conflict;
@@ -183,20 +204,18 @@ class _CorrectionCard extends ConsumerWidget {
             children: <Widget>[
               if (_isOwnershipConflict)
                 FilledButton.tonalIcon(
-                  onPressed: () => _openOwnership(context, ref),
-                  icon: const Icon(PhosphorIconsRegular.userSwitch, size: 18),
+                  onPressed: _busy ? null : () => unawaited(_openOwnership()),
+                  icon: _busy
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(PhosphorIconsRegular.userSwitch, size: 18),
                   label: const Text('Choisir'),
                 )
               else
                 TextButton.icon(
-                  onPressed: () async {
-                    await ref
-                        .read(writeRepositoryProvider)
-                        .retryOperation(row.seq);
-                    await ref
-                        .read(syncCoordinatorProvider.notifier)
-                        .run(pull: false);
-                  },
+                  onPressed: _busy ? null : () => unawaited(_retry()),
                   icon: const Icon(
                     PhosphorIconsRegular.arrowClockwise,
                     size: 18,
@@ -204,7 +223,7 @@ class _CorrectionCard extends ConsumerWidget {
                   label: const Text('Réessayer'),
                 ),
               TextButton.icon(
-                onPressed: () => _edit(context),
+                onPressed: _busy ? null : _edit,
                 icon: Icon(
                   row.entityType == 'representant'
                       ? PhosphorIconsRegular.pencilSimple
@@ -214,7 +233,7 @@ class _CorrectionCard extends ConsumerWidget {
                 label: Text(_editLabel),
               ),
               TextButton.icon(
-                onPressed: () => _discard(context, ref),
+                onPressed: _busy ? null : () => unawaited(_discard()),
                 icon: const Icon(PhosphorIconsRegular.trash, size: 18),
                 label: const Text('Supprimer'),
               ),
@@ -262,31 +281,59 @@ class _CorrectionCard extends ConsumerWidget {
       ? 'Envoi impossible.'
       : 'Refusé (${row.lastErrorCode}).';
 
-  Future<void> _openOwnership(BuildContext context, WidgetRef ref) async {
+  Future<void> _retry() async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(writeRepositoryProvider).retryOperation(row.seq);
+      await ref.read(syncCoordinatorProvider.notifier).run(pull: false);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openOwnership() async {
     final Object? decoded = _payload;
     final String? phone = decoded is Map ? decoded['phone'] as String? : null;
     if (phone == null) return;
 
+    // Hors ligne, la recherche attend le délai de connexion puis deux essais :
+    // trois quarts de minute sans rien à l'écran.
+    if (ref.read(connectivityProvider) != CpiConnectivity.online) {
+      _say('Arbitrage impossible hors ligne : il faut interroger le serveur.');
+      return;
+    }
+
+    setState(() => _busy = true);
     RepresentantLookup? lookup;
     try {
       lookup = await ref.read(apiPortProvider).lookupRepresentantByPhone(phone);
     } on ApiException catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Impossible de joindre le serveur : ${e.code}')),
-      );
+      _say('Impossible de joindre le serveur : ${e.code}');
+      return;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (!mounted) return;
+    if (lookup.representant == null) {
+      _say('Ce numéro n\'est plus enregistré ailleurs. Réessayez l\'envoi.');
       return;
     }
-    if (!context.mounted || lookup.representant == null) return;
     await showOwnershipSheet(context: context, row: row, lookup: lookup);
+  }
+
+  void _say(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String get _editLabel =>
       row.entityType == 'representant' ? 'Modifier' : 'Voir dans l\'historique';
 
-  void _edit(BuildContext context) {
+  void _edit() {
     if (row.entityType == 'representant') {
-      context.push(
+      context.pushOnce(
         '${Routes.newRepresentant}?id=${Uri.encodeComponent(row.entityId)}',
       );
     } else {
@@ -294,25 +341,24 @@ class _CorrectionCard extends ConsumerWidget {
     }
   }
 
-  Future<void> _discard(BuildContext context, WidgetRef ref) async {
+  Future<void> _discard() async {
     final bool ok = await confirmDiscard(
       context: context,
       ref: ref,
       seq: row.seq,
     );
-    if (!ok || !context.mounted) return;
-    final DiscardResult result = await ref
-        .read(writeRepositoryProvider)
-        .discardOperation(row.seq);
-    if (!context.mounted) return;
+    if (!ok || !mounted) return;
+    setState(() => _busy = true);
+    final DiscardResult result;
+    try {
+      result = await ref.read(writeRepositoryProvider).discardOperation(row.seq);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
     if (result.outcome == DiscardOutcome.claimed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Envoi en cours : impossible d\'abandonner cette saisie tout de '
-            'suite. Réessayez dans quelques instants.',
-          ),
-        ),
+      _say(
+        'Envoi en cours : impossible d\'abandonner cette saisie tout de '
+        'suite. Réessayez dans quelques instants.',
       );
     }
   }

@@ -6,6 +6,7 @@
 import 'package:crm_api_client/src/model/call_outcome.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
+import 'package:crm_api_client/src/model/whatsapp_status.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -40,15 +41,25 @@ class SyncEntityDataDto {
 
     this.representantId,
 
+    this.body,
+
     this.statut,
 
     this.notes,
+
+    this.whatsappStatus,
+
+    this.whatsappE164,
+
+    this.profession,
 
     this.clientCreatedAt,
 
     this.prospectId,
 
     this.outcome,
+
+    this.reasonCode,
 
     this.method,
 
@@ -93,6 +104,10 @@ class SyncEntityDataDto {
   @JsonKey(name: r'representantId', required: false, includeIfNull: false)
   final String? representantId;
 
+  /// Commentaire ajouté à une fiche.
+  @JsonKey(name: r'body', required: false, includeIfNull: false)
+  final String? body;
+
   @JsonKey(
     name: r'statut',
     required: false,
@@ -104,6 +119,23 @@ class SyncEntityDataDto {
   /// Représentant : notes libres.
   @JsonKey(name: r'notes', required: false, includeIfNull: false)
   final String? notes;
+
+  /// Représentant : la question du WhatsApp a-t-elle été posée, et avec quelle réponse.
+  @JsonKey(
+    name: r'whatsappStatus',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: WhatsappStatus.unknownDefaultOpenApi,
+  )
+  final WhatsappStatus? whatsappStatus;
+
+  /// Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO.
+  @JsonKey(name: r'whatsappE164', required: false, includeIfNull: false)
+  final String? whatsappE164;
+
+  /// Représentant : profession déclarée.
+  @JsonKey(name: r'profession', required: false, includeIfNull: false)
+  final String? profession;
 
   /// Horodatage de la saisie terrain.
   @JsonKey(name: r'clientCreatedAt', required: false, includeIfNull: false)
@@ -120,6 +152,10 @@ class SyncEntityDataDto {
     unknownEnumValue: CallOutcome.unknownDefaultOpenApi,
   )
   final CallOutcome? outcome;
+
+  /// Tentative d’appel : code du motif d’issue. FACULTATIF POUR TOUJOURS. Un lot qui ne le porte pas résout le motif système dont le code égale outcome.
+  @JsonKey(name: r'reasonCode', required: false, includeIfNull: false)
+  final String? reasonCode;
 
   /// Obligatoire si et seulement si outcome vaut METHOD_OBTAINED.
   @JsonKey(
@@ -153,11 +189,16 @@ class SyncEntityDataDto {
                 banqueId,
                 syndicatId,
                 representantId,
+                body,
                 statut,
                 notes,
+                whatsappStatus,
+                whatsappE164,
+                profession,
                 clientCreatedAt,
                 prospectId,
                 outcome,
+                reasonCode,
                 method,
                 comment,
                 callbackAt,
@@ -172,11 +213,16 @@ class SyncEntityDataDto {
                 other.banqueId,
                 other.syndicatId,
                 other.representantId,
+                other.body,
                 other.statut,
                 other.notes,
+                other.whatsappStatus,
+                other.whatsappE164,
+                other.profession,
                 other.clientCreatedAt,
                 other.prospectId,
                 other.outcome,
+                other.reasonCode,
                 other.method,
                 other.comment,
                 other.callbackAt,
@@ -197,11 +243,16 @@ class SyncEntityDataDto {
         banqueId,
         syndicatId,
         representantId,
+        body,
         statut,
         notes,
+        whatsappStatus,
+        whatsappE164,
+        profession,
         clientCreatedAt,
         prospectId,
         outcome,
+        reasonCode,
         method,
         comment,
         callbackAt,

@@ -94,6 +94,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.clientCreationRequest.count(),
     remove: async (db) => (await db.clientCreationRequest.deleteMany({})).count,
   },
+  visites: {
+    table: 'visites',
+    count: (db) => db.visite.count(),
+    remove: async (db) => (await db.visite.deleteMany({})).count,
+  },
   prospects: {
     table: 'prospects',
     count: (db) => db.prospect.count(),
@@ -151,6 +156,26 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     table: 'bank_rejection_reasons',
     count: (db) => db.bankRejectionReason.count(),
     remove: async (db) => (await db.bankRejectionReason.deleteMany({})).count,
+  },
+  visiteEntreprises: {
+    table: 'visite_entreprises',
+    count: (db) => db.visiteEntreprise.count(),
+    remove: async (db) => (await db.visiteEntreprise.deleteMany({})).count,
+  },
+  visiteDirections: {
+    table: 'visite_directions',
+    count: (db) => db.visiteDirection.count(),
+    remove: async (db) => (await db.visiteDirection.deleteMany({})).count,
+  },
+  visiteDestinataires: {
+    table: 'visite_destinataires',
+    count: (db) => db.visiteDestinataire.count(),
+    remove: async (db) => (await db.visiteDestinataire.deleteMany({})).count,
+  },
+  visiteObjets: {
+    table: 'visite_objets',
+    count: (db) => db.visiteObjet.count(),
+    remove: async (db) => (await db.visiteObjet.deleteMany({})).count,
   },
   banques: {
     table: 'banques',

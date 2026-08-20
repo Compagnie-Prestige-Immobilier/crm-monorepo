@@ -306,7 +306,13 @@ test('sa navigation se limite au Terrain, et le pilotage lui reste fermé', asyn
   const nav = page.getByRole('navigation', { name: 'Navigation principale' });
   await expect(nav.getByRole('heading', { name: 'Terrain', level: 2 })).toBeVisible();
 
-  for (const visible of ['Console d’appel', 'Rappels', 'Représentants', 'Nouveau prospect']) {
+  for (const visible of [
+    'Console d’appel',
+    'Rappels',
+    'Représentants',
+    'Numéros suggérés',
+    'Nouveau prospect',
+  ]) {
     await expect(nav.getByRole('link', { name: visible, exact: true })).toBeVisible();
   }
 

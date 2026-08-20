@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 class DraftDebouncer {
   DraftDebouncer({
@@ -22,8 +23,8 @@ class DraftDebouncer {
     if (_disposed) return;
     _dirty = true;
     _quietTimer?.cancel();
-    _quietTimer = Timer(quiet, flush);
-    _maxTimer ??= Timer(maxWait, flush);
+    _quietTimer = Timer(quiet, _flushUnattended);
+    _maxTimer ??= Timer(maxWait, _flushUnattended);
   }
 
   Future<void> flush() async {
@@ -33,7 +34,27 @@ class DraftDebouncer {
     _maxTimer = null;
     if (!_dirty || _disposed) return;
     _dirty = false;
-    await _onFlush();
+    try {
+      await _onFlush();
+    } on Object {
+      _dirty = true;
+      rethrow;
+    }
+  }
+
+  /// Personne n'attend cette écriture : sans journal, une base verrouillée
+  /// ferait disparaître la saisie sans un mot.
+  Future<void> _flushUnattended() async {
+    try {
+      await flush();
+    } on Object catch (e, stack) {
+      developer.log(
+        'Brouillon non enregistré, nouvelle tentative à la prochaine frappe',
+        name: 'cpi.drafts',
+        error: e,
+        stackTrace: stack,
+      );
+    }
   }
 
   void discard() {
@@ -45,7 +66,7 @@ class DraftDebouncer {
   }
 
   Future<void> dispose() async {
-    await flush();
+    await _flushUnattended();
     _disposed = true;
     _quietTimer?.cancel();
     _maxTimer?.cancel();

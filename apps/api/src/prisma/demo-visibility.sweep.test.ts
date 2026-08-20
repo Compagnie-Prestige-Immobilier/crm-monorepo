@@ -30,6 +30,7 @@ const DEMO_MODELS = [
   'representantSuggestion',
   'representantComment',
   'importJob',
+  'visite',
 ] as const;
 
 const EXEMPT = new Map<string, string>([
@@ -82,6 +83,7 @@ const DEMO_TABLES = [
   'representant_suggestions',
   'representant_comments',
   'import_jobs',
+  'visites',
 ] as const;
 
 const GLOBAL_READ_MARKER = 'LECTURE GLOBALE';

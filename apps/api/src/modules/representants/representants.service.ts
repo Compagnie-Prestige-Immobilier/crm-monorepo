@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ChangeSource, Prisma } from '@crm/database';
+import { ChangeSource, Prisma, WhatsappStatus } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -34,6 +34,7 @@ import type {
   RepresentantRelationChangeListDto,
 } from './dto.js';
 import { applyRelationChange, toRelationChangeDto } from './relation-change.js';
+import { hasReachableWhatsapp, resolveWhatsappPatch, whatsappNumberOf } from './whatsapp.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { demoScope } from '../../prisma/demo-visibility.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
@@ -96,7 +97,24 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     updatedAt: row.updatedAt.toISOString(),
     prospectCount: row._count.prospects,
     relationStatus: row.relationStatus,
+    whatsappStatus: row.whatsappStatus,
+    whatsappE164: row.whatsappE164,
+    whatsappNumber: whatsappNumberOf(row),
+    profession: row.profession,
   };
+}
+
+/**
+ * Les deux filtres WhatsApp se composent par INTERSECTION, jamais par écrasement :
+ * envoyer les deux et n'en voir appliquer qu'un rendrait une liste dont personne
+ * ne peut dire ce qu'elle montre.
+ */
+function allowedWhatsappStatuses(query: RepresentantQueryDto): WhatsappStatus[] {
+  let allowed = Object.values(WhatsappStatus);
+  if (query.hasWhatsapp === true) allowed = allowed.filter(hasReachableWhatsapp);
+  if (query.hasWhatsapp === false) allowed = allowed.filter((s) => !hasReachableWhatsapp(s));
+  if (query.whatsappStatus) allowed = allowed.filter((s) => s === query.whatsappStatus);
+  return allowed;
 }
 
 interface CommentRow {
@@ -149,6 +167,9 @@ export class RepresentantsService {
     if (query.departementId) where.departementId = query.departementId;
     if (query.iefId) where.iefId = query.iefId;
     if (query.relationStatus) where.relationStatus = query.relationStatus;
+    if (query.whatsappStatus || query.hasWhatsapp !== undefined) {
+      where.whatsappStatus = { in: allowedWhatsappStatuses(query) };
+    }
 
     if (query.dateFrom || query.dateTo) {
       where.clientCreatedAt = {
@@ -315,6 +336,8 @@ export class RepresentantsService {
     const phoneE164 = input.phone ? normalizePhone(input.phone) : undefined;
     if (phoneE164 && phoneE164 !== existing.phoneE164) await this.assertPhoneFree(user, phoneE164);
 
+    const whatsapp = resolveWhatsappPatch(input, existing);
+
     const updated = await this.prisma.$transaction(async (tx) => {
       // La bascule de relation part AVANT la mise à jour ordinaire : elle porte
       // sa propre garde sur le statut de départ, et la relecture qui suit doit
@@ -340,6 +363,7 @@ export class RepresentantsService {
           ...(input.departementId ? { departementId: input.departementId } : {}),
           ...(input.iefId === undefined ? {} : { iefId: input.iefId }),
           ...(input.clientCreatedAt ? { clientCreatedAt: new Date(input.clientCreatedAt) } : {}),
+          ...whatsapp,
           rev: { increment: 1 },
         },
         include: INCLUDE,

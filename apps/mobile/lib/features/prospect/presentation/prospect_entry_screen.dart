@@ -240,6 +240,10 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         });
         return;
       }
+      // Le brouillon se jette AVANT l'écriture : sinon le minuteur armé par la
+      // dernière frappe se déclenche pendant la transaction et réécrit la ligne
+      // qu'elle vient de supprimer.
+      discardDraft();
       await ref
           .read(writeRepositoryProvider)
           .createProspect(
@@ -253,7 +257,6 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
             draftId: _draftId,
           );
 
-      discardDraft();
       await HapticFeedback.mediumImpact();
       ref.read(syncCoordinatorProvider.notifier).nudge();
 

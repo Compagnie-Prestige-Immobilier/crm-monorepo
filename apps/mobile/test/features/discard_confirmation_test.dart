@@ -1,6 +1,8 @@
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/sync/api_port.dart';
+import 'package:cpi_go/core/router/route_paths.dart';
+import 'package:cpi_go/core/router/single_push.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/sync/outbox_status.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
@@ -13,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/db_fixture.dart';
@@ -224,7 +227,7 @@ void main() {
   group('la feuille d\'arbitrage ne détruit plus sans demander', () {
     /// La feuille ne s'ouvre que sur une création de représentant en `conflict`,
     /// donc sur la ligne exacte qui cascade.
-    Future<Widget> sheetHost() async {
+    Future<Widget> sheetHost({String? ownerName = 'Moussa Diop'}) async {
       final OutboxData head = await outboxById(db, 'A1');
       return host(
         Builder(
@@ -242,7 +245,7 @@ void main() {
                       phoneE164: '+221770000001',
                     ),
                     ownedByCommercialId: 'autre',
-                    ownedByCommercialName: 'Moussa Diop',
+                    ownedByCommercialName: ownerName,
                   ),
                 ),
                 child: const Text('ouvrir'),
@@ -260,6 +263,97 @@ void main() {
       await paint(tester);
       expect(find.text('Supprimer cette saisie'), findsOneWidget);
     }
+
+    testWidgets('« Corriger le numéro » ouvre la fiche une fois la feuille fermée', (
+      WidgetTester tester,
+    ) async {
+      // La feuille se dépilait AVANT de naviguer, avec son propre contexte :
+      // l'élément est désactivé, `GoRouter.of` n'y remonte plus rien et le
+      // bouton ne faisait que refermer la feuille.
+      await seedRefusedChain(headStatus: OutboxStatus.conflict);
+      final OutboxData head = await outboxById(db, 'A1');
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      SinglePush.reset();
+
+      final GoRouter router = GoRouter(
+        initialLocation: '/depart',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/depart',
+            builder: (BuildContext context, GoRouterState state) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => showOwnershipSheet(
+                    context: context,
+                    row: head,
+                    lookup: RepresentantLookup(
+                      found: true,
+                      phoneE164: '+221770000001',
+                      representant: representantDto(
+                        id: 'server-rep',
+                        phoneE164: '+221770000001',
+                      ),
+                      ownedByCommercialName: 'Moussa Diop',
+                    ),
+                  ),
+                  child: const Text('ouvrir'),
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: Routes.newRepresentant,
+            builder: (BuildContext context, GoRouterState state) =>
+                const Scaffold(body: Center(child: Text('FICHE'))),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await paint(
+        tester,
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(db),
+            apiPortProvider.overrideWithValue(FakeApi()),
+            clockProvider.overrideWithValue(FakeClock(t0)),
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            syncCoordinatorProvider.overrideWith(_FrozenCoordinator.new),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.light,
+            locale: const Locale('fr'),
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            supportedLocales: const <Locale>[Locale('fr')],
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('ouvrir'));
+      await paint(tester);
+      await tester.tap(find.text('Corriger le numéro'));
+      await paint(tester);
+
+      expect(find.text('FICHE'), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets('le propriétaire inconnu est un TÉLÉCONSEILLER, pas un commercial', (
+      WidgetTester tester,
+    ) async {
+      // `commercial` est proscrit de toute chaîne affichée : le vocabulaire du
+      // produit est gardé côté web, et la seule occurrence restante du dépôt
+      // était ce repli.
+      await seedRefusedChain(headStatus: OutboxStatus.conflict);
+      await paint(tester, await sheetHost(ownerName: null));
+      await tester.tap(find.text('ouvrir'));
+      await paint(tester);
+
+      expect(find.textContaining('commercial'), findsNothing);
+      expect(find.textContaining('téléconseiller'), findsOneWidget);
+      await unmount(tester);
+    });
 
     testWidgets('un appui ne suffit pas : il faut confirmer', (
       WidgetTester tester,

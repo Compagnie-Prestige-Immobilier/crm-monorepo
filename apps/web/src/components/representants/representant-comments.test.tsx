@@ -7,6 +7,7 @@ import { renderWithQuery } from '@/test/render-query';
 
 const fetchComments = vi.hoisted(() => vi.fn());
 const createComment = vi.hoisted(() => vi.fn());
+const deleteComment = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/data/representants', async () => {
   const actual = await vi.importActual<typeof RepresentantsModule>('@/lib/data/representants');
@@ -15,6 +16,8 @@ vi.mock('@/lib/data/representants', async () => {
     fetchRepresentantComments: () => fetchComments() as unknown,
     createRepresentantComment: (representantId: unknown, comment: unknown) =>
       createComment(representantId, comment) as unknown,
+    deleteRepresentantComment: (representantId: unknown, commentId: unknown) =>
+      deleteComment(representantId, commentId) as unknown,
   };
 });
 
@@ -36,6 +39,8 @@ const comment = (id: string, body: string, clientCreatedAt: string) => ({
 beforeEach(() => {
   fetchComments.mockResolvedValue([]);
   createComment.mockResolvedValue(comment('c-9', 'Publié', '2026-05-10T09:00:00.000Z'));
+  deleteComment.mockReset();
+  deleteComment.mockResolvedValue(undefined);
 });
 
 describe('RepresentantComments', () => {
@@ -124,6 +129,50 @@ describe('RepresentantComments', () => {
     await screen.findByText(/Rien dans le fil/u);
 
     expect(screen.getByRole('button', { name: /Publier/u }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('n’offre pas la suppression à un téléconseiller', async () => {
+    fetchComments.mockResolvedValue([
+      comment('c-1', 'Premier passage', '2026-05-01T09:00:00.000Z'),
+    ]);
+    renderWithQuery(<RepresentantComments representantId="rep-1" author={AUTHOR} />);
+    await screen.findByText('Premier passage');
+
+    expect(screen.queryByRole('button', { name: 'Supprimer ce commentaire' })).toBeNull();
+  });
+
+  it('demande confirmation avant de supprimer, et n’appelle rien avant', async () => {
+    const user = userEvent.setup();
+    fetchComments.mockResolvedValue([
+      comment('c-1', 'Premier passage', '2026-05-01T09:00:00.000Z'),
+    ]);
+    renderWithQuery(<RepresentantComments representantId="rep-1" author={AUTHOR} canAdminister />);
+    await screen.findByText('Premier passage');
+
+    await user.click(screen.getByRole('button', { name: 'Supprimer ce commentaire' }));
+
+    expect(await screen.findByRole('heading', { name: /Supprimer ce commentaire/u })).toBeTruthy();
+    expect(deleteComment).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Supprimer' }));
+
+    await waitFor(() => {
+      expect(deleteComment).toHaveBeenCalledWith('rep-1', 'c-1');
+    });
+  });
+
+  it('ne supprime rien quand la confirmation est refusée', async () => {
+    const user = userEvent.setup();
+    fetchComments.mockResolvedValue([
+      comment('c-1', 'Premier passage', '2026-05-01T09:00:00.000Z'),
+    ]);
+    renderWithQuery(<RepresentantComments representantId="rep-1" author={AUTHOR} canAdminister />);
+    await screen.findByText('Premier passage');
+
+    await user.click(screen.getByRole('button', { name: 'Supprimer ce commentaire' }));
+    await user.click(await screen.findByRole('button', { name: 'Annuler' }));
+
+    expect(deleteComment).not.toHaveBeenCalled();
   });
 
   it('dit quoi faire quand le fil est vide', async () => {

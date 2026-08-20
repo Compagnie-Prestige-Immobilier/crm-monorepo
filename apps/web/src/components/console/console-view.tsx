@@ -3,9 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CopyIcon, SparklesIcon } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { copyPhone, Kbd } from '@/components/console/console-ui';
+import { RepScript } from '@/components/console/rep-script';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -22,6 +24,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useLive } from '@/components/live/use-live';
 import {
@@ -89,10 +92,57 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['N', 'Nouveau prospect sur ce représentant'],
   ['R', 'Fiche du représentant'],
   ['Ctrl/Cmd K', 'Palette'],
+  ['M', 'Changer de volet'],
   ['?', 'Afficher cette carte'],
 ];
 
+const VOLETS = [
+  { value: 'prospects', label: 'Prospects' },
+  { value: 'representants', label: 'Représentants' },
+] as const;
+
+type Volet = (typeof VOLETS)[number]['value'];
+
+/**
+ * Deux files, un seul poste : la téléconseillère appelle des prospects et des
+ * représentants dans la même session, avec le même clavier.
+ */
 export function ConsoleView() {
+  const [volet, setVolet] = useState<Volet>('prospects');
+
+  useShortcuts({
+    m: () => {
+      setVolet((current) => (current === 'prospects' ? 'representants' : 'prospects'));
+    },
+  });
+
+  return (
+    <Tabs
+      value={volet}
+      onValueChange={(value) => {
+        setVolet(value as Volet);
+      }}
+    >
+      <TabsList>
+        {VOLETS.map((tab) => (
+          <TabsTrigger key={tab.value} value={tab.value}>
+            {tab.label}
+            {tab.value === 'prospects' ? <Kbd>M</Kbd> : null}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+
+      <TabsContent value="prospects">
+        {volet === 'prospects' ? <ProspectConsole /> : null}
+      </TabsContent>
+      <TabsContent value="representants">
+        {volet === 'representants' ? <RepScript /> : null}
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function ProspectConsole() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const live = useLive();
@@ -227,20 +277,8 @@ export function ConsoleView() {
     setSlots(null);
   }, [current, items]);
 
-  const copyPhone = useCallback(() => {
-    if (current === undefined) return;
-    if (!('clipboard' in navigator)) {
-      toast.error('Copie indisponible dans ce navigateur.');
-      return;
-    }
-    navigator.clipboard.writeText(current.phoneE164).then(
-      () => {
-        toast.success('Numéro copié.');
-      },
-      () => {
-        toast.error('Copie refusée par le navigateur.');
-      },
-    );
+  const copyCurrentPhone = useCallback(() => {
+    if (current !== undefined) copyPhone(current.phoneE164);
   }, [current]);
 
   const startOther = useCallback(() => {
@@ -327,7 +365,7 @@ export function ConsoleView() {
       Space: () => {
         if (selected !== undefined) setOpenedId(selected.id);
       },
-      c: copyPhone,
+      c: copyCurrentPhone,
       n: () => {
         if (current !== undefined) {
           router.push(`/prospects/nouveau?rep=${encodeURIComponent(current.representantId)}`);
@@ -458,7 +496,7 @@ export function ConsoleView() {
               <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
                 {formatPhone(current.phoneE164)}
               </span>
-              <Button variant="outline" size="sm" onClick={copyPhone}>
+              <Button variant="outline" size="sm" onClick={copyCurrentPhone}>
                 <CopyIcon aria-hidden="true" />
                 Copier
                 <Kbd>C</Kbd>
@@ -757,14 +795,6 @@ export function ConsoleView() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.75rem] font-[600] text-muted-foreground">
-      {children}
-    </kbd>
   );
 }
 

@@ -15,6 +15,8 @@ import { fetchProspects } from '@/lib/data/prospects';
 import {
   fetchRepresentant,
   fetchRepresentantRelationHistory,
+  scriptOf,
+  whatsappLabel,
   type RepresentantRelationChange,
 } from '@/lib/data/representants';
 import { queryKeys } from '@/lib/query-keys';
@@ -28,9 +30,11 @@ const SOURCE_LABELS = { WEB: 'Panneau', MOBILE: 'Mobile' } as const;
 export function RepresentantDetailView({
   representantId,
   author,
+  canAdminister = false,
 }: {
   representantId: string;
   author: { id: string; fullName: string };
+  canAdminister?: boolean;
 }) {
   const fiche = useQuery({
     queryKey: queryKeys.representant(representantId),
@@ -74,6 +78,7 @@ export function RepresentantDetailView({
   }
 
   const representant = fiche.data;
+  const script = scriptOf(representant);
 
   return (
     <div className="flex flex-col gap-6">
@@ -123,6 +128,14 @@ export function RepresentantDetailView({
                 </time>
               </dd>
             </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">WhatsApp</dt>
+              <dd className="truncate font-[600]">{whatsappLabel(script)}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">Profession</dt>
+              <dd className="truncate font-[600]">{script.profession ?? 'Non demandée'}</dd>
+            </div>
           </dl>
 
           {/* La note EST un champ de la fiche : elle reste dans la fiche, sous
@@ -141,7 +154,11 @@ export function RepresentantDetailView({
           <CardTitle>Fil de la fiche</CardTitle>
         </CardHeader>
         <CardContent>
-          <RepresentantComments representantId={representantId} author={author} />
+          <RepresentantComments
+            representantId={representantId}
+            author={author}
+            canAdminister={canAdminister}
+          />
         </CardContent>
       </Card>
 

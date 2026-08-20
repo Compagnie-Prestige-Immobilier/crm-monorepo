@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,9 +9,11 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../core/utils/relative_time.dart';
+import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
@@ -85,6 +89,7 @@ class _Fiche extends ConsumerWidget {
     }
 
     final String notes = (data.notes ?? '').trim();
+    final String profession = (data.profession ?? '').trim();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -118,6 +123,13 @@ class _Fiche extends ConsumerWidget {
             label: 'Département',
             value: departement,
           ),
+        _WhatsappRow(status: data.whatsappStatus, whatsappE164: data.whatsappE164),
+        if (profession.isNotEmpty)
+          _InfoRow(
+            icon: PhosphorIconsRegular.briefcase,
+            label: 'Profession',
+            value: profession,
+          ),
         if (ief != null)
           _InfoRow(icon: PhosphorIconsRegular.buildings, label: 'IEF', value: ief),
         const SizedBox(height: CpiSpacing.lg),
@@ -132,8 +144,8 @@ class _Fiche extends ConsumerWidget {
         const SizedBox(height: CpiSpacing.lg),
         FilledButton.icon(
           onPressed: () {
-            HapticFeedback.selectionClick();
-            context.push(Routes.newProspectFor(data.id));
+            unawaited(HapticFeedback.selectionClick());
+            context.pushOnce(Routes.newProspectFor(data.id));
           },
           icon: const Icon(PhosphorIconsRegular.userPlus, size: 20),
           label: const Text('Nouveau prospect'),
@@ -141,8 +153,10 @@ class _Fiche extends ConsumerWidget {
         const SizedBox(height: CpiSpacing.xs),
         OutlinedButton.icon(
           onPressed: () {
-            HapticFeedback.selectionClick();
-            context.push('${Routes.newRepresentant}?id=${Uri.encodeComponent(data.id)}');
+            unawaited(HapticFeedback.selectionClick());
+            context.pushOnce(
+              '${Routes.newRepresentant}?id=${Uri.encodeComponent(data.id)}',
+            );
           },
           icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 20),
           label: const Text('Modifier'),
@@ -178,6 +192,7 @@ class RepresentantCommentThread extends ConsumerStatefulWidget {
 class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentThread> {
   final TextEditingController _controller = TextEditingController();
   bool _sending = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -191,7 +206,10 @@ class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentT
     final String body = _controller.text.trim();
     if (authorId == null || body.isEmpty || _sending) return;
 
-    setState(() => _sending = true);
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
     try {
       await ref
           .read(writeRepositoryProvider)
@@ -203,6 +221,8 @@ class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentT
           );
       _controller.clear();
       await HapticFeedback.selectionClick();
+    } on Object catch (e) {
+      if (mounted) setState(() => _error = 'Commentaire non enregistré. $e');
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -230,6 +250,31 @@ class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentT
             border: OutlineInputBorder(),
           ),
         ),
+        if (_error != null) ...<Widget>[
+          const SizedBox(height: CpiSpacing.xs),
+          Semantics(
+            liveRegion: true,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(
+                  PhosphorIconsRegular.warningCircle,
+                  size: 18,
+                  color: theme.colorScheme.error,
+                ),
+                const SizedBox(width: CpiSpacing.xs),
+                Expanded(
+                  child: Text(
+                    _error!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: CpiSpacing.xs),
         Align(
           alignment: Alignment.centerRight,
@@ -322,6 +367,43 @@ class _RelationChip extends StatelessWidget {
   }
 }
 
+/// `NON_DEMANDE` n'est PAS `AUCUN` : la fiche dit « non demandé » tant que la
+/// question ne lui a pas été posée, et ne prétend jamais à une absence
+/// constatée. Sur `MEME_NUMERO` la ligne dit le lien, pas le numéro : il n'est
+/// stocké qu'une fois, une ligne plus haut.
+class _WhatsappRow extends StatelessWidget {
+  const _WhatsappRow({required this.status, this.whatsappE164});
+
+  final String status;
+  final String? whatsappE164;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final WhatsappStatus? known = WhatsappStatus.parse(status);
+    final String? autre = known == WhatsappStatus.autreNumero ? whatsappE164 : null;
+
+    if (autre != null) {
+      return _CopyableRow(
+        icon: PhosphorIconsRegular.whatsappLogo,
+        label: 'WhatsApp',
+        value: Phone.format(autre),
+        copied: autre,
+      );
+    }
+    return _InfoRow(
+      icon: PhosphorIconsRegular.whatsappLogo,
+      label: 'WhatsApp',
+      // Une valeur ajoutée côté serveur s'affiche telle quelle plutôt que de
+      // disparaître.
+      value: known?.label ?? status,
+      valueStyle: known == WhatsappStatus.nonDemande
+          ? theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)
+          : null,
+    );
+  }
+}
+
 class _ProspectList extends ConsumerWidget {
   const _ProspectList({required this.representantId});
 
@@ -394,11 +476,17 @@ class _ProspectList extends ConsumerWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.icon, required this.label, required this.value});
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueStyle,
+  });
 
   final IconData icon;
   final String label;
   final String value;
+  final TextStyle? valueStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -424,7 +512,7 @@ class _InfoRow extends StatelessWidget {
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                Text(value, style: theme.textTheme.bodyLarge),
+                Text(value, style: valueStyle ?? theme.textTheme.bodyLarge),
               ],
             ),
           ),

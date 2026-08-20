@@ -163,6 +163,42 @@ void main() {
     );
   });
 
+  test('la mise en veille survit à un WorkManager indisponible', () async {
+    // Sur un téléphone où l'enregistrement de la tâche de fond échoue (ROM
+    // constructeur, service Google absent), la mise en veille avec une file
+    // pleine lançait une erreur asynchrone que personne n'attrapait.
+    final ProviderContainer container = buildContainer();
+    container.read(syncCoordinatorProvider.notifier);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    await insertRepresentant(db, id: 'rep-4', phone: '+221774444444');
+    await queueOp(
+      db,
+      id: 'op-4',
+      entityType: 'representant',
+      entityId: 'rep-4',
+      payload: <String, Object?>{
+        'id': 'rep-4',
+        'fullName': 'Quatrième',
+        'phoneE164': '+221774444444',
+        'departementId': 'dep-1',
+      },
+    );
+
+    for (final AppLifecycleState state in <AppLifecycleState>[
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+    ]) {
+      TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(state);
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // La saisie doit toujours être en file : le rattrapage n'a pas pu être
+    // programmé, mais rien n'est perdu et l'application tient debout.
+    expect(await db.countPendingOutbox().getSingle(), 1);
+  });
+
   test('un lien mort laisse une preuve, un succès l\'efface', () async {
     // Le seul signal d'accessibilité que l'app possède, et il ne coûte rien :
     // il vient d'une requête qu'on faisait de toute façon. `connectivity_plus`

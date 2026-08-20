@@ -22,7 +22,7 @@ import {
   type Suggestion,
   type SuggestionStatus,
 } from '@/lib/data/suggestions';
-import { formatDateTime, formatPhone } from '@/lib/format';
+import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 
 const FILTERS: readonly { value: SuggestionStatus | null; label: string }[] = [
   { value: null, label: 'Tous' },
@@ -62,6 +62,7 @@ export function SuggestionsView({ readOnly = false }: { readOnly?: boolean }) {
 
   const items = orderSuggestions(data?.items ?? []);
   const counts = suggestionCountsByPhone(items);
+  const total = data?.total ?? 0;
 
   // Identité stable : le dialogue réinitialise ses champs à chaque changement
   // de cette valeur, et effacerait la saisie en cours si elle était recréée.
@@ -125,24 +126,32 @@ export function SuggestionsView({ readOnly = false }: { readOnly?: boolean }) {
           </p>
         </div>
       ) : (
-        <ul aria-label="Numéros suggérés" className="flex flex-col gap-3">
-          {items.map((suggestion) => (
-            <li key={suggestion.id}>
-              <SuggestionCard
-                suggestion={suggestion}
-                sameNumberCount={counts.get(suggestion.suggestedPhoneE164) ?? 1}
-                readOnly={readOnly}
-                pending={decide.isPending}
-                onDecide={(next) => {
-                  decide.mutate({ id: suggestion.id, status: next });
-                }}
-                onCreate={() => {
-                  setCreatingFrom(suggestion);
-                }}
-              />
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-3">
+          {total > items.length ? (
+            <p className="text-[0.8125rem] text-muted-foreground">
+              {formatNumber(total)} numéros au total, les {formatNumber(items.length)} plus récents
+              sont affichés.
+            </p>
+          ) : null}
+          <ul aria-label="Numéros suggérés" className="flex flex-col gap-3">
+            {items.map((suggestion) => (
+              <li key={suggestion.id}>
+                <SuggestionCard
+                  suggestion={suggestion}
+                  sameNumberCount={counts.get(suggestion.suggestedPhoneE164) ?? 1}
+                  readOnly={readOnly}
+                  pending={decide.isPending}
+                  onDecide={(next) => {
+                    decide.mutate({ id: suggestion.id, status: next });
+                  }}
+                  onCreate={() => {
+                    setCreatingFrom(suggestion);
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <RepresentantFormDialog
@@ -187,7 +196,7 @@ function SuggestionCard({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {sameNumberCount > 1 ? (
-            <Badge variant="info">Suggéré {sameNumberCount} fois</Badge>
+            <Badge variant="info">{sameNumberCount} fois dans cette liste</Badge>
           ) : null}
           {known === null ? null : (
             <Badge variant="success" render={<Link href={`/representants/${known}`} />}>

@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../core/sync/phase2_directory_sync.dart';
 import '../local/database.dart';
 
 typedef Region = ({String id, String name});
@@ -77,6 +78,25 @@ class ReferenceRepository {
         .watch();
   }
 
+  /// Les motifs d'issue proposés à la saisie, avec repli sur les six motifs
+  /// système tant que la table est vide : au premier lancement, avant la
+  /// première synchronisation, le téléconseiller doit pouvoir enregistrer un
+  /// appel.
+  Stream<List<CallReason>> watchCallReasons() {
+    return (_db.select(_db.callOutcomeReasons)
+          ..where((CallOutcomeReasons t) => t.isActive.equals(true))
+          ..orderBy(<OrderClauseGenerator<CallOutcomeReasons>>[
+            (CallOutcomeReasons t) => OrderingTerm.asc(t.sortOrder),
+            (CallOutcomeReasons t) => OrderingTerm.asc(t.label),
+          ]))
+        .watch()
+        .map(
+          (List<CallOutcomeReason> rows) => rows.isEmpty
+              ? SystemCallReasons.all
+              : rows.map(CallReason.fromRow).toList(growable: false),
+        );
+  }
+
   Future<Representant?> findRepresentantByPhone(String phoneE164) {
     return (_db.select(_db.representants)
           ..where(
@@ -138,12 +158,26 @@ class ReferenceRepository {
         .watchSingleOrNull();
   }
 
-  Stream<List<ProspectSyncViewData>> watchProspectsFor(String representantId) {
-    return _db.prospectsForRepresentant(representantId: representantId).watch();
+  /// Un cran au-dessus de ce qu'une fiche porte en pratique: la coupure existe
+  /// pour borner le rendu, pas pour cacher des lignes. L'ecran la signale.
+  static const int ficheRowCap = 200;
+
+  Stream<List<ProspectSyncViewData>> watchProspectsFor(
+    String representantId, {
+    int maxRows = ficheRowCap,
+  }) {
+    return _db
+        .prospectsForRepresentant(representantId: representantId, maxRows: maxRows)
+        .watch();
   }
 
-  Stream<List<RepresentantComment>> watchCommentsFor(String representantId) {
-    return _db.commentsForRepresentant(representantId: representantId).watch();
+  Stream<List<RepresentantComment>> watchCommentsFor(
+    String representantId, {
+    int maxRows = ficheRowCap,
+  }) {
+    return _db
+        .commentsForRepresentant(representantId: representantId, maxRows: maxRows)
+        .watch();
   }
 
   Stream<List<ProspectSyncViewData>> watchAllProspects({String? search}) {

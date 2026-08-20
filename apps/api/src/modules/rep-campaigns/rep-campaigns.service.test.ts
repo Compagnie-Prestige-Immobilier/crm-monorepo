@@ -12,6 +12,7 @@ import {
   RepCallOutcome,
   RepresentantRelation,
   Role,
+  WhatsappStatus,
 } from '@crm/database';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -34,7 +35,7 @@ type MockDb = {
     MockFn
   >;
   repCallAttempt: Record<'findMany' | 'findUnique' | 'create' | 'createMany', MockFn>;
-  representant: Record<'findMany' | 'findFirst' | 'count' | 'updateMany', MockFn>;
+  representant: Record<'findMany' | 'findFirst' | 'count' | 'update' | 'updateMany', MockFn>;
   representantRelationChange: Record<'create', MockFn>;
   representantSuggestion: Record<'create', MockFn>;
   departement: Record<'findUnique', MockFn>;
@@ -92,6 +93,7 @@ function prismaStub(): MockDb {
       findMany: vi.fn(),
       findFirst: vi.fn(),
       count: vi.fn(),
+      update: vi.fn(),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     representantRelationChange: { create: vi.fn() },
@@ -1078,5 +1080,152 @@ describe('REP_CHECKBOX_GROUPS', () => {
       ATTENDUS[RepCallOutcome.REACHED],
       ATTENDUS[RepCallOutcome.PROSPECTS_PROMISED],
     ]);
+  });
+});
+
+describe('RepCampaignsService : WhatsApp et profession recueillis pendant l’appel', () => {
+  const attempt = {
+    id: '01931f3c-1a2b-7c4d-8e5f-000000000030',
+    representantId: 'rep-1',
+    outcome: RepCallOutcome.REACHED,
+    clientCreatedAt: date.toISOString(),
+  };
+
+  const ready = (
+    over: Record<string, unknown> = {},
+    byPhone: Record<string, unknown> | null = null,
+  ): MockDb => {
+    const db = prismaStub();
+    db.repCallAttempt.findUnique.mockResolvedValue(null);
+    db.repCallTask.findFirst.mockResolvedValue(null);
+    db.representant.findFirst.mockImplementation((args: { where: Record<string, unknown> }) =>
+      'phoneE164' in args.where
+        ? byPhone
+        : {
+            id: 'rep-1',
+            isDemo: false,
+            relationStatus: RepresentantRelation.INCONNU,
+            whatsappStatus: WhatsappStatus.NON_DEMANDE,
+            whatsappE164: null,
+            ...over,
+          },
+    );
+    return db;
+  };
+
+  const patchOf = (db: MockDb): Record<string, unknown> =>
+    (db.representant.update.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+
+  it('un seul appel porte la relation, le WhatsApp, la profession et la suggestion', async () => {
+    const db = ready();
+
+    const result = await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+      whatsappStatus: WhatsappStatus.AUTRE_NUMERO,
+      whatsappE164: '78 000 00 01',
+      profession: 'Directeur d’école',
+      suggestedPhone: '77 987 65 43',
+    });
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.APPLIED);
+    expect(db.repCallAttempt.createMany).toHaveBeenCalledTimes(1);
+    expect(patchOf(db)).toMatchObject({
+      whatsappStatus: WhatsappStatus.AUTRE_NUMERO,
+      whatsappE164: '+221780000001',
+      profession: 'Directeur d’école',
+      rev: { increment: 1 },
+    });
+    expect(db.representantRelationChange.create).toHaveBeenCalledTimes(1);
+    expect(db.representantSuggestion.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('MEME_NUMERO n’écrit AUCUN numéro dédié : la copie divergerait du téléphone', async () => {
+    const db = ready();
+
+    await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      whatsappStatus: WhatsappStatus.MEME_NUMERO,
+    });
+
+    expect(patchOf(db)).toMatchObject({ whatsappStatus: WhatsappStatus.MEME_NUMERO });
+    expect(patchOf(db)).not.toHaveProperty('whatsappE164');
+  });
+
+  it('un appel INTERROMPU après le seul refus enregistre le refus', async () => {
+    const db = ready();
+
+    const result = await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      outcome: RepCallOutcome.REFUSED,
+      relationStatus: RepresentantRelation.REFUS,
+    });
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.APPLIED);
+    expect(db.representantRelationChange.create).toHaveBeenCalledTimes(1);
+    expect(db.representant.update).not.toHaveBeenCalled();
+    expect(db.representantSuggestion.create).not.toHaveBeenCalled();
+  });
+
+  it('la profession seule s’enregistre sans que le WhatsApp ait été abordé', async () => {
+    const db = ready();
+
+    await build(db).recordAttempt(COMMERCIAL, { ...attempt, profession: 'Comptable' });
+
+    expect(patchOf(db)).toEqual({ profession: 'Comptable', rev: { increment: 1 } });
+  });
+
+  it('un REJEU n’écrit pas le WhatsApp une seconde fois', async () => {
+    const db = ready();
+    db.repCallAttempt.findUnique.mockResolvedValue({ id: attempt.id, taskId: null });
+
+    const result = await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      whatsappStatus: WhatsappStatus.MEME_NUMERO,
+      profession: 'Comptable',
+    });
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
+    expect(db.representant.update).not.toHaveBeenCalled();
+  });
+
+  it('ni le rejeu écarté par l’unicité, découvert dans la transaction', async () => {
+    const db = ready();
+    db.repCallAttempt.createMany.mockResolvedValue({ count: 0 });
+
+    const result = await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      whatsappStatus: WhatsappStatus.MEME_NUMERO,
+      profession: 'Comptable',
+    });
+
+    expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
+    expect(db.representant.update).not.toHaveBeenCalled();
+  });
+
+  it('REFUSE la tentative ENTIÈRE sur un numéro que le statut interdit', async () => {
+    const db = ready();
+
+    await expect(
+      build(db).recordAttempt(COMMERCIAL, {
+        ...attempt,
+        whatsappStatus: WhatsappStatus.MEME_NUMERO,
+        whatsappE164: '78 000 00 01',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(db.repCallAttempt.createMany).not.toHaveBeenCalled();
+    expect(db.representant.update).not.toHaveBeenCalled();
+  });
+
+  it('une tentative qui ne dit rien du WhatsApp ne touche pas à la fiche', async () => {
+    const db = ready({
+      whatsappStatus: WhatsappStatus.AUTRE_NUMERO,
+      whatsappE164: '+221780000001',
+    });
+
+    await build(db).recordAttempt(COMMERCIAL, attempt);
+
+    expect(db.representant.update).not.toHaveBeenCalled();
   });
 });

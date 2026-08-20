@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { DetailBackLink } from '@/components/detail-back-link';
 import { useFileDownload } from '@/components/exports/download-button';
 import { CampaignProgressBar } from '@/components/phase2/campaign-progress-bar';
+import { CallRecordingPlayer } from '@/components/phase2/call-recording-player';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -236,6 +237,9 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                       attempt.assignedToId !== attempt.performedById ? (
                         <p className="mt-0.5">Tâche d’un autre téléconseiller</p>
                       ) : null}
+                    </div>
+                    <div className="basis-full">
+                      <CallRecordingPlayer attemptId={attempt.id} />
                     </div>
                   </li>
                 ))}

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/router/route_paths.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../notifications_controller.dart';
+import '../../../core/router/single_push.dart';
 
 class NotificationBell extends ConsumerWidget {
   const NotificationBell({super.key});
@@ -23,7 +23,7 @@ class NotificationBell extends ConsumerWidget {
           ? '$unread notification${unread > 1 ? 's' : ''} non lue${unread > 1 ? 's' : ''}'
           : 'Notifications',
       child: InkWell(
-        onTap: () => context.push(Routes.notifications),
+        onTap: () => context.pushOnce(Routes.notifications),
         borderRadius: CpiRadius.brFull,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),

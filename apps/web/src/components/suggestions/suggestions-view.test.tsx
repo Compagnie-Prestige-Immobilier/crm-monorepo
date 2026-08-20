@@ -35,12 +35,12 @@ const suggestion = (over: Partial<SuggestionsModule.Suggestion> = {}) => ({
   ...over,
 });
 
-const page = (items: unknown[]) => ({
+const page = (items: unknown[], total = items.length) => ({
   items,
-  total: items.length,
+  total,
   page: 1,
   pageSize: 100,
-  pageCount: 1,
+  pageCount: Math.max(1, Math.ceil(total / 100)),
 });
 
 beforeEach(() => {
@@ -104,7 +104,7 @@ describe('SuggestionsView', () => {
     expect(screen.queryByRole('button', { name: /Créer la fiche/u })).toBeNull();
   });
 
-  it('met en avant un numéro que plusieurs représentants ont cité', async () => {
+  it('met en avant un numéro que plusieurs représentants ont cité, en disant sur quoi il compte', async () => {
     fetchSuggestions.mockResolvedValue(
       page([
         suggestion({ id: 's-1', sourceRepresentantShortCode: 'AAA111' }),
@@ -114,7 +114,24 @@ describe('SuggestionsView', () => {
     );
     renderWithQuery(<SuggestionsView />);
 
-    expect(await screen.findAllByText('Suggéré 2 fois')).toHaveLength(2);
+    expect(await screen.findAllByText('2 fois dans cette liste')).toHaveLength(2);
+  });
+
+  it('avoue que la liste est coupée quand le serveur en a davantage', async () => {
+    fetchSuggestions.mockResolvedValue(page([suggestion(), suggestion({ id: 's-2' })], 240));
+    renderWithQuery(<SuggestionsView />);
+
+    expect(
+      await screen.findByText(/240 numéros au total, les 2 plus récents sont affichés/u),
+    ).toBeTruthy();
+  });
+
+  it('ne parle pas de coupure quand la liste est entière', async () => {
+    fetchSuggestions.mockResolvedValue(page([suggestion()]));
+    renderWithQuery(<SuggestionsView />);
+    await screen.findByText('K4M2P7');
+
+    expect(screen.queryByText(/plus récents sont affichés/u)).toBeNull();
   });
 
   it('marque un numéro appelé', async () => {

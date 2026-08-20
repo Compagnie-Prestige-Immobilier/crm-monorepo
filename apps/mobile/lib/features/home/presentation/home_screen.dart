@@ -274,7 +274,7 @@ class _PrimaryAction extends StatelessWidget {
         children: <Widget>[
           FilledButton.icon(
             onPressed: () {
-              HapticFeedback.selectionClick();
+              HapticFeedback.selectionClick().ignore();
               context.pushOnce(Routes.representants);
             },
             icon: const Icon(PhosphorIconsRegular.users, size: 20),
@@ -283,7 +283,7 @@ class _PrimaryAction extends StatelessWidget {
           const SizedBox(height: CpiSpacing.xs),
           OutlinedButton.icon(
             onPressed: () {
-              HapticFeedback.selectionClick();
+              HapticFeedback.selectionClick().ignore();
               context.pushOnce(Routes.newRepresentant);
             },
             icon: const Icon(PhosphorIconsRegular.userPlus, size: 20),

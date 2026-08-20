@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   CallTaskStatus,
   Phase2Status,
@@ -7,7 +12,7 @@ import {
   type EnrollmentMethod,
 } from '@crm/database';
 
-import { PHASE2_STATUS_FOR_OUTCOME, isTerminalOutcome, normalizeAttempt } from './attempt-rules.js';
+import { normalizeAttempt, systemReasonFor, type AttemptReason } from './attempt-rules.js';
 import {
   CallAttemptApplyStatus,
   type CallAttemptOpDto,
@@ -49,6 +54,20 @@ const toState = (row: ProspectState): ProspectPhase2StateDto => ({
   capturedAt: row.enrollmentCapturedAt?.toISOString() ?? null,
 });
 
+const REASON_SELECT = {
+  id: true,
+  code: true,
+  label: true,
+  effect: true,
+  requiresComment: true,
+  requiresCallback: true,
+  isActive: true,
+} satisfies Prisma.CallOutcomeReasonSelect;
+
+export const PHASE2_REASON_UNKNOWN = 'PHASE2_REASON_UNKNOWN';
+export const PHASE2_REASON_INACTIVE = 'PHASE2_REASON_INACTIVE';
+export const PHASE2_REASON_OUTCOME_MISMATCH = 'PHASE2_REASON_OUTCOME_MISMATCH';
+
 const alreadyCompleted = (state: ProspectPhase2StateDto): ConflictException =>
   new ConflictException({
     code: 'PHASE2_ALREADY_COMPLETED',
@@ -64,7 +83,7 @@ export class Phase2SyncService {
     userId: string,
     op: CallAttemptOpDto,
   ): Promise<CallAttemptResultDto> {
-    const attempt = normalizeAttempt(op);
+    const attempt = normalizeAttempt(op, await this.resolveReason(tx, op));
 
     const known = await tx.callAttempt.findUnique({
       where: { id: op.id },
@@ -102,6 +121,7 @@ export class Phase2SyncService {
           campaignId: activeTask?.campaignId ?? null,
           performedById: userId,
           outcome: attempt.outcome,
+          reasonId: attempt.reasonId,
           method: attempt.method,
           comment: attempt.comment,
           clientCreatedAt: new Date(op.clientCreatedAt),
@@ -146,7 +166,7 @@ export class Phase2SyncService {
       });
     }
 
-    if (!attempt.terminal || !isTerminalOutcome(attempt.outcome)) {
+    if (!attempt.terminal || attempt.phase2Status === null) {
       return {
         status: CallAttemptApplyStatus.APPLIED,
         attemptId: op.id,
@@ -157,7 +177,7 @@ export class Phase2SyncService {
     }
 
     const completedAt = new Date();
-    const nextStatus = PHASE2_STATUS_FOR_OUTCOME[attempt.outcome];
+    const nextStatus = attempt.phase2Status;
 
     const applied = await tx.prospect.updateMany({
       where: { id: op.prospectId, phase2Status: Phase2Status.PENDING },
@@ -190,6 +210,53 @@ export class Phase2SyncService {
       taskId: activeTask?.id ?? null,
       taskStatus: activeTask ? CallTaskStatus.DONE : null,
       state: toState(await this.loadProspect(tx, op.prospectId)),
+    };
+  }
+
+  /**
+   * Un motif système absent de la table ne fait PAS échouer la remontée : la
+   * règle compilée reste la référence et la tentative part sans `reasonId`.
+   * Refuser ici condamnerait la file d'un téléphone hors ligne, définitivement.
+   */
+  private async resolveReason(
+    tx: Phase2TransactionClient,
+    op: CallAttemptOpDto,
+  ): Promise<AttemptReason> {
+    const claimed = op.reasonCode?.trim().toUpperCase() ?? '';
+    const code = claimed === '' ? op.outcome : claimed;
+
+    const row = await tx.callOutcomeReason.findUnique({ where: { code }, select: REASON_SELECT });
+
+    if (row === null) {
+      if (claimed === '') return systemReasonFor(op.outcome);
+      throw new BadRequestException({
+        code: PHASE2_REASON_UNKNOWN,
+        message: `Motif d’issue inconnu : ${code}.`,
+      });
+    }
+
+    if (claimed !== '') {
+      if (!row.isActive) {
+        throw new BadRequestException({
+          code: PHASE2_REASON_INACTIVE,
+          message: `Le motif « ${row.label} » a été retiré du référentiel.`,
+        });
+      }
+      if (row.effect !== systemReasonFor(op.outcome).effect) {
+        throw new BadRequestException({
+          code: PHASE2_REASON_OUTCOME_MISMATCH,
+          message: `Le motif « ${row.label} » ne produit pas l’issue ${op.outcome}.`,
+        });
+      }
+    }
+
+    return {
+      id: row.id,
+      code: row.code,
+      label: row.label,
+      effect: row.effect,
+      requiresComment: row.requiresComment,
+      requiresCallback: row.requiresCallback,
     };
   }
 

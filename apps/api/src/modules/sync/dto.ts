@@ -20,7 +20,7 @@ import {
   type ValidatorConstraintInterface,
 } from 'class-validator';
 import { ValidatorConstraint } from 'class-validator';
-import { CallOutcome, EnrollmentMethod, ProspectStatut } from '@crm/database';
+import { CallOutcome, EnrollmentMethod, ProspectStatut, WhatsappStatus } from '@crm/database';
 
 import { BanqueDto, DepartementDto, IefDto, SyndicatDto } from '../referentiels/dto.js';
 import { ProspectDto } from '../prospects/dto.js';
@@ -32,6 +32,7 @@ export const SYNC_MAX_DEPENDENCY_GROUPS = 25;
 
 export enum SyncEntity {
   REPRESENTANT = 'representant',
+  REPRESENTANT_COMMENT = 'representant_comment',
   PROSPECT = 'prospect',
   CALL_ATTEMPT = 'call_attempt',
 }
@@ -50,7 +51,7 @@ export enum SyncOpStatus {
   SKIPPED_DEPENDENCY_FAILED = 'skipped_dependency_failed',
 }
 
-export const CLEARABLE_FIELDS = ['iefId', 'notes'] as const;
+export const CLEARABLE_FIELDS = ['iefId', 'notes', 'whatsappE164', 'profession'] as const;
 
 export type ClearableField = (typeof CLEARABLE_FIELDS)[number];
 
@@ -116,6 +117,12 @@ export class SyncEntityDataDto {
   @IsUUID()
   representantId?: string;
 
+  @ApiPropertyOptional({ maxLength: 2000, description: 'Commentaire ajouté à une fiche.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  body?: string;
+
   @ApiPropertyOptional({ enum: ProspectStatut, enumName: 'ProspectStatut' })
   @IsOptional()
   @IsEnum(ProspectStatut)
@@ -126,6 +133,32 @@ export class SyncEntityDataDto {
   @IsString()
   @MaxLength(2000)
   notes?: string;
+
+  @ApiPropertyOptional({
+    enum: WhatsappStatus,
+    enumName: 'WhatsappStatus',
+    description:
+      'Représentant : la question du WhatsApp a-t-elle été posée, et avec quelle réponse.',
+  })
+  @IsOptional()
+  @IsEnum(WhatsappStatus)
+  whatsappStatus?: WhatsappStatus;
+
+  @ApiPropertyOptional({
+    maxLength: 40,
+    description: 'Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  whatsappE164?: string;
+
+  @ApiPropertyOptional({ maxLength: 120, description: 'Représentant : profession déclarée.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  profession?: string;
 
   @ApiPropertyOptional({ format: 'date-time', description: 'Horodatage de la saisie terrain.' })
   @IsOptional()
@@ -144,6 +177,17 @@ export class SyncEntityDataDto {
   @IsOptional()
   @IsEnum(CallOutcome)
   outcome?: CallOutcome;
+
+  @ApiPropertyOptional({
+    maxLength: 40,
+    description:
+      'Tentative d’appel : code du motif d’issue. FACULTATIF POUR TOUJOURS. Un lot qui ne le ' +
+      'porte pas résout le motif système dont le code égale outcome.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  reasonCode?: string;
 
   @ApiPropertyOptional({
     enum: EnrollmentMethod,
@@ -265,6 +309,10 @@ export function dependencyKeyOf(operation: {
   data?: { representantId?: string; prospectId?: string } | undefined;
 }): string {
   if (operation.entity === SyncEntity.REPRESENTANT) return `representant:${operation.entityId}`;
+
+  if (operation.entity === SyncEntity.REPRESENTANT_COMMENT) {
+    return `representant:${operation.data?.representantId ?? operation.entityId}`;
+  }
 
   if (operation.entity === SyncEntity.CALL_ATTEMPT) {
     return `prospect:${operation.data?.prospectId ?? operation.entityId}`;

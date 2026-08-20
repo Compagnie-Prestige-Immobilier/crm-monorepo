@@ -55,6 +55,15 @@ enum RepresentantRelation {
   REFUS
 }
 
+// Pas un booléen non plus : `false` confondrait « il n'a pas WhatsApp » et « on
+// ne lui a pas posé la question », et c'est cet écart qui décide qui rappeler.
+enum WhatsappStatus {
+  NON_DEMANDE
+  MEME_NUMERO
+  AUTRE_NUMERO
+  AUCUN
+}
+
 // Prospection générale (phase 1). NE PAS confondre avec Phase2Status : les deux
 // décrivent des dimensions différentes du même prospect et évoluent
 // séparément.
@@ -246,6 +255,8 @@ model User {
 
   heartbeat AgentHeartbeat?
 
+  visitesEnregistrees Visite[] @relation("VisiteCreatedBy")
+
   @@index([role, isActive])
   @@index([deletedAt])
   @@index([isDemo])
@@ -411,6 +422,18 @@ model Representant {
 
   relationStatus RepresentantRelation @default(INCONNU)
 
+  // Invariant posé en CHECK dans la migration, pas seulement dans les DTO :
+  // `whatsappE164` est renseigné SI ET SEULEMENT SI `whatsappStatus` vaut
+  // AUTRE_NUMERO. Sur MEME_NUMERO la colonne reste NULLE : recopier
+  // `phoneE164` créerait une seconde vérité qui divergerait à la première
+  // correction du téléphone. La lecture recompose le numéro joignable.
+  whatsappStatus WhatsappStatus @default(NON_DEMANDE)
+  whatsappE164   String?
+
+  /// Texte libre, non normalisé. Pas de référentiel : le besoin de l'administrer
+  /// n'est pas établi, et `CallOutcomeReason` en donne le patron le jour venu.
+  profession String?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -444,6 +467,7 @@ model Representant {
   @@index([deletedAt])
   @@index([relationStatus])
   @@index([relationStatus, departementId])
+  @@index([whatsappStatus])
   @@index([isDemo])
   @@map("representants")
 }
@@ -805,10 +829,17 @@ model CallAttempt {
   performedById String
   performedBy   User   @relation("CallAttemptPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
 
+  /// L'EFFET de l'appel, dans le vocabulaire figé que les téléphones déployés
+  /// savent émettre. Le motif exact, lui, se lit sur `reasonId`.
   outcome CallOutcome
   method  EnrollmentMethod?
   // Obligatoire quand outcome = OTHER, facultatif sinon. Contrainte CHECK.
   comment String?
+
+  /// Motif saisi sur le terrain. Nul pour les tentatives remontées avant que le
+  /// parc sache l'émettre : `outcome` reste alors la seule qualification.
+  reasonId String?
+  reason   CallOutcomeReason? @relation(fields: [reasonId], references: [id], onDelete: Restrict)
 
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())
@@ -827,6 +858,7 @@ model CallAttempt {
   // La journee de travail se lit sur `clientCreatedAt`, l'heure de l'appel.
   @@index([performedById, clientCreatedAt])
   @@index([campaignId])
+  @@index([reasonId, clientCreatedAt])
   @@index([isDemo])
   @@map("call_attempts")
 }
@@ -1914,7 +1946,166 @@ model CallOutcomeReason {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  attempts CallAttempt[]
+
   @@index([isActive, sortOrder])
   @@index([effect, isActive])
   @@map("call_outcome_reasons")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Registre des visites (accueil)
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Les trois entreprises du groupe.
+///
+/// Patron des quatre référentiels de visite, calqué sur `BankCaseStage` : `code`
+/// immuable puisque les visites déjà enregistrées le désignent, désactivation
+/// plutôt que suppression, `isSystem` pour ce que l'administration ne peut pas
+/// retirer des listes.
+model VisiteEntreprise {
+  id    String @id @default(uuid(7))
+  /// Immuable : le registre le référence. Voir `BankCaseStage.code`.
+  code  String @unique
+  label String @unique
+
+  isActive  Boolean @default(true)
+  isSystem  Boolean @default(false)
+  sortOrder Int     @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visites Visite[]
+
+  @@index([isActive, sortOrder])
+  @@map("visite_entreprises")
+}
+
+/// Services ET niveaux du bâtiment dans le même référentiel.
+///
+/// Le classeur les mélange sous « DIRECTIONS &/OU NIVEAU » : l'accueil note
+/// tantôt le service demandé, tantôt l'étage où monte le visiteur. Les séparer
+/// obligerait à trancher pour elle sur les 45 lignes où seul l'étage est connu.
+model VisiteDirection {
+  id    String @id @default(uuid(7))
+  code  String @unique
+  label String @unique
+
+  isActive  Boolean @default(true)
+  isSystem  Boolean @default(false)
+  sortOrder Int     @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visites Visite[]
+
+  @@index([isActive, sortOrder])
+  @@map("visite_directions")
+}
+
+/// Les personnes reçues, nommées avec leur rôle.
+///
+/// Référentiel et non lien vers `User` : la caissière, le juriste ou le DG ne
+/// détiennent pas de compte sur la plateforme, et le registre doit continuer de
+/// nommer un destinataire parti depuis des années.
+model VisiteDestinataire {
+  id    String @id @default(uuid(7))
+  code  String @unique
+  label String @unique
+
+  isActive  Boolean @default(true)
+  isSystem  Boolean @default(false)
+  sortOrder Int     @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visites Visite[]
+
+  @@index([isActive, sortOrder])
+  @@map("visite_destinataires")
+}
+
+/// Le motif de la venue.
+model VisiteObjet {
+  id    String @id @default(uuid(7))
+  code  String @unique
+  label String @unique
+
+  isActive  Boolean @default(true)
+  isSystem  Boolean @default(false)
+  sortOrder Int     @default(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visites Visite[]
+
+  @@index([isActive, sortOrder])
+  @@map("visite_objets")
+}
+
+/// Une personne passée à l'accueil, une ligne.
+model Visite {
+  id String @id @default(uuid(7))
+
+  /// Le « N° » du classeur, engendré par le serveur au format `V-2026-000412`.
+  /// Immuable : c'est par lui que l'accueil retrouve une ligne à l'oral.
+  reference String @unique
+
+  /// Instant de la visite. Minuit Dakar quand l'heure n'a pas été relevée, d'où
+  /// `timeKnown` : sans lui, une visite sans heure s'afficherait « 00:00 ».
+  visitedAt DateTime
+  timeKnown Boolean  @default(true)
+
+  visitorName String
+
+  /// Le numéro TEL QUE DONNÉ, et sa forme E.164 quand elle a pu être obtenue.
+  /// Un visiteur peut laisser un numéro étranger ou incomplet : l'accueil
+  /// l'enregistre quand même, et `phoneE164` reste nul. Voir `tryNormalizePhone`.
+  phone     String?
+  phoneE164 String?
+
+  entrepriseId String
+  entreprise   VisiteEntreprise @relation(fields: [entrepriseId], references: [id], onDelete: Restrict)
+
+  objetId String
+  objet   VisiteObjet @relation(fields: [objetId], references: [id], onDelete: Restrict)
+
+  /// Facultatifs : le classeur compte 45 lignes sans direction et 44 sans
+  /// destinataire, et c'est ce qui explique l'écart entre le total annuel et la
+  /// somme de ses répartitions.
+  directionId String?
+  direction   VisiteDirection? @relation(fields: [directionId], references: [id], onDelete: Restrict)
+
+  destinataireId String?
+  destinataire   VisiteDestinataire? @relation(fields: [destinataireId], references: [id], onDelete: Restrict)
+
+  comment String?
+
+  createdById String
+  createdBy   User   @relation("VisiteCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Ligne appartenant au jeu de démonstration.
+  ///
+  /// Le mode démo est une BASCULE D'AFFICHAGE, pas une insertion suivie d'une
+  /// suppression : les lignes de démo coexistent en permanence avec les vraies,
+  /// et l'interrupteur ne fait que les montrer ou les cacher. Rien n'est jamais
+  /// détruit, et surtout une ligne de démo ne peut pas se retrouver dans un
+  /// export réel : elle est invisible dès que le mode est éteint.
+  isDemo Boolean @default(false)
+
+  @@index([visitedAt])
+  @@index([entrepriseId])
+  @@index([directionId])
+  @@index([destinataireId])
+  @@index([objetId])
+  @@index([createdById])
+  @@index([isDemo])
+  @@map("visites")
 }

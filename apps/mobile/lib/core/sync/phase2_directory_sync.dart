@@ -118,7 +118,7 @@ class Phase2DirectorySync {
     final Expression<int> total = _db.callAttempts.id.count();
     return (_db.selectOnly(_db.callAttempts)
           ..addColumns(<Expression<Object>>[total])
-          ..where(_db.callAttempts.outcome.isIn(CallOutcomes.terminal)))
+          ..where(_db.callAttempts.effect.isIn(CallEffects.closing)))
         .map((TypedResult row) => row.read(total) ?? 0)
         .getSingle();
   }
@@ -188,10 +188,166 @@ abstract final class CallOutcomes {
       .where((CallOutcome o) => o != CallOutcome.unknownDefaultOpenApi)
       .map((CallOutcome o) => o.value)
       .toList(growable: false);
+}
 
-  static final Set<String> terminal = Phase2Statuses.all
-      .where((String s) => s != Phase2Statuses.pending)
-      .toSet();
+/// Effets d'un motif d'issue : ce que la tentative FAIT au dossier. C'est la
+/// seule part du vocabulaire d'appel qui reste compilée, parce qu'elle porte des
+/// conséquences que l'application doit savoir appliquer hors ligne. Les motifs,
+/// eux, viennent du serveur et s'ajoutent sans nouvelle version.
+abstract final class CallEffects {
+  static const String closeMethod = 'CLOSE_METHOD';
+  static const String closeRefused = 'CLOSE_REFUSED';
+  static const String closeWrongNumber = 'CLOSE_WRONG_NUMBER';
+  static const String keepOpen = 'KEEP_OPEN';
+  static const String scheduleCallback = 'SCHEDULE_CALLBACK';
+
+  static final List<String> all = CallOutcomeEffect.values
+      .where((CallOutcomeEffect e) => e != CallOutcomeEffect.unknownDefaultOpenApi)
+      .map((CallOutcomeEffect e) => e.value)
+      .toList(growable: false);
+
+  static const List<String> closing = <String>[
+    closeMethod,
+    closeRefused,
+    closeWrongNumber,
+  ];
+
+  /// L'issue historique qu'un effet porte sur le fil. `outcome` reste une
+  /// énumération FERMÉE du contrat : un motif neuf voyage dans `reasonCode`, et
+  /// son effet dit quelle issue connue le serveur doit lire à sa place.
+  static const Map<String, String> outcome = <String, String>{
+    closeMethod: CallOutcomes.methodObtained,
+    closeRefused: CallOutcomes.refused,
+    closeWrongNumber: CallOutcomes.wrongNumber,
+    scheduleCallback: CallOutcomes.callback,
+    keepOpen: CallOutcomes.unreachable,
+  };
+
+  static String? phase2Status(String effect) => switch (effect) {
+    closeMethod => Phase2Statuses.methodObtained,
+    closeRefused => Phase2Statuses.refused,
+    closeWrongNumber => Phase2Statuses.wrongNumber,
+    _ => null,
+  };
+}
+
+/// Un motif d'issue, qu'il vienne de la table locale ou du repli compilé.
+class CallReason {
+  const CallReason({
+    required this.code,
+    required this.label,
+    required this.effect,
+    this.requiresComment = false,
+    this.requiresCallback = false,
+    this.countsAsReached = false,
+    this.sortOrder = 100,
+    this.color,
+  });
+
+  factory CallReason.fromRow(CallOutcomeReason row) => CallReason(
+    code: row.code,
+    label: row.label,
+    effect: row.effect,
+    requiresComment: row.requiresComment,
+    requiresCallback: row.requiresCallback,
+    countsAsReached: row.countsAsReached,
+    sortOrder: row.sortOrder,
+    color: row.color,
+  );
+
+  final String code;
+  final String label;
+  final String effect;
+  final bool requiresComment;
+  final bool requiresCallback;
+  final bool countsAsReached;
+  final int sortOrder;
+  final String? color;
+
+  /// Un motif système porte le code de son issue ; un motif ajouté par le client
+  /// emprunte celle de son effet.
+  String get outcome => CallOutcomes.all.contains(code)
+      ? code
+      : (CallEffects.outcome[effect] ?? CallOutcomes.unreachable);
+
+  bool get closes => CallEffects.closing.contains(effect);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || (other is CallReason && other.code == code);
+
+  @override
+  int get hashCode => code.hashCode;
+}
+
+/// Repli tant que la table locale est vide : au premier lancement, la saisie ne
+/// peut pas attendre la première synchronisation. Ce sont les six motifs
+/// SYSTÈME, dont le serveur garantit que le code ne bouge jamais.
+abstract final class SystemCallReasons {
+  static const List<CallReason> all = <CallReason>[
+    CallReason(
+      code: CallOutcomes.methodObtained,
+      label: 'Méthode obtenue',
+      effect: CallEffects.closeMethod,
+      countsAsReached: true,
+      sortOrder: 10,
+    ),
+    CallReason(
+      code: CallOutcomes.unreachable,
+      label: 'Injoignable',
+      effect: CallEffects.keepOpen,
+      sortOrder: 20,
+    ),
+    CallReason(
+      code: CallOutcomes.callback,
+      label: 'À rappeler',
+      effect: CallEffects.scheduleCallback,
+      countsAsReached: true,
+      sortOrder: 30,
+    ),
+    CallReason(
+      code: CallOutcomes.refused,
+      label: 'Refus',
+      effect: CallEffects.closeRefused,
+      countsAsReached: true,
+      sortOrder: 40,
+    ),
+    CallReason(
+      code: CallOutcomes.wrongNumber,
+      label: 'Mauvais numéro',
+      effect: CallEffects.closeWrongNumber,
+      sortOrder: 50,
+    ),
+    CallReason(
+      code: CallOutcomes.other,
+      label: 'Autre',
+      effect: CallEffects.keepOpen,
+      requiresComment: true,
+      countsAsReached: true,
+      sortOrder: 60,
+    ),
+  ];
+
+  static final Map<String, CallReason> byCode = <String, CallReason>{
+    for (final CallReason r in all) r.code: r,
+  };
+}
+
+/// Tous les motifs connus de cet appareil, ACTIFS OU NON : une tentative mise en
+/// file avant qu'un motif ne soit désactivé doit encore pouvoir partir.
+Future<Map<String, CallReason>> loadCallReasons(AppDatabase db) async {
+  final List<CallOutcomeReason> rows = await db.select(db.callOutcomeReasons).get();
+  return <String, CallReason>{
+    ...SystemCallReasons.byCode,
+    for (final CallOutcomeReason row in rows) row.code: CallReason.fromRow(row),
+  };
+}
+
+Future<CallReason?> resolveCallReason(AppDatabase db, String code) async {
+  final CallOutcomeReason? row = await (db.select(
+    db.callOutcomeReasons,
+  )..where((CallOutcomeReasons t) => t.code.equals(code))).getSingleOrNull();
+  return row == null ? SystemCallReasons.byCode[code] : CallReason.fromRow(row);
 }
 
 abstract final class EnrollmentMethods {

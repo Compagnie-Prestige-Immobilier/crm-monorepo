@@ -73,7 +73,12 @@ export const BANQUIER = {
   fullName: 'Moussa Fixture',
 } as const;
 
-const REPRESENTANT = { fullName: 'Ibrahima Fixture', phone: '+221781000001' } as const;
+/**
+ * Exporté : `workspaces.spec.ts` le désigne NOMMÉMENT dans le sélecteur de
+ * rattachement du dialogue d'approbation, dont la première entrée est une
+ * remise à zéro.
+ */
+export const REPRESENTANT = { fullName: 'Ibrahima Fixture', phone: '+221781000001' } as const;
 
 /**
  * Trente prospects : le tirage en retire, et plusieurs parcours tirent à la
@@ -81,6 +86,9 @@ const REPRESENTANT = { fullName: 'Ibrahima Fixture', phone: '+221781000001' } as
  * qui n'a rien à voir avec ce qu'il éprouve.
  */
 const PROSPECT_COUNT = 30;
+
+/** La fiche que le parcours bancaire ouvre en dossier: la première de la plage. */
+export const BANK_CLIENT_PHONE = '+221781001000';
 
 /**
  * Exige la présence, et NOMME ce qui manque.
@@ -179,7 +187,13 @@ async function ensureRepresentant(api: APIRequestContext, departementId: string)
 }
 
 /**
- * Crée les prospects manquants, et seulement ceux-là.
+ * Rend à la plage ses PROSPECT_COUNT fiches EN ATTENTE.
+ *
+ * Compter les fiches ne suffit pas : chaque exécution en clôt quelques-unes, et
+ * une fiche close ne se rappelle plus. La suite ne passait donc qu'un nombre
+ * limité de fois avant de manquer de matière, et l'échec accusait le tirage.
+ * Une fiche close de la plage est retirée puis recréée — la suppression est
+ * douce et l'index d'unicité du téléphone est PARTIEL, donc le numéro se libère.
  *
  * Le compte est fait sur le SEGMENT, pas sur le total : une base qui contient
  * déjà des prospects BDD3 n'en fournit aucun au tirage BDD1.
@@ -188,13 +202,28 @@ async function ensureProspects(
   api: APIRequestContext,
   ids: { banqueId: string; syndicatId: string; representantId: string },
 ): Promise<void> {
+  for (let index = 0; index < PROSPECT_COUNT; index += 1) {
+    const phone = `+22178100${String(1000 + index)}`;
+    if (phone === BANK_CLIENT_PHONE) continue;
+    const found = await json<{ items: { id: string; phoneE164: string; phase2Status: string }[] }>(
+      await api.get('/api/v1/prospects', { params: { search: phone, pageSize: '5' } }),
+    );
+    for (const row of found.items) {
+      if (row.phoneE164 === phone && row.phase2Status !== 'PENDING') {
+        await api.delete(`/api/v1/prospects/${row.id}`);
+      }
+    }
+  }
+
   // `{ items, meta: { total } }` : le total vit sous `meta`, pas à la racine.
   // Le lire au mauvais endroit rendait `undefined`, la boucle ne partait pas,
   // et l'amorçage se terminait sans avoir rien créé — en silence.
   const existing = await json<{ meta: { total: number } }>(
-    await api.get('/api/v1/prospects', { params: { segment: 'BDD1', pageSize: '1' } }),
+    await api.get('/api/v1/prospects', {
+      params: { segment: 'BDD1', phase2Status: 'PENDING', pageSize: '1' },
+    }),
   );
-  if (existing.meta.total >= PROSPECT_COUNT) return;
+  if (existing.meta.total >= PROSPECT_COUNT - 1) return;
 
   // On repart de zéro et on laisse les 409 absorber ce qui existe déjà : compter
   // à partir du total supposerait que les fiches présentes portent justement les
@@ -261,11 +290,60 @@ export async function ensureWorkspaceFixtures(): Promise<{
       syndicatId: syndicat.id,
       representantId,
     });
+    await ensureBankEligibleClient(api);
 
     return { teleconseillerIds, banquierId, representantId };
   } finally {
     await api.dispose();
   }
+}
+
+/**
+ * Un client réellement ouvrable en dossier bancaire.
+ *
+ * Le formulaire d'ouverture ne cherche QUE des fiches en « méthode obtenue », et
+ * aucune fixture n'en produisait : le parcours d'encaissement ne tenait que sur
+ * les restes d'une exécution précédente ou sur le jeu de démonstration.
+ *
+ * Le seul chemin qui pose ce statut est une tentative d'appel : une contrainte
+ * lie le statut à la méthode d'enrôlement, et `PATCH /prospects` ne l'accepte
+ * pas. On emprunte donc le même canal que la console.
+ */
+async function ensureBankEligibleClient(api: APIRequestContext): Promise<void> {
+  const found = await json<{ items: { id: string; phase2Status: string }[] }>(
+    await api.get('/api/v1/prospects', {
+      params: { search: BANK_CLIENT_PHONE, pageSize: '5' },
+    }),
+  );
+  const cible = found.items[0];
+  if (cible === undefined) return;
+  if (cible.phase2Status === 'METHOD_OBTAINED') return;
+
+  const at = new Date().toISOString();
+  const attemptId = crypto.randomUUID();
+  await api.post('/api/v1/sync/push', {
+    headers: { 'Idempotency-Key': attemptId },
+    data: {
+      clientBatchId: attemptId,
+      payloadVersion: 1,
+      operations: [
+        {
+          opId: attemptId,
+          seq: 0,
+          entity: 'call_attempt',
+          op: 'create',
+          entityId: attemptId,
+          clientUpdatedAt: at,
+          data: {
+            prospectId: cible.id,
+            outcome: 'METHOD_OBTAINED',
+            method: 'PLATFORM',
+            clientCreatedAt: at,
+          },
+        },
+      ],
+    },
+  });
 }
 
 /** Le mode démonstration, allumé pour être éprouvé — jamais pour semer. */
