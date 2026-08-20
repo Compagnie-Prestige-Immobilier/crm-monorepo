@@ -15644,7 +15644,7 @@
       },
       "Role": {
         "type": "string",
-        "enum": ["ADMIN", "COMMERCIAL", "BANQUE_FINANCE", "SUPERVISEUR"]
+        "enum": ["ADMIN", "COMMERCIAL", "BANQUE_FINANCE", "SUPERVISEUR", "DIRECTION", "ACCUEIL"]
       },
       "AuthUserDto": {
         "type": "object",
@@ -21972,6 +21972,7 @@
           "teleconseillers",
           "finances",
           "supervision",
+          "directionAccueil",
           "representants",
           "prospects",
           "campagnes",

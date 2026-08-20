@@ -5,7 +5,7 @@ import ExcelJS from 'exceljs';
 import type { Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { isAdmin, ownerScope } from '../../common/scope.js';
+import { readScope, readsEveryone } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { demoScope } from '../../prisma/demo-visibility.js';
@@ -191,12 +191,12 @@ export class RepresentantsExportService {
   ): Prisma.RepresentantWhereInput {
     const where: Prisma.RepresentantWhereInput = {
       deletedAt: null,
-      ...ownerScope(user),
+      ...readScope(user),
       ...demoScope(demoEnabled),
     };
 
     if (query.commercialId) {
-      where.createdById = isAdmin(user)
+      where.createdById = readsEveryone(user)
         ? query.commercialId
         : query.commercialId === user.id
           ? user.id

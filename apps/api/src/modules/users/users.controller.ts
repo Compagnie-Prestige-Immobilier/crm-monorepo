@@ -41,7 +41,7 @@ export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.SUPERVISEUR)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({ operationId: 'listUsers', summary: 'Liste paginée des comptes.' })
   @ApiResponse({ status: 200, type: UserListDto })
   list(@Query() query: UserListQueryDto): Promise<UserListDto> {

@@ -94,7 +94,7 @@ export class Phase2Controller {
   }
 
   @Get('call-attempts/:id/recording')
-  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.COMMERCIAL)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION, Role.COMMERCIAL)
   @ApiProduces('audio/mp4')
   @ApiOperation({
     operationId: 'downloadCallRecording',
@@ -132,7 +132,7 @@ export class Phase2Controller {
   }
 
   @Get('campaigns')
-  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listCallCampaigns',
     summary: 'Liste des campagnes, avec l’avancement de chacune.',
@@ -176,7 +176,7 @@ export class Phase2Controller {
   }
 
   @Get('campaigns/:id')
-  @Roles(Role.ADMIN, Role.SUPERVISEUR)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'getCallCampaign',
     summary: 'Détail d’une campagne, ventilé par commercial.',
@@ -205,7 +205,7 @@ export class Phase2Controller {
   }
 
   @Get('campaigns/:id/commerciaux/:userId/programme.pdf')
-  @Roles(Role.ADMIN, Role.SUPERVISEUR)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiProduces(PDF_MIME)
   @ApiOperation({
     operationId: 'downloadCallProgrammePdf',

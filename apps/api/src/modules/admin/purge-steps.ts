@@ -142,6 +142,8 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
   commercialAccounts: accountsOfRole(Role.COMMERCIAL),
   financeAccounts: accountsOfRole(Role.BANQUE_FINANCE),
   supervisionAccounts: accountsOfRole(Role.SUPERVISEUR),
+  directionAccounts: accountsOfRole(Role.DIRECTION),
+  accueilAccounts: accountsOfRole(Role.ACCUEIL),
   bankCaseStages: {
     table: 'bank_case_stages',
     count: (db) => db.bankCaseStage.count(),
