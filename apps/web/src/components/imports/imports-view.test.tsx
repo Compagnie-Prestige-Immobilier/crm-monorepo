@@ -254,6 +254,28 @@ describe('ImportsView', () => {
     expect(createImportJob.mock.calls[0]?.[0]).toBe('PROSPECTS');
   });
 
+  it('propose le classeur historique des visites sans modèle artificiel', async () => {
+    const user = userEvent.setup();
+    const visites = job({
+      kind: 'VISITES',
+      report: { ...SIMULATED_REPORT, kind: 'VISITES' },
+    });
+    createImportJob.mockResolvedValue(visites);
+    fetchImportJob.mockResolvedValue(visites);
+    renderWithQuery(<ImportsView />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Entité à importer' }));
+    await user.click(await screen.findByRole('option', { name: 'Visites' }));
+
+    expect(screen.queryByRole('button', { name: 'Télécharger le modèle' })).toBeNull();
+    expect(screen.getByText(/20 000 lignes au maximum/u)).toBeTruthy();
+    await deposer();
+    await waitFor(() => {
+      expect(createImportJob).toHaveBeenCalledWith('VISITES', expect.any(File));
+    });
+    expect(await screen.findByRole('button', { name: 'Créer 800 visites' })).toBeTruthy();
+  });
+
   it('présente un travail échu sans le traiter comme une panne', async () => {
     const expired = job({ status: 'expired', report: null });
     createImportJob.mockResolvedValue(expired);
