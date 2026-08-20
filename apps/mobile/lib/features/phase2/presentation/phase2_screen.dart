@@ -525,6 +525,7 @@ class _PhoneBlock extends ConsumerWidget {
               controller: controller,
               focusNode: focusNode,
               autofocus: true,
+              enabled: enabled,
               label: 'Numéro appelé',
               textInputAction: TextInputAction.done,
               helper: 'Recherche automatique',

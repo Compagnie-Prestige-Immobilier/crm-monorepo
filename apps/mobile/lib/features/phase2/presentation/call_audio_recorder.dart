@@ -198,7 +198,7 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
                 height: 48,
                 child: CustomPaint(
                   painter: _WaveformPainter(
-                    samples: _samples,
+                    samples: List<double>.of(_samples),
                     progress: _recording ? 1 : progress,
                     color: theme.colorScheme.primary,
                     background: theme.colorScheme.outlineVariant,
