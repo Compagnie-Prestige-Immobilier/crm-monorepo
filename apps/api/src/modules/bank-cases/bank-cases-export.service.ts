@@ -125,7 +125,7 @@ export class BankCasesExportService {
     let after: string | undefined;
     let exported = 0;
     for (;;) {
-      const ids = await this.pageIds(filter, after);
+      const ids = await this.pageIds(filter, after, demoEnabled);
       if (ids.length === 0) break;
 
       const rows = await this.prisma.bankCase.findMany({
@@ -171,10 +171,10 @@ export class BankCasesExportService {
     demoEnabled: boolean,
   ): Promise<void> {
     const [totals, byStage, byBank, byReason] = await Promise.all([
-      this.analytics.totals(filter),
-      this.analytics.byStage(filter),
-      this.analytics.byBank(filter),
-      this.analytics.byRejectionReason(filter),
+      this.analytics.totals(filter, demoEnabled),
+      this.analytics.byStage(filter, demoEnabled),
+      this.analytics.byBank(filter, demoEnabled),
+      this.analytics.byRejectionReason(filter, demoEnabled),
     ]);
 
     const summary = workbook.addWorksheet(SHEET_SUMMARY);
@@ -242,8 +242,12 @@ export class BankCasesExportService {
   }
 
   /** Une page d'identifiants, filtrée par la MÊME requête que la liste et les agrégats. */
-  private async pageIds(filter: BankCaseFilterDto, after: string | undefined): Promise<string[]> {
-    const where = bankCaseConditions(filter, await this.demo.enabled());
+  private async pageIds(
+    filter: BankCaseFilterDto,
+    after: string | undefined,
+    demoEnabled: boolean,
+  ): Promise<string[]> {
+    const where = bankCaseConditions(filter, demoEnabled);
     const keyset = after === undefined ? Prisma.sql`` : Prisma.sql`AND c."id" > ${after}`;
     const rows = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT c."id" ${BANK_CASE_FROM} WHERE ${where} ${keyset}

@@ -37,15 +37,16 @@ export class BankCaseAnalyticsService {
   ) {}
 
   async overview(query: BankAnalyticsQueryDto): Promise<BankCaseAnalyticsDto> {
+    const demoEnabled = await this.demo.enabled();
     const [totals, byStage, createdOverTime, cashingsOverTime, byBank, byRejectionReason, byAgent] =
       await Promise.all([
-        this.totals(query),
-        this.byStage(query),
-        this.createdOverTime(query),
-        this.cashingsOverTime(query),
-        this.byBank(query),
-        this.byRejectionReason(query),
-        this.byAgent(query),
+        this.totals(query, demoEnabled),
+        this.byStage(query, demoEnabled),
+        this.createdOverTime(query, demoEnabled),
+        this.cashingsOverTime(query, demoEnabled),
+        this.byBank(query, demoEnabled),
+        this.byRejectionReason(query, demoEnabled),
+        this.byAgent(query, demoEnabled),
       ]);
 
     return {
@@ -59,8 +60,12 @@ export class BankCaseAnalyticsService {
     };
   }
 
-  async totals(filter: BankCaseFilterDto): Promise<BankAnalyticsTotalsDto> {
-    const where = bankCaseConditions(filter, await this.demo.enabled());
+  async totals(
+    filter: BankCaseFilterDto,
+    demoEnabled?: boolean,
+  ): Promise<BankAnalyticsTotalsDto> {
+    demoEnabled ??= await this.demo.enabled();
+    const where = bankCaseConditions(filter, demoEnabled);
     const rows = await this.prisma.$queryRaw<
       {
         total: number;
@@ -101,8 +106,12 @@ export class BankCaseAnalyticsService {
     };
   }
 
-  async byStage(filter: BankCaseFilterDto): Promise<BankStageCountDto[]> {
-    const where = bankCaseConditions(filter, await this.demo.enabled());
+  async byStage(
+    filter: BankCaseFilterDto,
+    demoEnabled?: boolean,
+  ): Promise<BankStageCountDto[]> {
+    demoEnabled ??= await this.demo.enabled();
+    const where = bankCaseConditions(filter, demoEnabled);
     const rows = await this.prisma.$queryRaw<
       {
         stageId: string;
@@ -125,8 +134,12 @@ export class BankCaseAnalyticsService {
     return rows.map((row) => ({ ...row, share: share(row.cases, total) }));
   }
 
-  async createdOverTime(query: BankAnalyticsQueryDto): Promise<BankTimeBucketDto[]> {
-    const where = bankCaseConditions(query, await this.demo.enabled());
+  async createdOverTime(
+    query: BankAnalyticsQueryDto,
+    demoEnabled?: boolean,
+  ): Promise<BankTimeBucketDto[]> {
+    demoEnabled ??= await this.demo.enabled();
+    const where = bankCaseConditions(query, demoEnabled);
     const rows = await this.prisma.$queryRaw<{ bucket: Date; cases: number }[]>`
       SELECT date_trunc(${unit(query.granularity)}, c."createdAt") AS "bucket",
              COUNT(*)::int AS "cases"
@@ -142,8 +155,12 @@ export class BankCaseAnalyticsService {
     }));
   }
 
-  async cashingsOverTime(query: BankAnalyticsQueryDto): Promise<BankTimeBucketDto[]> {
-    const where = bankCaseConditions(query, await this.demo.enabled());
+  async cashingsOverTime(
+    query: BankAnalyticsQueryDto,
+    demoEnabled?: boolean,
+  ): Promise<BankTimeBucketDto[]> {
+    demoEnabled ??= await this.demo.enabled();
+    const where = bankCaseConditions(query, demoEnabled);
     const rows = await this.prisma.$queryRaw<{ bucket: Date; cases: number; amount: string }[]>`
       SELECT date_trunc(${unit(query.granularity)}, cl."closedAt") AS "bucket",
              COUNT(*)::int AS "cases",
@@ -161,8 +178,12 @@ export class BankCaseAnalyticsService {
     }));
   }
 
-  async byBank(filter: BankCaseFilterDto): Promise<BankBankBreakdownDto[]> {
-    const where = bankCaseConditions(filter, await this.demo.enabled());
+  async byBank(
+    filter: BankCaseFilterDto,
+    demoEnabled?: boolean,
+  ): Promise<BankBankBreakdownDto[]> {
+    demoEnabled ??= await this.demo.enabled();
+    const where = bankCaseConditions(filter, demoEnabled);
     const rows = await this.prisma.$queryRaw<
       {
         banqueId: string;
@@ -202,8 +223,12 @@ export class BankCaseAnalyticsService {
     }));
   }
 
-  async byRejectionReason(filter: BankCaseFilterDto): Promise<BankRejectionBreakdownDto[]> {
-    const where = bankCaseConditions(filter, await this.demo.enabled());
+  async byRejectionReason(
+    filter: BankCaseFilterDto,
+    demoEnabled?: boolean,
+  ): Promise<BankRejectionBreakdownDto[]> {
+    demoEnabled ??= await this.demo.enabled();
+    const where = bankCaseConditions(filter, demoEnabled);
     const rows = await this.prisma.$queryRaw<
       { reasonId: string; code: string; label: string; cases: number }[]
     >`
@@ -220,8 +245,12 @@ export class BankCaseAnalyticsService {
     return rows.map((row) => ({ ...row, share: share(row.cases, total) }));
   }
 
-  async byAgent(filter: BankCaseFilterDto): Promise<BankAgentActivityDto[]> {
-    const where = bankCaseConditions(filter, await this.demo.enabled());
+  async byAgent(
+    filter: BankCaseFilterDto,
+    demoEnabled?: boolean,
+  ): Promise<BankAgentActivityDto[]> {
+    demoEnabled ??= await this.demo.enabled();
+    const where = bankCaseConditions(filter, demoEnabled);
     const rows = await this.prisma.$queryRaw<
       {
         agentId: string;
