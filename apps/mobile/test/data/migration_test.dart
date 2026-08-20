@@ -15,6 +15,7 @@ import 'generated_migrations/schema_v7.dart' as v7;
 import 'generated_migrations/schema_v8.dart' as v8;
 import 'generated_migrations/schema_v9.dart' as v9;
 import 'generated_migrations/schema_v10.dart' as v10;
+import 'generated_migrations/schema_v11.dart' as v11;
 
 /// Test doré de migration.
 ///
@@ -144,7 +145,9 @@ void main() {
     final List<QueryRow> representants = await db
         .customSelect('SELECT id FROM representants')
         .get();
-    expect(representants.map((QueryRow r) => r.read<String>('id')), <String>['rep-1']);
+    expect(representants.map((QueryRow r) => r.read<String>('id')), <String>[
+      'rep-1',
+    ]);
     final List<QueryRow> pending = await db
         .customSelect('SELECT id FROM outbox WHERE status = \'pending\'')
         .get();
@@ -175,7 +178,9 @@ void main() {
           'WHERE type = \'index\' AND tbl_name IN (\'phase2_directory\', \'call_attempts\')',
         )
         .get();
-    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+    final Set<String> names = indexes
+        .map((QueryRow r) => r.read<String>('name'))
+        .toSet();
 
     // `phase2_directory_phone_unique` est le seul index qui rende la recherche
     // par téléphone tenable : sans lui, chaque numéro tapé déclenche un balayage
@@ -243,7 +248,9 @@ void main() {
           'WHERE type = \'index\' AND tbl_name = \'notifications\'',
         )
         .get();
-    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+    final Set<String> names = indexes
+        .map((QueryRow r) => r.read<String>('name'))
+        .toSet();
 
     // `notifications_unread_idx` sert la pastille de l'AppBar, relue à chaque
     // changement de la table.
@@ -277,7 +284,15 @@ void main() {
       '(id, full_name, phone_e164, departement_id, created_by_id, '
       ' client_created_at, local_updated_at) '
       'VALUES (?, ?, ?, ?, ?, ?, ?)',
-      <Object?>['rep-4', 'Fiche hors ligne', '+221771112233', 'dep-1', 'me', _iso, _iso],
+      <Object?>[
+        'rep-4',
+        'Fiche hors ligne',
+        '+221771112233',
+        'dep-1',
+        'me',
+        _iso,
+        _iso,
+      ],
     );
     await old.customStatement(
       'INSERT INTO outbox '
@@ -301,7 +316,6 @@ void main() {
       isNull,
       reason: 'une fiche ancienne n’a pas d’IEF, et ce n’est pas une erreur',
     );
-
 
     final List<QueryRow> pending = await db
         .customSelect('SELECT id FROM outbox WHERE status = \'pending\'')
@@ -354,7 +368,9 @@ void main() {
           'WHERE type = \'index\' AND tbl_name = \'iefs\'',
         )
         .get();
-    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+    final Set<String> names = indexes
+        .map((QueryRow r) => r.read<String>('name'))
+        .toSet();
 
     // `iefs_active_idx` sert le sélecteur de saisie, relu à chaque frappe ;
     // `iefs_departement_idx` sert la restriction au département choisi.
@@ -390,7 +406,11 @@ void main() {
         .customSelect('SELECT id, attempts, blocked_attempts FROM outbox')
         .get();
     expect(rows, hasLength(1), reason: 'la file ne doit pas être vidée');
-    expect(rows.single.read<int>('attempts'), 3, reason: 'le compteur serveur survit');
+    expect(
+      rows.single.read<int>('attempts'),
+      3,
+      reason: 'le compteur serveur survit',
+    );
     expect(
       rows.single.read<int>('blocked_attempts'),
       0,
@@ -411,54 +431,60 @@ void main() {
   // porte `callback_at` depuis la v8. Une base de v5 ne s'arrête donc plus à la
   // forme de la v6, et c'est le comportement de l'appareil réel.
 
-  test('v5 -> v6 accepte une valeur d\'énumération que ce client ignore', () async {
-    final schema = await verifier.schemaAt(5);
+  test(
+    'v5 -> v6 accepte une valeur d\'énumération que ce client ignore',
+    () async {
+      final schema = await verifier.schemaAt(5);
 
-    final v5.DatabaseAtV5 old = v5.DatabaseAtV5(schema.newConnection());
-    await old.customStatement('PRAGMA foreign_keys = ON;');
-    await old.customStatement(
-      'INSERT INTO phase2_directory '
-      '(prospect_id, phone_e164, phase2_status, rev, updated_at) '
-      'VALUES (?, ?, ?, ?, ?)',
-      <Object?>['p-1', '+221771112233', 'PENDING', 1, _iso],
-    );
-    // Sous v5, cette écriture est REFUSÉE par le CHECK : c'est le défaut.
-    await expectLater(
-      old.customStatement(
+      final v5.DatabaseAtV5 old = v5.DatabaseAtV5(schema.newConnection());
+      await old.customStatement('PRAGMA foreign_keys = ON;');
+      await old.customStatement(
         'INSERT INTO phase2_directory '
         '(prospect_id, phone_e164, phase2_status, rev, updated_at) '
         'VALUES (?, ?, ?, ?, ?)',
-        <Object?>['p-2', '+221771112244', 'ESCALATED', 1, _iso],
-      ),
-      throwsA(anything),
-      reason: 'c\'est bien le CHECK de v5 qui bloquait la page de pull entière',
-    );
-    await old.close();
+        <Object?>['p-1', '+221771112233', 'PENDING', 1, _iso],
+      );
+      // Sous v5, cette écriture est REFUSÉE par le CHECK : c'est le défaut.
+      await expectLater(
+        old.customStatement(
+          'INSERT INTO phase2_directory '
+          '(prospect_id, phone_e164, phase2_status, rev, updated_at) '
+          'VALUES (?, ?, ?, ?, ?)',
+          <Object?>['p-2', '+221771112244', 'ESCALATED', 1, _iso],
+        ),
+        throwsA(anything),
+        reason:
+            'c\'est bien le CHECK de v5 qui bloquait la page de pull entière',
+      );
+      await old.close();
 
-    final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
-    // Rien n'a été perdu par la recréation de table.
-    final List<QueryRow> kept = await db
-        .customSelect('SELECT prospect_id, phase2_status FROM phase2_directory')
-        .get();
-    expect(kept, hasLength(1));
-    expect(kept.single.read<String>('phase2_status'), 'PENDING');
+      // Rien n'a été perdu par la recréation de table.
+      final List<QueryRow> kept = await db
+          .customSelect(
+            'SELECT prospect_id, phase2_status FROM phase2_directory',
+          )
+          .get();
+      expect(kept, hasLength(1));
+      expect(kept.single.read<String>('phase2_status'), 'PENDING');
 
-    // Et la valeur inconnue passe désormais : c'est tout l'objet du palier.
-    await db.customStatement(
-      'INSERT INTO phase2_directory '
-      '(prospect_id, phone_e164, phase2_status, enrollment_method, rev, updated_at) '
-      'VALUES (?, ?, ?, ?, ?, ?)',
-      <Object?>['p-2', '+221771112244', 'ESCALATED', 'USSD', 1, _iso],
-    );
-    final List<QueryRow> after = await db
-        .customSelect('SELECT COUNT(*) AS c FROM phase2_directory')
-        .get();
-    expect(after.single.read<int>('c'), 2);
+      // Et la valeur inconnue passe désormais : c'est tout l'objet du palier.
+      await db.customStatement(
+        'INSERT INTO phase2_directory '
+        '(prospect_id, phone_e164, phase2_status, enrollment_method, rev, updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>['p-2', '+221771112244', 'ESCALATED', 'USSD', 1, _iso],
+      );
+      final List<QueryRow> after = await db
+          .customSelect('SELECT COUNT(*) AS c FROM phase2_directory')
+          .get();
+      expect(after.single.read<int>('c'), 2);
 
-    await db.close();
-  });
+      await db.close();
+    },
+  );
 
   test('v5 -> v6 repose les index des tables recréées', () async {
     final schema = await verifier.schemaAt(5);
@@ -471,7 +497,9 @@ void main() {
           'AND tbl_name IN (\'prospects\', \'phase2_directory\', \'call_attempts\')',
         )
         .get();
-    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+    final Set<String> names = indexes
+        .map((QueryRow r) => r.read<String>('name'))
+        .toSet();
 
     // Recréer une table emporte ses index avec elle. Les oublier ne casse
     // aucun test fonctionnel : ça rend seulement chaque recherche de numéro
@@ -546,14 +574,37 @@ void main() {
       '(id, entity_type, entity_id, op, payload, attempts, blocked_attempts, '
       ' status, next_attempt_at, created_at) '
       'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      <Object?>['op-1', 'prospect', 'pro-1', 'create', '{"nom":"Diop"}', 3, 1, 'pending', _iso, _iso],
+      <Object?>[
+        'op-1',
+        'prospect',
+        'pro-1',
+        'create',
+        '{"nom":"Diop"}',
+        3,
+        1,
+        'pending',
+        _iso,
+        _iso,
+      ],
     );
     await old.customStatement(
       'INSERT INTO outbox '
       '(id, entity_type, entity_id, op, payload, attempts, blocked_attempts, '
       ' status, next_attempt_at, lease_until, created_at) '
       'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      <Object?>['op-2', 'representant', 'rep-1', 'update', '{}', 0, 0, 'syncing', _iso, _iso, _iso],
+      <Object?>[
+        'op-2',
+        'representant',
+        'rep-1',
+        'update',
+        '{}',
+        0,
+        0,
+        'syncing',
+        _iso,
+        _iso,
+        _iso,
+      ],
     );
     await old.close();
 
@@ -606,7 +657,15 @@ void main() {
       '(id, full_name, phone_e164, departement_id, created_by_id, '
       ' client_created_at, local_updated_at) '
       'VALUES (?, ?, ?, ?, ?, ?, ?)',
-      <Object?>['rep-1', 'Awa Ndiaye', '+221771234567', 'dep-1', 'me', _iso, _iso],
+      <Object?>[
+        'rep-1',
+        'Awa Ndiaye',
+        '+221771234567',
+        'dep-1',
+        'me',
+        _iso,
+        _iso,
+      ],
     );
     await old.customStatement(
       'INSERT INTO call_attempts '
@@ -675,7 +734,9 @@ void main() {
     // Le curseur du référentiel est effacé : sans cela, aucun département déjà
     // en base ne redescendrait, et `region_name` resterait vide à vie.
     final List<QueryRow> cursors = await db
-        .customSelect('SELECT collection, cursor FROM sync_state ORDER BY collection')
+        .customSelect(
+          'SELECT collection, cursor FROM sync_state ORDER BY collection',
+        )
         .get();
     expect(
       cursors.map((QueryRow r) => r.read<String>('collection')),
@@ -708,7 +769,15 @@ void main() {
       '(id, full_name, phone_e164, departement_id, created_by_id, '
       ' client_created_at, local_updated_at) '
       'VALUES (?, ?, ?, ?, ?, ?, ?)',
-      <Object?>['rep-1', 'Awa Ndiaye', '+221771234567', 'dep-1', 'me', _iso, _iso],
+      <Object?>[
+        'rep-1',
+        'Awa Ndiaye',
+        '+221771234567',
+        'dep-1',
+        'me',
+        _iso,
+        _iso,
+      ],
     );
     await old.customStatement(
       'INSERT INTO outbox '
@@ -735,7 +804,9 @@ void main() {
       <Object?>['c-1', 'rep-1', 'me', 'Awa Sy', 'Rappeler après 15 h.', _iso],
     );
     final List<QueryRow> fil = await db
-        .customSelect('SELECT body, server_created_at FROM representant_comments')
+        .customSelect(
+          'SELECT body, server_created_at FROM representant_comments',
+        )
         .get();
     expect(fil.single.read<String>('body'), 'Rappeler après 15 h.');
     expect(fil.single.read<String?>('server_created_at'), isNull);
@@ -756,15 +827,18 @@ void main() {
     final List<QueryRow> columns = await db
         .customSelect('PRAGMA table_info(representant_comments)')
         .get();
-    expect(columns.map((QueryRow r) => r.read<String>('name')).toSet(), <String>{
-      'id',
-      'representant_id',
-      'author_id',
-      'author_name',
-      'body',
-      'client_created_at',
-      'server_created_at',
-    });
+    expect(
+      columns.map((QueryRow r) => r.read<String>('name')).toSet(),
+      <String>{
+        'id',
+        'representant_id',
+        'author_id',
+        'author_name',
+        'body',
+        'client_created_at',
+        'server_created_at',
+      },
+    );
 
     await db.close();
   });
@@ -780,7 +854,9 @@ void main() {
           'WHERE type = \'index\' AND tbl_name = \'representant_comments\'',
         )
         .get();
-    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+    final Set<String> names = indexes
+        .map((QueryRow r) => r.read<String>('name'))
+        .toSet();
 
     // Le fil est relu à chaque ouverture de fiche et à chaque publication.
     expect(names, contains('representant_comments_representant_idx'));
@@ -837,7 +913,11 @@ void main() {
           'FROM call_attempts ORDER BY id',
         )
         .get();
-    expect(attempts, hasLength(3), reason: 'le journal des appels ne se perd pas');
+    expect(
+      attempts,
+      hasLength(3),
+      reason: 'le journal des appels ne se perd pas',
+    );
 
     // ═══ LE PIÈGE DU PALIER ═══
     //
@@ -925,7 +1005,9 @@ void main() {
           'WHERE type = \'index\' AND tbl_name = \'call_outcome_reasons\'',
         )
         .get();
-    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+    final Set<String> names = indexes
+        .map((QueryRow r) => r.read<String>('name'))
+        .toSet();
 
     // La feuille des issues est relue à chaque ouverture, et elle trie sur
     // (is_active, sort_order, label).
@@ -989,7 +1071,15 @@ void main() {
       'INSERT INTO outbox '
       '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
       'VALUES (?, ?, ?, ?, ?, ?, ?)',
-      <Object?>['op-1', 'representant', 'rep-1', 'update', '{"notes":null}', _iso, _iso],
+      <Object?>[
+        'op-1',
+        'representant',
+        'rep-1',
+        'update',
+        '{"notes":null}',
+        _iso,
+        _iso,
+      ],
     );
     await old.close();
 
@@ -1053,7 +1143,10 @@ void main() {
     final List<QueryRow> fiches = await db
         .customSelect('SELECT whatsapp_status, profession FROM representants')
         .get();
-    expect(fiches.single.read<String>('whatsapp_status'), 'NUMERO_PROFESSIONNEL');
+    expect(
+      fiches.single.read<String>('whatsapp_status'),
+      'NUMERO_PROFESSIONNEL',
+    );
     expect(fiches.single.read<String?>('profession'), 'Censeur');
 
     await db.close();
@@ -1093,7 +1186,15 @@ void main() {
       '(id, full_name, phone_e164, departement_id, created_by_id, '
       ' client_created_at, local_updated_at) '
       'VALUES (?, ?, ?, ?, ?, ?, ?)',
-      <Object?>['rep-1', 'Awa Ndiaye', '+221771234567', 'dep-1', 'me', _iso, _iso],
+      <Object?>[
+        'rep-1',
+        'Awa Ndiaye',
+        '+221771234567',
+        'dep-1',
+        'me',
+        _iso,
+        _iso,
+      ],
     );
     // Un prospect : c'est SA table que le palier v6 recrée, et il porte une
     // clé étrangère vers le représentant.
@@ -1133,12 +1234,18 @@ void main() {
     final List<QueryRow> prospects = await db
         .customSelect('SELECT id, statut, representant_id FROM prospects')
         .get();
-    expect(prospects, hasLength(1), reason: 'la recréation de table ne perd rien');
+    expect(
+      prospects,
+      hasLength(1),
+      reason: 'la recréation de table ne perd rien',
+    );
     expect(prospects.single.read<String>('statut'), 'CONTACTE');
     expect(prospects.single.read<String>('representant_id'), 'rep-1');
 
     final List<QueryRow> queue = await db
-        .customSelect('SELECT id, attempts, blocked_attempts, claim_token FROM outbox')
+        .customSelect(
+          'SELECT id, attempts, blocked_attempts, claim_token FROM outbox',
+        )
         .get();
     expect(queue, hasLength(1), reason: 'la file survit au saut de versions');
     expect(queue.single.read<int>('attempts'), 2);
@@ -1149,7 +1256,11 @@ void main() {
     final List<QueryRow> violations = await db
         .customSelect('PRAGMA foreign_key_check')
         .get();
-    expect(violations, isEmpty, reason: 'la recréation a préservé les clés étrangères');
+    expect(
+      violations,
+      isEmpty,
+      reason: 'la recréation a préservé les clés étrangères',
+    );
 
     // Le saut long passe aussi par le palier v8 : les colonnes sont là, et la
     // fiche de v1 porte la relation par défaut.
@@ -1177,7 +1288,14 @@ void main() {
       'INSERT INTO representant_comments '
       '(id, representant_id, author_id, author_name, body, client_created_at) '
       'VALUES (?, ?, ?, ?, ?, ?)',
-      <Object?>['c-1', 'rep-1', 'me', 'Awa Sy', 'Fiche reprise après le saut.', _iso],
+      <Object?>[
+        'c-1',
+        'rep-1',
+        'me',
+        'Awa Sy',
+        'Fiche reprise après le saut.',
+        _iso,
+      ],
     );
     final List<QueryRow> fil = await db
         .customSelect('SELECT representant_id FROM representant_comments')
@@ -1204,7 +1322,10 @@ void main() {
           'SELECT id, reason_code, callback_at FROM call_attempts ORDER BY id',
         )
         .get();
-    expect(journal.map((QueryRow r) => r.read<String>('id')), <String>['a-1', 'a-2']);
+    expect(journal.map((QueryRow r) => r.read<String>('id')), <String>[
+      'a-1',
+      'a-2',
+    ]);
     expect(journal.first.read<String?>('callback_at'), isNotNull);
     expect(journal.last.read<String?>('reason_code'), 'NRP');
 
@@ -1258,6 +1379,89 @@ void main() {
         )
         .get();
     expect(motifs, isEmpty);
+
+    await db.close();
+  });
+  // ── v11 → v12 : les campagnes descendent sur l'appareil ────────────────────
+  //
+  // Deux tables NEUVES, aucune recopie. Ce qui doit être prouvé : la saisie déjà
+  // sur le téléphone survit, et les deux tables s'ouvrent vides plutôt que de
+  // faire échouer l'ouverture.
+
+  test(
+    'v11 -> v12 ajoute les campagnes sans toucher à la saisie du terrain',
+    () async {
+      final schema = await verifier.schemaAt(11);
+
+      final v11.DatabaseAtV11 old = v11.DatabaseAtV11(schema.newConnection());
+      await old.customStatement('PRAGMA foreign_keys = ON;');
+      await old.customStatement(
+        'INSERT INTO departements '
+        '(id, code, name, region_id, region_name, local_updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>['dep-1', 'DK', 'Dakar', 'reg-1', 'Dakar', _iso],
+      );
+      await old.customStatement(
+        'INSERT INTO outbox '
+        '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'op-1',
+          'representant',
+          'rep-1',
+          'create',
+          '{"x":1}',
+          _iso,
+          _iso,
+        ],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 12);
+
+      // La file d'attente d'un téléphone hors ligne depuis des semaines ne doit
+      // pas être emportée par un palier qui ne la concerne pas.
+      final List<QueryRow> enFile = await db
+          .customSelect('SELECT id FROM outbox')
+          .get();
+      expect(enFile.single.read<String>('id'), 'op-1');
+
+      expect(
+        await db.customSelect('SELECT * FROM call_campaigns').get(),
+        isEmpty,
+      );
+      expect(await db.customSelect('SELECT * FROM call_tasks').get(), isEmpty);
+
+      await db.close();
+    },
+  );
+
+  // Aucune contrainte locale ne doit pouvoir avorter un pull : le couple
+  // (campagne, fiche) est unique cote SERVEUR, et la meme paire renvoyee sous un
+  // autre identifiant doit s'ecrire plutot que d'arreter la synchronisation.
+  test('v12 accepte une meme fiche deux fois sans arreter le pull', () async {
+    final schema = await verifier.schemaAt(11);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 12);
+
+    Future<void> poser(String id) => db.customStatement(
+      'INSERT INTO call_tasks '
+      '(id, campaign_id, prospect_id, position, day_index, status, updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?) '
+      'ON CONFLICT(id) DO UPDATE SET status = excluded.status',
+      <Object?>[id, 'camp-1', 'pro-1', 1, 0, 'OPEN', _iso],
+    );
+
+    await poser('task-1');
+    await poser('task-2');
+    // Le rejeu de la MEME ligne ne la double pas.
+    await poser('task-1');
+
+    final List<QueryRow> lignes = await db
+        .customSelect('SELECT id FROM call_tasks')
+        .get();
+    expect(lignes, hasLength(2));
 
     await db.close();
   });

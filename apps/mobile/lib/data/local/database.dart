@@ -14,20 +14,21 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   /// L'effet d'une tentative saisie avant la v10, déduit de son issue. Sans
   /// cette dérivation, la recopie de table poserait le défaut `KEEP_OPEN`
   /// partout : la progression personnelle du téléconseiller repartirait à zéro,
   /// puisqu'elle se compte désormais sur l'effet.
-  static const CustomExpression<String> _effectFromOutcome = CustomExpression<String>(
-    'CASE outcome '
-    'WHEN \'METHOD_OBTAINED\' THEN \'CLOSE_METHOD\' '
-    'WHEN \'REFUSED\' THEN \'CLOSE_REFUSED\' '
-    'WHEN \'WRONG_NUMBER\' THEN \'CLOSE_WRONG_NUMBER\' '
-    'WHEN \'CALLBACK\' THEN \'SCHEDULE_CALLBACK\' '
-    'ELSE \'KEEP_OPEN\' END',
-  );
+  static const CustomExpression<String> _effectFromOutcome =
+      CustomExpression<String>(
+        'CASE outcome '
+        'WHEN \'METHOD_OBTAINED\' THEN \'CLOSE_METHOD\' '
+        'WHEN \'REFUSED\' THEN \'CLOSE_REFUSED\' '
+        'WHEN \'WRONG_NUMBER\' THEN \'CLOSE_WRONG_NUMBER\' '
+        'WHEN \'CALLBACK\' THEN \'SCHEDULE_CALLBACK\' '
+        'ELSE \'KEEP_OPEN\' END',
+      );
 
   static const CustomExpression<bool> _commentRequiredFromOutcome =
       CustomExpression<bool>('CASE WHEN outcome = \'OTHER\' THEN 1 ELSE 0 END');
@@ -93,7 +94,9 @@ class AppDatabase extends _$AppDatabase {
         // base ne redescend plus jamais, et `region_name` resterait vide à vie
         // sur les appareils existants. Effacer le curseur force un pull complet.
         // Le référentiel n'est jamais écrit localement : rien à perdre.
-        await customStatement('DELETE FROM sync_state WHERE collection = \'all\'');
+        await customStatement(
+          'DELETE FROM sync_state WHERE collection = \'all\'',
+        );
       }
       if (from < 9 && to >= 9) {
         await m.createTable(representantComments);
@@ -126,6 +129,14 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(representants, representants.whatsappStatus);
         await m.addColumn(representants, representants.whatsappE164);
         await m.addColumn(representants, representants.profession);
+      }
+      if (from < 12 && to >= 12) {
+        // Deux tables neuves, aucune recopie : rien ici ne peut lire une colonne
+        // qui n'existait pas encore au palier d'origine.
+        await m.createTable(callCampaigns);
+        await m.createTable(callTasks);
+        await m.createIndex(callTasksCampaignIdx);
+        await m.createIndex(callTasksProspectIdx);
       }
     },
     beforeOpen: (OpeningDetails details) async {

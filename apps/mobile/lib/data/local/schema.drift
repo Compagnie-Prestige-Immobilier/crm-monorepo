@@ -702,3 +702,62 @@ attemptsForProspect:
 
 countUnreadNotifications:
     SELECT COUNT(*) AS c FROM notifications WHERE read_at IS NULL;
+
+-- ── Campagnes d'appels ───────────────────────────────────────────────────────
+--
+-- Le tirage se fait sur le serveur. L'appareil n'en reçoit que le RÉSULTAT : le
+-- nom de la campagne, et la liste des fiches qu'elle lui a confiées. Sans ces
+-- deux tables, toutes les campagnes se confondaient dans une seule file et le
+-- téléconseiller ne savait pas au titre de quoi il appelait.
+
+CREATE TABLE call_campaigns (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    -- Pas de CHECK d'énumération : la valeur vient du SERVEUR. Voir `prospects`.
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    spread_days INTEGER NOT NULL DEFAULT 1,
+    closed_at DATETIME,
+    updated_at DATETIME NOT NULL
+);
+
+-- AUCUNE clé étrangère, volontairement. Les flux du pull paginent séparément :
+-- une file peut arriver avant sa campagne ou avant sa fiche, et une contrainte
+-- avorterait la transaction de pull entière au lieu d'attendre la page
+-- suivante. La jointure se fait à la lecture, et une ligne orpheline reste
+-- simplement invisible.
+CREATE TABLE call_tasks (
+    id TEXT NOT NULL PRIMARY KEY,
+    campaign_id TEXT NOT NULL,
+    prospect_id TEXT NOT NULL,
+    -- Rang dans le programme papier : l'écran doit rendre le MÊME ordre.
+    position INTEGER NOT NULL,
+    day_index INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'OPEN',
+    updated_at DATETIME NOT NULL
+);
+
+CREATE INDEX call_tasks_campaign_idx ON call_tasks (campaign_id, day_index, position);
+-- Index SIMPLE et non unique. Le couple (campagne, fiche) est unique côté
+-- serveur, et c'est à lui de le tenir : un index unique local avorterait la
+-- transaction de pull entière le jour où le serveur renvoie la même paire sous
+-- un autre identifiant, et la synchronisation s'arrêterait là.
+CREATE INDEX call_tasks_prospect_idx ON call_tasks (prospect_id);
+
+-- La file du jour, dans l'ordre du programme, fiches déjà closes exclues.
+campaignQueue:
+    SELECT t.*, p.nom AS nom, p.prenom AS prenom, p.phone_e164 AS phone_e164
+    FROM call_tasks t
+    JOIN prospects p ON p.id = t.prospect_id
+    WHERE t.campaign_id = :campaignId
+      AND t.status = 'OPEN'
+      AND p.deleted_at IS NULL
+    ORDER BY t.day_index ASC, t.position ASC;
+
+-- Les campagnes qui ont encore quelque chose à appeler, la plus recente d'abord.
+campaignsWithOpenWork:
+    SELECT c.*, COUNT(t.id) AS ouvertes
+    FROM call_campaigns c
+    JOIN call_tasks t ON t.campaign_id = c.id AND t.status = 'OPEN'
+    JOIN prospects p ON p.id = t.prospect_id AND p.deleted_at IS NULL
+    GROUP BY c.id
+    ORDER BY c.updated_at DESC;
