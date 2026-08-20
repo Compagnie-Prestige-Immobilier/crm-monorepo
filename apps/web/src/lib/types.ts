@@ -40,7 +40,16 @@ export const ROLE_LABELS: Record<Role, string> = {
   COMMERCIAL: 'Téléconseiller',
   BANQUE_FINANCE: 'Banque & Finance',
   SUPERVISEUR: 'Supervision',
+  DIRECTION: 'Direction',
+  ACCUEIL: 'Accueil',
 };
+
+/**
+ * Les rôles qui LISENT le travail des autres sans jamais y écrire. Les écrans
+ * partagés s'en servent pour retirer les gestes, l'API refusant de toute façon.
+ */
+export const readsOnly = (role: Role | undefined): boolean =>
+  role === 'SUPERVISEUR' || role === 'DIRECTION';
 
 export const RETIRED_SUFFIX = '(retiré)';
 

@@ -24,6 +24,7 @@ import 'package:crm_api_client/src/model/representant_relation_change_list_dto.d
 import 'package:crm_api_client/src/model/representant_sort_field.dart';
 import 'package:crm_api_client/src/model/sort_order.dart';
 import 'package:crm_api_client/src/model/update_representant_dto.dart';
+import 'package:crm_api_client/src/model/whatsapp_status.dart';
 
 class RepresentantsApi {
   final Dio _dio;
@@ -764,6 +765,8 @@ class RepresentantsApi {
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [hasProspects] - true : au moins un prospect vivant. false : aucun (représentant dormant).
   /// * [relationStatus] - Ne retient que les représentants dans cet état de relation.
+  /// * [whatsappStatus] - Ne retient que les représentants dans cet état WhatsApp.
+  /// * [hasWhatsapp] - true : un numéro WhatsApp joignable (MEME_NUMERO ou AUTRE_NUMERO). false : les autres, question non posée comprise. Se compose avec `whatsappStatus` par intersection.
   /// * [sortBy]
   /// * [sortOrder]
   /// * [page]
@@ -786,6 +789,8 @@ class RepresentantsApi {
     DateTime? dateTo,
     bool? hasProspects,
     RepresentantRelation? relationStatus,
+    WhatsappStatus? whatsappStatus,
+    bool? hasWhatsapp,
     RepresentantSortField? sortBy,
     SortOrder? sortOrder,
     num? page = 1,
@@ -819,6 +824,8 @@ class RepresentantsApi {
       if (dateTo != null) r'dateTo': dateTo,
       if (hasProspects != null) r'hasProspects': hasProspects,
       if (relationStatus != null) r'relationStatus': relationStatus,
+      if (whatsappStatus != null) r'whatsappStatus': whatsappStatus,
+      if (hasWhatsapp != null) r'hasWhatsapp': hasWhatsapp,
       if (sortBy != null) r'sortBy': sortBy,
       if (sortOrder != null) r'sortOrder': sortOrder,
       if (page != null) r'page': page,

@@ -1,14 +1,29 @@
-import { describe, expect, it } from 'vitest';
+import type { ApiClient } from '@crm/api-client';
+import { describe, expect, it, vi } from 'vitest';
 
 import { EMPTY_CAMPAIGN_FILTERS } from '@/lib/campaign-filters';
 import {
   buildCampaignPreview,
+  fetchCallRecording,
   programmePdfFileName,
   programmePdfUrl,
   roundRobinSplit,
   spreadIntoDays,
   toCampaignQuery,
 } from '@/lib/data/phase2';
+
+describe('note vocale', () => {
+  it('ne remet pas en cache un 404 reçu avant la fin de l’upload', async () => {
+    const GET = vi.fn().mockResolvedValue({ response: new Response(null, { status: 404 }) });
+    const client = { GET } as unknown as ApiClient;
+
+    expect(await fetchCallRecording('attempt-1', client)).toBeNull();
+    expect(GET).toHaveBeenCalledWith(
+      '/api/v1/phase2/call-attempts/{id}/recording',
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+  });
+});
 
 describe('roundRobinSplit', () => {
   it('répartit à parts égales quand le compte tombe juste', () => {

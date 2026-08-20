@@ -110,7 +110,7 @@ export class ImportRunnerService {
   }
 
   private async openSource(job: ImportJob, adapter: AnyImportAdapter): Promise<SheetSource> {
-    const source = await this.reader.open(job.storagePath, adapter.templateColumns);
+    const source = await this.reader.open(job.storagePath, adapter.templateColumns, adapter.layout);
 
     if (exceedsCeiling(source.declaredDataRows, adapter.maxRows)) {
       await source.close();

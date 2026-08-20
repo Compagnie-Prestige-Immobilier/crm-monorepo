@@ -40,7 +40,7 @@ import { SegmentConversionListDto, SegmentConversionsQueryDto } from './segment-
 
 @ApiTags('analytics')
 @ApiBearerAuth()
-@Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR)
+@Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION)
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'analytics', version: '1' })
 export class AnalyticsController {
@@ -229,6 +229,8 @@ export class AnalyticsController {
     return this.pilotage.delays(user, query);
   }
 
+  // Le domaine bancaire ne regarde pas la direction commerciale.
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR)
   @Get('bank-aging')
   @ApiOperation({
     operationId: 'getBankAging',
@@ -309,7 +311,7 @@ export class AnalyticsController {
   }
 
   @Get('segment-conversions')
-  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'getSegmentConversions',
     summary: 'Bascules de segment : sur la période, par segment d’origine, et par auteur.',

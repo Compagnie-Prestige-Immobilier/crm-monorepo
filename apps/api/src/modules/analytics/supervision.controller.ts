@@ -9,7 +9,7 @@ import { SupervisionActivityDto, SupervisionQueryDto } from './supervision.dto.j
 
 @ApiTags('supervision')
 @ApiBearerAuth()
-@Roles(Role.ADMIN, Role.SUPERVISEUR)
+@Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'supervision', version: '1' })
 export class SupervisionController {

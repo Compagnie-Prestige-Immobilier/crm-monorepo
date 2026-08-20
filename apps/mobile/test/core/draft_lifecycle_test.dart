@@ -74,6 +74,28 @@ void main() {
       await d.dispose();
       expect(writes, 1);
     });
+
+    testWidgets('une écriture qui échoue reste à refaire', (WidgetTester tester) async {
+      bool fail = true;
+      int writes = 0;
+      final DraftDebouncer d = DraftDebouncer(
+        onFlush: () async {
+          if (fail) throw StateError('base verrouillée');
+          writes++;
+        },
+      );
+      d.touch();
+      // Le minuteur appelle `flush` sans témoin : si l'échec efface le drapeau,
+      // la saisie ne repartira plus jamais, et personne ne le saura.
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(writes, 0);
+      expect(d.isDirty, isTrue, reason: 'la saisie non écrite reste à écrire');
+
+      fail = false;
+      await d.flush();
+      expect(writes, 1);
+      await d.dispose();
+    });
   });
 
   group('DraftFormMixin : vidange sur AppLifecycleState.inactive', () {

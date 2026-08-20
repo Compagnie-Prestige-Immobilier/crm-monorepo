@@ -102,9 +102,11 @@ class AuthInterceptor extends Interceptor {
 
     final Future<String> flight = _mutex.protect(_performRefresh);
     _inFlight = flight;
+    // `ignore` et non un `catchError` : l'échec est rendu à l'appelant par
+    // `flight`, cette dérivation ne sert qu'à libérer le vol unique.
     flight.whenComplete(() {
       if (identical(_inFlight, flight)) _inFlight = null;
-    });
+    }).ignore();
     return flight;
   }
 

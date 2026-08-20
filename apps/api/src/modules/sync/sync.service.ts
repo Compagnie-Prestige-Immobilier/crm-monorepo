@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { OperationResult, Prisma } from '@crm/database';
+import { OperationResult, Prisma, WhatsappStatus } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readEnv } from '../../env.js';
@@ -15,6 +15,7 @@ import { isAdmin, ownerScope } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PROSPECT_INCLUDE, toProspectDto } from '../prospects/prospects.service.js';
 import { REPRESENTANT_INCLUDE, toRepresentantDto } from '../representants/representants.service.js';
+import { resolveWhatsappPatch } from '../representants/whatsapp.js';
 import { CallAttemptApplyStatus } from '../phase2/dto.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
 import { SyncBatchStore } from './batch-store.js';
@@ -409,6 +410,9 @@ export class SyncService {
       if (operation.entity === SyncEntity.REPRESENTANT) {
         return await this.applyRepresentant(tx, user, operation, authorIsDemo);
       }
+      if (operation.entity === SyncEntity.REPRESENTANT_COMMENT) {
+        return await this.applyRepresentantComment(tx, user, operation);
+      }
       if (operation.entity === SyncEntity.CALL_ATTEMPT) {
         // La tentative hérite de SON PROSPECT, que `phase2-sync` lit déjà :
         // rien à transmettre ici.
@@ -431,6 +435,66 @@ export class SyncService {
       // entier soit annulé proprement.
       throw error;
     }
+  }
+
+  private async applyRepresentantComment(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    operation: SyncOperationDto,
+  ): Promise<OperationOutcome> {
+    if (operation.op !== SyncOp.CREATE) {
+      throw new OperationError(
+        SyncOpStatus.INVALID,
+        'OP_NOT_SUPPORTED',
+        'Un commentaire ne peut être ni modifié ni supprimé hors ligne.',
+      );
+    }
+
+    const data = operation.data ?? {};
+    requireUuid(data.representantId, 'representantId');
+    requireText(data.body, 'body');
+
+    const existing = await tx.representantComment.findUnique({
+      where: { id: operation.entityId },
+    });
+    if (existing) {
+      if (existing.representantId !== data.representantId || existing.authorId !== user.id) {
+        throw new OperationError(
+          SyncOpStatus.CONFLICT,
+          'ENTITY_ID_OWNED_BY_ANOTHER_USER',
+          'Cet identifiant appartient à un autre commentaire.',
+        );
+      }
+      return applied(existing.id, null, existing.createdAt);
+    }
+
+    const representant = await tx.representant.findFirst({
+      where: { id: data.representantId, deletedAt: null, ...ownerScope(user) },
+    });
+    if (!representant) {
+      throw new OperationError(
+        SyncOpStatus.INVALID,
+        'REPRESENTANT_NOT_FOUND',
+        'Représentant introuvable.',
+      );
+    }
+
+    const createdAt = new Date();
+    await tx.representantComment.createMany({
+      data: [
+        {
+          id: operation.entityId,
+          representantId: data.representantId,
+          authorId: user.id,
+          body: data.body.trim(),
+          clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
+          isDemo: representant.isDemo,
+          createdAt,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return applied(operation.entityId, null, createdAt);
   }
 
   // ─── Représentant ─────────────────────────────────────────────────────────
@@ -489,6 +553,13 @@ export class SyncService {
           fullName: data.fullName.trim(),
           phoneE164,
           ...(data.notes ? { notes: data.notes } : {}),
+          // Une fiche neuve part de `NON_DEMANDE`: le resolveur applique la
+          // meme regle que le panneau, donc le CHECK ne peut pas etre viole
+          // par le chemin hors ligne.
+          ...resolveWhatsappPatch(data, {
+            whatsappStatus: WhatsappStatus.NON_DEMANDE,
+            whatsappE164: null,
+          }),
           departementId: data.departementId,
           ...(data.iefId ? { iefId: data.iefId } : {}),
           createdById: user.id,
@@ -541,6 +612,7 @@ export class SyncService {
           : data.notes !== undefined
             ? { notes: data.notes || null }
             : {}),
+        ...resolveWhatsappPatch(this.whatsappInputFor(data, cleared), existing),
         ...(data.departementId ? { departementId: data.departementId } : {}),
         ...(cleared.has('iefId')
           ? { iefId: null }
@@ -551,6 +623,28 @@ export class SyncService {
       },
     });
     return applied(row.id, row.rev, row.updatedAt);
+  }
+
+  /**
+   * Un champ VIDE se declare par `clearedFields`, pas par une cle absente: le
+   * transport JSON supprime les `null`, donc l'absence et le vidage arrivent
+   * identiques. Voir `CLEARABLE_FIELDS`.
+   */
+  private whatsappInputFor(
+    data: SyncEntityDataDto,
+    cleared: ReadonlySet<string>,
+  ): { whatsappStatus?: WhatsappStatus; whatsappE164?: string; profession?: string } {
+    return {
+      ...(data.whatsappStatus === undefined ? {} : { whatsappStatus: data.whatsappStatus }),
+      ...(cleared.has('whatsappE164') || data.whatsappE164 === undefined
+        ? {}
+        : { whatsappE164: data.whatsappE164 }),
+      ...(cleared.has('profession')
+        ? { profession: '' }
+        : data.profession === undefined
+          ? {}
+          : { profession: data.profession }),
+    };
   }
 
   // ─── Tentative d'appel (phase 2) ──────────────────────────────────────────
@@ -584,6 +678,7 @@ export class SyncService {
         id: operation.entityId,
         prospectId: data.prospectId,
         outcome: data.outcome,
+        ...(data.reasonCode === undefined ? {} : { reasonCode: data.reasonCode }),
         ...(data.method === undefined ? {} : { method: data.method }),
         ...(data.comment === undefined ? {} : { comment: data.comment }),
         ...(data.callbackAt === undefined ? {} : { callbackAt: data.callbackAt }),
@@ -716,9 +811,10 @@ export class SyncService {
     if (phoneE164 !== existing.phoneE164) {
       await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
     }
-    if (data.representantId && data.representantId !== existing.representantId) {
-      await assertRepresentantUsable(tx, user, data.representantId);
-    }
+    const reassignedRepresentant =
+      data.representantId && data.representantId !== existing.representantId
+        ? await assertRepresentantUsable(tx, user, data.representantId)
+        : null;
 
     const row = await tx.prospect.update({
       where: { id: existing.id },
@@ -730,9 +826,15 @@ export class SyncService {
         ...(data.syndicatId ? { syndicatId: data.syndicatId } : {}),
         ...(data.representantId ? { representantId: data.representantId } : {}),
         ...(data.statut ? { statut: data.statut } : {}),
+        ...(reassignedRepresentant && (authorIsDemo || reassignedRepresentant.isDemo)
+          ? { isDemo: true }
+          : {}),
         rev: { increment: 1 },
       },
     });
+    if (reassignedRepresentant && (authorIsDemo || reassignedRepresentant.isDemo)) {
+      await recordDemoEntity(tx, 'prospect', row.id);
+    }
     return applied(row.id, row.rev, row.updatedAt);
   }
 

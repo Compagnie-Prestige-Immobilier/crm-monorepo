@@ -8,7 +8,10 @@ class StubApi implements ApiPort {
   static const String _marker = 'stub';
 
   @override
-  Future<AuthTokens> login({required String identifier, required String password}) async {
+  Future<AuthTokens> login({
+    required String identifier,
+    required String password,
+  }) async {
     if (identifier.trim().isEmpty || password.isEmpty) {
       throw const ApiException(
         'invalid_credentials',
@@ -74,6 +77,14 @@ class StubApi implements ApiPort {
   }
 
   @override
+  Future<void> uploadCallRecording({
+    required String attemptId,
+    required String path,
+  }) async {
+    throw const ApiException('api_not_configured', kind: FailureKind.retryable);
+  }
+
+  @override
   Future<Phase2DirectoryPage> pullPhase2Directory({
     String? cursor,
     int limit = 2000,
@@ -85,6 +96,11 @@ class StubApi implements ApiPort {
       serverTime: DateTime.now().toUtc(),
     );
   }
+
+  @override
+  Future<List<CallOutcomeReasonDto>> pullCallOutcomeReasons({
+    required int payloadVersion,
+  }) async => const <CallOutcomeReasonDto>[];
 
   @override
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone) async {

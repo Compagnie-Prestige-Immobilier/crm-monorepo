@@ -51,3 +51,19 @@ describe('compatibilité du champ callbackAt', () => {
     await expect(validate({ ...ANCIEN_LOT, callbackAt: 'demain' })).rejects.toThrow();
   });
 });
+
+describe('compatibilité du champ reasonCode', () => {
+  it('un lot d’une version antérieure, SANS reasonCode, reste accepté', async () => {
+    await expect(validate({ ...ANCIEN_LOT })).resolves.toMatchObject({ reasonCode: undefined });
+  });
+
+  it('le motif est reçu quand il est là', async () => {
+    await expect(validate({ ...ANCIEN_LOT, reasonCode: 'BOITE_VOCALE' })).resolves.toMatchObject({
+      reasonCode: 'BOITE_VOCALE',
+    });
+  });
+
+  it('un motif plus long que le code du référentiel est refusé à la porte', async () => {
+    await expect(validate({ ...ANCIEN_LOT, reasonCode: 'X'.repeat(41) })).rejects.toThrow();
+  });
+});

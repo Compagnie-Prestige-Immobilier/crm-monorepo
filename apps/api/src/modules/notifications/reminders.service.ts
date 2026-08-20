@@ -277,7 +277,7 @@ export class RemindersService {
     return this.emit({
       key: ReminderKey.DAILY_REPORT,
       now,
-      candidates: await this.roleAudience([Role.ADMIN, Role.SUPERVISEUR], {
+      candidates: await this.roleAudience([Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION], {
         jour: day,
         appels: String(total((row) => row.calls)),
         methodes: String(total((row) => row.methodObtained)),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/widgets.dart';
@@ -49,8 +50,11 @@ mixin DraftFormMixin<T extends StatefulWidget> on State<T> {
   void dispose() {
     _lifecycle?.dispose();
     _lifecycle = null;
-    _debouncer?.dispose();
+    final DraftDebouncer? debouncer = _debouncer;
     _debouncer = null;
+    // La dernière écriture part sans témoin : `dispose` ne peut pas l'attendre,
+    // mais `DraftDebouncer` journalise son échec.
+    if (debouncer != null) unawaited(debouncer.dispose());
     super.dispose();
   }
 
@@ -58,7 +62,9 @@ mixin DraftFormMixin<T extends StatefulWidget> on State<T> {
     if (!mounted) return;
     final String? target = draftRouteWithId();
     if (target == null) return;
-    GoRouter.maybeOf(context)?.replace(target);
+    final GoRouter? router = GoRouter.maybeOf(context);
+    if (router == null) return;
+    unawaited(router.replace<void>(target));
   }
 
   void markDraftDirty() => _debouncer?.touch();

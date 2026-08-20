@@ -1,5 +1,5 @@
 import type { ApiClient, components, operations } from '@crm/api-client';
-import { unwrap, type ApiResult } from '@crm/api-client/query';
+import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
@@ -11,6 +11,67 @@ type RepresentantQuery = NonNullable<operations['listRepresentants']['parameters
 export type CreateRepresentantInput = components['schemas']['CreateRepresentantDto'];
 export type RepresentantLookup = components['schemas']['RepresentantLookupDto'];
 export type RepresentantRelationChange = components['schemas']['RepresentantRelationChangeDto'];
+
+export const WHATSAPP_STATUSES = ['NON_DEMANDE', 'MEME_NUMERO', 'AUTRE_NUMERO', 'AUCUN'] as const;
+
+export type WhatsappStatus = (typeof WHATSAPP_STATUSES)[number];
+
+export const WHATSAPP_STATUS_LABELS: Record<WhatsappStatus, string> = {
+  NON_DEMANDE: 'Non demandé',
+  MEME_NUMERO: 'Le même que son téléphone',
+  AUTRE_NUMERO: 'Un autre numéro',
+  AUCUN: 'Pas de WhatsApp',
+};
+
+export const PROFESSIONS = [
+  'Instituteur',
+  'Professeur',
+  'Directeur d’école',
+  'Principal',
+  'Proviseur',
+  'Inspecteur',
+  'Personnel administratif',
+] as const;
+
+export interface RepresentantScript {
+  whatsappStatus: WhatsappStatus;
+  /** Renseigné UNIQUEMENT sur `AUTRE_NUMERO` : `MEME_NUMERO` ne duplique rien. */
+  whatsappE164: string | null;
+  whatsappNumber: string | null;
+  profession: string | null;
+}
+
+/**
+ * Le contrat porte desormais les quatre champs. L'alias reste, il nomme
+ * l'intention a l'appel et evite de propager `RepresentantRow` partout.
+ */
+export type ScriptedRepresentant = RepresentantRow;
+
+export function scriptOf(representant: ScriptedRepresentant): RepresentantScript {
+  return {
+    whatsappStatus: representant.whatsappStatus,
+    whatsappE164: representant.whatsappE164,
+    // Calcule par le SERVEUR: ne pas le recalculer ici, les deux definitions
+    // divergeraient au premier changement de regle.
+    whatsappNumber: representant.whatsappNumber,
+    profession: representant.profession,
+  };
+}
+
+export interface RepresentantScriptPatch {
+  whatsappStatus?: WhatsappStatus;
+  whatsappE164?: string;
+  profession?: string;
+}
+
+export type UpdateRepresentantPatch = UpdateRepresentantInput & RepresentantScriptPatch;
+
+export function whatsappLabel(script: RepresentantScript): string {
+  if (script.whatsappStatus === 'AUTRE_NUMERO' && script.whatsappNumber !== null) {
+    return script.whatsappNumber;
+  }
+  return WHATSAPP_STATUS_LABELS[script.whatsappStatus];
+}
 
 const startOfDay = (isoDate: string): string => `${isoDate}T00:00:00.000Z`;
 const endOfDay = (isoDate: string): string => `${isoDate}T23:59:59.999Z`;
@@ -86,7 +147,7 @@ export async function lookupRepresentantByPhone(
 
 export async function updateRepresentant(
   id: string,
-  patch: UpdateRepresentantInput,
+  patch: UpdateRepresentantPatch,
   client: ApiClient = getApiClient(),
 ): Promise<RepresentantRow> {
   return unwrap(
@@ -101,14 +162,7 @@ export async function deleteRepresentant(
   unwrap(await client.DELETE('/api/v1/representants/{id}', { params: { path: { id } } }));
 }
 
-export interface RepresentantComment {
-  id: string;
-  body: string;
-  authorId: string;
-  authorName: string;
-  clientCreatedAt: string;
-  createdAt: string;
-}
+export type RepresentantComment = components['schemas']['RepresentantCommentDto'];
 
 export interface NewRepresentantComment {
   id: string;
@@ -119,25 +173,12 @@ export interface NewRepresentantComment {
 export const representantCommentsQueryKey = (representantId: string) =>
   ['representants', 'detail', representantId, 'comments'] as const;
 
-// Le contrat ne porte pas encore `/representants/{id}/comments` : ce typage
-// local tombe au prochain codegen, avec la conversion ci-dessous.
-interface CommentsEndpoints {
-  GET: (
-    path: string,
-    init: unknown,
-  ) => Promise<ApiResult<{ items: RepresentantComment[] }, unknown>>;
-  POST: (path: string, init: unknown) => Promise<ApiResult<RepresentantComment, unknown>>;
-}
-
-const commentsApi = (client: ApiClient): CommentsEndpoints =>
-  client as unknown as CommentsEndpoints;
-
 export async function fetchRepresentantComments(
   representantId: string,
   client: ApiClient = getApiClient(),
 ): Promise<RepresentantComment[]> {
   const payload = unwrap(
-    await commentsApi(client).GET('/api/v1/representants/{id}/comments', {
+    await client.GET('/api/v1/representants/{id}/comments', {
       params: { path: { id: representantId } },
     }),
   );
@@ -150,9 +191,21 @@ export async function createRepresentantComment(
   client: ApiClient = getApiClient(),
 ): Promise<RepresentantComment> {
   return unwrap(
-    await commentsApi(client).POST('/api/v1/representants/{id}/comments', {
+    await client.POST('/api/v1/representants/{id}/comments', {
       params: { path: { id: representantId } },
       body: comment,
+    }),
+  );
+}
+
+export async function deleteRepresentantComment(
+  representantId: string,
+  commentId: string,
+  client: ApiClient = getApiClient(),
+): Promise<void> {
+  unwrap(
+    await client.DELETE('/api/v1/representants/{id}/comments/{commentId}', {
+      params: { path: { id: representantId, commentId } },
     }),
   );
 }

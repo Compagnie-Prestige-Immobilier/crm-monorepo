@@ -9,6 +9,8 @@ export const PANEL_ROLES: readonly Role[] = [
   'BANQUE_FINANCE',
   'COMMERCIAL',
   'SUPERVISEUR',
+  'DIRECTION',
+  'ACCUEIL',
 ];
 
 export interface AuthTokens {

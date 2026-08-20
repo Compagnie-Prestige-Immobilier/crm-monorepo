@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/representant_relation.dart';
+import 'package:crm_api_client/src/model/whatsapp_status.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -37,6 +38,12 @@ class UpdateRepresentantDto {
     this.relationStatus,
 
     this.relationReason,
+
+    this.whatsappStatus,
+
+    this.whatsappE164,
+
+    this.profession,
   });
 
   /// Identifiant UUID v7 généré par le client. Fourni par le mobile pour que les prospects saisis hors ligne puissent le référencer avant toute synchronisation.
@@ -77,6 +84,23 @@ class UpdateRepresentantDto {
   @JsonKey(name: r'relationReason', required: false, includeIfNull: false)
   final String? relationReason;
 
+  /// Trois états et non un booléen : NON_DEMANDE dit que la question n’a pas été posée, AUCUN qu’elle l’a été et que la réponse est non.
+  @JsonKey(
+    name: r'whatsappStatus',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: WhatsappStatus.unknownDefaultOpenApi,
+  )
+  final WhatsappStatus? whatsappStatus;
+
+  /// Numéro WhatsApp DISTINCT du téléphone. Saisie libre, normalisé par le serveur. Admis avec le seul statut AUTRE_NUMERO : sur MEME_NUMERO le numéro se relit sur `phoneE164`.
+  @JsonKey(name: r'whatsappE164', required: false, includeIfNull: false)
+  final String? whatsappE164;
+
+  /// Profession, en texte libre. Chaîne vide : la valeur est effacée.
+  @JsonKey(name: r'profession', required: false, includeIfNull: false)
+  final String? profession;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is UpdateRepresentantDto &&
@@ -92,6 +116,9 @@ class UpdateRepresentantDto {
                 clientCreatedAt,
                 relationStatus,
                 relationReason,
+                whatsappStatus,
+                whatsappE164,
+                profession,
               ],
               [
                 other.id,
@@ -103,6 +130,9 @@ class UpdateRepresentantDto {
                 other.clientCreatedAt,
                 other.relationStatus,
                 other.relationReason,
+                other.whatsappStatus,
+                other.whatsappE164,
+                other.profession,
               ],
             );
   }
@@ -120,6 +150,9 @@ class UpdateRepresentantDto {
         clientCreatedAt,
         relationStatus,
         relationReason,
+        whatsappStatus,
+        whatsappE164,
+        profession,
       ]);
 
   factory UpdateRepresentantDto.fromJson(Map<String, dynamic> json) =>

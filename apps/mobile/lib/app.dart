@@ -123,10 +123,10 @@ class _BrandSplash extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: Color(0xFF630210),
+      color: const Color(0xFF630210),
       child: Stack(
         children: <Widget>[
-          Center(
+          const Center(
             child: Image(
               image: AssetImage('assets/brand/cpi-header.png'),
               width: 180,
@@ -141,15 +141,15 @@ class _BrandSplash extends StatelessWidget {
             bottom: 32,
             child: Column(
               children: <Widget>[
-                Text(
+                const Text(
                   'Chargement…',
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                   semanticsLabel: 'Chargement en cours',
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 Semantics(
                   label: 'Chargement en cours',
-                  child: LinearProgressIndicator(
+                  child: const LinearProgressIndicator(
                     minHeight: 3,
                     backgroundColor: Color(0x66FFFFFF),
                     color: Colors.white,

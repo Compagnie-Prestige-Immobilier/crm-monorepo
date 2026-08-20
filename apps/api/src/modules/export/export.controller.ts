@@ -36,7 +36,7 @@ export class ExportController {
   // ADMIN et COMMERCIAL, les mêmes qu'`AnalyticsController` : la feuille Synthèse porte
   // exactement ses agrégats. Le cloisonnement par commercial reste dans `buildProspectWhere`.
   @Get('prospects.xlsx')
-  @Roles(Role.ADMIN, Role.COMMERCIAL)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.DIRECTION)
   @ApiProduces(XLSX_MIME)
   @ApiOperation({
     operationId: 'exportProspectsXlsx',
@@ -157,7 +157,7 @@ export class ExportController {
   // que son écran serait un contournement. Le SUPERVISEUR consulte, il n'emporte pas
   // l'annuaire national dans un classeur.
   @Get('representants.xlsx')
-  @Roles(Role.COMMERCIAL, Role.ADMIN)
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.DIRECTION)
   @ApiProduces(XLSX_MIME)
   @ApiOperation({
     operationId: 'exportRepresentantsXlsx',

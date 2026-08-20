@@ -37,7 +37,7 @@ void main() {
   setUp(() async {
     db = await openTestDatabase();
     repo = ReferenceRepository(db);
-    await (db.delete(db.departements)).go();
+    await db.delete(db.departements).go();
     await seedDepartement(
       id: 'dep-bakel',
       name: 'Bakel',
@@ -85,7 +85,7 @@ void main() {
   // départements sans libellé de région. Les rendre quand même afficherait une
   // ligne vide et un filtre qui ne filtre rien.
   test('un département sans libellé de région ne fabrique pas de région', () async {
-    await (db.delete(db.departements)).go();
+    await db.delete(db.departements).go();
     await seedDepartement(id: 'dep-1', name: 'Dakar', regionId: 'reg-dk');
 
     expect(await repo.watchRegions().first, isEmpty);

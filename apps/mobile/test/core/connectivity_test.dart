@@ -225,7 +225,7 @@ void main() {
               changes: const Stream<List<ConnectivityResult>>.empty(),
             ),
           ),
-          networkValidationProvider.overrideWithValue(_FakeValidation(false)),
+          networkValidationProvider.overrideWithValue(const _FakeValidation(false)),
         ],
       );
       addTearDown(container.dispose);
@@ -267,15 +267,28 @@ void main() {
       expect(container.read(connectivityProvider), CpiConnectivity.unreachable);
     });
 
-    test('la preuve expire toute seule : pas d\'icône collée à l\'écran', () async {
-      final ProviderContainer container = online();
-      container.listen(connectivityInterfaceProvider, (Object? _, Object? _) {});
-      await pumpEventQueue();
+    test('la preuve expire toute seule : pas d\'icône collée à l\'écran', () {
+      // L'ancienne version datait la preuve dans le passé et relisait la
+      // fraîcheur : elle prouvait une soustraction. Rien ne recalculait ce
+      // verdict, donc « Serveur injoignable » restait à l'écran jusqu'à ce
+      // qu'une autre dépendance bouge par hasard.
+      fakeAsync((FakeAsync async) {
+        final ProviderContainer container = online();
+        final List<CpiConnectivity> seen = <CpiConnectivity>[];
+        container.listen<CpiConnectivity>(
+          connectivityProvider,
+          (CpiConnectivity? _, CpiConnectivity next) => seen.add(next),
+        );
+        async.flushMicrotasks();
 
-      container
-          .read(unreachableEvidenceProvider.notifier)
-          .record(DateTime.now().subtract(kUnreachableFreshness * 2));
-      expect(container.read(connectivityProvider), CpiConnectivity.online);
+        container.read(unreachableEvidenceProvider.notifier).record(DateTime.now());
+        expect(container.read(connectivityProvider), CpiConnectivity.unreachable);
+
+        async.elapse(kUnreachableFreshness + const Duration(seconds: 1));
+
+        expect(seen.last, CpiConnectivity.online, reason: 'sans notification, l\'écran garde son bandeau');
+        expect(container.read(connectivityProvider), CpiConnectivity.online);
+      });
     });
 
     test('un succès efface la preuve immédiatement', () async {

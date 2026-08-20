@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/cpi_tokens.dart';
@@ -108,32 +110,33 @@ class _EntranceState extends State<_Entrance> with SingleTickerProviderStateMixi
     vsync: this,
     duration: widget.duration,
   );
+  late final CurvedAnimation _curved = CurvedAnimation(
+    parent: _controller,
+    curve: widget.curve,
+  );
 
   @override
   void initState() {
     super.initState();
     Future<void>.delayed(widget.delay, () {
-      if (mounted) _controller.forward();
+      if (mounted) unawaited(_controller.forward());
     });
   }
 
   @override
   void dispose() {
+    _curved.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final Animation<double> curved = CurvedAnimation(
-      parent: _controller,
-      curve: widget.curve,
-    );
     return SlideTransition(
       position: Tween<Offset>(
         begin: const Offset(0, 0.06),
         end: Offset.zero,
-      ).animate(curved),
+      ).animate(_curved),
       child: widget.child,
     );
   }

@@ -136,6 +136,11 @@ export class CampaignAttemptDto {
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
 }
 
+export class CallRecordingDto {
+  @ApiProperty({ format: 'uuid' }) attemptId!: string;
+  @ApiProperty({ type: Number }) bytes!: number;
+}
+
 export class CampaignSummaryDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() name!: string;
@@ -346,6 +351,18 @@ export class CallAttemptOpDto {
   @ApiProperty({ enum: CallOutcome, enumName: 'CallOutcome' })
   @IsEnum(CallOutcome)
   outcome!: CallOutcome;
+
+  @ApiPropertyOptional({
+    maxLength: 40,
+    description:
+      'Code du motif d’issue saisi sur le terrain. FACULTATIF POUR TOUJOURS : une version ' +
+      'installée ne l’envoie pas, et son absence fait résoudre le motif système dont le code ' +
+      'égale outcome.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  reasonCode?: string;
 
   @ApiPropertyOptional({
     enum: EnrollmentMethod,

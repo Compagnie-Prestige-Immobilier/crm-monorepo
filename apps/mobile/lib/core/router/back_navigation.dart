@@ -7,7 +7,10 @@ import 'route_paths.dart';
 void popOrHome(BuildContext context, {String fallback = Routes.home}) {
   final GoRouter? router = GoRouter.maybeOf(context);
   if (router == null) {
-    Navigator.of(context).maybePop();
+    // `maybePop` redemanderait son avis au `PopScope` qui vient de nous
+    // appeler, qui rappellerait `popOrHome` : l'écran se fige.
+    final NavigatorState navigator = Navigator.of(context);
+    if (navigator.canPop()) navigator.pop();
     return;
   }
   if (router.canPop()) {

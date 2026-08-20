@@ -22,10 +22,16 @@ import { queryKeys } from '@/lib/query-keys';
 import { countActiveRepCampaignFilters } from '@/lib/rep-campaign-filters';
 import { CAMPAIGN_STATUS_LABELS } from '@/lib/types';
 
-export function RepCampaignsView() {
+export function RepCampaignsView({ canManage }: { canManage: boolean }) {
   const { filters, setFilters } = useRepCampaignFilters();
   const [creating, setCreating] = useState(false);
   const activeFilterCount = countActiveRepCampaignFilters(filters);
+  let emptyDescription = 'Élargissez la période ou retirez un critère.';
+  if (activeFilterCount === 0) {
+    emptyDescription = canManage
+      ? 'Créez une campagne pour répartir les représentants à rappeler.'
+      : 'Aucune campagne n’est encore disponible.';
+  }
 
   const { data, isPending, isError, error, refetch, isFetching } = useQuery({
     queryKey: queryKeys.repCampaigns(filters),
@@ -42,15 +48,17 @@ export function RepCampaignsView() {
           Répartition des représentants à rappeler entre les téléconseillers choisis. Tirage
           définitif.
         </p>
-        <Button
-          type="button"
-          onClick={() => {
-            setCreating(true);
-          }}
-        >
-          <PlusIcon aria-hidden="true" />
-          Nouvelle campagne
-        </Button>
+        {canManage ? (
+          <Button
+            type="button"
+            onClick={() => {
+              setCreating(true);
+            }}
+          >
+            <PlusIcon aria-hidden="true" />
+            Nouvelle campagne
+          </Button>
+        ) : null}
       </div>
 
       <RepCampaignsFiltersBar />
@@ -73,13 +81,9 @@ export function RepCampaignsView() {
               ? 'Aucune campagne représentants'
               : 'Aucune campagne ne correspond à ces filtres'
           }
-          description={
-            activeFilterCount === 0
-              ? 'Créez une campagne pour répartir les représentants à rappeler.'
-              : 'Élargissez la période ou retirez un critère.'
-          }
+          description={emptyDescription}
           action={
-            activeFilterCount === 0 ? (
+            activeFilterCount === 0 && canManage ? (
               <Button
                 type="button"
                 onClick={() => {
@@ -186,7 +190,7 @@ export function RepCampaignsView() {
         </>
       )}
 
-      <RepCampaignCreateDialog open={creating} onOpenChange={setCreating} />
+      {canManage ? <RepCampaignCreateDialog open={creating} onOpenChange={setCreating} /> : null}
     </div>
   );
 }

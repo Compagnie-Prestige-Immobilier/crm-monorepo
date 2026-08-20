@@ -403,7 +403,7 @@ void main() {
         DiscardOutcome.claimed,
         reason: 'supprimer la ligne locale laisserait un enregistrement serveur orphelin',
       );
-      expect((await allOutbox(db)), hasLength(1));
+      expect(await allOutbox(db), hasLength(1));
     });
 
     /// ═══ CE TEST DISAIT L'INVERSE, ET C'ÉTAIT LE BUG ═══

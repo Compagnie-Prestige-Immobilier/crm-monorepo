@@ -21,15 +21,19 @@ export const IMPORT_HISTORY_PAGE_SIZE = 10;
 export const IMPORT_KIND_LABELS: Readonly<Record<ImportKind, string>> = {
   REPRESENTANTS: 'Représentants',
   PROSPECTS: 'Prospects',
+  VISITES: 'Visites',
 };
 
 /** Plafonds des adaptateurs d'import, annoncés avant le dépôt. */
 export const IMPORT_MAX_ROWS: Readonly<Record<ImportKind, number>> = {
   REPRESENTANTS: 50_000,
   PROSPECTS: 150_000,
+  VISITES: 20_000,
 };
 
-export const IMPORT_TEMPLATES: Readonly<Record<ImportKind, { url: string; fileName: string }>> = {
+export const IMPORT_TEMPLATES: Readonly<
+  Partial<Record<ImportKind, { url: string; fileName: string }>>
+> = {
   REPRESENTANTS: {
     url: '/api/v1/export/representants-modele.xlsx',
     fileName: 'cpi-representants-modele.xlsx',
@@ -75,14 +79,11 @@ export async function applyImportJob(
 const UPLOAD_PATHS: Readonly<Record<ImportKind, string>> = {
   REPRESENTANTS: '/api/v1/imports/representants',
   PROSPECTS: '/api/v1/imports/prospects',
+  VISITES: '/api/v1/imports/visites',
 };
 
-/*
- * `POST /imports/prospects` n'est pas encore dans le client engendré : `pnpm codegen`
- * n'a pas été rejoué. On frappe le relais comme le ferait le client, l'erreur repassant
- * par `unwrap` pour que les refus du mode démonstration restent traduits.
- * À REMPLACER par `client.POST(...)` à la première régénération du contrat.
- */
+// Le contrat engendré représente un fichier multipart par `string`; FormData
+// conserve ici le vrai fichier et laisse le navigateur écrire la frontière.
 export async function createImportJob(
   kind: ImportKind,
   file: File,

@@ -106,6 +106,7 @@ Map<String, dynamic> _$SyncDeletionDtoToJson(SyncDeletionDto instance) =>
 
 const _$SyncEntityEnumMap = {
   SyncEntity.representant: 'representant',
+  SyncEntity.representantComment: 'representant_comment',
   SyncEntity.prospect: 'prospect',
   SyncEntity.callAttempt: 'call_attempt',
   SyncEntity.unknownDefaultOpenApi: 'unknown_default_open_api',

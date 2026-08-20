@@ -3,11 +3,14 @@ import 'package:dio/dio.dart';
 enum TimeoutProfile {
   read(Duration(seconds: 30)),
 
-  push(Duration(seconds: 60));
+  push(Duration(seconds: 60)),
 
-  const TimeoutProfile(this.receive);
+  upload(Duration(minutes: 5), send: Duration(minutes: 5));
+
+  const TimeoutProfile(this.receive, {this.send});
 
   final Duration receive;
+  final Duration? send;
 
   static const String extraKey = 'cpi.timeoutProfile';
 
@@ -24,6 +27,7 @@ class TimeoutProfileInterceptor extends Interceptor {
       for (final TimeoutProfile profile in TimeoutProfile.values) {
         if (profile.name == raw) {
           options.receiveTimeout = profile.receive;
+          if (profile.send != null) options.sendTimeout = profile.send;
           break;
         }
       }

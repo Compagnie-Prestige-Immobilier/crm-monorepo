@@ -4,8 +4,10 @@ import {
   Phase2Status,
   ScheduledCallbackStatus,
 } from '@crm/database';
+import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SYSTEM_OUTCOME_REASONS } from '../referentiels/call-outcome-rules.js';
 import { Phase2SyncService, type Phase2TransactionClient } from './phase2-sync.service.js';
 import type { CallAttemptOpDto } from './dto.js';
 
@@ -14,9 +16,25 @@ type MockFn = ReturnType<typeof vi.fn>;
 interface MockTx {
   callAttempt: Record<'findUnique' | 'createMany', MockFn>;
   callTask: Record<'findFirst' | 'updateMany', MockFn>;
+  callOutcomeReason: Record<'findUnique', MockFn>;
   prospect: Record<'findFirst' | 'updateMany', MockFn>;
   scheduledCallback: Record<'updateMany' | 'createMany', MockFn>;
 }
+
+/** Le référentiel tel qu'il sort du semis : les six motifs système, actifs. */
+const seededReason = (code: string): Record<string, unknown> | null => {
+  const system = SYSTEM_OUTCOME_REASONS.find((reason) => reason.code === code);
+  if (!system) return null;
+  return {
+    id: `reason-${system.code}`,
+    code: system.code,
+    label: system.label,
+    effect: system.effect,
+    requiresComment: system.requiresComment,
+    requiresCallback: system.requiresCallback,
+    isActive: true,
+  };
+};
 
 const prospectRow = (isDemo: boolean): Record<string, unknown> => ({
   id: 'p-1',
@@ -40,6 +58,11 @@ const prepare = (isDemo: boolean): void => {
     callTask: {
       findFirst: vi.fn().mockResolvedValue(null),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    callOutcomeReason: {
+      findUnique: vi.fn((args: { where: { code: string } }) =>
+        Promise.resolve(seededReason(args.where.code)),
+      ),
     },
     prospect: {
       findFirst: vi.fn().mockResolvedValue(prospectRow(isDemo)),
@@ -189,5 +212,125 @@ describe('rappel planifié', () => {
     await apply();
 
     expect(tx.scheduledCallback.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+const codeOf = async (run: Promise<unknown>): Promise<string> => {
+  try {
+    await run;
+  } catch (error) {
+    expect(error).toBeInstanceOf(BadRequestException);
+    const body = (error as BadRequestException).getResponse() as { code?: string };
+    return body.code ?? '';
+  }
+  throw new Error('aucune exception levée');
+};
+
+describe('résolution du motif d’issue', () => {
+  beforeEach(() => {
+    prepare(false);
+  });
+
+  it('un lot sans reasonCode résout le motif système dont le code égale outcome', async () => {
+    await apply({ outcome: CallOutcome.REFUSED });
+
+    expect(tx.callOutcomeReason.findUnique.mock.calls[0]?.[0]).toMatchObject({
+      where: { code: CallOutcome.REFUSED },
+    });
+    expect(writtenRow().reasonId).toBe('reason-REFUSED');
+  });
+
+  it('un référentiel vide ne met PAS en échec un lot sans reasonCode', async () => {
+    tx.callOutcomeReason.findUnique.mockResolvedValue(null);
+    await apply();
+
+    expect(writtenRow().reasonId).toBeNull();
+    expect(writtenRow().outcome).toBe(CallOutcome.UNREACHABLE);
+  });
+
+  it.each(SYSTEM_OUTCOME_REASONS)(
+    '$code explicite écrit la MÊME ligne que l’issue seule',
+    async (system) => {
+      const saisie = {
+        outcome: system.code,
+        ...(system.effect === 'CLOSE_METHOD' ? { method: EnrollmentMethod.PLATFORM } : {}),
+        ...(system.requiresComment ? { comment: 'motif' } : {}),
+      };
+
+      prepare(false);
+      await apply(saisie);
+      const implicite = writtenRow();
+
+      prepare(false);
+      await apply({ ...saisie, reasonCode: system.code });
+      expect(writtenRow()).toEqual(implicite);
+    },
+  );
+
+  it('un code inconnu refuse la tentative, sans toucher au prospect', async () => {
+    expect(await codeOf(apply({ reasonCode: 'BOITE_VOCALE' }))).toBe('PHASE2_REASON_UNKNOWN');
+    expect(tx.callAttempt.createMany).not.toHaveBeenCalled();
+    expect(tx.prospect.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('un motif retiré du référentiel est refusé', async () => {
+    tx.callOutcomeReason.findUnique.mockResolvedValue({
+      ...seededReason(CallOutcome.UNREACHABLE),
+      code: 'BOITE_VOCALE',
+      label: 'Boîte vocale',
+      isActive: false,
+    });
+
+    expect(await codeOf(apply({ reasonCode: 'BOITE_VOCALE' }))).toBe('PHASE2_REASON_INACTIVE');
+  });
+
+  it('un motif dont l’effet contredit l’issue est refusé', async () => {
+    tx.callOutcomeReason.findUnique.mockResolvedValue({
+      ...seededReason(CallOutcome.REFUSED),
+      code: 'REFUS_SEC',
+      label: 'Refus sec',
+    });
+
+    expect(await codeOf(apply({ outcome: CallOutcome.UNREACHABLE, reasonCode: 'REFUS_SEC' }))).toBe(
+      'PHASE2_REASON_OUTCOME_MISMATCH',
+    );
+  });
+
+  it('un motif qui exige un commentaire le fait respecter jusqu’à l’écriture', async () => {
+    tx.callOutcomeReason.findUnique.mockResolvedValue({
+      ...seededReason(CallOutcome.UNREACHABLE),
+      id: 'reason-BOITE_VOCALE',
+      code: 'BOITE_VOCALE',
+      label: 'Boîte vocale',
+      requiresComment: true,
+    });
+
+    expect(await codeOf(apply({ reasonCode: 'BOITE_VOCALE' }))).toBe('PHASE2_COMMENT_REQUIRED');
+
+    prepare(false);
+    tx.callOutcomeReason.findUnique.mockResolvedValue({
+      ...seededReason(CallOutcome.UNREACHABLE),
+      id: 'reason-BOITE_VOCALE',
+      code: 'BOITE_VOCALE',
+      label: 'Boîte vocale',
+      requiresComment: true,
+    });
+    await apply({ reasonCode: 'BOITE_VOCALE', comment: 'boîte saturée' });
+    expect(writtenRow().reasonId).toBe('reason-BOITE_VOCALE');
+  });
+
+  it('un motif ajouté clôt le dossier quand son effet le dit', async () => {
+    tx.callOutcomeReason.findUnique.mockResolvedValue({
+      ...seededReason(CallOutcome.REFUSED),
+      id: 'reason-REFUS_SEC',
+      code: 'REFUS_SEC',
+      label: 'Refus sec',
+    });
+
+    await apply({ outcome: CallOutcome.REFUSED, reasonCode: 'REFUS_SEC' });
+
+    const [args] = tx.prospect.updateMany.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data.phase2Status).toBe(Phase2Status.REFUSED);
+    expect(writtenRow().reasonId).toBe('reason-REFUS_SEC');
   });
 });

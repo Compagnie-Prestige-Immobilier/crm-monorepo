@@ -13,10 +13,12 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { ChangeSource, RepresentantRelation } from '@crm/database';
+import { ChangeSource, RepresentantRelation, WhatsappStatus } from '@crm/database';
 
 import { PageMetaDto, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
+
+export const PROFESSION_MAX_LENGTH = 120;
 
 export class CreateRepresentantDto {
   @ApiPropertyOptional({
@@ -97,6 +99,39 @@ export class UpdateRepresentantDto extends PartialType(CreateRepresentantDto) {
   @IsString()
   @MaxLength(500)
   relationReason?: string;
+
+  @ApiPropertyOptional({
+    enum: WhatsappStatus,
+    enumName: 'WhatsappStatus',
+    description:
+      'Trois états et non un booléen : NON_DEMANDE dit que la question n’a pas été posée, AUCUN qu’elle l’a été et que la réponse est non.',
+  })
+  @IsOptional()
+  @IsEnum(WhatsappStatus)
+  whatsappStatus?: WhatsappStatus;
+
+  @ApiPropertyOptional({
+    type: String,
+    minLength: 6,
+    maxLength: 40,
+    description:
+      'Numéro WhatsApp DISTINCT du téléphone. Saisie libre, normalisé par le serveur. Admis avec le seul statut AUTRE_NUMERO : sur MEME_NUMERO le numéro se relit sur `phoneE164`.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  whatsappE164?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: PROFESSION_MAX_LENGTH,
+    description: 'Profession, en texte libre. Chaîne vide : la valeur est effacée.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(PROFESSION_MAX_LENGTH)
+  profession?: string;
 }
 
 export class RepresentantDto {
@@ -118,6 +153,26 @@ export class RepresentantDto {
   @ApiProperty({ type: Number }) prospectCount!: number;
   @ApiProperty({ enum: RepresentantRelation, enumName: 'RepresentantRelation' })
   relationStatus!: RepresentantRelation;
+
+  @ApiProperty({ enum: WhatsappStatus, enumName: 'WhatsappStatus' })
+  whatsappStatus!: WhatsappStatus;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Renseigné avec le seul statut AUTRE_NUMERO.',
+  })
+  whatsappE164!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon.',
+  })
+  whatsappNumber!: string | null;
+
+  @ApiProperty({ type: String, nullable: true }) profession!: string | null;
 }
 
 export class RepresentantListDto {
@@ -189,6 +244,25 @@ export class RepresentantQueryDto extends RepresentantExportQueryDto {
   @IsOptional()
   @IsEnum(RepresentantRelation)
   relationStatus?: RepresentantRelation;
+
+  @ApiPropertyOptional({
+    enum: WhatsappStatus,
+    enumName: 'WhatsappStatus',
+    description: 'Ne retient que les représentants dans cet état WhatsApp.',
+  })
+  @IsOptional()
+  @IsEnum(WhatsappStatus)
+  whatsappStatus?: WhatsappStatus;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'true : un numéro WhatsApp joignable (MEME_NUMERO ou AUTRE_NUMERO). false : les autres, question non posée comprise. Se compose avec `whatsappStatus` par intersection.',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  hasWhatsapp?: boolean;
 
   @ApiPropertyOptional({ enum: RepresentantSortField, enumName: 'RepresentantSortField' })
   @IsOptional()

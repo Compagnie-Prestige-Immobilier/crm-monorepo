@@ -145,6 +145,19 @@ describe('cloisonnement par commercial', () => {
     expect(where.createdById).toBe('com-alice');
   });
 
+  it('réaffecte aussi la nature de la fiche au représentant de démonstration', async () => {
+    prisma.prospect.findMany.mockResolvedValue([{ id: 'p-1' }]);
+    prisma.representant.findFirst.mockResolvedValue({
+      id: 'r-demo',
+      createdById: admin.id,
+      isDemo: true,
+    });
+
+    await service(prisma).reassign(admin, { prospectIds: ['p-1'], representantId: 'r-demo' });
+
+    expect(firstArg(prisma.prospect.updateMany).data?.isDemo).toBe(true);
+  });
+
   it('seul un ADMIN peut changer le commercial propriétaire', async () => {
     await expect(
       service(prisma).reassign(alice, { prospectIds: ['p-1'], commercialId: 'com-bob' }),

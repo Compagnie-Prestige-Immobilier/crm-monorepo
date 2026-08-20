@@ -23,6 +23,7 @@ const bob: AuthenticatedUser = { ...alice, id: 'com-bob', username: 'bob', fullN
 
 const REP_A = '0198a000-0000-7000-8000-000000000001';
 const REP_B = '0198a000-0000-7000-8000-000000000002';
+const COMMENT_A = '0198a000-0000-7000-8000-000000000003';
 
 let db: FakePrisma;
 let sync: SyncService;
@@ -169,6 +170,30 @@ describe('idempotence, niveau 1 (le lot)', () => {
 });
 
 describe('idempotence, niveau 2 (l’opération)', () => {
+  it('enregistre un commentaire hors ligne une seule fois', async () => {
+    await sync.push(alice, batch([createRep(REP_A, '77 123 45 67')], 'comment-parent'));
+    const operation = {
+      opId: opId(),
+      seq: 0,
+      entity: 'representant_comment' as SyncEntity,
+      op: SyncOp.CREATE,
+      entityId: COMMENT_A,
+      clientUpdatedAt: '2026-08-10T10:05:00.000Z',
+      data: {
+        representantId: REP_A,
+        body: 'Rappelle à 15 h.',
+        clientCreatedAt: '2026-08-10T10:05:00.000Z',
+      },
+    } as unknown as SyncOperationDto;
+
+    const first = await sync.push(alice, batch([operation], 'comment-1'));
+    const replay = await sync.push(alice, batch([operation], 'comment-2'));
+
+    expect(statuses(first.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    expect(statuses(replay.body.results)).toEqual([SyncOpStatus.DUPLICATE]);
+    expect(db.representantComments.size).toBe(1);
+  });
+
   it('une opération déjà appliquée dans un AUTRE lot ressort en duplicate, sans réécriture', async () => {
     const operation = createRep(REP_A, '77 123 45 67');
     await sync.push(alice, batch([operation], 'batch-1'));
@@ -237,6 +262,72 @@ describe('idempotence, niveau 2 (l’opération)', () => {
 
     expect(ligne?.status).toBe(SyncOpStatus.DUPLICATE);
     expect(ligne?.errorCode).toBeNull();
+  });
+});
+
+describe('nature du prospect lors d’un rattachement', () => {
+  it('suit le représentant de démonstration lors d’une mise à jour hors ligne', async () => {
+    db.representants.set(REP_A, {
+      id: REP_A,
+      fullName: 'Représentant réel',
+      phoneE164: '+221771111111',
+      notes: null,
+      rev: 1,
+      departementId: '0198c000-0000-7000-8000-000000000001',
+      createdById: alice.id,
+      clientCreatedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      isDemo: false,
+    });
+    db.representants.set(REP_B, {
+      id: REP_B,
+      fullName: 'Représentant fictif',
+      phoneE164: '+221772222222',
+      notes: null,
+      rev: 1,
+      departementId: '0198c000-0000-7000-8000-000000000001',
+      createdById: alice.id,
+      clientCreatedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      isDemo: true,
+    });
+    db.prospects.set('prospect-1', {
+      id: 'prospect-1',
+      nom: 'Fall',
+      prenom: 'Moussa',
+      phoneE164: '+221773333333',
+      rev: 1,
+      statut: 'NOUVEAU',
+      banqueId: '0198d000-0000-7000-8000-000000000001',
+      syndicatId: '0198e000-0000-7000-8000-000000000001',
+      representantId: REP_A,
+      createdById: alice.id,
+      clientCreatedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      isDemo: false,
+    });
+
+    const operation: SyncOperationDto = {
+      opId: opId(),
+      seq: 0,
+      entity: SyncEntity.PROSPECT,
+      op: SyncOp.UPDATE,
+      entityId: 'prospect-1',
+      clientUpdatedAt: '2026-08-10T11:00:00.000Z',
+      baseRev: 1,
+      data: { phone: '77 333 33 33', representantId: REP_B },
+    };
+
+    const result = await sync.push(alice, batch([operation], 'demo-reassignment'));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    expect(db.prospects.get('prospect-1')?.isDemo).toBe(true);
   });
 });
 

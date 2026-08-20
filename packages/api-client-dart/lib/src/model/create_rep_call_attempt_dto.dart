@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/rep_call_outcome.dart';
 import 'package:crm_api_client/src/model/representant_relation.dart';
+import 'package:crm_api_client/src/model/whatsapp_status.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -38,6 +39,12 @@ class CreateRepCallAttemptDto {
     this.suggestedName,
 
     this.suggestedNote,
+
+    this.whatsappStatus,
+
+    this.whatsappE164,
+
+    this.profession,
 
     required this.clientCreatedAt,
   });
@@ -88,6 +95,23 @@ class CreateRepCallAttemptDto {
   @JsonKey(name: r'suggestedNote', required: false, includeIfNull: false)
   final String? suggestedNote;
 
+  /// Ce que l’appel apprend du canal WhatsApp. La question ne se pose qu’APRÈS l’engagement : NON_DEMANDE reste donc la réponse honnête tant qu’elle n’a pas été posée. Absent : l’état ne bouge pas.
+  @JsonKey(
+    name: r'whatsappStatus',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: WhatsappStatus.unknownDefaultOpenApi,
+  )
+  final WhatsappStatus? whatsappStatus;
+
+  /// Numéro WhatsApp DISTINCT du téléphone. Saisie libre, normalisé par le serveur. Admis avec le seul statut AUTRE_NUMERO.
+  @JsonKey(name: r'whatsappE164', required: false, includeIfNull: false)
+  final String? whatsappE164;
+
+  /// Profession, en texte libre. Chaîne vide : la valeur est effacée.
+  @JsonKey(name: r'profession', required: false, includeIfNull: false)
+  final String? profession;
+
   /// Horodatage de l’appel sur le terrain, distinct de son arrivée en base.
   @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
   final DateTime clientCreatedAt;
@@ -107,6 +131,9 @@ class CreateRepCallAttemptDto {
                 suggestedPhone,
                 suggestedName,
                 suggestedNote,
+                whatsappStatus,
+                whatsappE164,
+                profession,
                 clientCreatedAt,
               ],
               [
@@ -119,6 +146,9 @@ class CreateRepCallAttemptDto {
                 other.suggestedPhone,
                 other.suggestedName,
                 other.suggestedNote,
+                other.whatsappStatus,
+                other.whatsappE164,
+                other.profession,
                 other.clientCreatedAt,
               ],
             );
@@ -137,6 +167,9 @@ class CreateRepCallAttemptDto {
         suggestedPhone,
         suggestedName,
         suggestedNote,
+        whatsappStatus,
+        whatsappE164,
+        profession,
         clientCreatedAt,
       ]);
 

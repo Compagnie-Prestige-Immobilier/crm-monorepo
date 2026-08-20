@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { DetailBackLink } from '@/components/detail-back-link';
 import { useFileDownload } from '@/components/exports/download-button';
 import { CampaignProgressBar } from '@/components/phase2/campaign-progress-bar';
+import { CallRecordingPlayer } from '@/components/phase2/call-recording-player';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -49,7 +50,13 @@ const OUTCOME_VARIANT: Record<CallOutcome, BadgeVariant> = {
   OTHER: 'outline',
 };
 
-export function CampaignDetailView({ campaignId }: { campaignId: string }) {
+export function CampaignDetailView({
+  campaignId,
+  canManage,
+}: {
+  campaignId: string;
+  canManage: boolean;
+}) {
   const queryClient = useQueryClient();
   const [closing, setClosing] = useState(false);
 
@@ -109,7 +116,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
               <Badge variant={isActive ? 'info' : 'secondary'}>
                 {CAMPAIGN_STATUS_LABELS[data.status]}
               </Badge>
-              {isActive ? (
+              {isActive && canManage ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -236,6 +243,9 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                       attempt.assignedToId !== attempt.performedById ? (
                         <p className="mt-0.5">Tâche d’un autre téléconseiller</p>
                       ) : null}
+                    </div>
+                    <div className="basis-full">
+                      <CallRecordingPlayer attemptId={attempt.id} />
                     </div>
                   </li>
                 ))}

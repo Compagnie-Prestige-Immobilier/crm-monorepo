@@ -316,3 +316,8 @@ final StreamProvider<({int attempts, int methods, int closed})> phase2ProgressPr
 final StreamProvider<int> phase2PendingCountProvider = StreamProvider<int>((Ref ref) {
   return ref.watch(appDatabaseProvider).countPhase2Pending().watchSingle();
 });
+
+final StreamProvider<List<CallReason>> callReasonsProvider =
+    StreamProvider<List<CallReason>>((Ref ref) {
+      return ref.watch(referenceRepositoryProvider).watchCallReasons();
+    });

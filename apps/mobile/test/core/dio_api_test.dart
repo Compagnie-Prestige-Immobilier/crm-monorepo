@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cpi_go/core/network/timeout_profile.dart';
@@ -20,18 +21,21 @@ import 'package:flutter_test/flutter_test.dart';
 ///    minutes sans antenne épuisaient les huit tentatives.
 void main() {
   group('lien mort vs refus serveur', () {
-    test('une coupure de connexion est INJOIGNABLE, pas réessayable-serveur', () {
-      final ApiException e = DioApi.classify(
-        DioException(
-          requestOptions: RequestOptions(path: '/api/v1/sync/push'),
-          type: DioExceptionType.connectionError,
-        ),
-        'push',
-      );
-      expect(e.code, 'NETWORK');
-      expect(e.kind, FailureKind.unreachable);
-      expect(e.isUnreachable, isTrue);
-    });
+    test(
+      'une coupure de connexion est INJOIGNABLE, pas réessayable-serveur',
+      () {
+        final ApiException e = DioApi.classify(
+          DioException(
+            requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+            type: DioExceptionType.connectionError,
+          ),
+          'push',
+        );
+        expect(e.code, 'NETWORK');
+        expect(e.kind, FailureKind.unreachable);
+        expect(e.isUnreachable, isTrue);
+      },
+    );
 
     test('un délai dépassé est INJOIGNABLE : le serveur n\'a rien refusé', () {
       for (final DioExceptionType type in <DioExceptionType>[
@@ -74,26 +78,29 @@ void main() {
     /// connexion : cette réponse tombait dans la branche terminale et condamnait
     /// le lot entier, jusqu'à deux cents saisies à reprendre une par une, pour
     /// un problème qui se règle en acceptant les conditions du wifi.
-    test('un 403 en HTML est un lien mort, pas un refus qui condamne le lot', () {
-      final ApiException e = DioApi.classify(
-        DioException(
-          requestOptions: RequestOptions(path: '/api/v1/sync/push'),
-          type: DioExceptionType.badResponse,
-          response: Response<dynamic>(
+    test(
+      'un 403 en HTML est un lien mort, pas un refus qui condamne le lot',
+      () {
+        final ApiException e = DioApi.classify(
+          DioException(
             requestOptions: RequestOptions(path: '/api/v1/sync/push'),
-            statusCode: 403,
-            data: '<html><body>Connectez-vous au wifi</body></html>',
-            headers: Headers.fromMap(<String, List<String>>{
-              'content-type': <String>['text/html; charset=utf-8'],
-            }),
+            type: DioExceptionType.badResponse,
+            response: Response<dynamic>(
+              requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+              statusCode: 403,
+              data: '<html><body>Connectez-vous au wifi</body></html>',
+              headers: Headers.fromMap(<String, List<String>>{
+                'content-type': <String>['text/html; charset=utf-8'],
+              }),
+            ),
           ),
-        ),
-        'push',
-      );
-      expect(e.code, DioApi.nonJsonResponseCode);
-      expect(e.kind, FailureKind.unreachable);
-      expect(e.isUnreachable, isTrue);
-    });
+          'push',
+        );
+        expect(e.code, DioApi.nonJsonResponseCode);
+        expect(e.kind, FailureKind.unreachable);
+        expect(e.isUnreachable, isTrue);
+      },
+    );
 
     /// Le filet ne doit PAS avaler un vrai refus. Notre serveur rend toujours du
     /// JSON avec un `code` : c'est ce couple qui le distingue d'un équipement
@@ -143,33 +150,43 @@ void main() {
     /// Un client dont l'adaptateur rend exactement ce qu'on lui dit.
     DioApi apiAnswering(String body, {required String? contentType}) {
       final Dio dio = Dio(BaseOptions(baseUrl: 'https://exemple.test'));
-      dio.httpClientAdapter = _CannedAdapter(body: body, contentType: contentType);
+      dio.httpClientAdapter = _CannedAdapter(
+        body: body,
+        contentType: contentType,
+      );
       return DioApi(CrmApiClient(dio: dio, interceptors: <Interceptor>[]));
     }
 
-    test('un portail captif ne condamne pas le lot : lien mort, pas refus', () async {
-      // Hôtel, aéroport, salle de formation : la passerelle répond 200 avec sa
-      // page de connexion à n'importe quelle requête. Classée `terminal`, elle
-      // faisait passer les deux cents opérations du lot en `failed`, chacune à
-      // reprendre à la main dans « À corriger ».
-      final DioApi api = apiAnswering(
-        '<html><body>Connectez-vous au Wi-Fi</body></html>',
-        contentType: 'text/html; charset=utf-8',
-      );
+    test(
+      'un portail captif ne condamne pas le lot : lien mort, pas refus',
+      () async {
+        // Hôtel, aéroport, salle de formation : la passerelle répond 200 avec sa
+        // page de connexion à n'importe quelle requête. Classée `terminal`, elle
+        // faisait passer les deux cents opérations du lot en `failed`, chacune à
+        // reprendre à la main dans « À corriger ».
+        final DioApi api = apiAnswering(
+          '<html><body>Connectez-vous au Wi-Fi</body></html>',
+          contentType: 'text/html; charset=utf-8',
+        );
 
-      await expectLater(
-        api.push(
-          batchId: 'b-1',
-          payloadVersion: 1,
-          operations: const <SyncOperationDto>[],
-        ),
-        throwsA(
-          isA<ApiException>()
-              .having((ApiException e) => e.code, 'code', 'NON_JSON_RESPONSE')
-              .having((ApiException e) => e.kind, 'kind', FailureKind.unreachable),
-        ),
-      );
-    });
+        await expectLater(
+          api.push(
+            batchId: 'b-1',
+            payloadVersion: 1,
+            operations: const <SyncOperationDto>[],
+          ),
+          throwsA(
+            isA<ApiException>()
+                .having((ApiException e) => e.code, 'code', 'NON_JSON_RESPONSE')
+                .having(
+                  (ApiException e) => e.kind,
+                  'kind',
+                  FailureKind.unreachable,
+                ),
+          ),
+        );
+      },
+    );
 
     test(
       'sans content-type non plus : c\'est déjà le signe d\'un intermédiaire',
@@ -209,7 +226,11 @@ void main() {
         ),
         throwsA(
           isA<ApiException>()
-              .having((ApiException e) => e.code, 'code', 'RESPONSE_SCHEMA_MISMATCH')
+              .having(
+                (ApiException e) => e.code,
+                'code',
+                'RESPONSE_SCHEMA_MISMATCH',
+              )
               .having((ApiException e) => e.kind, 'kind', FailureKind.terminal),
         ),
       );
@@ -225,7 +246,10 @@ void main() {
     /// Deux minutes pendant lesquelles la file ne bouge plus et l'interface
     /// n'a rien à dire.
     test('un 2xx à corps VIDE est classé, jamais lâché en TypeError', () async {
-      final DioApi api = apiAnswering('', contentType: 'application/json; charset=utf-8');
+      final DioApi api = apiAnswering(
+        '',
+        contentType: 'application/json; charset=utf-8',
+      );
 
       await expectLater(
         api.push(
@@ -235,7 +259,11 @@ void main() {
         ),
         throwsA(
           isA<ApiException>()
-              .having((ApiException e) => e.code, 'code', 'RESPONSE_SCHEMA_MISMATCH')
+              .having(
+                (ApiException e) => e.code,
+                'code',
+                'RESPONSE_SCHEMA_MISMATCH',
+              )
               .having((ApiException e) => e.kind, 'kind', FailureKind.terminal),
         ),
       );
@@ -250,8 +278,16 @@ void main() {
         api.pull(),
         throwsA(
           isA<ApiException>()
-              .having((ApiException e) => e.code, 'code', DioApi.nonJsonResponseCode)
-              .having((ApiException e) => e.kind, 'kind', FailureKind.unreachable),
+              .having(
+                (ApiException e) => e.code,
+                'code',
+                DioApi.nonJsonResponseCode,
+              )
+              .having(
+                (ApiException e) => e.kind,
+                'kind',
+                FailureKind.unreachable,
+              ),
         ),
       );
     });
@@ -312,7 +348,8 @@ void main() {
           body: directoryBody(const <Map<String, Object?>>[]),
         );
         await apiOn(adapter).pullPhase2Directory(cursor: cursor);
-        final Map<String, String> query = adapter.lastRequest!.uri.queryParameters;
+        final Map<String, String> query =
+            adapter.lastRequest!.uri.queryParameters;
         expect(
           query.containsKey('since'),
           isFalse,
@@ -327,41 +364,92 @@ void main() {
         body: directoryBody(const <Map<String, Object?>>[]),
       );
       await apiOn(adapter).pullPhase2Directory(cursor: 'c-42', limit: 500);
-      final Map<String, String> query = adapter.lastRequest!.uri.queryParameters;
+      final Map<String, String> query =
+          adapter.lastRequest!.uri.queryParameters;
       expect(query['since'], 'c-42');
       expect(query['limit'], '500');
     });
 
-    test('le profil de délai traverse le client généré jusqu\'au transport', () async {
-      // Le client généré n'expose pas de paramètre de délai : le profil passe
-      // par `Options.extra`. Perdu en route, il laisse les 3 s que Dio se donne
-      // par défaut, et une page de 2 000 entrées n'arrive jamais en 2G.
-      final _CannedAdapter adapter = _CannedAdapter(
-        body: directoryBody(const <Map<String, Object?>>[]),
+    test(
+      'le profil de délai traverse le client généré jusqu\'au transport',
+      () async {
+        // Le client généré n'expose pas de paramètre de délai : le profil passe
+        // par `Options.extra`. Perdu en route, il laisse les 3 s que Dio se donne
+        // par défaut, et une page de 2 000 entrées n'arrive jamais en 2G.
+        final _CannedAdapter adapter = _CannedAdapter(
+          body: directoryBody(const <Map<String, Object?>>[]),
+        );
+        await apiOn(adapter).pullPhase2Directory();
+        expect(
+          adapter.lastRequest!.extra[TimeoutProfile.extraKey],
+          TimeoutProfile.read.name,
+        );
+        expect(
+          adapter.lastRequest!.receiveTimeout,
+          TimeoutProfile.read.receive,
+        );
+      },
+    );
+
+    test('une note vocale garde un délai adapté à son poids', () async {
+      final File recording = File(
+        '${Directory.systemTemp.path}/cpi-recording-timeout-${DateTime.now().microsecondsSinceEpoch}.m4a',
       );
-      await apiOn(adapter).pullPhase2Directory();
-      expect(adapter.lastRequest!.extra[TimeoutProfile.extraKey], TimeoutProfile.read.name);
-      expect(adapter.lastRequest!.receiveTimeout, TimeoutProfile.read.receive);
+      addTearDown(() {
+        if (recording.existsSync()) recording.deleteSync();
+      });
+      recording.writeAsBytesSync(<int>[1, 2, 3]);
+      final _CannedAdapter adapter = _CannedAdapter(
+        body: jsonEncode(<String, Object?>{
+          'attemptId': 'attempt-1',
+          'bytes': 3,
+        }),
+      );
+
+      await apiOn(
+        adapter,
+      ).uploadCallRecording(attemptId: 'attempt-1', path: recording.path);
+
+      expect(
+        adapter.lastRequest!.extra[TimeoutProfile.extraKey],
+        TimeoutProfile.upload.name,
+      );
+      expect(
+        adapter.lastRequest!.receiveTimeout,
+        TimeoutProfile.upload.receive,
+      );
+      expect(adapter.lastRequest!.sendTimeout, TimeoutProfile.upload.send);
     });
 
-    test('un portail captif sur l\'annuaire reste un lien mort, pas un refus', () async {
-      // Le commercial est en salle de formation ou à l'hôtel : la passerelle
-      // répond 200 avec sa page de connexion. Le client généré emballe l'échec
-      // de désérialisation dans un `DioException(type: unknown)` portant la
-      // réponse 2xx : c'est `_guard` qui doit y relire le `content-type`.
-      final _CannedAdapter adapter = _CannedAdapter(
-        body: '<html><body>Connectez-vous au Wi-Fi</body></html>',
-        contentType: 'text/html; charset=utf-8',
-      );
-      await expectLater(
-        apiOn(adapter).pullPhase2Directory(),
-        throwsA(
-          isA<ApiException>()
-              .having((ApiException e) => e.code, 'code', DioApi.nonJsonResponseCode)
-              .having((ApiException e) => e.kind, 'kind', FailureKind.unreachable),
-        ),
-      );
-    });
+    test(
+      'un portail captif sur l\'annuaire reste un lien mort, pas un refus',
+      () async {
+        // Le commercial est en salle de formation ou à l'hôtel : la passerelle
+        // répond 200 avec sa page de connexion. Le client généré emballe l'échec
+        // de désérialisation dans un `DioException(type: unknown)` portant la
+        // réponse 2xx : c'est `_guard` qui doit y relire le `content-type`.
+        final _CannedAdapter adapter = _CannedAdapter(
+          body: '<html><body>Connectez-vous au Wi-Fi</body></html>',
+          contentType: 'text/html; charset=utf-8',
+        );
+        await expectLater(
+          apiOn(adapter).pullPhase2Directory(),
+          throwsA(
+            isA<ApiException>()
+                .having(
+                  (ApiException e) => e.code,
+                  'code',
+                  DioApi.nonJsonResponseCode,
+                )
+                .having(
+                  (ApiException e) => e.kind,
+                  'kind',
+                  FailureKind.unreachable,
+                ),
+          ),
+        );
+      },
+    );
 
     test('un JSON hors contrat sur l\'annuaire, lui, reste TERMINAL', () async {
       final _CannedAdapter adapter = _CannedAdapter(
@@ -371,89 +459,116 @@ void main() {
         apiOn(adapter).pullPhase2Directory(),
         throwsA(
           isA<ApiException>()
-              .having((ApiException e) => e.code, 'code', 'RESPONSE_SCHEMA_MISMATCH')
+              .having(
+                (ApiException e) => e.code,
+                'code',
+                'RESPONSE_SCHEMA_MISMATCH',
+              )
               .having((ApiException e) => e.kind, 'kind', FailureKind.terminal),
         ),
       );
     });
 
-    test('six champs traversent, et le serveur peut bien en envoyer trente', () async {
-      // La frontière de confidentialité se tient CÔTÉ CLIENT aussi : l'annuaire
-      // est répliqué sur le téléphone personnel du commercial et couvre tout le
-      // portefeuille. Ni nom, ni banque, ni syndicat, même envoyés.
-      final _CannedAdapter adapter = _CannedAdapter(
-        body: directoryBody(<Map<String, Object?>>[
-          entryJson(
-            extra: const <String, Object?>{
-              'fullName': 'Aminata Diallo',
-              'banque': 'CBAO',
-              'syndicat': 'SUDES',
-              'adresse': 'Dakar, Plateau',
-            },
-          ),
-        ]),
-      );
-      final Phase2DirectoryPage page = await apiOn(adapter).pullPhase2Directory();
-      final Phase2DirectoryEntry entry = page.entries.single;
-      expect(entry.prospectId, 'p-1');
-      expect(entry.phoneE164, '+221771234567');
-      expect(entry.phase2Status, 'METHOD_OBTAINED');
-      expect(entry.enrollmentMethod, 'PLATFORM');
-      expect(entry.rev, 7);
-      expect(entry.updatedAt, DateTime.utc(2026, 8, 15, 9, 30));
-      expect(page.nextCursor, 'c-suivant');
-      expect(page.hasMore, isFalse);
-      expect(page.serverTime, DateTime.utc(2026, 8, 15, 10));
-    });
+    test(
+      'six champs traversent, et le serveur peut bien en envoyer trente',
+      () async {
+        // La frontière de confidentialité se tient CÔTÉ CLIENT aussi : l'annuaire
+        // est répliqué sur le téléphone personnel du commercial et couvre tout le
+        // portefeuille. Ni nom, ni banque, ni syndicat, même envoyés.
+        final _CannedAdapter adapter = _CannedAdapter(
+          body: directoryBody(<Map<String, Object?>>[
+            entryJson(
+              extra: const <String, Object?>{
+                'fullName': 'Aminata Diallo',
+                'banque': 'CBAO',
+                'syndicat': 'SUDES',
+                'adresse': 'Dakar, Plateau',
+              },
+            ),
+          ]),
+        );
+        final Phase2DirectoryPage page = await apiOn(
+          adapter,
+        ).pullPhase2Directory();
+        final Phase2DirectoryEntry entry = page.entries.single;
+        expect(entry.prospectId, 'p-1');
+        expect(entry.phoneE164, '+221771234567');
+        expect(entry.phase2Status, 'METHOD_OBTAINED');
+        expect(entry.enrollmentMethod, 'PLATFORM');
+        expect(entry.rev, 7);
+        expect(entry.updatedAt, DateTime.utc(2026, 8, 15, 9, 30));
+        expect(page.nextCursor, 'c-suivant');
+        expect(page.hasMore, isFalse);
+        expect(page.serverTime, DateTime.utc(2026, 8, 15, 10));
+      },
+    );
 
-    test('le DTO généré ne porte que ces six champs : un septième fait tomber ce test', () {
-      // Le seul point où l'ajout d'un champ côté serveur devient visible. Sans
-      // lui, `openapi.json` régénérerait un `DirectoryEntryDto` élargi et
-      // personne ne se demanderait si ce champ a le droit de descendre sur les
-      // téléphones. C'est une décision humaine, pas une régénération.
-      expect(
-        DirectoryEntryDto(
-          prospectId: 'p-1',
-          phoneE164: '+221771234567',
-          phase2Status: Phase2Status.PENDING,
-          enrollmentMethod: null,
-          rev: 1,
-          updatedAt: DateTime.utc(2026),
-        ).toJson().keys.toSet(),
-        <String>{
-          'prospectId',
-          'phoneE164',
-          'phase2Status',
-          'enrollmentMethod',
-          'rev',
-          'updatedAt',
-        },
-      );
-    });
+    test(
+      'le DTO généré ne porte que ces six champs : un septième fait tomber ce test',
+      () {
+        // Le seul point où l'ajout d'un champ côté serveur devient visible. Sans
+        // lui, `openapi.json` régénérerait un `DirectoryEntryDto` élargi et
+        // personne ne se demanderait si ce champ a le droit de descendre sur les
+        // téléphones. C'est une décision humaine, pas une régénération.
+        expect(
+          DirectoryEntryDto(
+            prospectId: 'p-1',
+            phoneE164: '+221771234567',
+            phase2Status: Phase2Status.PENDING,
+            enrollmentMethod: null,
+            rev: 1,
+            updatedAt: DateTime.utc(2026),
+          ).toJson().keys.toSet(),
+          <String>{
+            'prospectId',
+            'phoneE164',
+            'phase2Status',
+            'enrollmentMethod',
+            'rev',
+            'updatedAt',
+          },
+        );
+      },
+    );
 
-    test('un statut que ce client ne connaît pas encore n\'invalide pas la page', () async {
-      // `enumUnknownDefaultCase: true` existe pour ça : un membre ajouté côté
-      // serveur ne doit pas faire échouer un annuaire de 500 000 lignes. On
-      // rend la chaîne DU CONTRAT (`.value`) et non l'identifiant Dart
-      // (`.name`), qui n'existe nulle part côté serveur.
-      final _CannedAdapter adapter = _CannedAdapter(
-        body: directoryBody(<Map<String, Object?>>[entryJson(phase2Status: 'EXPIRED')]),
-      );
-      final Phase2DirectoryPage page = await apiOn(adapter).pullPhase2Directory();
-      expect(page.entries.single.phase2Status, Phase2Status.unknownDefaultOpenApi.value);
-      expect(page.entries.single.phase2Status, 'unknown_default_open_api');
-    });
+    test(
+      'un statut que ce client ne connaît pas encore n\'invalide pas la page',
+      () async {
+        // `enumUnknownDefaultCase: true` existe pour ça : un membre ajouté côté
+        // serveur ne doit pas faire échouer un annuaire de 500 000 lignes. On
+        // rend la chaîne DU CONTRAT (`.value`) et non l'identifiant Dart
+        // (`.name`), qui n'existe nulle part côté serveur.
+        final _CannedAdapter adapter = _CannedAdapter(
+          body: directoryBody(<Map<String, Object?>>[
+            entryJson(phase2Status: 'EXPIRED'),
+          ]),
+        );
+        final Phase2DirectoryPage page = await apiOn(
+          adapter,
+        ).pullPhase2Directory();
+        expect(
+          page.entries.single.phase2Status,
+          Phase2Status.unknownDefaultOpenApi.value,
+        );
+        expect(page.entries.single.phase2Status, 'unknown_default_open_api');
+      },
+    );
 
-    test('`rev` flottant redescend en entier : la colonne locale l\'est', () async {
-      // JSON ne distingue pas entier et flottant, et le contrat déclare `rev`
-      // en `number` : un sérialiseur qui écrirait `7.0` doit rester lisible.
-      final _CannedAdapter adapter = _CannedAdapter(
-        body: directoryBody(<Map<String, Object?>>[entryJson(rev: 7.0)]),
-      );
-      final Phase2DirectoryPage page = await apiOn(adapter).pullPhase2Directory();
-      expect(page.entries.single.rev, 7);
-      expect(page.entries.single.rev, isA<int>());
-    });
+    test(
+      '`rev` flottant redescend en entier : la colonne locale l\'est',
+      () async {
+        // JSON ne distingue pas entier et flottant, et le contrat déclare `rev`
+        // en `number` : un sérialiseur qui écrirait `7.0` doit rester lisible.
+        final _CannedAdapter adapter = _CannedAdapter(
+          body: directoryBody(<Map<String, Object?>>[entryJson(rev: 7.0)]),
+        );
+        final Phase2DirectoryPage page = await apiOn(
+          adapter,
+        ).pullPhase2Directory();
+        expect(page.entries.single.rev, 7);
+        expect(page.entries.single.rev, isA<int>());
+      },
+    );
   });
 
   group('ResponseFormatException', () {
@@ -462,7 +577,10 @@ void main() {
         ResponseFormatException('x', 'application/json; charset=utf-8').isJson,
         isTrue,
       );
-      expect(ResponseFormatException('x', 'application/problem+json').isJson, isTrue);
+      expect(
+        ResponseFormatException('x', 'application/problem+json').isJson,
+        isTrue,
+      );
       expect(ResponseFormatException('x', 'text/html').isJson, isFalse);
       expect(ResponseFormatException('x', null).isJson, isFalse);
     });
@@ -502,7 +620,8 @@ class _CannedAdapter implements HttpClientAdapter {
       body,
       200,
       headers: <String, List<String>>{
-        if (contentType != null) Headers.contentTypeHeader: <String>[contentType!],
+        if (contentType != null)
+          Headers.contentTypeHeader: <String>[contentType!],
       },
     );
   }

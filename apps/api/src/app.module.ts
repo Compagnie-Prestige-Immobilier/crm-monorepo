@@ -32,6 +32,7 @@ import { SuggestionsModule } from './modules/suggestions/suggestions.module.js';
 import { SyncModule } from './modules/sync/sync.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { AppUpdatesModule } from './modules/app-updates/app-updates.module.js';
+import { VisitesModule } from './modules/visites/visites.module.js';
 
 const env = readEnv();
 
@@ -95,6 +96,7 @@ const env = readEnv();
     AppUpdatesModule,
     DbDumpModule,
     ImportsModule,
+    VisitesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
