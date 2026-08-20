@@ -294,6 +294,24 @@ describe('approbation', () => {
     expect(args.data.isDemo).toBe(true);
   });
 
+  it('rattache une demande fictive à un représentant fictif sans relire le mode', async () => {
+    const enabled = vi.fn().mockResolvedValue(true);
+    service = new ClientRequestsService(
+      db as unknown as PrismaService,
+      notify as unknown as NotificationsService,
+      { enabled } as never,
+    );
+    db.clientCreationRequest.findFirst.mockResolvedValue(requestRow({ isDemo: true }));
+
+    await service.approve(ADMIN, 'req-1', body);
+
+    const args = (db.representant.findFirst.mock.calls[0] as [
+      { where: Record<string, unknown> },
+    ])[0];
+    expect(args.where).toMatchObject({ id: 'rep-1', isDemo: true });
+    expect(enabled).toHaveBeenCalledTimes(1);
+  });
+
   it('relit le téléphone JUSTE AVANT d’écrire', async () => {
     db.prospect.findFirst.mockResolvedValue({ id: 'prospect-1' });
     await expect(service.approve(ADMIN, 'req-1', body)).rejects.toBeInstanceOf(ConflictException);
