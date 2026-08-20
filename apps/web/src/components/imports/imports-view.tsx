@@ -462,12 +462,14 @@ function JobPanel({
           <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
           <div className="min-w-0 text-[0.875rem]">
             <p className="font-[600]">
-              {formatNumber(job.createdRows)} fiche{job.createdRows > 1 ? 's' : ''} créée
+              {formatNumber(job.createdRows)} {job.kind === 'VISITES' ? 'visite' : 'fiche'}
+              {job.createdRows > 1 ? 's' : ''} créée
               {job.createdRows > 1 ? 's' : ''}.
             </p>
             <p className="mt-1 text-muted-foreground">
-              Corrigez les lignes refusées dans le classeur et redéposez-le : les fiches déjà en
-              base seront de nouveau ignorées, sans doublon.
+              Corrigez les lignes refusées dans le classeur et redéposez-le : les{' '}
+              {job.kind === 'VISITES' ? 'visites déjà au registre' : 'fiches déjà en base'} seront
+              de nouveau ignorées, sans doublon.
             </p>
           </div>
         </div>
