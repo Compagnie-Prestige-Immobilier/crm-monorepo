@@ -1123,6 +1123,20 @@ describe('visibilité de démonstration', () => {
     await expect(enDemonstration().get(cachee.id)).resolves.toBeDefined();
   });
 
+  it('refuse aussi d’annuler un envoi masqué par son identifiant', async () => {
+    const cachee = await enDemonstration().create(admin, {
+      ...ciblee,
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+    });
+
+    const error = await refusal(() => service.cancel(cachee.id));
+
+    expect(codeOf(error)).toBe(NotificationError.NOT_FOUND);
+    expect(db.notifications.find((row) => row.id === cachee.id)?.status).toBe(
+      NotificationStatus.SCHEDULED,
+    );
+  });
+
   it('la boîte de réception et sa pastille cachent l’un et l’autre', async () => {
     await enDemonstration().create(admin, ciblee);
 
