@@ -82,12 +82,8 @@ const UPLOAD_PATHS: Readonly<Record<ImportKind, string>> = {
   VISITES: '/api/v1/imports/visites',
 };
 
-/*
- * `POST /imports/prospects` n'est pas encore dans le client engendré : `pnpm codegen`
- * n'a pas été rejoué. On frappe le relais comme le ferait le client, l'erreur repassant
- * par `unwrap` pour que les refus du mode démonstration restent traduits.
- * À REMPLACER par `client.POST(...)` à la première régénération du contrat.
- */
+// Le contrat engendré représente un fichier multipart par `string`; FormData
+// conserve ici le vrai fichier et laisse le navigateur écrire la frontière.
 export async function createImportJob(
   kind: ImportKind,
   file: File,

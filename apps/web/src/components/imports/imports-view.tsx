@@ -804,8 +804,9 @@ function ApplyDialog({
             <DialogHeader>
               <DialogTitle>{applyLabel(job)} ?</DialogTitle>
               <DialogDescription>
-                Cette action écrit en base et ne s’annule pas : une fiche supprimée ensuite garde
-                son numéro dans l’index d’unicité.
+                {job.kind === 'VISITES'
+                  ? 'Cette action écrit les visites en base et ne s’annule pas.'
+                  : 'Cette action écrit en base et ne s’annule pas : une fiche supprimée ensuite garde son numéro dans l’index d’unicité.'}
               </DialogDescription>
             </DialogHeader>
 
@@ -819,9 +820,10 @@ function ApplyDialog({
               </p>
 
               <p className="text-[0.8125rem] text-muted-foreground">
-                {formatNumber(job.skippedRows)} ligne{job.skippedRows > 1 ? 's' : ''} sera ignorée
-                {job.skippedRows > 1 ? 's' : ''} car déjà en base, et {formatNumber(job.errorRows)}{' '}
-                refusée{job.errorRows > 1 ? 's' : ''}. Aucune des deux ne sera écrite.
+                {formatNumber(job.skippedRows)} ligne{job.skippedRows > 1 ? 's' : ''}{' '}
+                {job.skippedRows > 1 ? 'seront ignorées' : 'sera ignorée'} car déjà en base, et{' '}
+                {formatNumber(job.errorRows)} refusée{job.errorRows > 1 ? 's' : ''}. Aucune des deux
+                ne sera écrite.
               </p>
             </div>
 
