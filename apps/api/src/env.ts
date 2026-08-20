@@ -66,6 +66,14 @@ export const envSchema = z
     APK_RELEASE_DIR: z.string().min(1).default('./storage/releases'),
     APK_MAX_SIZE_BYTES: z.coerce.number().int().positive().max(1_073_741_824).default(524_288_000),
 
+    CALL_RECORDING_DIR: z.string().min(1).default('./storage/call-recordings'),
+    CALL_RECORDING_MAX_SIZE_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(100_000_000)
+      .default(25_000_000),
+
     DB_DUMP_DIR: z.string().min(1).default('./storage/db-dumps'),
 
     DB_DUMP_ENABLED: booleanFlag(false),

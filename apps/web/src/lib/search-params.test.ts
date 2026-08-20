@@ -50,6 +50,7 @@ describe('readIsoDate', () => {
     expect(readIsoDate({ dateFrom: '2026-8-1' }, 'dateFrom')).toBeNull();
     expect(readIsoDate({ dateFrom: '13/08/2026' }, 'dateFrom')).toBeNull();
     expect(readIsoDate({ dateFrom: '2026-08-13T00:00:00Z' }, 'dateFrom')).toBeNull();
+    expect(readIsoDate({ dateFrom: '2026-02-31' }, 'dateFrom')).toBeNull();
   });
 
   it('refuse des chiffres non arabes, que `\\d` sans `u` laisserait passer ailleurs', () => {

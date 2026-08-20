@@ -1,7 +1,8 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useCanvasPresentation } from '@/lib/use-canvas-presentation';
 
 export function ChartCard({
   title,
@@ -16,9 +17,7 @@ export function ChartCard({
 }) {
   const chartRegion = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    chartRegion.current?.querySelector('canvas')?.setAttribute('role', 'presentation');
-  }, []);
+  useCanvasPresentation(chartRegion);
 
   return (
     <Card className={cn('animate-rise', className)}>

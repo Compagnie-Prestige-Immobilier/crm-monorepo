@@ -110,6 +110,8 @@ const ADMISES: readonly string[] = [
   'Phase2Controller.getCampaign',
   'Phase2Controller.listCampaigns',
   'Phase2Controller.downloadProgramme',
+  // Lecture seule: un superviseur ecoute une note audio, il n'en televerse pas.
+  'Phase2Controller.downloadRecording',
 
   'ProspectsController.get',
   'ProspectsController.list',

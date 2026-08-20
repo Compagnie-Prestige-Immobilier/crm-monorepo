@@ -37,6 +37,40 @@ export interface RepresentantRow {
   isDemo?: boolean;
 }
 
+export interface CallAttemptRow {
+  id: string;
+  prospectId: string;
+  taskId: string | null;
+  campaignId: string | null;
+  performedById: string;
+  outcome: string;
+  reasonId: string | null;
+  method: string | null;
+  comment: string | null;
+  clientCreatedAt: Date;
+  isDemo: boolean;
+}
+
+interface RepresentantCommentRow {
+  id: string;
+  representantId: string;
+  authorId: string;
+  body: string;
+  clientCreatedAt: Date;
+  createdAt: Date;
+  isDemo: boolean;
+}
+
+export interface CallOutcomeReasonRow {
+  id: string;
+  code: string;
+  label: string;
+  effect: string;
+  requiresComment: boolean;
+  requiresCallback: boolean;
+  isActive: boolean;
+}
+
 export interface ProspectRow {
   id: string;
   nom: string;
@@ -44,6 +78,10 @@ export interface ProspectRow {
   phoneE164: string;
   rev: number;
   statut: string;
+  phase2Status?: string;
+  enrollmentMethod?: string | null;
+  enrollmentCapturedById?: string | null;
+  enrollmentCapturedAt?: Date | null;
   banqueId: string;
   syndicatId: string;
   representantId: string;
@@ -87,6 +125,9 @@ export class FakePrisma {
   operations = new Map<string, OperationRow>();
   representants = new Map<string, RepresentantRow>();
   prospects = new Map<string, ProspectRow>();
+  callAttempts = new Map<string, CallAttemptRow>();
+  representantComments = new Map<string, RepresentantCommentRow>();
+  callOutcomeReasons = new Map<string, CallOutcomeReasonRow>();
   users = new Map<string, { id: string; isDemo: boolean; role?: string }>();
   demoEntities: { entityType: string; entityId: string; sequence: number }[] = [];
 
@@ -183,6 +224,8 @@ export class FakePrisma {
       operations: new Map(this.operations),
       representants: new Map([...this.representants].map(([k, v]) => [k, clone(v)])),
       prospects: new Map([...this.prospects].map(([k, v]) => [k, clone(v)])),
+      callAttempts: new Map([...this.callAttempts].map(([k, v]) => [k, clone(v)])),
+      representantComments: new Map([...this.representantComments].map(([k, v]) => [k, clone(v)])),
     };
     try {
       return await fn(this);
@@ -190,6 +233,8 @@ export class FakePrisma {
       this.operations = snapshot.operations;
       this.representants = snapshot.representants;
       this.prospects = snapshot.prospects;
+      this.callAttempts = snapshot.callAttempts;
+      this.representantComments = snapshot.representantComments;
       this.rollbackCount += 1;
       throw error;
     }
@@ -286,6 +331,52 @@ export class FakePrisma {
     },
   };
 
+  callOutcomeReason = {
+    findUnique: (args: { where: { code: string } }) =>
+      Promise.resolve(this.callOutcomeReasons.get(args.where.code) ?? null),
+  };
+
+  callAttempt = {
+    findUnique: (args: { where: { id: string } }) => {
+      const row = this.callAttempts.get(args.where.id);
+      return Promise.resolve(row ? { ...row, task: null } : null);
+    },
+    createMany: (args: { data: CallAttemptRow[] }) => {
+      let count = 0;
+      for (const row of args.data) {
+        if (this.callAttempts.has(row.id)) continue;
+        this.callAttempts.set(row.id, clone(row));
+        count += 1;
+      }
+      return Promise.resolve({ count });
+    },
+  };
+
+  representantComment = {
+    findUnique: (args: { where: { id: string } }) =>
+      Promise.resolve(this.representantComments.get(args.where.id) ?? null),
+    createMany: (args: { data: RepresentantCommentRow[] }) => {
+      let count = 0;
+      for (const row of args.data) {
+        if (this.representantComments.has(row.id)) continue;
+        this.representantComments.set(row.id, clone(row));
+        count += 1;
+      }
+      return Promise.resolve({ count });
+    },
+  };
+
+  // Aucune campagne dans ce double : une tentative y arrive toujours hors file.
+  callTask = {
+    findFirst: () => Promise.resolve(null),
+    updateMany: () => Promise.resolve({ count: 0 }),
+  };
+
+  scheduledCallback = {
+    updateMany: () => Promise.resolve({ count: 0 }),
+    createMany: () => Promise.resolve({ count: 1 }),
+  };
+
   prospect = {
     findUnique: (args: { where: { id: string } }) =>
       Promise.resolve(this.prospects.get(args.where.id) ?? null),
@@ -308,6 +399,10 @@ export class FakePrisma {
       }
       const created = {
         statut: 'NOUVEAU',
+        phase2Status: 'PENDING',
+        enrollmentMethod: null,
+        enrollmentCapturedById: null,
+        enrollmentCapturedAt: null,
         rev: 1,
         createdAt: new Date(),
         updatedAt: new Date(),

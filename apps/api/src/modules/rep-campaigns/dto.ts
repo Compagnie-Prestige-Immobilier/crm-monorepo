@@ -16,12 +16,17 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { CampaignStatus, RepCallOutcome, RepresentantRelation } from '@crm/database';
+import {
+  CampaignStatus,
+  RepCallOutcome,
+  RepresentantRelation,
+  WhatsappStatus,
+} from '@crm/database';
 
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { MAX_SPREAD_DAYS, MIN_SPREAD_DAYS } from '../phase2/distribution.js';
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
-import { RepresentantLookupDto } from '../representants/dto.js';
+import { PROFESSION_MAX_LENGTH, RepresentantLookupDto } from '../representants/dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
 
 export class CreateRepCampaignDto {
@@ -381,6 +386,39 @@ export class CreateRepCallAttemptDto {
   @IsString()
   @MaxLength(COMMENT_MAX_LENGTH)
   suggestedNote?: string;
+
+  @ApiPropertyOptional({
+    enum: WhatsappStatus,
+    enumName: 'WhatsappStatus',
+    description:
+      'Ce que l’appel apprend du canal WhatsApp. La question ne se pose qu’APRÈS l’engagement : NON_DEMANDE reste donc la réponse honnête tant qu’elle n’a pas été posée. Absent : l’état ne bouge pas.',
+  })
+  @IsOptional()
+  @IsEnum(WhatsappStatus)
+  whatsappStatus?: WhatsappStatus;
+
+  @ApiPropertyOptional({
+    type: String,
+    minLength: 6,
+    maxLength: 40,
+    description:
+      'Numéro WhatsApp DISTINCT du téléphone. Saisie libre, normalisé par le serveur. Admis avec le seul statut AUTRE_NUMERO.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  whatsappE164?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: PROFESSION_MAX_LENGTH,
+    description: 'Profession, en texte libre. Chaîne vide : la valeur est effacée.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(PROFESSION_MAX_LENGTH)
+  profession?: string;
 
   @ApiProperty({
     type: String,

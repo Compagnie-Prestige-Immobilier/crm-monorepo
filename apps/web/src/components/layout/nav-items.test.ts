@@ -26,6 +26,7 @@ describe('navigation d’un agent BANQUE_FINANCE', () => {
   it('masque entièrement les écrans de prospection et d’administration', () => {
     const visible = hrefs('BANQUE_FINANCE');
     for (const forbidden of [
+      '/accueil',
       '/tableau-de-bord',
       '/prospects',
       '/campagnes',
@@ -53,6 +54,7 @@ describe('navigation d’un ADMIN', () => {
   it('voit tout, y compris la configuration du flux et les paramètres', () => {
     const visible = hrefs('ADMIN');
     for (const expected of [
+      '/accueil',
       '/tableau-de-bord',
       '/statistiques',
       '/prospects',
@@ -125,6 +127,7 @@ describe('navigation d’un téléconseiller', () => {
   it('masque entièrement le pilotage et l’administration', () => {
     const visible = hrefs('COMMERCIAL');
     for (const forbidden of [
+      '/accueil',
       '/tableau-de-bord',
       '/banque',
       '/statistiques',
@@ -171,6 +174,23 @@ describe('navigation d’un téléconseiller', () => {
     const labels = navItems('COMMERCIAL').map((item) => `${item.label} ${item.description}`);
     for (const text of labels) expect(text.toLowerCase()).not.toContain('commercial');
     expect(navTitle('COMMERCIAL', '/console')).toBe('Console d’appel');
+  });
+});
+
+describe('registre des visites', () => {
+  it('n’est proposé qu’à l’ADMIN, qui tient le registre', () => {
+    expect(hrefs('ADMIN')).toContain('/accueil');
+    for (const role of ['BANQUE_FINANCE', 'COMMERCIAL', 'SUPERVISEUR'] as const) {
+      expect(hrefs(role), role).not.toContain('/accueil');
+    }
+  });
+
+  it('le nomme par le classeur qu’il remplace, pas par sa route', () => {
+    expect(navTitle('ADMIN', '/accueil')).toBe('Registre des visites');
+  });
+
+  it('ouvre la navigation de l’ADMIN sur l’écran où elle passe sa journée', () => {
+    expect(hrefs('ADMIN')[0]).toBe('/accueil');
   });
 });
 
@@ -244,6 +264,7 @@ describe('navigation d’un SUPERVISEUR', () => {
   it('masque tout ce qui écrit, saisit, administre ou synchronise', () => {
     const visible = hrefs('SUPERVISEUR');
     for (const forbidden of [
+      '/accueil',
       '/console',
       '/prospects/nouveau',
       '/representants/import',

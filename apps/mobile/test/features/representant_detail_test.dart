@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/router/app_router.dart';
@@ -6,6 +8,7 @@ import 'package:cpi_go/core/router/single_push.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/data/local/database.dart';
+import 'package:cpi_go/data/repositories/write_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/representant/presentation/representant_detail_screen.dart';
@@ -47,10 +50,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
-  Future<ProviderContainer> makeContainer(WidgetTester tester) async {
+  Future<ProviderContainer> makeContainer(
+    WidgetTester tester, {
+    WriteRepository? writes,
+  }) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final ProviderContainer container = ProviderContainer(
       overrides: [
+        if (writes != null) writeRepositoryProvider.overrideWithValue(writes),
         appDatabaseProvider.overrideWithValue(db),
         apiPortProvider.overrideWithValue(api),
         clockProvider.overrideWithValue(FakeClock(t0)),
@@ -93,7 +100,7 @@ void main() {
       );
 
       final GoRouter router = await mountApp(tester);
-      router.push(Routes.representantDetailFor('rep-1'));
+      unawaited(router.push(Routes.representantDetailFor('rep-1')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
@@ -110,7 +117,7 @@ void main() {
       // `:id` avalerait `nouveau` si la route de détail était déclarée avant :
       // créer un représentant ouvrirait une fiche vide au lieu du formulaire.
       final GoRouter router = await mountApp(tester);
-      router.push(Routes.newRepresentant);
+      unawaited(router.push(Routes.newRepresentant));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
@@ -124,6 +131,14 @@ void main() {
   testWidgets('la fiche liste les prospects de CE représentant', (
     WidgetTester tester,
   ) async {
+    // Même raison que `mountFiche` du fil : la liste est en bas d'un `ListView`,
+    // qui ne construit pas ce qui est hors du viewport. Sur les 600 dp par
+    // défaut, la ligne WhatsApp suffit à la repousser dehors.
+    tester.view.physicalSize = const Size(1200, 6000);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
     await insertRepresentant(db, id: 'rep-2', phone: '+221770000002');
     await insertProspect(
@@ -231,17 +246,120 @@ void main() {
     await teardownTree(tester);
   });
 
+  group('WhatsApp et profession', () {
+    Future<void> mountFiche(WidgetTester tester) async {
+      final ProviderContainer container = await makeContainer(tester);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: AppTheme.light,
+            locale: const Locale('fr'),
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            supportedLocales: const <Locale>[Locale('fr')],
+            home: const RepresentantDetailScreen(representantId: 'rep-1'),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    // Sur 12 929 fiches, c'est cette différence qui décide de qui on rappelle :
+    // une question jamais posée n'est pas une absence constatée.
+    testWidgets('« non demandé » ne s\'affiche pas comme « aucun »', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
+      await mountFiche(tester);
+
+      expect(find.text('Non demandé'), findsOneWidget);
+      expect(find.text('Pas de WhatsApp'), findsNothing);
+
+      await teardownTree(tester);
+    });
+
+    testWidgets('« aucun » est une absence constatée, et le dit', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        whatsappStatus: 'AUCUN',
+      );
+      await mountFiche(tester);
+
+      expect(find.text('Pas de WhatsApp'), findsOneWidget);
+      expect(find.text('Non demandé'), findsNothing);
+
+      await teardownTree(tester);
+    });
+
+    // Le numéro n'est stocké qu'une fois : la fiche dit le lien, pas une copie
+    // qui divergerait du téléphone à la première correction.
+    testWidgets('« même numéro » ne réaffiche pas un second numéro', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        whatsappStatus: 'MEME_NUMERO',
+      );
+      await mountFiche(tester);
+
+      expect(find.text('Même numéro'), findsOneWidget);
+      expect(find.text('+221 77 000 00 01'), findsOneWidget);
+
+      await teardownTree(tester);
+    });
+
+    testWidgets('un autre numéro s\'affiche et se copie', (WidgetTester tester) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        whatsappStatus: 'AUTRE_NUMERO',
+        whatsappE164: '+221781112233',
+        profession: 'Directeur d\'école',
+      );
+      await mountFiche(tester);
+
+      expect(find.text('+221 78 111 22 33'), findsOneWidget);
+      expect(find.text('Directeur d\'école'), findsOneWidget);
+
+      await teardownTree(tester);
+    });
+
+    testWidgets('un état inconnu de ce client s\'affiche quand même', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        whatsappStatus: 'NUMERO_PROFESSIONNEL',
+      );
+      await mountFiche(tester);
+
+      expect(find.text('NUMERO_PROFESSIONNEL'), findsOneWidget);
+
+      await teardownTree(tester);
+    });
+  });
+
   group('fil de commentaires', () {
     /// Surface haute : le fil est en bas d'un `ListView`, et un `ListView` ne
     /// construit pas ce qui est hors du viewport. Sur les 600 dp par défaut,
     /// les assertions ne portaient sur rien.
-    Future<void> mountFiche(WidgetTester tester) async {
+    Future<void> mountFiche(WidgetTester tester, {WriteRepository? writes}) async {
       tester.view.physicalSize = const Size(1200, 6000);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final ProviderContainer container = await makeContainer(tester);
+      final ProviderContainer container = await makeContainer(tester, writes: writes);
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
@@ -319,6 +437,31 @@ void main() {
       expect(fil.single.authorId, 'me');
       expect(fil.single.authorName, 'Awa Sy');
       expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
+
+      await teardownTree(tester);
+    });
+
+    // L'écriture partait en arrière-plan depuis `onPressed` : une base qui la
+    // refuse vidait l'erreur dans la zone, le champ se vidait, et le
+    // téléconseiller repartait en croyant avoir publié.
+    testWidgets('une publication qui échoue le dit et garde le texte', (
+      WidgetTester tester,
+    ) async {
+      await mountFiche(tester, writes: _BrokenWrites(db));
+
+      await tester.enterText(find.byType(TextField), 'Passe par le secrétariat.');
+      await tester.pump();
+      await tester.ensureVisible(find.text('Publier'));
+      await tester.pump();
+      await tester.tap(find.text('Publier'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.textContaining('Commentaire non enregistré'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        'Passe par le secrétariat.',
+      );
 
       await teardownTree(tester);
     });
@@ -455,6 +598,19 @@ void main() {
       await teardownTree(tester);
     });
   });
+}
+
+/// Une base qui refuse l'écriture du commentaire.
+class _BrokenWrites extends WriteRepository {
+  _BrokenWrites(super.db);
+
+  @override
+  Future<String> addRepresentantComment({
+    required String representantId,
+    required String body,
+    required String authorId,
+    required String authorName,
+  }) => Future<String>.error(StateError('base en lecture seule'));
 }
 
 class _SignedInController extends AuthController {

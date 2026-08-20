@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -78,7 +80,7 @@ class _SyncStatusIconState extends State<SyncStatusIcon>
         widget.status == SyncStatus.syncing &&
         !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
     if (shouldSpin && !_controller.isAnimating) {
-      _controller.repeat();
+      unawaited(_controller.repeat());
     } else if (!shouldSpin && _controller.isAnimating) {
       _controller.stop();
       _controller.value = 0;

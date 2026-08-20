@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +19,7 @@ import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../phase2_controller.dart';
 import 'callback_picker.dart';
+import 'call_audio_recorder.dart';
 
 class Phase2Screen extends ConsumerStatefulWidget {
   const Phase2Screen({super.key});
@@ -30,6 +33,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   final FocusNode _phoneFocus = FocusNode();
 
   String? _lastSearched;
+  String? _recordingPath;
 
   @override
   void initState() {
@@ -57,7 +61,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     }
     if (_lastSearched == parsed.e164) return;
     _lastSearched = parsed.e164;
-    _runSearch(parsed.e164);
+    unawaited(_runSearch(parsed.e164));
   }
 
   Future<void> _runSearch(String e164) async {
@@ -71,12 +75,13 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   void _resetForNext() {
     _lastSearched = null;
     _phone.clear();
+    _recordingPath = null;
     ref.read(phase2ControllerProvider.notifier).next();
     _phoneFocus.requestFocus();
   }
 
   Future<void> _record({
-    required String outcome,
+    required CallReason reason,
     String? method,
     String? comment,
     DateTime? callbackAt,
@@ -84,10 +89,11 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     final bool ok = await ref
         .read(phase2ControllerProvider.notifier)
         .record(
-          outcome: outcome,
+          reason: reason,
           method: method,
           comment: comment,
           callbackAt: callbackAt,
+          recordingPath: _recordingPath,
         );
     if (!mounted) return;
     if (!ok) {
@@ -101,10 +107,17 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   Widget build(BuildContext context) {
     final Phase2State phase2 = ref.watch(phase2ControllerProvider);
     final CpiMotion motion = CpiMotion.of(context);
+    // Avant la première synchronisation la table est vide et le repli sert les
+    // six motifs système : la saisie ne dépend jamais du réseau.
+    final List<CallReason> reasons =
+        ref.watch(callReasonsProvider).value ?? SystemCallReasons.all;
 
     return CpiPopScope(
       child: Scaffold(
-        appBar: AppBar(title: const Text('Phase 2'), leading: const CpiBackButton()),
+        appBar: AppBar(
+          title: const Text('Phase 2'),
+          leading: const CpiBackButton(),
+        ),
         body: SafeArea(
           child: Column(
             children: <Widget>[
@@ -133,7 +146,9 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                           '${phase2.stage.name}:${phase2.entry?.prospectId ?? ''}',
                         ),
                         child: switch (phase2.stage) {
-                          Phase2Stage.search => _SearchHint(message: phase2.errorMessage),
+                          Phase2Stage.search => _SearchHint(
+                            message: phase2.errorMessage,
+                          ),
                           Phase2Stage.notFound => _NotFound(
                             phone: phase2.searchedPhone,
                             onClear: _resetForNext,
@@ -144,11 +159,13 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                           ),
                           Phase2Stage.capture => _Capture(
                             state: phase2,
+                            onRecordingChanged: (String? path) =>
+                                _recordingPath = path,
                             onMethod: (String method) => _record(
-                              outcome: CallOutcomes.methodObtained,
+                              reason: methodReasonOf(reasons),
                               method: method,
                             ),
-                            onNegative: _openNegativeSheet,
+                            onNegative: () => _openNegativeSheet(reasons),
                           ),
                           Phase2Stage.confirmed => _Confirmed(
                             label: phase2.confirmation,
@@ -168,23 +185,32 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     );
   }
 
-  Future<void> _openNegativeSheet() async {
-    final _NegativeResult? result = await showModalBottomSheet<_NegativeResult>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (BuildContext context) =>
-          _NegativeSheet(now: ref.read(clockProvider).now()),
-    );
+  Future<void> _openNegativeSheet(List<CallReason> reasons) async {
+    final CallOutcomeChoice? result =
+        await showModalBottomSheet<CallOutcomeChoice>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          builder: (BuildContext context) => CallOutcomeSheet(
+            now: ref.read(clockProvider).now(),
+            reasons: reasons,
+          ),
+        );
     if (result == null || !mounted) return;
     await _record(
-      outcome: result.outcome,
+      reason: result.reason,
       comment: result.comment,
       callbackAt: result.callbackAt,
     );
   }
 }
 
+/// Le motif qui ferme sur une méthode obtenue. Le serveur en garantit un seul,
+/// et le repli système le porte tant que la table locale est vide.
+CallReason methodReasonOf(List<CallReason> reasons) => reasons.firstWhere(
+  (CallReason r) => r.effect == CallEffects.closeMethod,
+  orElse: () => SystemCallReasons.byCode[CallOutcomes.methodObtained]!,
+);
 
 class _StatusStrip extends ConsumerWidget {
   const _StatusStrip();
@@ -195,7 +221,9 @@ class _StatusStrip extends ConsumerWidget {
     final CpiColors cpi = context.cpi;
     final Phase2State phase2 = ref.watch(phase2ControllerProvider);
     final int directory = ref.watch(phase2DirectoryCountProvider).value ?? 0;
-    final SyncStateData? syncState = ref.watch(phase2DirectoryStateProvider).value;
+    final SyncStateData? syncState = ref
+        .watch(phase2DirectoryStateProvider)
+        .value;
     final int pending = ref.watch(phase2PendingCountProvider).value ?? 0;
     final ({int attempts, int closed, int methods})? progress = ref
         .watch(phase2ProgressProvider)
@@ -286,8 +314,10 @@ class _DownloadBar extends ConsumerWidget {
         onPressed: downloading
             ? null
             : () {
-                HapticFeedback.selectionClick();
-                ref.read(phase2ControllerProvider.notifier).download();
+                unawaited(HapticFeedback.selectionClick());
+                unawaited(
+                  ref.read(phase2ControllerProvider.notifier).download(),
+                );
               },
         icon: downloading
             ? const SizedBox(
@@ -398,7 +428,9 @@ class _DirectoryLine extends ConsumerWidget {
               ? PhosphorIconsRegular.cloudArrowDown
               : PhosphorIconsRegular.addressBook,
           size: 18,
-          color: directory == 0 ? cpi.accentText : theme.colorScheme.onSurfaceVariant,
+          color: directory == 0
+              ? cpi.accentText
+              : theme.colorScheme.onSurfaceVariant,
         ),
         const SizedBox(width: CpiSpacing.xxs),
         Expanded(
@@ -407,7 +439,9 @@ class _DirectoryLine extends ConsumerWidget {
                 ? 'Annuaire non téléchargé'
                 : 'Annuaire : ${_number.format(directory)} numéros · $freshness',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: directory == 0 ? cpi.accentText : theme.colorScheme.onSurfaceVariant,
+              color: directory == 0
+                  ? cpi.accentText
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -415,7 +449,8 @@ class _DirectoryLine extends ConsumerWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             child: TextButton(
-              onPressed: () => ref.read(phase2ControllerProvider.notifier).download(),
+              onPressed: () =>
+                  ref.read(phase2ControllerProvider.notifier).download(),
               child: const Text('Mettre à jour'),
             ),
           ),
@@ -424,9 +459,7 @@ class _DirectoryLine extends ConsumerWidget {
   }
 
   static final NumberFormat _number = NumberFormat.decimalPattern('fr');
-
 }
-
 
 class _PhoneBlock extends ConsumerWidget {
   const _PhoneBlock({
@@ -441,7 +474,9 @@ class _PhoneBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final String? downloadError = ref.watch(phase2ControllerProvider).downloadError;
+    final String? downloadError = ref
+        .watch(phase2ControllerProvider)
+        .downloadError;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -474,7 +509,6 @@ class _PhoneBlock extends ConsumerWidget {
     );
   }
 }
-
 
 class _SearchHint extends StatelessWidget {
   const _SearchHint({this.message});
@@ -590,7 +624,9 @@ class _AlreadyClosed extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Dossier déjà traité',
-                          style: theme.textTheme.titleMedium?.copyWith(color: tone),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: tone,
+                          ),
                         ),
                       ),
                     ],
@@ -639,11 +675,17 @@ class _AlreadyClosed extends StatelessWidget {
 }
 
 class _Capture extends StatelessWidget {
-  const _Capture({required this.state, required this.onMethod, required this.onNegative});
+  const _Capture({
+    required this.state,
+    required this.onMethod,
+    required this.onNegative,
+    required this.onRecordingChanged,
+  });
 
   final Phase2State state;
   final ValueChanged<String> onMethod;
   final VoidCallback onNegative;
+  final ValueChanged<String?> onRecordingChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -653,7 +695,15 @@ class _Capture extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text('Méthode d\'enrôlement obtenue', style: theme.textTheme.titleMedium),
+        CallAudioRecorder(
+          enabled: !state.saving,
+          onChanged: onRecordingChanged,
+        ),
+        const SizedBox(height: CpiSpacing.md),
+        Text(
+          'Méthode d\'enrôlement obtenue',
+          style: theme.textTheme.titleMedium,
+        ),
         const SizedBox(height: CpiSpacing.xxs),
         Text(
           'Une seule réponse.',
@@ -734,7 +784,7 @@ class _MethodCard extends StatelessWidget {
     final CpiColors cpi = context.cpi;
 
     void choose() {
-      HapticFeedback.selectionClick();
+      unawaited(HapticFeedback.selectionClick());
       onTap(method);
     }
 
@@ -861,27 +911,32 @@ class _Confirmed extends StatelessWidget {
   }
 }
 
+class CallOutcomeChoice {
+  const CallOutcomeChoice(this.reason, this.comment, this.callbackAt);
 
-class _NegativeResult {
-  const _NegativeResult(this.outcome, this.comment, this.callbackAt);
-
-  final String outcome;
+  final CallReason reason;
   final String? comment;
   final DateTime? callbackAt;
 }
 
-class _NegativeSheet extends StatefulWidget {
-  const _NegativeSheet({required this.now});
+/// La feuille des issues autres qu'une méthode obtenue.
+///
+/// Elle ne cite aucun motif : elle rend ce que porte la table locale, groupé par
+/// EFFET, parce que c'est l'effet qui dit au téléconseiller ce que sa réponse
+/// fait au dossier, et trié par l'ordre que l'équipe du client a choisi.
+class CallOutcomeSheet extends StatefulWidget {
+  const CallOutcomeSheet({required this.now, required this.reasons, super.key});
 
   final DateTime now;
+  final List<CallReason> reasons;
 
   @override
-  State<_NegativeSheet> createState() => _NegativeSheetState();
+  State<CallOutcomeSheet> createState() => _CallOutcomeSheetState();
 }
 
-class _NegativeSheetState extends State<_NegativeSheet> {
+class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
   final TextEditingController _comment = TextEditingController();
-  String? _outcome;
+  CallReason? _reason;
   String? _error;
   DateTime? _callbackAt;
 
@@ -891,59 +946,67 @@ class _NegativeSheetState extends State<_NegativeSheet> {
     super.dispose();
   }
 
-  static const List<({String outcome, String title, String subtitle, IconData icon})>
-  _options = <({String outcome, String title, String subtitle, IconData icon})>[
-    (
-      outcome: CallOutcomes.unreachable,
-      title: 'Injoignable',
-      subtitle: 'Pas de réponse, boîte vocale, hors service',
-      icon: PhosphorIconsRegular.phoneSlash,
-    ),
-    (
-      outcome: CallOutcomes.callback,
-      title: 'À rappeler',
-      subtitle: 'Rappel demandé',
-      icon: PhosphorIconsRegular.clockCountdown,
-    ),
-    (
-      outcome: CallOutcomes.refused,
-      title: 'Refus',
-      subtitle: 'Refus définitif',
-      icon: PhosphorIconsRegular.prohibit,
-    ),
-    (
-      outcome: CallOutcomes.wrongNumber,
-      title: 'Mauvais numéro',
-      subtitle: 'Numéro erroné. Définitif',
-      icon: PhosphorIconsRegular.warningCircle,
-    ),
-    (
-      outcome: CallOutcomes.other,
-      title: 'Autre',
-      subtitle: 'Commentaire obligatoire',
-      icon: PhosphorIconsRegular.dotsThreeCircle,
-    ),
+  static const List<String> _effectOrder = <String>[
+    CallEffects.keepOpen,
+    CallEffects.scheduleCallback,
+    CallEffects.closeRefused,
+    CallEffects.closeWrongNumber,
   ];
 
-  bool get _needsComment => _outcome == CallOutcomes.other;
+  static const Map<String, String> _effectHeader = <String, String>{
+    CallEffects.keepOpen: 'Le dossier reste ouvert',
+    CallEffects.scheduleCallback: 'Un rappel est à programmer',
+    CallEffects.closeRefused: 'Refus, le dossier se ferme',
+    CallEffects.closeWrongNumber: 'Numéro hors service, le dossier se ferme',
+  };
+
+  List<({String header, List<CallReason> items})> _groups() {
+    final List<CallReason> sorted =
+        widget.reasons
+            .where((CallReason r) => r.effect != CallEffects.closeMethod)
+            .toList()
+          ..sort(
+            (CallReason a, CallReason b) => a.sortOrder.compareTo(b.sortOrder),
+          );
+
+    final Map<String, List<CallReason>> byEffect = <String, List<CallReason>>{};
+    for (final CallReason r in sorted) {
+      byEffect.putIfAbsent(r.effect, () => <CallReason>[]).add(r);
+    }
+    // Un effet que cette version ignore passe en fin de liste plutôt que d'être
+    // écarté : un motif invisible est exactement le défaut qu'on corrige.
+    final List<String> effects = <String>[
+      ..._effectOrder.where(byEffect.containsKey),
+      ...byEffect.keys.where((String e) => !_effectOrder.contains(e)),
+    ];
+    return <({String header, List<CallReason> items})>[
+      for (final String effect in effects)
+        (
+          header: _effectHeader[effect] ?? 'Autres motifs',
+          items: byEffect[effect]!,
+        ),
+    ];
+  }
+
+  bool get _needsComment => _reason?.requiresComment ?? false;
 
   void _submit() {
-    final String? outcome = _outcome;
-    if (outcome == null) {
+    final CallReason? reason = _reason;
+    if (reason == null) {
       setState(() => _error = 'Choisissez une issue.');
       return;
     }
     final String? comment = WriteRepository.normalizeComment(_comment.text);
     final CallAttemptProblem? problem = WriteRepository.validateCallAttempt(
-      outcome: outcome,
+      reason: reason,
       comment: comment,
     );
     if (problem != null) {
-      HapticFeedback.heavyImpact();
+      unawaited(HapticFeedback.heavyImpact());
       setState(() => _error = problem.message);
       return;
     }
-    Navigator.of(context).pop(_NegativeResult(outcome, comment, _callbackAt));
+    Navigator.of(context).pop(CallOutcomeChoice(reason, comment, _callbackAt));
   }
 
   @override
@@ -954,7 +1017,9 @@ class _NegativeSheetState extends State<_NegativeSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -980,7 +1045,10 @@ class _NegativeSheetState extends State<_NegativeSheet> {
                       ),
                     ),
                   ),
-                  Text('Méthode non obtenue', style: theme.textTheme.titleLarge),
+                  Text(
+                    'Méthode non obtenue',
+                    style: theme.textTheme.titleLarge,
+                  ),
                   const SizedBox(height: CpiSpacing.xxs),
                   Text(
                     'Pourquoi l\'appel n\'a pas abouti à une méthode.',
@@ -998,30 +1066,48 @@ class _NegativeSheetState extends State<_NegativeSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    for (final ({
-                          String outcome,
-                          String title,
-                          String subtitle,
-                          IconData icon,
-                        })
-                        option
-                        in _options)
+                    for (final ({String header, List<CallReason> items}) group
+                        in _groups()) ...<Widget>[
                       Padding(
-                        padding: const EdgeInsets.only(bottom: CpiSpacing.xxs),
-                        child: _OutcomeTile(
-                          option: option,
-                          selected: _outcome == option.outcome,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _outcome = option.outcome;
-                              _error = null;
-                              _callbackAt = null;
-                            });
-                          },
+                        padding: const EdgeInsets.only(
+                          top: CpiSpacing.xs,
+                          bottom: CpiSpacing.xxs,
+                        ),
+                        child: Text(
+                          group.header,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
-                    if (_outcome == CallOutcomes.callback) ...<Widget>[
+                      for (final CallReason reason in group.items)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: CpiSpacing.xxs,
+                          ),
+                          child: _OutcomeTile(
+                            reason: reason,
+                            selected: _reason == reason,
+                            onTap: () {
+                              unawaited(HapticFeedback.selectionClick());
+                              setState(() {
+                                // L'heure ne se remet à zéro que si le
+                                // sélecteur disparaît : entre deux motifs qui
+                                // programment tous deux un rappel il n'est pas
+                                // démonté, sa puce restait allumée sur une
+                                // heure qui venait d'être effacée.
+                                if (_reason?.effect != reason.effect) {
+                                  _callbackAt = null;
+                                }
+                                _reason = reason;
+                                _error = null;
+                              });
+                            },
+                          ),
+                        ),
+                    ],
+                    if (_reason?.effect ==
+                        CallEffects.scheduleCallback) ...<Widget>[
                       const SizedBox(height: CpiSpacing.sm),
                       CallbackPicker(
                         key: const ValueKey<String>('callback-picker'),
@@ -1088,7 +1174,10 @@ class _NegativeSheetState extends State<_NegativeSheet> {
                     height: 52,
                     child: FilledButton.icon(
                       onPressed: _submit,
-                      icon: const Icon(PhosphorIconsRegular.floppyDisk, size: 20),
+                      icon: const Icon(
+                        PhosphorIconsRegular.floppyDisk,
+                        size: 20,
+                      ),
                       label: const Text('Enregistrer'),
                     ),
                   ),
@@ -1111,21 +1200,42 @@ class _NegativeSheetState extends State<_NegativeSheet> {
 }
 
 class _OutcomeTile extends StatelessWidget {
-  const _OutcomeTile({required this.option, required this.selected, required this.onTap});
+  const _OutcomeTile({
+    required this.reason,
+    required this.selected,
+    required this.onTap,
+  });
 
-  final ({String outcome, String title, String subtitle, IconData icon}) option;
+  final CallReason reason;
   final bool selected;
   final VoidCallback onTap;
+
+  static IconData _icon(String effect) => switch (effect) {
+    CallEffects.scheduleCallback => PhosphorIconsRegular.clockCountdown,
+    CallEffects.closeRefused => PhosphorIconsRegular.prohibit,
+    CallEffects.closeWrongNumber => PhosphorIconsRegular.warningCircle,
+    CallEffects.keepOpen => PhosphorIconsRegular.phoneSlash,
+    _ => PhosphorIconsRegular.dotsThreeCircle,
+  };
+
+  /// La couleur choisie par l'équipe du client, en `#RRGGBB`. Illisible ou
+  /// absente, la puce reprend celle du thème plutôt que de disparaître.
+  static Color? _tint(String? hex) {
+    if (hex == null) return null;
+    final int? rgb = int.tryParse(hex.replaceFirst('#', ''), radix: 16);
+    return rgb == null || rgb > 0xFFFFFF ? null : Color(0xFF000000 | rgb);
+  }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
+    final String hint = reason.requiresComment ? 'Commentaire obligatoire' : '';
     return Semantics(
       button: true,
       selected: selected,
       onTap: onTap,
-      label: '${option.title}. ${option.subtitle}',
+      label: '${reason.label}. $hint',
       child: ExcludeSemantics(
         child: Material(
           color: selected
@@ -1144,18 +1254,21 @@ class _OutcomeTile extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: CpiRadius.brMd,
                 border: Border.all(
-                  color: selected ? theme.colorScheme.primary : cpi.borderSubtle,
+                  color: selected
+                      ? theme.colorScheme.primary
+                      : cpi.borderSubtle,
                   width: selected ? 2 : 1,
                 ),
               ),
               child: Row(
                 children: <Widget>[
                   Icon(
-                    option.icon,
+                    _icon(reason.effect),
                     size: 20,
                     color: selected
                         ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant,
+                        : (_tint(reason.color) ??
+                              theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(width: CpiSpacing.sm),
                   Expanded(
@@ -1163,13 +1276,14 @@ class _OutcomeTile extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        Text(option.title, style: theme.textTheme.titleSmall),
-                        Text(
-                          option.subtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        Text(reason.label, style: theme.textTheme.titleSmall),
+                        if (hint.isNotEmpty)
+                          Text(
+                            hint,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -1188,7 +1302,6 @@ class _OutcomeTile extends StatelessWidget {
     );
   }
 }
-
 
 class _Notice extends StatelessWidget {
   const _Notice({
@@ -1236,35 +1349,36 @@ class _SpringIn extends StatefulWidget {
   State<_SpringIn> createState() => _SpringInState();
 }
 
-class _SpringInState extends State<_SpringIn> with SingleTickerProviderStateMixin {
+class _SpringInState extends State<_SpringIn>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(vsync: this);
+  late final CurvedAnimation _curved = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.linear,
+  );
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final Duration duration = CpiMotion.of(context).component;
     _controller.duration = duration;
+    _curved.curve = CpiMotion.of(context).easeSpring;
     if (duration == Duration.zero) {
       _controller.value = 1;
     } else if (!_controller.isAnimating && _controller.value == 0) {
-      _controller.forward();
+      unawaited(_controller.forward());
     }
   }
 
   @override
   void dispose() {
+    _curved.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: CurvedAnimation(
-        parent: _controller,
-        curve: CpiMotion.of(context).easeSpring,
-      ),
-      child: widget.child,
-    );
+    return ScaleTransition(scale: _curved, child: widget.child);
   }
 }

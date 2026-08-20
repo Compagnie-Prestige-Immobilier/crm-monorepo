@@ -2,6 +2,7 @@ import {
   ActivityIcon,
   BellIcon,
   ChartColumnIcon,
+  ClipboardListIcon,
   ClockIcon,
   FileSpreadsheetIcon,
   FolderOpenIcon,
@@ -42,6 +43,15 @@ const SECTIONS: readonly NavSection[] = [
   {
     title: null,
     items: [
+      {
+        // En tête parce que c'est l'écran où la Directrice passe sa journée.
+        // Un rôle « accueil » dédié fera l'objet d'une passe séparée.
+        href: '/accueil',
+        label: 'Registre des visites',
+        icon: ClipboardListIcon,
+        description: 'Visites du jour et saisie',
+        roles: ['ADMIN'],
+      },
       {
         // Écran d'accueil du SUPERVISEUR : c'est le seul qui montre le travail
         // de chaque téléconseiller ligne à ligne.

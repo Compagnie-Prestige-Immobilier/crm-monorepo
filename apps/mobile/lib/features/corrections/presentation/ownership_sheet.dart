@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/route_paths.dart';
+import '../../../core/router/single_push.dart';
 import '../../../core/sync/api_port.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
@@ -25,17 +27,28 @@ Future<void> showOwnershipSheet({
   );
 }
 
-class _OwnershipSheet extends ConsumerWidget {
+class _OwnershipSheet extends ConsumerStatefulWidget {
   const _OwnershipSheet({required this.row, required this.lookup});
 
   final OutboxData row;
   final RepresentantLookup lookup;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_OwnershipSheet> createState() => _OwnershipSheetState();
+}
+
+class _OwnershipSheetState extends ConsumerState<_OwnershipSheet> {
+  bool _busy = false;
+
+  OutboxData get row => widget.row;
+  RepresentantLookup get lookup => widget.lookup;
+
+  @override
+  Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
-    final String owner = lookup.ownedByCommercialName ?? 'un autre commercial';
+    final String owner =
+        lookup.ownedByCommercialName ?? 'un autre téléconseiller';
     final String? departement = lookup.representant?.departementName;
     final String where = departement == null ? '' : ' ($departement)';
 
@@ -70,46 +83,24 @@ class _OwnershipSheet extends ConsumerWidget {
             ),
             const SizedBox(height: CpiSpacing.lg),
             FilledButton.icon(
-              onPressed: () => _attach(context, ref),
-              icon: const Icon(PhosphorIconsRegular.linkSimple, size: 20),
+              onPressed: _busy ? null : () => unawaited(_attach()),
+              icon: _busy
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(PhosphorIconsRegular.linkSimple, size: 20),
               label: const Text('Rattacher mes prospects'),
             ),
             const SizedBox(height: CpiSpacing.xs),
             OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).pop();
-                context.push(
-                  '${Routes.newRepresentant}?id=${Uri.encodeComponent(row.entityId)}',
-                );
-              },
+              onPressed: _busy ? null : _correct,
               icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 20),
               label: const Text('Corriger le numéro'),
             ),
             const SizedBox(height: CpiSpacing.xs),
             TextButton.icon(
-              onPressed: () async {
-                final bool ok = await confirmDiscard(
-                  context: context,
-                  ref: ref,
-                  seq: row.seq,
-                );
-                if (!ok || !context.mounted) return;
-                final DiscardResult result = await ref
-                    .read(writeRepositoryProvider)
-                    .discardOperation(row.seq);
-                if (!context.mounted) return;
-                if (result.outcome == DiscardOutcome.claimed) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Envoi en cours : réessayez dans quelques instants.',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-                Navigator.of(context).pop();
-              },
+              onPressed: _busy ? null : () => unawaited(_discard()),
               icon: Icon(PhosphorIconsRegular.trash, size: 20, color: cpi.syncFailed),
               label: Text(
                 'Supprimer cette saisie',
@@ -122,14 +113,53 @@ class _OwnershipSheet extends ConsumerWidget {
     );
   }
 
-  Future<void> _attach(BuildContext context, WidgetRef ref) async {
+  void _correct() {
+    Navigator.of(context).pop();
+    context.pushOnce(
+      '${Routes.newRepresentant}?id=${Uri.encodeComponent(row.entityId)}',
+    );
+  }
+
+  Future<void> _discard() async {
+    final bool ok = await confirmDiscard(
+      context: context,
+      ref: ref,
+      seq: row.seq,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busy = true);
+    final DiscardResult result;
+    try {
+      result = await ref.read(writeRepositoryProvider).discardOperation(row.seq);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (!mounted) return;
+    if (result.outcome == DiscardOutcome.claimed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Envoi en cours : réessayez dans quelques instants.'),
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _attach() async {
     final String? serverId = lookup.representant?.id;
     if (serverId == null) return;
-    await ref.read(syncEngineProvider).remapEntityId(row.entityId, serverId);
-    final DiscardResult result = await ref
-        .read(writeRepositoryProvider)
-        .discardOwnCreateOnly(row.id);
-    if (!context.mounted) return;
+    setState(() => _busy = true);
+    final DiscardResult result;
+    try {
+      await ref.read(syncEngineProvider).remapEntityId(row.entityId, serverId);
+      result = await ref
+          .read(writeRepositoryProvider)
+          .discardOwnCreateOnly(row.id);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (!mounted) return;
     if (result.outcome == DiscardOutcome.claimed) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -142,6 +172,6 @@ class _OwnershipSheet extends ConsumerWidget {
       return;
     }
     await ref.read(syncCoordinatorProvider.notifier).run(pull: false);
-    if (context.mounted) Navigator.of(context).pop();
+    if (mounted) Navigator.of(context).pop();
   }
 }

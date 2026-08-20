@@ -13,7 +13,7 @@ import 'auth_state.dart';
 class AuthController extends Notifier<AuthState> {
   @override
   AuthState build() {
-    Future<void>.microtask(restore);
+    unawaited(Future<void>.microtask(restore));
     return const AuthState.unknown();
   }
 
@@ -21,40 +21,49 @@ class AuthController extends Notifier<AuthState> {
   ApiPort get _api => ref.read(apiPortProvider);
 
   Future<void> restore() async {
-    final String? refresh = await _tokens.readRefreshToken();
-    if (refresh == null) {
-      state = const AuthState.signedOut();
-      return;
+    try {
+      final String? refresh = await _tokens.readRefreshToken();
+      if (refresh == null) {
+        state = const AuthState.signedOut();
+        return;
+      }
+      final TokenStore store = _tokens;
+      String? id;
+      String? name;
+      String? role;
+      String? email;
+      String? departementId;
+      if (store is SecureTokenStore) {
+        final ({
+          String fullName,
+          String id,
+          String? role,
+          String? email,
+          String? departementId,
+        })?
+        identity = await store.readIdentity();
+        id = identity?.id;
+        name = identity?.fullName;
+        role = identity?.role;
+        email = identity?.email;
+        departementId = identity?.departementId;
+      }
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        userId: id,
+        fullName: name,
+        role: role,
+        email: email,
+        departementId: departementId,
+      );
+    } on Object {
+      // Coffre chiffré illisible : sans ce repli l'état reste `unknown` et
+      // `app.dart` peint son écran d'amorçage indéfiniment.
+      state = const AuthState.signedOut(
+        errorMessage:
+            'Session illisible sur cet appareil. Reconnectez-vous pour continuer.',
+      );
     }
-    final TokenStore store = _tokens;
-    String? id;
-    String? name;
-    String? role;
-    String? email;
-    String? departementId;
-    if (store is SecureTokenStore) {
-      final ({
-        String fullName,
-        String id,
-        String? role,
-        String? email,
-        String? departementId,
-      })?
-      identity = await store.readIdentity();
-      id = identity?.id;
-      name = identity?.fullName;
-      role = identity?.role;
-      email = identity?.email;
-      departementId = identity?.departementId;
-    }
-    state = AuthState(
-      status: AuthStatus.authenticated,
-      userId: id,
-      fullName: name,
-      role: role,
-      email: email,
-      departementId: departementId,
-    );
   }
 
   Future<bool> signIn({
@@ -97,6 +106,15 @@ class AuthController extends Notifier<AuthState> {
       return true;
     } on ApiException catch (e) {
       state = AuthState.signedOut(errorMessage: _messageFor(e));
+      return false;
+    } on Object {
+      // Une panne du coffre chiffré laissait `isSubmitting` à vrai pour
+      // toujours : bouton grisé, roue qui tourne, application à tuer.
+      state = const AuthState.signedOut(
+        errorMessage:
+            'Ce téléphone n\'a pas pu enregistrer la session. Réessayez, '
+            'puis redémarrez-le si le message revient.',
+      );
       return false;
     }
   }

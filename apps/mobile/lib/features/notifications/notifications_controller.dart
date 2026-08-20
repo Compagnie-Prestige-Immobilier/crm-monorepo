@@ -133,6 +133,7 @@ class NotificationsCoordinator extends Notifier<bool> {
     );
 
     await _consumeLaunchMessage(transport, inbox);
+    if (!ref.mounted) return;
     unawaited(ref.read(notificationInboxProvider).refresh(force: true));
     state = true;
   }

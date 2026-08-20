@@ -39,6 +39,14 @@ abstract class _$RepresentantDtoCWProxy {
 
   RepresentantDto relationStatus(RepresentantRelation relationStatus);
 
+  RepresentantDto whatsappStatus(WhatsappStatus whatsappStatus);
+
+  RepresentantDto whatsappE164(String? whatsappE164);
+
+  RepresentantDto whatsappNumber(String? whatsappNumber);
+
+  RepresentantDto profession(String? profession);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -62,6 +70,10 @@ abstract class _$RepresentantDtoCWProxy {
     DateTime updatedAt,
     num prospectCount,
     RepresentantRelation relationStatus,
+    WhatsappStatus whatsappStatus,
+    String? whatsappE164,
+    String? whatsappNumber,
+    String? profession,
   });
 }
 
@@ -127,6 +139,22 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
       this(relationStatus: relationStatus);
 
   @override
+  RepresentantDto whatsappStatus(WhatsappStatus whatsappStatus) =>
+      this(whatsappStatus: whatsappStatus);
+
+  @override
+  RepresentantDto whatsappE164(String? whatsappE164) =>
+      this(whatsappE164: whatsappE164);
+
+  @override
+  RepresentantDto whatsappNumber(String? whatsappNumber) =>
+      this(whatsappNumber: whatsappNumber);
+
+  @override
+  RepresentantDto profession(String? profession) =>
+      this(profession: profession);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -150,6 +178,10 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
     Object? updatedAt = const $CopyWithPlaceholder(),
     Object? prospectCount = const $CopyWithPlaceholder(),
     Object? relationStatus = const $CopyWithPlaceholder(),
+    Object? whatsappStatus = const $CopyWithPlaceholder(),
+    Object? whatsappE164 = const $CopyWithPlaceholder(),
+    Object? whatsappNumber = const $CopyWithPlaceholder(),
+    Object? profession = const $CopyWithPlaceholder(),
   }) {
     return RepresentantDto(
       id: id == const $CopyWithPlaceholder()
@@ -216,6 +248,22 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
           ? _value.relationStatus
           // ignore: cast_nullable_to_non_nullable
           : relationStatus as RepresentantRelation,
+      whatsappStatus: whatsappStatus == const $CopyWithPlaceholder()
+          ? _value.whatsappStatus
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappStatus as WhatsappStatus,
+      whatsappE164: whatsappE164 == const $CopyWithPlaceholder()
+          ? _value.whatsappE164
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappE164 as String?,
+      whatsappNumber: whatsappNumber == const $CopyWithPlaceholder()
+          ? _value.whatsappNumber
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappNumber as String?,
+      profession: profession == const $CopyWithPlaceholder()
+          ? _value.profession
+          // ignore: cast_nullable_to_non_nullable
+          : profession as String?,
     );
   }
 }
@@ -252,6 +300,10 @@ RepresentantDto _$RepresentantDtoFromJson(
       'updatedAt',
       'prospectCount',
       'relationStatus',
+      'whatsappStatus',
+      'whatsappE164',
+      'whatsappNumber',
+      'profession',
     ],
   );
   final val = RepresentantDto(
@@ -281,6 +333,17 @@ RepresentantDto _$RepresentantDtoFromJson(
         unknownValue: RepresentantRelation.unknownDefaultOpenApi,
       ),
     ),
+    whatsappStatus: $checkedConvert(
+      'whatsappStatus',
+      (v) => $enumDecode(
+        _$WhatsappStatusEnumMap,
+        v,
+        unknownValue: WhatsappStatus.unknownDefaultOpenApi,
+      ),
+    ),
+    whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
+    whatsappNumber: $checkedConvert('whatsappNumber', (v) => v as String?),
+    profession: $checkedConvert('profession', (v) => v as String?),
   );
   return val;
 });
@@ -303,6 +366,10 @@ Map<String, dynamic> _$RepresentantDtoToJson(RepresentantDto instance) =>
       'updatedAt': instance.updatedAt.toIso8601String(),
       'prospectCount': instance.prospectCount,
       'relationStatus': _$RepresentantRelationEnumMap[instance.relationStatus]!,
+      'whatsappStatus': _$WhatsappStatusEnumMap[instance.whatsappStatus]!,
+      'whatsappE164': instance.whatsappE164,
+      'whatsappNumber': instance.whatsappNumber,
+      'profession': instance.profession,
     };
 
 const _$RepresentantRelationEnumMap = {
@@ -311,4 +378,12 @@ const _$RepresentantRelationEnumMap = {
   RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
   RepresentantRelation.REFUS: 'REFUS',
   RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$WhatsappStatusEnumMap = {
+  WhatsappStatus.NON_DEMANDE: 'NON_DEMANDE',
+  WhatsappStatus.MEME_NUMERO: 'MEME_NUMERO',
+  WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
+  WhatsappStatus.AUCUN: 'AUCUN',
+  WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

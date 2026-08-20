@@ -1338,6 +1338,21 @@ void main() {
       expect(sent.data?.notes, isNull);
     });
 
+    test('repasser à « même numéro » efface le numéro WhatsApp', () async {
+      // Le statut suffit à décrire l'état, mais le serveur garderait l'ancien
+      // numéro : la fiche dirait « même numéro » en portant un autre numéro.
+      final SyncOperationDto sent = await sendUpdate(<String, Object?>{
+        'fullName': 'Awa Sy',
+        'phone': '+221770000001',
+        'departementId': 'dep-1',
+        'whatsappStatus': 'MEME_NUMERO',
+        'whatsappE164': null,
+        'profession': 'Instituteur',
+      });
+
+      expect(sent.clearedFields, <String>['whatsappE164']);
+    });
+
     test('un champ que le formulaire ne porte pas n\'efface rien', () async {
       final SyncOperationDto sent = await sendUpdate(<String, Object?>{
         'fullName': 'Awa Sy',

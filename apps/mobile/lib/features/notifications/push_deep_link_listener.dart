@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -57,7 +59,7 @@ class _PushDeepLinkListenerState extends ConsumerState<PushDeepLinkListener> {
       if (router.routerDelegate.currentConfiguration.matches.length <= 1) {
         router.go(route.route);
       } else {
-        router.push(route.route);
+        unawaited(router.push<Object?>(route.route));
       }
     });
   }
