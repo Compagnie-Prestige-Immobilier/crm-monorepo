@@ -131,6 +131,41 @@ function errorMessageOf(error: { getResponse: () => unknown; message: string }):
   return error.message;
 }
 
+/**
+ * Ce qu'un téléphone tire, et ce sur quoi il a le droit d'écrire.
+ *
+ * `createdById` seul ne suffit pas : les fiches importées par un administrateur
+ * lui appartiennent, et une campagne qui les confie à un téléconseiller ne les
+ * faisait pas descendre sur son appareil. Le terrain voyait sa propre saisie et
+ * jamais la file qu'on lui avait attribuée.
+ *
+ * `isActive` et non `status` : une tâche retirée de la file ne doit plus rien
+ * tirer, mais une tâche déjà traitée reste visible, sinon la fiche disparaît de
+ * l'appareil au moment même où le téléconseiller vient de la qualifier.
+ */
+const assignedTo = (userId: string): Prisma.CallTaskListRelationFilter => ({
+  some: { assignedToId: userId, isActive: true },
+});
+
+const mineOrAssignedProspect = (
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+): Prisma.ProspectWhereInput =>
+  isAdmin(user)
+    ? {}
+    : { OR: [{ createdById: user.id }, { callTasks: assignedTo(user.id) }] };
+
+const mineOrAssignedRepresentant = (
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+): Prisma.RepresentantWhereInput =>
+  isAdmin(user)
+    ? {}
+    : {
+        OR: [
+          { createdById: user.id },
+          { prospects: { some: { callTasks: assignedTo(user.id) } } },
+        ],
+      };
+
 @Injectable()
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
@@ -510,11 +545,27 @@ export class SyncService {
     // GARDE ANTI-SQUAT D'IDENTIFIANT. Le client choisit l'UUID : sans ce
     // contrôle, poster l'identifiant d'un collègue écraserait sa fiche.
     if (existing && !isAdmin(user) && existing.createdById !== user.id) {
-      throw new OperationError(
-        SyncOpStatus.CONFLICT,
-        'ENTITY_ID_OWNED_BY_ANOTHER_USER',
-        'Cet identifiant appartient à un autre commercial.',
-      );
+      // Une campagne confie des fiches que le teleconseiller n'a pas saisies.
+      // Sans cette porte, il tirait la file sur son telephone et chaque
+      // qualification repartait en CONFLIT, sans qu'il puisse rien y faire.
+      // `isDemo` accorde au plus ce que l'auteur est : une file fictive
+      // n'ouvre pas l'ecriture sur une vraie fiche, ni l'inverse.
+      const assigned = await tx.callTask.findFirst({
+        where: {
+          prospectId: existing.id,
+          assignedToId: user.id,
+          isActive: true,
+          isDemo: authorIsDemo,
+        },
+        select: { id: true },
+      });
+      if (!assigned) {
+        throw new OperationError(
+          SyncOpStatus.CONFLICT,
+          'ENTITY_ID_OWNED_BY_ANOTHER_USER',
+          'Cet identifiant appartient à un autre commercial.',
+        );
+      }
     }
 
     if (operation.op === SyncOp.DELETE) {
@@ -732,11 +783,27 @@ export class SyncService {
     const existing = await tx.prospect.findUnique({ where: { id: operation.entityId } });
 
     if (existing && !isAdmin(user) && existing.createdById !== user.id) {
-      throw new OperationError(
-        SyncOpStatus.CONFLICT,
-        'ENTITY_ID_OWNED_BY_ANOTHER_USER',
-        'Cet identifiant appartient à un autre commercial.',
-      );
+      // Une campagne confie des fiches que le teleconseiller n'a pas saisies.
+      // Sans cette porte, il tirait la file sur son telephone et chaque
+      // qualification repartait en CONFLIT, sans qu'il puisse rien y faire.
+      // `isDemo` accorde au plus ce que l'auteur est : une file fictive
+      // n'ouvre pas l'ecriture sur une vraie fiche, ni l'inverse.
+      const assigned = await tx.callTask.findFirst({
+        where: {
+          prospectId: existing.id,
+          assignedToId: user.id,
+          isActive: true,
+          isDemo: authorIsDemo,
+        },
+        select: { id: true },
+      });
+      if (!assigned) {
+        throw new OperationError(
+          SyncOpStatus.CONFLICT,
+          'ENTITY_ID_OWNED_BY_ANOTHER_USER',
+          'Cet identifiant appartient à un autre commercial.',
+        );
+      }
     }
 
     if (operation.op === SyncOp.DELETE) {
@@ -886,17 +953,15 @@ export class SyncService {
     cursor = advance(cursor, 'syndicats', lastPosition(syndicats));
     hasMore ||= syndicats.length === limit;
 
-    // ─ Métier : cloisonné par commercial ─
+    // ─ Métier : ce que le compte a saisi, ET ce qu'une campagne lui a confié ─
     //
-    // Le cloisonnement suffirait presque : les fiches de démonstration
-    // appartiennent à des comptes de démonstration, et un vrai commercial ne
-    // tire que les siennes. On pose quand même le filtre, pour la seule
-    // situation où l'un ne couvre pas l'autre, le compte de démonstration
-    // lui-même, qui ne doit plus rien recevoir une fois le mode éteint.
-    const scope = { ...ownerScope(user), ...demoScope(await this.demo.enabled()) };
+    // Le filtre de démonstration ne fait pas doublon avec le cloisonnement : il
+    // couvre le compte de démonstration lui-même, qui ne doit plus rien recevoir
+    // une fois le mode éteint.
+    const demoEnabled = await this.demo.enabled();
 
     const representants = await this.prisma.representant.findMany({
-      where: { ...keyset(cursor.streams.representants, safeNow), ...scope },
+      where: { ...keyset(cursor.streams.representants, safeNow), ...demoScope(demoEnabled), ...mineOrAssignedRepresentant(user) },
       include: REPRESENTANT_INCLUDE,
       orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
       take: limit,
@@ -905,13 +970,40 @@ export class SyncService {
     hasMore ||= representants.length === limit;
 
     const prospects = await this.prisma.prospect.findMany({
-      where: { ...keyset(cursor.streams.prospects, safeNow), ...scope },
+      where: { ...keyset(cursor.streams.prospects, safeNow), ...demoScope(demoEnabled), ...mineOrAssignedProspect(user) },
       include: PROSPECT_INCLUDE,
       orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
       take: limit,
     });
     cursor = advance(cursor, 'prospects', lastPosition(prospects));
     hasMore ||= prospects.length === limit;
+
+    // Les campagnes AVANT les files : une file qui arrive sans sa campagne
+    // n'aurait pas de nom à afficher, et le terrain verrait une liste anonyme.
+    const callCampaigns = await this.prisma.callCampaign.findMany({
+      where: {
+        ...keyset(cursor.streams.callCampaigns, safeNow),
+        ...demoScope(demoEnabled),
+        ...(isAdmin(user) ? {} : { tasks: { some: { assignedToId: user.id, isActive: true } } }),
+      },
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'callCampaigns', lastPosition(callCampaigns));
+    hasMore ||= callCampaigns.length === limit;
+
+    const callTasks = await this.prisma.callTask.findMany({
+      where: {
+        ...keyset(cursor.streams.callTasks, safeNow),
+        ...demoScope(demoEnabled),
+        isActive: true,
+        ...(isAdmin(user) ? {} : { assignedToId: user.id }),
+      },
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'callTasks', lastPosition(callTasks));
+    hasMore ||= callTasks.length === limit;
 
     // Une ligne supprimée logiquement voyage dans le MÊME flux que les autres
     // (son `updatedAt` a bougé) : elle est simplement aiguillée vers
@@ -978,6 +1070,23 @@ export class SyncService {
           .filter((row) => !row.deletedAt)
           .map((row) => toRepresentantDto(row)),
         prospects: prospects.filter((row) => !row.deletedAt).map((row) => toProspectDto(row)),
+        callCampaigns: callCampaigns.map((row) => ({
+          id: row.id,
+          name: row.name,
+          status: row.status,
+          spreadDays: row.spreadDays,
+          updatedAt: row.updatedAt.toISOString(),
+          closedAt: row.closedAt?.toISOString() ?? null,
+        })),
+        callTasks: callTasks.map((row) => ({
+          id: row.id,
+          campaignId: row.campaignId,
+          prospectId: row.prospectId,
+          position: row.position,
+          dayIndex: row.dayIndex,
+          status: row.status,
+          updatedAt: row.updatedAt.toISOString(),
+        })),
       },
       deletions,
       nextCursor: encodeCursor(cursor),

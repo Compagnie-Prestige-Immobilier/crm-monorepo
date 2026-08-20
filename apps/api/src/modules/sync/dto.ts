@@ -20,7 +20,14 @@ import {
   type ValidatorConstraintInterface,
 } from 'class-validator';
 import { ValidatorConstraint } from 'class-validator';
-import { CallOutcome, EnrollmentMethod, ProspectStatut, WhatsappStatus } from '@crm/database';
+import {
+  CallOutcome,
+  CallTaskStatus,
+  CampaignStatus,
+  EnrollmentMethod,
+  ProspectStatut,
+  WhatsappStatus,
+} from '@crm/database';
 
 import { BanqueDto, DepartementDto, IefDto, SyndicatDto } from '../referentiels/dto.js';
 import { ProspectDto } from '../prospects/dto.js';
@@ -456,6 +463,35 @@ export class SyncPullQueryDto {
   appVersion?: string;
 }
 
+/**
+ * La campagne telle que le terrain la voit : son nom, son etat, rien de son
+ * tirage. Le telephone en a besoin pour dire A QUELLE FILE une fiche appartient,
+ * sans quoi deux campagnes se melangent dans une seule liste.
+ */
+export class SyncCallCampaignDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty({ enum: CampaignStatus, enumName: 'CampaignStatus' }) status!: CampaignStatus;
+  @ApiProperty({ type: Number, description: 'Journees d’etalement de la file.' })
+  spreadDays!: number;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  closedAt!: string | null;
+}
+
+/** Une ligne de la file d’un teleconseiller : quelle fiche, quel rang, quel jour. */
+export class SyncCallTaskDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ format: 'uuid' }) campaignId!: string;
+  @ApiProperty({ format: 'uuid' }) prospectId!: string;
+  @ApiProperty({ type: Number, description: 'Rang dans le programme, a partir de 1.' })
+  position!: number;
+  @ApiProperty({ type: Number, description: 'Journee d’etalement, a partir de 0.' })
+  dayIndex!: number;
+  @ApiProperty({ enum: CallTaskStatus, enumName: 'CallTaskStatus' }) status!: CallTaskStatus;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
 export class SyncChangesDto {
   @ApiProperty({ type: () => [DepartementDto] }) departements!: DepartementDto[];
   @ApiProperty({ type: () => [IefDto] }) iefs!: IefDto[];
@@ -463,6 +499,8 @@ export class SyncChangesDto {
   @ApiProperty({ type: () => [SyndicatDto] }) syndicats!: SyndicatDto[];
   @ApiProperty({ type: () => [RepresentantDto] }) representants!: RepresentantDto[];
   @ApiProperty({ type: () => [ProspectDto] }) prospects!: ProspectDto[];
+  @ApiProperty({ type: () => [SyncCallCampaignDto] }) callCampaigns!: SyncCallCampaignDto[];
+  @ApiProperty({ type: () => [SyncCallTaskDto] }) callTasks!: SyncCallTaskDto[];
 }
 
 export class SyncDeletionDto {

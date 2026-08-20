@@ -6,7 +6,7 @@ process.env.PHONE_DEFAULT_REGION ??= 'SN';
 
 import { randomUUID } from 'node:crypto';
 
-import { PrismaClient, PrismaPg, Role } from '@crm/database';
+import { CampaignScope, PrismaClient, PrismaPg, Role } from '@crm/database';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -42,6 +42,8 @@ const nextPhone = (): string => `+22177${String(1_000_000 + ++phoneSeed).slice(-
 async function cleanup(): Promise<void> {
   await prisma.syncOperation.deleteMany({ where: { userId: { in: [alice.id, bob.id] } } });
   await prisma.syncBatch.deleteMany({ where: { userId: { in: [alice.id, bob.id] } } });
+  await prisma.callTask.deleteMany({ where: { assignedToId: { in: [alice.id, bob.id] } } });
+  await prisma.callCampaign.deleteMany({ where: { createdById: { in: [alice.id, bob.id] } } });
   await prisma.prospect.deleteMany({ where: { createdById: { in: [alice.id, bob.id] } } });
   await prisma.representant.deleteMany({ where: { createdById: { in: [alice.id, bob.id] } } });
 }
@@ -350,5 +352,139 @@ describe('index unique partiel sur le téléphone', () => {
 
     const again = await sync.push(alice, push([prospectOp(randomUUID(), repId, phone, 0)]));
     expect(statuses(again.body.results)).toEqual([SyncOpStatus.APPLIED]);
+  });
+});
+
+describe('la file d’une campagne descend sur le téléphone de qui elle est', () => {
+  /** Une fiche de Bob, confiée à Alice par une campagne. */
+  async function ficheDeBobConfieeA(
+    destinataire: AuthenticatedUser | null,
+  ): Promise<{ prospectId: string; campaignId: string }> {
+    const representantId = randomUUID();
+    const prospectId = randomUUID();
+    await sync.push(bob, push([repOp(representantId, nextPhone())]));
+    await sync.push(bob, push([prospectOp(prospectId, representantId, nextPhone(), 1)]));
+
+    const campaign = await prisma.callCampaign.create({
+      data: {
+        name: `Campagne ${TAG}`,
+        scope: CampaignScope.ALL,
+        seed: 'graine',
+        createdById: bob.id,
+      },
+    });
+    if (destinataire) {
+      await prisma.callTask.create({
+        data: {
+          campaignId: campaign.id,
+          prospectId,
+          assignedToId: destinataire.id,
+          position: 1,
+        },
+      });
+    }
+    await backdate();
+    return { prospectId, campaignId: campaign.id };
+  }
+
+  it('la fiche d’un autre confiée par une campagne DESCEND, avec son représentant', async () => {
+    const { prospectId } = await ficheDeBobConfieeA(alice);
+
+    const page = await sync.pull(alice, { limit: 500 });
+
+    expect(page.changes.prospects.map((row) => row.id)).toContain(prospectId);
+    // Sans son représentant, la fiche s'afficherait avec un rattachement vide.
+    expect(page.changes.representants).not.toEqual([]);
+  });
+
+  it('la même fiche SANS campagne ne descend pas', async () => {
+    const { prospectId } = await ficheDeBobConfieeA(null);
+
+    const page = await sync.pull(alice, { limit: 500 });
+
+    expect(page.changes.prospects.map((row) => row.id)).not.toContain(prospectId);
+  });
+
+  it('la campagne et la file voyagent, et seulement celles du porteur', async () => {
+    const { prospectId, campaignId } = await ficheDeBobConfieeA(alice);
+
+    const pourAlice = await sync.pull(alice, { limit: 500 });
+    const pourBob = await sync.pull(bob, { limit: 500 });
+
+    expect(pourAlice.changes.callCampaigns.map((row) => row.id)).toEqual([campaignId]);
+    expect(pourAlice.changes.callTasks.map((row) => row.prospectId)).toEqual([prospectId]);
+    // Bob a saisi la fiche mais la campagne ne lui a rien confié : pas de file.
+    expect(pourBob.changes.callTasks).toEqual([]);
+    expect(pourBob.changes.callCampaigns).toEqual([]);
+  });
+
+  it('une tâche retirée de la file cesse de tirer la fiche', async () => {
+    const { prospectId } = await ficheDeBobConfieeA(alice);
+    await prisma.callTask.updateMany({ where: { prospectId }, data: { isActive: false } });
+
+    const page = await sync.pull(alice, { limit: 500 });
+
+    expect(page.changes.prospects.map((row) => row.id)).not.toContain(prospectId);
+  });
+
+  it('QUALIFIER une fiche confiée n’est plus un conflit', async () => {
+    const { prospectId } = await ficheDeBobConfieeA(alice);
+
+    const results: Awaited<ReturnType<typeof sync.push>> = await sync.push(
+      alice,
+      push([
+        {
+          opId: randomUUID(),
+          seq: 0,
+          entity: SyncEntity.PROSPECT,
+          op: SyncOp.UPDATE,
+          entityId: prospectId,
+          clientUpdatedAt: new Date().toISOString(),
+          data: {
+            nom: 'Fall',
+            prenom: 'Moussa',
+            phone: nextPhone(),
+            banqueId,
+            syndicatId,
+            representantId: (
+              await prisma.prospect.findUniqueOrThrow({ where: { id: prospectId } })
+            ).representantId,
+          },
+        },
+      ]),
+    );
+
+    expect(statuses(results.body.results)).toEqual([SyncOpStatus.APPLIED]);
+  });
+
+  it('sans campagne, écrire la fiche d’un autre reste un CONFLIT', async () => {
+    const { prospectId } = await ficheDeBobConfieeA(null);
+    const representantId = (
+      await prisma.prospect.findUniqueOrThrow({ where: { id: prospectId } })
+    ).representantId;
+
+    const results: Awaited<ReturnType<typeof sync.push>> = await sync.push(
+      alice,
+      push([
+        {
+          opId: randomUUID(),
+          seq: 0,
+          entity: SyncEntity.PROSPECT,
+          op: SyncOp.UPDATE,
+          entityId: prospectId,
+          clientUpdatedAt: new Date().toISOString(),
+          data: {
+            nom: 'Fall',
+            prenom: 'Moussa',
+            phone: nextPhone(),
+            banqueId,
+            syndicatId,
+            representantId,
+          },
+        },
+      ]),
+    );
+
+    expect(statuses(results.body.results)).toEqual([SyncOpStatus.CONFLICT]);
   });
 });

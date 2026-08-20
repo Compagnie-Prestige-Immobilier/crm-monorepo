@@ -366,9 +366,13 @@ export class FakePrisma {
     },
   };
 
-  // Aucune campagne dans ce double : une tentative y arrive toujours hors file.
+  // Vide par defaut : une tentative arrive alors hors file, comme avant. Un test
+  // qui veut une campagne remplit `callTasks` lui-meme.
+  callTasks = new Map<string, Row>();
+
   callTask = {
-    findFirst: () => Promise.resolve(null),
+    findFirst: (args: { where?: Row }) =>
+      Promise.resolve([...this.callTasks.values()].find((row) => matches(row, args.where)) ?? null),
     updateMany: () => Promise.resolve({ count: 0 }),
   };
 

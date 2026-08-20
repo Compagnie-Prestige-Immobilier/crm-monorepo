@@ -472,6 +472,105 @@ describe('garde anti-squat d’identifiant', () => {
   });
 });
 
+describe('une campagne ouvre l’écriture sur la fiche d’un autre', () => {
+  const PROSPECT_DE_BOB = '0198a000-0000-7000-8000-000000000009';
+
+  function ficheDeBob(): void {
+    db.prospects.set(PROSPECT_DE_BOB, {
+      id: PROSPECT_DE_BOB,
+      nom: 'Fall',
+      prenom: 'Moussa',
+      phoneE164: '+221770000009',
+      rev: 2,
+      banqueId: 'b',
+      syndicatId: 's',
+      representantId: REP_B,
+      createdById: bob.id,
+      statut: 'NOUVEAU',
+      phase2Status: 'PENDING',
+      enrollmentMethod: null,
+      enrollmentCapturedById: null,
+      enrollmentCapturedAt: null,
+      clientCreatedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      isDemo: false,
+    });
+  }
+
+  const qualifier = (): SyncOperationDto => ({
+    opId: opId(),
+    seq: 0,
+    entity: SyncEntity.PROSPECT,
+    op: SyncOp.UPDATE,
+    entityId: PROSPECT_DE_BOB,
+    clientUpdatedAt: new Date().toISOString(),
+    data: {
+      nom: 'Fall',
+      prenom: 'Moussa',
+      phone: '77 000 00 09',
+      banqueId: 'b',
+      syndicatId: 's',
+      representantId: REP_B,
+    },
+  });
+
+  it('sans file, la fiche d’un autre reste fermée', async () => {
+    ficheDeBob();
+
+    const result = await sync.push(alice, batch([qualifier()]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.CONFLICT]);
+    expect(result.body.results[0]?.errorCode).toBe('ENTITY_ID_OWNED_BY_ANOTHER_USER');
+  });
+
+  it('la file de la campagne l’ouvre à qui elle l’a confiée', async () => {
+    ficheDeBob();
+    db.callTasks.set('task-1', {
+      id: 'task-1',
+      prospectId: PROSPECT_DE_BOB,
+      assignedToId: alice.id,
+      isActive: true,
+      isDemo: false,
+    });
+
+    const result = await sync.push(alice, batch([qualifier()]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+  });
+
+  it('une file confiée à un TIERS ne l’ouvre pas', async () => {
+    ficheDeBob();
+    db.callTasks.set('task-1', {
+      id: 'task-1',
+      prospectId: PROSPECT_DE_BOB,
+      assignedToId: 'com-carine',
+      isActive: true,
+      isDemo: false,
+    });
+
+    const result = await sync.push(alice, batch([qualifier()]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.CONFLICT]);
+  });
+
+  it('une file RETIRÉE ne l’ouvre plus', async () => {
+    ficheDeBob();
+    db.callTasks.set('task-1', {
+      id: 'task-1',
+      prospectId: PROSPECT_DE_BOB,
+      assignedToId: alice.id,
+      isActive: false,
+      isDemo: false,
+    });
+
+    const result = await sync.push(alice, batch([qualifier()]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.CONFLICT]);
+  });
+});
+
 describe('écriture conditionnelle sur la révision', () => {
   it('un baseRev périmé produit un conflit au lieu d’écraser', async () => {
     await sync.push(alice, batch([createRep(REP_A, '77 123 45 67')], 'batch-1'));
