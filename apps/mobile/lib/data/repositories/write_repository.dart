@@ -743,7 +743,12 @@ class WriteRepository {
         }
         for (final OutboxData victim in victims) {
           if (victim.entityType != callAttemptEntity) continue;
-          final Object? payload = jsonDecode(victim.payload);
+          final Object? payload;
+          try {
+            payload = jsonDecode(victim.payload);
+          } on FormatException {
+            continue;
+          }
           if (payload is! Map<String, dynamic>) continue;
           final Object? path = payload['_recordingPath'];
           if (path is! String || path.isEmpty) continue;
