@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:developer' as developer;
 
 import 'package:crm_api_client/crm_api_client.dart';
 import 'package:drift/drift.dart';
@@ -680,12 +681,31 @@ class SyncEngine {
     if (path is! String || path.isEmpty) return true;
     final File file = File(path);
     // ignore: avoid_slow_async_io
-    if (!await file.exists()) return true;
+    if (!await file.exists()) {
+      await _markFailed(
+        row,
+        'CALL_RECORDING_FILE_MISSING',
+        'La note vocale a disparu du téléphone avant son envoi.',
+      );
+      return false;
+    }
     try {
       await _api.uploadCallRecording(attemptId: row.entityId, path: path);
       await file.delete();
       return true;
     } on ApiException catch (error) {
+      // Un refus TERMINAL ne guerira pas: fichier vide, type non audio, plafond
+      // depasse. Le remettre en file bloquerait la cloture de l'appel pour
+      // toujours. La note audio est abandonnee, l'appel lui-meme est conserve.
+      if (error.kind == FailureKind.terminal) {
+        await file.delete();
+        await _dropRecordingPath(row);
+        developer.log(
+          'Note audio refusee definitivement (${error.code}) : appel conserve',
+          name: 'cpi.sync',
+        );
+        return true;
+      }
       await _requeue(
         row,
         incrementAttempt: true,
@@ -694,6 +714,16 @@ class SyncEngine {
       );
       return false;
     }
+  }
+
+  /// Sans ce retrait, la tentative suivante rejouerait un chemin qui ne mene
+  /// plus a rien et repartirait pour un cycle de refus.
+  Future<void> _dropRecordingPath(OutboxData row) async {
+    final Object? raw = jsonDecode(row.payload);
+    if (raw is! Map<String, dynamic>) return;
+    raw.remove('_recordingPath');
+    await (_db.update(_db.outbox)..where((Outbox o) => o.seq.equals(row.seq)))
+        .write(OutboxCompanion(payload: Value<String>(jsonEncode(raw))));
   }
 
   Future<void> _unblockFollowers(int afterSeq) async {
