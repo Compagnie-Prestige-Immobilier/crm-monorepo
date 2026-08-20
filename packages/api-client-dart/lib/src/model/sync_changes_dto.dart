@@ -8,6 +8,7 @@ import 'package:crm_api_client/src/model/representant_dto.dart';
 import 'package:crm_api_client/src/model/prospect_dto.dart';
 import 'package:crm_api_client/src/model/ief_dto.dart';
 import 'package:crm_api_client/src/model/sync_call_task_dto.dart';
+import 'package:crm_api_client/src/model/sync_visite_dto.dart';
 import 'package:crm_api_client/src/model/syndicat_dto.dart';
 import 'package:crm_api_client/src/model/banque_dto.dart';
 import 'package:crm_api_client/src/model/sync_call_campaign_dto.dart';
@@ -42,6 +43,8 @@ class SyncChangesDto {
     required this.callCampaigns,
 
     required this.callTasks,
+
+    required this.visites,
   });
 
   @JsonKey(name: r'departements', required: true, includeIfNull: false)
@@ -68,6 +71,9 @@ class SyncChangesDto {
   @JsonKey(name: r'callTasks', required: true, includeIfNull: false)
   final List<SyncCallTaskDto> callTasks;
 
+  @JsonKey(name: r'visites', required: true, includeIfNull: false)
+  final List<SyncVisiteDto> visites;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SyncChangesDto &&
@@ -82,6 +88,7 @@ class SyncChangesDto {
                 prospects,
                 callCampaigns,
                 callTasks,
+                visites,
               ],
               [
                 other.departements,
@@ -92,6 +99,7 @@ class SyncChangesDto {
                 other.prospects,
                 other.callCampaigns,
                 other.callTasks,
+                other.visites,
               ],
             );
   }
@@ -108,6 +116,7 @@ class SyncChangesDto {
         prospects,
         callCampaigns,
         callTasks,
+        visites,
       ]);
 
   factory SyncChangesDto.fromJson(Map<String, dynamic> json) =>

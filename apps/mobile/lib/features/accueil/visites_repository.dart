@@ -5,15 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/sync/api_port.dart';
 import '../../core/sync/dio_api.dart';
+import '../../data/local/database.dart';
 
-/// Le registre des visites n'a ni table locale ni flux de synchronisation : ces
-/// trois appels partent directement au serveur et échouent sans réseau.
+/// Les listes de l'accueil (entreprises, objets, directions, destinataires)
+/// restent en ligne : elles alimentent le formulaire, changent rarement, et
+/// leur échec s'affiche déjà à l'écran. Le registre lui-même, lu et écrit hors
+/// ligne, vit dans la table locale `visites` et le moteur de synchronisation.
 abstract interface class VisitesPort {
   Future<VisiteReferentielsBundleDto> referentiels();
-
-  Future<List<VisiteDto>> registre({required String jour});
-
-  Future<VisiteDto> inscrire(CreateVisiteDto visite);
 }
 
 class DioVisitesPort implements VisitesPort {
@@ -24,19 +23,6 @@ class DioVisitesPort implements VisitesPort {
   @override
   Future<VisiteReferentielsBundleDto> referentiels() =>
       _send('referentiels', () => _api.listVisiteReferentiels());
-
-  @override
-  Future<List<VisiteDto>> registre({required String jour}) async {
-    final VisiteListDto page = await _send(
-      'registre',
-      () => _api.listVisites(from: jour, to: jour, pageSize: kRegistrePageSize),
-    );
-    return page.items;
-  }
-
-  @override
-  Future<VisiteDto> inscrire(CreateVisiteDto visite) =>
-      _send('inscription', () => _api.createVisite(createVisiteDto: visite));
 
   Future<T> _send<T>(String operation, Future<Response<T>> Function() call) async {
     try {
@@ -56,9 +42,6 @@ class DioVisitesPort implements VisitesPort {
   }
 }
 
-/// Le maximum accepté par l'API. Une journée d'accueil tient très en dessous.
-const int kRegistrePageSize = 200;
-
 final Provider<VisitesPort> visitesPortProvider = Provider<VisitesPort>((Ref ref) {
   return DioVisitesPort(ref.watch(apiClientProvider).client.getVisitesApi());
 });
@@ -68,10 +51,14 @@ final FutureProvider<VisiteReferentielsBundleDto> visiteReferentielsProvider =
       return ref.watch(visitesPortProvider).referentiels();
     });
 
-final FutureProvider<List<VisiteDto>> registreDuJourProvider =
-    FutureProvider<List<VisiteDto>>((Ref ref) {
+/// Le registre du jour, lu en local : il tient sans réseau, comme le reste de
+/// l'application. Une inscription hors ligne y apparaît immédiatement, sa
+/// référence complétée dès que le pull suivant la redescend.
+final StreamProvider<List<Visite>> registreDuJourProvider =
+    StreamProvider<List<Visite>>((Ref ref) {
+      final AppDatabase db = ref.watch(appDatabaseProvider);
       final String jour = jourDakar(ref.watch(clockProvider).now());
-      return ref.watch(visitesPortProvider).registre(jour: jour);
+      return db.registreDuJour(jour: jour).watch();
     });
 
 /// Dakar est à UTC toute l'année : l'horloge du serveur et la sienne coïncident.

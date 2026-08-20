@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
-import '../../../core/providers/connectivity.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
+import '../../auth/auth_state.dart';
 import '../visites_repository.dart';
 
 /// `null` : le choix a été abandonné. `_Choix(null)` : l'entrée a été retirée.
@@ -38,7 +38,7 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
 
   bool _envoiEnCours = false;
   String? _echec;
-  VisiteDto? _derniere;
+  String? _derniereInscrite;
   String? _erreurNom;
   String? _erreurEntreprise;
   String? _erreurObjet;
@@ -112,32 +112,36 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
     setState(() {
       _envoiEnCours = true;
       _echec = null;
-      _derniere = null;
+      _derniereInscrite = null;
     });
 
     try {
-      final VisiteDto enregistree = await ref
-          .read(visitesPortProvider)
-          .inscrire(
-            CreateVisiteDto(
-              date: jourDakar(_moment),
-              time: heureDakar(_moment),
-              visitorName: nom,
-              phone: telephone.isEmpty ? null : telephone,
-              entrepriseId: entreprise.id,
-              objetId: objet.id,
-              directionId: _direction?.id,
-              destinataireId: _destinataire?.id,
-              comment: commentaire.isEmpty ? null : commentaire,
-            ),
+      final AuthState auth = ref.read(authControllerProvider);
+      await ref
+          .read(writeRepositoryProvider)
+          .inscrireVisite(
+            visitorName: nom,
+            date: jourDakar(_moment),
+            time: heureDakar(_moment),
+            phone: telephone.isEmpty ? null : telephone,
+            entrepriseId: entreprise.id,
+            entrepriseLabel: entreprise.label,
+            objetId: objet.id,
+            objetLabel: objet.label,
+            directionId: _direction?.id,
+            directionLabel: _direction?.label,
+            destinataireId: _destinataire?.id,
+            destinataireLabel: _destinataire?.label,
+            comment: commentaire.isEmpty ? null : commentaire,
+            createdById: auth.userId ?? '',
           );
       if (!mounted) return;
-      ref.invalidate(registreDuJourProvider);
+      ref.read(syncCoordinatorProvider.notifier).nudge();
       _nom.clear();
       _telephone.clear();
       _commentaire.clear();
       setState(() {
-        _derniere = enregistree;
+        _derniereInscrite = nom;
         _objet = null;
         _direction = null;
         _destinataire = null;
@@ -176,8 +180,8 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
                   CpiSpacing.md,
                 ),
                 children: <Widget>[
-                  const RegistreEnLigneSeulement(),
-                  if (_derniere != null) _Confirmation(visite: _derniere!),
+                  if (_derniereInscrite != null)
+                    _Confirmation(visitorName: _derniereInscrite!),
                   _Moment(moment: _moment, onChanger: _changerHeure),
                   const SizedBox(height: CpiSpacing.md),
                   TextField(
@@ -335,45 +339,6 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Le registre ne se garde pas sur le téléphone : le dire avant la saisie, pas
-/// après l'échec.
-class RegistreEnLigneSeulement extends ConsumerWidget {
-  const RegistreEnLigneSeulement({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(connectivityProvider) == CpiConnectivity.online) {
-      return const SizedBox.shrink();
-    }
-    final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: CpiSpacing.md),
-      padding: const EdgeInsets.all(CpiSpacing.sm),
-      decoration: BoxDecoration(
-        color: cpi.accentSurface,
-        borderRadius: CpiRadius.brMd,
-        border: Border.all(color: cpi.accentBorder),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Icon(PhosphorIconsRegular.wifiSlash, size: 20, color: cpi.accentText),
-          const SizedBox(width: CpiSpacing.xs),
-          Expanded(
-            child: Text(
-              'Hors ligne. Le registre des visites s\'écrit sur le serveur : '
-              'il n\'attend pas le retour du réseau comme les autres saisies.',
-              style: theme.textTheme.bodyMedium?.copyWith(color: cpi.accentText),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -553,9 +518,9 @@ class _FeuilleDeChoix extends StatelessWidget {
 }
 
 class _Confirmation extends StatelessWidget {
-  const _Confirmation({required this.visite});
+  const _Confirmation({required this.visitorName});
 
-  final VisiteDto visite;
+  final String visitorName;
 
   @override
   Widget build(BuildContext context) {
@@ -581,7 +546,7 @@ class _Confirmation extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Text(
-                  '${visite.visitorName} inscrit sous ${visite.reference}.',
+                  '$visitorName inscrit(e) au registre.',
                   style: theme.textTheme.titleSmall,
                 ),
                 Text(

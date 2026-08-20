@@ -46,7 +46,11 @@ class StubApi implements ApiPort {
   Future<void> logout({required String refreshToken}) async {}
 
   @override
-  Future<PullPage> pull({String? cursor, int limit = 200}) async {
+  Future<PullPage> pull({
+    String? cursor,
+    int limit = 200,
+    required int payloadVersion,
+  }) async {
     return PullPage(
       changes: SyncChangesDto(
         departements: const <DepartementDto>[],
@@ -57,6 +61,7 @@ class StubApi implements ApiPort {
         prospects: const <ProspectDto>[],
         callCampaigns: const <SyncCallCampaignDto>[],
         callTasks: const <SyncCallTaskDto>[],
+        visites: const <SyncVisiteDto>[],
       ),
       deletions: const <SyncDeletionDto>[],
       nextCursor: cursor ?? '',

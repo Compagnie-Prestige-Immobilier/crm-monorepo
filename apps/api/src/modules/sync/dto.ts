@@ -11,6 +11,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -34,6 +35,11 @@ import {
 import { BanqueDto, DepartementDto, IefDto, SyndicatDto } from '../referentiels/dto.js';
 import { ProspectDto } from '../prospects/dto.js';
 import { RepresentantDto } from '../representants/dto.js';
+import {
+  DATE_PATTERN as VISITE_DATE_PATTERN,
+  TIME_PATTERN as VISITE_TIME_PATTERN,
+  VisiteReferentielRefDto,
+} from '../visites/dto.js';
 
 export const SYNC_MAX_BATCH_SIZE = Number(process.env.SYNC_MAX_BATCH_SIZE ?? 200) || 200;
 
@@ -44,6 +50,7 @@ export enum SyncEntity {
   REPRESENTANT_COMMENT = 'representant_comment',
   PROSPECT = 'prospect',
   CALL_ATTEMPT = 'call_attempt',
+  VISITE = 'visite',
 }
 
 export enum SyncOp {
@@ -282,6 +289,48 @@ export class SyncEntityDataDto {
   @IsOptional()
   @IsISO8601()
   callbackAt?: string;
+
+  @ApiPropertyOptional({ maxLength: 160, description: 'Visite : nom et prénom du visiteur.' })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  visitorName?: string;
+
+  @ApiPropertyOptional({ example: '2026-01-06', description: 'Visite : jour, à Dakar.' })
+  @IsOptional()
+  @IsString()
+  @Matches(VISITE_DATE_PATTERN)
+  visitDate?: string;
+
+  @ApiPropertyOptional({
+    example: '11:08',
+    description: 'Visite : heure, omise si elle n’a pas été relevée.',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(VISITE_TIME_PATTERN)
+  visitTime?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Visite : entreprise du visiteur.' })
+  @IsOptional()
+  @IsUUID()
+  entrepriseId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Visite : objet de la visite.' })
+  @IsOptional()
+  @IsUUID()
+  objetId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Visite : direction ou étage visé.' })
+  @IsOptional()
+  @IsUUID()
+  directionId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Visite : destinataire visé.' })
+  @IsOptional()
+  @IsUUID()
+  destinataireId?: string;
 }
 
 export class SyncOperationDto {
@@ -382,6 +431,11 @@ export function dependencyKeyOf(operation: {
 
   if (operation.entity === SyncEntity.CALL_ATTEMPT) {
     return `prospect:${operation.data?.prospectId ?? operation.entityId}`;
+  }
+
+  // Une visite ne dépend de rien : chaque inscription est sa propre partition.
+  if (operation.entity === SyncEntity.VISITE) {
+    return `visite:${operation.entityId}`;
   }
 
   const parent = operation.data?.representantId;
@@ -551,6 +605,30 @@ export class SyncCallTaskDto {
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
 
+/**
+ * Une ligne du registre, telle qu'elle voyage vers le téléphone. Le serveur
+ * seul l'écrit : pas de `rev`, un pull rejoué recopie simplement la même ligne.
+ */
+export class SyncVisiteDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ example: 'V-2026-000412' }) reference!: string;
+  @ApiProperty({ example: '2026-01-06' }) date!: string;
+  @ApiProperty({ type: String, nullable: true, example: '11:08' }) time!: string | null;
+  @ApiProperty() visitorName!: string;
+  @ApiProperty({ type: String, nullable: true }) phone!: string | null;
+  @ApiProperty({ type: String, nullable: true }) phoneE164!: string | null;
+  @ApiProperty({ type: () => VisiteReferentielRefDto }) entreprise!: VisiteReferentielRefDto;
+  @ApiProperty({ type: () => VisiteReferentielRefDto }) objet!: VisiteReferentielRefDto;
+  @ApiProperty({ type: () => VisiteReferentielRefDto, nullable: true })
+  direction!: VisiteReferentielRefDto | null;
+  @ApiProperty({ type: () => VisiteReferentielRefDto, nullable: true })
+  destinataire!: VisiteReferentielRefDto | null;
+  @ApiProperty({ type: String, nullable: true }) comment!: string | null;
+  @ApiProperty({ format: 'uuid' }) createdById!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
 export class SyncChangesDto {
   @ApiProperty({ type: () => [DepartementDto] }) departements!: DepartementDto[];
   @ApiProperty({ type: () => [IefDto] }) iefs!: IefDto[];
@@ -560,6 +638,7 @@ export class SyncChangesDto {
   @ApiProperty({ type: () => [ProspectDto] }) prospects!: ProspectDto[];
   @ApiProperty({ type: () => [SyncCallCampaignDto] }) callCampaigns!: SyncCallCampaignDto[];
   @ApiProperty({ type: () => [SyncCallTaskDto] }) callTasks!: SyncCallTaskDto[];
+  @ApiProperty({ type: () => [SyncVisiteDto] }) visites!: SyncVisiteDto[];
 }
 
 export class SyncDeletionDto {

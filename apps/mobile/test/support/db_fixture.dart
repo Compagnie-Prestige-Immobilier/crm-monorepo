@@ -203,6 +203,53 @@ Future<void> insertTache(
       );
 }
 
+Future<void> insertVisite(
+  AppDatabase db, {
+  required String id,
+  String? reference = 'V-2026-000412',
+  required String date,
+  String? time,
+  String visitorName = 'Awa Ndiaye',
+  String? phone,
+  String entrepriseId = 'e1',
+  String entrepriseLabel = 'CPI',
+  String objetId = 'o1',
+  String objetLabel = 'Achat terrain',
+  String? directionId,
+  String? directionLabel,
+  String? destinataireId,
+  String? destinataireLabel,
+  String? comment,
+  String createdById = 'me',
+  DateTime? createdAt,
+  DateTime? updatedAt,
+}) {
+  return db
+      .into(db.visites)
+      .insert(
+        VisitesCompanion.insert(
+          id: id,
+          reference: Value<String?>(reference),
+          date: date,
+          time: Value<String?>(time),
+          visitorName: visitorName,
+          phone: Value<String?>(phone),
+          entrepriseId: entrepriseId,
+          entrepriseLabel: entrepriseLabel,
+          objetId: objetId,
+          objetLabel: objetLabel,
+          directionId: Value<String?>(directionId),
+          directionLabel: Value<String?>(directionLabel),
+          destinataireId: Value<String?>(destinataireId),
+          destinataireLabel: Value<String?>(destinataireLabel),
+          comment: Value<String?>(comment),
+          createdById: createdById,
+          createdAt: createdAt ?? t0,
+          updatedAt: updatedAt ?? t0,
+        ),
+      );
+}
+
 Future<void> insertComment(
   AppDatabase db, {
   required String id,

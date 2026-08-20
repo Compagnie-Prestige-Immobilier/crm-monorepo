@@ -6,18 +6,20 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { OperationResult, Prisma, WhatsappStatus } from '@crm/database';
+import { OperationResult, Prisma, type Role, WhatsappStatus } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readEnv } from '../../env.js';
 import { normalizePhone } from '../../common/phone.js';
 import { isAdmin, ownerScope } from '../../common/scope.js';
+import { dakarWallClock } from '../../common/date-bounds.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PROSPECT_INCLUDE, toProspectDto } from '../prospects/prospects.service.js';
 import { REPRESENTANT_INCLUDE, toRepresentantDto } from '../representants/representants.service.js';
 import { resolveWhatsappPatch } from '../representants/whatsapp.js';
 import { CallAttemptApplyStatus } from '../phase2/dto.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
+import { VISITE_REGISTRE_ROLES, VisitesService, dakarDate } from '../visites/visites.service.js';
 import { SyncBatchStore } from './batch-store.js';
 import { requestHash } from './request-hash.js';
 import {
@@ -42,6 +44,7 @@ import {
   type SyncPullResponseDto,
   type SyncPushDto,
   type SyncPushResponseDto,
+  type SyncVisiteDto,
 } from './dto.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { demoScope } from '../../prisma/demo-visibility.js';
@@ -175,6 +178,7 @@ export class SyncService {
     private readonly batches: SyncBatchStore,
     private readonly phase2Sync: Phase2SyncService,
     private readonly demo: DemoVisibilityService,
+    private readonly visites: VisitesService,
   ) {}
 
   // PUSH
@@ -453,6 +457,9 @@ export class SyncService {
         // rien à transmettre ici.
         return await this.applyCallAttempt(tx, user, operation);
       }
+      if (operation.entity === SyncEntity.VISITE) {
+        return await this.applyVisite(tx, user, operation, authorIsDemo);
+      }
       return await this.applyProspect(tx, user, operation, authorIsDemo);
     } catch (error) {
       if (error instanceof OperationError) {
@@ -530,6 +537,86 @@ export class SyncService {
       skipDuplicates: true,
     });
     return applied(operation.entityId, null, createdAt);
+  }
+
+  // ─── Visite ───────────────────────────────────────────────────────────────
+
+  /**
+   * Une visite ne se modifie ni ne se supprime hors ligne : l'accueil inscrit,
+   * le web corrige. L'idempotence se réduit donc à « déjà là → renvoyer ce qui
+   * existe », sans arbitrage de révision.
+   */
+  private async applyVisite(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    operation: SyncOperationDto,
+    authorIsDemo: boolean,
+  ): Promise<OperationOutcome> {
+    if (operation.op !== SyncOp.CREATE) {
+      throw new OperationError(
+        SyncOpStatus.INVALID,
+        'OP_NOT_SUPPORTED',
+        'Une visite ne peut être ni modifiée ni supprimée hors ligne.',
+      );
+    }
+    if (!(VISITE_REGISTRE_ROLES as readonly Role[]).includes(user.role)) {
+      throw new OperationError(
+        SyncOpStatus.INVALID,
+        'VISITE_ROLE_NOT_ALLOWED',
+        'Ce compte ne tient pas le registre des visites.',
+      );
+    }
+
+    const existing = await tx.visite.findUnique({ where: { id: operation.entityId } });
+    if (existing) {
+      if (existing.createdById !== user.id) {
+        throw new OperationError(
+          SyncOpStatus.CONFLICT,
+          'ENTITY_ID_OWNED_BY_ANOTHER_USER',
+          'Cet identifiant appartient à une autre visite.',
+        );
+      }
+      return applied(existing.id, null, existing.createdAt);
+    }
+
+    const data = operation.data ?? {};
+    requireText(data.visitorName, 'visitorName');
+    requireUuid(data.entrepriseId, 'entrepriseId');
+    requireUuid(data.objetId, 'objetId');
+    requireText(data.visitDate, 'visitDate');
+
+    try {
+      const created = await this.visites.createForSync(
+        tx,
+        operation.entityId,
+        {
+          date: data.visitDate,
+          visitorName: data.visitorName,
+          entrepriseId: data.entrepriseId,
+          objetId: data.objetId,
+          ...(data.visitTime === undefined ? {} : { time: data.visitTime }),
+          ...(data.phone === undefined ? {} : { phone: data.phone }),
+          ...(data.directionId === undefined ? {} : { directionId: data.directionId }),
+          ...(data.destinataireId === undefined ? {} : { destinataireId: data.destinataireId }),
+          ...(data.comment === undefined ? {} : { comment: data.comment }),
+        },
+        user.id,
+        authorIsDemo,
+      );
+      // Inscrite au registre pour que la purge sache la reprendre : sans cela une visite
+      // fictive retiendrait le compte semé qui l'a inscrite (`createdById` en `onDelete: Restrict`).
+      if (authorIsDemo) await recordDemoEntity(tx, 'visite', created.id);
+      return applied(created.id, null, new Date(created.createdAt));
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw new OperationError(
+          SyncOpStatus.INVALID,
+          errorCodeOf(error) ?? 'VISITE_INVALID',
+          errorMessageOf(error),
+        );
+      }
+      throw error;
+    }
   }
 
   // ─── Représentant ─────────────────────────────────────────────────────────
@@ -1055,6 +1142,26 @@ export class SyncService {
     cursor = advance(cursor, 'callTasks', lastPosition(callTasks));
     hasMore ||= callTasks.length === limit;
 
+    // Le registre n'est pas un référentiel : il porte des noms et des numéros de
+    // visiteurs, hors du périmètre des rôles qui ne le tiennent pas. Un compte
+    // sans accès reçoit un flux vide plutôt qu'une erreur, comme les autres
+    // flux quand ils ne concernent pas le compte.
+    const visites = (VISITE_REGISTRE_ROLES as readonly Role[]).includes(user.role)
+      ? await this.prisma.visite.findMany({
+          where: { ...keyset(cursor.streams.visites, safeNow), ...demoScope(demoEnabled) },
+          include: {
+            entreprise: { select: { id: true, code: true, label: true } },
+            objet: { select: { id: true, code: true, label: true } },
+            direction: { select: { id: true, code: true, label: true } },
+            destinataire: { select: { id: true, code: true, label: true } },
+          },
+          orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+          take: limit,
+        })
+      : [];
+    cursor = advance(cursor, 'visites', lastPosition(visites));
+    hasMore ||= visites.length === limit;
+
     // Une ligne supprimée logiquement voyage dans le MÊME flux que les autres
     // (son `updatedAt` a bougé) : elle est simplement aiguillée vers
     // `deletions`. La sortir dans une requête séparée lui ferait rater la
@@ -1137,6 +1244,25 @@ export class SyncService {
           status: row.status,
           updatedAt: row.updatedAt.toISOString(),
         })),
+        visites: visites.map(
+          (row): SyncVisiteDto => ({
+            id: row.id,
+            reference: row.reference,
+            date: dakarDate(row.visitedAt),
+            time: row.timeKnown ? hourMinuteDakar(row.visitedAt) : null,
+            visitorName: row.visitorName,
+            phone: row.phone,
+            phoneE164: row.phoneE164,
+            entreprise: row.entreprise,
+            objet: row.objet,
+            direction: row.direction,
+            destinataire: row.destinataire,
+            comment: row.comment,
+            createdById: row.createdById,
+            createdAt: row.createdAt.toISOString(),
+            updatedAt: row.updatedAt.toISOString(),
+          }),
+        ),
       },
       deletions,
       nextCursor: encodeCursor(cursor),
@@ -1172,6 +1298,11 @@ function keyset(position: StreamPosition | undefined, safeNow: Date): { AND: Key
   }
   return { AND: clauses };
 }
+
+const hourMinuteDakar = (at: Date): string => {
+  const { hour, minute } = dakarWallClock(at);
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
 
 const lastPosition = (rows: { updatedAt: Date; id: string }[]): StreamPosition | undefined => {
   const last = rows.at(-1);
@@ -1391,7 +1522,7 @@ interface BatchAuthority {
  */
 async function recordDemoEntity(
   tx: Prisma.TransactionClient,
-  entityType: 'representant' | 'prospect',
+  entityType: 'representant' | 'prospect' | 'visite',
   entityId: string,
 ): Promise<void> {
   // Rang le plus élevé, pour que l'inscription reste lisible dans l'ordre où

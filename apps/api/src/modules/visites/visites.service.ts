@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma } from '@crm/database';
+import { Role, type Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
@@ -21,7 +21,16 @@ export const VisiteError = {
   REFERENCE_EXHAUSTED: 'VISITE_REFERENCE_EXHAUSTED',
 } as const;
 
+/** Qui tient le registre, à l'écran comme dans la file de synchronisation. */
+export const VISITE_REGISTRE_ROLES = [Role.ADMIN, Role.DIRECTION, Role.ACCUEIL] as const;
+
 const REFERENTIEL_SELECT = { select: { id: true, code: true, label: true } } as const;
+
+/** Surface commune à `PrismaService` et à une transaction : les deux servent les mêmes lectures. */
+type VisiteDb = Pick<
+  Prisma.TransactionClient,
+  'visite' | 'visiteEntreprise' | 'visiteObjet' | 'visiteDirection' | 'visiteDestinataire'
+>;
 
 const VISITE_INCLUDE = {
   entreprise: REFERENTIEL_SELECT,
@@ -105,10 +114,43 @@ export class VisitesService {
   }
 
   async create(input: CreateVisiteDto, createdById: string): Promise<VisiteDto> {
+    return this.createRow(
+      this.prisma,
+      undefined,
+      input,
+      createdById,
+      await this.demo.enabledForWrite(),
+    );
+  }
+
+  /**
+   * Même écriture, appelée DANS la transaction d'un lot de synchronisation :
+   * `tx` porte l'isolation qui rend la numérotation de référence sûre, et
+   * `entityId` est celui choisi par le téléphone hors ligne, seule façon de
+   * rejouer une remontée sans dupliquer la ligne.
+   */
+  async createForSync(
+    tx: Prisma.TransactionClient,
+    entityId: string,
+    input: CreateVisiteDto,
+    createdById: string,
+    isDemo: boolean,
+  ): Promise<VisiteDto> {
+    return this.createRow(tx, entityId, input, createdById, isDemo);
+  }
+
+  private async createRow(
+    db: VisiteDb,
+    entityId: string | undefined,
+    input: CreateVisiteDto,
+    createdById: string,
+    isDemo: boolean,
+  ): Promise<VisiteDto> {
     const visitedAt = this.instantOf(input.date, input.time);
-    await this.assertReferentielsUsable(input);
+    await this.assertReferentielsUsable(input, db);
 
     const data = {
+      ...(entityId === undefined ? {} : { id: entityId }),
       visitedAt,
       timeKnown: input.time !== undefined,
       visitorName: input.visitorName.trim(),
@@ -120,15 +162,15 @@ export class VisitesService {
       destinataireId: input.destinataireId ?? null,
       comment: input.comment?.trim() ?? null,
       createdById,
-      isDemo: await this.demo.enabledForWrite(),
+      isDemo,
     };
 
     const year = dakarWallClock(visitedAt).year;
 
     for (let attempt = 0; attempt < REFERENCE_ATTEMPTS; attempt += 1) {
-      const reference = formatVisiteReference(year, await this.nextSequence(year));
+      const reference = formatVisiteReference(year, await this.nextSequence(year, db));
       try {
-        const created = await this.prisma.visite.create({
+        const created = await db.visite.create({
           data: { ...data, reference },
           include: VISITE_INCLUDE,
         });
@@ -215,20 +257,23 @@ export class VisitesService {
    * L'accueil ne doit pas pouvoir ranger une visite sous une entrée retirée des
    * listes : le référentiel se désactive précisément pour cesser d'être proposé.
    */
-  private async assertReferentielsUsable(input: CreateVisiteDto | UpdateVisiteDto): Promise<void> {
+  private async assertReferentielsUsable(
+    input: CreateVisiteDto | UpdateVisiteDto,
+    db: VisiteDb = this.prisma,
+  ): Promise<void> {
     const [entreprise, objet, direction, destinataire] = await Promise.all([
       input.entrepriseId === undefined
         ? null
-        : this.prisma.visiteEntreprise.findUnique({ where: { id: input.entrepriseId } }),
+        : db.visiteEntreprise.findUnique({ where: { id: input.entrepriseId } }),
       input.objetId === undefined
         ? null
-        : this.prisma.visiteObjet.findUnique({ where: { id: input.objetId } }),
+        : db.visiteObjet.findUnique({ where: { id: input.objetId } }),
       input.directionId == null
         ? null
-        : this.prisma.visiteDirection.findUnique({ where: { id: input.directionId } }),
+        : db.visiteDirection.findUnique({ where: { id: input.directionId } }),
       input.destinataireId == null
         ? null
-        : this.prisma.visiteDestinataire.findUnique({ where: { id: input.destinataireId } }),
+        : db.visiteDestinataire.findUnique({ where: { id: input.destinataireId } }),
     ]);
 
     const refused = [
@@ -249,11 +294,11 @@ export class VisitesService {
     }
   }
 
-  private async nextSequence(year: number): Promise<number> {
+  private async nextSequence(year: number, db: VisiteDb = this.prisma): Promise<number> {
     // LECTURE GLOBALE : l'unicité de la référence est portée par un index
     // GLOBAL, lignes de démonstration comprises. Cloisonner ici rendrait un rang
     // déjà pris.
-    const last = await this.prisma.visite.findFirst({
+    const last = await db.visite.findFirst({
       where: { reference: { startsWith: visiteReferencePrefix(year) } },
       orderBy: { reference: 'desc' },
       select: { reference: true },

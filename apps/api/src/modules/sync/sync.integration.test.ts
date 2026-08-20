@@ -12,6 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
+import { VisitesService } from '../visites/visites.service.js';
 import { SyncBatchStore } from './batch-store.js';
 import { SyncService } from './sync.service.js';
 import { SyncEntity, SyncOp, SyncOpStatus } from './dto.js';
@@ -26,6 +27,7 @@ const sync = new SyncService(
   new SyncBatchStore(prisma as unknown as PrismaService),
   new Phase2SyncService(),
   fakeDemoVisibility(),
+  new VisitesService(prisma as unknown as PrismaService, fakeDemoVisibility()),
 );
 
 const TAG = 'it-sync';

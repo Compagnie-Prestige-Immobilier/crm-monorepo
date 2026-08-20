@@ -7,6 +7,7 @@ import type { Prisma } from '@crm/database';
 // parcourt à l'envers, et c'est lui, pas la séquence, qui satisfait les clés étrangères.
 export const DEMO_ENTITY_TYPES = [
   'user',
+  'visite',
   'representant',
   'prospect',
   'callCampaign',
@@ -46,6 +47,9 @@ export const DEMO_DELETERS: Readonly<
   prospect: (tx, ids) => tx.prospect.deleteMany({ where: { id: { in: ids } } }),
   representant: (tx, ids) => tx.representant.deleteMany({ where: { id: { in: ids } } }),
   user: (tx, ids) => tx.user.deleteMany({ where: { id: { in: ids } } }),
+  // Ne dépend que de `user` (créateur, `onDelete: Restrict`) : sans registre, une visite
+  // fictive bloquerait la suppression du compte semé qui l'a inscrite.
+  visite: (tx, ids) => tx.visite.deleteMany({ where: { id: { in: ids } } }),
 };
 
 export { DEMO_MODE_SETTING } from '../../prisma/demo-visibility.service.js';

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
+import { VisitesService } from '../visites/visites.service.js';
 import { SyncBatchStore } from './batch-store.js';
 import { SyncService } from './sync.service.js';
 import { FakePrisma } from './fake-prisma.js';
@@ -41,6 +42,7 @@ beforeEach(() => {
     new SyncBatchStore(prisma),
     new Phase2SyncService(),
     fakeDemoVisibility(),
+    new VisitesService(prisma, fakeDemoVisibility()),
   );
 });
 
@@ -652,6 +654,7 @@ describe('mode démonstration allumé, la remontée hors ligne reste du travail 
       new SyncBatchStore(prisma),
       new Phase2SyncService(),
       fakeDemoVisibility(true),
+      new VisitesService(prisma, fakeDemoVisibility(true)),
     );
   });
 
@@ -824,5 +827,89 @@ describe('champs vidés', () => {
     await sync.push(alice, batch([modifier({ clearedFields: ['iefId'] })], 'batch-3'));
 
     expect(db.representants.get(REP_ID)?.iefId).toBeNull();
+  });
+});
+
+describe('visite (registre d’accueil, hors ligne)', () => {
+  const accueil: AuthenticatedUser = { ...alice, id: 'com-accueil', role: Role.ACCUEIL };
+  const VISITE_A = '0198f100-0000-7000-8000-000000000001';
+  const ENTREPRISE = 'entreprise-1';
+  const OBJET = 'objet-1';
+
+  beforeEach(() => {
+    db.addUser(accueil.id, { role: Role.ACCUEIL });
+    db.visiteEntreprises.set(ENTREPRISE, {
+      id: ENTREPRISE,
+      code: 'SGBS',
+      label: 'SGBS',
+      isActive: true,
+    });
+    db.visiteObjets.set(OBJET, { id: OBJET, code: 'DEPOT', label: 'Dépôt', isActive: true });
+  });
+
+  const createVisite = (entityId: string, seq = 0): SyncOperationDto => ({
+    opId: opId(),
+    seq,
+    entity: SyncEntity.VISITE,
+    op: SyncOp.CREATE,
+    entityId,
+    clientUpdatedAt: '2026-08-10T10:00:00.000Z',
+    data: {
+      visitorName: 'Awa Ndiaye',
+      visitDate: '2026-08-10',
+      visitTime: '11:08',
+      entrepriseId: ENTREPRISE,
+      objetId: OBJET,
+    },
+  });
+
+  it('une inscription hors ligne s’applique, avec une référence attribuée', async () => {
+    const result = await sync.push(accueil, batch([createVisite(VISITE_A)]));
+
+    expect(result.body.results[0]?.status).toBe(SyncOpStatus.APPLIED);
+    const row = db.visites.get(VISITE_A);
+    expect(row?.visitorName).toBe('Awa Ndiaye');
+    expect(row?.reference).toMatch(/^V-2026-\d{6}$/);
+  });
+
+  it('rejouer le même opId ne double pas la ligne', async () => {
+    await sync.push(accueil, batch([createVisite(VISITE_A)]));
+    await sync.push(accueil, batch([createVisite(VISITE_A)], 'batch-visite-2'));
+
+    expect(db.visites.size).toBe(1);
+  });
+
+  it('un compte qui ne tient pas le registre est refusé', async () => {
+    const commercial: AuthenticatedUser = { ...alice, id: 'com-refuse', role: Role.COMMERCIAL };
+    db.addUser(commercial.id, { role: Role.COMMERCIAL });
+
+    const result = await sync.push(commercial, batch([createVisite(VISITE_A)]));
+
+    expect(result.body.results[0]?.status).toBe(SyncOpStatus.INVALID);
+    expect(result.body.results[0]?.errorCode).toBe('VISITE_ROLE_NOT_ALLOWED');
+    expect(db.visites.size).toBe(0);
+  });
+
+  it('une visite ne se modifie pas hors ligne', async () => {
+    await sync.push(accueil, batch([createVisite(VISITE_A)]));
+
+    const update: SyncOperationDto = createVisite(VISITE_A, 1);
+    update.op = SyncOp.UPDATE;
+    const result = await sync.push(accueil, batch([update], 'batch-visite-update'));
+
+    expect(result.body.results[0]?.status).toBe(SyncOpStatus.INVALID);
+    expect(result.body.results[0]?.errorCode).toBe('OP_NOT_SUPPORTED');
+  });
+
+  it('inscrite par un compte de démonstration, elle est fictive ET inscrite au registre', async () => {
+    const animateur: AuthenticatedUser = { ...accueil, id: 'demo-accueil' };
+    db.addUser(animateur.id, { role: Role.ACCUEIL, isDemo: true });
+
+    await sync.push(animateur, batch([createVisite(VISITE_A)]));
+
+    expect(db.visites.get(VISITE_A)?.isDemo).toBe(true);
+    expect(db.demoEntities).toContainEqual(
+      expect.objectContaining({ entityType: 'visite', entityId: VISITE_A }),
+    );
   });
 });
