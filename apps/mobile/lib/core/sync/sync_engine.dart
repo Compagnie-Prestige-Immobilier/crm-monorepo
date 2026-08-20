@@ -1451,6 +1451,41 @@ class SyncEngine {
         count++;
       }
 
+      // Les campagnes puis les files. Elles ne portent AUCUNE revision : le
+      // serveur est seul a les ecrire, un rejeu de pull reecrit donc la meme
+      // ligne sans qu'il y ait rien a arbitrer.
+      for (final SyncCallCampaignDto c in page.changes.callCampaigns) {
+        await _db
+            .into(_db.callCampaigns)
+            .insertOnConflictUpdate(
+              CallCampaignsCompanion.insert(
+                id: c.id,
+                name: c.name,
+                status: Value<String>(c.status.value),
+                spreadDays: Value<int>(c.spreadDays.toInt()),
+                closedAt: Value<DateTime?>(c.closedAt),
+                updatedAt: c.updatedAt,
+              ),
+            );
+        count++;
+      }
+      for (final SyncCallTaskDto t in page.changes.callTasks) {
+        await _db
+            .into(_db.callTasks)
+            .insertOnConflictUpdate(
+              CallTasksCompanion.insert(
+                id: t.id,
+                campaignId: t.campaignId,
+                prospectId: t.prospectId,
+                position: t.position.toInt(),
+                dayIndex: Value<int>(t.dayIndex.toInt()),
+                status: Value<String>(t.status.value),
+                updatedAt: t.updatedAt,
+              ),
+            );
+        count++;
+      }
+
       for (final SyncDeletionDto d in page.deletions) {
         if (d.entity == SyncEntity.representant) {
           if (guardedRepresentants.contains(d.id)) continue;
