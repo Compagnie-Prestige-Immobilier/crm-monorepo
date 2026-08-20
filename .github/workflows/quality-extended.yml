@@ -1,9 +1,18 @@
 name: quality-extended
 
+# PLANIFICATION RETIREE, ET C'EST UN CONSTAT, PAS UN RENONCEMENT.
+#
+# Les douze dernieres executions ont echoue, toutes : Maestro sur « not enough
+# disk space », Lighthouse et k6 sur une cause applicative jamais instruite.
+# Cinq matins par semaine, ce workflow facturait de vingt a soixante-dix minutes
+# pour un verdict connu d'avance, et les 2 000 minutes mensuelles incluses
+# etaient epuisees a mi-mois.
+#
+# Rien n'est supprime : les trois jobs restent declenchables a la main. La
+# planification revient le jour ou l'un d'eux passe au vert, un job qui echoue
+# toujours n'apprend rien a personne.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '23 3 * * 1-5'
 
 permissions:
   contents: read

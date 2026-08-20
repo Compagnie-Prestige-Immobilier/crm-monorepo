@@ -159,6 +159,16 @@ jobs:
   # les attendre — et sur un push vers `prod` ils ne tournaient même pas.
   securite:
     name: sécurité — secrets, SAST, dépendances, image
+    # Sur un PUSH vers `dev`, la pull request vient de tout verifier sur le meme
+    # arbre. Seul `node` est rejoue, parce qu'il est le seul a pouvoir attraper
+    # ce qu'une FUSION introduit et qu'une PR ne pouvait pas voir : un conflit
+    # semantique entre deux branches vertes separement. Le reste - contrat,
+    # Flutter, scanners, qualite - porte sur le meme code, deja eprouve.
+    #
+    # Les 2 000 minutes mensuelles incluses etaient epuisees a mi-mois, et ce
+    # doublon en representait la moitie. Un merge coute desormais ~11 minutes au
+    # lieu de ~25.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/prod'
     uses: ./.github/workflows/security.yml
     permissions:
       contents: read
@@ -188,7 +198,12 @@ jobs:
     #
     # La garantie est conservée là où elle s'exerce vraiment : rien n'atteint
     # `prod` sans être passé par `dev`, où ce job tourne et bloque.
-    if: ${{ vars.SONAR_ENABLED == 'true' && github.ref != 'refs/heads/prod' }}
+    # Meme raison que les autres : voir la garde de `contract`. La qualite se
+    # mesure sur la pull request, ou elle peut encore changer une decision.
+    if: >-
+      ${{ vars.SONAR_ENABLED == 'true'
+      && github.ref != 'refs/heads/prod'
+      && github.event_name != 'push' }}
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
@@ -235,6 +250,17 @@ jobs:
     name: contrat — dérive du code généré + ruptures ascendantes
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Sur un PUSH vers `dev`, la pull request vient de tout verifier sur le meme
+    # arbre. Seul `node` est rejoue, parce qu'il est le seul a pouvoir attraper
+    # ce qu'une FUSION introduit et qu'une PR ne pouvait pas voir : un conflit
+    # semantique entre deux branches vertes separement. Le reste - contrat,
+    # Flutter, scanners, qualite - porte sur le meme code, deja eprouve.
+    #
+    # Les 2 000 minutes mensuelles incluses etaient epuisees a mi-mois, et ce
+    # doublon en representait la moitie. Un merge coute desormais ~11 minutes au
+    # lieu de ~25.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/prod'
+
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
@@ -491,6 +517,17 @@ jobs:
     name: flutter — analyze + test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Sur un PUSH vers `dev`, la pull request vient de tout verifier sur le meme
+    # arbre. Seul `node` est rejoue, parce qu'il est le seul a pouvoir attraper
+    # ce qu'une FUSION introduit et qu'une PR ne pouvait pas voir : un conflit
+    # semantique entre deux branches vertes separement. Le reste - contrat,
+    # Flutter, scanners, qualite - porte sur le meme code, deja eprouve.
+    #
+    # Les 2 000 minutes mensuelles incluses etaient epuisees a mi-mois, et ce
+    # doublon en representait la moitie. Un merge coute desormais ~11 minutes au
+    # lieu de ~25.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/prod'
+
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
