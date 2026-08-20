@@ -22,10 +22,16 @@ import { formatDate, formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import { CAMPAIGN_STATUS_LABELS, campaignScopeLabel } from '@/lib/types';
 
-export function CampaignsView() {
+export function CampaignsView({ canManage }: { canManage: boolean }) {
   const { filters, setFilters } = useCampaignFilters();
   const [creating, setCreating] = useState(false);
   const activeFilterCount = countActiveCampaignFilters(filters);
+  let emptyDescription = 'Élargissez la période ou retirez un critère.';
+  if (activeFilterCount === 0) {
+    emptyDescription = canManage
+      ? 'Créez une campagne pour répartir les prospects en attente.'
+      : 'Aucune campagne n’est encore disponible.';
+  }
 
   const { data, isPending, isError, error, refetch, isFetching } = useQuery({
     queryKey: queryKeys.campaigns(filters),
@@ -41,15 +47,17 @@ export function CampaignsView() {
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
           Répartition des prospects en attente entre les téléconseillers choisis. Tirage définitif.
         </p>
-        <Button
-          type="button"
-          onClick={() => {
-            setCreating(true);
-          }}
-        >
-          <PlusIcon aria-hidden="true" />
-          Nouvelle campagne
-        </Button>
+        {canManage ? (
+          <Button
+            type="button"
+            onClick={() => {
+              setCreating(true);
+            }}
+          >
+            <PlusIcon aria-hidden="true" />
+            Nouvelle campagne
+          </Button>
+        ) : null}
       </div>
 
       <CampaignsFiltersBar />
@@ -72,13 +80,9 @@ export function CampaignsView() {
               ? 'Aucune campagne d’appels'
               : 'Aucune campagne ne correspond à ces filtres'
           }
-          description={
-            activeFilterCount === 0
-              ? 'Créez une campagne pour répartir les prospects en attente.'
-              : 'Élargissez la période ou retirez un critère.'
-          }
+          description={emptyDescription}
           action={
-            activeFilterCount === 0 ? (
+            activeFilterCount === 0 && canManage ? (
               <Button
                 type="button"
                 onClick={() => {
@@ -178,7 +182,7 @@ export function CampaignsView() {
         </>
       )}
 
-      <CampaignCreateDialog open={creating} onOpenChange={setCreating} />
+      {canManage ? <CampaignCreateDialog open={creating} onOpenChange={setCreating} /> : null}
     </div>
   );
 }

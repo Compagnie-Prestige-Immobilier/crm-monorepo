@@ -74,6 +74,13 @@ export const envSchema = z
       .max(100_000_000)
       .default(25_000_000),
 
+    /**
+     * Duree de conservation d'une note audio. Deux jours: le superviseur ecoute
+     * dans la foulee, et on ne garde pas la voix d'un salarie au-dela. Passe ce
+     * delai l'historique d'appel reste, sans son audio.
+     */
+    CALL_RECORDING_RETENTION_HOURS: z.coerce.number().int().positive().max(8_760).default(48),
+
     DB_DUMP_DIR: z.string().min(1).default('./storage/db-dumps'),
 
     DB_DUMP_ENABLED: booleanFlag(false),

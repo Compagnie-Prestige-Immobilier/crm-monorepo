@@ -178,8 +178,10 @@ describe('navigation d’un téléconseiller', () => {
 });
 
 describe('registre des visites', () => {
-  it('n’est proposé qu’à l’ADMIN, qui tient le registre', () => {
-    expect(hrefs('ADMIN')).toContain('/accueil');
+  it('n’est proposé qu’à ceux qui le tiennent', () => {
+    for (const role of ['ADMIN', 'DIRECTION', 'ACCUEIL'] as const) {
+      expect(hrefs(role), role).toContain('/accueil');
+    }
     for (const role of ['BANQUE_FINANCE', 'COMMERCIAL', 'SUPERVISEUR'] as const) {
       expect(hrefs(role), role).not.toContain('/accueil');
     }
@@ -200,6 +202,8 @@ describe('écran d’atterrissage après connexion', () => {
     expect(homePathForRole('BANQUE_FINANCE')).toBe('/dossiers');
     expect(homePathForRole('COMMERCIAL')).toBe('/console');
     expect(homePathForRole('SUPERVISEUR')).toBe('/supervision');
+    expect(homePathForRole('DIRECTION')).toBe('/accueil');
+    expect(homePathForRole('ACCUEIL')).toBe('/accueil');
   });
 
   // Sur PANEL_ROLES et non sur une liste retapée : un rôle admis dans le
@@ -255,6 +259,7 @@ describe('navigation d’un SUPERVISEUR', () => {
       '/supervision',
       '/statistiques',
       '/prospects',
+      '/campagnes',
       '/rappels',
       '/representants',
       '/suggestions',
@@ -268,7 +273,6 @@ describe('navigation d’un SUPERVISEUR', () => {
       '/console',
       '/prospects/nouveau',
       '/representants/import',
-      '/campagnes',
       '/dossiers',
       '/demandes-clients',
       '/notifications',
@@ -284,5 +288,55 @@ describe('navigation d’un SUPERVISEUR', () => {
   it('ne dit jamais « commercial » dans ses intitulés', () => {
     const labels = navItems('SUPERVISEUR').map((item) => `${item.label} ${item.description}`);
     for (const text of labels) expect(text.toLowerCase()).not.toContain('commercial');
+  });
+});
+
+describe('navigation d’un compte d’ACCUEIL', () => {
+  it('ne montre QUE le registre', () => {
+    expect(hrefs('ACCUEIL')).toEqual(['/accueil']);
+  });
+
+  it('n’a qu’une section, sans intitulé à lire', () => {
+    const sections = navSections('ACCUEIL');
+    expect(sections).toHaveLength(1);
+    expect(sections[0]?.title).toBeNull();
+  });
+});
+
+describe('navigation de la DIRECTION', () => {
+  it('montre le registre, le pilotage et le terrain, jamais la banque', () => {
+    expect(hrefs('DIRECTION')).toEqual([
+      '/accueil',
+      '/supervision',
+      '/statistiques',
+      '/prospects',
+      '/campagnes',
+      '/rappels',
+      '/representants',
+      '/suggestions',
+    ]);
+  });
+
+  it('masque ce qui écrit, saisit, administre ou relève de la banque', () => {
+    const visible = hrefs('DIRECTION');
+    for (const forbidden of [
+      '/tableau-de-bord',
+      '/console',
+      '/prospects/nouveau',
+      '/dossiers',
+      '/demandes-clients',
+      '/notifications',
+      '/commerciaux',
+      '/referentiels',
+      '/imports',
+      '/parametres',
+    ]) {
+      expect(visible, `« ${forbidden} » ne doit pas être proposé`).not.toContain(forbidden);
+    }
+  });
+
+  it('voit au moins tout ce que voit la supervision', () => {
+    const visible = new Set(hrefs('DIRECTION'));
+    expect(hrefs('SUPERVISEUR').filter((href) => !visible.has(href))).toEqual([]);
   });
 });

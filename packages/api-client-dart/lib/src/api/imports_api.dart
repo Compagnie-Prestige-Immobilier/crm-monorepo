@@ -286,6 +286,98 @@ class ImportsApi {
     );
   }
 
+  /// Dépose le classeur des visites de l’accueil et inscrit le travail. Rend immédiatement.
+  /// NE BLOQUE PAS : le classeur est écrit sur le volume, un travail &#x60;queued&#x60; est inscrit, et la réponse part. Le travail naît TOUJOURS en &#x60;DRY_RUN&#x60; : rien n’est écrit tant que &#x60;POST /imports/{id}/apply&#x60; n’a pas été appelé. Seuls les onglets « BDD VISITES » sont lus, en-tête en ligne 3, données à partir de la colonne C. La colonne « N° » n’est pas reprise : elle repart à 1 chaque mois. CET IMPORT NE CRÉE AUCUNE ENTRÉE DE RÉFÉRENTIEL : une entreprise, une direction, un destinataire ou un objet absent des quatre listes fait refuser la ligne, avec sa valeur exacte, son onglet et son numéro de ligne au rapport.
+  ///
+  /// Parameters:
+  /// * [file]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ImportJobDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ImportJobDto>> createVisitesImport({
+    required MultipartFile file,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/imports/visites';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      contentType: 'multipart/form-data',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = FormData.fromMap(<String, dynamic>{r'file': file});
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ImportJobDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ImportJobDto, ImportJobDto>(
+              rawData,
+              'ImportJobDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ImportJobDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// État d’un travail d’import, et son rapport quand il est terminé.
   /// Route de SONDAGE. &#x60;processedRows&#x60; avance à chaque tranche écrite, sans qu’aucun mécanisme de progression n’ait eu à être inventé : c’est le compteur que la transaction de la tranche avance elle-même.
   ///

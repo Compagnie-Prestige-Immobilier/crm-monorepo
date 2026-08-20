@@ -9,11 +9,12 @@ import { fetchRepresentant } from '@/lib/data/representants';
 import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { guardRoles } from '@/lib/session';
+import { readsOnly } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Représentant' };
 
 export default async function RepresentantPage({ params }: { params: Promise<{ id: string }> }) {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR']);
+  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="La fiche d’un représentant" />;
@@ -37,6 +38,7 @@ export default async function RepresentantPage({ params }: { params: Promise<{ i
         representantId={id}
         author={{ id: guard.user.id, fullName: guard.user.fullName }}
         canAdminister={guard.user.role === 'ADMIN'}
+        readOnly={readsOnly(guard.user.role)}
       />
     </HydrationBoundary>
   );

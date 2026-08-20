@@ -64,7 +64,7 @@ export class RepresentantsController {
   ) {}
 
   @Get()
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listRepresentants',
     summary: 'Liste paginée. Un COMMERCIAL ne voit que ses propres représentants.',
@@ -130,7 +130,7 @@ export class RepresentantsController {
   }
 
   @Get(':id')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({ operationId: 'getRepresentant', summary: 'Détail d’un représentant.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: RepresentantDto })
@@ -182,7 +182,7 @@ export class RepresentantsController {
   }
 
   @Get(':id/relation-history')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listRepresentantRelationChanges',
     summary:
@@ -203,7 +203,7 @@ export class RepresentantsController {
   }
 
   @Get(':id/comments')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR)
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listRepresentantComments',
     summary: 'Fil de commentaires d’une fiche, du plus récent au plus ancien.',

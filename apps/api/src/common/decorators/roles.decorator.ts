@@ -14,6 +14,8 @@ export const ANY_AUTHENTICATED = [
   Role.COMMERCIAL,
   Role.BANQUE_FINANCE,
   Role.SUPERVISEUR,
+  Role.DIRECTION,
+  Role.ACCUEIL,
 ] as const;
 
 /**

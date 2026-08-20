@@ -37,6 +37,15 @@ const REFERENCE_ATTEMPTS = 5;
 
 const pad2 = (value: number): string => String(value).padStart(2, '0');
 
+/** Africa/Dakar ne change pas d'heure : l'offset tient sur toute la journée. */
+export function visiteInstant(date: string, time: string | undefined): Date {
+  const midnight = inclusiveDateFrom(date);
+  if (time === undefined) return midnight;
+
+  const [hour, minute] = time.split(':').map(Number) as [number, number];
+  return new Date(midnight.getTime() + hour * 3_600_000 + minute * 60_000);
+}
+
 export const dakarDate = (instant: Date): string => {
   const { year, month, day } = dakarWallClock(instant);
   return `${String(year)}-${pad2(month)}-${pad2(day)}`;
@@ -252,13 +261,8 @@ export class VisitesService {
     return nextVisiteSequence(last?.reference, year);
   }
 
-  /** Africa/Dakar ne change pas d'heure : l'offset tient sur toute la journée. */
   private instantOf(date: string, time: string | undefined): Date {
-    const midnight = inclusiveDateFrom(date);
-    if (time === undefined) return midnight;
-
-    const [hour, minute] = time.split(':').map(Number) as [number, number];
-    return new Date(midnight.getTime() + hour * 3_600_000 + minute * 60_000);
+    return visiteInstant(date, time);
   }
 
   private async visite(id: string): Promise<VisiteRow> {

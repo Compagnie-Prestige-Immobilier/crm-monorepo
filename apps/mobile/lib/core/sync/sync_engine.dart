@@ -680,12 +680,29 @@ class SyncEngine {
     if (path is! String || path.isEmpty) return true;
     final File file = File(path);
     // ignore: avoid_slow_async_io
-    if (!await file.exists()) return true;
+    if (!await file.exists()) {
+      await _markFailed(
+        row,
+        'CALL_RECORDING_FILE_MISSING',
+        'La note vocale a disparu du téléphone avant son envoi.',
+      );
+      return false;
+    }
     try {
       await _api.uploadCallRecording(attemptId: row.entityId, path: path);
       await file.delete();
       return true;
     } on ApiException catch (error) {
+      if (error.kind == FailureKind.terminal) {
+        await _markFailed(
+          row,
+          error.code,
+          error.message ??
+              'La note vocale a été refusée. Contactez un administrateur '
+                  'avant d’abandonner cet envoi.',
+        );
+        return false;
+      }
       await _requeue(
         row,
         incrementAttempt: true,

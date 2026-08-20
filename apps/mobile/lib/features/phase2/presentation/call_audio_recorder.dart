@@ -14,11 +14,13 @@ class CallAudioRecorder extends StatefulWidget {
   const CallAudioRecorder({
     required this.enabled,
     required this.onChanged,
+    required this.onRecordingStateChanged,
     super.key,
   });
 
   final bool enabled;
   final ValueChanged<String?> onChanged;
+  final ValueChanged<String?> onRecordingStateChanged;
 
   @override
   State<CallAudioRecorder> createState() => _CallAudioRecorderState();
@@ -115,12 +117,14 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
       _position = Duration.zero;
       _duration = Duration.zero;
     });
+    widget.onRecordingStateChanged(path);
     widget.onChanged(null);
   }
 
   Future<void> _stop() async {
     final String? path = await _recorder.stop();
     await _amplitudes?.cancel();
+    widget.onRecordingStateChanged(null);
     if (path == null) {
       setState(() {
         _recording = false;
@@ -194,7 +198,7 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
                 height: 48,
                 child: CustomPaint(
                   painter: _WaveformPainter(
-                    samples: _samples,
+                    samples: List<double>.of(_samples),
                     progress: _recording ? 1 : progress,
                     color: theme.colorScheme.primary,
                     background: theme.colorScheme.outlineVariant,

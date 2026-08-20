@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart';
 
@@ -739,6 +740,20 @@ class WriteRepository {
               _db.representants,
             )..where((Representants t) => t.id.equals(victim.entityId))).go();
           }
+        }
+        for (final OutboxData victim in victims) {
+          if (victim.entityType != callAttemptEntity) continue;
+          final Object? payload;
+          try {
+            payload = jsonDecode(victim.payload);
+          } on FormatException {
+            continue;
+          }
+          if (payload is! Map<String, dynamic>) continue;
+          final Object? path = payload['_recordingPath'];
+          if (path is! String || path.isEmpty) continue;
+          final File recording = File(path);
+          if (recording.existsSync()) await recording.delete();
         }
 
         return DiscardResult(DiscardOutcome.discarded, removed: removed);

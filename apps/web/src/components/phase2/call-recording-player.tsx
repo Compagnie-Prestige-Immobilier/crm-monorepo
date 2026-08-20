@@ -53,6 +53,8 @@ export function CallRecordingPlayer({ attemptId }: { attemptId: string }) {
 
   async function load() {
     setLoading(true);
+    setMissing(false);
+    setError(false);
     try {
       const blob = await fetchCallRecording(attemptId);
       if (blob === null) {
@@ -70,13 +72,11 @@ export function CallRecordingPlayer({ attemptId }: { attemptId: string }) {
     }
   }
 
-  if (missing) return <p className="text-[0.75rem] text-muted-foreground">Aucune note vocale.</p>;
-  if (error) {
-    return (
-      <p className="text-[0.75rem] text-destructive">La note vocale n’a pas pu être chargée.</p>
-    );
-  }
   if (url === undefined) {
+    let label = 'Écouter la note vocale';
+    if (loading) label = 'Chargement…';
+    else if (missing) label = 'Vérifier la note vocale';
+    else if (error) label = 'Réessayer le chargement';
     return (
       <Button
         type="button"
@@ -90,7 +90,7 @@ export function CallRecordingPlayer({ attemptId }: { attemptId: string }) {
         ) : (
           <PlayIcon className="size-4" aria-hidden="true" />
         )}
-        {loading ? 'Chargement…' : 'Écouter la note vocale'}
+        {label}
       </Button>
     );
   }
@@ -118,8 +118,8 @@ export function CallRecordingPlayer({ attemptId }: { attemptId: string }) {
           setPlaying(false);
         }}
       />
-      <div className="relative h-14" aria-hidden="true">
-        <div className="absolute inset-0 flex items-center gap-px">
+      <div className="relative h-14">
+        <div className="absolute inset-0 flex items-center gap-px" aria-hidden="true">
           {peaks.map((peak, index) => (
             <span
               key={index}

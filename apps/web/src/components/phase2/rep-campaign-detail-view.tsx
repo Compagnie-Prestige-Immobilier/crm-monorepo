@@ -37,7 +37,13 @@ import {
   REP_CALL_OUTCOME_VARIANTS,
 } from '@/lib/types';
 
-export function RepCampaignDetailView({ campaignId }: { campaignId: string }) {
+export function RepCampaignDetailView({
+  campaignId,
+  canManage,
+}: {
+  campaignId: string;
+  canManage: boolean;
+}) {
   const queryClient = useQueryClient();
   const [closing, setClosing] = useState(false);
 
@@ -100,7 +106,7 @@ export function RepCampaignDetailView({ campaignId }: { campaignId: string }) {
               <Badge variant={isActive ? 'info' : 'secondary'}>
                 {CAMPAIGN_STATUS_LABELS[data.status]}
               </Badge>
-              {isActive ? (
+              {isActive && canManage ? (
                 <Button
                   type="button"
                   variant="outline"
