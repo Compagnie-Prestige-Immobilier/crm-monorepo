@@ -30,6 +30,8 @@ export const PURGE_STEP_ORDER = [
   'commercialAccounts',
   'financeAccounts',
   'supervisionAccounts',
+  'directionAccounts',
+  'accueilAccounts',
   'bankCaseStages',
   'bankRejectionReasons',
   'callOutcomeReasons',
@@ -50,6 +52,7 @@ export const PURGE_DOMAIN_KEYS = [
   'teleconseillers',
   'finances',
   'supervision',
+  'directionAccueil',
   'representants',
   'prospects',
   'campagnes',
@@ -195,10 +198,16 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
   {
     key: 'supervision',
     label: 'Comptes supervision',
-    hint: 'Comptes qui suivent le travail des téléconseillers, et le registre d’accueil qu’ils ont tenu.',
+    hint: 'Comptes qui suivent le travail des téléconseillers.',
     steps: ['supervisionAccounts'],
-    // `visites` : Visite.createdBy pointe le compte en Restrict, et un superviseur
-    // tient le registre d'accueil.
+    requires: [],
+  },
+  {
+    key: 'directionAccueil',
+    label: 'Comptes direction et accueil',
+    hint: 'Comptes du comptoir et de la direction commerciale, et le registre qu’ils ont tenu.',
+    steps: ['directionAccounts', 'accueilAccounts'],
+    // `visites` : Visite.createdBy pointe le compte en Restrict.
     requires: ['visites'],
   },
   {

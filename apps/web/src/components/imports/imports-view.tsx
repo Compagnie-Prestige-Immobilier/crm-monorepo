@@ -75,7 +75,22 @@ const ACCEPTED = '.xlsx,application/vnd.openxmlformats-officedocument.spreadshee
 const KIND_OPTIONS = [
   { value: 'PROSPECTS', label: IMPORT_KIND_LABELS.PROSPECTS },
   { value: 'REPRESENTANTS', label: IMPORT_KIND_LABELS.REPRESENTANTS },
+  { value: 'VISITES', label: IMPORT_KIND_LABELS.VISITES },
 ] as const satisfies readonly { value: ImportKind; label: string }[];
+
+const IMPORT_HINTS: Readonly<Record<ImportKind, string>> = {
+  PROSPECTS:
+    'Banque et Syndicat se choisissent dans les listes déroulantes du modèle : leur croisement détermine le segment BDD. Ce fichier ne crée aucun représentant, importez-les d’abord.',
+  REPRESENTANTS:
+    'Département et IEF se choisissent dans les listes déroulantes du modèle, tirées des référentiels du jour.',
+  VISITES: 'Seuls les onglets « BDD VISITES » sont lus, avec l’en-tête en ligne 3.',
+};
+
+const IMPORT_NOUNS: Readonly<Record<ImportKind, string>> = {
+  PROSPECTS: 'prospect',
+  REPRESENTANTS: 'représentant',
+  VISITES: 'visite',
+};
 
 function isRunning(job: ImportJob | undefined): boolean {
   return job?.status === 'queued' || job?.status === 'running';
@@ -124,8 +139,13 @@ function canApply(job: ImportJob, now = new Date()): boolean {
 
 /** Le bouton porte le chiffre : « Appliquer » ne se relit pas, « Créer 12 480 prospects » si. */
 function applyLabel(job: ImportJob): string {
-  const noun = job.kind === 'PROSPECTS' ? 'prospect' : 'représentant';
+  const noun = IMPORT_NOUNS[job.kind];
   return `Créer ${formatNumber(job.createdRows)} ${noun}${job.createdRows > 1 ? 's' : ''}`;
+}
+
+function createdVerb(job: ImportJob): string {
+  if (job.kind === 'VISITES') return job.createdRows > 1 ? 'seront créées' : 'sera créée';
+  return job.createdRows > 1 ? 'seront créés' : 'sera créé';
 }
 
 /** `errorRows` reste exact, `errors` est bornée : la troncature doit se dire. */
@@ -170,6 +190,10 @@ export function ImportsView() {
     if (job === undefined || job.status !== 'succeeded' || job.mode !== 'APPLY') return;
     if (invalidatedFor.current === job.id) return;
     invalidatedFor.current = job.id;
+    if (job.kind === 'VISITES') {
+      void queryClient.invalidateQueries({ queryKey: ['visites'] });
+      return;
+    }
     void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
     void queryClient.invalidateQueries({ queryKey: queryKeys.representantsRoot });
     void queryClient.invalidateQueries({ queryKey: queryKeys.reference });
@@ -211,6 +235,8 @@ export function ImportsView() {
     deposit.mutate({ kind, file: candidate });
   }
 
+  const selectedTemplate = IMPORT_TEMPLATES[kind];
+
   return (
     <div className="flex flex-col gap-6">
       <Card>
@@ -247,32 +273,31 @@ export function ImportsView() {
               </Select>
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              disabled={template.pending}
-              onClick={() => {
-                void template.download({
-                  url: IMPORT_TEMPLATES[kind].url,
-                  fileName: IMPORT_TEMPLATES[kind].fileName,
-                  failureMessage: 'Le modèle n’a pas pu être généré.',
-                });
-              }}
-            >
-              {template.pending ? (
-                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <DownloadIcon aria-hidden="true" />
-              )}
-              Télécharger le modèle
-            </Button>
+            {selectedTemplate === undefined ? null : (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={template.pending}
+                onClick={() => {
+                  void template.download({
+                    url: selectedTemplate.url,
+                    fileName: selectedTemplate.fileName,
+                    failureMessage: 'Le modèle n’a pas pu être généré.',
+                  });
+                }}
+              >
+                {template.pending ? (
+                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <DownloadIcon aria-hidden="true" />
+                )}
+                Télécharger le modèle
+              </Button>
+            )}
           </div>
 
           <p className="text-[0.8125rem] text-muted-foreground">
-            {kind === 'PROSPECTS'
-              ? 'Banque et Syndicat se choisissent dans les listes déroulantes du modèle : leur croisement détermine le segment BDD. Ce fichier ne crée aucun représentant, importez-les d’abord.'
-              : 'Département et IEF se choisissent dans les listes déroulantes du modèle, tirées des référentiels du jour.'}{' '}
-            {formatNumber(IMPORT_MAX_ROWS[kind])} lignes au maximum.
+            {IMPORT_HINTS[kind]} {formatNumber(IMPORT_MAX_ROWS[kind])} lignes au maximum.
           </p>
 
           {/* Le champ de fichier double la zone de dépôt : le glisser-déposer
@@ -437,12 +462,14 @@ function JobPanel({
           <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
           <div className="min-w-0 text-[0.875rem]">
             <p className="font-[600]">
-              {formatNumber(job.createdRows)} fiche{job.createdRows > 1 ? 's' : ''} créée
+              {formatNumber(job.createdRows)} {job.kind === 'VISITES' ? 'visite' : 'fiche'}
+              {job.createdRows > 1 ? 's' : ''} créée
               {job.createdRows > 1 ? 's' : ''}.
             </p>
             <p className="mt-1 text-muted-foreground">
-              Corrigez les lignes refusées dans le classeur et redéposez-le : les fiches déjà en
-              base seront de nouveau ignorées, sans doublon.
+              Corrigez les lignes refusées dans le classeur et redéposez-le : les{' '}
+              {job.kind === 'VISITES' ? 'visites déjà au registre' : 'fiches déjà en base'} seront
+              de nouveau ignorées, sans doublon.
             </p>
           </div>
         </div>
@@ -779,8 +806,9 @@ function ApplyDialog({
             <DialogHeader>
               <DialogTitle>{applyLabel(job)} ?</DialogTitle>
               <DialogDescription>
-                Cette action écrit en base et ne s’annule pas : une fiche supprimée ensuite garde
-                son numéro dans l’index d’unicité.
+                {job.kind === 'VISITES'
+                  ? 'Cette action écrit les visites en base et ne s’annule pas.'
+                  : 'Cette action écrit en base et ne s’annule pas : une fiche supprimée ensuite garde son numéro dans l’index d’unicité.'}
               </DialogDescription>
             </DialogHeader>
 
@@ -789,15 +817,15 @@ function ApplyDialog({
                 <span className="font-display text-[1.5rem] font-[800] tabular-nums">
                   {formatNumber(job.createdRows)}
                 </span>{' '}
-                {job.kind === 'PROSPECTS' ? 'prospect' : 'représentant'}
-                {job.createdRows > 1 ? 's' : ''}{' '}
-                {job.createdRows > 1 ? 'seront créés' : 'sera créé'} à partir de « {job.fileName} ».
+                {IMPORT_NOUNS[job.kind]}
+                {job.createdRows > 1 ? 's' : ''} {createdVerb(job)} à partir de « {job.fileName} ».
               </p>
 
               <p className="text-[0.8125rem] text-muted-foreground">
-                {formatNumber(job.skippedRows)} ligne{job.skippedRows > 1 ? 's' : ''} sera ignorée
-                {job.skippedRows > 1 ? 's' : ''} car déjà en base, et {formatNumber(job.errorRows)}{' '}
-                refusée{job.errorRows > 1 ? 's' : ''}. Aucune des deux ne sera écrite.
+                {formatNumber(job.skippedRows)} ligne{job.skippedRows > 1 ? 's' : ''}{' '}
+                {job.skippedRows > 1 ? 'seront ignorées' : 'sera ignorée'} car déjà en base, et{' '}
+                {formatNumber(job.errorRows)} refusée{job.errorRows > 1 ? 's' : ''}. Aucune des deux
+                ne sera écrite.
               </p>
             </div>
 

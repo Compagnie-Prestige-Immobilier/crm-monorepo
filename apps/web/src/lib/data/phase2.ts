@@ -59,6 +59,7 @@ export async function fetchCallRecording(
   const result = await client.GET('/api/v1/phase2/call-attempts/{id}/recording', {
     params: { path: { id: attemptId } },
     parseAs: 'blob',
+    cache: 'no-store',
   });
   if (result.response.status === 404) return null;
   if (result.error !== undefined) {

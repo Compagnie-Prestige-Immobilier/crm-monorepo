@@ -14428,6 +14428,109 @@
         "tags": ["imports"]
       }
     },
+    "/api/v1/imports/visites": {
+      "post": {
+        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Seuls les onglets « BDD VISITES » sont lus, en-tête en ligne 3, données à partir de la colonne C. La colonne « N° » n’est pas reprise : elle repart à 1 chaque mois. CET IMPORT NE CRÉE AUCUNE ENTRÉE DE RÉFÉRENTIEL : une entreprise, une direction, un destinataire ou un objet absent des quatre listes fait refuser la ligne, avec sa valeur exacte, son onglet et son numéro de ligne au rapport.",
+        "operationId": "createVisitesImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dépose le classeur des visites de l’accueil et inscrit le travail. Rend immédiatement.",
+        "tags": ["imports"]
+      }
+    },
     "/api/v1/imports/{id}": {
       "get": {
         "description": "Route de SONDAGE. `processedRows` avance à chaque tranche écrite, sans qu’aucun mécanisme de progression n’ait eu à être inventé : c’est le compteur que la transaction de la tranche avance elle-même.",
@@ -15541,7 +15644,7 @@
       },
       "Role": {
         "type": "string",
-        "enum": ["ADMIN", "COMMERCIAL", "BANQUE_FINANCE", "SUPERVISEUR"]
+        "enum": ["ADMIN", "COMMERCIAL", "BANQUE_FINANCE", "SUPERVISEUR", "DIRECTION", "ACCUEIL"]
       },
       "AuthUserDto": {
         "type": "object",
@@ -21869,6 +21972,7 @@
           "teleconseillers",
           "finances",
           "supervision",
+          "directionAccueil",
           "representants",
           "prospects",
           "campagnes",
@@ -22277,7 +22381,7 @@
       },
       "ImportKind": {
         "type": "string",
-        "enum": ["REPRESENTANTS", "PROSPECTS"]
+        "enum": ["REPRESENTANTS", "PROSPECTS", "VISITES"]
       },
       "ImportStatus": {
         "type": "string",

@@ -46,11 +46,11 @@ describe('garde des numéros suggérés', () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
-  it('n’ouvre l’écran qu’aux trois rôles qui suivent le terrain', async () => {
+  it('n’ouvre l’écran qu’aux rôles qui suivent le terrain', async () => {
     guardRoles.mockResolvedValue({ status: 'anonymous' });
 
     await SuggestionsPage().catch(() => undefined);
 
-    expect(guardRoles).toHaveBeenCalledWith(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR']);
+    expect(guardRoles).toHaveBeenCalledWith(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
   });
 });

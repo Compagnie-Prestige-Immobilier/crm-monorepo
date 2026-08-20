@@ -144,7 +144,7 @@ class DioApi implements ApiPort {
           filename: '$attemptId.m4a',
           contentType: DioMediaType('audio', 'mp4'),
         ),
-        extra: TimeoutProfile.push.extra,
+        extra: TimeoutProfile.upload.extra,
       );
     });
   }

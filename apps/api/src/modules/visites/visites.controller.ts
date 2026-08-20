@@ -46,9 +46,11 @@ import {
 /**
  * Le registre est celui de l'accueil et de la direction. Le superviseur en est
  * volontairement absent : il supervise les teleconseillers, pas les visiteurs.
- * Un role d'accueil dedie viendra s'ajouter ici.
  */
-const REGISTRE_ROLES = [Role.ADMIN] as const;
+const REGISTRE_ROLES = [Role.ADMIN, Role.DIRECTION, Role.ACCUEIL] as const;
+
+/** Les quatre listes du registre appartiennent au metier, pas a la technique. */
+const LISTES_ROLES = [Role.ADMIN, Role.DIRECTION] as const;
 
 @ApiTags('visites')
 @ApiBearerAuth()
@@ -72,7 +74,7 @@ export class VisitesController {
     return this.referentiels.bundle(query.activeOnly ?? true);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...LISTES_ROLES)
   @Get('referentiels/:kind')
   @ApiOperation({
     operationId: 'listVisiteReferentiel',
@@ -87,7 +89,7 @@ export class VisitesController {
     return this.referentiels.list(kind, query.activeOnly ?? false);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...LISTES_ROLES)
   @Post('referentiels/:kind')
   @ApiOperation({
     operationId: 'createVisiteReferentiel',
@@ -108,7 +110,7 @@ export class VisitesController {
     return this.referentiels.create(kind, body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...LISTES_ROLES)
   @Patch('referentiels/:kind/:id')
   @ApiOperation({
     operationId: 'updateVisiteReferentiel',
@@ -126,7 +128,7 @@ export class VisitesController {
     return this.referentiels.update(kind, id, body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...LISTES_ROLES)
   @Post('referentiels/:kind/:id/active')
   @ApiOperation({
     operationId: 'setVisiteReferentielActive',
@@ -145,7 +147,7 @@ export class VisitesController {
     return this.referentiels.setActive(kind, id, body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...LISTES_ROLES)
   @Post('referentiels/:kind/reorder')
   @ApiOperation({
     operationId: 'reorderVisiteReferentiel',

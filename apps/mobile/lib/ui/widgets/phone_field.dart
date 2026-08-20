@@ -62,6 +62,7 @@ class PhoneField extends StatelessWidget {
     this.onEditingComplete,
     this.focusNode,
     this.autofocus = false,
+    this.enabled = true,
     this.helper,
     this.textInputAction = TextInputAction.next,
   });
@@ -72,6 +73,7 @@ class PhoneField extends StatelessWidget {
   final VoidCallback? onEditingComplete;
   final FocusNode? focusNode;
   final bool autofocus;
+  final bool enabled;
 
   final String? helper;
 
@@ -96,6 +98,7 @@ class PhoneField extends StatelessWidget {
           controller: controller,
           focusNode: focusNode,
           autofocus: autofocus,
+          enabled: enabled,
           keyboardType: TextInputType.phone,
           textInputAction: textInputAction,
           inputFormatters: const <TextInputFormatter>[SenegalPhoneFormatter()],

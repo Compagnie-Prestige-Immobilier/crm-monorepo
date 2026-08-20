@@ -48,11 +48,11 @@ describe('garde de la fiche représentant', () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
-  it('n’ouvre la fiche qu’aux trois rôles qui suivent le terrain', async () => {
+  it('n’ouvre la fiche qu’aux rôles qui suivent le terrain', async () => {
     guardRoles.mockResolvedValue({ status: 'anonymous' });
 
     await RepresentantPage({ params }).catch(() => undefined);
 
-    expect(guardRoles).toHaveBeenCalledWith(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR']);
+    expect(guardRoles).toHaveBeenCalledWith(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
   });
 });

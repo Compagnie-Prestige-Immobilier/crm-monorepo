@@ -31,10 +31,25 @@ import { withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { userFormSchema, type UserFormInput } from '@/lib/schemas';
-import { ROLE_LABELS, type CreateUserInput, type UpdateUserInput, type UserRow } from '@/lib/types';
+import {
+  ROLE_LABELS,
+  type CreateUserInput,
+  type Role,
+  type UpdateUserInput,
+  type UserRow,
+} from '@/lib/types';
 import { ROLES } from '@/lib/user-filters';
 
 const NO_DEPARTEMENT = '__aucun__';
+
+const ROLE_HINTS: Record<Role, string> = {
+  ADMIN: 'Accès complet, y compris les comptes et les référentiels.',
+  COMMERCIAL: 'Saisit les prospects depuis l’application mobile.',
+  BANQUE_FINANCE: 'Accède aux dossiers bancaires, pas aux prospects.',
+  SUPERVISEUR: 'Suit le travail des téléconseillers, en lecture. Ne saisit rien.',
+  DIRECTION: 'Lit tout le téléconseil et tient le registre des visites. Ne purge rien.',
+  ACCUEIL: 'Tient le registre des visites, et rien d’autre.',
+};
 
 export function UserFormDialog({
   open,
@@ -210,15 +225,9 @@ export function UserFormDialog({
             label="Rôle"
             required
             description={
-              role === 'BANQUE_FINANCE'
-                ? 'Accède aux dossiers bancaires, pas aux prospects.'
-                : role === 'ADMIN'
-                  ? 'Accès complet, y compris les comptes et les référentiels.'
-                  : role === 'COMMERCIAL'
-                    ? 'Saisit les prospects depuis l’application mobile.'
-                    : role === 'SUPERVISEUR'
-                      ? 'Suit le travail des téléconseillers, en lecture. Ne saisit rien.'
-                      : 'Décide de ce que le compte pourra consulter.'
+              role === undefined
+                ? 'Décide de ce que le compte pourra consulter.'
+                : ROLE_HINTS[role]
             }
             error={formState.errors.role?.message}
           >

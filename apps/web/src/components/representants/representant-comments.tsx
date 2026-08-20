@@ -29,10 +29,13 @@ export function RepresentantComments({
   representantId,
   author,
   canAdminister = false,
+  readOnly = false,
 }: {
   representantId: string;
   author: { id: string; fullName: string };
   canAdminister?: boolean;
+  /** Un rôle de pilotage lit le fil : le composeur disparaît au lieu de 403. */
+  readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const fieldId = useId();
@@ -99,6 +102,7 @@ export function RepresentantComments({
 
   return (
     <div className="flex flex-col gap-5">
+      {readOnly ? null : (
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={fieldId}>Ajouter au fil</Label>
         <Textarea
@@ -125,6 +129,7 @@ export function RepresentantComments({
           </Button>
         </div>
       </div>
+      )}
 
       {thread.isPending ? (
         <Skeleton className="h-24 w-full" />

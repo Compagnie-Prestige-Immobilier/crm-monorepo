@@ -18,7 +18,7 @@ export default async function CampagnesRepresentantsPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  const guard = await guardRoles(['ADMIN']);
+  const guard = await guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return (
@@ -38,7 +38,7 @@ export default async function CampagnesRepresentantsPage({
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <RepCampaignsView />
+      <RepCampaignsView canManage={guard.user.role === 'ADMIN'} />
     </HydrationBoundary>
   );
 }

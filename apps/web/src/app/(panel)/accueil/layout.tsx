@@ -7,7 +7,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { guardRoles } from '@/lib/session';
 
 export default async function AccueilLayout({ children }: { children: ReactNode }) {
-  const guard = await guardRoles(['ADMIN']);
+  const guard = await guardRoles(['ADMIN', 'DIRECTION', 'ACCUEIL']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="Le registre des visites" />;

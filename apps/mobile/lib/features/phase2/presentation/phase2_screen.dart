@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -34,6 +35,10 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
 
   String? _lastSearched;
   String? _recordingPath;
+  String? _activeRecordingPath;
+  bool _savingRecording = false;
+
+  bool get _recordingActive => _activeRecordingPath != null;
 
   @override
   void initState() {
@@ -43,6 +48,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
 
   @override
   void dispose() {
+    if (!_savingRecording) _discardRecording();
     _phone.removeListener(_onPhoneChanged);
     _phone.dispose();
     _phoneFocus.dispose();
@@ -54,12 +60,14 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     final PhoneResult parsed = Phone.parse(raw);
     if (parsed is! PhoneValid) {
       if (_lastSearched != null) {
+        _discardRecording();
         _lastSearched = null;
         ref.read(phase2ControllerProvider.notifier).next();
       }
       return;
     }
     if (_lastSearched == parsed.e164) return;
+    _discardRecording();
     _lastSearched = parsed.e164;
     unawaited(_runSearch(parsed.e164));
   }
@@ -73,11 +81,24 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   }
 
   void _resetForNext() {
+    _discardRecording();
     _lastSearched = null;
     _phone.clear();
-    _recordingPath = null;
     ref.read(phase2ControllerProvider.notifier).next();
     _phoneFocus.requestFocus();
+  }
+
+  void _discardRecording() {
+    for (final String? path in <String?>{
+      _recordingPath,
+      _activeRecordingPath,
+    }) {
+      if (path == null) continue;
+      final File recording = File(path);
+      if (recording.existsSync()) recording.deleteSync();
+    }
+    _recordingPath = null;
+    _activeRecordingPath = null;
   }
 
   Future<void> _record({
@@ -86,15 +107,23 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     String? comment,
     DateTime? callbackAt,
   }) async {
-    final bool ok = await ref
-        .read(phase2ControllerProvider.notifier)
-        .record(
-          reason: reason,
-          method: method,
-          comment: comment,
-          callbackAt: callbackAt,
-          recordingPath: _recordingPath,
-        );
+    bool ok = false;
+    _savingRecording = true;
+    try {
+      ok = await ref
+          .read(phase2ControllerProvider.notifier)
+          .record(
+            reason: reason,
+            method: method,
+            comment: comment,
+            callbackAt: callbackAt,
+            recordingPath: _recordingPath,
+          );
+      if (ok) _recordingPath = null;
+    } finally {
+      _savingRecording = false;
+      if (!mounted && !ok) _discardRecording();
+    }
     if (!mounted) return;
     if (!ok) {
       await HapticFeedback.heavyImpact();
@@ -134,7 +163,10 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                     _PhoneBlock(
                       controller: _phone,
                       focusNode: _phoneFocus,
-                      enabled: phase2.stage != Phase2Stage.confirmed,
+                      enabled:
+                          phase2.stage != Phase2Stage.confirmed &&
+                          !phase2.saving &&
+                          !_recordingActive,
                     ),
                     const SizedBox(height: CpiSpacing.md),
                     AnimatedSwitcher(
@@ -159,8 +191,12 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                           ),
                           Phase2Stage.capture => _Capture(
                             state: phase2,
+                            recording: _recordingActive,
                             onRecordingChanged: (String? path) =>
                                 _recordingPath = path,
+                            onRecordingStateChanged: (String? path) {
+                              setState(() => _activeRecordingPath = path);
+                            },
                             onMethod: (String method) => _record(
                               reason: methodReasonOf(reasons),
                               method: method,
@@ -489,6 +525,7 @@ class _PhoneBlock extends ConsumerWidget {
               controller: controller,
               focusNode: focusNode,
               autofocus: true,
+              enabled: enabled,
               label: 'Numéro appelé',
               textInputAction: TextInputAction.done,
               helper: 'Recherche automatique',
@@ -677,20 +714,25 @@ class _AlreadyClosed extends StatelessWidget {
 class _Capture extends StatelessWidget {
   const _Capture({
     required this.state,
+    required this.recording,
     required this.onMethod,
     required this.onNegative,
     required this.onRecordingChanged,
+    required this.onRecordingStateChanged,
   });
 
   final Phase2State state;
+  final bool recording;
   final ValueChanged<String> onMethod;
   final VoidCallback onNegative;
   final ValueChanged<String?> onRecordingChanged;
+  final ValueChanged<String?> onRecordingStateChanged;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
+    final bool enabled = !state.saving && !recording;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -698,6 +740,7 @@ class _Capture extends StatelessWidget {
         CallAudioRecorder(
           enabled: !state.saving,
           onChanged: onRecordingChanged,
+          onRecordingStateChanged: onRecordingStateChanged,
         ),
         const SizedBox(height: CpiSpacing.md),
         Text(
@@ -717,7 +760,7 @@ class _Capture extends StatelessWidget {
           title: 'Plateforme',
           subtitle: 'En ligne',
           icon: PhosphorIconsRegular.deviceMobile,
-          enabled: !state.saving,
+          enabled: enabled,
           onTap: onMethod,
         ),
         const SizedBox(height: CpiSpacing.xs),
@@ -726,7 +769,7 @@ class _Capture extends StatelessWidget {
           title: 'Physique',
           subtitle: 'Dossier signé en présence',
           icon: PhosphorIconsRegular.handshake,
-          enabled: !state.saving,
+          enabled: enabled,
           onTap: onMethod,
         ),
         const SizedBox(height: CpiSpacing.xs),
@@ -735,14 +778,14 @@ class _Capture extends StatelessWidget {
           title: 'Voix / messagerie électronique',
           subtitle: 'Accord par appel, SMS ou message',
           icon: PhosphorIconsRegular.chatCircleText,
-          enabled: !state.saving,
+          enabled: enabled,
           onTap: onMethod,
         ),
         const SizedBox(height: CpiSpacing.md),
         SizedBox(
           height: 52,
           child: OutlinedButton.icon(
-            onPressed: state.saving ? null : onNegative,
+            onPressed: enabled ? onNegative : null,
             icon: const Icon(PhosphorIconsRegular.phoneX, size: 20),
             label: const Text('Méthode non obtenue'),
           ),

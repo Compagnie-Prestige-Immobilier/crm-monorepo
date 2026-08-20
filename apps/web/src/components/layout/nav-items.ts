@@ -44,13 +44,13 @@ const SECTIONS: readonly NavSection[] = [
     title: null,
     items: [
       {
-        // En tête parce que c'est l'écran où la Directrice passe sa journée.
-        // Un rôle « accueil » dédié fera l'objet d'une passe séparée.
+        // En tête parce que c'est l'écran où la Directrice passe sa journée, et
+        // le seul du panneau pour un compte d'accueil.
         href: '/accueil',
         label: 'Registre des visites',
         icon: ClipboardListIcon,
         description: 'Visites du jour et saisie',
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'DIRECTION', 'ACCUEIL'],
       },
       {
         // Écran d'accueil du SUPERVISEUR : c'est le seul qui montre le travail
@@ -59,7 +59,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Supervision',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
-        roles: ['SUPERVISEUR'],
+        roles: ['SUPERVISEUR', 'DIRECTION'],
       },
       {
         href: '/tableau-de-bord',
@@ -80,21 +80,21 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Statistiques',
         icon: ChartColumnIcon,
         description: 'Téléconseil et banques',
-        roles: ['ADMIN', 'SUPERVISEUR'],
+        roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
         href: '/prospects',
         label: 'Prospects',
         icon: UsersIcon,
         description: 'Liste filtrable et export',
-        roles: ['ADMIN', 'SUPERVISEUR'],
+        roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
         href: '/campagnes',
         label: 'Campagnes',
         icon: MegaphoneIcon,
         description: 'Campagnes d’appels prospects et représentants',
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
       },
     ],
   },
@@ -113,21 +113,21 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Rappels',
         icon: ClockIcon,
         description: 'Échéances promises et retards',
-        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
         href: '/representants',
         label: 'Représentants',
         icon: UsersRoundIcon,
         description: 'Fiches et coordonnées',
-        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
         href: '/suggestions',
         label: 'Numéros suggérés',
         icon: PhoneForwardedIcon,
         description: 'Contacts nommés par les représentants',
-        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
         href: '/prospects/nouveau',
@@ -281,6 +281,11 @@ export function homePathForRole(role: Role): string {
       return '/console';
     case 'SUPERVISEUR':
       return '/supervision';
+    // Le registre, pas le tableau de bord général : la direction commerciale a
+    // le sien, et l'accueil n'atteint que celui-là.
+    case 'DIRECTION':
+    case 'ACCUEIL':
+      return '/accueil';
     default:
       return '/connexion';
   }

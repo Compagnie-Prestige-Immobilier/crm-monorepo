@@ -22,7 +22,7 @@ export class SuggestionsController {
   constructor(private readonly suggestions: SuggestionsService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listSuggestions',
     summary: 'Numéros donnés par des représentants qui ont refusé.',

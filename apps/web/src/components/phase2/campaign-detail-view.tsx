@@ -50,7 +50,13 @@ const OUTCOME_VARIANT: Record<CallOutcome, BadgeVariant> = {
   OTHER: 'outline',
 };
 
-export function CampaignDetailView({ campaignId }: { campaignId: string }) {
+export function CampaignDetailView({
+  campaignId,
+  canManage,
+}: {
+  campaignId: string;
+  canManage: boolean;
+}) {
   const queryClient = useQueryClient();
   const [closing, setClosing] = useState(false);
 
@@ -110,7 +116,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
               <Badge variant={isActive ? 'info' : 'secondary'}>
                 {CAMPAIGN_STATUS_LABELS[data.status]}
               </Badge>
-              {isActive ? (
+              {isActive && canManage ? (
                 <Button
                   type="button"
                   variant="outline"

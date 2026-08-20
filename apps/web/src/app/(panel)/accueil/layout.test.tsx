@@ -27,12 +27,12 @@ describe('garde du registre des visites', () => {
     await expect(render_()).rejects.toThrow('REDIRECT /connexion');
   });
 
-  it('n’ouvre le registre qu’à l’ADMIN, qui le tient', async () => {
+  it('n’ouvre le registre qu’au comptoir, à la direction et à l’ADMIN', async () => {
     guardRoles.mockResolvedValue({ status: 'anonymous' });
 
     await render_().catch(() => undefined);
 
-    expect(guardRoles).toHaveBeenCalledWith(['ADMIN']);
+    expect(guardRoles).toHaveBeenCalledWith(['ADMIN', 'DIRECTION', 'ACCUEIL']);
   });
 
   it('refuse un autre rôle au lieu de lui servir le registre', async () => {
