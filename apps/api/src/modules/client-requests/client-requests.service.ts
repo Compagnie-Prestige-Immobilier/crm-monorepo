@@ -209,7 +209,7 @@ export class ClientRequestsService {
         where: {
           id: body.representantId,
           deletedAt: null,
-          ...demoScope(await this.demo.enabled()),
+          isDemo: request.isDemo,
         },
         select: { id: true },
       }),
@@ -326,7 +326,7 @@ export class ClientRequestsService {
 
   private async reload(id: string): Promise<RequestRow> {
     const row = await this.prisma.clientCreationRequest.findFirst({
-      where: { id, ...demoScope(await this.demo.enabled()) },
+      where: { id },
       include: INCLUDE,
     });
     if (!row) throw clientRequestNotFound();
