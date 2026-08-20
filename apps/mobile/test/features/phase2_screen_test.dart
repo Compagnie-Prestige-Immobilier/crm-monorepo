@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/sync/api_port.dart';
 import 'package:cpi_go/core/sync/clock.dart';
@@ -7,6 +9,7 @@ import 'package:cpi_go/core/theme/cpi_tokens.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
+import 'package:cpi_go/features/phase2/presentation/call_audio_recorder.dart';
 import 'package:cpi_go/features/phase2/presentation/phase2_screen.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
@@ -88,13 +91,17 @@ void main() {
 
   tearDown(() => db.close());
 
-  Widget host({bool disableAnimations = false, Phase2DirectorySync? directory}) {
+  Widget host({
+    bool disableAnimations = false,
+    Phase2DirectorySync? directory,
+  }) {
     return ProviderScope(
       overrides: [
         appDatabaseProvider.overrideWithValue(db),
         apiPortProvider.overrideWithValue(api),
         clockProvider.overrideWithValue(FakeClock(t0)),
-        if (directory != null) phase2DirectoryProvider.overrideWithValue(directory),
+        if (directory != null)
+          phase2DirectoryProvider.overrideWithValue(directory),
         // Session simulée. Sans elle, `recordCallAttempt` n'a pas d'auteur à
         // écrire et refuse la saisie : le test échouerait sur l'absence de
         // session, pas sur ce qu'il prétend vérifier.
@@ -119,32 +126,85 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  phase2TestWidgets('le champ prend le focus tout seul : aucun appui préalable', (
+  phase2TestWidgets(
+    'le champ prend le focus tout seul : aucun appui préalable',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(host());
+      await tester.pump();
+
+      final EditableText field = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byType(TextField).first,
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(field.focusNode.hasFocus, isTrue);
+    },
+  );
+
+  phase2TestWidgets(
+    'un numéro connu et ouvert ouvre les trois cartes de méthode',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(host());
+      await type(tester, '771234567');
+
+      expect(find.text('Plateforme'), findsOneWidget);
+      expect(find.text('Physique'), findsOneWidget);
+      expect(find.text('Voix / messagerie électronique'), findsOneWidget);
+      expect(find.text('Méthode non obtenue'), findsOneWidget);
+    },
+  );
+
+  phase2TestWidgets('changer de numéro efface la note vocale non enregistrée', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(host());
-    await tester.pump();
-
-    final EditableText field = tester.widget<EditableText>(
-      find.descendant(
-        of: find.byType(TextField).first,
-        matching: find.byType(EditableText),
-      ),
+    final Directory temp = Directory.systemTemp.createTempSync(
+      'cpi-recording-',
     );
-    expect(field.focusNode.hasFocus, isTrue);
-  });
-
-  phase2TestWidgets('un numéro connu et ouvert ouvre les trois cartes de méthode', (
-    WidgetTester tester,
-  ) async {
+    addTearDown(() {
+      if (temp.existsSync()) temp.deleteSync(recursive: true);
+    });
+    final File recording = File('${temp.path}/attempt.m4a');
+    recording.writeAsBytesSync(<int>[1, 2, 3]);
     await tester.pumpWidget(host());
     await type(tester, '771234567');
+    tester
+        .widget<CallAudioRecorder>(find.byType(CallAudioRecorder))
+        .onChanged(recording.path);
 
-    expect(find.text('Plateforme'), findsOneWidget);
-    expect(find.text('Physique'), findsOneWidget);
-    expect(find.text('Voix / messagerie électronique'), findsOneWidget);
-    expect(find.text('Méthode non obtenue'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, '781234567');
+
+    expect(recording.existsSync(), isFalse);
   });
+
+  phase2TestWidgets(
+    'une note enregistrée reste disponible pour la synchronisation',
+    (WidgetTester tester) async {
+      final Directory temp = Directory.systemTemp.createTempSync(
+        'cpi-recording-',
+      );
+      addTearDown(() {
+        if (temp.existsSync()) temp.deleteSync(recursive: true);
+      });
+      final File recording = File('${temp.path}/attempt.m4a');
+      recording.writeAsBytesSync(<int>[1, 2, 3]);
+      await tester.pumpWidget(host());
+      await type(tester, '771234567');
+      tester
+          .widget<CallAudioRecorder>(find.byType(CallAudioRecorder))
+          .onChanged(recording.path);
+
+      await tester.ensureVisible(find.text('Plateforme'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Plateforme'));
+      await tester.pumpAndSettle();
+      expect(await db.countMyAttempts().getSingle(), 1);
+      await tester.tap(find.text('Numéro suivant'));
+      await tester.pumpAndSettle();
+
+      expect(recording.existsSync(), isTrue);
+    },
+  );
 
   phase2TestWidgets('les cibles tactiles font au moins 48 dp', (
     WidgetTester tester,
@@ -176,60 +236,72 @@ void main() {
     }
   });
 
-  phase2TestWidgets('un dossier déjà clos est en lecture seule, sans issue de saisie', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(host());
-    await type(tester, '781234567');
+  phase2TestWidgets(
+    'un dossier déjà clos est en lecture seule, sans issue de saisie',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(host());
+      await type(tester, '781234567');
 
-    expect(find.text('Dossier déjà traité'), findsOneWidget);
-    expect(find.text('Méthode obtenue'), findsOneWidget);
-    expect(find.textContaining('Modifiable par un administrateur'), findsOneWidget);
-    // Aucune carte de saisie : le serveur refuserait l'écriture, et proposer un
-    // formulaire qui ne peut pas aboutir ferait perdre du temps au commercial.
-    expect(find.text('Plateforme'), findsNothing);
-    expect(find.text('Méthode non obtenue'), findsNothing);
-  });
+      expect(find.text('Dossier déjà traité'), findsOneWidget);
+      expect(find.text('Méthode obtenue'), findsOneWidget);
+      expect(
+        find.textContaining('Modifiable par un administrateur'),
+        findsOneWidget,
+      );
+      // Aucune carte de saisie : le serveur refuserait l'écriture, et proposer un
+      // formulaire qui ne peut pas aboutir ferait perdre du temps au commercial.
+      expect(find.text('Plateforme'), findsNothing);
+      expect(find.text('Méthode non obtenue'), findsNothing);
+    },
+  );
 
-  phase2TestWidgets('un numéro inconnu de l\'annuaire est signalé sans blocage', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(host());
-    await type(tester, '765555555');
+  phase2TestWidgets(
+    'un numéro inconnu de l\'annuaire est signalé sans blocage',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(host());
+      await type(tester, '765555555');
 
-    expect(find.textContaining('Numéro absent de l\'annuaire'), findsOneWidget);
-    expect(find.text('Effacer et recommencer'), findsOneWidget);
-  });
+      expect(
+        find.textContaining('Numéro absent de l\'annuaire'),
+        findsOneWidget,
+      );
+      expect(find.text('Effacer et recommencer'), findsOneWidget);
+    },
+  );
 
-  phase2TestWidgets('OTHER sans commentaire est refusé DANS la feuille, avant écriture', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(host());
-    await type(tester, '771234567');
+  phase2TestWidgets(
+    'OTHER sans commentaire est refusé DANS la feuille, avant écriture',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(host());
+      await type(tester, '771234567');
 
-    await tester.ensureVisible(find.text('Méthode non obtenue'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Méthode non obtenue'));
-    await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Méthode non obtenue'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Méthode non obtenue'));
+      await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Autre'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Autre'));
-    await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Autre'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Autre'));
+      await tester.pumpAndSettle();
 
-    // La feuille est défilable et le bouton peut être sous la ligne de
-    // flottaison sur un petit écran : sans ce défilement, `tap()` rate sa cible
-    // et n'avertit que dans un `warnIfMissed` que rien ne lit.
-    await tester.ensureVisible(find.text('Enregistrer'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pumpAndSettle();
+      // La feuille est défilable et le bouton peut être sous la ligne de
+      // flottaison sur un petit écran : sans ce défilement, `tap()` rate sa cible
+      // et n'avertit que dans un `warnIfMissed` que rien ne lit.
+      await tester.ensureVisible(find.text('Enregistrer'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Enregistrer'));
+      await tester.pumpAndSettle();
 
-    // La feuille reste ouverte avec son message : rien n'est parti en base, donc
-    // rien ne sera refusé trois semaines plus tard par un CHECK PostgreSQL.
-    expect(find.textContaining('commentaire est obligatoire'), findsOneWidget);
-    expect(await db.countMyAttempts().getSingle(), 0);
-  });
+      // La feuille reste ouverte avec son message : rien n'est parti en base, donc
+      // rien ne sera refusé trois semaines plus tard par un CHECK PostgreSQL.
+      expect(
+        find.textContaining('commentaire est obligatoire'),
+        findsOneWidget,
+      );
+      expect(await db.countMyAttempts().getSingle(), 0);
+    },
+  );
 
   phase2TestWidgets('OTHER commenté s\'enregistre et confirme', (
     WidgetTester tester,
@@ -438,24 +510,31 @@ void main() {
     await tester.pumpWidget(host());
     await type(tester, '771234567');
 
-    expect(find.bySemanticsLabel(RegExp('Méthode obtenue : Plateforme')), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp('Numéro appelé, neuf chiffres')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('Méthode obtenue : Plateforme')),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(RegExp('Numéro appelé, neuf chiffres')),
+      findsOneWidget,
+    );
     expect(find.bySemanticsLabel(RegExp('appels consignés')), findsOneWidget);
     handle.dispose();
   });
 
-  phase2TestWidgets('l\'annuaire vide invite à le télécharger avant de commencer', (
-    WidgetTester tester,
-  ) async {
-    await db.delete(db.phase2Directory).go();
-    await tester.pumpWidget(host());
-    await tester.pumpAndSettle();
+  phase2TestWidgets(
+    'l\'annuaire vide invite à le télécharger avant de commencer',
+    (WidgetTester tester) async {
+      await db.delete(db.phase2Directory).go();
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
 
-    expect(find.textContaining('Annuaire non téléchargé'), findsOneWidget);
-    // L'action de premier téléchargement est ancrée en bas d'écran, en zone de
-    // pouce, et non plus en tête de bandeau.
-    expect(find.text('Télécharger l\'annuaire'), findsOneWidget);
-  });
+      expect(find.textContaining('Annuaire non téléchargé'), findsOneWidget);
+      // L'action de premier téléchargement est ancrée en bas d'écran, en zone de
+      // pouce, et non plus en tête de bandeau.
+      expect(find.text('Télécharger l\'annuaire'), findsOneWidget);
+    },
+  );
 
   phase2TestWidgets('le téléchargement rend une progression, page par page', (
     WidgetTester tester,
@@ -502,7 +581,10 @@ void main() {
     await tester.pumpAndSettle();
     await type(tester, '771234567');
 
-    expect(find.textContaining('Lecture de l\'annuaire impossible'), findsOneWidget);
+    expect(
+      find.textContaining('Lecture de l\'annuaire impossible'),
+      findsOneWidget,
+    );
   });
 
   phase2TestWidgets('un téléchargement qui casse rend la main au bouton', (
@@ -594,7 +676,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Demain 9 h')).selected,
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Demain 9 h'))
+          .selected,
       isTrue,
     );
 

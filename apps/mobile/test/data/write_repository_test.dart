@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/sync/outbox_status.dart';
@@ -429,6 +430,30 @@ void main() {
       // La fiche existe côté serveur : la supprimer localement la ferait
       // revenir au prochain pull, en donnant l'illusion d'un bug.
       expect(await db.select(db.representants).get(), hasLength(1));
+    });
+
+    test('abandonner une tentative supprime sa note vocale locale', () async {
+      final Directory temp = await Directory.systemTemp.createTemp(
+        'cpi-recording-',
+      );
+      addTearDown(() async {
+        if (temp.existsSync()) await temp.delete(recursive: true);
+      });
+      final File recording = File('${temp.path}/attempt.m4a');
+      await recording.writeAsBytes(<int>[1, 2, 3]);
+      await queueOp(
+        db,
+        id: 'audio-1',
+        entityType: callAttemptEntity,
+        entityId: 'attempt-1',
+        status: OutboxStatus.failed,
+        payload: <String, Object?>{'_recordingPath': recording.path},
+      );
+      final OutboxData operation = await outboxById(db, 'audio-1');
+
+      expect((await repo.discardOperation(operation.seq)).removed, 1);
+
+      expect(recording.existsSync(), isFalse);
     });
 
     test('discardOwnCreateOnly laisse partir les prospects repointés', () async {

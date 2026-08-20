@@ -10,6 +10,8 @@ enum ImportKind {
   REPRESENTANTS(r'REPRESENTANTS'),
   @JsonValue(r'PROSPECTS')
   PROSPECTS(r'PROSPECTS'),
+  @JsonValue(r'VISITES')
+  VISITES(r'VISITES'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

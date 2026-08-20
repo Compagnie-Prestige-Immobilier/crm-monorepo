@@ -1646,6 +1646,7 @@ model NotificationDelivery {
 enum ImportKind {
   REPRESENTANTS
   PROSPECTS
+  VISITES
 }
 
 /// `expired` n'est PAS un échec : le fichier et le rapport ont simplement passé
