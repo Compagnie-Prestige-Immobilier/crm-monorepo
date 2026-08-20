@@ -260,8 +260,12 @@ describe('ImportsView', () => {
       kind: 'VISITES',
       report: { ...SIMULATED_REPORT, kind: 'VISITES' },
     });
+    const visitesAppliquees = job({ kind: 'VISITES', status: 'succeeded', mode: 'APPLY' });
     createImportJob.mockResolvedValue(visites);
-    fetchImportJob.mockResolvedValue(visites);
+    fetchImportJob.mockImplementation(() =>
+      Promise.resolve(applyImportJob.mock.calls.length === 0 ? visites : visitesAppliquees),
+    );
+    applyImportJob.mockResolvedValue(visitesAppliquees);
     renderWithQuery(<ImportsView />);
 
     await user.click(screen.getByRole('combobox', { name: 'Entité à importer' }));
@@ -278,6 +282,14 @@ describe('ImportsView', () => {
     expect(dialog.textContent).toContain('écrit les visites en base');
     expect(dialog.textContent).not.toContain('index d’unicité');
     expect(dialog.textContent).not.toContain('lignes sera');
+    await user.click(within(dialog).getByRole('button', { name: 'Créer 800 visites' }));
+    await waitFor(() => {
+      expect(
+        screen
+          .getAllByRole('status')
+          .some((status) => status.textContent.startsWith('800 visites créées.')),
+      ).toBe(true);
+    });
   });
 
   it('présente un travail échu sans le traiter comme une panne', async () => {
