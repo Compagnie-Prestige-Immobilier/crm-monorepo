@@ -12,6 +12,7 @@ jobs:
   lighthouse:
     name: Lighthouse — performance and accessibility
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:18.4
@@ -51,6 +52,7 @@ jobs:
   k6:
     name: k6 — API latency and availability
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:18.4
@@ -85,6 +87,13 @@ jobs:
   mobile-maestro:
     name: Maestro — Android smoke journey
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Casse systématiquement sur « not enough disk space » (voir le commentaire
+    # plus bas) et facture jusqu'à une heure certains jours pour un échec
+    # connu d'avance, sans jamais avoir tourné vert. Retiré du planning
+    # quotidien ; reste déclenchable à la main le jour où le problème de
+    # disque est corrigé.
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
