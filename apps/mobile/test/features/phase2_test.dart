@@ -845,6 +845,61 @@ void main() {
       expect((await allOutbox(db)).single.status, OutboxStatus.done);
     });
 
+    test('un fichier local disparu rend la perte visible', () async {
+      await seedDirectory();
+      final String missingPath =
+          '${Directory.systemTemp.path}/crm-audio-absent-${DateTime.now().microsecondsSinceEpoch}.m4a';
+      await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        createdById: 'me',
+        recordingPath: missingPath,
+      );
+
+      await engine.drain();
+
+      final OutboxData row = (await allOutbox(db)).single;
+      expect(row.status, OutboxStatus.failed);
+      expect(row.lastErrorCode, 'CALL_RECORDING_FILE_MISSING');
+      expect(api.uploadedRecordings, isEmpty);
+    });
+
+    test('un refus DEFINITIF abandonne la note et laisse partir l’appel', () async {
+      // Le fichier vide ou le type non audio ne guerissent pas. Les remettre en
+      // file bloquait la cloture de l'appel pour toujours: le teleconseiller
+      // avait bien passe son appel, et rien ne remontait.
+      await seedDirectory();
+      final File recording = File(
+        '${Directory.systemTemp.path}/crm-audio-refus-${DateTime.now().microsecondsSinceEpoch}.m4a',
+      );
+      await recording.writeAsString('audio');
+      await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        createdById: 'me',
+        recordingPath: recording.path,
+      );
+      api.failNextRecordingUpload = const ApiException(
+        'CALL_RECORDING_EMPTY',
+        statusCode: 400,
+        kind: FailureKind.terminal,
+      );
+
+      await engine.drain();
+
+      // ignore: avoid_slow_async_io
+      expect(
+        await recording.exists(),
+        isFalse,
+        reason: 'le fichier refuse est retire',
+      );
+      expect(
+        (await allOutbox(db)).single.status,
+        OutboxStatus.done,
+        reason: 'l’appel part malgre le refus de sa note',
+      );
+    });
+
     // Un motif retiré du référentiel entre la saisie et l'envoi ne doit pas
     // condamner une tentative déjà faite : le téléconseiller ne peut plus rien y
     // corriger trois semaines plus tard.
