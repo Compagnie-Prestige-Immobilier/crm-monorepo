@@ -206,6 +206,48 @@ void main() {
     },
   );
 
+  phase2TestWidgets('une issue ne part pas pendant que le micro enregistre', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await type(tester, '771234567');
+    tester
+        .widget<CallAudioRecorder>(find.byType(CallAudioRecorder))
+        .onRecordingStateChanged('/tmp/active-recording.m4a');
+    await tester.pump();
+
+    final InkWell action = tester.widget<InkWell>(
+      find.ancestor(
+        of: find.text('Plateforme'),
+        matching: find.byType(InkWell),
+      ),
+    );
+    expect(action.onTap, isNull);
+  });
+
+  phase2TestWidgets('quitter pendant la capture efface le fichier incomplet', (
+    WidgetTester tester,
+  ) async {
+    final Directory temp = Directory.systemTemp.createTempSync(
+      'cpi-recording-',
+    );
+    addTearDown(() {
+      if (temp.existsSync()) temp.deleteSync(recursive: true);
+    });
+    final File recording = File('${temp.path}/active.m4a');
+    recording.writeAsBytesSync(<int>[1, 2, 3]);
+    await tester.pumpWidget(host());
+    await type(tester, '771234567');
+    tester
+        .widget<CallAudioRecorder>(find.byType(CallAudioRecorder))
+        .onRecordingStateChanged(recording.path);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    expect(recording.existsSync(), isFalse);
+  });
+
   phase2TestWidgets('les cibles tactiles font au moins 48 dp', (
     WidgetTester tester,
   ) async {

@@ -8,6 +8,7 @@ import 'package:cpi_go/core/sync/sync_engine.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/draft_repository.dart';
 import 'package:cpi_go/data/repositories/write_repository.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 // `isNull`/`isNotNull` existent des deux côtés : ici on parle de matchers, pas
 // d'expressions SQL.
 import 'package:flutter_test/flutter_test.dart';
@@ -454,6 +455,25 @@ void main() {
       expect((await repo.discardOperation(operation.seq)).removed, 1);
 
       expect(recording.existsSync(), isFalse);
+    });
+
+    test('une charge utile illisible reste abandonnable', () async {
+      await queueOp(
+        db,
+        id: 'audio-corrompu',
+        entityType: callAttemptEntity,
+        entityId: 'attempt-1',
+        status: OutboxStatus.failed,
+      );
+      final OutboxData operation = await outboxById(db, 'audio-corrompu');
+      await (db.update(db.outbox)
+            ..where((Outbox row) => row.seq.equals(operation.seq)))
+          .write(const OutboxCompanion(payload: Value<String>('{')));
+
+      final DiscardResult result = await repo.discardOperation(operation.seq);
+
+      expect(result.outcome, DiscardOutcome.discarded);
+      expect(await allOutbox(db), isEmpty);
     });
 
     test('discardOwnCreateOnly laisse partir les prospects repointés', () async {
