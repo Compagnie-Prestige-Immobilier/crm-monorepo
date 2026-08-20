@@ -1021,6 +1021,213 @@
         "tags": ["referentiels"]
       }
     },
+    "/api/v1/referentiels/canaux-provenance": {
+      "get": {
+        "operationId": "listCanauxProvenance",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "description": "Ne renvoyer que les entrées actives.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CanalProvenanceDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Canaux de provenance du Grand Public.",
+        "tags": ["referentiels"]
+      },
+      "post": {
+        "operationId": "createCanalProvenance",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCanalProvenanceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanalProvenanceDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajoute un canal. Le code est immuable : les fiches le désignent.",
+        "tags": ["referentiels"]
+      }
+    },
+    "/api/v1/referentiels/canaux-provenance/{id}": {
+      "patch": {
+        "operationId": "updateCanalProvenance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCanalProvenanceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanalProvenanceDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renomme un canal, ou le retire des listes via isActive.",
+        "tags": ["referentiels"]
+      }
+    },
     "/api/v1/referentiels/departements": {
       "get": {
         "operationId": "listDepartements",
@@ -3000,6 +3207,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -8560,6 +8795,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -8777,6 +9040,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -8988,6 +9279,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -9213,6 +9532,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -9447,6 +9794,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -9664,6 +10039,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -9875,6 +10278,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -10099,6 +10530,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -10311,6 +10770,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -10535,6 +11022,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -10746,6 +11261,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -10981,6 +11524,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -11193,6 +11764,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -11417,6 +12016,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -11629,6 +12256,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -11852,6 +12507,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -12064,6 +12747,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -12311,6 +13022,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -12523,6 +13262,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -12867,6 +13634,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -13569,6 +14364,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -16322,6 +17145,71 @@
         },
         "required": ["banques", "syndicats", "departements", "regions"]
       },
+      "CanalProvenanceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Clé stable, jamais réécrite : les fiches la désignent."
+          },
+          "label": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "code", "label", "position", "isActive", "updatedAt"]
+      },
+      "CreateCanalProvenanceDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Immuable une fois posé."
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          }
+        },
+        "required": ["code", "label"]
+      },
+      "UpdateCanalProvenanceDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Le retirer des listes, jamais le supprimer."
+          }
+        }
+      },
       "IefDto": {
         "type": "object",
         "properties": {
@@ -17243,6 +18131,14 @@
         },
         "required": ["id", "body"]
       },
+      "Projet": {
+        "type": "string",
+        "enum": ["CHUES", "GRAND_PUBLIC"]
+      },
+      "ProspectType": {
+        "type": "string",
+        "enum": ["FONCTIONNAIRE", "SECTEUR_PRIVE", "INFORMEL", "DIASPORA"]
+      },
       "ProspectStatut": {
         "type": "string",
         "enum": ["NOUVEAU", "CONTACTE", "CONVERTI", "PERDU"]
@@ -17262,15 +18158,6 @@
       "ProspectSortField": {
         "type": "string",
         "enum": ["createdAt", "clientCreatedAt", "nom", "prenom", "statut"]
-      },
-      "Projet": {
-        "type": "string",
-        "enum": ["CHUES", "GRAND_PUBLIC"]
-      },
-      "ProspectType": {
-        "type": "string",
-        "enum": ["FONCTIONNAIRE", "SECTEUR_PRIVE", "INFORMEL", "DIASPORA"],
-        "description": "Hors CHUES : ce qu’est le prospect. Nul si la question n’a pas été posée."
       },
       "CallOutcome": {
         "type": "string",

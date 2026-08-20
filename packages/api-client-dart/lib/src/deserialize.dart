@@ -42,6 +42,7 @@ import 'package:crm_api_client/src/model/campaign_list_dto.dart';
 import 'package:crm_api_client/src/model/campaign_pilotage_dto.dart';
 import 'package:crm_api_client/src/model/campaign_progress_dto.dart';
 import 'package:crm_api_client/src/model/campaign_summary_dto.dart';
+import 'package:crm_api_client/src/model/canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/change_prospect_segment_dto.dart';
 import 'package:crm_api_client/src/model/client_request_dto.dart';
 import 'package:crm_api_client/src/model/client_request_list_dto.dart';
@@ -52,6 +53,7 @@ import 'package:crm_api_client/src/model/create_bank_case_transition_dto.dart';
 import 'package:crm_api_client/src/model/create_banque_dto.dart';
 import 'package:crm_api_client/src/model/create_call_outcome_reason_dto.dart';
 import 'package:crm_api_client/src/model/create_campaign_dto.dart';
+import 'package:crm_api_client/src/model/create_canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/create_client_request_dto.dart';
 import 'package:crm_api_client/src/model/create_departement_dto.dart';
 import 'package:crm_api_client/src/model/create_notification_dto.dart';
@@ -188,6 +190,7 @@ import 'package:crm_api_client/src/model/update_bank_case_dto.dart';
 import 'package:crm_api_client/src/model/update_bank_case_stage_dto.dart';
 import 'package:crm_api_client/src/model/update_banque_dto.dart';
 import 'package:crm_api_client/src/model/update_call_outcome_reason_dto.dart';
+import 'package:crm_api_client/src/model/update_canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/update_departement_dto.dart';
 import 'package:crm_api_client/src/model/update_notification_template_dto.dart';
 import 'package:crm_api_client/src/model/update_prospect_dto.dart';
@@ -369,6 +372,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CampaignSummaryDto':
       return CampaignSummaryDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'CanalProvenanceDto':
+      return CanalProvenanceDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'ChangeProspectSegmentDto':
       return ChangeProspectSegmentDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -400,6 +406,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'CreateCampaignDto':
       return CreateCampaignDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CreateCanalProvenanceDto':
+      return CreateCanalProvenanceDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'CreateClientRequestDto':
       return CreateClientRequestDto.fromJson(value as Map<String, dynamic>)
@@ -841,6 +850,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'UpdateCallOutcomeReasonDto':
       return UpdateCallOutcomeReasonDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'UpdateCanalProvenanceDto':
+      return UpdateCanalProvenanceDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'UpdateDepartementDto':
       return UpdateDepartementDto.fromJson(value as Map<String, dynamic>)

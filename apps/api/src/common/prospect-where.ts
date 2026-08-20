@@ -30,6 +30,11 @@ export function buildProspectWhere(
     where.deletedAt = null;
   }
 
+  // ABSENT veut dire les deux projets. Chaque ecran de projet le pose : sans
+  // lui, une fiche Grand Public apparait dans une liste CHUES.
+  if (filter.projet) where.projet = filter.projet;
+  if (filter.type) where.type = filter.type;
+  if (filter.canalProvenanceId) where.canalProvenanceId = filter.canalProvenanceId;
   if (filter.representantId) where.representantId = filter.representantId;
   if (filter.banqueId) where.banqueId = filter.banqueId;
   if (filter.syndicatId) where.syndicatId = filter.syndicatId;

@@ -124,6 +124,7 @@ const ADMISES: readonly string[] = [
 
   'ReferentielsController.bundle',
   'ReferentielsController.listBanques',
+  'ReferentielsController.listCanauxProvenance',
   'ReferentielsController.listDepartements',
   'ReferentielsController.listIefs',
   'ReferentielsController.listRegions',
@@ -166,6 +167,7 @@ const SOCLE: readonly string[] = [
   'NotificationsController.mine',
   'ReferentielsController.bundle',
   'ReferentielsController.listBanques',
+  'ReferentielsController.listCanauxProvenance',
   'ReferentielsController.listDepartements',
   'ReferentielsController.listIefs',
   'ReferentielsController.listRegions',
