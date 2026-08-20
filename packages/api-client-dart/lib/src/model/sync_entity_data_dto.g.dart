@@ -25,15 +25,25 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto representantId(String? representantId);
 
+  SyncEntityDataDto body(String? body);
+
   SyncEntityDataDto statut(ProspectStatut? statut);
 
   SyncEntityDataDto notes(String? notes);
+
+  SyncEntityDataDto whatsappStatus(WhatsappStatus? whatsappStatus);
+
+  SyncEntityDataDto whatsappE164(String? whatsappE164);
+
+  SyncEntityDataDto profession(String? profession);
 
   SyncEntityDataDto clientCreatedAt(DateTime? clientCreatedAt);
 
   SyncEntityDataDto prospectId(String? prospectId);
 
   SyncEntityDataDto outcome(CallOutcome? outcome);
+
+  SyncEntityDataDto reasonCode(String? reasonCode);
 
   SyncEntityDataDto method(EnrollmentMethod? method);
 
@@ -57,11 +67,16 @@ abstract class _$SyncEntityDataDtoCWProxy {
     String? banqueId,
     String? syndicatId,
     String? representantId,
+    String? body,
     ProspectStatut? statut,
     String? notes,
+    WhatsappStatus? whatsappStatus,
+    String? whatsappE164,
+    String? profession,
     DateTime? clientCreatedAt,
     String? prospectId,
     CallOutcome? outcome,
+    String? reasonCode,
     EnrollmentMethod? method,
     String? comment,
     DateTime? callbackAt,
@@ -105,10 +120,25 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
       this(representantId: representantId);
 
   @override
+  SyncEntityDataDto body(String? body) => this(body: body);
+
+  @override
   SyncEntityDataDto statut(ProspectStatut? statut) => this(statut: statut);
 
   @override
   SyncEntityDataDto notes(String? notes) => this(notes: notes);
+
+  @override
+  SyncEntityDataDto whatsappStatus(WhatsappStatus? whatsappStatus) =>
+      this(whatsappStatus: whatsappStatus);
+
+  @override
+  SyncEntityDataDto whatsappE164(String? whatsappE164) =>
+      this(whatsappE164: whatsappE164);
+
+  @override
+  SyncEntityDataDto profession(String? profession) =>
+      this(profession: profession);
 
   @override
   SyncEntityDataDto clientCreatedAt(DateTime? clientCreatedAt) =>
@@ -120,6 +150,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
 
   @override
   SyncEntityDataDto outcome(CallOutcome? outcome) => this(outcome: outcome);
+
+  @override
+  SyncEntityDataDto reasonCode(String? reasonCode) =>
+      this(reasonCode: reasonCode);
 
   @override
   SyncEntityDataDto method(EnrollmentMethod? method) => this(method: method);
@@ -148,11 +182,16 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? banqueId = const $CopyWithPlaceholder(),
     Object? syndicatId = const $CopyWithPlaceholder(),
     Object? representantId = const $CopyWithPlaceholder(),
+    Object? body = const $CopyWithPlaceholder(),
     Object? statut = const $CopyWithPlaceholder(),
     Object? notes = const $CopyWithPlaceholder(),
+    Object? whatsappStatus = const $CopyWithPlaceholder(),
+    Object? whatsappE164 = const $CopyWithPlaceholder(),
+    Object? profession = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? prospectId = const $CopyWithPlaceholder(),
     Object? outcome = const $CopyWithPlaceholder(),
+    Object? reasonCode = const $CopyWithPlaceholder(),
     Object? method = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
     Object? callbackAt = const $CopyWithPlaceholder(),
@@ -194,6 +233,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.representantId
           // ignore: cast_nullable_to_non_nullable
           : representantId as String?,
+      body: body == const $CopyWithPlaceholder()
+          ? _value.body
+          // ignore: cast_nullable_to_non_nullable
+          : body as String?,
       statut: statut == const $CopyWithPlaceholder()
           ? _value.statut
           // ignore: cast_nullable_to_non_nullable
@@ -202,6 +245,18 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.notes
           // ignore: cast_nullable_to_non_nullable
           : notes as String?,
+      whatsappStatus: whatsappStatus == const $CopyWithPlaceholder()
+          ? _value.whatsappStatus
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappStatus as WhatsappStatus?,
+      whatsappE164: whatsappE164 == const $CopyWithPlaceholder()
+          ? _value.whatsappE164
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappE164 as String?,
+      profession: profession == const $CopyWithPlaceholder()
+          ? _value.profession
+          // ignore: cast_nullable_to_non_nullable
+          : profession as String?,
       clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -214,6 +269,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.outcome
           // ignore: cast_nullable_to_non_nullable
           : outcome as CallOutcome?,
+      reasonCode: reasonCode == const $CopyWithPlaceholder()
+          ? _value.reasonCode
+          // ignore: cast_nullable_to_non_nullable
+          : reasonCode as String?,
       method: method == const $CopyWithPlaceholder()
           ? _value.method
           // ignore: cast_nullable_to_non_nullable
@@ -253,6 +312,7 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
         banqueId: $checkedConvert('banqueId', (v) => v as String?),
         syndicatId: $checkedConvert('syndicatId', (v) => v as String?),
         representantId: $checkedConvert('representantId', (v) => v as String?),
+        body: $checkedConvert('body', (v) => v as String?),
         statut: $checkedConvert(
           'statut',
           (v) => $enumDecodeNullable(
@@ -262,6 +322,16 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
           ),
         ),
         notes: $checkedConvert('notes', (v) => v as String?),
+        whatsappStatus: $checkedConvert(
+          'whatsappStatus',
+          (v) => $enumDecodeNullable(
+            _$WhatsappStatusEnumMap,
+            v,
+            unknownValue: WhatsappStatus.unknownDefaultOpenApi,
+          ),
+        ),
+        whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
+        profession: $checkedConvert('profession', (v) => v as String?),
         clientCreatedAt: $checkedConvert(
           'clientCreatedAt',
           (v) => v == null ? null : DateTime.parse(v as String),
@@ -275,6 +345,7 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
             unknownValue: CallOutcome.unknownDefaultOpenApi,
           ),
         ),
+        reasonCode: $checkedConvert('reasonCode', (v) => v as String?),
         method: $checkedConvert(
           'method',
           (v) => $enumDecodeNullable(
@@ -303,14 +374,20 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(SyncEntityDataDto instance) =>
       if (instance.banqueId case final value?) 'banqueId': value,
       if (instance.syndicatId case final value?) 'syndicatId': value,
       if (instance.representantId case final value?) 'representantId': value,
+      if (instance.body case final value?) 'body': value,
       if (_$ProspectStatutEnumMap[instance.statut] case final value?)
         'statut': value,
       if (instance.notes case final value?) 'notes': value,
+      if (_$WhatsappStatusEnumMap[instance.whatsappStatus] case final value?)
+        'whatsappStatus': value,
+      if (instance.whatsappE164 case final value?) 'whatsappE164': value,
+      if (instance.profession case final value?) 'profession': value,
       if (instance.clientCreatedAt?.toIso8601String() case final value?)
         'clientCreatedAt': value,
       if (instance.prospectId case final value?) 'prospectId': value,
       if (_$CallOutcomeEnumMap[instance.outcome] case final value?)
         'outcome': value,
+      if (instance.reasonCode case final value?) 'reasonCode': value,
       if (_$EnrollmentMethodEnumMap[instance.method] case final value?)
         'method': value,
       if (instance.comment case final value?) 'comment': value,
@@ -324,6 +401,14 @@ const _$ProspectStatutEnumMap = {
   ProspectStatut.CONVERTI: 'CONVERTI',
   ProspectStatut.PERDU: 'PERDU',
   ProspectStatut.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$WhatsappStatusEnumMap = {
+  WhatsappStatus.NON_DEMANDE: 'NON_DEMANDE',
+  WhatsappStatus.MEME_NUMERO: 'MEME_NUMERO',
+  WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
+  WhatsappStatus.AUCUN: 'AUCUN',
+  WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$CallOutcomeEnumMap = {

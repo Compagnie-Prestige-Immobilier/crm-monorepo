@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart';
 
@@ -7,12 +8,13 @@ import '../../core/sync/outbox_status.dart';
 import '../../core/sync/phase2_directory_sync.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/utils/ids.dart';
+import '../../core/utils/whatsapp.dart';
 import '../local/database.dart';
 
 const int kCallAttemptCommentMaxLength = 2000;
 
 enum CallAttemptProblem {
-  unknownOutcome,
+  unknownReason,
   unknownMethod,
   methodRequired,
   methodNotAllowed,
@@ -20,26 +22,22 @@ enum CallAttemptProblem {
   commentTooLong;
 
   String get message => switch (this) {
-    CallAttemptProblem.unknownOutcome => 'Issue d\'appel inconnue.',
+    CallAttemptProblem.unknownReason =>
+      'Motif d\'appel inconnu de cet appareil.',
     CallAttemptProblem.unknownMethod => 'Méthode d\'enrôlement inconnue.',
-    CallAttemptProblem.methodRequired => 'Choisissez la méthode d\'enrôlement obtenue.',
+    CallAttemptProblem.methodRequired =>
+      'Choisissez la méthode d\'enrôlement obtenue.',
     CallAttemptProblem.methodNotAllowed =>
       'Une méthode ne se saisit que si elle a été obtenue.',
     CallAttemptProblem.commentRequired =>
-      'Précisez ce qui s\'est passé : le commentaire est obligatoire pour '
-          '« Autre ».',
+      'Précisez ce qui s\'est passé : le commentaire est obligatoire pour ce '
+          'motif.',
     CallAttemptProblem.commentTooLong =>
       'Le commentaire dépasse $kCallAttemptCommentMaxLength caractères.',
   };
 }
 
-enum DiscardOutcome {
-  discarded,
-
-  claimed,
-
-  notFound,
-}
+enum DiscardOutcome { discarded, claimed, notFound }
 
 class DiscardResult {
   const DiscardResult(this.outcome, {this.removed = 0});
@@ -73,11 +71,19 @@ class CallAttemptInvalid implements Exception {
 }
 
 class WriteRepository {
-  WriteRepository(this._db, {Clock clock = const SystemClock()}) : _clock = clock;
+  WriteRepository(this._db, {Clock clock = const SystemClock()})
+    : _clock = clock;
 
   final AppDatabase _db;
   final Clock _clock;
 
+  /// Le numéro WhatsApp n'est retenu que sur `AUTRE_NUMERO`.
+  ///
+  /// Le choke point est ici et pas dans l'écran : sur `MEME_NUMERO`, recopier
+  /// `phone_e164` donnerait deux numéros à tenir d'accord, et le jour où le
+  /// téléphone est corrigé la copie divergerait sans que rien ne le signale.
+  static String? _whatsappE164For(String status, String? entered) =>
+      status == WhatsappStatus.autreNumero.code ? entered : null;
 
   Future<String> createRepresentant({
     required String fullName,
@@ -86,11 +92,15 @@ class WriteRepository {
     required String createdById,
     String? iefId,
     String? notes,
+    String whatsappStatus = 'NON_DEMANDE',
+    String? whatsappE164,
+    String? profession,
     String? id,
     String? draftId,
   }) async {
     final String entityId = id ?? Ids.newId();
     final DateTime now = _clock.now();
+    final String? whatsapp = _whatsappE164For(whatsappStatus, whatsappE164);
 
     await _db.transaction(() async {
       await _db
@@ -103,6 +113,9 @@ class WriteRepository {
               notes: Value<String?>(notes),
               departementId: departementId,
               iefId: Value<String?>(iefId),
+              whatsappStatus: Value<String>(whatsappStatus),
+              whatsappE164: Value<String?>(whatsapp),
+              profession: Value<String?>(profession),
               createdById: createdById,
               clientCreatedAt: now,
               localUpdatedAt: now,
@@ -119,6 +132,9 @@ class WriteRepository {
           'departementId': departementId,
           'iefId': ?iefId,
           if (notes != null && notes.isNotEmpty) 'notes': notes,
+          'whatsappStatus': whatsappStatus,
+          'whatsappE164': ?whatsapp,
+          'profession': ?profession,
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
         now: now,
@@ -135,9 +151,13 @@ class WriteRepository {
     required String departementId,
     String? iefId,
     String? notes,
+    String whatsappStatus = 'NON_DEMANDE',
+    String? whatsappE164,
+    String? profession,
     String? draftId,
   }) async {
     final DateTime now = _clock.now();
+    final String? whatsapp = _whatsappE164For(whatsappStatus, whatsappE164);
     await _db.transaction(() async {
       final Representant current = await (_db.select(
         _db.representants,
@@ -151,6 +171,9 @@ class WriteRepository {
           notes: Value<String?>(notes),
           departementId: Value<String>(departementId),
           iefId: Value<String?>(iefId),
+          whatsappStatus: Value<String>(whatsappStatus),
+          whatsappE164: Value<String?>(whatsapp),
+          profession: Value<String?>(profession),
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
@@ -167,6 +190,9 @@ class WriteRepository {
           'departementId': departementId,
           'iefId': iefId,
           'notes': notes,
+          'whatsappStatus': whatsappStatus,
+          'whatsappE164': whatsapp,
+          'profession': profession,
         },
         now: now,
       );
@@ -188,8 +214,9 @@ class WriteRepository {
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
-      await (_db.update(_db.prospects)
-            ..where((Prospects t) => t.representantId.equals(id) & t.deletedAt.isNull()))
+      await (_db.update(_db.prospects)..where(
+            (Prospects t) => t.representantId.equals(id) & t.deletedAt.isNull(),
+          ))
           .write(
             ProspectsCompanion(
               deletedAt: Value<DateTime?>(now),
@@ -208,7 +235,6 @@ class WriteRepository {
     });
   }
 
-
   /// Ajout seul. Un commentaire ne se modifie ni ne s'efface : il n'y a donc ni
   /// `rev` à envoyer ni conflit possible, et deux téléconseillers hors ligne qui
   /// commentent la même fiche produisent deux lignes distinctes.
@@ -220,25 +246,42 @@ class WriteRepository {
   }) async {
     final String trimmed = body.trim();
     if (trimmed.isEmpty) {
-      throw ArgumentError.value(body, 'body', 'un commentaire vide ne s\'écrit pas');
+      throw ArgumentError.value(
+        body,
+        'body',
+        'un commentaire vide ne s\'écrit pas',
+      );
     }
     final String entityId = Ids.newId();
     final DateTime now = _clock.now();
-    await _db
-        .into(_db.representantComments)
-        .insert(
-          RepresentantCommentsCompanion.insert(
-            id: entityId,
-            representantId: representantId,
-            authorId: authorId,
-            authorName: authorName,
-            body: trimmed,
-            clientCreatedAt: now,
-          ),
-        );
+    await _db.transaction(() async {
+      await _db
+          .into(_db.representantComments)
+          .insert(
+            RepresentantCommentsCompanion.insert(
+              id: entityId,
+              representantId: representantId,
+              authorId: authorId,
+              authorName: authorName,
+              body: trimmed,
+              clientCreatedAt: now,
+            ),
+          );
+      await _enqueue(
+        dependencyKey: representantId,
+        entityType: 'representant_comment',
+        entityId: entityId,
+        op: 'create',
+        payload: <String, Object?>{
+          'representantId': representantId,
+          'body': trimmed,
+          'clientCreatedAt': now.toUtc().toIso8601String(),
+        },
+        now: now,
+      );
+    });
     return entityId;
   }
-
 
   Future<String> createProspect({
     required String nom,
@@ -308,7 +351,9 @@ class WriteRepository {
       final Prospect current = await (_db.select(
         _db.prospects,
       )..where((Prospects t) => t.id.equals(id))).getSingle();
-      await (_db.update(_db.prospects)..where((Prospects t) => t.id.equals(id))).write(
+      await (_db.update(
+        _db.prospects,
+      )..where((Prospects t) => t.id.equals(id))).write(
         ProspectsCompanion(
           nom: Value<String>(nom),
           prenom: Value<String>(prenom),
@@ -348,7 +393,9 @@ class WriteRepository {
       final Prospect current = await (_db.select(
         _db.prospects,
       )..where((Prospects t) => t.id.equals(id))).getSingle();
-      await (_db.update(_db.prospects)..where((Prospects t) => t.id.equals(id))).write(
+      await (_db.update(
+        _db.prospects,
+      )..where((Prospects t) => t.id.equals(id))).write(
         ProspectsCompanion(
           deletedAt: Value<DateTime?>(now),
           localUpdatedAt: Value<DateTime>(now),
@@ -366,26 +413,39 @@ class WriteRepository {
     });
   }
 
-
+  /// [outcome] et [reasonCode] désignent le MÊME motif : le second l'emporte, le
+  /// premier reste le point d'entrée des six codes système, dont le référentiel
+  /// garantit qu'ils portent le code de leur issue.
   Future<String> recordCallAttempt({
     required String prospectId,
     required String outcome,
     required String createdById,
+    String? reasonCode,
     String? method,
     String? comment,
     DateTime? callbackAt,
+    String? recordingPath,
     String? id,
   }) async {
+    final CallReason? reason = await resolveCallReason(
+      _db,
+      reasonCode ?? outcome,
+    );
+    if (reason == null) {
+      throw const CallAttemptInvalid(CallAttemptProblem.unknownReason);
+    }
     final String? normalizedComment = normalizeComment(comment);
     final CallAttemptProblem? problem = validateCallAttempt(
-      outcome: outcome,
+      reason: reason,
       method: method,
       comment: normalizedComment,
     );
     if (problem != null) throw CallAttemptInvalid(problem);
 
-    // Le serveur refuse une heure de rappel sur une autre issue que CALLBACK.
-    final DateTime? callback = outcome == CallOutcomes.callback ? callbackAt : null;
+    // Le serveur refuse une heure de rappel sur une issue qui n'en programme pas.
+    final DateTime? callback = reason.effect == CallEffects.scheduleCallback
+        ? callbackAt
+        : null;
     final String entityId = id ?? Ids.newId();
     final DateTime now = _clock.now();
 
@@ -396,7 +456,10 @@ class WriteRepository {
             CallAttemptsCompanion.insert(
               id: entityId,
               prospectId: prospectId,
-              outcome: outcome,
+              outcome: reason.outcome,
+              reasonCode: Value<String?>(reason.code),
+              effect: Value<String>(reason.effect),
+              requiresComment: Value<bool>(reason.requiresComment),
               method: Value<String?>(method),
               comment: Value<String?>(normalizedComment),
               callbackAt: Value<DateTime?>(callback),
@@ -411,23 +474,26 @@ class WriteRepository {
         op: 'create',
         payload: <String, Object?>{
           'prospectId': prospectId,
-          'outcome': outcome,
+          'outcome': reason.outcome,
+          'reasonCode': reason.code,
           'method': ?method,
           'comment': ?normalizedComment,
           'callbackAt': ?callback?.toUtc().toIso8601String(),
           'clientCreatedAt': now.toUtc().toIso8601String(),
+          '_recordingPath': ?recordingPath,
         },
         now: now,
       );
 
-      if (CallOutcomes.terminal.contains(outcome)) {
+      final String? closed = CallEffects.phase2Status(reason.effect);
+      if (closed != null) {
         await (_db.update(
           _db.phase2Directory,
         )..where((Phase2Directory t) => t.prospectId.equals(prospectId))).write(
           Phase2DirectoryCompanion(
-            phase2Status: Value<String>(outcome),
+            phase2Status: Value<String>(closed),
             enrollmentMethod: Value<String?>(
-              outcome == CallOutcomes.methodObtained ? method : null,
+              reason.effect == CallEffects.closeMethod ? method : null,
             ),
             updatedAt: Value<DateTime>(now),
           ),
@@ -444,14 +510,11 @@ class WriteRepository {
   }
 
   static CallAttemptProblem? validateCallAttempt({
-    required String outcome,
+    required CallReason reason,
     String? method,
     String? comment,
   }) {
-    if (!CallOutcomes.all.contains(outcome)) {
-      return CallAttemptProblem.unknownOutcome;
-    }
-    if (outcome == CallOutcomes.methodObtained) {
+    if (reason.effect == CallEffects.closeMethod) {
       if (method == null) return CallAttemptProblem.methodRequired;
       if (!EnrollmentMethods.all.contains(method)) {
         return CallAttemptProblem.unknownMethod;
@@ -459,7 +522,7 @@ class WriteRepository {
     } else if (method != null) {
       return CallAttemptProblem.methodNotAllowed;
     }
-    if (outcome == CallOutcomes.other && (comment == null || comment.isEmpty)) {
+    if (reason.requiresComment && (comment == null || comment.isEmpty)) {
       return CallAttemptProblem.commentRequired;
     }
     if (comment != null && comment.length > kCallAttemptCommentMaxLength) {
@@ -467,7 +530,6 @@ class WriteRepository {
     }
     return null;
   }
-
 
   Future<OutboxData?> headOperation(String entityType, String entityId) {
     return (_db.select(_db.outbox)
@@ -483,7 +545,6 @@ class WriteRepository {
           ..limit(1))
         .getSingleOrNull();
   }
-
 
   static bool _isClaimed(OutboxData row) =>
       row.claimToken != null || row.status == OutboxStatus.syncing;
@@ -547,25 +608,27 @@ class WriteRepository {
       ...payload,
     };
     final int amended =
-        await (_db.update(_db.outbox)
-              ..where((Outbox o) => o.seq.equals(head.seq) & _unclaimed(o)))
-            .write(
-      OutboxCompanion(
-        id: Value<String>(Ids.newId()),
-        payload: Value<String>(jsonEncode(merged)),
-        payloadVersion: const Value<int>(SyncEngine.payloadVersion),
-        baseRev: head.op == 'create' ? const Value<int?>(null) : Value<int?>(baseRev),
-        status: const Value<String>(OutboxStatus.pending),
-        attempts: const Value<int>(0),
-        blockedAttempts: const Value<int>(0),
-        nextAttemptAt: Value<DateTime>(now),
-        leaseUntil: const Value<DateTime?>(null),
-        claimToken: const Value<String?>(null),
-        batchId: const Value<String?>(null),
-        lastErrorCode: const Value<String?>(null),
-        lastErrorMsg: const Value<String?>(null),
-      ),
-    );
+        await (_db.update(
+          _db.outbox,
+        )..where((Outbox o) => o.seq.equals(head.seq) & _unclaimed(o))).write(
+          OutboxCompanion(
+            id: Value<String>(Ids.newId()),
+            payload: Value<String>(jsonEncode(merged)),
+            payloadVersion: const Value<int>(SyncEngine.payloadVersion),
+            baseRev: head.op == 'create'
+                ? const Value<int?>(null)
+                : Value<int?>(baseRev),
+            status: const Value<String>(OutboxStatus.pending),
+            attempts: const Value<int>(0),
+            blockedAttempts: const Value<int>(0),
+            nextAttemptAt: Value<DateTime>(now),
+            leaseUntil: const Value<DateTime?>(null),
+            claimToken: const Value<String?>(null),
+            batchId: const Value<String?>(null),
+            lastErrorCode: const Value<String?>(null),
+            lastErrorMsg: const Value<String?>(null),
+          ),
+        );
     return amended > 0;
   }
 
@@ -584,12 +647,12 @@ class WriteRepository {
     )..where((FormDrafts t) => t.draftId.equals(draftId))).go();
   }
 
-
   Future<bool> retryOperation(int seq) async {
     final int changed =
         await (_db.update(_db.outbox)..where(
               (Outbox o) =>
-                  o.seq.equals(seq) & o.status.isIn(OutboxStatus.needsAttention),
+                  o.seq.equals(seq) &
+                  o.status.isIn(OutboxStatus.needsAttention),
             ))
             .write(
               OutboxCompanion(
@@ -655,10 +718,9 @@ class WriteRepository {
         final List<int> seqs = victims
             .map((OutboxData v) => v.seq)
             .toList(growable: false);
-        final int removed =
-            await (_db.delete(
-              _db.outbox,
-            )..where((Outbox o) => o.seq.isIn(seqs) & _unclaimed(o))).go();
+        final int removed = await (_db.delete(
+          _db.outbox,
+        )..where((Outbox o) => o.seq.isIn(seqs) & _unclaimed(o))).go();
         if (removed != victims.length) {
           throw const _ClaimRace();
         }
@@ -678,6 +740,20 @@ class WriteRepository {
               _db.representants,
             )..where((Representants t) => t.id.equals(victim.entityId))).go();
           }
+        }
+        for (final OutboxData victim in victims) {
+          if (victim.entityType != callAttemptEntity) continue;
+          final Object? payload;
+          try {
+            payload = jsonDecode(victim.payload);
+          } on FormatException {
+            continue;
+          }
+          if (payload is! Map<String, dynamic>) continue;
+          final Object? path = payload['_recordingPath'];
+          if (path is! String || path.isEmpty) continue;
+          final File recording = File(path);
+          if (recording.existsSync()) await recording.delete();
         }
 
         return DiscardResult(DiscardOutcome.discarded, removed: removed);
@@ -711,9 +787,7 @@ class WriteRepository {
     }
     final List<OutboxData> victims = await _discardVictims(row);
     final int prospects = victims
-        .where(
-          (OutboxData v) => v.op == 'create' && v.entityType == 'prospect',
-        )
+        .where((OutboxData v) => v.op == 'create' && v.entityType == 'prospect')
         .length;
     return DiscardPreview(operations: victims.length, prospects: prospects);
   }

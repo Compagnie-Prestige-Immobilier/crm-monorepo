@@ -1,16 +1,19 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LoaderIcon, SendHorizontalIcon } from 'lucide-react';
+import { LoaderIcon, SendHorizontalIcon, Trash2Icon } from 'lucide-react';
 import { useId, useState } from 'react';
+import { toast } from 'sonner';
 
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
   createRepresentantComment,
+  deleteRepresentantComment,
   fetchRepresentantComments,
   newCommentId,
   representantCommentsQueryKey,
@@ -25,13 +28,19 @@ const MAX_LENGTH = 2000;
 export function RepresentantComments({
   representantId,
   author,
+  canAdminister = false,
+  readOnly = false,
 }: {
   representantId: string;
   author: { id: string; fullName: string };
+  canAdminister?: boolean;
+  /** Un rôle de pilotage lit le fil : le composeur disparaît au lieu de 403. */
+  readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const fieldId = useId();
   const [draft, setDraft] = useState('');
+  const [deleting, setDeleting] = useState<RepresentantComment | null>(null);
   const queryKey = representantCommentsQueryKey(representantId);
 
   const thread = useQuery({ queryKey, queryFn: () => fetchRepresentantComments(representantId) });
@@ -45,6 +54,7 @@ export function RepresentantComments({
       queryClient.setQueryData<RepresentantComment[]>(queryKey, (current) => [
         {
           ...comment,
+          representantId,
           authorId: author.id,
           authorName: author.fullName,
           createdAt: comment.clientCreatedAt,
@@ -67,6 +77,21 @@ export function RepresentantComments({
     },
   });
 
+  const remove = useMutation({
+    mutationFn: (comment: RepresentantComment) =>
+      deleteRepresentantComment(representantId, comment.id),
+    onSuccess: () => {
+      setDeleting(null);
+      toast.success('Commentaire supprimé.');
+    },
+    onError: (error) => {
+      toastApiError(error, 'Le commentaire n’a pas été supprimé.');
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   const body = draft.trim();
 
   const submit = () => {
@@ -77,6 +102,7 @@ export function RepresentantComments({
 
   return (
     <div className="flex flex-col gap-5">
+      {readOnly ? null : (
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={fieldId}>Ajouter au fil</Label>
         <Textarea
@@ -103,6 +129,7 @@ export function RepresentantComments({
           </Button>
         </div>
       </div>
+      )}
 
       {thread.isPending ? (
         <Skeleton className="h-24 w-full" />
@@ -128,7 +155,7 @@ export function RepresentantComments({
               >
                 {initials(comment.authorName)}
               </span>
-              <div className="min-w-0">
+              <div className="min-w-0 grow">
                 <p className="text-[0.75rem] text-muted-foreground">
                   <span className="font-[600] text-foreground">{comment.authorName}</span> ·{' '}
                   <time dateTime={comment.clientCreatedAt} className="tabular-nums">
@@ -137,10 +164,47 @@ export function RepresentantComments({
                 </p>
                 <p className="max-w-prose whitespace-pre-wrap text-[0.875rem]">{comment.body}</p>
               </div>
+              {canAdminister ? (
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="Supprimer ce commentaire"
+                  onClick={() => {
+                    setDeleting(comment);
+                  }}
+                >
+                  <Trash2Icon aria-hidden="true" />
+                </Button>
+              ) : null}
             </li>
           ))}
         </ol>
       )}
+
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        pending={remove.isPending}
+        confirmLabel="Supprimer"
+        title="Supprimer ce commentaire ?"
+        description={
+          deleting === null
+            ? ''
+            : `Publié par ${deleting.authorName} le ${formatDateTime(deleting.clientCreatedAt)}. La ligne quitte le fil et ne se rétablit pas.`
+        }
+        onConfirm={() => {
+          if (deleting !== null) remove.mutate(deleting);
+        }}
+      >
+        {deleting === null ? null : (
+          <p className="max-w-prose rounded-md border border-border bg-secondary px-3 py-2.5 text-[0.875rem] whitespace-pre-wrap">
+            {deleting.body}
+          </p>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

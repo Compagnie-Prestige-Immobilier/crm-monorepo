@@ -38,7 +38,7 @@ describe('sortie de secours des écrans de détail', () => {
   });
 
   it('campagne prospects : le retour vers /campagnes survit à l’erreur', async () => {
-    renderWithQuery(<CampaignDetailView campaignId="inconnue" />);
+    renderWithQuery(<CampaignDetailView campaignId="inconnue" canManage={false} />);
 
     const back = await screen.findByRole('link', { name: /Toutes les campagnes/ });
     expect(back.getAttribute('href')).toBe('/campagnes');
@@ -46,7 +46,7 @@ describe('sortie de secours des écrans de détail', () => {
   });
 
   it('campagne représentants : le retour vers /campagnes/representants survit à l’erreur', async () => {
-    renderWithQuery(<RepCampaignDetailView campaignId="inconnue" />);
+    renderWithQuery(<RepCampaignDetailView campaignId="inconnue" canManage={false} />);
 
     const back = await screen.findByRole('link', { name: /Toutes les campagnes/ });
     expect(back.getAttribute('href')).toBe('/campagnes/representants');

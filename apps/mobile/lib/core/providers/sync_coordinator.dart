@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
@@ -96,7 +97,7 @@ class SyncCoordinator extends Notifier<SyncUiState> {
       if (next.value == null) return;
       unawaited(run(pull: false));
     });
-    Future<void>.microtask(_start);
+    scheduleMicrotask(_start);
     return const SyncUiState();
   }
 
@@ -163,7 +164,7 @@ class SyncCoordinator extends Notifier<SyncUiState> {
         lastError: e.toString(),
         lastErrorKind: FailureKind.retryable,
       );
-      return SyncOutcome.failed('unexpected', kind: FailureKind.retryable);
+      return const SyncOutcome.failed('unexpected', kind: FailureKind.retryable);
     }
   }
 
@@ -179,8 +180,18 @@ class SyncCoordinator extends Notifier<SyncUiState> {
   }
 
   Future<void> _scheduleCatchUp() async {
-    final int schedulable = await ref.read(syncEngineProvider).schedulableCount();
-    if (schedulable <= 0) return;
-    await BackgroundSync.enqueueCatchUp();
+    try {
+      final int schedulable = await ref.read(syncEngineProvider).schedulableCount();
+      if (schedulable <= 0) return;
+      await BackgroundSync.enqueueCatchUp();
+    } on Object catch (e, stack) {
+      // La file reste intacte : le prochain retour au premier plan la videra.
+      developer.log(
+        'Rattrapage de fond non programmé',
+        name: 'cpi.sync',
+        error: e,
+        stackTrace: stack,
+      );
+    }
   }
 }

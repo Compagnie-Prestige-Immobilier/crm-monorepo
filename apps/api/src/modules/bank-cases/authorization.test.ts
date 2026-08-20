@@ -171,14 +171,14 @@ const MATRICE_NOUVEAUX: {
   { controller: ClientRequestsController, method: 'reject', roles: [Role.ADMIN] },
 
   { controller: RepCampaignsController, method: 'preview', roles: [Role.ADMIN] },
-  { controller: RepCampaignsController, method: 'list', roles: [Role.ADMIN, Role.SUPERVISEUR] },
+  { controller: RepCampaignsController, method: 'list', roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION] },
   { controller: RepCampaignsController, method: 'create', roles: [Role.ADMIN] },
-  { controller: RepCampaignsController, method: 'get', roles: [Role.ADMIN, Role.SUPERVISEUR] },
+  { controller: RepCampaignsController, method: 'get', roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION] },
   { controller: RepCampaignsController, method: 'close', roles: [Role.ADMIN] },
   {
     controller: RepCampaignsController,
     method: 'downloadProgramme',
-    roles: [Role.ADMIN, Role.SUPERVISEUR],
+    roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepCampaignsController,
@@ -189,7 +189,7 @@ const MATRICE_NOUVEAUX: {
   {
     controller: RepresentantsController,
     method: 'list',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
@@ -199,7 +199,7 @@ const MATRICE_NOUVEAUX: {
   {
     controller: RepresentantsController,
     method: 'get',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
   },
   { controller: RepresentantsController, method: 'create', roles: [Role.ADMIN, Role.COMMERCIAL] },
   { controller: RepresentantsController, method: 'update', roles: [Role.ADMIN, Role.COMMERCIAL] },
@@ -208,12 +208,12 @@ const MATRICE_NOUVEAUX: {
   {
     controller: RepresentantsController,
     method: 'relationHistory',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
     method: 'listComments',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
@@ -268,9 +268,19 @@ describe('matrice d’autorisation des modules récents', () => {
     expect(allows(RepresentantsController, 'import', Role.ADMIN)).toBe(true);
   });
 
-  it('l’annuaire des représentants n’est ouvert au SUPERVISEUR qu’en lecture', () => {
+  it('l’annuaire des représentants n’est ouvert qu’en lecture aux rôles de pilotage', () => {
     for (const method of ['create', 'update', 'remove', 'import', 'addComment', 'removeComment']) {
-      expect(allows(RepresentantsController, method, Role.SUPERVISEUR), method).toBe(false);
+      for (const role of [Role.SUPERVISEUR, Role.DIRECTION]) {
+        expect(allows(RepresentantsController, method, role), `${role}.${method}`).toBe(false);
+      }
+    }
+  });
+
+  it('l’annuaire des représentants est fermé à l’ACCUEIL, route par route', () => {
+    for (const method of Object.getOwnPropertyNames(RepresentantsController.prototype).filter(
+      (name) => name !== 'constructor',
+    )) {
+      expect(allows(RepresentantsController, method, Role.ACCUEIL), method).toBe(false);
     }
   });
 
@@ -289,16 +299,22 @@ describe('matrice d’autorisation des modules récents', () => {
     expect(routes.length).toBeGreaterThanOrEqual(19);
 
     for (const method of routes) {
-      expect(admitted(AnalyticsController, method).sort()).toEqual(
-        [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR].sort(),
-      );
+      // Le vieillissement des dossiers est la seule route resserree: il tient du
+      // domaine bancaire, qui ne regarde pas la direction commerciale.
+      const attendus =
+        method === 'bankAging'
+          ? [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR]
+          : [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION];
+      expect(admitted(AnalyticsController, method).sort(), method).toEqual([...attendus].sort());
       expect(allows(AnalyticsController, method, Role.BANQUE_FINANCE)).toBe(false);
+      expect(allows(AnalyticsController, method, Role.ACCUEIL)).toBe(false);
     }
 
     expect(Reflect.getMetadata(ROLES_KEY, AnalyticsController)).toEqual([
       Role.ADMIN,
       Role.COMMERCIAL,
       Role.SUPERVISEUR,
+      Role.DIRECTION,
     ]);
   });
 });

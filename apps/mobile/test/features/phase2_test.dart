@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cpi_go/core/sync/api_port.dart';
 import 'package:cpi_go/core/sync/clock.dart';
@@ -38,12 +39,9 @@ void main() {
     clock = FakeClock(t0);
     writes = WriteRepository(db, clock: clock);
     directory = Phase2DirectorySync(database: db, api: api, clock: clock);
-    engine = SyncEngine(
-      database: db,
-      api: api,
-      tokens: InMemoryTokenStore()..save(accessToken: 'a', refreshToken: 'r'),
-      clock: clock,
-    );
+    final InMemoryTokenStore tokens = InMemoryTokenStore();
+    await tokens.save(accessToken: 'a', refreshToken: 'r');
+    engine = SyncEngine(database: db, api: api, tokens: tokens, clock: clock);
   });
 
   tearDown(() => db.close());
@@ -83,46 +81,52 @@ void main() {
     //
     // Ajouter une colonne doit donc casser ici, bruyamment, et obliger celui qui
     // le fait à écrire pourquoi.
-    test('phase2_directory ne stocke exactement que les six champs autorisés', () async {
-      final List<QueryRow> columns = await db
-          .customSelect('PRAGMA table_info(phase2_directory)')
-          .get();
-      final Set<String> names = columns
-          .map((QueryRow r) => r.read<String>('name'))
-          .toSet();
+    test(
+      'phase2_directory ne stocke exactement que les six champs autorisés',
+      () async {
+        final List<QueryRow> columns = await db
+            .customSelect('PRAGMA table_info(phase2_directory)')
+            .get();
+        final Set<String> names = columns
+            .map((QueryRow r) => r.read<String>('name'))
+            .toSet();
 
-      expect(names, <String>{
-        'prospect_id',
-        'phone_e164',
-        'phase2_status',
-        'enrollment_method',
-        'rev',
-        'updated_at',
-      });
-    });
+        expect(names, <String>{
+          'prospect_id',
+          'phone_e164',
+          'phase2_status',
+          'enrollment_method',
+          'rev',
+          'updated_at',
+        });
+      },
+    );
 
-    test('aucune colonne nominative n\'a été glissée dans call_attempts', () async {
-      final List<QueryRow> columns = await db
-          .customSelect('PRAGMA table_info(call_attempts)')
-          .get();
-      final Set<String> names = columns
-          .map((QueryRow r) => r.read<String>('name'))
-          .toSet();
+    test(
+      'aucune colonne nominative n\'a été glissée dans call_attempts',
+      () async {
+        final List<QueryRow> columns = await db
+            .customSelect('PRAGMA table_info(call_attempts)')
+            .get();
+        final Set<String> names = columns
+            .map((QueryRow r) => r.read<String>('name'))
+            .toSet();
 
-      // Le journal local désigne le dossier par son identifiant. Ni nom, ni
-      // téléphone, ni banque : la jointure vers l'annuaire suffit à l'affichage,
-      // et dupliquer le numéro ici multiplierait les endroits à purger.
-      for (final String forbidden in const <String>[
-        'nom',
-        'prenom',
-        'full_name',
-        'phone_e164',
-        'banque_id',
-        'syndicat_id',
-      ]) {
-        expect(names, isNot(contains(forbidden)));
-      }
-    });
+        // Le journal local désigne le dossier par son identifiant. Ni nom, ni
+        // téléphone, ni banque : la jointure vers l'annuaire suffit à l'affichage,
+        // et dupliquer le numéro ici multiplierait les endroits à purger.
+        for (final String forbidden in const <String>[
+          'nom',
+          'prenom',
+          'full_name',
+          'phone_e164',
+          'banque_id',
+          'syndicat_id',
+        ]) {
+          expect(names, isNot(contains(forbidden)));
+        }
+      },
+    );
 
     /// ═══ CE QUE LA DÉCONNEXION A LE DROIT DE DÉTRUIRE ═══
     ///
@@ -153,7 +157,12 @@ void main() {
       // l'annuaire, pas les saisies de prospection qui n'ont pas encore été
       // envoyées : les emporter détruirait le travail de la journée.
       await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
-      await queueOp(db, id: 'op-p1', entityType: 'representant', entityId: 'rep-1');
+      await queueOp(
+        db,
+        id: 'op-p1',
+        entityType: 'representant',
+        entityId: 'rep-1',
+      );
 
       await directory.purge();
 
@@ -192,9 +201,11 @@ void main() {
       );
 
       // Le premier appel est acquitté, le second est toujours en file.
-      await (db.update(db.outbox)
-            ..where((Outbox o) => o.entityId.equals(sent)))
-          .write(const OutboxCompanion(status: Value<String>(OutboxStatus.done)));
+      await (db.update(
+        db.outbox,
+      )..where((Outbox o) => o.entityId.equals(sent))).write(
+        const OutboxCompanion(status: Value<String>(OutboxStatus.done)),
+      );
 
       await directory.purge();
 
@@ -217,28 +228,37 @@ void main() {
     // désignent le même abonné et DOIVENT retrouver la même ligne : sans cela,
     // il conclurait « ce numéro n'est pas dans mon annuaire » et sauterait un
     // dossier, sans que rien ne le signale.
-    test('les trois écritures d\'un même numéro retrouvent la même ligne', () async {
-      await seedDirectory(phone: '+221771234567');
+    test(
+      'les trois écritures d\'un même numéro retrouvent la même ligne',
+      () async {
+        await seedDirectory(phone: '+221771234567');
 
-      for (final String typed in const <String>[
-        '77 123 45 67',
-        '771234567',
-        '+221771234567',
-        '+221 77 123 45 67',
-        '00221771234567',
-        '221771234567',
-        // Recopié depuis WhatsApp, avec un tiret cadratin.
-        '77-123-45-67',
-        '77.123.45.67',
-        '(77) 123 45 67',
-      ]) {
-        final String? e164 = Phone.toE164(typed);
-        expect(e164, '+221771234567', reason: 'normalisation de « $typed »');
+        for (final String typed in const <String>[
+          '77 123 45 67',
+          '771234567',
+          '+221771234567',
+          '+221 77 123 45 67',
+          '00221771234567',
+          '221771234567',
+          // Recopié depuis WhatsApp, avec un tiret cadratin.
+          '77-123-45-67',
+          '77.123.45.67',
+          '(77) 123 45 67',
+        ]) {
+          final String? e164 = Phone.toE164(typed);
+          expect(e164, '+221771234567', reason: 'normalisation de « $typed »');
 
-        final Phase2DirectoryData? found = await directory.lookupByPhone(e164!);
-        expect(found?.prospectId, 'pros-1', reason: '« $typed » doit retrouver la ligne');
-      }
-    });
+          final Phase2DirectoryData? found = await directory.lookupByPhone(
+            e164!,
+          );
+          expect(
+            found?.prospectId,
+            'pros-1',
+            reason: '« $typed » doit retrouver la ligne',
+          );
+        }
+      },
+    );
 
     test('un numéro absent de l\'annuaire ne rend rien', () async {
       await seedDirectory(phone: '+221771234567');
@@ -254,7 +274,10 @@ void main() {
         api: const ExplodingApi(),
         clock: clock,
       );
-      expect((await offline.lookupByPhone('+221771234567'))?.prospectId, 'pros-1');
+      expect(
+        (await offline.lookupByPhone('+221771234567'))?.prospectId,
+        'pros-1',
+      );
     });
 
     test('deux prospects ne peuvent pas partager un numéro', () async {
@@ -330,7 +353,11 @@ void main() {
       api.directoryPages.add(
         directoryPage(
           entries: <Phase2DirectoryEntry>[
-            directoryEntry(prospectId: 'p1', phoneE164: '+221770000001', rev: 2),
+            directoryEntry(
+              prospectId: 'p1',
+              phoneE164: '+221770000001',
+              rev: 2,
+            ),
           ],
         ),
       );
@@ -343,37 +370,41 @@ void main() {
       expect(row.phase2Status, Phase2Statuses.methodObtained);
     });
 
-    test('à révision égale, le serveur l\'emporte sur le miroir optimiste', () async {
-      // Le scénario de réconciliation : on a marqué localement « refus », le
-      // serveur a refusé l'écriture (dossier déjà clos par un collègue) et n'a
-      // donc pas bougé sa `rev`. Sans `>=`, ce pull ne corrigerait jamais rien.
-      await seedDirectory(rev: 3);
-      await db.customStatement(
-        'UPDATE phase2_directory SET phase2_status = ? WHERE prospect_id = ?',
-        <Object?>[Phase2Statuses.refused, 'pros-1'],
-      );
+    test(
+      'à révision égale, le serveur l\'emporte sur le miroir optimiste',
+      () async {
+        // Le scénario de réconciliation : on a marqué localement « refus », le
+        // serveur a refusé l'écriture (dossier déjà clos par un collègue) et n'a
+        // donc pas bougé sa `rev`. Sans `>=`, ce pull ne corrigerait jamais rien.
+        await seedDirectory(rev: 3);
+        await db.customStatement(
+          'UPDATE phase2_directory SET phase2_status = ? WHERE prospect_id = ?',
+          <Object?>[Phase2Statuses.refused, 'pros-1'],
+        );
 
-      api.directoryPages.add(
-        directoryPage(
-          entries: <Phase2DirectoryEntry>[
-            directoryEntry(
-              prospectId: 'pros-1',
-              phoneE164: '+221771234567',
-              phase2Status: Phase2Statuses.methodObtained,
-              enrollmentMethod: EnrollmentMethods.physical,
-              rev: 3,
-            ),
-          ],
-        ),
-      );
+        api.directoryPages.add(
+          directoryPage(
+            entries: <Phase2DirectoryEntry>[
+              directoryEntry(
+                prospectId: 'pros-1',
+                phoneE164: '+221771234567',
+                phase2Status: Phase2Statuses.methodObtained,
+                enrollmentMethod: EnrollmentMethods.physical,
+                rev: 3,
+              ),
+            ],
+          ),
+        );
 
-      await directory.pull();
+        await directory.pull();
 
-      final Phase2DirectoryData row =
-          await directory.lookupByPhone('+221771234567') as Phase2DirectoryData;
-      expect(row.phase2Status, Phase2Statuses.methodObtained);
-      expect(row.enrollmentMethod, EnrollmentMethods.physical);
-    });
+        final Phase2DirectoryData row =
+            await directory.lookupByPhone('+221771234567')
+                as Phase2DirectoryData;
+        expect(row.phase2Status, Phase2Statuses.methodObtained);
+        expect(row.enrollmentMethod, EnrollmentMethods.physical);
+      },
+    );
 
     test('un échec réseau laisse l\'annuaire déjà téléchargé intact', () async {
       await seedDirectory();
@@ -416,7 +447,8 @@ void main() {
       // numéro partent dans l'ordre de saisie.
       expect(op.dependencyKey, 'phase2:pros-1');
 
-      final Map<String, Object?> payload = jsonDecode(op.payload) as Map<String, Object?>;
+      final Map<String, Object?> payload =
+          jsonDecode(op.payload) as Map<String, Object?>;
       expect(payload['prospectId'], 'pros-1');
       expect(payload['outcome'], CallOutcomes.methodObtained);
       expect(payload['method'], EnrollmentMethods.platform);
@@ -463,7 +495,10 @@ void main() {
         (await directory.lookupByPhone('+221770000001'))?.phase2Status,
         Phase2Statuses.refused,
       );
-      expect((await directory.lookupByPhone('+221770000002'))?.enrollmentMethod, isNull);
+      expect(
+        (await directory.lookupByPhone('+221770000002'))?.enrollmentMethod,
+        isNull,
+      );
     });
 
     group('validation locale', () {
@@ -572,19 +607,422 @@ void main() {
         );
       });
 
-      test('la base refuse elle aussi, si un chemin de code contournait Dart', () async {
-        // La validation Dart donne le message ; le CHECK garantit qu'aucun
-        // chemin ne peut l'esquiver.
-        await expectLater(
-          db.customStatement(
-            'INSERT INTO call_attempts '
-            '(id, prospect_id, outcome, method, comment, client_created_at, created_by_id) '
-            'VALUES (?, ?, ?, NULL, NULL, ?, ?)',
-            <Object?>['x', 'pros-1', 'OTHER', t0.toIso8601String(), 'me'],
+      test(
+        'la base refuse elle aussi, si un chemin de code contournait Dart',
+        () async {
+          // La validation Dart donne le message ; le CHECK garantit qu'aucun
+          // chemin ne peut l'esquiver.
+          await expectLater(
+            db.customStatement(
+              'INSERT INTO call_attempts '
+              '(id, prospect_id, outcome, requires_comment, method, comment, '
+              ' client_created_at, created_by_id) '
+              'VALUES (?, ?, ?, 1, NULL, NULL, ?, ?)',
+              <Object?>['x', 'pros-1', 'OTHER', t0.toIso8601String(), 'me'],
+            ),
+            throwsA(isA<SqliteException>()),
+          );
+        },
+      );
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Motifs d'issue administrés par le client
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// Un motif tel que le serveur le rend.
+  CallOutcomeReasonDto reasonDto({
+    required String code,
+    required String label,
+    CallOutcomeEffect effect = CallOutcomeEffect.KEEP_OPEN,
+    bool requiresComment = false,
+    bool isActive = true,
+    int sortOrder = 100,
+  }) => CallOutcomeReasonDto(
+    id: 'id-$code',
+    code: code,
+    label: label,
+    effect: effect,
+    requiresComment: requiresComment,
+    requiresCallback: false,
+    countsAsReached: true,
+    isActive: isActive,
+    isSystem: false,
+    sortOrder: sortOrder,
+    color: null,
+    minPayloadVersion: 2,
+    updatedAt: t0,
+  );
+
+  Future<void> seedReason({
+    required String code,
+    required String label,
+    String effect = CallEffects.keepOpen,
+    bool requiresComment = false,
+    bool isActive = true,
+    int sortOrder = 100,
+  }) {
+    return db
+        .into(db.callOutcomeReasons)
+        .insert(
+          CallOutcomeReasonsCompanion.insert(
+            code: code,
+            label: label,
+            effect: effect,
+            requiresComment: Value<bool>(requiresComment),
+            isActive: Value<bool>(isActive),
+            sortOrder: Value<int>(sortOrder),
+            minPayloadVersion: const Value<int>(2),
           ),
-          throwsA(isA<SqliteException>()),
         );
+  }
+
+  group('motifs d\'issue', () {
+    test('le référentiel redescend avec le pull et remplace la table', () async {
+      api.callOutcomeReasons.addAll(<CallOutcomeReasonDto>[
+        reasonDto(code: 'NRP', label: 'Ne répond pas', sortOrder: 15),
+        reasonDto(
+          code: 'RDV_PRIS',
+          label: 'Rendez-vous pris',
+          effect: CallOutcomeEffect.SCHEDULE_CALLBACK,
+          sortOrder: 35,
+        ),
+      ]);
+
+      await engine.pullChanges();
+
+      // Le serveur filtre lui-même sur la version de charge utile : l'application
+      // ne reçoit que des motifs qu'elle sait émettre.
+      expect(api.reasonCalls, <int>[SyncEngine.payloadVersion]);
+
+      final List<CallOutcomeReason> rows = await db
+          .select(db.callOutcomeReasons)
+          .get();
+      expect(rows.map((CallOutcomeReason r) => r.code).toSet(), <String>{
+        'NRP',
+        'RDV_PRIS',
       });
+      expect(
+        rows.firstWhere((CallOutcomeReason r) => r.code == 'RDV_PRIS').effect,
+        CallEffects.scheduleCallback,
+      );
+    });
+
+    // Le référentiel est un confort ; la page de saisies, non. Si l'un tombe,
+    // l'autre doit passer quand même.
+    test(
+      'un référentiel injoignable n\'arrête pas le pull des entités',
+      () async {
+        api.failNextReasonsPull = const ApiException(
+          'NETWORK',
+          kind: FailureKind.unreachable,
+        );
+
+        await expectLater(engine.pullChanges(), completes);
+        expect(await db.select(db.callOutcomeReasons).get(), isEmpty);
+      },
+    );
+
+    test('un motif ajouté par le client se saisit et porte son code', () async {
+      await seedDirectory();
+      await seedReason(code: 'NRP', label: 'Ne répond pas', sortOrder: 15);
+
+      final String attemptId = await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        reasonCode: 'NRP',
+        createdById: 'me',
+      );
+
+      final CallAttempt attempt = await (db.select(
+        db.callAttempts,
+      )..where((CallAttempts a) => a.id.equals(attemptId))).getSingle();
+      expect(attempt.reasonCode, 'NRP');
+      expect(attempt.effect, CallEffects.keepOpen);
+      // L'issue reste celle de l'effet : `outcome` est une énumération FERMÉE du
+      // contrat, et y écrire « NRP » repartirait en `unknown_default_open_api`.
+      expect(attempt.outcome, CallOutcomes.unreachable);
+
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload)
+              as Map<String, Object?>;
+      expect(payload['reasonCode'], 'NRP');
+      expect(payload['outcome'], CallOutcomes.unreachable);
+    });
+
+    // C'est le défaut que ce lot corrige : le moteur marquait
+    // PAYLOAD_SCHEMA_MISMATCH, statut TERMINAL, sur toute issue absente d'un
+    // vocabulaire compilé. Un motif neuf n'atteignait jamais le serveur.
+    test('un motif de la table locale traverse le moteur', () async {
+      await seedDirectory();
+      await seedReason(code: 'NRP', label: 'Ne répond pas');
+      // Écrite à la main : « NRP » en guise d'issue, ce qu'aucune version
+      // antérieure n'aurait su relire. Le moteur la résout par le RÉFÉRENTIEL,
+      // et c'est l'effet du motif qui décide de l'issue qui part sur le fil.
+      await queueOp(
+        db,
+        id: 'op-nrp',
+        entityType: callAttemptEntity,
+        entityId: 'att-1',
+        dependencyKey: 'phase2:pros-1',
+        payload: <String, Object?>{
+          'prospectId': 'pros-1',
+          'outcome': 'NRP',
+          'clientCreatedAt': t0.toIso8601String(),
+        },
+      );
+
+      await engine.drain();
+
+      final OutboxData row = await outboxById(db, 'op-nrp');
+      expect(row.status, OutboxStatus.done);
+      expect(row.lastErrorCode, isNot(ClientErrorCodes.payloadSchemaMismatch));
+      final SyncOperationDto sent = api.calls.single.operations.single;
+      expect(sent.data?.outcome, CallOutcome.UNREACHABLE);
+    });
+
+    test('la file d\'aujourd\'hui part en version de charge utile 3', () async {
+      await seedDirectory();
+      await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        createdById: 'me',
+      );
+
+      await engine.drain();
+
+      expect((await allOutbox(db)).single.payloadVersion, 3);
+      expect(api.calls.single.payloadVersion, 3);
+    });
+
+    test('la note vocale reste en file jusqu’à son envoi', () async {
+      await seedDirectory();
+      final File recording = File(
+        '${Directory.systemTemp.path}/crm-audio-${DateTime.now().microsecondsSinceEpoch}.m4a',
+      );
+      await recording.writeAsString('audio');
+      await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        createdById: 'me',
+        recordingPath: recording.path,
+      );
+
+      await engine.drain();
+
+      expect(api.uploadedRecordings, hasLength(1));
+      // ignore: avoid_slow_async_io
+      expect(await recording.exists(), isFalse);
+      expect((await allOutbox(db)).single.status, OutboxStatus.done);
+    });
+
+    test('un échec d’envoi conserve la note vocale pour le rejeu', () async {
+      await seedDirectory();
+      final File recording = File(
+        '${Directory.systemTemp.path}/crm-audio-retry-${DateTime.now().microsecondsSinceEpoch}.m4a',
+      );
+      await recording.writeAsString('audio');
+      await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        createdById: 'me',
+        recordingPath: recording.path,
+      );
+      api.failNextRecordingUpload = const ApiException('NETWORK');
+
+      await engine.drain();
+
+      // ignore: avoid_slow_async_io
+      expect(await recording.exists(), isTrue);
+      expect((await allOutbox(db)).single.status, OutboxStatus.pending);
+
+      clock.advance(const Duration(minutes: 5));
+      await engine.drain();
+
+      // ignore: avoid_slow_async_io
+      expect(await recording.exists(), isFalse);
+      expect((await allOutbox(db)).single.status, OutboxStatus.done);
+    });
+
+    test('un fichier local disparu rend la perte visible', () async {
+      await seedDirectory();
+      final String missingPath =
+          '${Directory.systemTemp.path}/crm-audio-absent-${DateTime.now().microsecondsSinceEpoch}.m4a';
+      await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        createdById: 'me',
+        recordingPath: missingPath,
+      );
+
+      await engine.drain();
+
+      final OutboxData row = (await allOutbox(db)).single;
+      expect(row.status, OutboxStatus.failed);
+      expect(row.lastErrorCode, 'CALL_RECORDING_FILE_MISSING');
+      expect(api.uploadedRecordings, isEmpty);
+    });
+
+    test(
+      'un refus DEFINITIF rend la perte visible et conserve la note',
+      () async {
+        await seedDirectory();
+        final File recording = File(
+          '${Directory.systemTemp.path}/crm-audio-refus-${DateTime.now().microsecondsSinceEpoch}.m4a',
+        );
+        await recording.writeAsString('audio');
+        await writes.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.unreachable,
+          createdById: 'me',
+          recordingPath: recording.path,
+        );
+        api.failNextRecordingUpload = const ApiException(
+          'CALL_RECORDING_EMPTY',
+          statusCode: 400,
+          kind: FailureKind.terminal,
+        );
+
+        await engine.drain();
+
+        // ignore: avoid_slow_async_io
+        expect(await recording.exists(), isTrue);
+        final OutboxData row = (await allOutbox(db)).single;
+        expect(row.status, OutboxStatus.failed);
+        expect(row.lastErrorCode, 'CALL_RECORDING_EMPTY');
+      },
+    );
+
+    // Un motif retiré du référentiel entre la saisie et l'envoi ne doit pas
+    // condamner une tentative déjà faite : le téléconseiller ne peut plus rien y
+    // corriger trois semaines plus tard.
+    test(
+      'un motif désactivé laisse partir une tentative déjà en file',
+      () async {
+        await seedDirectory();
+        await seedReason(code: 'NRP', label: 'Ne répond pas');
+        await writes.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.unreachable,
+          reasonCode: 'NRP',
+          createdById: 'me',
+        );
+        await (db.update(
+          db.callOutcomeReasons,
+        )..where((CallOutcomeReasons t) => t.code.equals('NRP'))).write(
+          const CallOutcomeReasonsCompanion(isActive: Value<bool>(false)),
+        );
+
+        await engine.drain();
+
+        expect((await allOutbox(db)).single.status, OutboxStatus.done);
+      },
+    );
+
+    // Premier lancement : le référentiel n'est pas encore descendu, et la saisie
+    // ne peut pas attendre le réseau.
+    test('table vide, les six motifs système restent saisissables', () async {
+      await seedDirectory();
+      expect(await db.select(db.callOutcomeReasons).get(), isEmpty);
+
+      await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.refused,
+        createdById: 'me',
+      );
+
+      final CallAttempt attempt =
+          (await db.select(db.callAttempts).get()).single;
+      expect(attempt.effect, CallEffects.closeRefused);
+      expect(attempt.reasonCode, CallOutcomes.refused);
+      final Phase2DirectoryData row =
+          await directory.lookupByPhone('+221771234567') as Phase2DirectoryData;
+      expect(row.phase2Status, Phase2Statuses.refused);
+    });
+
+    test(
+      'un motif que même le repli ignore est refusé, avec un message',
+      () async {
+        await seedDirectory();
+        await expectLater(
+          writes.recordCallAttempt(
+            prospectId: 'pros-1',
+            outcome: CallOutcomes.unreachable,
+            reasonCode: 'MOTIF_JAMAIS_DESCENDU',
+            createdById: 'me',
+          ),
+          throwsA(
+            isA<CallAttemptInvalid>().having(
+              (CallAttemptInvalid e) => e.problem,
+              'problem',
+              CallAttemptProblem.unknownReason,
+            ),
+          ),
+        );
+        expect(await db.countMyAttempts().getSingle(), 0);
+      },
+    );
+
+    test('un motif du serveur qui exige un commentaire l\'obtient', () async {
+      await seedDirectory();
+      await seedReason(
+        code: 'LITIGE',
+        label: 'Litige en cours',
+        requiresComment: true,
+      );
+
+      await expectLater(
+        writes.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.unreachable,
+          reasonCode: 'LITIGE',
+          createdById: 'me',
+        ),
+        throwsA(
+          isA<CallAttemptInvalid>().having(
+            (CallAttemptInvalid e) => e.problem,
+            'problem',
+            CallAttemptProblem.commentRequired,
+          ),
+        ),
+      );
+
+      final String id = await writes.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.unreachable,
+        reasonCode: 'LITIGE',
+        comment: 'Dossier chez l\'avocat.',
+        createdById: 'me',
+      );
+      final CallAttempt attempt = await (db.select(
+        db.callAttempts,
+      )..where((CallAttempts a) => a.id.equals(id))).getSingle();
+      expect(attempt.requiresComment, isTrue);
+      expect(attempt.comment, 'Dossier chez l\'avocat.');
+    });
+
+    // Le CHECK est le filet du filet : la validation Dart donne le message, le
+    // DDL garantit qu'aucun chemin de code ne l'esquive.
+    test('la base refuse un motif exigeant sans commentaire', () async {
+      await expectLater(
+        db.customStatement(
+          'INSERT INTO call_attempts '
+          '(id, prospect_id, outcome, reason_code, effect, requires_comment, '
+          ' client_created_at, created_by_id) '
+          'VALUES (?, ?, ?, ?, ?, 1, ?, ?)',
+          <Object?>[
+            'x',
+            'pros-1',
+            'UNREACHABLE',
+            'LITIGE',
+            CallEffects.keepOpen,
+            t0.toIso8601String(),
+            'me',
+          ],
+        ),
+        throwsA(isA<SqliteException>()),
+      );
     });
   });
 
@@ -671,7 +1109,8 @@ void main() {
       // rendu `unknown_default_open_api` passerait toutes les assertions
       // ci-dessus sur les objets et ne se verrait qu'ici.
       final Map<String, dynamic> wire = sent.toJson();
-      final Map<String, dynamic> wireData = wire['data'] as Map<String, dynamic>;
+      final Map<String, dynamic> wireData =
+          wire['data'] as Map<String, dynamic>;
       expect(wire['entity'], 'call_attempt');
       expect(wireData['prospectId'], 'a');
       expect(wireData['outcome'], CallOutcomes.methodObtained);
@@ -764,7 +1203,9 @@ void main() {
       }
 
       final List<OutboxData> batch = await engine.selectBatch();
-      final Set<String?> keys = batch.map((OutboxData o) => o.dependencyKey).toSet();
+      final Set<String?> keys = batch
+          .map((OutboxData o) => o.dependencyKey)
+          .toSet();
       expect(keys.length, lessThanOrEqualTo(engine.maxBatchGroups));
 
       // La vidange complète les emporte quand même, en plusieurs lots.
@@ -810,7 +1251,9 @@ void main() {
       await engine.drain();
       expect(api.calls, hasLength(1), reason: 'un seul aller-retour, pas deux');
       expect(
-        api.calls.single.operations.map((SyncOperationDto o) => o.entity).toSet(),
+        api.calls.single.operations
+            .map((SyncOperationDto o) => o.entity)
+            .toSet(),
         <SyncEntity>{SyncEntity.representant, SyncEntity.callAttempt},
       );
       expect(await db.countPendingOutbox().getSingle(), 0);
@@ -870,7 +1313,8 @@ void main() {
         expect(
           api.calls,
           isEmpty,
-          reason: 'rien ne doit partir avec une issue que le serveur ne connaît pas',
+          reason:
+              'rien ne doit partir avec une issue que le serveur ne connaît pas',
         );
       },
     );

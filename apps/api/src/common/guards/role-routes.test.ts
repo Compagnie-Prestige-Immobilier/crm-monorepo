@@ -29,6 +29,8 @@ import { RepresentantsController } from '../../modules/representants/representan
 import { SuggestionsController } from '../../modules/suggestions/suggestions.controller.js';
 import { SupervisionController } from '../../modules/analytics/supervision.controller.js';
 import { SyncController } from '../../modules/sync/sync.controller.js';
+import { CallOutcomeReasonsController } from '../../modules/referentiels/call-outcome-reasons.controller.js';
+import { VisitesController } from '../../modules/visites/visites.controller.js';
 import { UsersController } from '../../modules/users/users.controller.js';
 
 type Controller = new (...args: never[]) => object;
@@ -42,6 +44,7 @@ const CONTROLLERS: readonly Controller[] = [
   BankCasesController,
   BankCasesExportController,
   CallbacksController,
+  CallOutcomeReasonsController,
   ClientRequestsController,
   DbDumpController,
   DemoController,
@@ -59,6 +62,7 @@ const CONTROLLERS: readonly Controller[] = [
   SupervisionController,
   SyncController,
   UsersController,
+  VisitesController,
 ];
 
 /**
@@ -102,6 +106,7 @@ const ADMISES: readonly string[] = [
   'HealthController.ready',
 
   'AuthController.me',
+  'CallOutcomeReasonsController.list',
   'CallbacksController.list',
   'DemoController.status',
   'NotificationsController.mine',
@@ -110,6 +115,8 @@ const ADMISES: readonly string[] = [
   'Phase2Controller.getCampaign',
   'Phase2Controller.listCampaigns',
   'Phase2Controller.downloadProgramme',
+  // Lecture seule: un superviseur ecoute une note audio, il n'en televerse pas.
+  'Phase2Controller.downloadRecording',
 
   'ProspectsController.get',
   'ProspectsController.list',
@@ -135,27 +142,88 @@ const ADMISES: readonly string[] = [
 
   'SupervisionController.activite',
   'UsersController.list',
+  'VisitesController.bundle',
+];
+
+/**
+ * Ce que TOUT compte atteint : son identité, les référentiels, ses
+ * notifications. C'est aussi, à une route près, tout ce que l'ACCUEIL atteint
+ * en dehors du registre.
+ */
+const SOCLE: readonly string[] = [
+  'AppUpdatesController.current',
+  'AppUpdatesController.download',
+  'AuthController.login',
+  'AuthController.logout',
+  'AuthController.me',
+  'AuthController.refresh',
+  'CallOutcomeReasonsController.list',
+  'DemoController.status',
+  'HealthController.live',
+  'HealthController.ready',
+  'NotificationsController.markRead',
+  'NotificationsController.mine',
+  'ReferentielsController.bundle',
+  'ReferentielsController.listBanques',
+  'ReferentielsController.listDepartements',
+  'ReferentielsController.listIefs',
+  'ReferentielsController.listRegions',
+  'ReferentielsController.listRegionsWithDepartements',
+  'ReferentielsController.listSyndicats',
+  'VisitesController.bundle',
+];
+
+/** Le registre lui-même : ce que l'ACCUEIL tient, et que la DIRECTION relit. */
+const REGISTRE: readonly string[] = [
+  'VisitesController.create',
+  'VisitesController.get',
+  'VisitesController.list',
+  'VisitesController.statistiques',
+  'VisitesController.update',
+];
+
+/**
+ * L'ACCUEIL, c'est le comptoir : le registre, et rien d'autre. Ni prospect, ni
+ * représentant, ni statistique d'appel.
+ */
+const ADMISES_ACCUEIL: readonly string[] = [...SOCLE, ...REGISTRE];
+
+/**
+ * La DIRECTION lit ce que lit la supervision, tient le registre avec l'accueil,
+ * administre les quatre listes qui l'alimentent et exporte ce qu'elle lit. Elle
+ * n'ouvre aucun compte et ne purge rien.
+ */
+const ADMISES_DIRECTION: readonly string[] = [
+  ...ADMISES.filter((route) => route !== 'AnalyticsController.bankAging'),
+  ...REGISTRE,
+  'ExportController.prospects',
+  'ExportController.representantsExport',
+  'VisitesController.createReferentiel',
+  'VisitesController.listReferentiel',
+  'VisitesController.reorderReferentiel',
+  'VisitesController.setReferentielActive',
+  'VisitesController.updateReferentiel',
 ];
 
 const guard = new RolesGuard(new Reflector());
 
-const identity: AuthenticatedUser = {
-  id: 'sup-1',
-  email: 'sup@cpi.sn',
-  username: 'sup',
+const identityOf = (role: Role): AuthenticatedUser => ({
+  id: `${role}-1`,
+  email: `${role}@cpi.sn`,
+  username: role,
   fullName: 'Awa Sy',
-  role: Role.SUPERVISEUR,
-};
+  role,
+});
 
 const routesOf = (controller: Controller): string[] =>
   Object.getOwnPropertyNames(controller.prototype).filter((name) => name !== 'constructor');
 
-function allows(controller: Controller, method: string): boolean {
+function allowsAs(role: Role, controller: Controller, method: string): boolean {
   const handler = (controller.prototype as Record<string, unknown>)[method];
   const context = {
     getHandler: () => handler,
     getClass: () => controller,
-    switchToHttp: () => ({ getRequest: () => ({ user: identity }) }),
+    switchToHttp: () => ({ getRequest: () => ({ user: identityOf(role) }) }),
   } as unknown as ExecutionContext;
 
   try {
@@ -166,12 +234,17 @@ function allows(controller: Controller, method: string): boolean {
   }
 }
 
-const ouvertes = (): string[] =>
+const allows = (controller: Controller, method: string): boolean =>
+  allowsAs(Role.SUPERVISEUR, controller, method);
+
+const ouvertesDe = (role: Role): string[] =>
   CONTROLLERS.flatMap((controller) =>
     routesOf(controller)
-      .filter((method) => allows(controller, method))
+      .filter((method) => allowsAs(role, controller, method))
       .map((method) => `${controller.name}.${method}`),
   ).sort();
+
+const ouvertes = (): string[] => ouvertesDe(Role.SUPERVISEUR);
 
 describe('ce qu’un SUPERVISEUR atteint, route par route', () => {
   it('exactement l’inventaire, ni plus ni moins', () => {
@@ -227,6 +300,99 @@ describe('ce qu’un SUPERVISEUR atteint, route par route', () => {
       for (const method of routesOf(controller)) {
         expect(allows(controller, method), `${controller.name}.${method}`).toBe(false);
       }
+    }
+  });
+});
+
+describe('ce qu’un compte d’ACCUEIL atteint, route par route', () => {
+  it('exactement l’inventaire, ni plus ni moins', () => {
+    expect(ouvertesDe(Role.ACCUEIL)).toEqual([...ADMISES_ACCUEIL].sort());
+  });
+
+  it('ne voit ni prospect, ni représentant, ni statistique d’appel', () => {
+    for (const controller of [
+      AnalyticsController,
+      ProspectsController,
+      RepresentantsController,
+      RepCampaignsController,
+      Phase2Controller,
+      SupervisionController,
+      SuggestionsController,
+      CallbacksController,
+      SyncController,
+      UsersController,
+    ]) {
+      for (const method of routesOf(controller)) {
+        expect(allowsAs(Role.ACCUEIL, controller, method), `${controller.name}.${method}`).toBe(
+          false,
+        );
+      }
+    }
+  });
+
+  it('n’administre pas les listes qu’il utilise', () => {
+    for (const method of [
+      'listReferentiel',
+      'createReferentiel',
+      'updateReferentiel',
+      'setReferentielActive',
+      'reorderReferentiel',
+    ]) {
+      expect(allowsAs(Role.ACCUEIL, VisitesController, method), `visites.${method}`).toBe(false);
+    }
+  });
+});
+
+describe('ce qu’une DIRECTION atteint, route par route', () => {
+  it('exactement l’inventaire, ni plus ni moins', () => {
+    expect(ouvertesDe(Role.DIRECTION)).toEqual([...ADMISES_DIRECTION].sort());
+  });
+
+  it('lit tout ce que lit la supervision, hors dossiers bancaires', () => {
+    const direction = new Set(ouvertesDe(Role.DIRECTION));
+    expect(ouvertesDe(Role.SUPERVISEUR).filter((route) => !direction.has(route))).toEqual([
+      'AnalyticsController.bankAging',
+    ]);
+  });
+
+  it('reste hors du domaine bancaire', () => {
+    for (const controller of [
+      BankCasesController,
+      BankCaseStagesController,
+      BankCasesExportController,
+      ClientRequestsController,
+    ]) {
+      for (const method of routesOf(controller)) {
+        expect(allowsAs(Role.DIRECTION, controller, method), `${controller.name}.${method}`).toBe(
+          false,
+        );
+      }
+    }
+    expect(allowsAs(Role.DIRECTION, AnalyticsController, 'bankAging')).toBe(false);
+  });
+
+  it('LA SYNCHRONISATION MOBILE LUI EST FERMÉE, poussée comme tirage', () => {
+    for (const method of routesOf(SyncController)) {
+      expect(allowsAs(Role.DIRECTION, SyncController, method), `sync.${method}`).toBe(false);
+    }
+  });
+
+  it('n’ouvre aucun compte, ne purge rien, n’émet aucune notification', () => {
+    for (const method of routesOf(UsersController).filter((name) => name !== 'list')) {
+      expect(allowsAs(Role.DIRECTION, UsersController, method), `users.${method}`).toBe(false);
+    }
+    expect(allowsAs(Role.DIRECTION, AdminController, 'purge')).toBe(false);
+    expect(allowsAs(Role.DIRECTION, AdminController, 'catalog')).toBe(false);
+    for (const method of routesOf(NotificationTemplatesController)) {
+      expect(allowsAs(Role.DIRECTION, NotificationTemplatesController, method)).toBe(false);
+    }
+    for (const method of ['create', 'update', 'remove', 'merge', 'reassign', 'changeSegment']) {
+      expect(allowsAs(Role.DIRECTION, ProspectsController, method), `prospects.${method}`).toBe(
+        false,
+      );
+    }
+    for (const method of routesOf(ImportsController)) {
+      expect(allowsAs(Role.DIRECTION, ImportsController, method), `imports.${method}`).toBe(false);
     }
   });
 });

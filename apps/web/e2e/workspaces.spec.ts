@@ -5,11 +5,13 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   adminApi,
+  BANK_CLIENT_PHONE,
   BANQUIER,
   enableDemo,
   ensureWorkspaceFixtures,
   FIXTURE_PASSWORD,
   purgeDemo,
+  REPRESENTANT,
 } from './fixtures';
 
 /**
@@ -168,7 +170,11 @@ test('les filtres de phase 2 vivent dans l’URL et survivent au rechargement', 
   const countLine = page.getByRole('status').filter({ hasText: 'Prospects affichés' });
   await expect(countLine).not.toHaveText('');
 
-  await page.getByRole('button', { name: 'Filtres avancés' }).click();
+  // DÉPLIÉ, pas basculé : `AdvancedPanel` mémorise son état dans
+  // `localStorage`, et l'état de session l'emporte d'une exécution à l'autre.
+  const avances = page.getByRole('button', { name: 'Filtres avancés' });
+  if ((await avances.getAttribute('aria-expanded')) !== 'true') await avances.click();
+  await expect(avances).toHaveAttribute('aria-expanded', 'true');
   await page.getByRole('combobox', { name: 'Statut phase 2' }).click();
   await page.getByRole('option', { name: 'Méthode obtenue' }).click();
   await expect(page).toHaveURL(/phase2Status=METHOD_OBTAINED/);
@@ -512,9 +518,10 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
     await expect(depot.getByLabel(/^Nom/)).toHaveValue(nom);
 
     await depot.getByLabel(/^Téléphone/).fill(phone);
-    // Le déclencheur d'un `Select` porte son nom accessible dans son CONTENU :
-    // un `<label for>` n'entre pas dans le calcul du nom d'un bouton.
-    await depot.getByRole('combobox', { name: /Choisir une banque/ }).click();
+    // Le déclencheur d'un `Select` Base UI est nommé par son `<label for>`, pas
+    // par le texte de remplacement qu'il affiche : viser « Choisir une banque »
+    // ne désigne AUCUN élément, et le clic attend indéfiniment.
+    await depot.getByRole('combobox', { name: /Banque demandeuse/ }).click();
     await bankPage.getByRole('option', { name: /^CBAO/ }).click();
     await depot.getByLabel(/^Contexte pour/).fill('Ouverture de dossier, suite E2E.');
 
@@ -524,14 +531,19 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
     // un arbitrage, sinon il redéposerait la même dans la minute.
     await expect(depot).toContainText('Demande envoyée', { timeout: 30_000 });
     await expect(depot).toContainText(`${prenom} ${nom} est en attente d’approbation.`);
-    await depot.getByRole('button', { name: 'Fermer' }).click();
+    // Deux boutons portent ce nom une fois la demande partie : l'action du pied
+    // de page et la croix de l'en-tête. C'est l'action qui est éprouvée.
+    await depot
+      .locator('[data-slot="dialog-footer"]')
+      .getByRole('button', { name: 'Fermer' })
+      .click();
 
     // Il retrouve sa demande sur SON écran de suivi, et l'écran ne lui propose
     // aucun geste d'arbitrage : l'API ne lui renvoie que ses propres demandes,
     // et la décision n'est pas la sienne.
     await bankPage.goto('/demandes-clients');
     await expect(bankPage.getByRole('heading', { name: 'Mes demandes', level: 1 })).toBeVisible();
-    const suivi = bankPage.getByRole('listitem').filter({ hasText: nom });
+    const suivi = bankPage.getByRole('main').getByRole('listitem').filter({ hasText: nom });
     await expect(suivi).toContainText('En attente d’arbitrage par l’administration.');
     await expect(suivi.getByRole('button', { name: 'Approuver et créer le prospect' })).toHaveCount(
       0,
@@ -541,7 +553,7 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
     await page.goto('/demandes-clients');
     await expect(page.getByRole('heading', { name: 'Demandes clients', level: 1 })).toBeVisible();
 
-    const carte = page.getByRole('listitem').filter({ hasText: nom });
+    const carte = page.getByRole('main').getByRole('listitem').filter({ hasText: nom });
     await expect(carte).toBeVisible({ timeout: 30_000 });
     // La PROVENANCE est lisible avant la décision : c'est elle qui explique
     // qu'une fiche née ici n'ait pas de représentant de terrain.
@@ -550,7 +562,10 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
 
     await carte.getByRole('button', { name: 'Approuver et créer le prospect' }).click();
 
-    const arbitrage = page.getByRole('dialog');
+    // Nommé, et pas seulement `getByRole('dialog')` : le sélecteur de
+    // représentant s'ouvre dans un popover qui porte lui aussi ce rôle, et un
+    // locator ambigu casse le mode strict au lieu d'attendre.
+    const arbitrage = page.getByRole('dialog', { name: 'Approuver la demande' });
     await expect(arbitrage).toContainText(`${prenom} ${nom}`);
 
     const creer = arbitrage.getByRole('button', { name: 'Créer le prospect' });
@@ -565,15 +580,18 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
      */
     await expect(creer).toBeDisabled();
 
-    await arbitrage.getByRole('button', { name: /Représentant de rattachement/ }).click();
-    // La liste est rendue dans un portail, hors du dialogue.
-    await page.getByRole('option').first().click();
+    // Les trois listes sont rendues dans un portail, hors du dialogue — mais
+    // AUCUNE ne se désigne par `.first()` : la liste de représentants s'ouvre
+    // sur une entrée de remise à zéro qui porte le texte de remplacement, et la
+    // choisir laisserait le champ vide et l'envoi verrouillé.
+    await arbitrage.getByRole('combobox', { name: /Représentant de rattachement/ }).click();
+    await page.getByRole('option', { name: REPRESENTANT.fullName }).click();
 
-    await arbitrage.getByRole('combobox', { name: /Choisir un syndicat/ }).click();
-    await page.getByRole('option').first().click();
+    await arbitrage.getByRole('combobox', { name: /^Syndicat/ }).click();
+    await page.getByRole('option', { name: /^CHUES/ }).click();
 
-    await arbitrage.getByRole('combobox', { name: /Choisir une méthode/ }).click();
-    await page.getByRole('option').first().click();
+    await arbitrage.getByRole('combobox', { name: /Méthode d’enrôlement/ }).click();
+    await page.getByRole('option', { name: 'Plateforme' }).click();
 
     await expect(creer).toBeEnabled();
     await creer.click();
@@ -581,7 +599,9 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
 
     // ─── Le prospect existe, et la provenance a suivi ───────────────────────
     await page.getByRole('button', { name: 'Approuvées' }).click();
-    const arbitree = page.getByRole('listitem').filter({ hasText: nom });
+    // Scope au contenu principal: une notification ephemere est un `<li>` elle
+    // aussi, et « Prospect cree pour Coumba » rend le selecteur ambigu.
+    const arbitree = page.getByRole('main').getByRole('listitem').filter({ hasText: nom });
     await expect(arbitree).toContainText('Approuvée', { timeout: 30_000 });
     await expect(arbitree).toContainText('Demande de CBAO');
 
@@ -602,6 +622,7 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
     await bankPage.getByRole('button', { name: 'Approuvées' }).click();
     await expect(
       bankPage
+        .getByRole('main')
         .getByRole('listitem')
         .filter({ hasText: nom })
         .getByRole('link', { name: 'Ouvrir un dossier pour ce client' }),
@@ -620,7 +641,9 @@ async function createCase(page: Page, reference: string): Promise<void> {
   await page.goto('/dossiers/nouveau');
   await expect(page.getByLabel('Rechercher un client')).toBeVisible();
 
-  await page.getByLabel('Rechercher un client').fill('Di');
+  // La fixture garantit CETTE fiche en « méthode obtenue ». Chercher un fragment
+  // de nom commun ne tenait que sur les restes d'une exécution précédente.
+  await page.getByLabel('Rechercher un client').fill(BANK_CLIENT_PHONE);
   const firstResult = page.getByRole('button', { name: /\+221/ }).first();
   await expect(firstResult).toBeVisible({ timeout: 30_000 });
   await firstResult.click();
@@ -732,7 +755,7 @@ test('la référence dupliquée est signalée au flou, avec un lien vers le doss
 
   // Deuxième dossier, même référence.
   await page.goto('/dossiers/nouveau');
-  await page.getByLabel('Rechercher un client').fill('Di');
+  await page.getByLabel('Rechercher un client').fill(BANK_CLIENT_PHONE);
   await page.getByRole('button', { name: /\+221/ }).first().click();
   await page.getByLabel('Référence bancaire').fill(reference);
   // Le contrôle part au FLOU, pas à chaque frappe.

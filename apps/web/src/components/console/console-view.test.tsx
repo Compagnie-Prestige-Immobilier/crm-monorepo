@@ -13,6 +13,7 @@ const fetchConsoleQueue = vi.fn();
 const fetchConsoleCampaigns = vi.fn();
 const fetchCallbacks = vi.fn();
 const pushCallAttempt = vi.fn();
+const fetchRepScriptQueue = vi.fn();
 const toastError = vi.fn();
 
 vi.mock('@/lib/data/console', async (importOriginal) => {
@@ -23,6 +24,7 @@ vi.mock('@/lib/data/console', async (importOriginal) => {
     fetchConsoleCampaigns: (...args: unknown[]) => fetchConsoleCampaigns(...args) as unknown,
     fetchCallbacks: (...args: unknown[]) => fetchCallbacks(...args) as unknown,
     pushCallAttempt: (...args: unknown[]) => pushCallAttempt(...args) as unknown,
+    fetchRepScriptQueue: (...args: unknown[]) => fetchRepScriptQueue(...args) as unknown,
   };
 });
 
@@ -138,6 +140,8 @@ beforeEach(() => {
   fetchConsoleCampaigns.mockResolvedValue([]);
   pushCallAttempt.mockReset();
   pushCallAttempt.mockResolvedValue(undefined);
+  fetchRepScriptQueue.mockReset();
+  fetchRepScriptQueue.mockResolvedValue({ items: [], total: 0 });
   toastError.mockClear();
 });
 
@@ -489,5 +493,23 @@ describe('ConsoleView : navigation et raccourcis annexes', () => {
     await userEvent.keyboard('?');
 
     expect(screen.getByText('Copier le numéro')).toBeTruthy();
+  });
+});
+
+describe('ConsoleView : les deux volets', () => {
+  it('ouvre sur les prospects, sans appeler la file des représentants', async () => {
+    await renderConsole();
+
+    expect(screen.getByRole('button', { name: /Injoignable/ })).toBeTruthy();
+    expect(fetchRepScriptQueue).not.toHaveBeenCalled();
+  });
+
+  it('bascule vers le script représentant sur M', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('m');
+
+    expect(await screen.findByRole('region', { name: 'File des représentants' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Injoignable/ })).toBeNull();
   });
 });

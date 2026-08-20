@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangleIcon, CheckIcon, LoaderIcon } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -29,7 +29,13 @@ import { fetchReferenceData } from '@/lib/data/reference';
 import {
   createRepresentant,
   lookupRepresentantByPhone,
+  scriptOf,
   updateRepresentant,
+  PROFESSIONS,
+  WHATSAPP_STATUS_LABELS,
+  WHATSAPP_STATUSES,
+  type UpdateRepresentantPatch,
+  type WhatsappStatus,
 } from '@/lib/data/representants';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -44,6 +50,11 @@ import type { RepresentantRow } from '@/lib/types';
 const RELATION_ITEMS = REPRESENTANT_RELATIONS.map((relation) => ({
   value: relation,
   label: REPRESENTANT_RELATION_LABELS[relation],
+}));
+
+const WHATSAPP_ITEMS = WHATSAPP_STATUSES.map((status) => ({
+  value: status,
+  label: WHATSAPP_STATUS_LABELS[status],
 }));
 
 export interface RepresentantPrefill {
@@ -69,6 +80,10 @@ export function RepresentantFormDialog({
   const phoneId = useId();
   const notesId = useId();
   const relationId = useId();
+  const reasonId = useId();
+  const whatsappId = useId();
+  const whatsappNumberId = useId();
+  const professionId = useId();
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -77,9 +92,20 @@ export function RepresentantFormDialog({
   const [iefId, setIefId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [relationStatus, setRelationStatus] = useState<RepresentantRelation>('INCONNU');
+  const [relationReason, setRelationReason] = useState('');
+  const [whatsappStatus, setWhatsappStatus] = useState<WhatsappStatus>('NON_DEMANDE');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [profession, setProfession] = useState('');
   const [conflict, setConflict] = useState<{ label: string; owner: string | null } | null>(null);
 
+  const savedScript = useMemo(
+    () => (representant === null ? null : scriptOf(representant)),
+    [representant],
+  );
+
   const isEdit = representant !== null;
+  const switchingToRefus =
+    representant !== null && relationStatus === 'REFUS' && representant.relationStatus !== 'REFUS';
 
   useEffect(() => {
     if (!open) return;
@@ -90,8 +116,12 @@ export function RepresentantFormDialog({
     setIefId(representant?.iefId ?? null);
     setNotes(representant?.notes ?? prefill?.notes ?? '');
     setRelationStatus(representant?.relationStatus ?? 'INCONNU');
+    setRelationReason('');
+    setWhatsappStatus(savedScript?.whatsappStatus ?? 'NON_DEMANDE');
+    setWhatsappNumber(savedScript?.whatsappE164 ?? '');
+    setProfession(savedScript?.profession ?? '');
     setConflict(null);
-  }, [open, representant, prefill]);
+  }, [open, representant, prefill, savedScript]);
 
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,
@@ -130,7 +160,7 @@ export function RepresentantFormDialog({
       if (departementId === null) throw new Error('Département manquant.');
 
       if (representant !== null) {
-        const patch: Parameters<typeof updateRepresentant>[1] = {
+        const patch: UpdateRepresentantPatch = {
           fullName: fullName.trim(),
           phone: phone.trim(),
           departementId,
@@ -140,6 +170,18 @@ export function RepresentantFormDialog({
         // Un statut inchangé n'est PAS renvoyé : le serveur le refuserait sans
         // rien écrire, et l'écran laisserait croire à une bascule historisée.
         if (relationStatus !== representant.relationStatus) patch.relationStatus = relationStatus;
+        const reason = relationReason.trim();
+        if (switchingToRefus && reason !== '') patch.relationReason = reason;
+
+        if (whatsappStatus !== savedScript?.whatsappStatus) patch.whatsappStatus = whatsappStatus;
+        // Sur MEME_NUMERO le numero se relit sur `phoneE164` : le dupliquer
+        // fabriquerait deux verites a maintenir.
+        if (whatsappStatus === 'AUTRE_NUMERO' && whatsappNumber.trim() !== '') {
+          patch.whatsappE164 = whatsappNumber.trim();
+        }
+        if (profession.trim() !== (savedScript?.profession ?? '')) {
+          patch.profession = profession.trim();
+        }
         return updateRepresentant(representant.id, patch);
       }
 
@@ -326,7 +368,93 @@ export function RepresentantFormDialog({
               <p className="text-[0.75rem] text-muted-foreground">
                 Chaque changement est daté et signé dans l’histoire de la fiche.
               </p>
+
+              {switchingToRefus ? (
+                <div className="mt-1 flex flex-col gap-1.5">
+                  <Label htmlFor={reasonId}>Motif du refus</Label>
+                  <Input
+                    id={reasonId}
+                    value={relationReason}
+                    maxLength={500}
+                    autoComplete="off"
+                    placeholder="Ce qu’il a répondu"
+                    onChange={(event) => {
+                      setRelationReason(event.target.value);
+                    }}
+                  />
+                  <p className="text-[0.75rem] text-muted-foreground">
+                    Facultatif. Repris tel quel dans l’histoire de la relation.
+                  </p>
+                </div>
+              ) : null}
             </div>
+          ) : null}
+
+          {isEdit ? (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={whatsappId}>WhatsApp</Label>
+                <Select
+                  items={WHATSAPP_ITEMS}
+                  value={whatsappStatus}
+                  onValueChange={(value) => {
+                    if (value === null) return;
+                    setWhatsappStatus(value);
+                  }}
+                >
+                  <SelectTrigger id={whatsappId} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WHATSAPP_ITEMS.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[0.75rem] text-muted-foreground">
+                  « Non demandé » dit que la question n’a pas été posée, « pas de WhatsApp » qu’elle
+                  l’a été.
+                </p>
+              </div>
+
+              {whatsappStatus === 'AUTRE_NUMERO' ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={whatsappNumberId}>Numéro WhatsApp</Label>
+                  <Input
+                    id={whatsappNumberId}
+                    value={whatsappNumber}
+                    maxLength={40}
+                    inputMode="tel"
+                    autoComplete="off"
+                    placeholder="77 123 45 67"
+                    onChange={(event) => {
+                      setWhatsappNumber(event.target.value);
+                    }}
+                  />
+                </div>
+              ) : null}
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={professionId}>Profession</Label>
+                <Input
+                  id={professionId}
+                  value={profession}
+                  maxLength={120}
+                  autoComplete="off"
+                  list={`${professionId}-frequentes`}
+                  onChange={(event) => {
+                    setProfession(event.target.value);
+                  }}
+                />
+                <datalist id={`${professionId}-frequentes`}>
+                  {PROFESSIONS.map((item) => (
+                    <option key={item} value={item} />
+                  ))}
+                </datalist>
+              </div>
+            </>
           ) : null}
 
           <div className="flex flex-col gap-1.5">

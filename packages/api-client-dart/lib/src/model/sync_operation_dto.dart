@@ -80,7 +80,7 @@ class SyncOperationDto {
   @JsonKey(name: r'data', required: false, includeIfNull: false)
   final SyncEntityDataDto? data;
 
-  /// Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes.
+  /// Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession.
   @JsonKey(name: r'clearedFields', required: false, includeIfNull: false)
   final List<String>? clearedFields;
 

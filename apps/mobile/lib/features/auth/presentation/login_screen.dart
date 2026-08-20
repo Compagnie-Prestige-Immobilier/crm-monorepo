@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,6 +35,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (ref.read(authControllerProvider).isSubmitting) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
     await ref
@@ -110,7 +113,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
-                            _FieldLabel(text: 'Identifiant'),
+                            const _FieldLabel(text: 'Identifiant'),
                             const SizedBox(height: CpiSpacing.xs),
                             TextFormField(
                               controller: _identifier,
@@ -137,7 +140,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                             const SizedBox(height: CpiSpacing.md),
 
-                            _FieldLabel(text: 'Mot de passe'),
+                            const _FieldLabel(text: 'Mot de passe'),
                             const SizedBox(height: CpiSpacing.xs),
                             TextFormField(
                               controller: _password,
@@ -169,7 +172,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   (value == null || value.isEmpty)
                                   ? 'Saisissez le mot de passe.'
                                   : null,
-                              onFieldSubmitted: (_) => _submit(),
+                              onFieldSubmitted: (_) => unawaited(_submit()),
                             ),
 
                             const SizedBox(height: CpiSpacing.xs),
@@ -249,7 +252,8 @@ class _StaySignedInToggle extends StatelessWidget {
     return InkWell(
       onTap: () => onChanged(!value),
       borderRadius: CpiRadius.brSm,
-      child: Padding(
+      child: Container(
+        constraints: const BoxConstraints(minHeight: kCpiMinTouchTarget),
         padding: const EdgeInsets.symmetric(vertical: CpiSpacing.xs),
         child: Row(
           children: <Widget>[

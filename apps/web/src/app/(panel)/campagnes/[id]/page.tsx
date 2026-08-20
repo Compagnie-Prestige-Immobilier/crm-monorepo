@@ -13,7 +13,7 @@ import { guardRoles } from '@/lib/session';
 export const metadata: Metadata = { title: 'Campagne d’appels prospects' };
 
 export default async function CampagnePage({ params }: { params: Promise<{ id: string }> }) {
-  const guard = await guardRoles(['ADMIN']);
+  const guard = await guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return (
@@ -35,7 +35,7 @@ export default async function CampagnePage({ params }: { params: Promise<{ id: s
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <CampaignDetailView campaignId={id} />
+      <CampaignDetailView campaignId={id} canManage={guard.user.role === 'ADMIN'} />
     </HydrationBoundary>
   );
 }

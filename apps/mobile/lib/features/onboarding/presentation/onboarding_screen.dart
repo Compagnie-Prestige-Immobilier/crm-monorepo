@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,7 +33,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () => _finish(context),
+                  onPressed: () => unawaited(_finish()),
                   child: const Text('Passer'),
                 ),
               ),
@@ -79,12 +81,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 child: FilledButton(
                   onPressed: () {
                     if (_index == 1) {
-                      _finish(context);
+                      unawaited(_finish());
                     } else {
-                      _pages.nextPage(
-                        duration: const Duration(milliseconds: 240),
-                        curve: Curves.easeOut,
-                      );
+                      _pages
+                          .nextPage(
+                            duration: const Duration(milliseconds: 240),
+                            curve: Curves.easeOut,
+                          )
+                          .ignore();
                     }
                   },
                   child: Text(_index == 1 ? 'Commencer' : 'Continuer'),
@@ -97,8 +101,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
-  void _finish(BuildContext context) {
-    ref.read(onboardingControllerProvider.notifier).complete();
+  Future<void> _finish() async {
+    try {
+      await ref.read(onboardingControllerProvider.notifier).complete();
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Le téléphone n\'a pas pu enregistrer ce réglage. Réessayez.',
+          ),
+        ),
+      );
+    }
   }
 }
 

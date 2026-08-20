@@ -13,6 +13,8 @@ import 'generated_migrations/schema_v5.dart' as v5;
 import 'generated_migrations/schema_v6.dart' as v6;
 import 'generated_migrations/schema_v7.dart' as v7;
 import 'generated_migrations/schema_v8.dart' as v8;
+import 'generated_migrations/schema_v9.dart' as v9;
+import 'generated_migrations/schema_v10.dart' as v10;
 
 /// Test doré de migration.
 ///
@@ -52,7 +54,7 @@ void main() {
     await db.close();
   });
 
-  test('le golden couvre toutes les versions déclarées', () {
+  test('le golden couvre toutes les versions déclarées', () async {
     final AppDatabase db = AppDatabase(NativeDatabase.memory());
     expect(
       GeneratedHelper.versions,
@@ -61,7 +63,7 @@ void main() {
           'schemaVersion a bougé sans nouveau dump : '
           'dart run drift_dev schema dump lib/data/local/database.dart drift_schemas/',
     );
-    db.close();
+    await db.close();
   });
 
   // ── v1 → v2 : phase 2 ──────────────────────────────────────────────────────
@@ -491,9 +493,10 @@ void main() {
     await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
     // Ce qui a été retiré, c'est la LISTE de vocabulaire. Les trois règles
-    // structurelles du serveur : méthode ssi METHOD_OBTAINED, OTHER exige un
-    // commentaire, commentaire borné : restent vraies quelle que soit l'issue
-    // que le serveur ajoutera, et doivent survivre à la recréation de table.
+    // structurelles du serveur : méthode ssi le motif ferme sur une méthode, un
+    // motif qui exige un commentaire l'obtient, commentaire borné : restent
+    // vraies quel que soit le motif que le client ajoutera, et doivent survivre
+    // à la recréation de table.
     await expectLater(
       db.customStatement(
         'INSERT INTO call_attempts '
@@ -502,17 +505,18 @@ void main() {
         <Object?>['a-1', 'p-1', 'CALLBACK', 'PLATFORM', _iso, 'me'],
       ),
       throwsA(anything),
-      reason: 'une méthode sur une issue non terminale reste refusée',
+      reason: 'une méthode sur un effet qui ne ferme pas reste refusée',
     );
     await expectLater(
       db.customStatement(
         'INSERT INTO call_attempts '
-        '(id, prospect_id, outcome, client_created_at, created_by_id) '
-        'VALUES (?, ?, ?, ?, ?)',
-        <Object?>['a-2', 'p-1', 'OTHER', _iso, 'me'],
+        '(id, prospect_id, outcome, requires_comment, client_created_at, '
+        ' created_by_id) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>['a-2', 'p-1', 'OTHER', 1, _iso, 'me'],
       ),
       throwsA(anything),
-      reason: 'OTHER sans commentaire reste refusé',
+      reason: 'un motif qui exige un commentaire sans commentaire reste refusé',
     );
     // Mais une issue INCONNUE de ce client passe maintenant.
     await db.customStatement(
@@ -784,6 +788,277 @@ void main() {
     await db.close();
   });
 
+  // ── v9 → v10 : les motifs d'issue viennent du serveur ──────────────────────
+  //
+  // Le palier RECRÉE `call_attempts` pour remplacer des CHECK qui citaient des
+  // issues littérales. C'est donc le palier le plus exposé du fichier après le
+  // v6 : la table porte le journal des appels de la journée, et deux colonnes
+  // NOT NULL y apparaissent, qu'il faut DÉDUIRE et non poser à leur défaut.
+
+  test('v9 -> v10 déduit l\'effet des tentatives déjà saisies', () async {
+    final schema = await verifier.schemaAt(9);
+
+    final v9.DatabaseAtV9 old = v9.DatabaseAtV9(schema.newConnection());
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO call_attempts '
+      '(id, prospect_id, outcome, method, client_created_at, created_by_id) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['a-1', 'p-1', 'METHOD_OBTAINED', 'PLATFORM', _iso, 'me'],
+    );
+    await old.customStatement(
+      'INSERT INTO call_attempts '
+      '(id, prospect_id, outcome, comment, client_created_at, created_by_id) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['a-2', 'p-1', 'OTHER', 'Boutique.', _iso, 'me'],
+    );
+    // Une tentative avec son heure de rappel : la colonne date de la v8 et ne
+    // doit surtout PAS être déclarée neuve par la recopie.
+    await old.customStatement(
+      'INSERT INTO call_attempts '
+      '(id, prospect_id, outcome, callback_at, client_created_at, created_by_id) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['a-3', 'p-1', 'CALLBACK', _iso, _iso, 'me'],
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-1', 'call_attempt', 'a-1', 'create', '{}', _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 10);
+
+    final List<QueryRow> attempts = await db
+        .customSelect(
+          'SELECT id, outcome, reason_code, effect, requires_comment, callback_at '
+          'FROM call_attempts ORDER BY id',
+        )
+        .get();
+    expect(attempts, hasLength(3), reason: 'le journal des appels ne se perd pas');
+
+    // ═══ LE PIÈGE DU PALIER ═══
+    //
+    // Sans dérivation, `effect` prendrait son défaut `KEEP_OPEN` sur les trois
+    // lignes : `countMyMethods` et `countClosed` se comptent désormais dessus,
+    // et la progression personnelle du téléconseiller repartirait à zéro sans
+    // qu'aucune erreur ne soit levée.
+    expect(attempts[0].read<String>('effect'), 'CLOSE_METHOD');
+    expect(attempts[1].read<String>('effect'), 'KEEP_OPEN');
+    expect(attempts[2].read<String>('effect'), 'SCHEDULE_CALLBACK');
+    expect(attempts[1].read<bool>('requires_comment'), isTrue);
+    expect(attempts[0].read<bool>('requires_comment'), isFalse);
+    expect(
+      attempts[2].read<String?>('callback_at'),
+      isNotNull,
+      reason: 'la recopie ne doit pas effacer une heure de rappel de la v8',
+    );
+
+    // Aucune tentative d'avant le palier ne porte de motif : c'est l'issue qui
+    // en tient lieu, et le repli système sait la résoudre.
+    for (final QueryRow row in attempts) {
+      expect(row.read<String?>('reason_code'), isNull);
+    }
+
+    final List<QueryRow> pending = await db
+        .customSelect('SELECT id FROM outbox WHERE status = \'pending\'')
+        .get();
+    expect(pending, hasLength(1), reason: 'la file ne doit pas être vidée');
+
+    // Le référentiel démarre vide : il se télécharge, il ne se fabrique pas par
+    // migration. Tant qu'il l'est, la saisie se replie sur les six codes système.
+    final List<QueryRow> reasons = await db
+        .customSelect('SELECT COUNT(*) AS c FROM call_outcome_reasons')
+        .get();
+    expect(reasons.single.read<int>('c'), 0);
+
+    await db.close();
+  });
+
+  test('v9 -> v10 accepte un motif que ce client ne connaît pas', () async {
+    final schema = await verifier.schemaAt(9);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 10);
+
+    // C'est TOUT l'objet du palier : l'équipe du client ajoute « NRP » depuis le
+    // web, et la saisie hors ligne doit l'écrire sans qu'aucun CHECK ne cite son
+    // code. Un effet inconnu de cette version passe aussi : un CHECK figé sur
+    // `effect` ferait avorter la page de pull entière.
+    await db.customStatement(
+      'INSERT INTO call_outcome_reasons '
+      '(code, label, effect, sort_order, min_payload_version) '
+      'VALUES (?, ?, ?, ?, ?)',
+      <Object?>['NRP', 'Ne répond pas', 'KEEP_OPEN', 15, 2],
+    );
+    await db.customStatement(
+      'INSERT INTO call_outcome_reasons '
+      '(code, label, effect, sort_order, min_payload_version) '
+      'VALUES (?, ?, ?, ?, ?)',
+      <Object?>['ESCALADE', 'Escalade', 'TRANSFER_TO_MANAGER', 90, 2],
+    );
+    await db.customStatement(
+      'INSERT INTO call_attempts '
+      '(id, prospect_id, outcome, reason_code, effect, client_created_at, '
+      ' created_by_id) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['a-1', 'p-1', 'UNREACHABLE', 'NRP', 'KEEP_OPEN', _iso, 'me'],
+    );
+
+    final List<QueryRow> saisie = await db
+        .customSelect('SELECT reason_code FROM call_attempts')
+        .get();
+    expect(saisie.single.read<String?>('reason_code'), 'NRP');
+
+    await db.close();
+  });
+
+  test('v9 -> v10 crée l\'index du référentiel des motifs', () async {
+    final schema = await verifier.schemaAt(9);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 10);
+
+    final List<QueryRow> indexes = await db
+        .customSelect(
+          'SELECT name FROM sqlite_master '
+          'WHERE type = \'index\' AND tbl_name = \'call_outcome_reasons\'',
+        )
+        .get();
+    final Set<String> names = indexes.map((QueryRow r) => r.read<String>('name')).toSet();
+
+    // La feuille des issues est relue à chaque ouverture, et elle trie sur
+    // (is_active, sort_order, label).
+    expect(names, contains('call_outcome_reasons_active_idx'));
+
+    // La recréation de `call_attempts` emporte ses index avec elle : les oublier
+    // ne casse aucun test fonctionnel, ça rend seulement l'historique d'un
+    // prospect linéaire sur tout le journal.
+    final List<QueryRow> attemptIndexes = await db
+        .customSelect(
+          'SELECT name FROM sqlite_master '
+          'WHERE type = \'index\' AND tbl_name = \'call_attempts\'',
+        )
+        .get();
+    final Set<String> attemptNames = attemptIndexes
+        .map((QueryRow r) => r.read<String>('name'))
+        .toSet();
+    expect(attemptNames, contains('call_attempts_prospect_idx'));
+    expect(attemptNames, contains('call_attempts_created_idx'));
+
+    await db.close();
+  });
+
+  // ── v10 → v11 : WhatsApp et profession ─────────────────────────────────────
+  //
+  // Palier additif sur `representants`, qui n'a jamais été recréée : trois
+  // `addColumn` suffisent. Ce qui doit être prouvé n'est donc pas la recopie,
+  // c'est le DÉFAUT posé sur les 12 929 fiches déjà en base. `NON_DEMANDE` et
+  // non `AUCUN` : la migration ne peut pas savoir si la question a été posée, et
+  // poser « pas de WhatsApp » partout ferait cesser les rappels.
+
+  test('v10 -> v11 pose « non demandé » sur les fiches déjà en base', () async {
+    final schema = await verifier.schemaAt(10);
+
+    final v10.DatabaseAtV10 old = v10.DatabaseAtV10(schema.newConnection());
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO departements '
+      '(id, code, name, region_id, region_name, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['dep-1', 'DK', 'Dakar', 'reg-1', 'Dakar', _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, notes, departement_id, relation_status, '
+      ' created_by_id, client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'rep-1',
+        'Awa Ndiaye',
+        '+221771234567',
+        'Rappeler le matin.',
+        'dep-1',
+        'AMBASSADEUR',
+        'me',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-1', 'representant', 'rep-1', 'update', '{"notes":null}', _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 11);
+
+    final List<QueryRow> fiches = await db
+        .customSelect(
+          'SELECT notes, relation_status, whatsapp_status, whatsapp_e164, profession '
+          'FROM representants',
+        )
+        .get();
+    expect(fiches.single.read<String>('whatsapp_status'), 'NON_DEMANDE');
+    expect(fiches.single.read<String?>('whatsapp_e164'), isNull);
+    expect(fiches.single.read<String?>('profession'), isNull);
+    // Le palier v8 ne régresse pas, et la saisie du terrain reste intacte.
+    expect(fiches.single.read<String>('relation_status'), 'AMBASSADEUR');
+    expect(fiches.single.read<String?>('notes'), 'Rappeler le matin.');
+
+    // Une opération en file depuis trois semaines reste lisible : le palier ne
+    // touche pas au payload, et c'est lui que le moteur relit.
+    final List<QueryRow> queue = await db
+        .customSelect('SELECT payload FROM outbox')
+        .get();
+    expect(queue.single.read<String>('payload'), '{"notes":null}');
+
+    await db.close();
+  });
+
+  test('v10 -> v11 accepte un état WhatsApp que ce client ignore', () async {
+    final schema = await verifier.schemaAt(10);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 11);
+
+    await db.customStatement(
+      'INSERT INTO departements '
+      '(id, code, name, region_id, local_updated_at) VALUES (?, ?, ?, ?, ?)',
+      <Object?>['dep-1', 'DK', 'Dakar', 'reg-1', _iso],
+    );
+    // C'est TOUT l'objet de l'absence de CHECK : le jour où le serveur ajoute un
+    // état, un CHECK figé ferait avorter la transaction de pull ENTIÈRE, donc la
+    // page complète de changements, pas seulement cette fiche.
+    await db.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, departement_id, whatsapp_status, profession, '
+      ' created_by_id, client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'rep-2',
+        'Ibrahima Sarr',
+        '+221771234568',
+        'dep-1',
+        'NUMERO_PROFESSIONNEL',
+        'Censeur',
+        'me',
+        _iso,
+        _iso,
+      ],
+    );
+
+    final List<QueryRow> fiches = await db
+        .customSelect('SELECT whatsapp_status, profession FROM representants')
+        .get();
+    expect(fiches.single.read<String>('whatsapp_status'), 'NUMERO_PROFESSIONNEL');
+    expect(fiches.single.read<String?>('profession'), 'Censeur');
+
+    await db.close();
+  });
+
   // ── Le saut de plusieurs versions ──────────────────────────────────────────
   //
   // Chaque test ci-dessus ne franchit qu'UN palier. Or un commercial qui n'a pas
@@ -793,7 +1068,7 @@ void main() {
   // gardés par `to >= n` précisément parce qu'une composition mal ordonnée
   // produit un schéma qui n'est AUCUNE version déclarée.
 
-  test('v1 -> v9 d\'un seul coup : deux mois sans mise à jour', () async {
+  test('v1 -> v11 d\'un seul coup : deux mois sans mise à jour', () async {
     final schema = await verifier.schemaAt(1);
 
     final v1.DatabaseAtV1 old = v1.DatabaseAtV1(schema.newConnection());
@@ -850,9 +1125,9 @@ void main() {
     await old.close();
 
     final AppDatabase db = AppDatabase(schema.newConnection());
-    // UN SEUL appel, de 1 à 9 : c'est le vrai chemin de l'appareil qui a sauté
+    // UN SEUL appel, de 1 à 11 : c'est le vrai chemin de l'appareil qui a sauté
     // les versions intermédiaires.
-    await verifier.migrateAndValidate(db, 9);
+    await verifier.migrateAndValidate(db, 11);
 
     // Les données de v1 ont traversé six paliers, dont une recréation de table.
     final List<QueryRow> prospects = await db
@@ -909,19 +1184,57 @@ void main() {
         .get();
     expect(fil.single.read<String>('representant_id'), 'rep-1');
 
+    // Le saut long passe aussi par le palier v10. La recréation de
+    // `call_attempts` a eu lieu EN v6, donc dans la forme courante : le palier
+    // v10 la laisse tranquille, et c'est justement ce qui doit être prouvé, sans
+    // quoi `callback_at` y serait déclaré neuf donc effacé sur tout le journal.
+    await db.customStatement(
+      'INSERT INTO call_outcome_reasons (code, label, effect) VALUES (?, ?, ?)',
+      <Object?>['NRP', 'Ne répond pas', 'KEEP_OPEN'],
+    );
+    await db.customStatement(
+      'INSERT INTO call_attempts '
+      '(id, prospect_id, outcome, reason_code, effect, client_created_at, '
+      ' created_by_id) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['a-2', 'pro-1', 'UNREACHABLE', 'NRP', 'KEEP_OPEN', _iso, 'me'],
+    );
+    final List<QueryRow> journal = await db
+        .customSelect(
+          'SELECT id, reason_code, callback_at FROM call_attempts ORDER BY id',
+        )
+        .get();
+    expect(journal.map((QueryRow r) => r.read<String>('id')), <String>['a-1', 'a-2']);
+    expect(journal.first.read<String?>('callback_at'), isNotNull);
+    expect(journal.last.read<String?>('reason_code'), 'NRP');
+
+    // Le saut long passe aussi par le palier v11 : la fiche de v1 sort en
+    // « non demandé », le seul état qui ne prétende rien sur elle.
+    final List<QueryRow> whatsapp = await db
+        .customSelect(
+          'SELECT whatsapp_status, whatsapp_e164, profession FROM representants',
+        )
+        .get();
+    expect(whatsapp.single.read<String>('whatsapp_status'), 'NON_DEMANDE');
+    expect(whatsapp.single.read<String?>('whatsapp_e164'), isNull);
+    expect(whatsapp.single.read<String?>('profession'), isNull);
+
     await db.close();
   });
 
-  test('v2 -> v9 : le saut passe aussi par les colonnes ajoutées', () async {
+  test('v2 -> v11 : le saut passe aussi par les colonnes ajoutées', () async {
     final schema = await verifier.schemaAt(2);
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 9);
+    await verifier.migrateAndValidate(db, 11);
 
     // Les colonnes ajoutées en chemin (v4, v5, v7 puis v8) doivent être là
     // toutes : un palier gardé par `from < n` seul, sans `to >= n`, produit un
     // schéma intermédiaire qui n'est aucune version déclarée.
     final List<QueryRow> columns = await db
-        .customSelect('SELECT ief_id, relation_status FROM representants')
+        .customSelect(
+          'SELECT ief_id, relation_status, whatsapp_status, whatsapp_e164, '
+          'profession FROM representants',
+        )
         .get();
     expect(columns, isEmpty);
     final List<QueryRow> outbox = await db
@@ -929,13 +1242,22 @@ void main() {
         .get();
     expect(outbox, isEmpty);
     final List<QueryRow> attempts = await db
-        .customSelect('SELECT callback_at FROM call_attempts')
+        .customSelect(
+          'SELECT callback_at, reason_code, effect, requires_comment '
+          'FROM call_attempts',
+        )
         .get();
     expect(attempts, isEmpty);
     final List<QueryRow> fil = await db
         .customSelect('SELECT body FROM representant_comments')
         .get();
     expect(fil, isEmpty);
+    final List<QueryRow> motifs = await db
+        .customSelect(
+          'SELECT code, effect, min_payload_version FROM call_outcome_reasons',
+        )
+        .get();
+    expect(motifs, isEmpty);
 
     await db.close();
   });

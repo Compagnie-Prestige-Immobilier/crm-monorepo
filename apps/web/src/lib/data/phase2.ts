@@ -52,6 +52,22 @@ export async function fetchCampaign(
   return unwrap(await client.GET('/api/v1/phase2/campaigns/{id}', { params: { path: { id } } }));
 }
 
+export async function fetchCallRecording(
+  attemptId: string,
+  client: ApiClient = getApiClient(),
+): Promise<Blob | null> {
+  const result = await client.GET('/api/v1/phase2/call-attempts/{id}/recording', {
+    params: { path: { id: attemptId } },
+    parseAs: 'blob',
+    cache: 'no-store',
+  });
+  if (result.response.status === 404) return null;
+  if (result.error !== undefined) {
+    throw new Error('La note vocale n’a pas pu être chargée.', { cause: result.error });
+  }
+  return result.data;
+}
+
 export async function createCampaign(
   input: CreateCampaignInput,
   client: ApiClient = getApiClient(),

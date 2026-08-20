@@ -17,7 +17,7 @@ export default async function CampagneRepresentantsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const guard = await guardRoles(['ADMIN']);
+  const guard = await guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return (
@@ -42,7 +42,7 @@ export default async function CampagneRepresentantsPage({
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <RepCampaignDetailView campaignId={id} />
+      <RepCampaignDetailView campaignId={id} canManage={guard.user.role === 'ADMIN'} />
     </HydrationBoundary>
   );
 }

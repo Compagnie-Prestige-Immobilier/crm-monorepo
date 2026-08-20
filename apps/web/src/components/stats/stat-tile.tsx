@@ -1,13 +1,14 @@
 'use client';
 
 import type { LucideIcon } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 
 import { AnimatedNumber } from '@/components/live/animated-number';
 import { StatInfo } from '@/components/stats/stat-info';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { StatKey } from '@/lib/stat-explanations';
+import { useCanvasPresentation } from '@/lib/use-canvas-presentation';
 
 export function StatTile({
   stat,
@@ -88,9 +89,7 @@ export function StatChartCard({
 }) {
   const chartRegion = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    chartRegion.current?.querySelector('canvas')?.setAttribute('role', 'presentation');
-  }, []);
+  useCanvasPresentation(chartRegion);
 
   return (
     <Card className={`animate-rise ${className ?? ''}`}>

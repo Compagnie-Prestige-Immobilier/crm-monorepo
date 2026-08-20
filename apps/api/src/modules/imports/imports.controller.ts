@@ -162,6 +162,47 @@ export class ImportsController {
     return this.imports.create(user, request, ImportKind.PROSPECTS);
   }
 
+  /**
+   * Aucun modèle à télécharger : ce classeur EXISTE, tenu à l'accueil depuis des
+   * années. C'est l'import qui s'adapte à sa forme, pas l'inverse.
+   */
+  @Post('visites')
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    operationId: 'createVisitesImport',
+    summary:
+      'Dépose le classeur des visites de l’accueil et inscrit le travail. Rend immédiatement.',
+    description:
+      'NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, ' +
+      'et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que ' +
+      '`POST /imports/{id}/apply` n’a pas été appelé. Seuls les onglets « BDD VISITES » sont lus, ' +
+      'en-tête en ligne 3, données à partir de la colonne C. La colonne « N° » n’est pas reprise : ' +
+      'elle repart à 1 chaque mois. CET IMPORT NE CRÉE AUCUNE ENTRÉE DE RÉFÉRENTIEL : une ' +
+      'entreprise, une direction, un destinataire ou un objet absent des quatre listes fait ' +
+      'refuser la ligne, avec sa valeur exacte, son onglet et son numéro de ligne au rapport.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiResponse({ status: 201, type: ImportJobDto })
+  @ApiErrors({
+    409: 'DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé.',
+    413: 'IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.',
+    429: true,
+  })
+  createVisites(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: FastifyRequest,
+  ): Promise<ImportJobDto> {
+    return this.imports.create(user, request, ImportKind.VISITES);
+  }
+
   @Get(':id')
   @ApiOperation({
     operationId: 'getImportJob',

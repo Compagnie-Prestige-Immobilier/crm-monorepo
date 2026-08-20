@@ -41,6 +41,13 @@ const FICHE = {
   createdByName: 'Aminata Diallo',
   prospectCount: 2,
   relationStatus: 'AMBASSADEUR',
+  // Le serveur rend TOUJOURS ces quatre champs: `whatsappStatus` n'est pas
+  // nullable au contrat. La fiche par defaut reproduit une fiche jamais
+  // interrogee, pas une fiche incomplete.
+  whatsappStatus: 'NON_DEMANDE',
+  whatsappE164: null,
+  whatsappNumber: null,
+  profession: null,
   notes: null,
   clientCreatedAt: '2026-03-01T09:00:00.000Z',
   createdAt: '2026-03-01T09:00:00.000Z',
@@ -148,5 +155,28 @@ describe('RepresentantDetailView', () => {
 
     expect(await screen.findByText('Moussa Sow')).toBeTruthy();
     expect(screen.getByText('Converti')).toBeTruthy();
+  });
+});
+
+describe('RepresentantDetailView, ce que l’appel a appris', () => {
+  it('dit que le WhatsApp n’a pas été demandé, plutôt que de le laisser vide', async () => {
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
+
+    expect(await screen.findByText('Non demandé')).toBeTruthy();
+    expect(screen.getByText('Non demandée')).toBeTruthy();
+  });
+
+  it('montre le numéro WhatsApp joignable quand il diffère du téléphone', async () => {
+    fetchRepresentant.mockResolvedValue({
+      ...FICHE,
+      whatsappStatus: 'AUTRE_NUMERO',
+      whatsappE164: '+221779876543',
+      whatsappNumber: '+221779876543',
+      profession: 'Proviseur',
+    });
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
+
+    expect(await screen.findByText('+221779876543')).toBeTruthy();
+    expect(screen.getByText('Proviseur')).toBeTruthy();
   });
 });

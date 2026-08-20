@@ -37,6 +37,7 @@ import {
   representantNotFound,
 } from './errors.js';
 import { applyRelationChange } from '../representants/relation-change.js';
+import { resolveWhatsappPatch } from '../representants/whatsapp.js';
 import { RepresentantsService } from '../representants/representants.service.js';
 import type { RepresentantLookupDto } from '../representants/dto.js';
 import { RepCallAttemptApplyStatus } from './dto.js';
@@ -561,9 +562,17 @@ export class RepCampaignsService {
     const demoEnabled = await this.demo.enabled();
     const representant = await this.prisma.representant.findFirst({
       where: { id: body.representantId, deletedAt: null, ...demoScope(demoEnabled) },
-      select: { id: true, isDemo: true, relationStatus: true },
+      select: {
+        id: true,
+        isDemo: true,
+        relationStatus: true,
+        whatsappStatus: true,
+        whatsappE164: true,
+      },
     });
     if (!representant) throw representantNotFound();
+
+    const whatsapp = resolveWhatsappPatch(body, representant);
 
     const task = await this.prisma.repCallTask.findFirst({
       where: { representantId: body.representantId, isActive: true, ...demoScope(demoEnabled) },
@@ -607,6 +616,15 @@ export class RepCampaignsService {
             clientCreatedAt: new Date(body.clientCreatedAt),
             isDemo: representant.isDemo,
           },
+        });
+      }
+
+      // Sous le même verrou d'idempotence que la suggestion : un rejeu s'arrête
+      // au `return false` ci-dessus et n'écrit donc pas le WhatsApp deux fois.
+      if (Object.keys(whatsapp).length > 0) {
+        await tx.representant.update({
+          where: { id: body.representantId },
+          data: { ...whatsapp, rev: { increment: 1 } },
         });
       }
 

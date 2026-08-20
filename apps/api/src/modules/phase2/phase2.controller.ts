@@ -8,10 +8,13 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Req,
   Res,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiParam,
   ApiProduces,
@@ -21,7 +24,7 @@ import {
 } from '@nestjs/swagger';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Role } from '@crm/database';
 
 import {
@@ -31,7 +34,8 @@ import {
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { Phase2CampaignsService } from './campaigns.service.js';
 import { Phase2DirectoryService } from './directory.service.js';
-import { programmeFilename, writeProgrammePdf } from './programme-pdf.js';
+import { CallOutcomeReasonsService } from '../referentiels/call-outcome-reasons.service.js';
+import { programmeFilename, prospectCheckboxGroups, writeProgrammePdf } from './programme-pdf.js';
 import {
   CampaignDetailDto,
   CampaignListDto,
@@ -40,7 +44,10 @@ import {
   DirectoryPageDto,
   DirectoryQueryDto,
   ProgrammeQueryDto,
+  CallRecordingDto,
 } from './dto.js';
+import { CallRecordingsService } from './recordings.service.js';
+import { readEnv } from '../../env.js';
 
 const PDF_MIME = 'application/pdf';
 
@@ -52,7 +59,63 @@ export class Phase2Controller {
   constructor(
     private readonly campaigns: Phase2CampaignsService,
     private readonly directory: Phase2DirectoryService,
+    private readonly reasons: CallOutcomeReasonsService,
+    private readonly recordings: CallRecordingsService,
   ) {}
+
+  @Post('call-attempts/:id/recording')
+  @Roles(Role.COMMERCIAL)
+  @HttpCode(HttpStatus.OK)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOperation({
+    operationId: 'uploadCallRecording',
+    summary: 'Joint une note audio à une tentative déjà synchronisée.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: CallRecordingDto })
+  async uploadRecording(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: FastifyRequest,
+  ): Promise<CallRecordingDto> {
+    const maxBytes = readEnv().CALL_RECORDING_MAX_SIZE_BYTES;
+    return this.recordings.upload(
+      user,
+      id,
+      await request.file({ limits: { fileSize: maxBytes, files: 1 } }),
+    );
+  }
+
+  @Get('call-attempts/:id/recording')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION, Role.COMMERCIAL)
+  @ApiProduces('audio/mp4')
+  @ApiOperation({
+    operationId: 'downloadCallRecording',
+    summary: 'Lit la note audio jointe à une tentative.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({
+    status: 200,
+    content: { 'audio/mp4': { schema: { type: 'string', format: 'binary' } } },
+  })
+  async downloadRecording(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const recording = await this.recordings.open(user, id);
+    reply.header('Content-Type', 'audio/mp4');
+    reply.header('Content-Length', String(recording.bytes));
+    reply.header('Cache-Control', 'private, max-age=3600');
+    await reply.send(recording.stream);
+  }
 
   @Get('directory')
   @Roles(Role.COMMERCIAL, Role.ADMIN)
@@ -69,7 +132,7 @@ export class Phase2Controller {
   }
 
   @Get('campaigns')
-  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listCallCampaigns',
     summary: 'Liste des campagnes, avec l’avancement de chacune.',
@@ -113,7 +176,7 @@ export class Phase2Controller {
   }
 
   @Get('campaigns/:id')
-  @Roles(Role.ADMIN, Role.SUPERVISEUR)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'getCallCampaign',
     summary: 'Détail d’une campagne, ventilé par commercial.',
@@ -142,7 +205,7 @@ export class Phase2Controller {
   }
 
   @Get('campaigns/:id/commerciaux/:userId/programme.pdf')
-  @Roles(Role.ADMIN, Role.SUPERVISEUR)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiProduces(PDF_MIME)
   @ApiOperation({
     operationId: 'downloadCallProgrammePdf',
@@ -169,6 +232,7 @@ export class Phase2Controller {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const programme = await this.campaigns.programme(id, userId, query.jour);
+    const reasons = await this.reasons.listAll();
     const generatedAt = new Date();
 
     reply.hijack();
@@ -180,7 +244,11 @@ export class Phase2Controller {
     reply.raw.setHeader('Cache-Control', 'no-store');
 
     try {
-      await writeProgrammePdf(reply.raw, { ...programme, generatedAt });
+      await writeProgrammePdf(reply.raw, {
+        ...programme,
+        generatedAt,
+        checkboxGroups: prospectCheckboxGroups(reasons.items.filter((reason) => reason.isActive)),
+      });
     } catch (error) {
       reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
       throw error;

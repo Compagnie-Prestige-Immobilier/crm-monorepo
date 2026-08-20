@@ -258,7 +258,7 @@ class AppUpdateController extends Notifier<AppUpdateState> {
       'cpi-go-${release.versionCode}.apk',
     );
     final File target = File(path);
-    final int existing = await target.exists() ? await target.length() : 0;
+    final int existing = target.existsSync() ? target.lengthSync() : 0;
     final Response<ResponseBody> response = await dio.get<ResponseBody>(
       release.downloadUrl,
       options: Options(
