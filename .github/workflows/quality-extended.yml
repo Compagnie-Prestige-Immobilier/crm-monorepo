@@ -1,16 +1,14 @@
 name: quality-extended
 
-# PLANIFICATION RETIREE, ET C'EST UN CONSTAT, PAS UN RENONCEMENT.
+# UN SEUL JOB, ET PLUS AUCUNE PLANIFICATION.
 #
-# Les douze dernieres executions ont echoue, toutes : Maestro sur « not enough
-# disk space », Lighthouse et k6 sur une cause applicative jamais instruite.
-# Cinq matins par semaine, ce workflow facturait de vingt a soixante-dix minutes
-# pour un verdict connu d'avance, et les 2 000 minutes mensuelles incluses
-# etaient epuisees a mi-mois.
+# Lighthouse et k6 sont RETIRES : ils echouaient a CHAQUE execution, cinq matins
+# par semaine, sur une cause applicative que personne n'a jamais instruite. Un
+# job qui echoue toujours n'apprend rien ; il facture.
 #
-# Rien n'est supprime : les trois jobs restent declenchables a la main. La
-# planification revient le jour ou l'un d'eux passe au vert, un job qui echoue
-# toujours n'apprend rien a personne.
+# Maestro reste, mais a la demande seulement : il casse sur « not enough disk
+# space » et facturait jusqu'a soixante-dix minutes pour un verdict connu
+# d'avance. La planification reviendra le jour ou il passera au vert.
 on:
   workflow_dispatch:
 
@@ -18,81 +16,6 @@ permissions:
   contents: read
 
 jobs:
-  lighthouse:
-    name: Lighthouse — performance and accessibility
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:18.4
-        env:
-          POSTGRES_DB: crm
-          POSTGRES_USER: crm
-          POSTGRES_PASSWORD: crm
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U crm -d crm"
-          --health-interval 10s --health-timeout 5s --health-retries 5
-    env:
-      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
-      JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
-      JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
-      SEED_ADMIN_EMAIL: admin@cpi.sn
-      SEED_ADMIN_USERNAME: admin
-      SEED_ADMIN_PASSWORD: ci-admin-password-2026
-      NODE_ENV: production
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: ./.github/actions/setup-node
-      - run: pnpm db:generate
-      - run: pnpm db:deploy
-      - run: pnpm db:seed
-      - run: pnpm --filter @crm/api build
-      - run: pnpm --filter @crm/web build
-      - name: Start API and web
-        run: |
-          pnpm --filter @crm/api start > /tmp/cpi-api.log 2>&1 &
-          pnpm --filter @crm/web start > /tmp/cpi-web.log 2>&1 &
-          npx --yes wait-on http://127.0.0.1:3001/health/live http://127.0.0.1:3000
-      - name: Lighthouse CI
-        run: |
-          npx --yes @lhci/cli@0.15.x autorun --config=tools/perf/lighthouserc.json
-
-  k6:
-    name: k6 — API latency and availability
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:18.4
-        env:
-          POSTGRES_DB: crm
-          POSTGRES_USER: crm
-          POSTGRES_PASSWORD: crm
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U crm -d crm"
-          --health-interval 10s --health-timeout 5s --health-retries 5
-    env:
-      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
-      JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
-      JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
-      SEED_ADMIN_EMAIL: admin@cpi.sn
-      SEED_ADMIN_USERNAME: admin
-      SEED_ADMIN_PASSWORD: ci-admin-password-2026
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: ./.github/actions/setup-node
-      - run: pnpm db:generate
-      - run: pnpm db:deploy
-      - run: pnpm --filter @crm/api build
-      - run: pnpm --filter @crm/api start > /tmp/cpi-api.log 2>&1 &
-      - run: npx --yes wait-on http://127.0.0.1:3001/health/ready
-      - name: k6
-        uses: grafana/k6-action@e4714b734f2b0afaabeb7b4a69142745548ab9ec # v0.3.1
-        with:
-          filename: tools/perf/api-smoke.js
-
   mobile-maestro:
     name: Maestro — Android smoke journey
     runs-on: ubuntu-latest
