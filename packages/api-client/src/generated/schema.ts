@@ -2475,7 +2475,7 @@ export interface components {
       password: string;
     };
     /** @enum {string} */
-    Role: 'ADMIN' | 'COMMERCIAL' | 'BANQUE_FINANCE' | 'SUPERVISEUR';
+    Role: 'ADMIN' | 'COMMERCIAL' | 'BANQUE_FINANCE' | 'SUPERVISEUR' | 'DIRECTION' | 'ACCUEIL';
     AuthUserDto: {
       /** Format: uuid */
       id: string;
@@ -4792,6 +4792,7 @@ export interface components {
       | 'teleconseillers'
       | 'finances'
       | 'supervision'
+      | 'directionAccueil'
       | 'representants'
       | 'prospects'
       | 'campagnes'

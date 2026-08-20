@@ -29,7 +29,7 @@ export class CallbacksController {
   constructor(private readonly callbacks: CallbacksService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listScheduledCallbacks',
     summary: 'Rappels promis encore dus.',
