@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { ProspectsService } from './prospects.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const alice: AuthenticatedUser = {
   id: 'com-alice',
@@ -59,7 +58,7 @@ function firstArg(fn: ReturnType<typeof vi.fn>): PrismaCallArgs {
 }
 
 const service = (prisma: PrismaMock): ProspectsService =>
-  new ProspectsService(prisma as unknown as PrismaService, fakeDemoVisibility());
+  new ProspectsService(prisma as unknown as PrismaService);
 
 describe('cloisonnement par commercial', () => {
   let prisma: PrismaMock;
@@ -150,12 +149,9 @@ describe('cloisonnement par commercial', () => {
     prisma.representant.findFirst.mockResolvedValue({
       id: 'r-demo',
       createdById: admin.id,
-      isDemo: true,
     });
 
     await service(prisma).reassign(admin, { prospectIds: ['p-1'], representantId: 'r-demo' });
-
-    expect(firstArg(prisma.prospect.updateMany).data?.isDemo).toBe(true);
   });
 
   it('seul un ADMIN peut changer le commercial propriétaire', async () => {
@@ -504,58 +500,21 @@ describe('nature de la fiche créée', () => {
     representantId: 'r-1',
   };
 
-  const prepare = (representantIsDemo: boolean): PrismaMock => {
+  const prepare = (): PrismaMock => {
     const prisma = makePrisma();
     prisma.representant.findFirst.mockResolvedValue({
       id: 'r-1',
       createdById: alice.id,
-      isDemo: representantIsDemo,
     });
     prisma.prospect.create.mockResolvedValue(prospectRow({}));
     return prisma;
   };
 
-  it('mode ÉTEINT et représentant réel : la fiche est réelle', async () => {
-    const prisma = prepare(false);
-    await new ProspectsService(
-      prisma as unknown as PrismaService,
-      fakeDemoVisibility(false),
-    ).create(alice, saisie);
+  it('valide le représentant avant de créer la fiche', async () => {
+    const prisma = prepare();
+    await new ProspectsService(prisma as unknown as PrismaService).create(alice, saisie);
 
-    expect(firstArg(prisma.prospect.create).data?.isDemo).toBe(false);
-  });
-
-  it('mode ALLUMÉ : la fiche est une fiche de démonstration', async () => {
-    const prisma = prepare(false);
-    await new ProspectsService(prisma as unknown as PrismaService, fakeDemoVisibility(true)).create(
-      alice,
-      saisie,
-    );
-
-    expect(firstArg(prisma.prospect.create).data?.isDemo).toBe(true);
-  });
-
-  it('représentant de démonstration : la fiche le suit, mode éteint compris', async () => {
-    const prisma = prepare(true);
-    await new ProspectsService(
-      prisma as unknown as PrismaService,
-      fakeDemoVisibility(false),
-    ).create(alice, saisie);
-
-    expect(firstArg(prisma.prospect.create).data?.isDemo).toBe(true);
-  });
-
-  it('lit la nature du représentant, elle ne peut pas être devinée après coup', async () => {
-    const prisma = prepare(true);
-    await new ProspectsService(
-      prisma as unknown as PrismaService,
-      fakeDemoVisibility(false),
-    ).create(alice, saisie);
-
-    const select = (
-      prisma.representant.findFirst.mock.calls[0]?.[0] as { select?: Record<string, unknown> }
-    ).select;
-    expect(select?.isDemo).toBe(true);
+    expect(prisma.representant.findFirst).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -654,7 +613,6 @@ describe('le panneau sait saisir une fiche Grand Public', () => {
     prisma.representant.findFirst.mockResolvedValue({
       id: 'r-1',
       createdById: alice.id,
-      isDemo: false,
     });
     prisma.prospect.create.mockResolvedValue(prospectRow({}));
 

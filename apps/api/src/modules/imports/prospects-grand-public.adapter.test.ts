@@ -35,7 +35,6 @@ interface WrittenProspect {
   dureeSystemeMois: number | null;
   canalProvenanceId: string | null;
   createdById: string;
-  isDemo: boolean;
 }
 
 interface Store {
@@ -212,9 +211,7 @@ describe('une cellule vide n’est pas une erreur', () => {
   });
 
   it('accepte aussi une ligne dont les colonnes facultatives manquent du fichier', () => {
-    const row = accepted(
-      adapter.parseRow({ [H.nom]: 'Fall', [H.phone]: '781112233' }, 4),
-    );
+    const row = accepted(adapter.parseRow({ [H.nom]: 'Fall', [H.phone]: '781112233' }, 4));
 
     expect(row.nom).toBe('Fall');
     expect(row.canalProvenanceId).toBeNull();
@@ -270,20 +267,18 @@ describe('ce qui fait refuser une ligne', () => {
     [H.banque, 'Ecobank', GrandPublicImportError.BANQUE_INCONNUE, 'CBAO'],
     [H.syndicat, 'SAES', GrandPublicImportError.SYNDICAT_INCONNU, 'CHUES'],
     [H.canal, 'Pigeon voyageur', GrandPublicImportError.CANAL_INCONNU, 'TikTok'],
-  ])('refuse « %s » rempli hors référentiel, en nommant les valeurs admises', (
-    column,
-    valeur,
-    code,
-    admise,
-  ) => {
-    const error = refusal(adapter.parseRow(cells({ [column]: valeur }), 3));
+  ])(
+    'refuse « %s » rempli hors référentiel, en nommant les valeurs admises',
+    (column, valeur, code, admise) => {
+      const error = refusal(adapter.parseRow(cells({ [column]: valeur }), 3));
 
-    expect(error.code).toBe(code);
-    expect(error.column).toBe(column);
-    expect(error.message).toContain(valeur);
-    expect(error.message).toContain(admise);
-    expect(error.message).toMatch(/cellule vide/);
-  });
+      expect(error.code).toBe(code);
+      expect(error.column).toBe(column);
+      expect(error.message).toContain(valeur);
+      expect(error.message).toContain(admise);
+      expect(error.message).toMatch(/cellule vide/);
+    },
+  );
 
   it('refuse une durée qui n’est pas un entier de mois', () => {
     for (const raw of ['2 ans', '0', 'douze', '-3', '1000']) {
@@ -302,11 +297,14 @@ describe('ce qui fait refuser une ligne', () => {
 });
 
 describe('« Fonctionnaire » et le type se composent sans jamais se deviner', () => {
-  it.each(['oui', 'OUI', 'O', 'x', '1', 'vrai'])('« %s » range la fiche en FONCTIONNAIRE', (raw) => {
-    expect(accepted(adapter.parseRow(cells({ [H.fonctionnaire]: raw }), 3)).type).toBe(
-      ProspectType.FONCTIONNAIRE,
-    );
-  });
+  it.each(['oui', 'OUI', 'O', 'x', '1', 'vrai'])(
+    '« %s » range la fiche en FONCTIONNAIRE',
+    (raw) => {
+      expect(accepted(adapter.parseRow(cells({ [H.fonctionnaire]: raw }), 3)).type).toBe(
+        ProspectType.FONCTIONNAIRE,
+      );
+    },
+  );
 
   // « Non » dit ce que la personne n'est pas, pas ce qu'elle est : le fichier ne
   // choisit pas entre secteur privé, informel et diaspora.
@@ -365,7 +363,6 @@ describe('écriture d’une tranche', () => {
     expect(store.written[0]).toMatchObject({
       projet: Projet.GRAND_PUBLIC,
       representantId: null,
-      isDemo: false,
       createdById: 'user-admin',
     });
   });

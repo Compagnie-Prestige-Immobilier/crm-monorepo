@@ -176,7 +176,8 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
     }
 
     const rawBanque = (cells[H.banque] ?? '').trim();
-    const banqueId = rawBanque === '' ? null : (refs.banques.get(referentialKey(rawBanque)) ?? null);
+    const banqueId =
+      rawBanque === '' ? null : (refs.banques.get(referentialKey(rawBanque)) ?? null);
     if (rawBanque !== '' && banqueId === null) {
       return refuse(
         H.banque,
@@ -319,9 +320,6 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
         canalProvenanceId: row.canalProvenanceId,
         createdById: ctx.requestedById,
         clientCreatedAt: now,
-        // Une reprise de données réelles n'emprunte pas l'interrupteur de
-        // démonstration : les lignes disparaîtraient à son extinction.
-        isDemo: false,
       })),
       // L'index unique partiel double le contrôle : une ligne prise pendant
       // l'import est écartée, et l'écart est COMPTÉ dans `skipped`.
@@ -331,14 +329,6 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
     return { created: written.count, skipped: retained.length - written.count, errors };
   }
 
-  /**
-   * Prospects vivants portant l'un de ces numéros, et leur projet.
-   *
-   * LECTURE GLOBALE, sans filtre de démonstration ni de projet : l'index unique
-   * partiel `prospects_phone_e164_active_key` est global. Filtré, ce contrôle
-   * déclarerait libres des numéros déjà tenus, `skipDuplicates` les écarterait
-   * en silence, et le rapport annoncerait des créations qui n'ont pas eu lieu.
-   */
   private async existingProspects(
     phones: readonly string[],
     ctx: ImportRunContext,

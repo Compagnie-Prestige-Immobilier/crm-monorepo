@@ -3,7 +3,6 @@ import { PrismaClient, PrismaPg, Role } from '@crm/database';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { PilotageService } from './pilotage.service.js';
 import { PortfolioService } from './portfolio.service.js';
 import { QualityService } from './quality.service.js';
@@ -24,19 +23,14 @@ const admin: AuthenticatedUser = {
   role: Role.ADMIN,
 };
 
-const modes = [
-  { nom: 'mode démonstration éteint', enabled: false },
-  { nom: 'mode démonstration allumé', enabled: true },
-];
-
 beforeAll(async () => {
   await prisma.$queryRaw`SELECT 1`;
 });
 
-describe.each(modes)('agrégats de pilotage ($nom)', ({ enabled }) => {
-  const pilotage = new PilotageService(client, fakeDemoVisibility(enabled));
-  const portfolio = new PortfolioService(client, fakeDemoVisibility(enabled));
-  const quality = new QualityService(client, fakeDemoVisibility(enabled));
+describe('agrégats de pilotage', () => {
+  const pilotage = new PilotageService(client);
+  const portfolio = new PortfolioService(client);
+  const quality = new QualityService(client);
 
   it('campaign-pilotage, sans campagne puis sur une campagne', async () => {
     const toutes = await pilotage.campaignPilotage(admin, {});

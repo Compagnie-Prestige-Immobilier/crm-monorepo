@@ -10,7 +10,6 @@ export interface RelationChange {
   readonly reason?: string | null;
   readonly changedById: string;
   readonly source: ChangeSource;
-  readonly isDemo: boolean;
 }
 
 /**
@@ -47,10 +46,6 @@ export async function applyRelationChange(
       reason: change.reason ?? null,
       changedById: change.changedById,
       source: change.source,
-      // La trace suit SA FICHE, pas le mode en vigueur à la seconde du clic :
-      // une bascule non marquée sur un représentant de démonstration entrerait
-      // dans le décompte réel des ambassadeurs.
-      isDemo: change.isDemo,
     },
   });
   return true;

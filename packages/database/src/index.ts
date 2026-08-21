@@ -8,5 +8,5 @@ export * from './seed-data/bank-workflow.js';
 export * from './seed-data/call-outcomes.js';
 export * from './seed-data/canaux-provenance.js';
 export * from './segment.js';
-export * from './demo/index.js';
+export * from './demo-workspace-factory.js';
 export * from './seed-data/visites.js';

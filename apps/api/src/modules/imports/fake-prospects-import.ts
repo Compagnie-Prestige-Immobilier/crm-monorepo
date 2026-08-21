@@ -20,7 +20,6 @@ export interface FakeSyndicat {
 export interface FakeRepresentant {
   id: string;
   phoneE164: string;
-  isDemo: boolean;
   deletedAt: Date | null;
 }
 
@@ -38,7 +37,6 @@ export interface FakeProspectRow {
   enrollmentCapturedAt: Date | null;
   enrollmentCapturedById: string | null;
   clientCreatedAt: Date;
-  isDemo: boolean;
   deletedAt: Date | null;
 }
 
@@ -68,8 +66,8 @@ export function createFakeImportStore(
       { id: 'syn-sudes', sigle: 'SUDES', isActive: true, sortOrder: 20 },
     ],
     representants: over.representants ?? [
-      { id: 'rep-1', phoneE164: FAKE_REPRESENTANT_PHONE, isDemo: false, deletedAt: null },
-      { id: 'rep-2', phoneE164: FAKE_OTHER_REPRESENTANT_PHONE, isDemo: false, deletedAt: null },
+      { id: 'rep-1', phoneE164: FAKE_REPRESENTANT_PHONE, deletedAt: null },
+      { id: 'rep-2', phoneE164: FAKE_OTHER_REPRESENTANT_PHONE, deletedAt: null },
     ],
     prospects: over.prospects ?? [],
     racingPhones: over.racingPhones ?? [],
@@ -96,17 +94,12 @@ export function fakeExistingProspect(over: {
     enrollmentCapturedAt: null,
     enrollmentCapturedById: null,
     clientCreatedAt: new Date('2026-01-01T08:00:00.000Z'),
-    isDemo: false,
     deletedAt: over.deletedAt ?? null,
   };
 }
 
 interface ReferentialFindManyArgs {
   where: { isActive: boolean };
-}
-
-interface RepresentantFindManyArgs {
-  where: { deletedAt: null; isDemo: boolean };
 }
 
 interface ProspectFindManyArgs {
@@ -144,10 +137,10 @@ export function fakeImportContext(
         ),
     },
     representant: {
-      findMany: (args: RepresentantFindManyArgs) =>
+      findMany: () =>
         Promise.resolve(
           store.representants
-            .filter((row) => row.deletedAt === null && row.isDemo === args.where.isDemo)
+            .filter((row) => row.deletedAt === null)
             .map((row) => ({ id: row.id, phoneE164: row.phoneE164 })),
         ),
     },

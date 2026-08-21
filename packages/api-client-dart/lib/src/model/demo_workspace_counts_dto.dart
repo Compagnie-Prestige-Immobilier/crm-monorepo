@@ -7,7 +7,7 @@ import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
 
-part 'demo_counts_dto.g.dart';
+part 'demo_workspace_counts_dto.g.dart';
 
 @CopyWith()
 @JsonSerializable(
@@ -16,9 +16,9 @@ part 'demo_counts_dto.g.dart';
   disallowUnrecognizedKeys: false,
   explicitToJson: true,
 )
-class DemoCountsDto {
-  /// Returns a new [DemoCountsDto] instance.
-  DemoCountsDto({
+class DemoWorkspaceCountsDto {
+  /// Returns a new [DemoWorkspaceCountsDto] instance.
+  DemoWorkspaceCountsDto({
     required this.users,
 
     required this.representants,
@@ -27,15 +27,7 @@ class DemoCountsDto {
 
     required this.campaigns,
 
-    required this.campaignCommerciaux,
-
-    required this.callTasks,
-
-    required this.callAttempts,
-
     required this.bankCases,
-
-    required this.bankCaseTransitions,
   });
 
   @JsonKey(name: r'users', required: true, includeIfNull: false)
@@ -50,47 +42,21 @@ class DemoCountsDto {
   @JsonKey(name: r'campaigns', required: true, includeIfNull: false)
   final num campaigns;
 
-  @JsonKey(name: r'campaignCommerciaux', required: true, includeIfNull: false)
-  final num campaignCommerciaux;
-
-  @JsonKey(name: r'callTasks', required: true, includeIfNull: false)
-  final num callTasks;
-
-  @JsonKey(name: r'callAttempts', required: true, includeIfNull: false)
-  final num callAttempts;
-
   @JsonKey(name: r'bankCases', required: true, includeIfNull: false)
   final num bankCases;
 
-  @JsonKey(name: r'bankCaseTransitions', required: true, includeIfNull: false)
-  final num bankCaseTransitions;
-
   bool operator ==(Object other) {
     return identical(this, other) ||
-        other is DemoCountsDto &&
+        other is DemoWorkspaceCountsDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [
-                users,
-                representants,
-                prospects,
-                campaigns,
-                campaignCommerciaux,
-                callTasks,
-                callAttempts,
-                bankCases,
-                bankCaseTransitions,
-              ],
+              [users, representants, prospects, campaigns, bankCases],
               [
                 other.users,
                 other.representants,
                 other.prospects,
                 other.campaigns,
-                other.campaignCommerciaux,
-                other.callTasks,
-                other.callAttempts,
                 other.bankCases,
-                other.bankCaseTransitions,
               ],
             );
   }
@@ -103,17 +69,13 @@ class DemoCountsDto {
         representants,
         prospects,
         campaigns,
-        campaignCommerciaux,
-        callTasks,
-        callAttempts,
         bankCases,
-        bankCaseTransitions,
       ]);
 
-  factory DemoCountsDto.fromJson(Map<String, dynamic> json) =>
-      _$DemoCountsDtoFromJson(json);
+  factory DemoWorkspaceCountsDto.fromJson(Map<String, dynamic> json) =>
+      _$DemoWorkspaceCountsDtoFromJson(json);
 
-  Map<String, dynamic> toJson() => _$DemoCountsDtoToJson(this);
+  Map<String, dynamic> toJson() => _$DemoWorkspaceCountsDtoToJson(this);
 
   @override
   String toString() {

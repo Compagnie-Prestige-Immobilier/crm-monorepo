@@ -96,9 +96,7 @@ export class SegmentChangeService {
     const banqueShortName =
       toBanqueId === fromBanqueId ? banque.shortName : await this.resolveBanque(toBanqueId);
     const syndicatSigle =
-      toSyndicatId === fromSyndicatId
-        ? syndicat.sigle
-        : await this.resolveSyndicat(toSyndicatId);
+      toSyndicatId === fromSyndicatId ? syndicat.sigle : await this.resolveSyndicat(toSyndicatId);
 
     const toSegment = requireSegment(classifySegment({ syndicatSigle, banqueShortName }));
 
@@ -130,10 +128,6 @@ export class SegmentChangeService {
           // depuis le corps de la requête permettrait à n'importe quel appelant
           // de se faire passer pour l'autre.
           source: ChangeSource.WEB,
-          // La trace suit SA FICHE, pas le mode en vigueur à la seconde du
-          // clic : une bascule non marquée sur un prospect de démonstration
-          // entrerait dans le décompte réel des conversions du mois.
-          isDemo: existing.isDemo,
         },
       });
       return null;
@@ -158,15 +152,6 @@ export class SegmentChangeService {
     return toProspectDto(saved, attempts.get(saved.id));
   }
 
-  /**
-   * L'historique d'UNE fiche, du plus récent au plus ancien.
-   *
-   * Sert l'index `(prospectId, changedAt)`. La lecture n'est PAS bornée par le
-   * mode démonstration : le prospect vient d'être résolu par sa clé primaire et
-   * son cloisonnement s'est joué là. Rejouer un filtre ici rendrait une fiche
-   * sans son historique, ce qui se lit à l'écran comme une fiche jamais
-   * convertie.
-   */
   async history(user: AuthenticatedUser, id: string): Promise<SegmentChangeListDto> {
     const prospect = await this.prisma.prospect.findFirst({
       where: { id, deletedAt: null },
@@ -175,11 +160,6 @@ export class SegmentChangeService {
     if (!prospect) throw prospectNotFound();
     assertOwnership(user, prospect);
 
-    // LECTURE GLOBALE délibérée : l'historique d'une fiche DÉJÀ résolue par sa
-    // clé primaire juste au-dessus, et dont le cloisonnement s'est joué là. Une
-    // trace suit toujours la nature de son prospect ; filtrer ici rendrait donc
-    // soit exactement le même ensemble, soit une fiche de démonstration privée
-    // de son histoire, ce qui se lit à l'écran comme une fiche jamais convertie.
     const rows = await this.prisma.segmentChange.findMany({
       where: { prospectId: id },
       include: { changedBy: { select: { id: true, fullName: true } } },

@@ -2,8 +2,6 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Role, type Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 import { dakarWallClock, inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import { formatVisiteReference, nextVisiteSequence, visiteReferencePrefix } from './reference.js';
@@ -82,15 +80,12 @@ function toDto(row: VisiteRow): VisiteDto {
 
 @Injectable()
 export class VisitesService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async list(query: VisiteQueryDto): Promise<VisiteListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
-    const where = this.buildWhere(query, await this.demo.enabled());
+    const where = this.buildWhere(query);
 
     const [total, rows] = await Promise.all([
       this.prisma.visite.count({ where }),
@@ -114,13 +109,7 @@ export class VisitesService {
   }
 
   async create(input: CreateVisiteDto, createdById: string): Promise<VisiteDto> {
-    return this.createRow(
-      this.prisma,
-      undefined,
-      input,
-      createdById,
-      await this.demo.enabledForWrite(),
-    );
+    return this.createRow(this.prisma, undefined, input, createdById);
   }
 
   /**
@@ -134,9 +123,8 @@ export class VisitesService {
     entityId: string,
     input: CreateVisiteDto,
     createdById: string,
-    isDemo: boolean,
   ): Promise<VisiteDto> {
-    return this.createRow(tx, entityId, input, createdById, isDemo);
+    return this.createRow(tx, entityId, input, createdById);
   }
 
   private async createRow(
@@ -144,7 +132,6 @@ export class VisitesService {
     entityId: string | undefined,
     input: CreateVisiteDto,
     createdById: string,
-    isDemo: boolean,
   ): Promise<VisiteDto> {
     const visitedAt = this.instantOf(input.date, input.time);
     await this.assertReferentielsUsable(input, db);
@@ -162,7 +149,6 @@ export class VisitesService {
       destinataireId: input.destinataireId ?? null,
       comment: input.comment?.trim() ?? null,
       createdById,
-      isDemo,
     };
 
     const year = dakarWallClock(visitedAt).year;
@@ -226,10 +212,9 @@ export class VisitesService {
     return toDto(updated);
   }
 
-  buildWhere(query: VisiteQueryDto, demoEnabled: boolean): Prisma.VisiteWhereInput {
+  buildWhere(query: VisiteQueryDto): Prisma.VisiteWhereInput {
     const search = query.search?.trim();
     return {
-      ...demoScope(demoEnabled),
       ...(query.from === undefined && query.to === undefined
         ? {}
         : {
@@ -294,10 +279,10 @@ export class VisitesService {
     }
   }
 
+  // `db` en parametre : l'inscription venue de la synchronisation s'execute dans
+  // la transaction de son groupe, et lire hors d'elle rendrait un rang deja pris
+  // par une visite du meme lot.
   private async nextSequence(year: number, db: VisiteDb = this.prisma): Promise<number> {
-    // LECTURE GLOBALE : l'unicité de la référence est portée par un index
-    // GLOBAL, lignes de démonstration comprises. Cloisonner ici rendrait un rang
-    // déjà pris.
     const last = await db.visite.findFirst({
       where: { reference: { startsWith: visiteReferencePrefix(year) } },
       orderBy: { reference: 'desc' },
@@ -311,9 +296,8 @@ export class VisitesService {
   }
 
   private async visite(id: string): Promise<VisiteRow> {
-    const demoEnabled = await this.demo.enabled();
     const found = await this.prisma.visite.findFirst({
-      where: { id, ...demoScope(demoEnabled) },
+      where: { id },
       include: VISITE_INCLUDE,
     });
     if (!found) {

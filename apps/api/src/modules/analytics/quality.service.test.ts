@@ -2,7 +2,6 @@ import { Role } from '@crm/database';
 import { describe, expect, it } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { makeAnalyticsPrisma } from './fake-analytics-prisma.js';
 import { QualityService } from './quality.service.js';
 
@@ -23,22 +22,17 @@ const alice: AuthenticatedUser = {
 describe('productivité des représentants', () => {
   it('calcule la dormance en base, sur le seuil par défaut de 90 jours', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    const result = await new QualityService(service, fakeDemoVisibility()).representantProductivity(
-      admin,
-      {},
-    );
+    const result = await new QualityService(service).representantProductivity(admin, {});
 
     expect(sql()).toContain('90::int');
-    expect(sql()).toContain('p."isDemo" = FALSE');
     expect(result.dormantDays).toBe(90);
   });
 
   it('accepte un seuil de dormance propre à la zone', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    const result = await new QualityService(service, fakeDemoVisibility()).representantProductivity(
-      admin,
-      { dormantDays: 30 },
-    );
+    const result = await new QualityService(service).representantProductivity(admin, {
+      dormantDays: 30,
+    });
 
     expect(sql()).toContain('30::int');
     expect(result.dormantDays).toBe(30);
@@ -68,10 +62,7 @@ describe('productivité des représentants', () => {
       },
     ]);
 
-    const result = await new QualityService(service, fakeDemoVisibility()).representantProductivity(
-      admin,
-      {},
-    );
+    const result = await new QualityService(service).representantProductivity(admin, {});
 
     expect(result.items[0]?.conversionRate).toBe(75);
     expect(result.items[0]?.lastProspectAt).toBe('2026-08-01T10:00:00.000Z');
@@ -95,10 +86,7 @@ describe('productivité des représentants', () => {
       },
     ]);
 
-    const result = await new QualityService(service, fakeDemoVisibility()).representantProductivity(
-      admin,
-      { limit: 1 },
-    );
+    const result = await new QualityService(service).representantProductivity(admin, { limit: 1 });
 
     expect(sql()).toContain('SUM(COUNT(*)) OVER ()');
     expect(result.items).toHaveLength(1);
@@ -107,7 +95,7 @@ describe('productivité des représentants', () => {
 
   it('un COMMERCIAL ne lit que ses propres apporteurs', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new QualityService(service, fakeDemoVisibility()).representantProductivity(alice, {});
+    await new QualityService(service).representantProductivity(alice, {});
     expect(sql()).toContain('p."createdById" = "com-alice"');
   });
 });
@@ -119,7 +107,7 @@ describe('qualité de la base', () => {
       [{ id: 'd-1', label: 'Thiès', tentatives: 10, injoignables: 3, errones: 2 }],
     );
 
-    const result = await new QualityService(service, fakeDemoVisibility()).dataQuality(admin, {});
+    const result = await new QualityService(service).dataQuality(admin, {});
 
     expect(queries()).toHaveLength(2);
     expect(result.representants[0]?.badRate).toBe(50);
@@ -131,11 +119,10 @@ describe('qualité de la base', () => {
 
   it('se branche sur les issues d’appel, avec la visibilité de démonstration', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new QualityService(service, fakeDemoVisibility()).dataQuality(admin, {});
+    await new QualityService(service).dataQuality(admin, {});
 
     expect(sql()).toContain(`ca."outcome" = 'UNREACHABLE'`);
     expect(sql()).toContain(`ca."outcome" = 'WRONG_NUMBER'`);
-    expect(sql()).toContain('ca."isDemo" = FALSE');
   });
 
   it('aucune tentative : taux NULS, jamais une division par zéro ni un faux 0 %', async () => {
@@ -144,7 +131,7 @@ describe('qualité de la base', () => {
       [],
     );
 
-    const result = await new QualityService(service, fakeDemoVisibility()).dataQuality(admin, {});
+    const result = await new QualityService(service).dataQuality(admin, {});
 
     expect(result.representants[0]?.badRate).toBeNull();
     expect(result.departements).toEqual([]);
@@ -165,10 +152,7 @@ describe('provenance des fiches', () => {
       ],
     );
 
-    const result = await new QualityService(service, fakeDemoVisibility()).originBreakdown(
-      admin,
-      {},
-    );
+    const result = await new QualityService(service).originBreakdown(admin, {});
 
     expect(result.items[0]).toEqual({
       origin: null,
@@ -185,19 +169,13 @@ describe('provenance des fiches', () => {
 
   it('une provenance encore inconnue du libellé sort telle quelle', async () => {
     const { service } = makeAnalyticsPrisma([{ origin: 'PARTENAIRE', prospects: 5 }], []);
-    const result = await new QualityService(service, fakeDemoVisibility()).originBreakdown(
-      admin,
-      {},
-    );
+    const result = await new QualityService(service).originBreakdown(admin, {});
     expect(result.items[0]?.label).toBe('PARTENAIRE');
   });
 
   it('base vide : charge utile bien formée', async () => {
     const { service, calls } = makeAnalyticsPrisma();
-    const result = await new QualityService(service, fakeDemoVisibility()).originBreakdown(
-      admin,
-      {},
-    );
+    const result = await new QualityService(service).originBreakdown(admin, {});
 
     expect(calls()).toBe(2);
     expect(result).toEqual({ items: [], byLabel: [], total: 0 });
@@ -214,7 +192,7 @@ describe('conversion des représentants en ambassadeurs', () => {
 
   it('date la conversion sur la BASCULE, jamais sur l’arrivée en base', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(admin, {
+    await new QualityService(service).ambassadorConversion(admin, {
       dateFrom: '2026-03-02',
       dateTo: '2026-03-08',
     });
@@ -233,10 +211,7 @@ describe('conversion des représentants en ambassadeurs', () => {
       [{ orphelins: 460 }],
     );
 
-    const result = await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(
-      admin,
-      {},
-    );
+    const result = await new QualityService(service).ambassadorConversion(admin, {});
 
     expect(result).toEqual({
       contacted: 40,
@@ -253,10 +228,7 @@ describe('conversion des représentants en ambassadeurs', () => {
       [{ orphelins: 0 }],
     );
 
-    const result = await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(
-      admin,
-      {},
-    );
+    const result = await new QualityService(service).ambassadorConversion(admin, {});
 
     expect(result.conversionRate).toBe(40);
     expect(result.reverted).toBe(4);
@@ -268,10 +240,7 @@ describe('conversion des représentants en ambassadeurs', () => {
       [{ orphelins: 120 }],
     );
 
-    const result = await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(
-      admin,
-      {},
-    );
+    const result = await new QualityService(service).ambassadorConversion(admin, {});
 
     expect(result.conversionRate).toBeNull();
     expect(result.untracked).toBe(120);
@@ -279,7 +248,7 @@ describe('conversion des représentants en ambassadeurs', () => {
 
   it('l’annuaire jamais travaillé se compte hors du taux, sur les DEUX requêtes', async () => {
     const { service, queries } = makeAnalyticsPrisma();
-    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(admin, {});
+    await new QualityService(service).ambassadorConversion(admin, {});
 
     expect(queries()).toHaveLength(2);
     expect(queries()[1]).toContain('NOT EXISTS');
@@ -288,7 +257,7 @@ describe('conversion des représentants en ambassadeurs', () => {
 
   it('un COMMERCIAL ne lit que ses propres représentants, sur les DEUX requêtes', async () => {
     const { service, queries } = makeAnalyticsPrisma();
-    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(alice, {});
+    await new QualityService(service).ambassadorConversion(alice, {});
 
     for (const query of queries()) {
       expect(query).toContain('r."createdById" = "com-alice"');
@@ -297,26 +266,18 @@ describe('conversion des représentants en ambassadeurs', () => {
 
   it('une DIRECTION lit TOUT : la borner sur son compte rendrait un écran à zéro', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(direction, {});
+    await new QualityService(service).ambassadorConversion(direction, {});
 
     expect(sql()).not.toContain('dir-1');
   });
 
   it('un COMMERCIAL qui demande le périmètre d’un autre n’obtient rien', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(alice, {
+    await new QualityService(service).ambassadorConversion(alice, {
       commercialId: 'com-bineta',
     });
 
     expect(sql()).toContain('"__aucun__"');
     expect(sql()).not.toContain('"com-bineta"');
-  });
-
-  it('la visibilité de démonstration est posée sur la trace comme sur la fiche', async () => {
-    const { service, sql } = makeAnalyticsPrisma();
-    await new QualityService(service, fakeDemoVisibility()).ambassadorConversion(admin, {});
-
-    expect(sql()).toContain('r."isDemo" = FALSE');
-    expect(sql()).toContain('rc."isDemo" = FALSE');
   });
 });

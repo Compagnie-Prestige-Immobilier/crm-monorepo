@@ -16,43 +16,39 @@ const admin: AuthenticatedUser = { ...alice, id: 'admin-1', username: 'admin', r
 describe('filtre par segment', () => {
   it('délègue à segmentWhere plutôt que de réécrire le croisement', () => {
     for (const segment of ['BDD1', 'BDD2', 'BDD3', 'BDD4'] as const) {
-      const where = buildProspectWhere(admin, { segment }, false);
+      const where = buildProspectWhere(admin, { segment });
       expect(where.AND).toEqual([segmentWhere(segment)]);
     }
   });
 
   it('BDD1 vise CHUES et CBAO ; BDD4 vise leurs compléments', () => {
-    expect(buildProspectWhere(admin, { segment: 'BDD1' }, false).AND).toEqual([
+    expect(buildProspectWhere(admin, { segment: 'BDD1' }).AND).toEqual([
       { syndicat: { sigle: 'CHUES' }, banque: { shortName: 'CBAO' } },
     ]);
-    expect(buildProspectWhere(admin, { segment: 'BDD4' }, false).AND).toEqual([
+    expect(buildProspectWhere(admin, { segment: 'BDD4' }).AND).toEqual([
       { syndicat: { sigle: { not: 'CHUES' } }, banque: { shortName: { not: 'CBAO' } } },
     ]);
   });
 
   it('n’écrase pas le filtre par département, qui porte aussi une relation', () => {
-    const where = buildProspectWhere(admin, { segment: 'BDD2', departementId: 'dep-1' }, false);
+    const where = buildProspectWhere(admin, { segment: 'BDD2', departementId: 'dep-1' });
     expect(where.representant).toEqual({ departementId: 'dep-1' });
     expect(where.AND).toEqual([segmentWhere('BDD2')]);
   });
 
   it('reste soumis au cloisonnement : un segment ne l’élargit pas', () => {
-    const where = buildProspectWhere(alice, { segment: 'BDD1' }, false);
+    const where = buildProspectWhere(alice, { segment: 'BDD1' });
     expect(where.createdById).toBe('com-alice');
   });
 });
 
 describe('filtres de phase 2', () => {
   it('traduit statut, méthode et auteur de la méthode', () => {
-    const where = buildProspectWhere(
-      admin,
-      {
-        phase2Status: 'METHOD_OBTAINED',
-        enrollmentMethod: 'PLATFORM',
-        enrollmentCapturedById: 'com-bob',
-      },
-      false,
-    );
+    const where = buildProspectWhere(admin, {
+      phase2Status: 'METHOD_OBTAINED',
+      enrollmentMethod: 'PLATFORM',
+      enrollmentCapturedById: 'com-bob',
+    });
 
     expect(where.phase2Status).toBe('METHOD_OBTAINED');
     expect(where.enrollmentMethod).toBe('PLATFORM');
@@ -60,26 +56,22 @@ describe('filtres de phase 2', () => {
   });
 
   it('distingue l’auteur de la méthode du commercial de saisie', () => {
-    const where = buildProspectWhere(
-      admin,
-      {
-        commercialId: 'com-saisie',
-        enrollmentCapturedById: 'com-appel',
-      },
-      false,
-    );
+    const where = buildProspectWhere(admin, {
+      commercialId: 'com-saisie',
+      enrollmentCapturedById: 'com-appel',
+    });
 
     expect(where.createdById).toBe('com-saisie');
     expect(where.enrollmentCapturedById).toBe('com-appel');
   });
 
   it('filtre la campagne par la relation callTasks', () => {
-    const where = buildProspectWhere(admin, { campaignId: 'camp-1' }, false);
+    const where = buildProspectWhere(admin, { campaignId: 'camp-1' });
     expect(where.AND).toEqual([{ callTasks: { some: { campaignId: 'camp-1' } } }]);
   });
 
   it('cumule segment et campagne sans que l’un efface l’autre', () => {
-    const where = buildProspectWhere(admin, { segment: 'BDD3', campaignId: 'camp-1' }, false);
+    const where = buildProspectWhere(admin, { segment: 'BDD3', campaignId: 'camp-1' });
     expect(where.AND).toEqual([
       segmentWhere('BDD3'),
       { callTasks: { some: { campaignId: 'camp-1' } } },
@@ -87,17 +79,13 @@ describe('filtres de phase 2', () => {
   });
 
   it('n’ajoute aucune clause AND quand ni segment ni campagne ne sont demandés', () => {
-    expect(buildProspectWhere(admin, { statut: 'NOUVEAU' }, false).AND).toBeUndefined();
+    expect(buildProspectWhere(admin, { statut: 'NOUVEAU' }).AND).toBeUndefined();
   });
 });
 
 describe('filtre par attribution de la tâche d’appel', () => {
   it('borne la campagne à la file d’UN téléconseiller', () => {
-    const where = buildProspectWhere(
-      admin,
-      { campaignId: 'camp-1', assignedToId: 'com-bob' },
-      false,
-    );
+    const where = buildProspectWhere(admin, { campaignId: 'camp-1', assignedToId: 'com-bob' });
 
     expect(where.AND).toEqual([
       { callTasks: { some: { campaignId: 'camp-1', assignedToId: 'com-bob' } } },
@@ -105,16 +93,12 @@ describe('filtre par attribution de la tâche d’appel', () => {
   });
 
   it('sans campagne, retient les fiches attribuées à ce téléconseiller', () => {
-    const where = buildProspectWhere(admin, { assignedToId: 'com-bob' }, false);
+    const where = buildProspectWhere(admin, { assignedToId: 'com-bob' });
     expect(where.AND).toEqual([{ callTasks: { some: { assignedToId: 'com-bob' } } }]);
   });
 
   it('ne se confond pas avec l’auteur de la saisie', () => {
-    const where = buildProspectWhere(
-      admin,
-      { commercialId: 'com-alice', assignedToId: 'com-bob' },
-      false,
-    );
+    const where = buildProspectWhere(admin, { commercialId: 'com-alice', assignedToId: 'com-bob' });
 
     expect(where.createdById).toBe('com-alice');
     expect(where.AND).toEqual([{ callTasks: { some: { assignedToId: 'com-bob' } } }]);
@@ -123,7 +107,7 @@ describe('filtre par attribution de la tâche d’appel', () => {
 
 describe('recherche, la clause téléphone ne doit jamais tout matcher', () => {
   const clauses = (search: string) =>
-    (buildProspectWhere(admin, { search }, false).OR ?? []) as Record<string, unknown>[];
+    (buildProspectWhere(admin, { search }).OR ?? []) as Record<string, unknown>[];
 
   it('un terme alphabétique ne pose PAS de clause téléphone', () => {
     const or = clauses('ZZZZZNOPE');
@@ -159,17 +143,17 @@ describe('portée du SUPERVISEUR', () => {
   };
 
   it('lit le portefeuille national, sans borne sur son propre identifiant', () => {
-    const where = buildProspectWhere(superviseur, {}, false);
+    const where = buildProspectWhere(superviseur, {});
     expect(where.createdById).toBeUndefined();
   });
 
   it('son filtre par téléconseiller RÉPOND, au lieu de rendre zéro ligne', () => {
-    const where = buildProspectWhere(superviseur, { commercialId: 'com-alice' }, false);
+    const where = buildProspectWhere(superviseur, { commercialId: 'com-alice' });
     expect(where.createdById).toBe('com-alice');
   });
 
   it('un téléconseiller reste enfermé sur lui-même quoi qu’il demande', () => {
-    const where = buildProspectWhere(alice, { commercialId: 'com-bob' }, false);
+    const where = buildProspectWhere(alice, { commercialId: 'com-bob' });
     expect(where.createdById).toBe('__aucun__');
   });
 });

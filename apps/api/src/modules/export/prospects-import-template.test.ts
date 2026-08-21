@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AnalyticsService } from '../analytics/analytics.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
+import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
 import {
   ENROLLMENT_METHOD_TOKENS,
   PROSPECTS_IMPORT_COLUMNS,
@@ -25,7 +25,7 @@ function makeExports(banques: string[], syndicats: string[]): ExportService {
   return new ExportService(
     prisma as unknown as PrismaService,
     {} as unknown as AnalyticsService,
-    fakeDemoVisibility(),
+    fakeWorkspace(),
   );
 }
 
@@ -136,7 +136,7 @@ describe('modèle d’import des prospects', () => {
     const exports = new ExportService(
       prisma as unknown as PrismaService,
       {} as unknown as AnalyticsService,
-      fakeDemoVisibility(),
+      fakeWorkspace(),
     );
 
     const stream = new PassThrough();

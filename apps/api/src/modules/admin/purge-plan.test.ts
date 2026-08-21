@@ -20,14 +20,7 @@ const SCHEMA_PATH = new URL(
 ).pathname;
 
 const PURGE_EXEMPT = new Map<string, string>([
-  [
-    'app_settings',
-    'réglages de la plateforme (mode démo, workflow) et non données métier ; la purge les remet à zéro explicitement',
-  ],
-  [
-    'demo_entities',
-    'registre du jeu de démonstration, vidé dans la MÊME transaction par DEMO_TRACKED_STEPS',
-  ],
+  ['app_settings', 'réglages de workflow et non données métier'],
   [
     'refresh_tokens',
     'sessions, emportées en cascade avec leur compte ; les purger seules déconnecterait tout le monde sans rien effacer',

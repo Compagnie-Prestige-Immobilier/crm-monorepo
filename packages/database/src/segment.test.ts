@@ -104,7 +104,7 @@ describe('scopeWhere', () => {
 
 describe('eligibleForCampaignWhere', () => {
   it('exclut les supprimés, les non-PENDING, ceux déjà pourvus et ceux déjà attribués', () => {
-    const where = eligibleForCampaignWhere('ALL', false);
+    const where = eligibleForCampaignWhere('ALL');
 
     expect(where.deletedAt).toBeNull();
     expect(where.phase2Status).toBe('PENDING');
@@ -113,27 +113,15 @@ describe('eligibleForCampaignWhere', () => {
   });
 
   it('combine le périmètre de segment avec les conditions d’éligibilité', () => {
-    const where = eligibleForCampaignWhere('BDD1', false);
+    const where = eligibleForCampaignWhere('BDD1');
 
     expect(where.syndicat).toEqual({ sigle: CHUES_SIGLE });
     expect(where.banque).toEqual({ shortName: CBAO_SHORT_NAME });
     expect(where.phase2Status).toBe('PENDING');
   });
 
-  it('exclut les fiches de démonstration quand le mode est éteint', () => {
-    expect(eligibleForCampaignWhere('ALL', false).isDemo).toBe(false);
-  });
-
-  it('ne tire QUE des fiches de démonstration quand le mode est allumé', () => {
-    expect(eligibleForCampaignWhere('ALL', true).isDemo).toBe(true);
-  });
-
   it('ne borne PAS le blocage par population, l’index ne le fait pas non plus', () => {
-    for (const demoEnabled of [true, false]) {
-      expect(eligibleForCampaignWhere('ALL', demoEnabled).callTasks).toEqual({
-        none: { isActive: true },
-      });
-    }
+    expect(eligibleForCampaignWhere('ALL').callTasks).toEqual({ none: { isActive: true } });
   });
 });
 

@@ -5,8 +5,8 @@ import { JwtService } from '@nestjs/jwt';
 import type { User } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { readEnv } from '../../env.js';
+import { WorkspaceContext, type Workspace } from '../../workspaces/workspace.js';
 import { hashPassword, verifyPassword } from './password.js';
 import type { AuthTokensDto, AuthUserDto } from './dto.js';
 
@@ -23,15 +23,12 @@ async function decoy(): Promise<string> {
   return decoyDigest;
 }
 
-export const DEMO_SESSION_REFUSED =
-  'Ce compte de démonstration n’est utilisable que pendant une démonstration. ' +
-  'Demandez à un administrateur d’activer le mode démonstration.';
-
 interface RefreshTokenPayload {
   sub: string;
   jti: string;
   fam: string;
   typ: string;
+  workspace?: Workspace;
 }
 
 @Injectable()
@@ -41,18 +38,8 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
-    private readonly demo: DemoVisibilityService,
+    private readonly workspace: WorkspaceContext,
   ) {}
-
-  private async assertDemoSessionAllowed(user: { isDemo: boolean }): Promise<void> {
-    if (!user.isDemo) return;
-    if ((await this.demo.state()) === 'on') return;
-
-    throw new UnauthorizedException({
-      code: 'ACCOUNT_DISABLED',
-      message: DEMO_SESSION_REFUSED,
-    });
-  }
 
   async login(identifier: string, password: string, userAgent?: string): Promise<AuthTokensDto> {
     const trimmed = identifier.trim();
@@ -82,14 +69,12 @@ export class AuthService {
       });
     }
 
-    await this.assertDemoSessionAllowed(user);
-
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
 
-    return this.issue(user, randomUUID(), userAgent);
+    return this.issue(user, randomUUID(), userAgent, 'public');
   }
 
   // Rotation dans la MÊME famille. Un jeton déjà consommé qui se represente est un
@@ -153,20 +138,30 @@ export class AuthService {
       });
     }
 
-    if (stored.user.isDemo && (await this.demo.state()) !== 'on') {
-      await this.revokeFamily(stored.familyId);
-      throw new UnauthorizedException({
-        code: 'ACCOUNT_DISABLED',
-        message: DEMO_SESSION_REFUSED,
-      });
-    }
-
     await this.prisma.refreshToken.update({
       where: { id: stored.id },
       data: { revokedAt: new Date() },
     });
 
-    return this.issue(stored.user, stored.familyId, userAgent);
+    return this.issue(stored.user, stored.familyId, userAgent, payload.workspace ?? 'public');
+  }
+
+  async switchWorkspace(
+    userId: string,
+    workspace: Workspace,
+    userAgent?: string,
+  ): Promise<AuthTokensDto> {
+    this.workspace.enter('public');
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, isActive: true, deletedAt: null },
+    });
+    if (!user) {
+      throw new UnauthorizedException({
+        code: 'ACCOUNT_DISABLED',
+        message: 'Ce compte est désactivé. Contactez un administrateur.',
+      });
+    }
+    return this.issue(user, randomUUID(), userAgent, workspace);
   }
 
   async logout(presented: string): Promise<boolean> {
@@ -178,7 +173,7 @@ export class AuthService {
     return true;
   }
 
-  async me(userId: string): Promise<AuthUserDto> {
+  async me(userId: string, workspace: Workspace): Promise<AuthUserDto> {
     const user = await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
     if (!user) {
       throw new UnauthorizedException({
@@ -186,7 +181,7 @@ export class AuthService {
         message: 'Compte introuvable.',
       });
     }
-    return toAuthUser(user);
+    return toAuthUser(user, workspace);
   }
 
   private async revokeFamily(familyId: string): Promise<void> {
@@ -196,7 +191,12 @@ export class AuthService {
     });
   }
 
-  private async issue(user: User, familyId: string, userAgent?: string): Promise<AuthTokensDto> {
+  private async issue(
+    user: User,
+    familyId: string,
+    userAgent?: string,
+    workspace: Workspace = 'public',
+  ): Promise<AuthTokensDto> {
     const env = readEnv();
     const accessToken = this.jwt.sign(
       {
@@ -205,6 +205,7 @@ export class AuthService {
         username: user.username,
         fullName: user.fullName,
         role: user.role,
+        workspace,
         typ: 'access',
       },
       { secret: env.JWT_ACCESS_SECRET, expiresIn: ttlToSeconds(env.JWT_ACCESS_TTL) },
@@ -213,7 +214,7 @@ export class AuthService {
     const jti = randomUUID();
     const expiresAt = new Date(Date.now() + env.JWT_REFRESH_TTL_DAYS * 86_400_000);
     const refreshToken = this.jwt.sign(
-      { sub: user.id, jti, fam: familyId, typ: 'refresh' },
+      { sub: user.id, jti, fam: familyId, typ: 'refresh', workspace },
       { secret: env.JWT_REFRESH_SECRET, expiresIn: env.JWT_REFRESH_TTL_DAYS * 86_400 },
     );
 
@@ -231,7 +232,7 @@ export class AuthService {
       accessToken,
       refreshToken,
       expiresIn: ttlToSeconds(env.JWT_ACCESS_TTL),
-      user: toAuthUser(user),
+      user: toAuthUser(user, workspace),
     };
   }
 }
@@ -252,7 +253,7 @@ export function ttlToSeconds(ttl: string): number {
   }
 }
 
-export function toAuthUser(user: User): AuthUserDto {
+export function toAuthUser(user: User, workspace: Workspace = 'public'): AuthUserDto {
   return {
     id: user.id,
     email: user.email,
@@ -260,6 +261,7 @@ export function toAuthUser(user: User): AuthUserDto {
     fullName: user.fullName,
     role: user.role,
     isActive: user.isActive,
+    workspace,
     departementId: user.departementId,
     phoneE164: user.phoneE164,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,

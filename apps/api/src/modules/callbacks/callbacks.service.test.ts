@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { CallbacksService, dakarDayEnd } from './callbacks.service.js';
 import { CallbackScope } from './dto.js';
 
@@ -47,8 +46,7 @@ const row = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
 
 let db: MockDb;
 
-const service = (demoEnabled = false): CallbacksService =>
-  new CallbacksService(db as unknown as PrismaService, fakeDemoVisibility(demoEnabled));
+const service = (): CallbacksService => new CallbacksService(db as unknown as PrismaService);
 
 const whereOf = (call: MockFn): Record<string, unknown> =>
   (call.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
@@ -90,7 +88,6 @@ describe('file des rappels', () => {
     await service().list(AWA, { scope: CallbackScope.TODAY });
 
     expect(whereOf(db.scheduledCallback.findMany)).toEqual({
-      isDemo: false,
       status: ScheduledCallbackStatus.PENDING,
       assignedToId: AWA.id,
       scheduledAt: { lte: new Date('2026-08-18T23:59:59.999Z') },
@@ -145,15 +142,6 @@ describe('file des rappels', () => {
     db.scheduledCallback.findMany.mockClear();
     await service().list(ADMIN, { assignedToId: 'com-2' });
     expect(whereOf(db.scheduledCallback.findMany).assignedToId).toBe('com-2');
-  });
-
-  it('CLOISONNE la file quand le mode démonstration est éteint', async () => {
-    await service(false).list(AWA, {});
-    expect(whereOf(db.scheduledCallback.findMany).isDemo).toBe(false);
-
-    db.scheduledCallback.findMany.mockClear();
-    await service(true).list(AWA, {});
-    expect(whereOf(db.scheduledCallback.findMany)).not.toHaveProperty('isDemo');
   });
 
   it('rend le numéro à composer et le code court, jamais le nom du prospect', async () => {

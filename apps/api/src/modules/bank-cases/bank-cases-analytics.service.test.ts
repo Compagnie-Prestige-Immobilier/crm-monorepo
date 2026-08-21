@@ -1,7 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { BankCaseAnalyticsService } from './bank-cases-analytics.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 
 const prismaReturning = (rows: unknown[]): PrismaService =>
@@ -21,7 +20,6 @@ describe('byBank', () => {
           meanSeconds: 45000,
         },
       ]),
-      fakeDemoVisibility(),
     );
 
     const [banque] = await service.byBank({});
@@ -31,15 +29,3 @@ describe('byBank', () => {
   });
 });
 
-describe('overview', () => {
-  it('fige le mode démonstration pour tous les agrégats de la réponse', async () => {
-    const enabled = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
-    const service = new BankCaseAnalyticsService(prismaReturning([]), {
-      enabled,
-    } as never);
-
-    await service.overview({});
-
-    expect(enabled).toHaveBeenCalledTimes(1);
-  });
-});

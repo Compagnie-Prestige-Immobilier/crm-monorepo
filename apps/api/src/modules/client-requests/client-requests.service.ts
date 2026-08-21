@@ -14,8 +14,6 @@ import { normalizePhone } from '../../common/phone.js';
 import { isPrismaKnownError } from '../../common/filters/prisma-exception.filter.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 import {
   banqueNotFound,
   clientRequestAlreadyPending,
@@ -75,15 +73,10 @@ export class ClientRequestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
-    private readonly demo: DemoVisibilityService,
   ) {}
 
   async create(user: AuthenticatedUser, body: CreateClientRequestDto): Promise<ClientRequestDto> {
     const phoneE164 = normalizePhone(body.phone);
-    // `enabledForWrite` et non `enabled` : cette valeur est écrite dans `isDemo`, et un repli
-    // `false` sur panne de lecture ferait d'une demande d'exercice une vraie demande.
-    const demoEnabled = await this.demo.enabledForWrite();
-
     const banque = await this.prisma.banque.findUnique({
       where: { id: body.banqueId },
       select: { id: true },
@@ -91,13 +84,13 @@ export class ClientRequestsService {
     if (!banque) throw banqueNotFound();
 
     const existingProspect = await this.prisma.prospect.findFirst({
-      where: { phoneE164, deletedAt: null, ...demoScope(demoEnabled) },
+      where: { phoneE164, deletedAt: null },
       select: { id: true },
     });
     if (existingProspect) throw clientRequestProspectExists(phoneE164);
 
     const pending = await this.prisma.clientCreationRequest.findFirst({
-      where: { phoneE164, status: ClientRequestStatus.PENDING, ...demoScope(demoEnabled) },
+      where: { phoneE164, status: ClientRequestStatus.PENDING },
       select: { id: true },
     });
     if (pending) throw clientRequestAlreadyPending(pending.id);
@@ -111,7 +104,6 @@ export class ClientRequestsService {
           note: body.note?.trim() || null,
           banqueId: body.banqueId,
           requestedById: user.id,
-          isDemo: demoEnabled,
         },
         include: INCLUDE,
       })
@@ -135,8 +127,6 @@ export class ClientRequestsService {
   async list(user: AuthenticatedUser, query: ClientRequestQueryDto): Promise<ClientRequestListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
-    const demoEnabled = await this.demo.enabled();
-
     // Un agent bancaire ne voit que ses propres demandes : les autres révéleraient à une banque
     // les clients qu'une concurrente cherche à faire créer.
     const scope: Prisma.ClientCreationRequestWhereInput =
@@ -146,7 +136,6 @@ export class ClientRequestsService {
     const phoneDigits = search?.replace(/\D/g, '') ?? '';
     const where: Prisma.ClientCreationRequestWhereInput = {
       ...scope,
-      ...demoScope(demoEnabled),
       ...(query.status ? { status: query.status } : {}),
       ...(query.banqueId ? { banqueId: query.banqueId } : {}),
       ...(search
@@ -170,7 +159,7 @@ export class ClientRequestsService {
         take: pageSize,
       }),
       this.prisma.clientCreationRequest.count({
-        where: { ...scope, ...demoScope(demoEnabled), status: ClientRequestStatus.PENDING },
+        where: { ...scope, status: ClientRequestStatus.PENDING },
       }),
     ]);
 
@@ -185,7 +174,6 @@ export class ClientRequestsService {
     const row = await this.prisma.clientCreationRequest.findFirst({
       where: {
         id,
-        ...demoScope(await this.demo.enabled()),
         ...(user.role === Role.ADMIN ? {} : { requestedById: user.id }),
       },
       include: INCLUDE,
@@ -210,7 +198,6 @@ export class ClientRequestsService {
         where: {
           id: body.representantId,
           deletedAt: null,
-          isDemo: request.isDemo,
         },
         select: { id: true },
       }),
@@ -261,7 +248,6 @@ export class ClientRequestsService {
           clientCreatedAt: body.clientCreatedAt
             ? new Date(body.clientCreatedAt)
             : request.createdAt,
-          isDemo: request.isDemo,
         },
       });
 
@@ -315,7 +301,7 @@ export class ClientRequestsService {
 
   private async loadPending(id: string): Promise<RequestRow> {
     const row = await this.prisma.clientCreationRequest.findFirst({
-      where: { id, ...demoScope(await this.demo.enabled()) },
+      where: { id },
       include: INCLUDE,
     });
     if (!row) throw clientRequestNotFound();
