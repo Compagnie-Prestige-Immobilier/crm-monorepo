@@ -24,6 +24,7 @@ import '../../../ui/widgets/local_typeahead.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../../ui/widgets/referentials_banner.dart';
+import 'representant_detail_screen.dart' show relationLabel;
 
 class RepresentantFormScreen extends ConsumerStatefulWidget {
   const RepresentantFormScreen({
@@ -74,7 +75,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   String? _defaultDepartementId;
   String? _iefId;
   String _whatsappStatus = WhatsappStatus.nonDemande.code;
-  bool _professionLibre = false;
+  String? _professionId;
+  String? _relationStatus;
   bool _saving = false;
   String? _error;
 
@@ -124,7 +126,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     'whatsappStatus': _whatsappStatus,
     'whatsapp': _whatsapp.text,
     'profession': _profession.text,
-    'professionLibre': _professionLibre,
     'notes': _notes.text,
   };
 
@@ -206,6 +207,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
           );
           _setProfession(existing.profession ?? '');
           _notes.text = existing.notes ?? '';
+          _relationStatus = existing.relationStatus;
         });
         await _labelDepartement(existing.departementId);
         if (existing.iefId != null) await _labelIef(existing.iefId!);
@@ -263,8 +265,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
           (snapshot.values['whatsappStatus'] as String?) ??
           WhatsappStatus.nonDemande.code;
       _whatsapp.text = (snapshot.values['whatsapp'] as String?) ?? '';
-      _profession.text = (snapshot.values['profession'] as String?) ?? '';
-      _professionLibre = (snapshot.values['professionLibre'] as bool?) ?? false;
+      _setProfession((snapshot.values['profession'] as String?) ?? '');
       _notes.text = (snapshot.values['notes'] as String?) ?? '';
       _pendingRestore = null;
     });
@@ -289,11 +290,12 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     if (ief != null && mounted) setState(() => _ief.text = ief.name);
   }
 
-  /// Une profession absente des puces bascule l'écran en saisie libre, sinon la
-  /// valeur enregistrée n'apparaîtrait nulle part.
+  /// Une profession hors référentiel ne se marque PAS comme choisie : sinon
+  /// elle se retrouverait seule dans la liste, qui se rouvrirait sur elle à
+  /// chaque retour du focus.
   void _setProfession(String value) {
     _profession.text = value;
-    _professionLibre = value.isNotEmpty && !kProfessionsFrequentes.contains(value);
+    _professionId = kProfessionsFrequentes.contains(value) ? value : null;
   }
 
   void _pickWhatsapp(String next) {
@@ -305,17 +307,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     markDraftDirty();
     unawaited(flushDraft());
   }
-
-  void _pickProfession(String value, {bool libre = false}) {
-    unawaited(HapticFeedback.selectionClick());
-    setState(() {
-      _profession.text = value;
-      _professionLibre = libre;
-    });
-    markDraftDirty();
-    unawaited(flushDraft());
-  }
-
 
   void _scheduleLookup() {
     _lookupDebounce?.cancel();
@@ -509,6 +500,10 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                 child: ListView(
                   padding: const EdgeInsets.all(CpiSpacing.md),
                   children: <Widget>[
+                    if (_relationStatus != null) ...<Widget>[
+                      _RelationLine(status: _relationStatus!),
+                      const SizedBox(height: CpiSpacing.md),
+                    ],
                     TextField(
                       controller: _nom,
                       focusNode: _nomFocus,
@@ -660,12 +655,29 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                       },
                     ),
                     const SizedBox(height: CpiSpacing.md),
-                    _ProfessionPicker(
+                    LocalTypeahead(
                       controller: _profession,
                       focusNode: _professionFocus,
-                      libre: _professionLibre,
-                      onPick: _pickProfession,
-                      onTextChanged: (String _) => markDraftDirty(),
+                      label: 'Profession (facultatif)',
+                      hint: 'Instituteur, Proviseur, Inspecteur…',
+                      selectedId: _professionId,
+                      freeText: true,
+                      maxLength: kProfessionMaxLength,
+                      textInputAction: TextInputAction.done,
+                      options: kProfessionsFrequentes
+                          .map((String m) => TypeaheadOption(id: m, label: m))
+                          .toList(growable: false),
+                      onChanged: (String _) {
+                        if (_professionId != null) {
+                          setState(() => _professionId = null);
+                        }
+                        markDraftDirty();
+                      },
+                      onSelected: (TypeaheadOption option) {
+                        setState(() => _professionId = option.id);
+                        markDraftDirty();
+                        unawaited(flushDraft());
+                      },
                     ),
                     const SizedBox(height: CpiSpacing.md),
                     TextField(
@@ -682,9 +694,9 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                 ),
               ),
               _SaveBar(
-                label: widget.representantId == null
-                    ? 'Enregistrer et saisir des prospects'
-                    : 'Enregistrer',
+                // Les deux chemins enchaînent sur la saisie de prospects : le
+                // libellé le dit, au lieu de laisser l'écran suivant surprendre.
+                label: 'Enregistrer et saisir des prospects',
                 enabled: _canSave,
                 busy: _saving,
                 onPressed: _save,
@@ -800,57 +812,32 @@ class _WhatsappPicker extends StatelessWidget {
   }
 }
 
-class _ProfessionPicker extends StatelessWidget {
-  const _ProfessionPicker({
-    required this.controller,
-    required this.focusNode,
-    required this.libre,
-    required this.onPick,
-    required this.onTextChanged,
-  });
+/// Où en est la relation, en LECTURE SEULE : le contrat de synchronisation n'a
+/// pas de chemin d'écriture mobile pour ce statut, seul le serveur l'écrit.
+class _RelationLine extends StatelessWidget {
+  const _RelationLine({required this.status});
 
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final bool libre;
-  final void Function(String value, {bool libre}) onPick;
-  final ValueChanged<String> onTextChanged;
+  final String status;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: <Widget>[
-        Text('Profession (facultatif)', style: theme.textTheme.titleSmall),
-        const SizedBox(height: CpiSpacing.xs),
-        Wrap(
-          spacing: CpiSpacing.xs,
-          runSpacing: CpiSpacing.xs,
-          children: <Widget>[
-            for (final String metier in kProfessionsFrequentes)
-              ChoiceChip(
-                label: Text(metier, maxLines: 1, overflow: TextOverflow.ellipsis),
-                selected: !libre && controller.text == metier,
-                onSelected: (bool on) => onPick(on ? metier : ''),
-              ),
-            ChoiceChip(
-              label: const Text('Autre', maxLines: 1, overflow: TextOverflow.ellipsis),
-              selected: libre,
-              onSelected: (bool on) => onPick(on ? controller.text : '', libre: on),
-            ),
-          ],
+        Icon(
+          PhosphorIconsRegular.handshake,
+          size: 18,
+          color: theme.colorScheme.onSurfaceVariant,
         ),
-        if (libre) ...<Widget>[
-          const SizedBox(height: CpiSpacing.xs),
-          TextField(
-            controller: controller,
-            focusNode: focusNode,
-            maxLength: kProfessionMaxLength,
-            textCapitalization: TextCapitalization.sentences,
-            onChanged: onTextChanged,
-            decoration: const InputDecoration(labelText: 'Préciser la profession'),
+        const SizedBox(width: CpiSpacing.xs),
+        Expanded(
+          child: Text(
+            'Relation : ${relationLabel(status)}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ],
+        ),
       ],
     );
   }

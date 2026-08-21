@@ -85,6 +85,76 @@ class WriteRepository {
   static String? _whatsappE164For(String status, String? entered) =>
       status == WhatsappStatus.autreNumero.code ? entered : null;
 
+  /// `reference` reste absente en local : c'est le serveur qui l'attribue, à
+  /// la poussée. Elle apparaît au pull suivant, qui recopie la ligne en place
+  /// grâce au même `id`.
+  Future<String> inscrireVisite({
+    required String visitorName,
+    required String date,
+    required String entrepriseId,
+    required String entrepriseLabel,
+    required String objetId,
+    required String objetLabel,
+    required String createdById,
+    String? time,
+    String? phone,
+    String? directionId,
+    String? directionLabel,
+    String? destinataireId,
+    String? destinataireLabel,
+    String? comment,
+    String? id,
+  }) async {
+    final String entityId = id ?? Ids.newId();
+    final DateTime now = _clock.now();
+    await _db.transaction(() async {
+      await _db
+          .into(_db.visites)
+          .insert(
+            VisitesCompanion.insert(
+              id: entityId,
+              date: date,
+              time: Value<String?>(time),
+              visitorName: visitorName,
+              phone: Value<String?>(phone),
+              entrepriseId: entrepriseId,
+              entrepriseLabel: entrepriseLabel,
+              objetId: objetId,
+              objetLabel: objetLabel,
+              directionId: Value<String?>(directionId),
+              directionLabel: Value<String?>(directionLabel),
+              destinataireId: Value<String?>(destinataireId),
+              destinataireLabel: Value<String?>(destinataireLabel),
+              comment: Value<String?>(comment),
+              createdById: createdById,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await _enqueue(
+        // Une inscription ne depend de rien : chaque visite est sa propre
+        // partition, comme cote serveur (voir dependencyKeyOf).
+        dependencyKey: entityId,
+        entityType: 'visite',
+        entityId: entityId,
+        op: 'create',
+        payload: <String, Object?>{
+          'visitorName': visitorName,
+          'visitDate': date,
+          'visitTime': ?time,
+          'phone': ?phone,
+          'entrepriseId': entrepriseId,
+          'objetId': objetId,
+          'directionId': ?directionId,
+          'destinataireId': ?destinataireId,
+          'comment': ?comment,
+        },
+        now: now,
+      );
+    });
+    return entityId;
+  }
+
   Future<String> createRepresentant({
     required String fullName,
     required String phoneE164,
@@ -283,14 +353,21 @@ class WriteRepository {
     return entityId;
   }
 
+  /// Banque, syndicat et representant sont FACULTATIFS : un teleconseiller ne
+  /// les obtient pas toujours, et une fiche Grand Public n'en a aucun.
   Future<String> createProspect({
     required String nom,
     required String prenom,
     required String phoneE164,
-    required String banqueId,
-    required String syndicatId,
-    required String representantId,
     required String createdById,
+    String? banqueId,
+    String? syndicatId,
+    String? representantId,
+    String? projet,
+    String? type,
+    String? profession,
+    int? dureeSystemeMois,
+    String? canalProvenanceId,
     String? id,
     String? draftId,
   }) async {
@@ -306,26 +383,42 @@ class WriteRepository {
               nom: nom,
               prenom: prenom,
               phoneE164: phoneE164,
-              banqueId: banqueId,
-              syndicatId: syndicatId,
-              representantId: representantId,
+              banqueId: Value<String?>(banqueId),
+              syndicatId: Value<String?>(syndicatId),
+              representantId: Value<String?>(representantId),
+              projet: projet == null
+                  ? const Value<String>.absent()
+                  : Value<String>(projet),
+              type: Value<String?>(type),
+              profession: Value<String?>(profession),
               createdById: createdById,
               clientCreatedAt: now,
               localUpdatedAt: now,
             ),
           );
       await _enqueue(
-        dependencyKey: representantId,
+        // Sans representant, la fiche ne depend de personne : elle se chaine sur
+        // elle-meme plutot que de bloquer derriere une cle vide.
+        dependencyKey: representantId ?? entityId,
         entityType: 'prospect',
         entityId: entityId,
         op: 'create',
+        // Une cle absente n'est PAS un vidage : le transport JSON supprime les
+        // `null`, et le serveur refuse le lot entier sur un champ inconnu. On
+        // n'ecrit donc que ce qui a une valeur.
         payload: <String, Object?>{
           'nom': nom,
           'prenom': prenom,
           'phone': phoneE164,
-          'banqueId': banqueId,
-          'syndicatId': syndicatId,
-          'representantId': representantId,
+          'banqueId': ?banqueId,
+          'syndicatId': ?syndicatId,
+          'representantId': ?representantId,
+          'projet': ?projet,
+          'type': ?type,
+          if (profession != null && profession.isNotEmpty)
+            'profession': profession,
+          'dureeSystemeMois': ?dureeSystemeMois,
+          'canalProvenanceId': ?canalProvenanceId,
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
         now: now,
@@ -340,9 +433,9 @@ class WriteRepository {
     required String nom,
     required String prenom,
     required String phoneE164,
-    required String banqueId,
-    required String syndicatId,
-    required String representantId,
+    String? banqueId,
+    String? syndicatId,
+    String? representantId,
     String? statut,
     String? draftId,
   }) async {
@@ -358,15 +451,15 @@ class WriteRepository {
           nom: Value<String>(nom),
           prenom: Value<String>(prenom),
           phoneE164: Value<String>(phoneE164),
-          banqueId: Value<String>(banqueId),
-          syndicatId: Value<String>(syndicatId),
-          representantId: Value<String>(representantId),
+          banqueId: Value<String?>(banqueId),
+          syndicatId: Value<String?>(syndicatId),
+          representantId: Value<String?>(representantId),
           statut: statut == null ? const Value.absent() : Value<String>(statut),
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
       await _enqueue(
-        dependencyKey: representantId,
+        dependencyKey: representantId ?? id,
         entityType: 'prospect',
         entityId: id,
         op: 'update',
@@ -402,7 +495,9 @@ class WriteRepository {
         ),
       );
       await _enqueue(
-        dependencyKey: current.representantId,
+        // Sans representant, la fiche ne depend de personne : elle se chaine sur
+        // elle-meme plutot que de bloquer derriere une cle vide.
+        dependencyKey: current.representantId ?? id,
         entityType: 'prospect',
         entityId: id,
         op: 'delete',

@@ -2,8 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { NotificationCategory, Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { extractVariables, renderNotification } from './template.js';
 import { routeInvalid, templateNameConflict, templateNotFound } from './errors.js';
@@ -18,16 +16,12 @@ import {
 
 @Injectable()
 export class NotificationTemplatesService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async list(includeInactive: boolean): Promise<NotificationTemplateListDto> {
     const rows = await this.prisma.notificationTemplate.findMany({
       where: {
         ...(includeInactive ? {} : { isActive: true }),
-        ...demoScope(await this.demo.enabled()),
       },
       orderBy: { name: 'asc' },
     });
@@ -54,7 +48,6 @@ export class NotificationTemplatesService {
           route: body.route ?? null,
           variables: mergedVariables(body.titleTemplate, body.bodyTemplate),
           createdById: user.id,
-          isDemo: await this.demo.enabledForWrite(),
         },
       });
       return toDto(row);
@@ -65,7 +58,11 @@ export class NotificationTemplatesService {
   }
 
   async update(id: string, body: UpdateNotificationTemplateDto): Promise<NotificationTemplateDto> {
-    if (body.route !== undefined && !ROUTE_PATTERN.test(body.route)) throw routeInvalid();
+    // La chaine vide passe : elle EFFACE le lien, elle ne le remplace pas par
+    // une route invalide.
+    if (body.route !== undefined && body.route !== '' && !ROUTE_PATTERN.test(body.route)) {
+      throw routeInvalid();
+    }
 
     const current = await this.findVisible(id);
 
@@ -79,7 +76,8 @@ export class NotificationTemplatesService {
           ...(body.name !== undefined ? { name: body.name.trim() } : {}),
           ...(body.category !== undefined ? { category: body.category } : {}),
           ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
-          ...(body.route !== undefined ? { route: body.route } : {}),
+          // Meme regle que le departement d'un compte : le vide efface.
+        ...(body.route !== undefined ? { route: body.route === '' ? null : body.route } : {}),
           titleTemplate,
           bodyTemplate,
           variables: mergedVariables(titleTemplate, bodyTemplate),
@@ -101,7 +99,7 @@ export class NotificationTemplatesService {
 
   private async findVisible(id: string): Promise<TemplateRow> {
     const row = await this.prisma.notificationTemplate.findFirst({
-      where: { id, ...demoScope(await this.demo.enabled()) },
+      where: { id },
     });
     if (!row) throw templateNotFound();
     return row;

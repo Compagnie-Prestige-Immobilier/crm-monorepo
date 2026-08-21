@@ -68,7 +68,10 @@ void main() {
 
       final List<OutboxData> claimed = await engine.claimBatch();
       expect(claimed.single.claimToken, isNotNull);
-      expect((await outboxById(db, 'A1')).claimToken, claimed.single.claimToken);
+      expect(
+        (await outboxById(db, 'A1')).claimToken,
+        claimed.single.claimToken,
+      );
 
       clock.advance(engine.leaseDuration + const Duration(seconds: 1));
       expect(await engine.reclaimExpiredLeases(), 1);
@@ -84,17 +87,25 @@ void main() {
       );
     });
 
-    test('deux réservations successives ne portent jamais le même jeton', () async {
-      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
-      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+    test(
+      'deux réservations successives ne portent jamais le même jeton',
+      () async {
+        await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+        await queueOp(
+          db,
+          id: 'A1',
+          entityType: 'representant',
+          entityId: 'repA',
+        );
 
-      final List<OutboxData> first = await engine.claimBatch();
-      clock.advance(engine.leaseDuration + const Duration(seconds: 1));
-      await engine.reclaimExpiredLeases();
-      final List<OutboxData> second = await engine.claimBatch();
+        final List<OutboxData> first = await engine.claimBatch();
+        clock.advance(engine.leaseDuration + const Duration(seconds: 1));
+        await engine.reclaimExpiredLeases();
+        final List<OutboxData> second = await engine.claimBatch();
 
-      expect(second.single.claimToken, isNot(first.single.claimToken));
-    });
+        expect(second.single.claimToken, isNot(first.single.claimToken));
+      },
+    );
 
     /// ═══ L'ENTRELACEMENT QUI PERDAIT LA LIGNE ═══
     ///
@@ -152,33 +163,45 @@ void main() {
     /// Le même entrelacement, côté échec : un `_requeue` de A remettait la ligne
     /// en `pending` alors que B l'avait en vol. Elle repartait alors une
     /// troisième fois, sous une clé d'idempotence neuve.
-    test('un échec de lot périmé ne remet pas en file une ligne en vol', () async {
-      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
-      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+    test(
+      'un échec de lot périmé ne remet pas en file une ligne en vol',
+      () async {
+        await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+        await queueOp(
+          db,
+          id: 'A1',
+          entityType: 'representant',
+          entityId: 'repA',
+        );
 
-      final _GatedApi slow = _GatedApi(
-        failWith: const ApiException(
-          'SERVER_ERROR',
-          statusCode: 503,
-          kind: FailureKind.retryable,
-        ),
-      );
-      final SyncEngine isolateA = workerOn(slow);
-      final Future<int> pushA = isolateA.drain();
-      await slow.entered.future;
+        final _GatedApi slow = _GatedApi(
+          failWith: const ApiException(
+            'SERVER_ERROR',
+            statusCode: 503,
+            kind: FailureKind.retryable,
+          ),
+        );
+        final SyncEngine isolateA = workerOn(slow);
+        final Future<int> pushA = isolateA.drain();
+        await slow.entered.future;
 
-      clock.advance(engine.leaseDuration + const Duration(seconds: 1));
-      await engine.reclaimExpiredLeases();
-      final List<OutboxData> takenByB = await engine.claimBatch();
+        clock.advance(engine.leaseDuration + const Duration(seconds: 1));
+        await engine.reclaimExpiredLeases();
+        final List<OutboxData> takenByB = await engine.claimBatch();
 
-      slow.release();
-      await pushA;
+        slow.release();
+        await pushA;
 
-      final OutboxData row = await outboxById(db, 'A1');
-      expect(row.status, OutboxStatus.syncing);
-      expect(row.claimToken, takenByB.single.claimToken);
-      expect(row.attempts, 0, reason: 'le compteur de B n\'est pas celui de A');
-    });
+        final OutboxData row = await outboxById(db, 'A1');
+        expect(row.status, OutboxStatus.syncing);
+        expect(row.claimToken, takenByB.single.claimToken);
+        expect(
+          row.attempts,
+          0,
+          reason: 'le compteur de B n\'est pas celui de A',
+        );
+      },
+    );
   });
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -244,11 +267,16 @@ void main() {
       );
 
       final List<OutboxData> queue = await allOutbox(db);
-      expect(queue, hasLength(1), reason: 'la correction reste une amende sur place');
+      expect(
+        queue,
+        hasLength(1),
+        reason: 'la correction reste une amende sur place',
+      );
       expect(
         queue.single.id,
         isNot('U1'),
-        reason: 'contenu neuf, opération neuve : sinon le serveur rejoue le '
+        reason:
+            'contenu neuf, opération neuve : sinon le serveur rejoue le '
             'verdict de l\'ancien contenu',
       );
 
@@ -408,7 +436,11 @@ void main() {
             'U1 est refusé par révision ; U2, privé de garde, écrasait la '
             'version 11 en écriture inconditionnelle',
       );
-      expect(server.rev['repA'], 11, reason: 'aucune des deux n\'a été appliquée');
+      expect(
+        server.rev['repA'],
+        11,
+        reason: 'aucune des deux n\'a été appliquée',
+      );
       expect(
         (await outboxById(db, 'U1')).status,
         OutboxStatus.conflict,
@@ -545,7 +577,8 @@ void main() {
       // Et la version de l'utilisateur n'est pas perdue pour autant : elle vit
       // dans le payload, que l'écran « À corriger » décode et affiche.
       final Map<String, Object?> payload =
-          jsonDecode((await outboxById(db, 'U1')).payload) as Map<String, Object?>;
+          jsonDecode((await outboxById(db, 'U1')).payload)
+              as Map<String, Object?>;
       expect(payload['fullName'], 'Ma version');
     });
 
@@ -567,67 +600,72 @@ void main() {
     /// L'entrelacement est réel : le crochet écrit VRAIMENT dans la base, par
     /// `WriteRepository`, et il est commité avant que la transaction de la page
     /// ne s'ouvre.
-    test('une correction enregistrée pendant le tirage n\'est pas écrasée', () async {
-      final _HookedDatabase hooked = _HookedDatabase(NativeDatabase.memory());
-      addTearDown(hooked.close);
-      await seedReferentials(hooked);
-      await insertRepresentant(
-        hooked,
-        id: 'repA',
-        phone: '+221770000001',
-        fullName: 'Avant',
-        rev: 1,
-        serverUpdatedAt: t0,
-      );
-
-      final FakeApi slowApi = FakeApi();
-      final SyncEngine pulling = SyncEngine(
-        database: hooked,
-        api: slowApi,
-        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
-        clock: clock,
-        random: Random(3),
-      );
-      final WriteRepository writes = WriteRepository(hooked, clock: clock);
-
-      slowApi.pullPages.add(
-        pullPageWithRepresentant(
-          representantDto(
-            id: 'repA',
-            phoneE164: '+221770000001',
-            fullName: 'Version serveur',
-            rev: 7,
-          ),
-        ),
-      );
-
-      // Le geste de l'utilisateur, placé exactement dans la fenêtre : juste
-      // avant que la page n'ouvre sa transaction.
-      hooked.onNextTransaction = () async {
-        await writes.updateRepresentant(
+    test(
+      'une correction enregistrée pendant le tirage n\'est pas écrasée',
+      () async {
+        final _HookedDatabase hooked = _HookedDatabase(NativeDatabase.memory());
+        addTearDown(hooked.close);
+        await seedReferentials(hooked);
+        await insertRepresentant(
+          hooked,
           id: 'repA',
-          fullName: 'Ma correction',
-          phoneE164: '+221770000001',
-          departementId: 'dep-1',
+          phone: '+221770000001',
+          fullName: 'Avant',
+          rev: 1,
+          serverUpdatedAt: t0,
         );
-      };
 
-      await pulling.pullChanges();
+        final FakeApi slowApi = FakeApi();
+        final SyncEngine pulling = SyncEngine(
+          database: hooked,
+          api: slowApi,
+          tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+          clock: clock,
+          random: Random(3),
+        );
+        final WriteRepository writes = WriteRepository(hooked, clock: clock);
 
-      final Representant row = (await hooked.select(hooked.representants).get()).single;
-      expect(
-        row.fullName,
-        'Ma correction',
-        reason:
-            'l\'opération était en file au moment d\'écrire : tant qu\'un envoi '
-            'peut trancher, le pull ne tranche pas à sa place',
-      );
-      expect(
-        (await allOutbox(hooked)).single.status,
-        OutboxStatus.pending,
-        reason: 'la correction est bien partie en file, elle n\'a pas été avalée',
-      );
-    });
+        slowApi.pullPages.add(
+          pullPageWithRepresentant(
+            representantDto(
+              id: 'repA',
+              phoneE164: '+221770000001',
+              fullName: 'Version serveur',
+              rev: 7,
+            ),
+          ),
+        );
+
+        // Le geste de l'utilisateur, placé exactement dans la fenêtre : juste
+        // avant que la page n'ouvre sa transaction.
+        hooked.onNextTransaction = () async {
+          await writes.updateRepresentant(
+            id: 'repA',
+            fullName: 'Ma correction',
+            phoneE164: '+221770000001',
+            departementId: 'dep-1',
+          );
+        };
+
+        await pulling.pullChanges();
+
+        final Representant row =
+            (await hooked.select(hooked.representants).get()).single;
+        expect(
+          row.fullName,
+          'Ma correction',
+          reason:
+              'l\'opération était en file au moment d\'écrire : tant qu\'un envoi '
+              'peut trancher, le pull ne tranche pas à sa place',
+        );
+        expect(
+          (await allOutbox(hooked)).single.status,
+          OutboxStatus.pending,
+          reason:
+              'la correction est bien partie en file, elle n\'a pas été avalée',
+        );
+      },
+    );
 
     test('une ligne encore en file, elle, reste protégée', () async {
       await insertRepresentant(
@@ -705,7 +743,11 @@ void main() {
       );
 
       for (final String key in <String>['k1', 'k2', 'k4']) {
-        await insertRepresentant(db, id: 'rep-$key', phone: '+22177000000${key[1]}');
+        await insertRepresentant(
+          db,
+          id: 'rep-$key',
+          phone: '+22177000000${key[1]}',
+        );
       }
       await queueOp(
         db,
@@ -739,7 +781,10 @@ void main() {
         dependencyKey: 'k4',
       );
 
-      api.verdicts['C1'] = conflictOn('C1', errorCode: ServerErrorCodes.revConflict);
+      api.verdicts['C1'] = conflictOn(
+        'C1',
+        errorCode: ServerErrorCodes.revConflict,
+      );
       api.verdicts['C2'] = invalidOn('C2');
       api.verdicts['C4'] = SyncOperationResultDto(
         opId: 'C4',
@@ -754,12 +799,15 @@ void main() {
       await strict.drain();
 
       final List<OutboxData> stuck = (await allOutbox(db))
-          .where((OutboxData o) => OutboxStatus.needsAttention.contains(o.status))
+          .where(
+            (OutboxData o) => OutboxStatus.needsAttention.contains(o.status),
+          )
           .toList(growable: false);
       expect(
         stuck.map((OutboxData o) => o.id).toSet(),
         <String>{'C1', 'C2', 'C3', 'C4'},
-        reason: 'les quatre chemins doivent avoir abouti, sinon le test ne prouve rien',
+        reason:
+            'les quatre chemins doivent avoir abouti, sinon le test ne prouve rien',
       );
       for (final OutboxData row in stuck) {
         expect(
@@ -773,23 +821,31 @@ void main() {
       }
     });
 
-    test('un acquittement rend le jeton, et c\'est ce qui borne la purge', () async {
-      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
-      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+    test(
+      'un acquittement rend le jeton, et c\'est ce qui borne la purge',
+      () async {
+        await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+        await queueOp(
+          db,
+          id: 'A1',
+          entityType: 'representant',
+          entityId: 'repA',
+        );
 
-      await engine.drain();
+        await engine.drain();
 
-      final OutboxData done = await outboxById(db, 'A1');
-      expect(done.status, OutboxStatus.done);
-      expect(
-        done.claimToken,
-        isNull,
-        reason:
-            'la purge de déconnexion supprime les lignes hors `open` sans reposer '
-            'la possession : elle n\'est fenêtrée que par cette remise à null',
-      );
-      expect(done.leaseUntil, isNull);
-    });
+        final OutboxData done = await outboxById(db, 'A1');
+        expect(done.status, OutboxStatus.done);
+        expect(
+          done.claimToken,
+          isNull,
+          reason:
+              'la purge de déconnexion supprime les lignes hors `open` sans reposer '
+              'la possession : elle n\'est fenêtrée que par cette remise à null',
+        );
+        expect(done.leaseUntil, isNull);
+      },
+    );
   });
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -830,6 +886,9 @@ void main() {
         syndicats: const <SyndicatDto>[],
         representants: const <RepresentantDto>[],
         prospects: const <ProspectDto>[],
+        callCampaigns: const <SyncCallCampaignDto>[],
+        callTasks: const <SyncCallTaskDto>[],
+        visites: const <SyncVisiteDto>[],
       ),
       deletions: <SyncDeletionDto>[
         SyncDeletionDto(entity: SyncEntity.prospect, id: id, deletedAt: t0),
@@ -861,7 +920,8 @@ void main() {
     /// et porte telle révision : la marque doit tomber.
     test('un acquittement efface la marque de suppression', () async {
       await seedProspectWithPendingWrite();
-      await (db.update(db.prospects)..where((Prospects t) => t.id.equals('pro1')))
+      await (db.update(db.prospects)
+            ..where((Prospects t) => t.id.equals('pro1')))
           .write(ProspectsCompanion(deletedAt: Value<DateTime?>(t0)));
 
       await engine.drain();
@@ -897,7 +957,11 @@ void main() {
       await engine.drain();
 
       final Prospect row = (await db.select(db.prospects).get()).single;
-      expect(row.deletedAt, t0, reason: 'c\'est le résultat attendu de l\'opération');
+      expect(
+        row.deletedAt,
+        t0,
+        reason: 'c\'est le résultat attendu de l\'opération',
+      );
     });
   });
 
@@ -940,7 +1004,10 @@ void main() {
         entityId: 'pro1',
         dependencyKey: 'repA',
         op: 'update',
-        payload: <String, Object?>{'nom': 'Diop', 'statut': 'unknown_default_open_api'},
+        payload: <String, Object?>{
+          'nom': 'Diop',
+          'statut': 'unknown_default_open_api',
+        },
       );
       await queueOp(
         db,
@@ -998,7 +1065,10 @@ void main() {
       await engine.drain();
 
       expect((await outboxById(db, 'U1')).status, OutboxStatus.done);
-      expect(api.calls.single.operations.single.data!.statut, ProspectStatut.CONVERTI);
+      expect(
+        api.calls.single.operations.single.data!.statut,
+        ProspectStatut.CONVERTI,
+      );
     });
   });
 
@@ -1007,27 +1077,33 @@ void main() {
   // ───────────────────────────────────────────────────────────────────────────
 
   group('curseur monotone', () {
-    test('une position périmée n\'écrase pas une position plus avancée', () async {
-      expect(await engine.advanceCursor(from: null, to: 'c1'), isTrue);
-      expect(await engine.advanceCursor(from: 'c1', to: 'c2'), isTrue);
+    test(
+      'une position périmée n\'écrase pas une position plus avancée',
+      () async {
+        expect(await engine.advanceCursor(from: null, to: 'c1'), isTrue);
+        expect(await engine.advanceCursor(from: 'c1', to: 'c2'), isTrue);
 
-      // Le retardataire tient encore la position de départ.
-      expect(
-        await engine.advanceCursor(from: null, to: 'c1'),
-        isFalse,
-        reason: 'il n\'a pas la position qu\'il prétend remplacer',
-      );
-      expect(await engine.readCursor(), 'c2');
-    });
+        // Le retardataire tient encore la position de départ.
+        expect(
+          await engine.advanceCursor(from: null, to: 'c1'),
+          isFalse,
+          reason: 'il n\'a pas la position qu\'il prétend remplacer',
+        );
+        expect(await engine.readCursor(), 'c2');
+      },
+    );
 
-    test('le curseur reste opaque : on ne compare jamais son contenu', () async {
-      // Deux positions dont l'ordre lexicographique est INVERSE de l'ordre
-      // réel. Un client qui « comparerait » les curseurs se tromperait ici ;
-      // la règle est la position qu'on remplace, pas la valeur qu'on écrit.
-      expect(await engine.advanceCursor(from: null, to: 'zzz'), isTrue);
-      expect(await engine.advanceCursor(from: 'zzz', to: 'aaa'), isTrue);
-      expect(await engine.readCursor(), 'aaa');
-    });
+    test(
+      'le curseur reste opaque : on ne compare jamais son contenu',
+      () async {
+        // Deux positions dont l'ordre lexicographique est INVERSE de l'ordre
+        // réel. Un client qui « comparerait » les curseurs se tromperait ici ;
+        // la règle est la position qu'on remplace, pas la valeur qu'on écrit.
+        expect(await engine.advanceCursor(from: null, to: 'zzz'), isTrue);
+        expect(await engine.advanceCursor(from: 'zzz', to: 'aaa'), isTrue);
+        expect(await engine.readCursor(), 'aaa');
+      },
+    );
 
     /// ═══ DEUX ISOLATS, UNE BASE, UN FORFAIT PRÉPAYÉ ═══
     ///
@@ -1089,37 +1165,46 @@ void main() {
     /// fiche métier disparaissent pendant que le serveur applique la requête.
     /// Il reste alors côté serveur un enregistrement que rien, sur ce
     /// téléphone, ne sait plus rattacher.
-    test('un abandon ne supprime pas une ligne dont l\'envoi est en vol', () async {
-      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
-      await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
+    test(
+      'un abandon ne supprime pas une ligne dont l\'envoi est en vol',
+      () async {
+        await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+        await queueOp(
+          db,
+          id: 'A1',
+          entityType: 'representant',
+          entityId: 'repA',
+        );
 
-      final _GatedApi slow = _GatedApi();
-      final SyncEngine isolateA = workerOn(slow);
-      final Future<int> pushA = isolateA.drain();
-      await slow.entered.future;
+        final _GatedApi slow = _GatedApi();
+        final SyncEngine isolateA = workerOn(slow);
+        final Future<int> pushA = isolateA.drain();
+        await slow.entered.future;
 
-      // L'envoi dépasse son bail, et il est TOUJOURS en vol.
-      clock.advance(engine.leaseDuration + const Duration(seconds: 1));
+        // L'envoi dépasse son bail, et il est TOUJOURS en vol.
+        clock.advance(engine.leaseDuration + const Duration(seconds: 1));
 
-      final OutboxData row = await outboxById(db, 'A1');
-      final DiscardResult result = await repo.discardOperation(row.seq);
+        final OutboxData row = await outboxById(db, 'A1');
+        final DiscardResult result = await repo.discardOperation(row.seq);
 
-      expect(result.outcome, DiscardOutcome.claimed);
-      expect(result.removed, 0);
-      expect(
-        await allOutbox(db),
-        hasLength(1),
-        reason: 'la ligne d\'outbox est le seul lien qui reste vers l\'envoi en vol',
-      );
-      expect(await db.select(db.representants).get(), hasLength(1));
+        expect(result.outcome, DiscardOutcome.claimed);
+        expect(result.removed, 0);
+        expect(
+          await allOutbox(db),
+          hasLength(1),
+          reason:
+              'la ligne d\'outbox est le seul lien qui reste vers l\'envoi en vol',
+        );
+        expect(await db.select(db.representants).get(), hasLength(1));
 
-      // L'envoi aboutit : le serveur a la fiche, et le téléphone aussi.
-      slow.release();
-      await pushA;
+        // L'envoi aboutit : le serveur a la fiche, et le téléphone aussi.
+        slow.release();
+        await pushA;
 
-      expect(slow.rows.keys, contains('repA'));
-      expect((await outboxById(db, 'A1')).status, OutboxStatus.done);
-    });
+        expect(slow.rows.keys, contains('repA'));
+        expect((await outboxById(db, 'A1')).status, OutboxStatus.done);
+      },
+    );
 
     /// La cascade emporte les prospects du représentant. Ne contrôler que la
     /// ligne visée revenait donc à ne contrôler qu'une des lignes qu'on
@@ -1149,9 +1234,7 @@ void main() {
       // Les deux lignes sont réservées par le même lot : c'est ce qui rend la
       // cascade dangereuse.
       expect(
-        (await allOutbox(db))
-            .map((OutboxData o) => o.status)
-            .toSet(),
+        (await allOutbox(db)).map((OutboxData o) => o.status).toSet(),
         <String>{OutboxStatus.syncing},
       );
 
@@ -1168,7 +1251,8 @@ void main() {
       expect(
         await db.select(db.prospects).get(),
         hasLength(1),
-        reason: 'le prospect part dans le même lot que son parent, donc il est en vol aussi',
+        reason:
+            'le prospect part dans le même lot que son parent, donc il est en vol aussi',
       );
 
       slow.release();
@@ -1219,7 +1303,8 @@ void main() {
       expect(
         await allOutbox(db),
         hasLength(2),
-        reason: 'la ligne d\'outbox est le seul lien qui reste vers l\'envoi en vol',
+        reason:
+            'la ligne d\'outbox est le seul lien qui reste vers l\'envoi en vol',
       );
 
       // L'envoi aboutit : le serveur a la fiche, et le téléphone la reconnaît.
@@ -1232,39 +1317,41 @@ void main() {
 
     /// Le pendant positif : hors réservation, l'abandon sans cascade fait
     /// toujours son travail, et il le dit.
-    test('« rattacher » abandonne la création libre et laisse les prospects', () async {
-      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
-      await insertProspect(
-        db,
-        id: 'pA1',
-        representantId: 'repA',
-        phone: '+221780000002',
-      );
-      await queueOp(
-        db,
-        id: 'A1',
-        entityType: 'representant',
-        entityId: 'repA',
-        status: OutboxStatus.conflict,
-      );
-      await queueOp(
-        db,
-        id: 'A2',
-        entityType: 'prospect',
-        entityId: 'pA1',
-        dependencyKey: 'repA',
-      );
+    test(
+      '« rattacher » abandonne la création libre et laisse les prospects',
+      () async {
+        await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+        await insertProspect(
+          db,
+          id: 'pA1',
+          representantId: 'repA',
+          phone: '+221780000002',
+        );
+        await queueOp(
+          db,
+          id: 'A1',
+          entityType: 'representant',
+          entityId: 'repA',
+          status: OutboxStatus.conflict,
+        );
+        await queueOp(
+          db,
+          id: 'A2',
+          entityType: 'prospect',
+          entityId: 'pA1',
+          dependencyKey: 'repA',
+        );
 
-      final DiscardResult result = await repo.discardOwnCreateOnly('A1');
+        final DiscardResult result = await repo.discardOwnCreateOnly('A1');
 
-      expect(result.outcome, DiscardOutcome.discarded);
-      expect(result.removed, 1);
-      expect(
-        (await allOutbox(db)).map((OutboxData o) => o.id),
-        <String>['A2'],
-      );
-      expect(await db.select(db.prospects).get(), hasLength(1));
-    });
+        expect(result.outcome, DiscardOutcome.discarded);
+        expect(result.removed, 1);
+        expect((await allOutbox(db)).map((OutboxData o) => o.id), <String>[
+          'A2',
+        ]);
+        expect(await db.select(db.prospects).get(), hasLength(1));
+      },
+    );
 
     /// ═══ L'AMENDEMENT NE VOLE PAS LA RÉSERVATION D'UN AUTRE ═══
     ///
@@ -1280,101 +1367,114 @@ void main() {
     /// correction ne l'écrase pas et ne remet pas son jeton à NULL. Elle
     /// s'empile, et surtout elle n'est pas perdue : c'est le défaut qui a
     /// ouvert ce fil.
-    test('une correction n\'écrase pas une ligne réservée, elle s\'empile', () async {
-      await insertRepresentant(
-        db,
-        id: 'repA',
-        phone: '+221770000001',
-        rev: 3,
-        serverUpdatedAt: t0,
-      );
-      await queueOp(
-        db,
-        id: 'A1',
-        entityType: 'representant',
-        entityId: 'repA',
-        op: 'update',
-        status: OutboxStatus.failed,
-        payload: <String, Object?>{'fullName': 'Awa'},
-        claimToken: 'jeton-d-un-envoi-en-vol',
-      );
+    test(
+      'une correction n\'écrase pas une ligne réservée, elle s\'empile',
+      () async {
+        await insertRepresentant(
+          db,
+          id: 'repA',
+          phone: '+221770000001',
+          rev: 3,
+          serverUpdatedAt: t0,
+        );
+        await queueOp(
+          db,
+          id: 'A1',
+          entityType: 'representant',
+          entityId: 'repA',
+          op: 'update',
+          status: OutboxStatus.failed,
+          payload: <String, Object?>{'fullName': 'Awa'},
+          claimToken: 'jeton-d-un-envoi-en-vol',
+        );
 
-      await repo.updateRepresentant(
-        id: 'repA',
-        fullName: 'Awa Ndiaye',
-        phoneE164: '+221770000001',
-        departementId: 'dep-1',
-      );
+        await repo.updateRepresentant(
+          id: 'repA',
+          fullName: 'Awa Ndiaye',
+          phoneE164: '+221770000001',
+          departementId: 'dep-1',
+        );
 
-      final OutboxData untouched = await outboxById(db, 'A1');
-      expect(
-        untouched.claimToken,
-        'jeton-d-un-envoi-en-vol',
-        reason: 'effacer le jeton d\'un autre, c\'est lui retirer sa ligne sous les pieds',
-      );
-      expect(untouched.status, OutboxStatus.failed);
-      expect(jsonDecode(untouched.payload), <String, Object?>{'fullName': 'Awa'});
+        final OutboxData untouched = await outboxById(db, 'A1');
+        expect(
+          untouched.claimToken,
+          'jeton-d-un-envoi-en-vol',
+          reason:
+              'effacer le jeton d\'un autre, c\'est lui retirer sa ligne sous les pieds',
+        );
+        expect(untouched.status, OutboxStatus.failed);
+        expect(jsonDecode(untouched.payload), <String, Object?>{
+          'fullName': 'Awa',
+        });
 
-      // La correction existe, en clair, dans une opération à elle.
-      final List<OutboxData> all = await allOutbox(db);
-      expect(all, hasLength(2));
-      final OutboxData appended = all.last;
-      expect(appended.status, OutboxStatus.pending);
-      expect(appended.id, isNot('A1'));
-      expect(
-        (jsonDecode(appended.payload) as Map<String, Object?>)['fullName'],
-        'Awa Ndiaye',
-      );
-    });
+        // La correction existe, en clair, dans une opération à elle.
+        final List<OutboxData> all = await allOutbox(db);
+        expect(all, hasLength(2));
+        final OutboxData appended = all.last;
+        expect(appended.status, OutboxStatus.pending);
+        expect(appended.id, isNot('A1'));
+        expect(
+          (jsonDecode(appended.payload) as Map<String, Object?>)['fullName'],
+          'Awa Ndiaye',
+        );
+      },
+    );
 
     /// Le pendant réel du test précédent : la tête est en vol pour de bon, donc
     /// `syncing`, et l'utilisateur enregistre une correction pendant ce
     /// temps-là. Elle doit exister ensuite comme opération à part entière, sans
     /// avoir touché à la ligne en vol ni à son jeton.
-    test('corriger pendant un envoi laisse partir les deux, chacun une fois', () async {
-      await insertRepresentant(
-        db,
-        id: 'repA',
-        phone: '+221770000001',
-        rev: 3,
-        serverUpdatedAt: t0,
-      );
-      await queueOp(
-        db,
-        id: 'A1',
-        entityType: 'representant',
-        entityId: 'repA',
-        op: 'update',
-        payload: <String, Object?>{'fullName': 'Awa'},
-      );
+    test(
+      'corriger pendant un envoi laisse partir les deux, chacun une fois',
+      () async {
+        await insertRepresentant(
+          db,
+          id: 'repA',
+          phone: '+221770000001',
+          rev: 3,
+          serverUpdatedAt: t0,
+        );
+        await queueOp(
+          db,
+          id: 'A1',
+          entityType: 'representant',
+          entityId: 'repA',
+          op: 'update',
+          payload: <String, Object?>{'fullName': 'Awa'},
+        );
 
-      final _GatedApi slow = _GatedApi();
-      final SyncEngine isolateA = workerOn(slow);
-      final Future<int> pushA = isolateA.drain();
-      await slow.entered.future;
+        final _GatedApi slow = _GatedApi();
+        final SyncEngine isolateA = workerOn(slow);
+        final Future<int> pushA = isolateA.drain();
+        await slow.entered.future;
 
-      final String? tokenInFlight = (await outboxById(db, 'A1')).claimToken;
-      expect(tokenInFlight, isNotNull);
+        final String? tokenInFlight = (await outboxById(db, 'A1')).claimToken;
+        expect(tokenInFlight, isNotNull);
 
-      await repo.updateRepresentant(
-        id: 'repA',
-        fullName: 'Awa Ndiaye',
-        phoneE164: '+221770000001',
-        departementId: 'dep-1',
-      );
+        await repo.updateRepresentant(
+          id: 'repA',
+          fullName: 'Awa Ndiaye',
+          phoneE164: '+221770000001',
+          departementId: 'dep-1',
+        );
 
-      expect((await outboxById(db, 'A1')).claimToken, tokenInFlight);
-      expect(await allOutbox(db), hasLength(2));
+        expect((await outboxById(db, 'A1')).claimToken, tokenInFlight);
+        expect(await allOutbox(db), hasLength(2));
 
-      slow.release();
-      await pushA;
+        slow.release();
+        await pushA;
 
-      // La correction part au tour suivant, sous son propre identifiant.
-      await engine.drain();
-      final List<String> sent = api.receivedOpIds + slow.receivedOpIds;
-      expect(sent.toSet(), hasLength(2));
-      expect(sent, hasLength(2), reason: 'aucune opération ne part deux fois');
-    });
+        // La correction part au tour suivant, sous son propre identifiant.
+        await engine.drain();
+        final List<String> sent = api.receivedOpIds + slow.receivedOpIds;
+        expect(sent.toSet(), hasLength(2));
+        expect(
+          sent,
+          hasLength(2),
+          reason: 'aucune opération ne part deux fois',
+        );
+      },
+    );
   });
 }
 
@@ -1389,6 +1489,9 @@ PullPage _page({required String cursor, bool hasMore = false}) => PullPage(
     syndicats: const <SyndicatDto>[],
     representants: const <RepresentantDto>[],
     prospects: const <ProspectDto>[],
+    callCampaigns: const <SyncCallCampaignDto>[],
+    callTasks: const <SyncCallTaskDto>[],
+    visites: const <SyncVisiteDto>[],
   ),
   deletions: const <SyncDeletionDto>[],
   nextCursor: cursor,
@@ -1406,6 +1509,9 @@ PullPage pullPageWithRepresentant(RepresentantDto dto) => PullPage(
     syndicats: const <SyndicatDto>[],
     representants: <RepresentantDto>[dto],
     prospects: const <ProspectDto>[],
+    callCampaigns: const <SyncCallCampaignDto>[],
+    callTasks: const <SyncCallTaskDto>[],
+    visites: const <SyncVisiteDto>[],
   ),
   deletions: const <SyncDeletionDto>[],
   nextCursor: 'c1',
@@ -1487,7 +1593,7 @@ class _GatedPullApi extends FakeApi {
   void release(PullPage page) => _gate.complete(page);
 
   @override
-  Future<PullPage> pull({String? cursor, int limit = 200}) async {
+  Future<PullPage> pull({String? cursor, int limit = 200, required int payloadVersion}) async {
     if (!entered.isCompleted) entered.complete();
     return _gate.future;
   }
@@ -1556,6 +1662,10 @@ class _RevAwareApi extends FakeApi {
         ),
       );
     }
-    return PushResult(batchId: batchId, results: results, serverTime: serverTime);
+    return PushResult(
+      batchId: batchId,
+      results: results,
+      serverTime: serverTime,
+    );
   }
 }

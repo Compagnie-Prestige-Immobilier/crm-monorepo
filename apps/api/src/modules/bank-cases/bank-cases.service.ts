@@ -23,6 +23,7 @@ import { assertReachable, planTransitionEffect } from './workflow.js';
 import {
   BankCaseError,
   bankNotFound,
+  bankRequired,
   caseNotFound,
   prospectNotEnrolled,
   prospectNotFound,
@@ -44,7 +45,6 @@ import type {
   ProspectSearchQueryDto,
   UpdateBankCaseDto,
 } from './dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
 const DEFAULT_PAGE_SIZE = 25;
 const DEFAULT_SEARCH_PAGE_SIZE = 20;
@@ -54,17 +54,14 @@ const REV_MISMATCH = Symbol('rev-mismatch');
 
 @Injectable()
 export class BankCasesService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // Les identifiants viennent de la MÊME requête SQL que les agrégats, puis sont
   // hydratés : un aller-retour de plus, mais une seule définition du filtre.
   async list(query: BankCaseQueryDto): Promise<BankCaseListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
-    const where = bankCaseConditions(query, await this.demo.enabled());
+    const where = bankCaseConditions(query);
     const orderBy = bankCaseOrderBy(query.sortBy, query.sortOrder);
 
     const [ids, totals] = await Promise.all([
@@ -116,7 +113,10 @@ export class BankCasesService {
     await this.assertReferenceFree(referenceKey);
 
     const prospect = await this.prisma.prospect.findFirst({
-      where: { id: input.prospectId, deletedAt: null },
+      where: {
+        id: input.prospectId,
+        deletedAt: null,
+      },
       select: {
         id: true,
         nom: true,
@@ -124,7 +124,6 @@ export class BankCasesService {
         phoneE164: true,
         banqueId: true,
         phase2Status: true,
-        isDemo: true,
       },
     });
     if (!prospect) throw prospectNotFound();
@@ -132,7 +131,10 @@ export class BankCasesService {
       throw prospectNotEnrolled(prospect.phase2Status, prospect.id);
     }
 
+    // La banque du prospect est desormais facultative : un dossier ne peut pas
+    // s'ouvrir sans en designer une, explicitement ou par heritage.
     const processingBankId = input.processingBankId ?? prospect.banqueId;
+    if (processingBankId === null) throw bankRequired();
     const bank = await this.prisma.banque.findUnique({
       where: { id: processingBankId },
       select: { id: true },
@@ -166,9 +168,6 @@ export class BankCasesService {
             processingBankId,
             currentStageId: initial.id,
             createdById: user.id,
-            // Hérité du PROSPECT, jamais du mode en vigueur à l'ouverture : sinon un
-            // dossier de démonstration entre dans les encaissements réels.
-            isDemo: prospect.isDemo,
           },
           include: BANK_CASE_INCLUDE,
         });
@@ -179,7 +178,6 @@ export class BankCasesService {
             caseId: row.id,
             toStageId: initial.id,
             performedById: user.id,
-            isDemo: prospect.isDemo,
           },
         });
         return row;
@@ -321,7 +319,6 @@ export class BankCasesService {
           comment: comment === undefined || comment === '' ? null : comment,
           correctionReason: correctionReason ?? null,
           // L'historique suit SON DOSSIER, pas le mode en vigueur à la transition.
-          isDemo: existing.isDemo,
         },
       });
       return null;
@@ -354,6 +351,7 @@ export class BankCasesService {
 
     const where = Prisma.sql`
       p."deletedAt" IS NULL
+      AND ${Prisma.sql`TRUE`}
       AND p."phase2Status" = 'METHOD_OBTAINED'::"Phase2Status"
       AND (
         (lower(p."nom") || ' ' || lower(p."prenom")) LIKE ${like}
@@ -444,13 +442,6 @@ export class BankCasesService {
     return reason;
   }
 
-  /**
-   * LECTURE GLOBALE délibérée : l'index unique partiel
-   * `bank_cases_reference_key_active` est global, il ne connaît pas le mode
-   * démonstration. Filtré, ce pré-contrôle déclarerait libre une référence que
-   * la base refuse ensuite, et l'agent recevrait un 409 générique au lieu du
-   * message qui pointe le dossier existant.
-   */
   private async assertReferenceFree(referenceKey: string): Promise<void> {
     const clash = await this.prisma.bankCase.findFirst({
       where: { referenceKey, deletedAt: null },

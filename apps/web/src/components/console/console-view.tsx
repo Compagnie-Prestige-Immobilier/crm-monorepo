@@ -366,15 +366,15 @@ function ProspectConsole() {
         if (selected !== undefined) setOpenedId(selected.id);
       },
       c: copyCurrentPhone,
+      // Une fiche Grand Public n'a pas de representant : le raccourci ne mene
+      // nulle part plutot que vers une adresse construite sur du vide.
       n: () => {
-        if (current !== undefined) {
-          router.push(`/prospects/nouveau?rep=${encodeURIComponent(current.representantId)}`);
-        }
+        const rep = current?.representantId;
+        if (rep) router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
       },
       r: () => {
-        if (current !== undefined) {
-          router.push(`/representants/${encodeURIComponent(current.representantId)}`);
-        }
+        const rep = current?.representantId;
+        if (rep) router.push(`/chues/representants/${encodeURIComponent(rep)}`);
       },
       'mod+k': () => {
         setPalette(true);
@@ -708,8 +708,12 @@ function ProspectConsole() {
             <h3 className="text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
               Représentant
             </h3>
-            <p className="font-[600]">{current.representantName}</p>
-            <p className="text-muted-foreground">{formatPhone(current.representantPhoneE164)}</p>
+            <p className="font-[600]">{current.representantName ?? 'Aucun'}</p>
+            <p className="text-muted-foreground">
+              {current.representantPhoneE164 === null
+                ? '–'
+                : formatPhone(current.representantPhoneE164)}
+            </p>
             <p className="text-muted-foreground">
               {formatNumber(repFiches)} fiche{repFiches > 1 ? 's' : ''} dans cette file
             </p>

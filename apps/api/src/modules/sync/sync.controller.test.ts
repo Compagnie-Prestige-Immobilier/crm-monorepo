@@ -1,10 +1,10 @@
-import { UnprocessableEntityException } from '@nestjs/common';
+import { HttpException, UnprocessableEntityException } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { Role } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { SyncController } from './sync.controller.js';
+import { MIN_PULL_PAYLOAD_VERSION, SyncController } from './sync.controller.js';
 import type { SyncService } from './sync.service.js';
 import type { HeartbeatService } from '../heartbeat/heartbeat.service.js';
 import type { SyncPullQueryDto, SyncPushDto } from './dto.js';
@@ -102,7 +102,7 @@ describe('battement de cœur du terrain', () => {
     const controller = controllerPulling(vi.fn().mockResolvedValue({ changes: {} }));
 
     const query: SyncPullQueryDto = { pendingOps: 12, appVersion: '1.4.2' };
-    await controller.pull(user, query);
+    await controller.pull(user, query, String(MIN_PULL_PAYLOAD_VERSION));
 
     expect(battements).toEqual([
       { userId: 'com-1', kind: 'pull', signal: { pendingOps: 12, appVersion: '1.4.2' } },
@@ -126,5 +126,71 @@ describe('battement de cœur du terrain', () => {
     await controller.push(user, body(), BATCH, replyStub()).catch(() => undefined);
 
     expect(battements).toEqual([]);
+  });
+});
+
+describe('format de charge utile annoncé au tirage', () => {
+  const refus = async (annonce: string | undefined) => {
+    const pull = vi.fn().mockResolvedValue({ changes: {} });
+    const error = await controllerPulling(pull)
+      .pull(user, {}, annonce)
+      .catch((e: unknown) => e);
+    return { error, pull };
+  };
+
+  it('refuse un client qui n’annonce aucun format, sans lui servir la page', async () => {
+    const { error, pull } = await refus(undefined);
+
+    expect(error).toBeInstanceOf(HttpException);
+    expect((error as HttpException).getStatus()).toBe(426);
+    expect((error as HttpException).getResponse()).toMatchObject({ code: 'APP_UPDATE_REQUIRED' });
+    expect(pull).not.toHaveBeenCalled();
+  });
+
+  it('dit au téléconseiller quoi faire, et que ses saisies partent quand même', async () => {
+    const { error } = await refus(undefined);
+    const { message } = (error as HttpException).getResponse() as { message: string };
+
+    expect(message).toContain('mise à jour');
+    expect(message).toContain('Vos saisies continuent de partir');
+  });
+
+  it('refuse un format antérieur au palier', async () => {
+    const { error, pull } = await refus(String(MIN_PULL_PAYLOAD_VERSION - 1));
+
+    expect((error as HttpException).getStatus()).toBe(426);
+    expect(pull).not.toHaveBeenCalled();
+  });
+
+  it('refuse une annonce qui n’est pas un entier plutôt que de l’arrondir', async () => {
+    for (const annonce of ['', 'quatre', String(MIN_PULL_PAYLOAD_VERSION) + '.5']) {
+      const { error, pull } = await refus(annonce);
+      expect((error as HttpException).getStatus(), annonce).toBe(426);
+      expect(pull, annonce).not.toHaveBeenCalled();
+    }
+  });
+
+  it('n’enregistre aucun battement de cœur sur un refus', async () => {
+    await refus(undefined);
+
+    expect(battements).toEqual([]);
+  });
+
+  it('sert le tirage au palier et au-dessus', async () => {
+    for (const annonce of [MIN_PULL_PAYLOAD_VERSION, MIN_PULL_PAYLOAD_VERSION + 1]) {
+      const pull = vi.fn().mockResolvedValue({ changes: {} });
+      await controllerPulling(pull).pull(user, {}, String(annonce));
+      expect(pull, String(annonce)).toHaveBeenCalledOnce();
+    }
+  });
+
+  it('laisse la remontée hors ligne passer, elle, sans annonce de format', async () => {
+    const controller = controllerWith(
+      vi.fn().mockResolvedValue({ replayed: false, body: { results: [] } }),
+    );
+
+    await expect(controller.push(user, body(), BATCH, replyStub())).resolves.toEqual({
+      results: [],
+    });
   });
 });

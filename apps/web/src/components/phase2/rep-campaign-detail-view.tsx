@@ -73,7 +73,7 @@ export function RepCampaignDetailView({
   if (isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/campagnes/representants">
+        <DetailBackLink href="/chues/campagnes/representants">
           Toutes les campagnes représentants
         </DetailBackLink>
         <QueryErrorState
@@ -91,7 +91,7 @@ export function RepCampaignDetailView({
 
   return (
     <div className="flex flex-col gap-6">
-      <DetailBackLink href="/campagnes/representants">
+      <DetailBackLink href="/chues/campagnes/representants">
         Toutes les campagnes représentants
       </DetailBackLink>
 

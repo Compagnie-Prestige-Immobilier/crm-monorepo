@@ -296,7 +296,7 @@ describe('matrice d’autorisation des modules récents', () => {
     const routes = Object.getOwnPropertyNames(AnalyticsController.prototype).filter(
       (name) => name !== 'constructor',
     );
-    expect(routes.length).toBeGreaterThanOrEqual(19);
+    expect(routes.length).toBeGreaterThanOrEqual(21);
 
     for (const method of routes) {
       // Le vieillissement des dossiers est la seule route resserree: il tient du

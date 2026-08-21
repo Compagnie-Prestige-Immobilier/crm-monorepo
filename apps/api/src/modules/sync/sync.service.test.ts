@@ -5,12 +5,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
+import { VisitesService } from '../visites/visites.service.js';
 import { SyncBatchStore } from './batch-store.js';
 import { SyncService } from './sync.service.js';
 import { FakePrisma } from './fake-prisma.js';
 import { SyncEntity, SyncOp, SyncOpStatus, dependencyKeyOf } from './dto.js';
 import type { SyncOperationDto, SyncPushDto } from './dto.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const alice: AuthenticatedUser = {
   id: 'com-alice',
@@ -40,7 +40,7 @@ beforeEach(() => {
     prisma,
     new SyncBatchStore(prisma),
     new Phase2SyncService(),
-    fakeDemoVisibility(),
+    new VisitesService(prisma),
   );
 });
 
@@ -279,7 +279,6 @@ describe('nature du prospect lors d’un rattachement', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
-      isDemo: false,
     });
     db.representants.set(REP_B, {
       id: REP_B,
@@ -293,7 +292,6 @@ describe('nature du prospect lors d’un rattachement', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
-      isDemo: true,
     });
     db.prospects.set('prospect-1', {
       id: 'prospect-1',
@@ -310,7 +308,6 @@ describe('nature du prospect lors d’un rattachement', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
-      isDemo: false,
     });
 
     const operation: SyncOperationDto = {
@@ -327,7 +324,6 @@ describe('nature du prospect lors d’un rattachement', () => {
     const result = await sync.push(alice, batch([operation], 'demo-reassignment'));
 
     expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
-    expect(db.prospects.get('prospect-1')?.isDemo).toBe(true);
   });
 });
 
@@ -472,6 +468,138 @@ describe('garde anti-squat d’identifiant', () => {
   });
 });
 
+describe('une fiche naît sans banque, sans syndicat et sans représentant', () => {
+  const PROSPECT_NU = '0198a000-0000-7000-8000-00000000000a';
+
+  const saisirNu = (extra: Record<string, unknown> = {}): SyncOperationDto => ({
+    opId: opId(),
+    seq: 0,
+    entity: SyncEntity.PROSPECT,
+    op: SyncOp.CREATE,
+    entityId: PROSPECT_NU,
+    clientUpdatedAt: new Date().toISOString(),
+    data: { nom: 'Diop', prenom: 'Awa', phone: '77 000 00 10', ...extra },
+  });
+
+  it('un prospect sans aucun rattachement s’enregistre', async () => {
+    const result = await sync.push(alice, batch([saisirNu()]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    const row = db.prospects.get(PROSPECT_NU);
+    expect(row?.banqueId ?? null).toBeNull();
+    expect(row?.syndicatId ?? null).toBeNull();
+    expect(row?.representantId ?? null).toBeNull();
+  });
+
+  it('le projet et le type du Grand Public voyagent', async () => {
+    const result = await sync.push(
+      alice,
+      batch([saisirNu({ projet: 'GRAND_PUBLIC', type: 'INFORMEL', profession: 'Mécanicien' })]),
+    );
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    const row = db.prospects.get(PROSPECT_NU) as unknown as Record<string, unknown>;
+    expect(row.projet).toBe('GRAND_PUBLIC');
+    expect(row.type).toBe('INFORMEL');
+    expect(row.profession).toBe('Mécanicien');
+  });
+});
+
+describe('une campagne ouvre l’écriture sur la fiche d’un autre', () => {
+  const PROSPECT_DE_BOB = '0198a000-0000-7000-8000-000000000009';
+
+  function ficheDeBob(): void {
+    db.prospects.set(PROSPECT_DE_BOB, {
+      id: PROSPECT_DE_BOB,
+      nom: 'Fall',
+      prenom: 'Moussa',
+      phoneE164: '+221770000009',
+      rev: 2,
+      banqueId: 'b',
+      syndicatId: 's',
+      representantId: REP_B,
+      createdById: bob.id,
+      statut: 'NOUVEAU',
+      phase2Status: 'PENDING',
+      enrollmentMethod: null,
+      enrollmentCapturedById: null,
+      enrollmentCapturedAt: null,
+      clientCreatedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+    });
+  }
+
+  const qualifier = (): SyncOperationDto => ({
+    opId: opId(),
+    seq: 0,
+    entity: SyncEntity.PROSPECT,
+    op: SyncOp.UPDATE,
+    entityId: PROSPECT_DE_BOB,
+    clientUpdatedAt: new Date().toISOString(),
+    data: {
+      nom: 'Fall',
+      prenom: 'Moussa',
+      phone: '77 000 00 09',
+      banqueId: 'b',
+      syndicatId: 's',
+      representantId: REP_B,
+    },
+  });
+
+  it('sans file, la fiche d’un autre reste fermée', async () => {
+    ficheDeBob();
+
+    const result = await sync.push(alice, batch([qualifier()]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.CONFLICT]);
+    expect(result.body.results[0]?.errorCode).toBe('ENTITY_ID_OWNED_BY_ANOTHER_USER');
+  });
+
+  it('la file de la campagne l’ouvre à qui elle l’a confiée', async () => {
+    ficheDeBob();
+    db.callTasks.set('task-1', {
+      id: 'task-1',
+      prospectId: PROSPECT_DE_BOB,
+      assignedToId: alice.id,
+      isActive: true,
+    });
+
+    const result = await sync.push(alice, batch([qualifier()]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+  });
+
+  it('une file confiée à un TIERS ne l’ouvre pas', async () => {
+    ficheDeBob();
+    db.callTasks.set('task-1', {
+      id: 'task-1',
+      prospectId: PROSPECT_DE_BOB,
+      assignedToId: 'com-carine',
+      isActive: true,
+    });
+
+    const result = await sync.push(alice, batch([qualifier()]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.CONFLICT]);
+  });
+
+  it('une file RETIRÉE ne l’ouvre plus', async () => {
+    ficheDeBob();
+    db.callTasks.set('task-1', {
+      id: 'task-1',
+      prospectId: PROSPECT_DE_BOB,
+      assignedToId: alice.id,
+      isActive: false,
+    });
+
+    const result = await sync.push(alice, batch([qualifier()]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.CONFLICT]);
+  });
+});
+
 describe('écriture conditionnelle sur la révision', () => {
   it('un baseRev périmé produit un conflit au lieu d’écraser', async () => {
     await sync.push(alice, batch([createRep(REP_A, '77 123 45 67')], 'batch-1'));
@@ -515,14 +643,12 @@ describe('mode démonstration allumé, la remontée hors ligne reste du travail 
       prisma,
       new SyncBatchStore(prisma),
       new Phase2SyncService(),
-      fakeDemoVisibility(true),
+      new VisitesService(prisma),
     );
   });
 
   it('un représentant remonté n’est PAS marqué de démonstration', async () => {
     await demoSync.push(alice, batch([createRep(REP_A, '77 123 45 67')]));
-
-    expect(demoDb.representants.get(REP_A)?.isDemo ?? false).toBe(false);
   });
 
   it('un prospect remonté n’est PAS marqué de démonstration', async () => {
@@ -534,116 +660,6 @@ describe('mode démonstration allumé, la remontée hors ligne reste du travail 
         createProspect(prospectId, REP_A, '78 222 33 44', 1),
       ]),
     );
-
-    expect(demoDb.prospects.get(prospectId)?.isDemo ?? false).toBe(false);
-  });
-});
-
-describe('la remontée d’un COMPTE de démonstration écrit du fictif', () => {
-  const animateur: AuthenticatedUser = { ...alice, id: 'demo-awa', username: 'demo.awa' };
-  const PROSPECT = '0198f000-0000-7000-8000-000000000009';
-
-  beforeEach(() => {
-    db.addDemoUser(animateur.id);
-  });
-
-  it('LE REPRÉSENTANT SAISI PAR L’ANIMATEUR EST FICTIF', async () => {
-    await sync.push(animateur, batch([createRep(REP_A, '77 123 45 67')]));
-
-    expect(db.representants.get(REP_A)?.isDemo).toBe(true);
-  });
-
-  it('et il est INSCRIT AU REGISTRE, sans quoi la purge resterait bloquée', async () => {
-    await sync.push(animateur, batch([createRep(REP_A, '77 123 45 67')]));
-
-    expect(db.demoEntities).toContainEqual(
-      expect.objectContaining({ entityType: 'representant', entityId: REP_A }),
-    );
-  });
-
-  it('le prospect suit, et part du registre AVANT son représentant', async () => {
-    await sync.push(
-      animateur,
-      batch([
-        createRep(REP_A, '77 123 45 67', 0),
-        createProspect(PROSPECT, REP_A, '78 222 33 44', 1),
-      ]),
-    );
-
-    expect(db.prospects.get(PROSPECT)?.isDemo).toBe(true);
-
-    const rang = (entityId: string): number =>
-      db.demoEntities.find((row) => row.entityId === entityId)?.sequence ?? -1;
-    expect(rang(PROSPECT)).toBeGreaterThan(rang(REP_A));
-  });
-
-  it('UN VRAI COMMERCIAL rattaché à un représentant FICTIF écrit du fictif', async () => {
-    await sync.push(animateur, batch([createRep(REP_A, '77 123 45 67')]));
-
-    const admin: AuthenticatedUser = { ...alice, id: 'com-admin', role: Role.ADMIN };
-    await sync.push(admin, batch([createProspect(PROSPECT, REP_A, '78 222 33 44', 0)]));
-
-    expect(db.prospects.get(PROSPECT)?.isDemo).toBe(true);
-  });
-
-  it('un compte RÉEL sur un représentant RÉEL n’écrit rien de fictif', async () => {
-    await sync.push(
-      alice,
-      batch([
-        createRep(REP_B, '77 999 88 77', 0),
-        createProspect(PROSPECT, REP_B, '78 222 33 44', 1),
-      ]),
-    );
-
-    expect(db.representants.get(REP_B)?.isDemo ?? false).toBe(false);
-    expect(db.prospects.get(PROSPECT)?.isDemo ?? false).toBe(false);
-    expect(db.demoEntities).toHaveLength(0);
-  });
-});
-
-describe('autorité d’un lot', () => {
-  const basculerApresLePremierGroupe = (mute: () => void): void => {
-    const original = db.$transaction;
-    let groupes = 0;
-    db.$transaction = async <T>(fn: (tx: FakePrisma) => Promise<T>): Promise<T> => {
-      const outcome = await original(fn);
-      groupes += 1;
-      if (groupes === 1) mute();
-      return outcome;
-    };
-  };
-
-  const deuxGroupes = (): SyncPushDto =>
-    batch([createRep(REP_A, '+221770000001', 0), createRep(REP_B, '+221770000002', 1)], opId());
-
-  it('LES DEUX GROUPES ÉCRIVENT LA MÊME NATURE, même si l’auteur bascule au milieu', async () => {
-    db.addUser('com-alice', { role: Role.COMMERCIAL, isDemo: false });
-    basculerApresLePremierGroupe(() => {
-      db.addUser('com-alice', { role: Role.COMMERCIAL, isDemo: true });
-    });
-
-    await sync.push(alice, deuxGroupes());
-
-    expect(db.transactionCount).toBeGreaterThanOrEqual(2);
-    const natures = [...db.representants.values()].map((row) => row.isDemo);
-    expect(natures).toHaveLength(2);
-    expect(new Set(natures).size).toBe(1);
-    expect(natures[0]).toBe(false);
-  });
-
-  it('l’autorité est lue EN BASE, une seule fois, et non reprise du jeton', async () => {
-    let lectures = 0;
-    const original = db.user.findUnique;
-    db.user.findUnique = (args: { where: { id: string } }) => {
-      lectures += 1;
-      return original(args);
-    };
-    db.addUser('com-alice', { role: Role.COMMERCIAL, isDemo: true });
-
-    await sync.push(alice, deuxGroupes());
-
-    expect(lectures).toBe(1);
-    expect([...db.representants.values()].every((row) => row.isDemo)).toBe(true);
   });
 });
 
@@ -689,4 +705,77 @@ describe('champs vidés', () => {
 
     expect(db.representants.get(REP_ID)?.iefId).toBeNull();
   });
+});
+
+describe('visite (registre d’accueil, hors ligne)', () => {
+  const accueil: AuthenticatedUser = { ...alice, id: 'com-accueil', role: Role.ACCUEIL };
+  const VISITE_A = '0198f100-0000-7000-8000-000000000001';
+  const ENTREPRISE = 'entreprise-1';
+  const OBJET = 'objet-1';
+
+  beforeEach(() => {
+    db.addUser(accueil.id, { role: Role.ACCUEIL });
+    db.visiteEntreprises.set(ENTREPRISE, {
+      id: ENTREPRISE,
+      code: 'SGBS',
+      label: 'SGBS',
+      isActive: true,
+    });
+    db.visiteObjets.set(OBJET, { id: OBJET, code: 'DEPOT', label: 'Dépôt', isActive: true });
+  });
+
+  const createVisite = (entityId: string, seq = 0): SyncOperationDto => ({
+    opId: opId(),
+    seq,
+    entity: SyncEntity.VISITE,
+    op: SyncOp.CREATE,
+    entityId,
+    clientUpdatedAt: '2026-08-10T10:00:00.000Z',
+    data: {
+      visitorName: 'Awa Ndiaye',
+      visitDate: '2026-08-10',
+      visitTime: '11:08',
+      entrepriseId: ENTREPRISE,
+      objetId: OBJET,
+    },
+  });
+
+  it('une inscription hors ligne s’applique, avec une référence attribuée', async () => {
+    const result = await sync.push(accueil, batch([createVisite(VISITE_A)]));
+
+    expect(result.body.results[0]?.status).toBe(SyncOpStatus.APPLIED);
+    const row = db.visites.get(VISITE_A);
+    expect(row?.visitorName).toBe('Awa Ndiaye');
+    expect(row?.reference).toMatch(/^V-2026-\d{6}$/);
+  });
+
+  it('rejouer le même opId ne double pas la ligne', async () => {
+    await sync.push(accueil, batch([createVisite(VISITE_A)]));
+    await sync.push(accueil, batch([createVisite(VISITE_A)], 'batch-visite-2'));
+
+    expect(db.visites.size).toBe(1);
+  });
+
+  it('un compte qui ne tient pas le registre est refusé', async () => {
+    const commercial: AuthenticatedUser = { ...alice, id: 'com-refuse', role: Role.COMMERCIAL };
+    db.addUser(commercial.id, { role: Role.COMMERCIAL });
+
+    const result = await sync.push(commercial, batch([createVisite(VISITE_A)]));
+
+    expect(result.body.results[0]?.status).toBe(SyncOpStatus.INVALID);
+    expect(result.body.results[0]?.errorCode).toBe('VISITE_ROLE_NOT_ALLOWED');
+    expect(db.visites.size).toBe(0);
+  });
+
+  it('une visite ne se modifie pas hors ligne', async () => {
+    await sync.push(accueil, batch([createVisite(VISITE_A)]));
+
+    const update: SyncOperationDto = createVisite(VISITE_A, 1);
+    update.op = SyncOp.UPDATE;
+    const result = await sync.push(accueil, batch([update], 'batch-visite-update'));
+
+    expect(result.body.results[0]?.status).toBe(SyncOpStatus.INVALID);
+    expect(result.body.results[0]?.errorCode).toBe('OP_NOT_SUPPORTED');
+  });
+
 });

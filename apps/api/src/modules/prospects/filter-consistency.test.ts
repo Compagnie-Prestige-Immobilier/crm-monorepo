@@ -36,6 +36,9 @@ const CHAMPS: Readonly<Record<keyof ProspectFilterDto, ProspectFilterDto>> = {
   syndicatId: { syndicatId: 's-1' },
   departementId: { departementId: 'd-1' },
   commercialId: { commercialId: 'com-bob' },
+  projet: { projet: 'GRAND_PUBLIC' },
+  type: { type: 'INFORMEL' },
+  canalProvenanceId: { canalProvenanceId: 'canal-1' },
   statut: { statut: 'CONVERTI' },
   origin: { origin: 'BANQUE' },
   segment: { segment: 'BDD2' },
@@ -50,13 +53,13 @@ const CHAMPS: Readonly<Record<keyof ProspectFilterDto, ProspectFilterDto>> = {
 };
 
 describe('un filtre, la même population sur les trois surfaces', () => {
-  const referenceWhere = JSON.stringify(buildProspectWhere(admin, {}, false));
-  const referenceSql = rendered(prospectConditions(admin, {}, false));
+  const referenceWhere = JSON.stringify(buildProspectWhere(admin, {}));
+  const referenceSql = rendered(prospectConditions(admin, {}));
 
   for (const [champ, filtre] of Object.entries(CHAMPS)) {
     it(`« ${champ} » restreint la liste ET les agrégats`, () => {
-      expect(JSON.stringify(buildProspectWhere(admin, filtre, false))).not.toBe(referenceWhere);
-      expect(rendered(prospectConditions(admin, filtre, false))).not.toBe(referenceSql);
+      expect(JSON.stringify(buildProspectWhere(admin, filtre))).not.toBe(referenceWhere);
+      expect(rendered(prospectConditions(admin, filtre))).not.toBe(referenceSql);
     });
   }
 
@@ -66,6 +69,7 @@ describe('un filtre, la même population sur les trois surfaces', () => {
       'assignedToId',
       'banqueId',
       'campaignId',
+      'canalProvenanceId',
       'commercialId',
       'dateFrom',
       'dateTo',
@@ -75,11 +79,13 @@ describe('un filtre, la même population sur les trois surfaces', () => {
       'includeDeleted',
       'origin',
       'phase2Status',
+      'projet',
       'representantId',
       'search',
       'segment',
       'statut',
       'syndicatId',
+      'type',
     ];
     expect(declares).toEqual(attendus);
   });
@@ -87,12 +93,12 @@ describe('un filtre, la même population sur les trois surfaces', () => {
   it('le cloisonnement s’applique aux trois surfaces, et n’est jamais surchargeable', () => {
     const filtre: ProspectFilterDto = { commercialId: 'com-bob', includeDeleted: true };
 
-    expect(buildProspectWhere(alice, filtre, false)).toMatchObject({
+    expect(buildProspectWhere(alice, filtre)).toMatchObject({
       createdById: '__aucun__',
       deletedAt: null,
     });
 
-    const sql = rendered(prospectConditions(alice, filtre, false));
+    const sql = rendered(prospectConditions(alice, filtre));
     expect(sql).toContain('p."createdById" = "com-alice"');
     expect(sql).toContain('"__aucun__"');
     expect(sql).toContain('p."deletedAt" IS NULL');
@@ -101,11 +107,11 @@ describe('un filtre, la même population sur les trois surfaces', () => {
   it('le segment ne se combine jamais en écrasant un autre filtre relationnel', () => {
     const filtre: ProspectFilterDto = { segment: 'BDD1', departementId: 'd-1' };
 
-    const where = buildProspectWhere(admin, filtre, false);
+    const where = buildProspectWhere(admin, filtre);
     expect(where.representant).toEqual({ departementId: 'd-1' });
     expect(where.AND).toHaveLength(1);
 
-    const sql = rendered(prospectConditions(admin, filtre, false));
+    const sql = rendered(prospectConditions(admin, filtre));
     expect(sql).toContain('r."departementId" = "d-1"');
     expect(sql).toContain('sy."sigle" = "CHUES"');
     expect(sql).toContain('bq."shortName" = "CBAO"');

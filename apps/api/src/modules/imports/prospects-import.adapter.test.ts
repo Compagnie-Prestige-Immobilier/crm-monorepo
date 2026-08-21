@@ -126,31 +126,6 @@ describe('analyse d’une ligne', () => {
     expect(error.message).toContain('+221700000000');
   });
 
-  it('refuse un représentant de démonstration comme s’il n’existait pas', async () => {
-    const demoStore = createFakeImportStore({
-      representants: [
-        { id: 'rep-demo', phoneE164: FAKE_REPRESENTANT_PHONE, isDemo: true, deletedAt: null },
-      ],
-    });
-    const demoAdapter = new ProspectsImportAdapter();
-    await demoAdapter.prepare(fakeImportContext(demoStore));
-
-    const error = refusal(demoAdapter.parseRow(cells(), 3));
-    expect(error.code).toBe(ProspectImportError.REPRESENTANT_UNKNOWN);
-  });
-});
-
-describe('banque et syndicat : rapprochement exact', () => {
-  it('refuse une banque inconnue en nommant la colonne et les valeurs admises', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.banque]: 'CBAO Attijari' }), 3));
-
-    expect(error.code).toBe(ProspectImportError.BANQUE_UNKNOWN);
-    expect(error.column).toBe(H.banque);
-    expect(error.message).toContain('CBAO Attijari');
-    expect(error.message).toContain('CBAO');
-    expect(error.message).toContain('BNDE');
-  });
-
   it('refuse un syndicat inconnu en nommant la colonne et les valeurs admises', () => {
     const error = refusal(adapter.parseRow(cells({ [H.syndicat]: 'CHUE' }), 3));
 
@@ -293,7 +268,6 @@ describe('écriture d’une tranche', () => {
       syndicatId: 'syn-chues',
       representantId: 'rep-1',
       createdById: 'user-admin',
-      isDemo: false,
       phase2Status: Phase2Status.PENDING,
       enrollmentMethod: null,
       enrollmentCapturedAt: null,

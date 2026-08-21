@@ -158,7 +158,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                 <TableCell>
                   <div className="flex justify-end gap-2">
                     <Link
-                      href={`/console?fiche=${encodeURIComponent(callback.prospectId)}`}
+                      href={`/chues/console?fiche=${encodeURIComponent(callback.prospectId)}`}
                       className={buttonVariants({ variant: 'outline', size: 'sm' })}
                     >
                       <PhoneCallIcon aria-hidden="true" />

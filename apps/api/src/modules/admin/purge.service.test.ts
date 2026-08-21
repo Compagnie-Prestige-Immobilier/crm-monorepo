@@ -205,28 +205,6 @@ describe('PurgeService, exécution', () => {
     expect(roles).not.toContain(Role.ADMIN);
   });
 
-  it('remet le mode démonstration à zéro quand la purge emporte ses lignes', async () => {
-    const { prisma, trace } = makePrisma();
-    await new PurgeService(prisma).purge(actor(), {
-      domains: ['prospects'],
-      confirmation: 'direction',
-    });
-
-    expect(trace.deletes.map((call) => call.model)).toContain('demoEntity');
-    expect(trace.upserts).toEqual(['demo_mode', 'demo_seeded_at']);
-  });
-
-  it('laisse le registre de démonstration intact pour un domaine sans rapport', async () => {
-    const { prisma, trace } = makePrisma();
-    await new PurgeService(prisma).purge(actor(), {
-      domains: ['journal'],
-      confirmation: 'direction',
-    });
-
-    expect(trace.deletes.map((call) => call.model)).not.toContain('demoEntity');
-    expect(trace.upserts).toEqual([]);
-  });
-
   it('journalise la purge après les suppressions, pour que la trace survive', async () => {
     const { prisma, trace } = makePrisma();
     await new PurgeService(prisma).purge(actor(), {

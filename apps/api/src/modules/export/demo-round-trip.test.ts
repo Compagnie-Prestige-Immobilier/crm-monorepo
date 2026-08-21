@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { AnalyticsService } from '../analytics/analytics.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
+import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
 import { BankCasesExportService } from '../bank-cases/bank-cases-export.service.js';
 import { ExportService } from './export.service.js';
 import { RepresentantsExportService } from './representants-export.service.js';
@@ -22,7 +22,7 @@ const admin: AuthenticatedUser = {
   role: Role.ADMIN,
 };
 
-const AVERTISSEMENT = 'MODE DÉMONSTRATION';
+const AVERTISSEMENT = 'données fictives';
 
 async function relire(write: (stream: PassThrough) => Promise<void>): Promise<ExcelJS.Workbook> {
   const sink = new PassThrough();
@@ -184,7 +184,7 @@ const EXPORTS: { nom: string; rendre: (demo: boolean, stream: PassThrough) => Pr
   {
     nom: 'prospects (mode filtré)',
     rendre: (demo, stream) =>
-      new ExportService(prospectPrisma(), analyticsStub(), fakeDemoVisibility(demo)).writeProspects(
+      new ExportService(prospectPrisma(), analyticsStub(), fakeWorkspace(demo)).writeProspects(
         admin,
         {},
         stream,
@@ -194,7 +194,7 @@ const EXPORTS: { nom: string; rendre: (demo: boolean, stream: PassThrough) => Pr
   {
     nom: 'prospects (mode consolidé)',
     rendre: (demo, stream) =>
-      new ExportService(prospectPrisma(), analyticsStub(), fakeDemoVisibility(demo)).writeProspects(
+      new ExportService(prospectPrisma(), analyticsStub(), fakeWorkspace(demo)).writeProspects(
         admin,
         {},
         stream,
@@ -204,7 +204,7 @@ const EXPORTS: { nom: string; rendre: (demo: boolean, stream: PassThrough) => Pr
   {
     nom: 'représentants',
     rendre: (demo, stream) =>
-      new RepresentantsExportService(prospectPrisma(), fakeDemoVisibility(demo)).writeRepresentants(
+      new RepresentantsExportService(prospectPrisma(), fakeWorkspace(demo)).writeRepresentants(
         admin,
         {},
         stream,
@@ -213,7 +213,7 @@ const EXPORTS: { nom: string; rendre: (demo: boolean, stream: PassThrough) => Pr
   {
     nom: 'dossiers bancaires',
     rendre: (demo, stream) =>
-      new BankCasesExportService(bankPrisma(), bankAnalyticsStub(), fakeDemoVisibility(demo)).write(
+      new BankCasesExportService(bankPrisma(), bankAnalyticsStub(), fakeWorkspace(demo)).write(
         {},
         stream,
       ),

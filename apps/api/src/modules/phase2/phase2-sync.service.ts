@@ -30,7 +30,6 @@ interface ProspectState {
   updatedAt: Date;
   enrollmentCapturedById: string | null;
   enrollmentCapturedAt: Date | null;
-  isDemo: boolean;
 }
 
 const PROSPECT_STATE_SELECT = {
@@ -41,7 +40,6 @@ const PROSPECT_STATE_SELECT = {
   updatedAt: true,
   enrollmentCapturedById: true,
   enrollmentCapturedAt: true,
-  isDemo: true,
 } satisfies Prisma.ProspectSelect;
 
 const toState = (row: ProspectState): ProspectPhase2StateDto => ({
@@ -125,7 +123,6 @@ export class Phase2SyncService {
           method: attempt.method,
           comment: attempt.comment,
           clientCreatedAt: new Date(op.clientCreatedAt),
-          isDemo: prospect.isDemo,
         },
       ],
       skipDuplicates: true,
@@ -159,7 +156,6 @@ export class Phase2SyncService {
             scheduledAt: attempt.callbackAt,
             comment: attempt.comment,
             sourceAttemptId: op.id,
-            isDemo: prospect.isDemo,
           },
         ],
         skipDuplicates: true,

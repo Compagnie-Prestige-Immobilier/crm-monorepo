@@ -166,13 +166,26 @@ export async function* projectSheets(
   columns: readonly ImportColumn[],
   layout: SheetLayout,
 ): AsyncIterable<SheetRow> {
+  const names: string[] = [];
+  let matched = 0;
+
   for await (const sheet of sheets) {
     const name = sheet.name ?? '';
+    names.push(name);
     if (!layout.sheetPattern.test(name)) {
       await drain(sheet);
       continue;
     }
+    matched += 1;
     yield* projectRows(sheet, columns, layout, name);
+  }
+
+  // Sans ce refus, un onglet renommé rendrait un rapport à zéro ligne, qui a
+  // l'air d'un fichier vide et n'en est pas un.
+  if (matched === 0) {
+    throw new UnreadableWorkbookError(
+      `Aucun onglet de ce classeur ne porte de données à importer. Onglets trouvés : ${names.join(', ')}.`,
+    );
   }
 }
 
@@ -191,7 +204,7 @@ async function* projectRows(
   layout: SheetLayout,
   sheetName: string,
 ): AsyncIterable<SheetRow> {
-  let mapping: number[] | null = null;
+  let mapping: (number | null)[] | null = null;
 
   for await (const row of sheet) {
     const rowNumber = row.number;
@@ -208,10 +221,14 @@ async function* projectRows(
       );
     }
 
+    // La ligne 2 d'un modèle engendré porte l'exemple grisé, jamais des données.
+    if (rowNumber < FIRST_DATA_ROW) continue;
+
     const at = mapping;
     const cells: Record<string, string> = { [SHEET_CELL]: sheetName };
     columns.forEach((column, index) => {
-      cells[column.header] = cellText(row.getCell(at[index] ?? 1).value);
+      const source = at[index];
+      cells[column.header] = source == null ? '' : cellText(row.getCell(source).value);
     });
 
     yield { rowNumber, cells };
@@ -231,7 +248,7 @@ function mapHeaders(
   columns: readonly ImportColumn[],
   layout: SheetLayout,
   sheetName: string,
-): number[] {
+): (number | null)[] {
   const found = new Map<string, number>();
   for (let index = 1; index <= row.cellCount; index += 1) {
     const key = normalizeKey(cellText(row.getCell(index).value));
@@ -239,8 +256,15 @@ function mapHeaders(
   }
 
   return columns.map((column) => {
-    const index = found.get(normalizeKey(column.header));
+    const index = [column.header, ...(column.aliases ?? [])]
+      .map((label) => found.get(normalizeKey(label)))
+      .find((rank) => rank !== undefined);
+
+    // Une colonne facultative absente n'est pas un classeur illisible : ses
+    // cellules se lisent vides, et une cellule vide est une information qu'on
+    // n'a pas.
     if (index === undefined) {
+      if (!column.required) return null;
       throw new UnreadableWorkbookError(
         `Onglet « ${sheetName} » : la colonne « ${column.header} » est introuvable en ligne ${String(layout.headerRow)}.`,
       );

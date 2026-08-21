@@ -4,6 +4,8 @@ export interface ImportColumn {
   readonly required: boolean;
   readonly help: string;
   readonly sample: string;
+  /** Autres intitulés admis pour cette colonne, quand le classeur vient du terrain. */
+  readonly aliases?: readonly string[];
 }
 
 export const IMPORT_COLUMNS: readonly ImportColumn[] = [

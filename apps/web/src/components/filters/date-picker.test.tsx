@@ -13,6 +13,32 @@ function renderPicker() {
 }
 
 describe('la structure ARIA du calendrier', () => {
+  it('repère aujourd’hui et la période comprise entre Du et Au', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-03-16T12:00:00.000Z'));
+    try {
+      render(
+        <DatePicker
+          id="du"
+          label="Date de début"
+          value="2026-03-10"
+          max="2026-03-20"
+          onChange={vi.fn()}
+        />,
+      );
+      await openCalendar();
+
+      expect(
+        screen.getByRole('gridcell', { name: '16 mars 2026' }).getAttribute('aria-current'),
+      ).toBe('date');
+      expect(
+        screen.getByRole('gridcell', { name: '17 mars 2026' }).getAttribute('data-in-range'),
+      ).toBe('true');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('n’expose AUCUNE cellule en enfant direct de la grille', async () => {
     renderPicker();
     await openCalendar();

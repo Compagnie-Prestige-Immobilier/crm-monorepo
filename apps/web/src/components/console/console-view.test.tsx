@@ -55,6 +55,12 @@ function prospect(over: Partial<ProspectRow> & { id: string }): ProspectRow {
     departementName: 'Dakar',
     ownedByCommercialId: 'u-1',
     ownedByCommercialName: 'Fatou Sow',
+    projet: 'CHUES',
+    type: null,
+    profession: null,
+    dureeSystemeMois: null,
+    canalProvenanceId: null,
+    canalProvenanceLabel: null,
     segment: 'BDD1',
     phase2Status: 'PENDING',
     enrollmentMethod: null,
@@ -178,7 +184,7 @@ describe('ConsoleView : file', () => {
   });
 
   it('ouvre la fiche demandée par la file des rappels', async () => {
-    setUrl('/console?fiche=p-2');
+    setUrl('/chues/console?fiche=p-2');
     await renderConsole([NEUVE, RAPPEL]);
 
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Rappel Fiche');
@@ -186,7 +192,7 @@ describe('ConsoleView : file', () => {
   });
 
   it('le dit quand la fiche demandée n’est pas dans la file chargée', async () => {
-    setUrl('/console?fiche=p-absente');
+    setUrl('/chues/console?fiche=p-absente');
     await renderConsole([NEUVE, RAPPEL]);
 
     expect(screen.getByRole('alert').textContent).toMatch(/n’est pas dans cette file/);
@@ -474,7 +480,7 @@ describe('ConsoleView : navigation et raccourcis annexes', () => {
 
     await userEvent.keyboard('n');
 
-    expect(routerMock.push).toHaveBeenCalledWith('/prospects/nouveau?rep=r-9');
+    expect(routerMock.push).toHaveBeenCalledWith('/chues/prospects/nouveau?rep=r-9');
   });
 
   it('ouvre la fiche du représentant', async () => {
@@ -482,7 +488,7 @@ describe('ConsoleView : navigation et raccourcis annexes', () => {
 
     await userEvent.keyboard('r');
 
-    expect(routerMock.push).toHaveBeenCalledWith('/representants/r-9');
+    expect(routerMock.push).toHaveBeenCalledWith('/chues/representants/r-9');
   });
 
   it('affiche la carte clavier sur ?', async () => {

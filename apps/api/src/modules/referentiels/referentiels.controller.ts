@@ -15,6 +15,8 @@ import { ReferentielsService } from './referentiels.service.js';
 import {
   BanqueDto,
   CreateBanqueDto,
+  CanalProvenanceDto,
+  CreateCanalProvenanceDto,
   CreateDepartementDto,
   CreateSyndicatDto,
   DepartementDto,
@@ -25,6 +27,7 @@ import {
   RegionWithDepartementsDto,
   SyndicatDto,
   UpdateBanqueDto,
+  UpdateCanalProvenanceDto,
   UpdateDepartementDto,
   UpdateSyndicatDto,
 } from './dto.js';
@@ -61,6 +64,43 @@ export class ReferentielsController {
   @ApiResponse({ status: 200, type: [SyndicatDto] })
   listSyndicats(@Query() query: ReferentielQueryDto): Promise<SyndicatDto[]> {
     return this.referentiels.listSyndicats(query);
+  }
+
+  @Get('canaux-provenance')
+  @Roles(...ANY_AUTHENTICATED)
+  @ApiOperation({
+    operationId: 'listCanauxProvenance',
+    summary: 'Canaux de provenance du Grand Public.',
+  })
+  @ApiResponse({ status: 200, type: [CanalProvenanceDto] })
+  listCanauxProvenance(@Query() query: ReferentielQueryDto): Promise<CanalProvenanceDto[]> {
+    return this.referentiels.listCanauxProvenance(query);
+  }
+
+  @Roles(Role.ADMIN)
+  @Post('canaux-provenance')
+  @ApiOperation({
+    operationId: 'createCanalProvenance',
+    summary: 'Ajoute un canal. Le code est immuable : les fiches le désignent.',
+  })
+  @ApiResponse({ status: 201, type: CanalProvenanceDto })
+  createCanalProvenance(@Body() body: CreateCanalProvenanceDto): Promise<CanalProvenanceDto> {
+    return this.referentiels.createCanalProvenance(body);
+  }
+
+  @Roles(Role.ADMIN)
+  @Patch('canaux-provenance/:id')
+  @ApiOperation({
+    operationId: 'updateCanalProvenance',
+    summary: 'Renomme un canal, ou le retire des listes via isActive.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: CanalProvenanceDto })
+  updateCanalProvenance(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateCanalProvenanceDto,
+  ): Promise<CanalProvenanceDto> {
+    return this.referentiels.updateCanalProvenance(id, body);
   }
 
   @Get('departements')

@@ -10,8 +10,6 @@ import {
   type DirectoryCursor,
 } from './directory-cursor.js';
 import type { DirectoryEntryDto, DirectoryPageDto, DirectoryQueryDto } from './dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 
 export const DIRECTORY_SAFETY_LAG_MS = 2_000;
 
@@ -52,10 +50,7 @@ function keyset(cursor: DirectoryCursor | undefined, safeNow: Date): Prisma.Pros
 
 @Injectable()
 export class Phase2DirectoryService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async pull(query: DirectoryQueryDto): Promise<DirectoryPageDto> {
     const limit = query.limit ?? DIRECTORY_DEFAULT_PAGE_SIZE;
@@ -66,7 +61,6 @@ export class Phase2DirectoryService {
     const rows = await this.prisma.prospect.findMany({
       where: {
         deletedAt: null,
-        ...demoScope(await this.demo.enabled()),
         ...keyset(incoming, safeNow),
       },
       select: DIRECTORY_SELECT,

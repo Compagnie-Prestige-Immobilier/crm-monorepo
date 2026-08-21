@@ -5,7 +5,6 @@ import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { Role } from '@crm/database';
 
 import { Roles } from '../../common/decorators/roles.decorator.js';
-import { DemoWritable } from '../../common/decorators/demo-writable.decorator.js';
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -79,7 +78,6 @@ export class NotificationTemplatesController {
     return this.templates.update(id, body);
   }
 
-  @DemoWritable('aperçu calculé, aucune écriture malgré la méthode POST')
   @Post(':id/render')
   @ApiOperation({
     operationId: 'renderNotificationTemplate',

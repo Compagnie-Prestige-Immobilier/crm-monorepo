@@ -63,6 +63,59 @@ export class SyndicatDto {
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
 
+/** Par ou un prospect Grand Public est arrive : TikTok, LinkedIn, salon, parrainage. */
+export class CanalProvenanceDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ description: 'Clé stable, jamais réécrite : les fiches la désignent.' })
+  code!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty({ type: Number }) position!: number;
+  @ApiProperty({ type: Boolean }) isActive!: boolean;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
+export class CreateCanalProvenanceDto {
+  @ApiProperty({ maxLength: 40, description: 'Immuable une fois posé.' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(40)
+  code!: string;
+
+  @ApiProperty({ maxLength: 80 })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  label!: string;
+
+  @ApiPropertyOptional({ type: Number, minimum: 0, maximum: 9999 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  position?: number;
+}
+
+export class UpdateCanalProvenanceDto {
+  @ApiPropertyOptional({ maxLength: 80 })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  label?: string;
+
+  @ApiPropertyOptional({ type: Number, minimum: 0, maximum: 9999 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  position?: number;
+
+  @ApiPropertyOptional({ type: Boolean, description: 'Le retirer des listes, jamais le supprimer.' })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
 export class RegionWithDepartementsDto extends RegionDto {
   @ApiProperty({ type: () => [DepartementDto] })
   departements!: DepartementDto[];

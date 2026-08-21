@@ -39,9 +39,8 @@ import {
   type NotificationListDto,
   type NotificationQueryDto,
 } from './dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 import { DispatchClaim, SENDING_LEASE_MS } from './dispatch-claim.js';
+import { WorkspaceContext } from '../../workspaces/workspace.js';
 
 /** Motif d'une livraison `PENDING` conservée pour un nouvel essai. */
 export const DELIVERY_RETRY_ERROR = 'EMAIL_RETRY';
@@ -199,7 +198,7 @@ export class NotificationsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
+    private readonly workspace: WorkspaceContext,
     @Inject(BREVO_TRANSPORT) private readonly email: BrevoTransport,
   ) {}
 
@@ -229,27 +228,8 @@ export class NotificationsService {
     });
     if (!recipients.length) throw audienceEmpty();
 
-    // ═══ LA NOTIFICATION SUIT L'INTERRUPTEUR ═══
-    //
-    // Composée mode ALLUMÉ, elle est une ligne de démonstration, au même titre
-    // qu'un prospect ou qu'une campagne saisis pendant la même séance : c'est
-    // ce qui la fait disparaître à l'extinction. Sans cela, une annonce
-    // d'exemple resterait dans la boîte de réception de vrais commerciaux,
-    // avec un texte écrit pour une démo.
-    //
-    // Les LIVRAISONS portent la même valeur : elles n'existent que par leur
-    // notification, et une livraison visible accrochée à une notification
-    // masquée afficherait une ligne vide dans la boîte de réception.
-    //
-    // `enabledForWrite` et non `enabled` : cette valeur est ÉCRITE. Sur panne
-    // de lecture du réglage, `enabled()` rendrait `false` et l'annonce
-    // d'exemple atterrirait pour de bon dans la boîte de vrais commerciaux,
-    // avec un texte écrit pour une démonstration.
-    const isDemo = await this.demo.enabledForWrite();
-
     const created = await this.prisma.notification.create({
       data: {
-        isDemo,
         title: body.title,
         body: body.body,
         category: body.category ?? NotificationCategory.ANNONCE,
@@ -269,7 +249,6 @@ export class NotificationsService {
               (recipient): Prisma.NotificationDeliveryCreateManyNotificationInput => ({
                 userId: recipient.userId,
                 status: NotificationDeliveryStatus.PENDING,
-                isDemo,
               }),
             ),
           },
@@ -295,7 +274,7 @@ export class NotificationsService {
       // Le filtre de demonstration s'ajoute a l'audience choisie, il ne la
       // remplace pas : une campagne « tous les commerciaux » ne doit pas
       // notifier des comptes fictifs quand le mode est eteint.
-      where: { ...buildAudienceWhere(selector), ...demoScope(await this.demo.enabled()) },
+      where: { ...buildAudienceWhere(selector) },
       select: { id: true },
       orderBy: { id: 'asc' },
     });
@@ -525,36 +504,6 @@ export class NotificationsService {
     };
   }
 
-  /**
-   * Sert la notification par e-mail, aux téléconseillers seuls.
-   *
-   * POURQUOI LES COMMERCIAUX ET EUX SEULS : ce sont les seuls destinataires qui
-   * travaillent devant un poste, souvent loin de l'application. Les autres
-   * rôles ont le panel ouvert toute la journée, et leur envoyer un e-mail de
-   * plus par notification transformerait leur boîte en bruit qu'ils finiraient
-   * par filtrer, e-mails utiles compris.
-   *
-   * RIEN DE CE QUI SE PASSE ICI N'EST UNE ERREUR REMONTÉE. Le `try` couvre
-   * l'appel réseau ET la lecture des comptes : une panne Brevo ou une base
-   * momentanément indisponible laissent les lignes EN FILE, avec le marqueur de
-   * réessai, plutôt que de faire échouer l'appel ou d'enterrer les livraisons.
-   *
-   * CETTE PHRASE ÉTAIT FAUSSE POUR LA BRANCHE BASE, et c'est le défaut que
-   * `candidates` répare. Le rattrapage ne connaissait que `targeted`, rempli
-   * APRÈS la lecture des comptes : quand c'est cette lecture-là qui lâchait
-   * (délai d'attente du pool, requête interrompue), il remettait en file une
-   * liste VIDE. Aucune livraison ne portait alors de verdict, `dispatch()` les
-   * comptait toutes « rien à envoyer », `retryable` restait à zéro, et
-   * `settleNotification` refermait l'envoi sur SENT. Zéro e-mail parti, toutes
-   * les lignes `PENDING` estampillées « boîte de réception seule », et aucun
-   * des deux filets de reprise ne pouvait les retrouver : `dispatchDue` ne
-   * reprend que les SCHEDULED et les SENDING au bail expiré, `retryStalled`
-   * exige un `reminderKey` que les envois composés n'ont jamais.
-   *
-   * Les identifiants viennent des lignes de livraison, donc d'un public déjà
-   * résolu avec la visibilité de démonstration : le filtre n'a pas à être
-   * réappliqué sur une liste qui en sort.
-   */
   private async sendByEmail(
     claim: DispatchClaim,
     notification: NotificationRow,
@@ -562,6 +511,8 @@ export class NotificationsService {
   ): Promise<EmailLegResult> {
     const empty = new Map<string, DeliveryVerdict>();
     if (!userIds.length)
+      return { emailed: 0, status: 'SENT', verdicts: empty, emailable: new Set<string>() };
+    if (this.workspace.current() === 'demo')
       return { emailed: 0, status: 'SENT', verdicts: empty, emailable: new Set<string>() };
 
     // Hissé hors du `try` : le rattrapage doit savoir QUI était visé pour
@@ -957,11 +908,6 @@ export class NotificationsService {
     outstanding: number,
     now: Date,
   ): Promise<void> {
-    // PORTÉE GLOBALE délibérée sur les livraisons, et pour la MÊME raison que
-    // celle de `dispatch()` : une livraison masquée par la visibilité de
-    // démonstration attend toujours son e-mail. L'écarter ferait refermer
-    // l'envoi sur SENT, et le simple fait de basculer l'interrupteur suffirait
-    // à enterrer des livraisons en attente.
     const closed = await this.prisma.notification.updateMany({
       where: { ...claim.fence, deliveries: { none: OUTSTANDING_DELIVERY } },
       data: {
@@ -1010,7 +956,6 @@ export class NotificationsService {
       ...(query.category ? { category: query.category } : {}),
       // Le total et la page partagent la MÊME clause : sans cela, la
       // pagination annoncerait un nombre d'envois que la liste ne montre pas.
-      ...demoScope(await this.demo.enabled()),
     };
 
     const [total, rows] = await Promise.all([
@@ -1038,7 +983,7 @@ export class NotificationsService {
     // répond « introuvable », sans quoi le masquage ne couvrirait que la liste
     // et l'écran de détail resterait ouvert à qui connaît l'identifiant.
     const row = await this.prisma.notification.findFirst({
-      where: { id, ...demoScope(await this.demo.enabled()) },
+      where: { id },
       select: NOTIFICATION_SELECT,
     });
     if (!row) throw notificationNotFound();
@@ -1091,7 +1036,7 @@ export class NotificationsService {
     });
 
     if (updated.count === 0) {
-      const exists = await this.prisma.notification.findUnique({
+      const exists = await this.prisma.notification.findFirst({
         where: { id },
         select: { id: true },
       });
@@ -1111,12 +1056,10 @@ export class NotificationsService {
 
     // Une notification encore programmée n'appartient PAS à la boîte de
     // réception : elle n'a pas encore eu lieu.
-    const demoEnabled = await this.demo.enabled();
     const where: Prisma.NotificationDeliveryWhereInput = {
       userId: user.id,
       notification: { status: { in: [NotificationStatus.SENDING, NotificationStatus.SENT] } },
       ...(query.unreadOnly === true ? { readAt: null } : {}),
-      ...demoScope(demoEnabled),
     };
 
     const [total, unreadCount, rows] = await Promise.all([
@@ -1129,7 +1072,6 @@ export class NotificationsService {
           userId: user.id,
           readAt: null,
           notification: { status: { in: [NotificationStatus.SENDING, NotificationStatus.SENT] } },
-          ...demoScope(demoEnabled),
         },
       }),
       this.prisma.notificationDelivery.findMany({
@@ -1200,8 +1142,7 @@ export class NotificationsService {
     // comme sur le repli : marquer lue une notification masquée répondrait
     // « c'est fait » sur une ligne que l'utilisateur ne voit nulle part, et
     // écrirait une date de lecture sur une ligne que le mode éteint nie.
-    const demoEnabled = await this.demo.enabled();
-    const scope = { notificationId, userId: user.id, readAt: null, ...demoScope(demoEnabled) };
+    const scope = { notificationId, userId: user.id, readAt: null };
     const readAt = new Date();
 
     const advanced = await this.prisma.notificationDelivery.updateMany({
@@ -1228,7 +1169,7 @@ export class NotificationsService {
 
     if (result.count === 0) {
       const existing = await this.prisma.notificationDelivery.findFirst({
-        where: { notificationId, userId: user.id, ...demoScope(demoEnabled) },
+        where: { notificationId, userId: user.id },
         select: { id: true },
       });
       if (!existing) throw notificationNotFound();

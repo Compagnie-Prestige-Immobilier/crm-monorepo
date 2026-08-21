@@ -1,15 +1,16 @@
 'use client';
 
-import { MenuIcon } from 'lucide-react';
+import { LayoutGridIcon, MenuIcon } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
-import { navTitle } from '@/components/layout/nav-items';
+import { HUB_PATH, navTitle } from '@/components/layout/nav-items';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { UserMenu } from '@/components/layout/user-menu';
 import { NotificationBell } from '@/components/notifications/notification-bell';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import type { SessionUser } from '@/lib/types';
 
@@ -57,6 +58,14 @@ export function Topbar({ user }: { user: SessionUser }) {
           client, rappels système) et l'agent BANQUE_FINANCE (réponse à ses
           demandes, dossiers sans mouvement). Celles d'un téléconseiller visent
           l'application mobile, et sa console n'en affiche aucune. */}
+      <Link
+        href={HUB_PATH}
+        className={buttonVariants({ variant: 'ghost', className: 'h-11 gap-2 px-3' })}
+      >
+        <LayoutGridIcon className="size-5" aria-hidden="true" />
+        <span className="hidden sm:block">Espaces</span>
+      </Link>
+
       {user.role === 'COMMERCIAL' ? null : <NotificationBell />}
       <ThemeToggle />
       <UserMenu user={user} />

@@ -14,7 +14,7 @@ import { ExportService } from '../export/export.service.js';
 import { ExportMode } from '../export/dto.js';
 import { PROSPECT_COLUMNS } from '../export/columns.js';
 import { ProspectsService } from './prospects.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
+import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
 
 const RUN = uuidv7().slice(0, 8);
 const DATABASE_URL = process.env.DATABASE_URL ?? readRootEnv();
@@ -29,9 +29,9 @@ function readRootEnv(): string {
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: DATABASE_URL }) });
 const service = prisma as unknown as PrismaService;
 
-const prospects = new ProspectsService(service, fakeDemoVisibility());
-const analytics = new AnalyticsService(service, fakeDemoVisibility());
-const exports = new ExportService(service, analytics, fakeDemoVisibility());
+const prospects = new ProspectsService(service);
+const analytics = new AnalyticsService(service);
+const exports = new ExportService(service, analytics, fakeWorkspace());
 
 let commercial: AuthenticatedUser;
 let autreCommercial: AuthenticatedUser;
@@ -207,7 +207,7 @@ beforeAll(async () => {
       segment: classifySegment({
         syndicatSigle: entry.sigle,
         banqueShortName: entry.shortName,
-      }),
+      }) as BddSegment,
     });
   }
 

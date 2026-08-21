@@ -5,6 +5,7 @@ import {
   BANK_STAGES,
   BANQUES_SENEGAL,
   CALL_OUTCOME_REASONS,
+  CANAUX_PROVENANCE,
   DEPARTEMENT_COUNT,
   PrismaClient,
   PrismaPg,
@@ -105,6 +106,18 @@ async function seedSyndicats(): Promise<void> {
     });
   }
   console.info(`  syndicats : ${String(SYNDICATS_SENEGAL.length)}`);
+}
+
+async function seedCanauxProvenance(): Promise<void> {
+  for (const canal of CANAUX_PROVENANCE) {
+    await prisma.canalProvenance.upsert({
+      where: { code: canal.code },
+      // Le `code` n'est jamais reecrit : il identifie le canal sur les fiches.
+      create: canal,
+      update: { label: canal.label, position: canal.position },
+    });
+  }
+  console.info(`  canaux de provenance : ${String(CANAUX_PROVENANCE.length)}`);
 }
 
 async function seedBankWorkflow(): Promise<void> {
@@ -241,6 +254,7 @@ async function main(): Promise<void> {
   await seedGeography();
   await seedBanques();
   await seedSyndicats();
+  await seedCanauxProvenance();
   await seedBankWorkflow();
   await seedCallOutcomes();
   await seedVisiteReferentiels();

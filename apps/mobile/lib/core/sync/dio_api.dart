@@ -87,12 +87,17 @@ class DioApi implements ApiPort {
   }
 
   @override
-  Future<PullPage> pull({String? cursor, int limit = 200}) async {
+  Future<PullPage> pull({
+    String? cursor,
+    int limit = 200,
+    required int payloadVersion,
+  }) async {
     return _guard('pull', () async {
       final Response<SyncPullResponseDto> response = await _sync
           .pullSyncChanges(
             since: cursor,
             limit: limit,
+            xCPIPayloadVersion: payloadVersion,
             extra: TimeoutProfile.read.extra,
           );
       final SyncPullResponseDto body = _body('pull', response);

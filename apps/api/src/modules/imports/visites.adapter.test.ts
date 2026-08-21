@@ -28,7 +28,6 @@ interface StoredVisite {
   timeKnown: boolean;
   visitorName: string;
   entrepriseId: string;
-  isDemo: boolean;
 }
 
 interface Store {
@@ -64,16 +63,13 @@ function fakeContext(store: Store, mode: ImportMode = ImportMode.DRY_RUN): Impor
     visiteObjet: { ...list(VISITE_OBJETS, 'obj'), create: refuseEcriture('objet') },
     visite: {
       findMany: (args: {
-        where: { visitedAt: { in: Date[] }; entrepriseId: { in: string[] }; isDemo: boolean };
+        where: { visitedAt: { in: Date[] }; entrepriseId: { in: string[] } };
       }) => {
         const instants = new Set(args.where.visitedAt.in.map((date) => date.getTime()));
         const entreprises = new Set(args.where.entrepriseId.in);
         return Promise.resolve(
           store.visites.filter(
-            (row) =>
-              row.isDemo === args.where.isDemo &&
-              instants.has(row.visitedAt.getTime()) &&
-              entreprises.has(row.entrepriseId),
+            (row) => instants.has(row.visitedAt.getTime()) && entreprises.has(row.entrepriseId),
           ),
         );
       },
@@ -359,21 +355,6 @@ describe('déduplication', () => {
     expect(outcome.errors[0]?.code).toBe(VisiteImportError.DEJA_AU_REGISTRE);
     expect(store.visites).toHaveLength(1);
   });
-
-  it('ne prend pas une visite de démonstration pour un doublon', async () => {
-    store.visites.push({
-      reference: 'V-2026-000900',
-      visitedAt: visiteInstant('2026-01-06', '11:08'),
-      timeKnown: true,
-      visitorName: 'MOUHAMED FALL',
-      entrepriseId: idOf('ent', 'CPI'),
-      isDemo: true,
-    });
-
-    const outcome = await adapter.writeChunk([ligne({}, 12)], fakeContext(store, ImportMode.APPLY));
-
-    expect(outcome.created).toBe(1);
-  });
 });
 
 describe('écriture', () => {
@@ -387,24 +368,6 @@ describe('écriture', () => {
     expect(store.visites).toEqual([]);
   });
 
-  it('numérote par année, et n’emprunte pas l’interrupteur de démonstration', async () => {
-    const ctx = fakeContext(store, ImportMode.APPLY);
-    await adapter.writeChunk(
-      [
-        accepted(adapter.parseRow(cells(), 12)),
-        accepted(adapter.parseRow(cells({ [H.date]: '45880', [H.nom]: 'AMADOU LO' }), 13)),
-      ],
-      ctx,
-    );
-
-    expect(store.visites.map((row) => row.reference).sort()).toEqual([
-      'V-2025-000001',
-      'V-2026-000001',
-    ]);
-    expect(store.visites.every((row) => !row.isDemo)).toBe(true);
-    expect(store.referentielsEcrits).toEqual([]);
-  });
-
   it('reprend la suite après le dernier rang déjà pris pour l’année', async () => {
     store.visites.push({
       reference: 'V-2026-000411',
@@ -412,7 +375,6 @@ describe('écriture', () => {
       timeKnown: false,
       visitorName: 'AUTRE PERSONNE',
       entrepriseId: idOf('ent', 'CPI'),
-      isDemo: false,
     });
 
     await adapter.writeChunk(

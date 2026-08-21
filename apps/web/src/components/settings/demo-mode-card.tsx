@@ -1,500 +1,85 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  CheckCircle2Icon,
-  FlaskConicalIcon,
-  InfoIcon,
-  LoaderIcon,
-  LockIcon,
-  ShieldCheckIcon,
-  SmartphoneIcon,
-  TriangleAlertIcon,
-} from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useId, useState } from 'react';
+import { FlaskConicalIcon, LoaderIcon, RotateCcwIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { QueryErrorState } from '@/components/query-error-state';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  canSubmitDisable,
-  canSubmitEnable,
-  DEMO_SEEDED_KINDS,
-  demoBreakdown,
-  demoControl,
-  disableDemoMode,
-  enableDemoMode,
-  fetchDemoStatus,
-  seededAtOrNull,
-  totalDemoRows,
-} from '@/lib/data/demo';
-import { formatDateTime, formatNumber } from '@/lib/format';
+import { fetchDemoStatus, resetDemoWorkspace } from '@/lib/data/demo';
+import { formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
+const LABELS = {
+  users: 'comptes',
+  representants: 'représentants',
+  prospects: 'prospects',
+  campaigns: 'campagnes',
+  bankCases: 'dossiers bancaires',
+} as const;
+
 export function DemoModeCard() {
   const queryClient = useQueryClient();
-  const router = useRouter();
-  const [confirming, setConfirming] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
-  const [confirmingEnable, setConfirmingEnable] = useState(false);
-  const confirmId = useId();
-
-  const status = useQuery({
-    queryKey: queryKeys.demoStatus,
-    queryFn: () => fetchDemoStatus(),
-  });
-
-  function afterToggle(): void {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.demoStatus });
-    void queryClient.invalidateQueries();
-    router.refresh();
-  }
-
-  const enable = useMutation({
-    mutationFn: () => enableDemoMode(),
+  const status = useQuery({ queryKey: queryKeys.demoStatus, queryFn: () => fetchDemoStatus() });
+  const reset = useMutation({
+    mutationFn: () => resetDemoWorkspace(),
     onSuccess: (next) => {
-      afterToggle();
-      setConfirmingEnable(false);
-      toast.success(
-        `Mode démonstration activé : ${formatNumber(totalDemoRows(next.counts))} lignes créées.`,
-      );
+      queryClient.setQueryData(queryKeys.demoStatus, next);
+      toast.success('Espace démo réinitialisé.');
     },
     onError: (error) => {
-      toastApiError(error, 'Activation impossible. Réessayez.');
+      toastApiError(error, 'Réinitialisation impossible. Réessayez.');
     },
   });
 
-  const disable = useMutation({
-    mutationFn: () => disableDemoMode(),
-    onSuccess: () => {
-      afterToggle();
-      setConfirming(false);
-      setConfirmed(false);
-      toast.success('Mode démonstration retiré. Les données réelles sont conservées.');
-    },
-    onError: (error) => {
-      toastApiError(error, 'Suppression impossible. Réessayez.');
-    },
-  });
-
-  if (status.isPending) return <DemoModeSkeleton />;
-
+  if (status.isPending) return null;
   if (status.isError) {
     return (
       <QueryErrorState
         error={status.error}
-        onRetry={() => {
-          void status.refetch();
-        }}
-        fallback="État du mode démonstration non chargé."
+        onRetry={() => void status.refetch()}
+        fallback="État de l’espace démo non chargé."
       />
     );
   }
 
-  const data = status.data;
-  const control = demoControl(data);
-  const seededAt = seededAtOrNull(data);
-  const breakdown = demoBreakdown(data.counts);
-  const total = totalDemoRows(data.counts);
-
   return (
-    <>
-      <Card className="animate-rise">
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="flex items-center gap-2">
-                <FlaskConicalIcon className="size-4" aria-hidden="true" />
-                Mode démonstration
-              </CardTitle>
-              <CardDescription>
-                Jeu de données complet&nbsp;: comptes, prospects, campagnes, dossiers bancaires.
-              </CardDescription>
-            </div>
-            <Badge variant={data.enabled ? 'warning' : 'secondary'}>
-              {data.enabled ? 'Actif' : 'Inactif'}
-            </Badge>
-          </div>
-        </CardHeader>
-
-        <CardContent className="flex flex-col gap-5">
-          {/* `role="status"` : l'état change après une mutation, hors du flux de
-              lecture. Sans annonce, un utilisateur de lecteur d'écran ne saurait
-              pas que la bascule a abouti. */}
-          <div role="status" className="flex flex-col gap-3">
-            {data.enabled ? (
-              <p className="text-[0.875rem]">
-                Jeu de démonstration en place
-                {seededAt !== null ? (
-                  <>
-                    , créé le{' '}
-                    <time dateTime={seededAt} className="font-[600]">
-                      {formatDateTime(seededAt)}
-                    </time>
-                  </>
-                ) : null}
-                . Un bandeau le signale sur tous les écrans.
-              </p>
-            ) : (
-              <p className="text-[0.875rem] text-muted-foreground">
-                Aucune donnée de démonstration.
-                {seededAt !== null ? (
-                  <>
-                    {' '}
-                    Dernier jeu créé le <time dateTime={seededAt}>{formatDateTime(seededAt)}</time>.
-                  </>
-                ) : null}
-              </p>
-            )}
-
-            {total > 0 ? (
-              <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {breakdown.map((row) => (
-                  <div
-                    key={row.label}
-                    className="flex items-baseline justify-between gap-2 rounded-md border border-border px-3 py-2"
-                  >
-                    <dt className="text-[0.8125rem] text-muted-foreground">{row.label}</dt>
-                    <dd className="font-[600] tabular-nums">{formatNumber(row.value)}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : null}
-          </div>
-
-          {control.kind === 'blocked' ? (
-            <p
-              role="status"
-              className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.8125rem] text-warning"
-            >
-              <InfoIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span>
-                <span className="font-[600]">Bascule indisponible sur cet environnement.</span>{' '}
-                {control.reason}
-              </span>
-            </p>
-          ) : control.kind === 'enable' ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                disabled={!canSubmitEnable({ status: data, pending: enable.isPending })}
-                onClick={() => {
-                  setConfirmingEnable(true);
-                }}
-              >
-                {enable.isPending ? (
-                  <>
-                    <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                    Création du jeu de démonstration…
-                  </>
-                ) : (
-                  <>
-                    <FlaskConicalIcon aria-hidden="true" />
-                    Activer le mode démonstration
-                  </>
-                )}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={disable.isPending}
-                onClick={() => {
-                  setConfirmed(false);
-                  setConfirming(true);
-                }}
-              >
-                <TriangleAlertIcon aria-hidden="true" />
-                Retirer les données de démonstration
-              </Button>
-              <p className="text-[0.75rem] text-muted-foreground">Confirmation requise.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/*
-        Confirmation de l'ACTIVATION.
-
-        Elle NOMME ce qui va être créé plutôt que de promettre « un jeu de
-        démonstration » : un administrateur doit savoir, avant de cliquer, que
-        des comptes, des prospects, des campagnes et des dossiers bancaires
-        fictifs vont apparaître dans les écrans de TOUS les rôles, et dans leurs
-        exports. Pas de case à cocher ici : l'action est entièrement réversible
-        (l'API tient le registre des lignes qu'elle a créées), et exiger le même
-        rituel que la suppression banaliserait celui de la suppression.
-
-        Elle annonce AUSSI la conséquence que l'opérateur ne peut pas deviner :
-        activer la démonstration passe TOUTE LA PLATEFORME en lecture seule,
-        pour tout le monde et pas seulement pour lui. Le contrat le dit sur
-        `DemoStatusDto.enabled` et sur la description d'`enableDemoMode` ; s'il
-        ne l'apprend qu'au premier 409 d'un collègue, la fonctionnalité se lit
-        comme une panne, et quelqu'un ouvre un ticket au lieu d'éteindre
-        l'interrupteur.
-      */}
-      <Dialog
-        open={confirmingEnable}
-        onOpenChange={(open) => {
-          if (!open && enable.isPending) return;
-          setConfirmingEnable(open);
-        }}
-      >
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Créer le jeu de démonstration ?</DialogTitle>
-            <DialogDescription>
-              Des lignes fictives vont être ajoutées à cette base, et toute la plateforme passera en
-              lecture seule pour tous les utilisateurs.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4">
-            <ul className="flex flex-col gap-1 rounded-md border border-border p-3 text-[0.875rem]">
-              {DEMO_SEEDED_KINDS.map((kind) => (
-                <li key={kind} className="text-muted-foreground">
-                  {kind}
-                </li>
-              ))}
-            </ul>
-
-            <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.875rem] text-warning">
-              <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span>
-                <span className="font-[600]">
-                  Les chiffres affichés ne seront plus des chiffres réels.
-                </span>{' '}
-                Un bandeau le signalera sur tous les écrans, et les classeurs exportés porteront la
-                mention «&nbsp;DEMONSTRATION&nbsp;» dans leur nom. Ne lancez pas cette bascule
-                pendant qu’une équipe travaille sur des données réelles.
-              </span>
-            </p>
-
-            {/*
-              LA conséquence que l'opérateur ne peut pas deviner.
-
-              Ce n'est pas un détail technique à ranger dans une infobulle : la
-              bascule qu'il s'apprête à faire suspend la saisie de TOUS ses
-              collègues, dans tout le pays, jusqu'à ce que quelqu'un la
-              rattrape. Elle est donc affirmée en toutes lettres, avant le
-              bouton, au même rang que la pollution des chiffres.
-
-              Les exceptions sont NOMMÉES juste après, et brièvement : sans
-              elles, « lecture seule » se lit comme « plus rien ne marche », et
-              un administrateur prudent n'ose plus lancer la démonstration.
-            */}
-            <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.875rem] text-warning">
-              <LockIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span>
-                <span className="font-[600]">
-                  Toute la plateforme passe en lecture seule, pour tous les utilisateurs.
-                </span>{' '}
-                Tant que le mode est actif, chaque création, modification et suppression est
-                refusée, pour tout le monde et pas seulement pour vous. Restent possibles&nbsp;: se
-                connecter, rebasculer ce réglage, la synchronisation mobile, et marquer une
-                notification comme lue.
-              </span>
-            </p>
-
-            {/*
-              LA phrase qui décide si la bascule sera lancée.
-
-              La crainte qu'elle lève est celle qui a dicté toute la conception
-              côté serveur : « et les saisies que mes équipes font sur le
-              terrain pendant ce temps, je les perds ? ». Non. La remontée hors
-              ligne du mobile n'est JAMAIS refusée, et ce qui arrive par ce
-              chemin est écrit `isDemo: false`, donc comme du travail réel qui
-              survit à l'extinction du mode. Sans cette phrase, personne
-              n'active la démonstration en journée, et la fonctionnalité ne sert
-              qu'après 20 h.
-            */}
-            <p className="flex items-start gap-2 rounded-md border border-success/30 bg-success-surface px-3 py-2.5 text-[0.875rem] text-success">
-              <SmartphoneIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span>
-                <span className="font-[600]">Le travail du terrain n’est pas affecté.</span> Les
-                saisies remontées par la synchronisation mobile pendant la démonstration sont
-                enregistrées comme des données réelles, jamais comme des données de démonstration,
-                et elles restent en place une fois le mode désactivé.
-              </span>
-            </p>
-
-            <p className="flex items-start gap-2 rounded-md border border-success/30 bg-success-surface px-3 py-2.5 text-[0.875rem] text-success">
-              <ShieldCheckIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span>
-                <span className="font-[600]">Réversible.</span> L’API enregistre chaque ligne
-                qu’elle crée et le retrait ne supprimera que celles-là. Le retrait rend aussi
-                l’écriture à toute la plateforme.
-              </span>
-            </p>
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={enable.isPending}
-              onClick={() => {
-                setConfirmingEnable(false);
-              }}
-            >
-              Annuler
-            </Button>
-            <Button
-              type="button"
-              disabled={!canSubmitEnable({ status: data, pending: enable.isPending })}
-              onClick={() => {
-                enable.mutate();
-              }}
-            >
-              {enable.isPending ? (
-                <>
-                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                  Création du jeu de démonstration…
-                </>
-              ) : (
-                <>
-                  <FlaskConicalIcon aria-hidden="true" />
-                  Créer le jeu de démonstration
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={confirming}
-        onOpenChange={(open) => {
-          if (!open && disable.isPending) return;
-          setConfirming(open);
-          if (!open) setConfirmed(false);
-        }}
-      >
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Retirer les données de démonstration ?</DialogTitle>
-            <DialogDescription>
-              {formatNumber(total)} ligne{total > 1 ? 's' : ''} de démonstration ser
-              {total > 1 ? 'ont' : 'a'} supprimée{total > 1 ? 's' : ''}.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4">
-            <ul className="flex flex-col gap-1 rounded-md border border-border p-3 text-[0.875rem]">
-              {breakdown.length === 0 ? (
-                <li className="text-muted-foreground">Aucune ligne enregistrée.</li>
-              ) : (
-                breakdown.map((row) => (
-                  <li key={row.label} className="flex items-baseline justify-between gap-3">
-                    <span className="text-muted-foreground">{row.label}</span>
-                    <span className="font-[600] tabular-nums">{formatNumber(row.value)}</span>
-                  </li>
-                ))
-              )}
-            </ul>
-
-            {/*
-              LA phrase qui décide si le bouton sera pressé.
-
-              Sans elle, un administrateur devant « 4 210 prospects seront
-              supprimés » se demande, légitimement, si les siens en font partie.
-              Il n'ose pas, le jeu de démonstration reste en place, et quelqu'un
-              finit par exporter des chiffres inventés. On affirme donc
-              explicitement le mécanisme : l'API enregistre chaque ligne qu'elle
-              crée et ne supprime QUE celles-là.
-            */}
-            <p className="flex items-start gap-2 rounded-md border border-success/30 bg-success-surface px-3 py-2.5 text-[0.875rem] text-success">
-              <ShieldCheckIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span>
-                <span className="font-[600]">Les données réelles ne sont pas supprimées.</span>{' '}
-                Seules les lignes créées par le mode démonstration le sont.
-              </span>
-            </p>
-
-            <label
-              htmlFor={confirmId}
-              className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-[0.875rem] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring"
-            >
-              <input
-                id={confirmId}
-                type="checkbox"
-                checked={confirmed}
-                disabled={disable.isPending}
-                className="mt-0.5 size-4 shrink-0 accent-[var(--destructive)]"
-                onChange={(event) => {
-                  setConfirmed(event.target.checked);
-                }}
-              />
-              <span>
-                Je confirme la suppression des {formatNumber(total)} lignes de démonstration.
-              </span>
-            </label>
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={disable.isPending}
-              onClick={() => {
-                setConfirming(false);
-              }}
-            >
-              Annuler
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={!canSubmitDisable({ status: data, confirmed, pending: disable.isPending })}
-              onClick={() => {
-                disable.mutate();
-              }}
-            >
-              {disable.isPending ? (
-                <>
-                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                  Suppression en cours…
-                </>
-              ) : (
-                <>
-                  <CheckCircle2Icon aria-hidden="true" />
-                  Supprimer définitivement
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-export function DemoModeSkeleton() {
-  return (
-    <Card aria-hidden="true">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FlaskConicalIcon className="size-4" aria-hidden="true" />
+          Espace démo
+        </CardTitle>
+        <CardDescription>
+          Le jeu est reconstruit par la factory à partir des référentiels et comptes actuels.
+        </CardDescription>
+      </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <Skeleton className="h-5 w-56" />
-        <Skeleton className="h-3 w-full max-w-lg" />
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2, 3, 4, 5].map((index) => (
-            <Skeleton key={index} className="h-11 w-full" />
+        <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries(status.data.counts).map(([key, value]) => (
+            <div key={key} className="flex justify-between rounded-md border px-3 py-2">
+              <dt className="text-muted-foreground">{LABELS[key as keyof typeof LABELS]}</dt>
+              <dd className="font-[600] tabular-nums">{formatNumber(value)}</dd>
+            </div>
           ))}
-        </div>
-        <Skeleton className="h-11 w-64" />
+        </dl>
+        <Button
+          type="button"
+          className="self-start"
+          disabled={reset.isPending}
+          onClick={() => {
+            reset.mutate();
+          }}
+        >
+          {reset.isPending ? (
+            <LoaderIcon className="animate-spin" aria-hidden="true" />
+          ) : (
+            <RotateCcwIcon aria-hidden="true" />
+          )}
+          Réinitialiser l’espace démo
+        </Button>
       </CardContent>
     </Card>
   );

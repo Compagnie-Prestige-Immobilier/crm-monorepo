@@ -3,6 +3,8 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/projet.dart';
+import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/call_outcome.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
@@ -53,6 +55,16 @@ class SyncEntityDataDto {
 
     this.profession,
 
+    this.etablissement,
+
+    this.projet,
+
+    this.type,
+
+    this.dureeSystemeMois,
+
+    this.canalProvenanceId,
+
     this.clientCreatedAt,
 
     this.prospectId,
@@ -66,6 +78,20 @@ class SyncEntityDataDto {
     this.comment,
 
     this.callbackAt,
+
+    this.visitorName,
+
+    this.visitDate,
+
+    this.visitTime,
+
+    this.entrepriseId,
+
+    this.objetId,
+
+    this.directionId,
+
+    this.destinataireId,
   });
 
   /// Représentant : nom complet.
@@ -133,9 +159,41 @@ class SyncEntityDataDto {
   @JsonKey(name: r'whatsappE164', required: false, includeIfNull: false)
   final String? whatsappE164;
 
-  /// Représentant : profession déclarée.
+  /// Profession déclarée. Sert au représentant comme au prospect.
   @JsonKey(name: r'profession', required: false, includeIfNull: false)
   final String? profession;
+
+  /// Représentant : l’établissement où il exerce. Ni l’IEF ni le département.
+  @JsonKey(name: r'etablissement', required: false, includeIfNull: false)
+  final String? etablissement;
+
+  /// Prospect : le projet dont il relève. CHUES par défaut côté serveur.
+  @JsonKey(
+    name: r'projet',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: Projet.unknownDefaultOpenApi,
+  )
+  final Projet? projet;
+
+  /// Prospect hors CHUES : ce qu’il est. Jamais obligatoire.
+  @JsonKey(
+    name: r'type',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: ProspectType.unknownDefaultOpenApi,
+  )
+  final ProspectType? type;
+
+  /// Prospect : durée du système de paiement, en MOIS.
+  // minimum: 1
+  // maximum: 600
+  @JsonKey(name: r'dureeSystemeMois', required: false, includeIfNull: false)
+  final num? dureeSystemeMois;
+
+  /// Prospect : canal de provenance, choisi dans le référentiel.
+  @JsonKey(name: r'canalProvenanceId', required: false, includeIfNull: false)
+  final String? canalProvenanceId;
 
   /// Horodatage de la saisie terrain.
   @JsonKey(name: r'clientCreatedAt', required: false, includeIfNull: false)
@@ -174,6 +232,34 @@ class SyncEntityDataDto {
   @JsonKey(name: r'callbackAt', required: false, includeIfNull: false)
   final DateTime? callbackAt;
 
+  /// Visite : nom et prénom du visiteur.
+  @JsonKey(name: r'visitorName', required: false, includeIfNull: false)
+  final String? visitorName;
+
+  /// Visite : jour, à Dakar.
+  @JsonKey(name: r'visitDate', required: false, includeIfNull: false)
+  final String? visitDate;
+
+  /// Visite : heure, omise si elle n’a pas été relevée.
+  @JsonKey(name: r'visitTime', required: false, includeIfNull: false)
+  final String? visitTime;
+
+  /// Visite : entreprise du visiteur.
+  @JsonKey(name: r'entrepriseId', required: false, includeIfNull: false)
+  final String? entrepriseId;
+
+  /// Visite : objet de la visite.
+  @JsonKey(name: r'objetId', required: false, includeIfNull: false)
+  final String? objetId;
+
+  /// Visite : direction ou étage visé.
+  @JsonKey(name: r'directionId', required: false, includeIfNull: false)
+  final String? directionId;
+
+  /// Visite : destinataire visé.
+  @JsonKey(name: r'destinataireId', required: false, includeIfNull: false)
+  final String? destinataireId;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SyncEntityDataDto &&
@@ -195,6 +281,11 @@ class SyncEntityDataDto {
                 whatsappStatus,
                 whatsappE164,
                 profession,
+                etablissement,
+                projet,
+                type,
+                dureeSystemeMois,
+                canalProvenanceId,
                 clientCreatedAt,
                 prospectId,
                 outcome,
@@ -202,6 +293,13 @@ class SyncEntityDataDto {
                 method,
                 comment,
                 callbackAt,
+                visitorName,
+                visitDate,
+                visitTime,
+                entrepriseId,
+                objetId,
+                directionId,
+                destinataireId,
               ],
               [
                 other.fullName,
@@ -219,6 +317,11 @@ class SyncEntityDataDto {
                 other.whatsappStatus,
                 other.whatsappE164,
                 other.profession,
+                other.etablissement,
+                other.projet,
+                other.type,
+                other.dureeSystemeMois,
+                other.canalProvenanceId,
                 other.clientCreatedAt,
                 other.prospectId,
                 other.outcome,
@@ -226,6 +329,13 @@ class SyncEntityDataDto {
                 other.method,
                 other.comment,
                 other.callbackAt,
+                other.visitorName,
+                other.visitDate,
+                other.visitTime,
+                other.entrepriseId,
+                other.objetId,
+                other.directionId,
+                other.destinataireId,
               ],
             );
   }
@@ -249,6 +359,11 @@ class SyncEntityDataDto {
         whatsappStatus,
         whatsappE164,
         profession,
+        etablissement,
+        projet,
+        type,
+        dureeSystemeMois,
+        canalProvenanceId,
         clientCreatedAt,
         prospectId,
         outcome,
@@ -256,6 +371,13 @@ class SyncEntityDataDto {
         method,
         comment,
         callbackAt,
+        visitorName,
+        visitDate,
+        visitTime,
+        entrepriseId,
+        objetId,
+        directionId,
+        destinataireId,
       ]);
 
   factory SyncEntityDataDto.fromJson(Map<String, dynamic> json) =>

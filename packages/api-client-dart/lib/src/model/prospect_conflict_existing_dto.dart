@@ -45,11 +45,11 @@ class ProspectConflictExistingDto {
   @JsonKey(name: r'prenom', required: true, includeIfNull: false)
   final String prenom;
 
-  @JsonKey(name: r'representantId', required: true, includeIfNull: false)
-  final String representantId;
+  @JsonKey(name: r'representantId', required: true, includeIfNull: true)
+  final String? representantId;
 
-  @JsonKey(name: r'representantName', required: true, includeIfNull: false)
-  final String representantName;
+  @JsonKey(name: r'representantName', required: true, includeIfNull: true)
+  final String? representantName;
 
   @JsonKey(name: r'ownedByCommercialId', required: true, includeIfNull: false)
   final String ownedByCommercialId;
