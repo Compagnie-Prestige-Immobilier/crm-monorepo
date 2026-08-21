@@ -222,6 +222,20 @@ describe('lecture', () => {
     )[0];
     expect(pendingArgs.where).toMatchObject({ status: ClientRequestStatus.PENDING });
   });
+
+  it('une recherche par nom ne devient pas un filtre téléphone vide qui accepte tout', async () => {
+    await service.list(ADMIN, { search: 'Fatou' });
+
+    const args = (
+      db.clientCreationRequest.findMany.mock.calls[0] as [
+        { where: { OR: Record<string, unknown>[] } },
+      ]
+    )[0];
+    expect(args.where.OR).toEqual([
+      { nom: { contains: 'Fatou', mode: 'insensitive' } },
+      { prenom: { contains: 'Fatou', mode: 'insensitive' } },
+    ]);
+  });
 });
 
 describe('approbation', () => {

@@ -65,7 +65,11 @@ export class NotificationTemplatesService {
   }
 
   async update(id: string, body: UpdateNotificationTemplateDto): Promise<NotificationTemplateDto> {
-    if (body.route !== undefined && !ROUTE_PATTERN.test(body.route)) throw routeInvalid();
+    // La chaine vide passe : elle EFFACE le lien, elle ne le remplace pas par
+    // une route invalide.
+    if (body.route !== undefined && body.route !== '' && !ROUTE_PATTERN.test(body.route)) {
+      throw routeInvalid();
+    }
 
     const current = await this.findVisible(id);
 
@@ -79,7 +83,8 @@ export class NotificationTemplatesService {
           ...(body.name !== undefined ? { name: body.name.trim() } : {}),
           ...(body.category !== undefined ? { category: body.category } : {}),
           ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
-          ...(body.route !== undefined ? { route: body.route } : {}),
+          // Meme regle que le departement d'un compte : le vide efface.
+        ...(body.route !== undefined ? { route: body.route === '' ? null : body.route } : {}),
           titleTemplate,
           bodyTemplate,
           variables: mergedVariables(titleTemplate, bodyTemplate),

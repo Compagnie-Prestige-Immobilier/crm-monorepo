@@ -143,6 +143,7 @@ export class ClientRequestsService {
       user.role === Role.ADMIN ? {} : { requestedById: user.id };
 
     const search = query.search?.trim();
+    const phoneDigits = search?.replace(/\D/g, '') ?? '';
     const where: Prisma.ClientCreationRequestWhereInput = {
       ...scope,
       ...demoScope(demoEnabled),
@@ -153,7 +154,7 @@ export class ClientRequestsService {
             OR: [
               { nom: { contains: search, mode: 'insensitive' } },
               { prenom: { contains: search, mode: 'insensitive' } },
-              { phoneE164: { contains: search.replace(/[^\d+]/g, '') } },
+              ...(phoneDigits.length >= 4 ? [{ phoneE164: { contains: phoneDigits } }] : []),
             ],
           }
         : {}),

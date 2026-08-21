@@ -200,7 +200,22 @@ export class ReferentielsService {
 
   async updateSyndicat(id: string, input: UpdateSyndicatDto): Promise<SyndicatDto> {
     await this.assertExists('syndicat', id);
-    return toSyndicat(await this.prisma.syndicat.update({ where: { id }, data: input }));
+    return toSyndicat(
+      await this.prisma.syndicat.update({
+        where: { id },
+        // La chaine vide EFFACE le secteur au lieu de le stocker vide : l'ecran
+        // rend « aucun » sur `null`, pas sur `''`. Champ par champ et non par
+        // etalement : `input` est une instance de classe, l'etaler perd son
+        // prototype.
+        data: {
+          ...(input.name === undefined ? {} : { name: input.name }),
+          ...(input.sigle === undefined ? {} : { sigle: input.sigle }),
+          ...(input.sortOrder === undefined ? {} : { sortOrder: input.sortOrder }),
+          ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
+          ...(input.secteur === undefined ? {} : { secteur: input.secteur === '' ? null : input.secteur }),
+        },
+      }),
+    );
   }
 
   async createDepartement(input: CreateDepartementDto): Promise<DepartementDto> {

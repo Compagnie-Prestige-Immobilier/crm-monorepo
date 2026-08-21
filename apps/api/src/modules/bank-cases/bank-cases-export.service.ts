@@ -67,10 +67,14 @@ export class BankCasesExportService {
    * Le filtre est celui de la liste, mot pour mot : l'agent exporte exactement
    * ce qu'il voit à l'écran.
    */
-  async write(filter: BankCaseFilterDto, stream: Writable): Promise<void> {
+  async write(
+    filter: BankCaseFilterDto,
+    stream: Writable,
+    currentDemoEnabled?: boolean,
+  ): Promise<void> {
     // Lu UNE fois pour tout le classeur : une bascule survenue en cours
     // d'export laisserait sinon une feuille avertie et l'autre muette.
-    const demoEnabled = await this.demo.enabled();
+    const demoEnabled = currentDemoEnabled ?? (await this.demo.enabled());
 
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
     markWorkbook(workbook, demoEnabled);

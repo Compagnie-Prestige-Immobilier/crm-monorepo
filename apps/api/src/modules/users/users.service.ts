@@ -151,7 +151,12 @@ export class UsersService {
         ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
         ...(input.role ? { role: input.role } : {}),
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
-        ...(input.departementId !== undefined ? { departementId: input.departementId } : {}),
+        // La chaine VIDE efface, l'absence ne change rien. Sans cette
+        // distinction, « Aucun » cote panneau ne pouvait que taire le champ, et
+        // un departement pose par erreur ne se retirait jamais.
+        ...(input.departementId !== undefined
+          ? { departementId: input.departementId === '' ? null : input.departementId }
+          : {}),
         ...(input.phone !== undefined
           ? { phoneE164: input.phone ? normalizePhone(input.phone) : null }
           : {}),
