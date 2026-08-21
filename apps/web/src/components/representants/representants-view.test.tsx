@@ -58,7 +58,7 @@ describe('RepresentantsView, état vide', () => {
   });
 
   it('sans aucun critère, ne renvoie PAS retirer un filtre inexistant', async () => {
-    setUrl('/representants');
+    setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister />);
 
     expect(await screen.findByText('Aucun représentant enregistré.')).toBeTruthy();
@@ -66,14 +66,14 @@ describe('RepresentantsView, état vide', () => {
   });
 
   it('sans aucun critère, dit d’où viennent les fiches', async () => {
-    setUrl('/representants');
+    setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister />);
 
     expect(await screen.findByText(/saisies en tournée depuis le mobile/)).toBeTruthy();
   });
 
   it('rend son état vide en dehors du tableau, pour qu’il survive au petit écran', async () => {
-    setUrl('/representants');
+    setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister />);
 
     const message = await screen.findByText('Aucun représentant enregistré.');
@@ -81,7 +81,7 @@ describe('RepresentantsView, état vide', () => {
   });
 
   it('avec un critère actif, invite bien à l’élargir', async () => {
-    setUrl('/representants?search=Ndeye');
+    setUrl('/chues/representants?search=Ndeye');
     renderWithQuery(<RepresentantsView canAdminister />);
 
     expect(
@@ -92,7 +92,7 @@ describe('RepresentantsView, état vide', () => {
   });
 
   it('ne propose l’import Excel qu’aux administrateurs', async () => {
-    setUrl('/representants');
+    setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister={false} />);
 
     expect(await screen.findByText('Aucun représentant enregistré.')).toBeTruthy();
@@ -106,7 +106,7 @@ describe('RepresentantsView, repli en carte', () => {
   });
 
   it('rend chaque représentant DEUX fois : en ligne de tableau et en carte', async () => {
-    setUrl('/representants');
+    setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister />);
 
     const noms = await screen.findAllByText('Ndeye Fall');
@@ -116,7 +116,7 @@ describe('RepresentantsView, repli en carte', () => {
   });
 
   it('la carte porte les mêmes champs que la ligne, sans en perdre un seul', async () => {
-    setUrl('/representants');
+    setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister />);
 
     await screen.findAllByText('Ndeye Fall');
@@ -138,7 +138,7 @@ describe('RepresentantsView vue par un SUPERVISEUR', () => {
   });
 
   it('affiche les fiches, et AUCUN geste que l’API lui refuserait', async () => {
-    setUrl('/representants');
+    setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister={false} readOnly />);
 
     await screen.findAllByText('Ndeye Fall');
@@ -150,7 +150,7 @@ describe('RepresentantsView vue par un SUPERVISEUR', () => {
   });
 
   it('un téléconseiller, lui, garde la saisie et l’export', async () => {
-    setUrl('/representants');
+    setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister={false} />);
 
     expect(await screen.findByRole('button', { name: 'Nouveau représentant' })).toBeTruthy();
@@ -191,7 +191,7 @@ describe('RepresentantsView, état de la relation', () => {
         pageCount: 1,
       }),
     );
-    setUrl('/representants');
+    setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister />);
 
     const table = (await screen.findAllByRole('table'))[0];
@@ -220,11 +220,11 @@ describe('RepresentantsView, état de la relation', () => {
         pageCount: 1,
       }),
     );
-    setUrl('/representants');
+    setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister />);
 
     const liens = await screen.findAllByRole('link', { name: 'Awa Ba' });
-    expect(liens[0]?.getAttribute('href')).toBe('/representants/r-9');
+    expect(liens[0]?.getAttribute('href')).toBe('/chues/representants/r-9');
   });
 
   it('compte les ambassadeurs de la sélection, sur le total et non sur la page', async () => {
@@ -235,7 +235,7 @@ describe('RepresentantsView, état de la relation', () => {
           : { items: [fiche('r-1', 'Ndeye Fall', 'CONTACTE')], total: 900, page: 1, pageCount: 36 },
       ),
     );
-    setUrl('/representants');
+    setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister />);
 
     expect(await screen.findByText(/dont 143 ambassadeurs/u)).toBeTruthy();
@@ -250,7 +250,7 @@ describe('RepresentantsView, état de la relation', () => {
         pageCount: 6,
       }),
     );
-    setUrl('/representants?relationStatus=AMBASSADEUR');
+    setUrl('/chues/representants?relationStatus=AMBASSADEUR');
     renderWithQuery(<RepresentantsView canAdminister />);
 
     await screen.findAllByText('Awa Ba');

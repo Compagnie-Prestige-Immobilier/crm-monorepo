@@ -3,7 +3,6 @@ import { SuggestionStatus } from '@crm/database';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { shortCode } from '../../common/short-code.js';
 import { SuggestionsService } from './suggestions.service.js';
 
@@ -41,8 +40,8 @@ function stub(): MockDb {
   };
 }
 
-const build = (db: MockDb, demoEnabled = false): SuggestionsService =>
-  new SuggestionsService(db as unknown as PrismaService, fakeDemoVisibility(demoEnabled));
+const build = (db: MockDb): SuggestionsService =>
+  new SuggestionsService(db as unknown as PrismaService);
 
 describe('SuggestionsService : liste', () => {
   it('désigne le représentant source par son code court, jamais par son nom', async () => {
@@ -68,19 +67,8 @@ describe('SuggestionsService : liste', () => {
       .where;
     expect(where).toMatchObject({
       deletedAt: null,
-      isDemo: false,
       status: SuggestionStatus.A_APPELER,
     });
-  });
-
-  it('MONTRE les lignes fictives quand le mode est allumé', async () => {
-    const db = stub();
-
-    await build(db, true).list({});
-
-    const where = (db.representantSuggestion.findMany.mock.calls[0] as [{ where: unknown }])[0]
-      .where;
-    expect(where).not.toHaveProperty('isDemo');
   });
 
   it('pagine sur la page demandée', async () => {
@@ -106,7 +94,7 @@ describe('SuggestionsService : bascule de statut', () => {
         { where: Record<string, unknown>; data: Record<string, unknown> },
       ]
     )[0];
-    expect(call.where).toMatchObject({ id: 'sug-1', deletedAt: null, isDemo: false });
+    expect(call.where).toMatchObject({ id: 'sug-1', deletedAt: null });
     expect(call.data).toEqual({ status: SuggestionStatus.APPELE });
     expect(result.status).toBe(SuggestionStatus.APPELE);
   });

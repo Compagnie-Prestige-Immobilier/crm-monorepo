@@ -111,7 +111,7 @@ export function RepCampaignsView({ canManage }: { canManage: boolean }) {
                               sélection de texte et n'annonce aucun nom
                               accessible utile. */}
                           <Link
-                            href={`/campagnes/representants/${campaign.id}`}
+                            href={`/chues/campagnes/representants/${campaign.id}`}
                             className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                           >
                             {campaign.name}

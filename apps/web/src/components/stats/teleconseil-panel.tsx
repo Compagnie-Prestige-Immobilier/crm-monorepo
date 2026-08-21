@@ -12,6 +12,7 @@ import {
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
 import { QueryErrorState } from '@/components/query-error-state';
+import { AmbassadorConversionCard } from '@/components/stats/ambassador-conversion-card';
 import { DelaysStrip, PortfolioBlocks } from '@/components/stats/portfolio-blocks';
 import {
   StatChartCard,
@@ -205,6 +206,7 @@ export function TeleconseilPanel() {
           rafraîchissement continu ci-dessus multiplierait la charge SQL pour
           des chiffres qui ne bougent pas à la minute. */}
       <DelaysStrip />
+      <AmbassadorConversionCard />
       <PortfolioBlocks />
     </div>
   );

@@ -39,9 +39,9 @@ export const VisiteReferentielKindEnum: Readonly<
   objets: 'objets',
 };
 
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+export const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const CODE_PATTERN = /^[A-Z0-9_]+$/;
 
 export class VisiteReferentielDto {

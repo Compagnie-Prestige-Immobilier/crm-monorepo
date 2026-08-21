@@ -23,6 +23,7 @@
     "db:deploy": "pnpm --filter @crm/database db:deploy",
     "db:studio": "pnpm --filter @crm/database db:studio",
     "db:seed": "pnpm --filter @crm/database db:seed",
+    "db:seed:demo": "pnpm --filter @crm/database db:seed:demo",
     "db:reset": "pnpm --filter @crm/database db:reset",
     "openapi:generate": "pnpm --filter @crm/api openapi:generate",
     "mobile:client:generate": "node tools/dev/generate-dart-client.mjs",

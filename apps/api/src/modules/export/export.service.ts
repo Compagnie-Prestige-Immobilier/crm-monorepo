@@ -16,14 +16,25 @@ import { EXPORT_INCLUDE, PROSPECT_COLUMNS, cellValue } from './columns.js';
 import type { ExportRow } from './columns.js';
 import { CONSOLIDATED_SHEET, ExportMode } from './dto.js';
 import { markWorkbook, writeDemoWarningRow } from './demo-marking.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { CPI_BURGUNDY_ARGB } from '../../common/brand.js';
 import {
   ENROLLMENT_METHOD_TOKENS,
   PROSPECTS_IMPORT_COLUMNS,
   PROSPECTS_IMPORT_SHEET_NAME,
 } from '../imports/prospects-import-template.js';
-import { COMMON_TEMPLATE_RULES, writeImportTemplate } from './import-template.workbook.js';
+import {
+  FONCTIONNAIRE_CHOICES,
+  GRAND_PUBLIC_IMPORT_COLUMNS,
+  GRAND_PUBLIC_IMPORT_HEADERS,
+  GRAND_PUBLIC_SHEET_NAME,
+} from '../imports/prospects-grand-public-template.js';
+import {
+  COLUMNS_BY_HEADER_RULE,
+  COLUMNS_BY_POSITION_RULE,
+  COMMON_TEMPLATE_RULES,
+  writeImportTemplate,
+} from './import-template.workbook.js';
 
 /** ARGB sans le dièse : exceljs n'accepte pas la notation CSS. */
 const CPI_BURGUNDY = CPI_BURGUNDY_ARGB;
@@ -54,7 +65,7 @@ export class ExportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly analytics: AnalyticsService,
-    private readonly demo: DemoVisibilityService,
+    private readonly demo: WorkspaceContext,
   ) {}
 
   /** Banque et Syndicat sont des listes, pas du texte libre : leur croisement est le segment BDD. */
@@ -91,6 +102,66 @@ export class ExportService {
     });
   }
 
+  /** Grand Public : seuls le nom et le téléphone sont exigés, tout le reste peut rester vide. */
+  async writeProspectsGrandPublicImportTemplate(stream: Writable): Promise<void> {
+    const [banques, syndicats, canaux] = await Promise.all([
+      this.prisma.banque.findMany({
+        where: { isActive: true },
+        select: { shortName: true },
+        orderBy: [{ sortOrder: 'asc' }, { shortName: 'asc' }],
+      }),
+      this.prisma.syndicat.findMany({
+        where: { isActive: true },
+        select: { sigle: true },
+        orderBy: [{ sortOrder: 'asc' }, { sigle: 'asc' }],
+      }),
+      // Même ordre que `ProspectsGrandPublicImportAdapter.prepare`, qui énumère
+      // les valeurs admises dans ses messages de refus.
+      this.prisma.canalProvenance.findMany({
+        where: { isActive: true },
+        select: { label: true },
+        orderBy: [{ position: 'asc' }, { label: 'asc' }],
+      }),
+    ]);
+
+    const rankOf = (header: string): number =>
+      GRAND_PUBLIC_IMPORT_COLUMNS.findIndex((column) => column.header === header) + 1;
+
+    await writeImportTemplate(stream, {
+      sheetName: GRAND_PUBLIC_SHEET_NAME,
+      columns: GRAND_PUBLIC_IMPORT_COLUMNS,
+      dropdowns: [
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.syndicat),
+          label: 'Syndicats',
+          values: syndicats.map((row) => row.sigle),
+        },
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.banque),
+          label: 'Banques',
+          values: banques.map((row) => row.shortName),
+        },
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.fonctionnaire),
+          label: 'Fonctionnaire',
+          values: [...FONCTIONNAIRE_CHOICES],
+        },
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.canal),
+          label: 'Canaux de provenance',
+          values: canaux.map((row) => row.label),
+        },
+      ],
+      rules: [
+        COLUMNS_BY_HEADER_RULE,
+        ...COMMON_TEMPLATE_RULES.filter((rule) => rule !== COLUMNS_BY_POSITION_RULE),
+        'Seuls le Nom et le Téléphone sont exigés. Une cellule vide n’est pas une erreur : c’est une information qu’on n’a pas encore, et la ligne est écrite quand même.',
+        'Le téléphone est la clé de déduplication, tous projets confondus : un numéro déjà porté par une fiche, CHUES comprise, est signalé et non écrit.',
+        '« Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE. À « non », le type reste VIDE : le fichier ne dit pas s’il s’agit du secteur privé, de l’informel ou de la diaspora, et rien ne se devine ici.',
+      ],
+    });
+  }
+
   /** `WorkbookWriter` + pagination keyset : le classeur n'est jamais materialise en memoire. */
   async writeProspects(
     user: AuthenticatedUser,
@@ -100,7 +171,7 @@ export class ExportService {
   ): Promise<void> {
     // Lu UNE fois pour tout le classeur : une bascule en cours d'export marquerait
     // une feuille et pas l'autre.
-    const demoEnabled = await this.demo.enabled();
+    const demoEnabled = this.demo.current() === 'demo';
 
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
     markWorkbook(workbook, demoEnabled);
@@ -120,7 +191,7 @@ export class ExportService {
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
     demoEnabled: boolean,
   ): Promise<void> {
-    const where = buildProspectWhere(user, filter, demoEnabled);
+    const where = buildProspectWhere(user, filter);
     const { rows: total, representants } = await this.writeProspectSheet(
       workbook,
       'Prospects',
@@ -243,7 +314,7 @@ export class ExportService {
     await this.writeProspectSheet(
       workbook,
       CONSOLIDATED_SHEET,
-      buildProspectWhere(user, filterForSegment(filter, undefined), demoEnabled),
+      buildProspectWhere(user, filterForSegment(filter, undefined)),
       demoEnabled,
     );
 
@@ -251,7 +322,7 @@ export class ExportService {
       await this.writeProspectSheet(
         workbook,
         segment,
-        buildProspectWhere(user, filterForSegment(filter, segment), demoEnabled),
+        buildProspectWhere(user, filterForSegment(filter, segment)),
         demoEnabled,
       );
     }
@@ -294,17 +365,22 @@ export class ExportService {
           .commit();
         rows += 1;
 
-        const known = representants.get(row.representant.id);
-        if (known) known.prospects += 1;
-        else {
-          representants.set(row.representant.id, {
-            fullName: row.representant.fullName,
-            phoneE164: row.representant.phoneE164,
-            departement: row.representant.departement.name,
-            commercial: row.representant.createdBy.fullName,
-            clientCreatedAt: row.representant.clientCreatedAt,
-            prospects: 1,
-          });
+        // Une fiche sans representant ne peuple pas l'onglet Representants : il
+        // n'y a personne a y nommer. Elle reste comptee dans l'onglet Prospects.
+        const representant = row.representant;
+        if (representant) {
+          const known = representants.get(representant.id);
+          if (known) known.prospects += 1;
+          else {
+            representants.set(representant.id, {
+              fullName: representant.fullName,
+              phoneE164: representant.phoneE164,
+              departement: representant.departement.name,
+              commercial: representant.createdBy.fullName,
+              clientCreatedAt: representant.clientCreatedAt,
+              prospects: 1,
+            });
+          }
         }
       }
       if (page.length < PAGE_SIZE) break;

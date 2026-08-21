@@ -25,20 +25,8 @@ export const closedAtLateral = (caseAlias: Prisma.Sql): Prisma.Sql => Prisma.sql
   ) cl ON TRUE
 `;
 
-export function bankCaseConditions(filter: BankCaseFilterDto, demoEnabled: boolean): Prisma.Sql {
+export function bankCaseConditions(filter: BankCaseFilterDto): Prisma.Sql {
   const conditions: Prisma.Sql[] = [Prisma.sql`c."deletedAt" IS NULL`];
-
-  // Le dossier ET son client : un dossier réel accroché à un prospect fictif est
-  // fictif. `NOT EXISTS` car toutes les requêtes appelantes ne joignent pas `prospects`.
-  if (!demoEnabled) {
-    conditions.push(Prisma.sql`c."isDemo" = FALSE`);
-    conditions.push(
-      Prisma.sql`NOT EXISTS (
-        SELECT 1 FROM "prospects" dp
-        WHERE dp."id" = c."prospectId" AND dp."isDemo" = TRUE
-      )`,
-    );
-  }
 
   if (filter.stageId) conditions.push(Prisma.sql`c."currentStageId" = ${filter.stageId}`);
   if (filter.stageType) {

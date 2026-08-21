@@ -18,12 +18,12 @@ import type {
   UserListDto,
   UserListQueryDto,
 } from './dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 
 type UserRow = Prisma.UserGetPayload<{
   include: { departement: { select: { name: true } }; _count: { select: { prospects: true } } };
 }>;
+
+type UserChanges = UpdateUserDto & Partial<SetActiveDto>;
 
 const INCLUDE = {
   departement: { select: { name: true } },
@@ -49,10 +49,7 @@ function toDto(user: UserRow): UserDto {
 
 @Injectable()
 export class UsersService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async list(query: UserListQueryDto): Promise<UserListDto> {
     const page = query.page ?? 1;
@@ -60,7 +57,6 @@ export class UsersService {
 
     const where: Prisma.UserWhereInput = {
       deletedAt: null,
-      ...demoScope(await this.demo.enabled()),
     };
     if (query.role) where.role = query.role;
     if (query.isActive !== undefined) where.isActive = query.isActive;
@@ -112,22 +108,16 @@ export class UsersService {
         role: input.role ?? Role.COMMERCIAL,
         ...(input.departementId ? { departementId: input.departementId } : {}),
         ...(input.phone ? { phoneE164: normalizePhone(input.phone) } : {}),
-        // Un compte est une racine : rien dont hériter, l'interrupteur décide
-        // seul.
-        //
-        // L'asymétrie est ce qui rendait l'omission visible : `list()`
-        // cloisonne DÉJÀ par `demoScope`. Le compte ouvert pendant une
-        // démonstration disparaissait donc de l'écran qui aurait permis de le
-        // voir, tout en restant en base et connectable.
-        isDemo: await this.demo.enabledForWrite(),
       },
       include: INCLUDE,
     });
     return toDto(user);
   }
 
-  async update(id: string, input: UpdateUserDto): Promise<UserDto> {
-    const existing = await this.prisma.user.findFirst({ where: { id, deletedAt: null } });
+  async update(id: string, input: UserChanges): Promise<UserDto> {
+    const existing = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!existing) {
       throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'Compte introuvable.' });
     }
@@ -147,7 +137,12 @@ export class UsersService {
         ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
         ...(input.role ? { role: input.role } : {}),
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
-        ...(input.departementId !== undefined ? { departementId: input.departementId } : {}),
+        // La chaine VIDE efface, l'absence ne change rien. Sans cette
+        // distinction, « Aucun » cote panneau ne pouvait que taire le champ, et
+        // un departement pose par erreur ne se retirait jamais.
+        ...(input.departementId !== undefined
+          ? { departementId: input.departementId === '' ? null : input.departementId }
+          : {}),
         ...(input.phone !== undefined
           ? { phoneE164: input.phone ? normalizePhone(input.phone) : null }
           : {}),
@@ -184,7 +179,9 @@ export class UsersService {
   }
 
   async resetPassword(id: string, input: ResetPasswordDto): Promise<{ ok: boolean }> {
-    const existing = await this.prisma.user.findFirst({ where: { id, deletedAt: null } });
+    const existing = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!existing) {
       throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'Compte introuvable.' });
     }
@@ -205,7 +202,9 @@ export class UsersService {
         message: 'Un administrateur ne peut pas supprimer son propre compte.',
       });
     }
-    const existing = await this.prisma.user.findFirst({ where: { id, deletedAt: null } });
+    const existing = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!existing) {
       throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'Compte introuvable.' });
     }
@@ -229,12 +228,6 @@ export class UsersService {
     });
   }
 
-  /**
-   * LECTURE GLOBALE délibérée : l'unicité de l'e-mail et de l'identifiant est
-   * globale en base. Filtrée, elle laisserait créer un compte réel portant
-   * l'identifiant d'un compte de démonstration, et la contrainte le refuserait
-   * ensuite sans que l'administrateur comprenne quel compte le lui prend.
-   */
   private async assertIdentifiersFree(email?: string, username?: string): Promise<void> {
     const or: Prisma.UserWhereInput[] = [];
     if (email) or.push({ email: email.trim().toLowerCase() });

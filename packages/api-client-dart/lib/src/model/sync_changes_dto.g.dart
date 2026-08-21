@@ -19,6 +19,12 @@ abstract class _$SyncChangesDtoCWProxy {
 
   SyncChangesDto prospects(List<ProspectDto> prospects);
 
+  SyncChangesDto callCampaigns(List<SyncCallCampaignDto> callCampaigns);
+
+  SyncChangesDto callTasks(List<SyncCallTaskDto> callTasks);
+
+  SyncChangesDto visites(List<SyncVisiteDto> visites);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncChangesDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -32,6 +38,9 @@ abstract class _$SyncChangesDtoCWProxy {
     List<SyndicatDto> syndicats,
     List<RepresentantDto> representants,
     List<ProspectDto> prospects,
+    List<SyncCallCampaignDto> callCampaigns,
+    List<SyncCallTaskDto> callTasks,
+    List<SyncVisiteDto> visites,
   });
 }
 
@@ -64,6 +73,17 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
       this(prospects: prospects);
 
   @override
+  SyncChangesDto callCampaigns(List<SyncCallCampaignDto> callCampaigns) =>
+      this(callCampaigns: callCampaigns);
+
+  @override
+  SyncChangesDto callTasks(List<SyncCallTaskDto> callTasks) =>
+      this(callTasks: callTasks);
+
+  @override
+  SyncChangesDto visites(List<SyncVisiteDto> visites) => this(visites: visites);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncChangesDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -77,6 +97,9 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
     Object? syndicats = const $CopyWithPlaceholder(),
     Object? representants = const $CopyWithPlaceholder(),
     Object? prospects = const $CopyWithPlaceholder(),
+    Object? callCampaigns = const $CopyWithPlaceholder(),
+    Object? callTasks = const $CopyWithPlaceholder(),
+    Object? visites = const $CopyWithPlaceholder(),
   }) {
     return SyncChangesDto(
       departements: departements == const $CopyWithPlaceholder()
@@ -103,6 +126,18 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
           ? _value.prospects
           // ignore: cast_nullable_to_non_nullable
           : prospects as List<ProspectDto>,
+      callCampaigns: callCampaigns == const $CopyWithPlaceholder()
+          ? _value.callCampaigns
+          // ignore: cast_nullable_to_non_nullable
+          : callCampaigns as List<SyncCallCampaignDto>,
+      callTasks: callTasks == const $CopyWithPlaceholder()
+          ? _value.callTasks
+          // ignore: cast_nullable_to_non_nullable
+          : callTasks as List<SyncCallTaskDto>,
+      visites: visites == const $CopyWithPlaceholder()
+          ? _value.visites
+          // ignore: cast_nullable_to_non_nullable
+          : visites as List<SyncVisiteDto>,
     );
   }
 }
@@ -128,6 +163,9 @@ SyncChangesDto _$SyncChangesDtoFromJson(Map<String, dynamic> json) =>
           'syndicats',
           'representants',
           'prospects',
+          'callCampaigns',
+          'callTasks',
+          'visites',
         ],
       );
       final val = SyncChangesDto(
@@ -167,6 +205,26 @@ SyncChangesDto _$SyncChangesDtoFromJson(Map<String, dynamic> json) =>
               .map((e) => ProspectDto.fromJson(e as Map<String, dynamic>))
               .toList(),
         ),
+        callCampaigns: $checkedConvert(
+          'callCampaigns',
+          (v) => (v as List<dynamic>)
+              .map(
+                (e) => SyncCallCampaignDto.fromJson(e as Map<String, dynamic>),
+              )
+              .toList(),
+        ),
+        callTasks: $checkedConvert(
+          'callTasks',
+          (v) => (v as List<dynamic>)
+              .map((e) => SyncCallTaskDto.fromJson(e as Map<String, dynamic>))
+              .toList(),
+        ),
+        visites: $checkedConvert(
+          'visites',
+          (v) => (v as List<dynamic>)
+              .map((e) => SyncVisiteDto.fromJson(e as Map<String, dynamic>))
+              .toList(),
+        ),
       );
       return val;
     });
@@ -179,4 +237,7 @@ Map<String, dynamic> _$SyncChangesDtoToJson(SyncChangesDto instance) =>
       'syndicats': instance.syndicats.map((e) => e.toJson()).toList(),
       'representants': instance.representants.map((e) => e.toJson()).toList(),
       'prospects': instance.prospects.map((e) => e.toJson()).toList(),
+      'callCampaigns': instance.callCampaigns.map((e) => e.toJson()).toList(),
+      'callTasks': instance.callTasks.map((e) => e.toJson()).toList(),
+      'visites': instance.visites.map((e) => e.toJson()).toList(),
     };

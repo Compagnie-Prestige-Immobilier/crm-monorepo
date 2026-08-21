@@ -1,5 +1,6 @@
 import { createParamDecorator, type ExecutionContext } from '@nestjs/common';
 import type { Role } from '@crm/database';
+import type { Workspace } from '../../workspaces/workspace.js';
 
 export interface AuthenticatedUser {
   readonly id: string;
@@ -7,6 +8,7 @@ export interface AuthenticatedUser {
   readonly username: string;
   readonly fullName: string;
   readonly role: Role;
+  readonly workspace?: Workspace;
 }
 
 export const CurrentUser = createParamDecorator(

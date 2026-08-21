@@ -84,7 +84,7 @@ export function CampaignCreateDialog({
       );
       reset();
       onOpenChange(false);
-      router.push(`/campagnes/${campaign.id}`);
+      router.push(`/chues/campagnes/${campaign.id}`);
     },
     onError: (error) => {
       toastApiError(error, 'La campagne n’a pas pu être créée.');

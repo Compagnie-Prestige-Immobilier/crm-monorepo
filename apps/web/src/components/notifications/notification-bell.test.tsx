@@ -26,7 +26,7 @@ const item = (over: Partial<Record<string, unknown>> = {}) => ({
   title: 'Demande de création à arbitrer',
   body: 'Une banque a déposé une demande.',
   category: 'DOSSIER',
-  route: '/demandes-clients',
+  route: '/chues/demandes-clients',
   isRead: false,
   readAt: null,
   createdAt: '2026-08-13T09:00:00.000Z',
@@ -87,7 +87,7 @@ describe('NotificationBell', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Notifications/ }));
 
     const all = await screen.findByRole('link', { name: 'Tout voir' });
-    expect(all.getAttribute('href')).toBe('/notifications?onglet=reception');
+    expect(all.getAttribute('href')).toBe('/admin/notifications?onglet=reception');
   });
 
   it('marque une ligne non lue à l’ouverture', async () => {

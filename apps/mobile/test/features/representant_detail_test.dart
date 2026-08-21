@@ -515,6 +515,14 @@ void main() {
             ),
           ),
           GoRoute(
+            path: Routes.newRepresentant,
+            builder: (BuildContext context, GoRouterState state) => Scaffold(
+              body: Center(
+                child: Text('FORMULAIRE ${state.uri.queryParameters['id']}'),
+              ),
+            ),
+          ),
+          GoRoute(
             path: Routes.representantDetail,
             builder: (BuildContext context, GoRouterState state) => Scaffold(
               body: Center(child: Text('FICHE ${state.pathParameters['id']}')),
@@ -539,12 +547,12 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
     }
 
-    testWidgets('le chemin rapide reste le tap sur la ligne', (
+    testWidgets('le tap sur la ligne ouvre le formulaire de ce représentant', (
       WidgetTester tester,
     ) async {
-      // Les téléconseillers enchaînent les saisies depuis cette liste : un tap
-      // qui n'ouvre plus le formulaire de prospect leur coûte un geste par
-      // fiche.
+      // Les fiches sont importées : le geste courant est de CHOISIR puis de
+      // compléter. Sauter le formulaire pour tomber sur les prospects retirait
+      // le seul endroit où corriger un numéro ou poser une profession.
       await insertRepresentant(
         db,
         id: 'rep-1',
@@ -557,7 +565,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('SAISIE PROSPECT rep-1'), findsOneWidget);
+      expect(find.text('FORMULAIRE rep-1'), findsOneWidget);
+      expect(find.text('SAISIE PROSPECT rep-1'), findsNothing);
 
       await teardownTree(tester);
     });

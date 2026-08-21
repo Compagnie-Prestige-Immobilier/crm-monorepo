@@ -8,6 +8,7 @@ import {
   format,
   isSameDay,
   isSameMonth,
+  isToday,
   parseISO,
   startOfMonth,
   startOfWeek,
@@ -183,6 +184,13 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
                 {week.map((day) => {
                   const disabled = (minDate && day < minDate) || (maxDate && day > maxDate);
                   const currentMonth = isSameMonth(day, month);
+                  const rangeStart = minDate ?? selected;
+                  const rangeEnd = maxDate ?? selected;
+                  const inRange =
+                    rangeStart !== null && rangeEnd !== null && day > rangeStart && day < rangeEnd;
+                  const rangeBoundary =
+                    (minDate !== null && isSameDay(day, minDate)) ||
+                    (maxDate !== null && isSameDay(day, maxDate));
                   return (
                     <button
                       key={day.toISOString()}
@@ -190,6 +198,8 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
                       role="gridcell"
                       aria-label={format(day, 'dd MMMM yyyy', { locale: fr })}
                       aria-selected={selected ? isSameDay(day, selected) : false}
+                      aria-current={isToday(day) ? 'date' : undefined}
+                      data-in-range={inRange || undefined}
                       disabled={Boolean(disabled)}
                       onClick={() => {
                         onChange(format(day, 'yyyy-MM-dd'));
@@ -199,6 +209,9 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
                         'flex h-9 items-center justify-center rounded-md text-sm transition-colors',
                         'hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring',
                         !currentMonth && 'text-muted-foreground/50',
+                        inRange && 'bg-primary/10 text-foreground',
+                        rangeBoundary && 'ring-1 ring-primary/40',
+                        isToday(day) && 'font-[700] underline decoration-2 underline-offset-4',
                         selected &&
                           isSameDay(day, selected) &&
                           'bg-primary text-primary-foreground hover:bg-primary/90',

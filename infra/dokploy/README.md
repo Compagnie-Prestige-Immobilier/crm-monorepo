@@ -132,15 +132,14 @@ partie privée dans Dokploy → **SSH Keys**.
 Depuis un terminal du conteneur API, **une seule fois** :
 
 ```bash
-pnpm --filter @crm/database db:deploy   # migrations
 pnpm --filter @crm/database db:seed     # référentiels + compte administrateur
+pnpm --filter @crm/database db:seed:demo # espace démo, via la factory
 ```
 
 Sans le seed, aucune saisie n'est possible : les banques, syndicats et
 départements sont des clés étrangères obligatoires.
 
-Les données de démonstration s'activent depuis le panel web
-(**Paramètres → Mode démonstration**), jamais en ligne de commande.
+L'espace démo peut ensuite être réinitialisé depuis le panel web.
 
 ## Fichiers engendrés, jamais commités
 
@@ -252,5 +251,3 @@ dumps Dokploy sont au format `custom`, pas du SQL en clair.
   chaque trimestre. Une sauvegarde non testée n'est pas une sauvegarde.
 - Régénérer la clé d'API Dokploy : elle a circulé en clair.
 - Changer le mot de passe administrateur à la première connexion.
-- Repasser `DEMO_MODE_ALLOWED` à `false` le jour où de vraies fiches entrent
-  dans cette base.

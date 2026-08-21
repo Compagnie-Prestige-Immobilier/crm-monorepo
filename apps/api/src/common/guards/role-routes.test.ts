@@ -75,6 +75,7 @@ const CONTROLLERS: readonly Controller[] = [
 const ADMISES: readonly string[] = [
   'AdminController.supervisionOverview',
 
+  'AnalyticsController.ambassadorConversion',
   'AnalyticsController.bankAging',
   'AnalyticsController.byBanque',
   'AnalyticsController.byDepartement',
@@ -108,7 +109,7 @@ const ADMISES: readonly string[] = [
   'AuthController.me',
   'CallOutcomeReasonsController.list',
   'CallbacksController.list',
-  'DemoController.status',
+  'AuthController.switchWorkspace',
   'NotificationsController.mine',
   'NotificationsController.markRead',
 
@@ -123,6 +124,7 @@ const ADMISES: readonly string[] = [
 
   'ReferentielsController.bundle',
   'ReferentielsController.listBanques',
+  'ReferentielsController.listCanauxProvenance',
   'ReferentielsController.listDepartements',
   'ReferentielsController.listIefs',
   'ReferentielsController.listRegions',
@@ -158,13 +160,14 @@ const SOCLE: readonly string[] = [
   'AuthController.me',
   'AuthController.refresh',
   'CallOutcomeReasonsController.list',
-  'DemoController.status',
+  'AuthController.switchWorkspace',
   'HealthController.live',
   'HealthController.ready',
   'NotificationsController.markRead',
   'NotificationsController.mine',
   'ReferentielsController.bundle',
   'ReferentielsController.listBanques',
+  'ReferentielsController.listCanauxProvenance',
   'ReferentielsController.listDepartements',
   'ReferentielsController.listIefs',
   'ReferentielsController.listRegions',

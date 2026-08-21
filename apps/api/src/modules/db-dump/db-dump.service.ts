@@ -261,8 +261,7 @@ export class DbDumpService implements OnModuleInit {
     reply.header('Content-Disposition', `attachment; filename="${fileName}"`);
     reply.header('Content-Length', String(size));
     reply.header('Cache-Control', 'no-store');
-    // Posé explicitement : sinon `DemoModeInterceptor` estampille `true` pendant
-    // une démonstration et le panel enregistre la base RÉELLE sous « …-DEMONSTRATION ».
+
     reply.header('X-Demo-Mode', 'false');
   }
 

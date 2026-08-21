@@ -23,8 +23,6 @@ import { SENDING_LEASE_MS } from './dispatch-claim.js';
 import { readNotificationsEnv } from './notifications.env.js';
 import { renderNotification } from './template.js';
 import type { ReminderRunDto } from './dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 
 const env = readNotificationsEnv();
 
@@ -80,7 +78,6 @@ export class RemindersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
-    private readonly demo: DemoVisibilityService,
     private readonly activity: SupervisionActivityService,
   ) {}
 
@@ -98,7 +95,6 @@ export class RemindersService {
     const due = await this.prisma.notification.findMany({
       where: {
         OR: claimable,
-        ...demoScope(await this.demo.enabled()),
       },
       select: { id: true },
       orderBy: [{ scheduledFor: 'asc' }, { createdAt: 'asc' }],
@@ -181,7 +177,6 @@ export class RemindersService {
         status: CallTaskStatus.OPEN,
         isActive: true,
         campaign: { status: CampaignStatus.ACTIVE },
-        ...demoScope(false),
       },
       _count: { _all: true },
     });
@@ -213,7 +208,6 @@ export class RemindersService {
       where: {
         status: ScheduledCallbackStatus.PENDING,
         scheduledAt: { lte: dakarDayEnd(now, 0) },
-        ...demoScope(false),
       },
       _count: { _all: true },
     });
@@ -254,14 +248,12 @@ export class RemindersService {
         where: {
           status: ScheduledCallbackStatus.DONE,
           updatedAt: { gte: inclusiveDateFrom(day), lte: inclusiveDateTo(day) },
-          ...demoScope(false),
         },
       }),
       this.prisma.scheduledCallback.count({
         where: {
           status: ScheduledCallbackStatus.PENDING,
           scheduledAt: { lte: now },
-          ...demoScope(false),
         },
       }),
     ]);
@@ -309,7 +301,6 @@ export class RemindersService {
         id: { in: groups.map((group) => group.assignedToId) },
         isActive: true,
         deletedAt: null,
-        ...demoScope(false),
       },
       select: { id: true, fullName: true },
     });
@@ -338,7 +329,6 @@ export class RemindersService {
         deletedAt: null,
         currentStage: { type: BankStageType.OPEN },
         createdAt: { lte: cutoff },
-        ...demoScope(false),
       },
     });
     if (!total) return { created: 0, skipped: 0 };
@@ -370,7 +360,6 @@ export class RemindersService {
         currentStage: { type: BankStageType.OPEN },
         createdAt: { lte: cutoff },
         transitions: { none: { createdAt: { gt: cutoff } } },
-        ...demoScope(false),
       },
     });
     if (!total) return { created: 0, skipped: 0 };
@@ -399,7 +388,6 @@ export class RemindersService {
         role: { in: [...roles] },
         isActive: true,
         deletedAt: null,
-        ...demoScope(false),
       },
       select: { id: true, fullName: true },
     });
@@ -443,7 +431,6 @@ export class RemindersService {
             status: NotificationStatus.SENDING,
             reminderKey: `${input.key}:${candidate.userId}`,
             period,
-            isDemo: false,
             deliveries: {
               create: [
                 {
@@ -451,7 +438,6 @@ export class RemindersService {
                   status: NotificationDeliveryStatus.PENDING,
                   reminderKey: input.key,
                   period,
-                  isDemo: false,
                 },
               ],
             },
@@ -492,7 +478,6 @@ export class RemindersService {
         period,
         status: NotificationDeliveryStatus.PENDING,
         error: DELIVERY_RETRY_ERROR,
-        ...demoScope(false),
       },
       select: { notificationId: true },
     });

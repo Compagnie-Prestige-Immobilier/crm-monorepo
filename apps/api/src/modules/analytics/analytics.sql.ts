@@ -6,21 +6,15 @@ import { tryNormalizePhone } from '../../common/phone.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
-import { TASK, demoScopeOn } from './pilotage.sql.js';
 
 export function prospectConditions(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   filter: ProspectFilterDto,
-  demoEnabled: boolean,
 ): Prisma.Sql {
   const conditions: Prisma.Sql[] = [];
 
   if (!readsEveryone(user)) {
     conditions.push(Prisma.sql`p."createdById" = ${user.id}`);
-  }
-
-  if (!demoEnabled) {
-    conditions.push(Prisma.sql`p."isDemo" = FALSE`);
   }
 
   if (filter.commercialId) {
@@ -42,6 +36,13 @@ export function prospectConditions(
     conditions.push(Prisma.sql`p."representantId" = ${filter.representantId}`);
   if (filter.banqueId) conditions.push(Prisma.sql`p."banqueId" = ${filter.banqueId}`);
   if (filter.syndicatId) conditions.push(Prisma.sql`p."syndicatId" = ${filter.syndicatId}`);
+  // Meme population que `buildProspectWhere` : un filtre qui n'agirait que sur
+  // la liste ferait diverger le total du graphique du total du tableau.
+  if (filter.projet) conditions.push(Prisma.sql`p."projet" = ${filter.projet}::"Projet"`);
+  if (filter.type) conditions.push(Prisma.sql`p."type" = ${filter.type}::"ProspectType"`);
+  if (filter.canalProvenanceId) {
+    conditions.push(Prisma.sql`p."canalProvenanceId" = ${filter.canalProvenanceId}`);
+  }
   if (filter.statut) {
     conditions.push(Prisma.sql`p."statut" = ${filter.statut}::"ProspectStatut"`);
   }
@@ -68,14 +69,13 @@ export function prospectConditions(
     const attribuee = filter.assignedToId
       ? Prisma.sql`AND ct."assignedToId" = ${filter.assignedToId}`
       : Prisma.empty;
-    // `call_tasks` porte son propre `isDemo` : le `p."isDemo"` posé plus haut ne le couvre pas.
     conditions.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "call_tasks" ct
         WHERE ct."prospectId" = p."id"
           ${campagne}
           ${attribuee}
-          AND ${demoScopeOn(TASK, demoEnabled)}
+          AND TRUE
       )`,
     );
   }
@@ -96,6 +96,38 @@ export function prospectConditions(
   }
 
   if (!conditions.length) return Prisma.sql`TRUE`;
+  return Prisma.join(conditions, ' AND ');
+}
+
+/**
+ * Périmètre de l'annuaire, sur l'alias `r`.
+ *
+ * Sans bornes de date : un agrégat de représentants se date sur l'ACTE mesuré,
+ * pas sur la fiche, et la colonne qui le porte change d'un agrégat à l'autre.
+ */
+export function representantConditions(
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+  filter: ProspectFilterDto,
+): Prisma.Sql {
+  const conditions: Prisma.Sql[] = [Prisma.sql`r."deletedAt" IS NULL`];
+
+  if (!readsEveryone(user)) {
+    conditions.push(Prisma.sql`r."createdById" = ${user.id}`);
+  }
+  if (filter.commercialId) {
+    const target = readsEveryone(user)
+      ? filter.commercialId
+      : filter.commercialId === user.id
+        ? user.id
+        : '__aucun__';
+    conditions.push(Prisma.sql`r."createdById" = ${target}`);
+  }
+
+  if (filter.representantId) conditions.push(Prisma.sql`r."id" = ${filter.representantId}`);
+  if (filter.departementId) {
+    conditions.push(Prisma.sql`r."departementId" = ${filter.departementId}`);
+  }
+
   return Prisma.join(conditions, ' AND ');
 }
 

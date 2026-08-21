@@ -292,6 +292,53 @@ describe('ImportsView', () => {
     });
   });
 
+  // Le Grand Public compte des prospects, pas des « fiches », et « Grand Public »
+  // ne prend pas la marque du pluriel.
+  it('dépose un classeur Grand Public sur sa propre route, avec son propre modèle', async () => {
+    const user = userEvent.setup();
+    const grandPublic = job({
+      kind: 'PROSPECTS_GRAND_PUBLIC',
+      report: { ...SIMULATED_REPORT, kind: 'PROSPECTS_GRAND_PUBLIC' },
+    });
+    const grandPublicApplique = job({
+      kind: 'PROSPECTS_GRAND_PUBLIC',
+      status: 'succeeded',
+      mode: 'APPLY',
+    });
+    createImportJob.mockResolvedValue(grandPublic);
+    fetchImportJob.mockImplementation(() =>
+      Promise.resolve(applyImportJob.mock.calls.length === 0 ? grandPublic : grandPublicApplique),
+    );
+    applyImportJob.mockResolvedValue(grandPublicApplique);
+    renderWithQuery(<ImportsView />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Entité à importer' }));
+    await user.click(await screen.findByRole('option', { name: 'Prospects Grand Public' }));
+
+    expect(screen.getByRole('button', { name: 'Télécharger le modèle' })).toBeTruthy();
+    expect(screen.getByText(/50 000 lignes au maximum/u)).toBeTruthy();
+    expect(screen.getByText(/Seuls le nom et le téléphone sont exigés/u)).toBeTruthy();
+
+    await deposer();
+    await waitFor(() => {
+      expect(createImportJob).toHaveBeenCalledWith('PROSPECTS_GRAND_PUBLIC', expect.any(File));
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Créer 800 prospects Grand Public' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.textContent).toContain('800 prospects Grand Public seront créés');
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Créer 800 prospects Grand Public' }),
+    );
+    await waitFor(() => {
+      expect(
+        screen
+          .getAllByRole('status')
+          .some((status) => status.textContent.startsWith('800 prospects Grand Public créés.')),
+      ).toBe(true);
+    });
+  });
+
   it('présente un travail échu sans le traiter comme une panne', async () => {
     const expired = job({ status: 'expired', report: null });
     createImportJob.mockResolvedValue(expired);

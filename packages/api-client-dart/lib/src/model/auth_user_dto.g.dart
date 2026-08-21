@@ -19,6 +19,8 @@ abstract class _$AuthUserDtoCWProxy {
 
   AuthUserDto isActive(bool isActive);
 
+  AuthUserDto workspace(AuthUserDtoWorkspaceEnum workspace);
+
   AuthUserDto departementId(String? departementId);
 
   AuthUserDto phoneE164(String? phoneE164);
@@ -38,6 +40,7 @@ abstract class _$AuthUserDtoCWProxy {
     String fullName,
     Role role,
     bool isActive,
+    AuthUserDtoWorkspaceEnum workspace,
     String? departementId,
     String? phoneE164,
     DateTime? lastLoginAt,
@@ -69,6 +72,10 @@ class _$AuthUserDtoCWProxyImpl implements _$AuthUserDtoCWProxy {
   AuthUserDto isActive(bool isActive) => this(isActive: isActive);
 
   @override
+  AuthUserDto workspace(AuthUserDtoWorkspaceEnum workspace) =>
+      this(workspace: workspace);
+
+  @override
   AuthUserDto departementId(String? departementId) =>
       this(departementId: departementId);
 
@@ -93,6 +100,7 @@ class _$AuthUserDtoCWProxyImpl implements _$AuthUserDtoCWProxy {
     Object? fullName = const $CopyWithPlaceholder(),
     Object? role = const $CopyWithPlaceholder(),
     Object? isActive = const $CopyWithPlaceholder(),
+    Object? workspace = const $CopyWithPlaceholder(),
     Object? departementId = const $CopyWithPlaceholder(),
     Object? phoneE164 = const $CopyWithPlaceholder(),
     Object? lastLoginAt = const $CopyWithPlaceholder(),
@@ -122,6 +130,10 @@ class _$AuthUserDtoCWProxyImpl implements _$AuthUserDtoCWProxy {
           ? _value.isActive
           // ignore: cast_nullable_to_non_nullable
           : isActive as bool,
+      workspace: workspace == const $CopyWithPlaceholder()
+          ? _value.workspace
+          // ignore: cast_nullable_to_non_nullable
+          : workspace as AuthUserDtoWorkspaceEnum,
       departementId: departementId == const $CopyWithPlaceholder()
           ? _value.departementId
           // ignore: cast_nullable_to_non_nullable
@@ -159,6 +171,7 @@ AuthUserDto _$AuthUserDtoFromJson(Map<String, dynamic> json) =>
           'fullName',
           'role',
           'isActive',
+          'workspace',
         ],
       );
       final val = AuthUserDto(
@@ -175,6 +188,14 @@ AuthUserDto _$AuthUserDtoFromJson(Map<String, dynamic> json) =>
           ),
         ),
         isActive: $checkedConvert('isActive', (v) => v as bool),
+        workspace: $checkedConvert(
+          'workspace',
+          (v) => $enumDecode(
+            _$AuthUserDtoWorkspaceEnumEnumMap,
+            v,
+            unknownValue: AuthUserDtoWorkspaceEnum.unknownDefaultOpenApi,
+          ),
+        ),
         departementId: $checkedConvert('departementId', (v) => v as String?),
         phoneE164: $checkedConvert('phoneE164', (v) => v as String?),
         lastLoginAt: $checkedConvert(
@@ -193,6 +214,7 @@ Map<String, dynamic> _$AuthUserDtoToJson(AuthUserDto instance) =>
       'fullName': instance.fullName,
       'role': _$RoleEnumMap[instance.role]!,
       'isActive': instance.isActive,
+      'workspace': _$AuthUserDtoWorkspaceEnumEnumMap[instance.workspace]!,
       if (instance.departementId case final value?) 'departementId': value,
       if (instance.phoneE164 case final value?) 'phoneE164': value,
       if (instance.lastLoginAt?.toIso8601String() case final value?)
@@ -207,4 +229,10 @@ const _$RoleEnumMap = {
   Role.DIRECTION: 'DIRECTION',
   Role.ACCUEIL: 'ACCUEIL',
   Role.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$AuthUserDtoWorkspaceEnumEnumMap = {
+  AuthUserDtoWorkspaceEnum.public: 'public',
+  AuthUserDtoWorkspaceEnum.demo: 'demo',
+  AuthUserDtoWorkspaceEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

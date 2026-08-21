@@ -57,6 +57,7 @@ class CreateUserDto {
   )
   final Role? role;
 
+  /// Chaîne vide pour retirer le rattachement.
   @JsonKey(name: r'departementId', required: false, includeIfNull: false)
   final String? departementId;
 

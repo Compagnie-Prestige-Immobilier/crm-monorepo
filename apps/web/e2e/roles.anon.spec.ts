@@ -1,4 +1,5 @@
-import { expect, request, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { BANQUIER, ensureWorkspaceFixtures, FIXTURE_PASSWORD, TELECONSEILLERS } from './fixtures';
 
 /**
  * Navigation dépendante du rôle, éprouvée SUR UN VRAI NAVIGATEUR.
@@ -35,14 +36,12 @@ import { expect, request, test, type Page } from '@playwright/test';
  * éprouvent.
  */
 
-const BANK_IDENTIFIER = process.env.E2E_BANK_IDENTIFIER ?? 'demo.banque@cpi.sn';
-const BANK_PASSWORD = process.env.E2E_BANK_PASSWORD ?? 'Demo1-CPI-Sunugal';
+const BANK_IDENTIFIER = process.env.E2E_BANK_IDENTIFIER ?? BANQUIER.email;
+const BANK_PASSWORD = process.env.E2E_BANK_PASSWORD ?? FIXTURE_PASSWORD;
 
-/** Même provenance que le compte bancaire : le jeu de démonstration semé ci-dessous. */
-const TELECONSEILLER_IDENTIFIER = process.env.E2E_TELECONSEILLER_IDENTIFIER ?? 'demo.awa@cpi.sn';
-const TELECONSEILLER_PASSWORD = process.env.E2E_TELECONSEILLER_PASSWORD ?? 'Demo1-CPI-Sunugal';
-
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const TELECONSEILLER_IDENTIFIER =
+  process.env.E2E_TELECONSEILLER_IDENTIFIER ?? TELECONSEILLERS[0].email;
+const TELECONSEILLER_PASSWORD = process.env.E2E_TELECONSEILLER_PASSWORD ?? FIXTURE_PASSWORD;
 
 /**
  * Recopié plutôt qu'importé de `auth.setup.ts`.
@@ -53,73 +52,9 @@ const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
  * `playwright.config.ts`) : c'est le prix d'une constante qui ne peut pas
  * voyager sans traîner un effet de bord.
  */
-const ADMIN_STORAGE_STATE = 'e2e/.auth/admin.json';
-
-/** Vrai si c'est CE fichier qui a allumé le mode démonstration. */
-let seededHere = false;
-
-/**
- * Le mode démonstration est posé par l'API, pas par le navigateur.
- *
- * On emprunte le relais `/api/v1/*` de Next avec l'état de session de
- * l'administrateur déjà rangé sur disque : aucune connexion supplémentaire
- * n'est consommée, alors que l'API n'en accepte que dix par minute et par IP,
- * et que le projet anonyme en dépense déjà huit.
- */
 test.beforeAll(async () => {
-  // L'ensemencement écrit plusieurs milliers de lignes : le délai par défaut
-  // d'un crochet est celui d'un test, et il ne suffit pas.
   test.setTimeout(180_000);
-
-  const api = await request.newContext({
-    baseURL: WEB_URL,
-    storageState: ADMIN_STORAGE_STATE,
-  });
-
-  try {
-    const status = await api.get('/api/v1/admin/demo');
-    expect(
-      status.ok(),
-      `L’état du mode démonstration n’a pas pu être lu (${String(status.status())}). ` +
-        'Vérifiez que la pile est démarrée et que `e2e/.auth/admin.json` est frais.',
-    ).toBe(true);
-
-    const { enabled } = (await status.json()) as { enabled: boolean };
-    if (enabled) return;
-
-    const enable = await api.post('/api/v1/admin/demo/enable', { timeout: 150_000 });
-    expect(
-      enable.ok(),
-      `Le mode démonstration n’a pas pu être activé (${String(enable.status())}). ` +
-        'Sans lui, le compte BANQUE_FINANCE de démonstration n’existe pas et ces ' +
-        'parcours n’ont rien à éprouver.',
-    ).toBe(true);
-    seededHere = true;
-  } finally {
-    await api.dispose();
-  }
-});
-
-/**
- * On ne laisse pas derrière soi ce qu'on a semé.
- *
- * `purge` et non `disable` : la désactivation ne fait que masquer les lignes,
- * et une base de développement qui accumule un jeu de démonstration invisible
- * par exécution finit par mentir sur ses compteurs.
- */
-test.afterAll(async () => {
-  if (!seededHere) return;
-  test.setTimeout(180_000);
-
-  const api = await request.newContext({
-    baseURL: WEB_URL,
-    storageState: ADMIN_STORAGE_STATE,
-  });
-  try {
-    await api.post('/api/v1/admin/demo/purge', { timeout: 150_000 });
-  } finally {
-    await api.dispose();
-  }
+  await ensureWorkspaceFixtures();
 });
 
 /**
@@ -153,7 +88,7 @@ async function login(page: Page, identifier: string, password: string): Promise<
   // réussite plutôt que d'attendre en vain une URL qui ne viendra pas.
   const landed = await Promise.race([
     page
-      .waitForURL(/\/(tableau-de-bord|dossiers|console|supervision)/, { timeout: 15_000 })
+      .waitForURL(/\/espaces$/, { timeout: 15_000 })
       .then(() => true)
       .catch(() => false),
     alert
@@ -179,19 +114,52 @@ async function login(page: Page, identifier: string, password: string): Promise<
   );
 }
 
-test('un agent Banque & Finance atterrit sur ses dossiers, pas sur le tableau de bord des prospects', async ({
+/**
+ * Ouvre une tuile du hub, seul chemin vers un écran depuis la connexion.
+ *
+ * L'atterrissage est le même pour TOUS les rôles depuis le découpage en
+ * quatre espaces : c'est la tuile qui décide de l'écran, et elle ne mène pas
+ * au même endroit selon le rôle.
+ */
+async function ouvrirEspace(page: Page, label: string): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Choisissez un espace', level: 1 })).toBeVisible();
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: new RegExp(`^${label}`) })
+    .click();
+}
+
+/** Les tuiles hors de portée sont MONTRÉES et GRISÉES, jamais cliquables. */
+async function attendreTuilesFermees(page: Page, labels: readonly string[]): Promise<void> {
+  const hub = page.getByRole('main');
+  for (const label of labels) {
+    const tuile = hub.getByRole('listitem').filter({ hasText: label });
+    await expect(tuile, label).toContainText('Réservé à d’autres profils');
+    await expect(tuile.getByRole('link'), label).toHaveCount(0);
+  }
+}
+
+test('un agent Banque & Finance atterrit sur le hub, dont une seule tuile lui est ouverte', async ({
   page,
 }) => {
   await login(page, BANK_IDENTIFIER, BANK_PASSWORD);
 
-  // Redirection d'après connexion : `/tableau-de-bord` lui vaudrait un 403 dès
-  // la première seconde d'utilisation.
-  await expect(page).toHaveURL(/\/dossiers/);
-  await expect(page.getByRole('heading', { name: 'Dossiers', level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/\/espaces$/);
+  await attendreTuilesFermees(page, ['Accueil', 'Projet Grand Public', 'Admin']);
+
+  // Sa tuile CHUES ouvre le tableau de bord BANCAIRE : celui des prospects lui
+  // vaudrait un 403 dès la première seconde d'utilisation.
+  await ouvrirEspace(page, 'Projet CHUES');
+  await page.waitForURL('**/chues/banque');
+  // Le titre du DOCUMENT, que seule la page pose : le titre de niveau 1 est
+  // dérivé de la route par la barre supérieure et vaudrait aussi pour une page
+  // qui n'a rien rendu.
+  await expect(page).toHaveTitle(/Tableau de bord bancaire/);
 });
 
 test('sa navigation ne montre QUE ses écrans', async ({ page }) => {
   await login(page, BANK_IDENTIFIER, BANK_PASSWORD);
+  await ouvrirEspace(page, 'Projet CHUES');
 
   const nav = page.getByRole('navigation', { name: 'Navigation principale' });
 
@@ -232,9 +200,11 @@ test('sa navigation ne montre QUE ses écrans', async ({ page }) => {
     await expect(nav.getByRole('link', { name: hidden, exact: true })).toHaveCount(0);
   }
 
-  // Et son « Tableau de bord » est bien le tableau de bord BANCAIRE.
+  // Et son « Tableau de bord » est bien le tableau de bord BANCAIRE. L'adresse
+  // est vérifiée EN ENTIER : `/banque` seul se satisferait de n'importe quelle
+  // route qui contient le mot.
   await nav.getByRole('link', { name: 'Tableau de bord', exact: true }).click();
-  await expect(page).toHaveURL(/\/banque/);
+  await expect(page).toHaveURL(/\/chues\/banque$/);
 });
 
 test('une URL interdite tapée à la main rend un refus lisible, pas une page cassée', async ({
@@ -243,8 +213,8 @@ test('une URL interdite tapée à la main rend un refus lisible, pas une page ca
   await login(page, BANK_IDENTIFIER, BANK_PASSWORD);
 
   // Le masquage du menu ne protège rien : une URL se tape, et un onglet resté
-  // ouvert rejoue l'ancienne route.
-  await page.goto('/prospects');
+  // ouvert rejoue la route.
+  await page.goto('/chues/prospects');
   await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
   // Le refus NOMME le rôle en cours : sans lui, l'utilisateur ne sait pas quoi
   // demander à son administrateur.
@@ -253,25 +223,28 @@ test('une URL interdite tapée à la main rend un refus lisible, pas une page ca
   await expect(page.getByRole('alert').filter({ hasText: 'Accès refusé' })).toContainText(
     'Banque & Finance',
   );
-  // Et il propose une sortie vers un écran qui lui est ouvert.
-  // `exact` : le logo de la barre latérale est nommé « CPI GO, retour à
-  // l’accueil » et satisferait une correspondance partielle.
-  await expect(page.getByRole('link', { name: 'Retour à l’accueil', exact: true })).toBeVisible();
+  // Et il propose une sortie : le hub, désormais, et non plus un écran de
+  // travail. C'est le seul endroit qui vaille pour tous les rôles.
+  await expect(page.getByRole('link', { name: 'Retour à l’accueil', exact: true })).toHaveAttribute(
+    'href',
+    '/espaces',
+  );
 
-  await page.goto('/parametres');
+  await page.goto('/admin/parametres');
   await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
 
   // Les deux écrans ajoutés depuis, fermés au même rôle et par la même garde.
-  await page.goto('/campagnes/representants');
+  await page.goto('/chues/campagnes/representants');
   await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
 
-  await page.goto('/representants/import');
+  await page.goto('/chues/representants/import');
   await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
 
-  // `/demandes-clients` lui est en revanche OUVERT, et c'est le point : l'API
-  // y restreint la liste à ses propres demandes, l'écran ne lui propose aucun
-  // geste d'arbitrage. Un refus ici casserait la notification qui l'y envoie.
-  await page.goto('/demandes-clients');
+  // `/chues/demandes-clients` lui est en revanche OUVERT, et c'est le point :
+  // l'API y restreint la liste à ses propres demandes, l'écran ne lui propose
+  // aucun geste d'arbitrage. Un refus ici casserait la notification qui l'y
+  // envoie.
+  await page.goto('/chues/demandes-clients');
   await expect(page.getByRole('heading', { name: 'Accès refusé' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Mes demandes', level: 1 })).toBeVisible();
 });
@@ -281,27 +254,38 @@ test('une URL interdite tapée à la main rend un refus lisible, pas une page ca
  * teleconseillers, avec une section Terrain ». Ce fichier éprouvait l'inverse,
  * et c'est la seule couverture du nouvel atterrissage.
  */
-test('un téléconseiller atterrit sur la console, sans boucle de redirection', async ({ page }) => {
+test('un téléconseiller ouvre CHUES sur sa console, sans boucle de redirection', async ({
+  page,
+}) => {
   await login(page, TELECONSEILLER_IDENTIFIER, TELECONSEILLER_PASSWORD);
 
-  await expect(page).toHaveURL(/\/console/);
-  await expect(page.getByRole('heading', { name: 'Console d’appel', level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/\/espaces$/);
+  await attendreTuilesFermees(page, ['Accueil', 'Admin']);
+
+  await ouvrirEspace(page, 'Projet CHUES');
+  await page.waitForURL('**/chues/console');
+  // Le titre du DOCUMENT, posé par la page et non par la barre supérieure : il
+  // ne dépend pas de ce que la file d'appels contient ce jour-là.
+  await expect(page).toHaveTitle(/Console d’appel/);
 
   /**
    * Les deux routes qui ont déjà bouclé : `/` et `/connexion` renvoient toutes
-   * deux vers l'écran d'accueil du rôle, et cet écran ne doit pas renvoyer
-   * ailleurs. Un aller-retour infini se solderait ici par un délai dépassé,
-   * pas par une assertion fausse : `waitForURL` est ce qui le nomme.
+   * deux vers le hub, et le hub ne doit pas renvoyer ailleurs. Un aller-retour
+   * infini se solderait ici par un délai dépassé, pas par une assertion
+   * fausse : `waitForURL` est ce qui le nomme.
    */
   for (const entry of ['/', '/connexion']) {
     await page.goto(entry);
-    await page.waitForURL('**/console');
-    await expect(page.getByRole('heading', { name: 'Console d’appel', level: 1 })).toBeVisible();
+    await page.waitForURL('**/espaces');
+    await expect(
+      page.getByRole('heading', { name: 'Choisissez un espace', level: 1 }),
+    ).toBeVisible();
   }
 });
 
 test('sa navigation se limite au Terrain, et le pilotage lui reste fermé', async ({ page }) => {
   await login(page, TELECONSEILLER_IDENTIFIER, TELECONSEILLER_PASSWORD);
+  await ouvrirEspace(page, 'Projet CHUES');
 
   const nav = page.getByRole('navigation', { name: 'Navigation principale' });
   await expect(nav.getByRole('heading', { name: 'Terrain', level: 2 })).toBeVisible();
@@ -317,7 +301,9 @@ test('sa navigation se limite au Terrain, et le pilotage lui reste fermé', asyn
   }
 
   // `exact` : sans lui, « Supervision » matcherait aussi une entrée dont le
-  // libellé la contient, et « Tableau de bord » le logo de la barre latérale.
+  // libellé la contient. Les entrées d'administration relèvent maintenant
+  // d'une AUTRE coque : ce qui les tient hors de portée est la tuile grisée du
+  // hub, éprouvée dans le parcours d'atterrissage.
   for (const hidden of [
     'Tableau de bord',
     'Statistiques',
@@ -340,17 +326,17 @@ test('sa navigation se limite au Terrain, et le pilotage lui reste fermé', asyn
    * Chaque écran de pilotage est donc redemandé PAR SON URL.
    */
   for (const forbidden of [
-    '/tableau-de-bord',
-    '/statistiques',
-    '/campagnes',
-    '/campagnes/representants',
-    '/commerciaux',
-    '/supervision',
-    '/referentiels',
-    '/imports',
-    '/parametres',
-    '/representants/import',
-    '/dossiers',
+    '/chues/tableau-de-bord',
+    '/chues/statistiques',
+    '/chues/campagnes',
+    '/chues/campagnes/representants',
+    '/admin/commerciaux',
+    '/chues/supervision',
+    '/admin/referentiels',
+    '/admin/imports',
+    '/admin/parametres',
+    '/chues/representants/import',
+    '/chues/dossiers',
   ]) {
     await page.goto(forbidden);
     await expect(
@@ -359,9 +345,12 @@ test('sa navigation se limite au Terrain, et le pilotage lui reste fermé', asyn
     ).toBeVisible();
   }
 
-  // Le refus NOMME le rôle en cours, et propose une sortie vers un écran ouvert.
+  // Le refus NOMME le rôle en cours, et propose une sortie vers le hub.
   await expect(page.getByRole('alert').filter({ hasText: 'Accès refusé' })).toContainText(
     'Téléconseiller',
   );
-  await expect(page.getByRole('link', { name: 'Retour à l’accueil', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Retour à l’accueil', exact: true })).toHaveAttribute(
+    'href',
+    '/espaces',
+  );
 });

@@ -74,6 +74,14 @@ export async function markAllNotificationsRead(
   return marked;
 }
 
+/**
+ * Les DEUX formes, et il faut les deux.
+ *
+ * Les notifications déjà en base portent les adresses d'avant le découpage en
+ * coques ; les nouvelles portent les adresses canoniques. Retirer les anciennes
+ * ferait taire les liens de tout ce qui a été envoyé jusqu'ici, et n'accepter
+ * que les anciennes ferait taire ceux d'après.
+ */
 const WEB_ROUTES: readonly string[] = [
   '/tableau-de-bord',
   '/statistiques',
@@ -88,6 +96,23 @@ const WEB_ROUTES: readonly string[] = [
   '/notifications',
   '/parametres',
   '/banque',
+
+  '/chues/tableau-de-bord',
+  '/chues/statistiques',
+  '/chues/prospects',
+  '/chues/campagnes',
+  '/chues/dossiers',
+  '/chues/demandes-clients',
+  '/chues/representants',
+  '/chues/supervision',
+  '/chues/banque',
+  '/admin/commerciaux',
+  '/admin/referentiels',
+  '/admin/notifications',
+  '/admin/parametres',
+  '/accueil',
+  '/grand-public',
+  '/espaces',
 ];
 
 export function webRouteFor(route: string | null): string | null {

@@ -15,6 +15,7 @@ import {
   Matches,
   Max,
   MaxLength,
+  ValidateIf,
   Min,
   MinLength,
 } from 'class-validator';
@@ -370,10 +371,12 @@ export class UpdateNotificationTemplateDto {
   @MaxLength(500)
   bodyTemplate?: string;
 
-  @ApiPropertyOptional({ maxLength: 300 })
+  /** La chaîne VIDE retire le lien ; sur un PATCH, l'omission ne change rien. */
+  @ApiPropertyOptional({ maxLength: 300, description: 'Chaîne vide pour retirer le lien.' })
   @IsOptional()
   @IsString()
   @MaxLength(300)
+  @ValidateIf((_object: object, value: unknown) => value !== '')
   @Matches(ROUTE_PATTERN, { message: 'route doit être une route interne commençant par /' })
   route?: string;
 

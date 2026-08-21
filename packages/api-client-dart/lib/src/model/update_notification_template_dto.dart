@@ -50,6 +50,7 @@ class UpdateNotificationTemplateDto {
   @JsonKey(name: r'bodyTemplate', required: false, includeIfNull: false)
   final String? bodyTemplate;
 
+  /// Chaîne vide pour retirer le lien.
   @JsonKey(name: r'route', required: false, includeIfNull: false)
   final String? route;
 

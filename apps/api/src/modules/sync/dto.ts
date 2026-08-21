@@ -11,6 +11,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -20,11 +21,25 @@ import {
   type ValidatorConstraintInterface,
 } from 'class-validator';
 import { ValidatorConstraint } from 'class-validator';
-import { CallOutcome, EnrollmentMethod, ProspectStatut, WhatsappStatus } from '@crm/database';
+import {
+  CallOutcome,
+  CallTaskStatus,
+  CampaignStatus,
+  EnrollmentMethod,
+  Projet,
+  ProspectStatut,
+  ProspectType,
+  WhatsappStatus,
+} from '@crm/database';
 
 import { BanqueDto, DepartementDto, IefDto, SyndicatDto } from '../referentiels/dto.js';
 import { ProspectDto } from '../prospects/dto.js';
 import { RepresentantDto } from '../representants/dto.js';
+import {
+  DATE_PATTERN as VISITE_DATE_PATTERN,
+  TIME_PATTERN as VISITE_TIME_PATTERN,
+  VisiteReferentielRefDto,
+} from '../visites/dto.js';
 
 export const SYNC_MAX_BATCH_SIZE = Number(process.env.SYNC_MAX_BATCH_SIZE ?? 200) || 200;
 
@@ -35,6 +50,7 @@ export enum SyncEntity {
   REPRESENTANT_COMMENT = 'representant_comment',
   PROSPECT = 'prospect',
   CALL_ATTEMPT = 'call_attempt',
+  VISITE = 'visite',
 }
 
 export enum SyncOp {
@@ -51,7 +67,14 @@ export enum SyncOpStatus {
   SKIPPED_DEPENDENCY_FAILED = 'skipped_dependency_failed',
 }
 
-export const CLEARABLE_FIELDS = ['iefId', 'notes', 'whatsappE164', 'profession'] as const;
+export const CLEARABLE_FIELDS = [
+  'iefId',
+  'notes',
+  'whatsappE164',
+  'profession',
+  'prenom',
+  'etablissement',
+] as const;
 
 export type ClearableField = (typeof CLEARABLE_FIELDS)[number];
 
@@ -154,11 +177,61 @@ export class SyncEntityDataDto {
   @MaxLength(40)
   whatsappE164?: string;
 
-  @ApiPropertyOptional({ maxLength: 120, description: 'Représentant : profession déclarée.' })
+  @ApiPropertyOptional({
+    maxLength: 120,
+    description: 'Profession déclarée. Sert au représentant comme au prospect.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(120)
   profession?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 160,
+    description: 'Représentant : l’établissement où il exerce. Ni l’IEF ni le département.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  etablissement?: string;
+
+  @ApiPropertyOptional({
+    enum: Projet,
+    enumName: 'Projet',
+    description: 'Prospect : le projet dont il relève. CHUES par défaut côté serveur.',
+  })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
+
+  @ApiPropertyOptional({
+    enum: ProspectType,
+    enumName: 'ProspectType',
+    description: 'Prospect hors CHUES : ce qu’il est. Jamais obligatoire.',
+  })
+  @IsOptional()
+  @IsEnum(ProspectType)
+  type?: ProspectType;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: 600,
+    description: 'Prospect : durée du système de paiement, en MOIS.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(600)
+  dureeSystemeMois?: number;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Prospect : canal de provenance, choisi dans le référentiel.',
+  })
+  @IsOptional()
+  @IsUUID()
+  canalProvenanceId?: string;
 
   @ApiPropertyOptional({ format: 'date-time', description: 'Horodatage de la saisie terrain.' })
   @IsOptional()
@@ -216,6 +289,48 @@ export class SyncEntityDataDto {
   @IsOptional()
   @IsISO8601()
   callbackAt?: string;
+
+  @ApiPropertyOptional({ maxLength: 160, description: 'Visite : nom et prénom du visiteur.' })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  visitorName?: string;
+
+  @ApiPropertyOptional({ example: '2026-01-06', description: 'Visite : jour, à Dakar.' })
+  @IsOptional()
+  @IsString()
+  @Matches(VISITE_DATE_PATTERN)
+  visitDate?: string;
+
+  @ApiPropertyOptional({
+    example: '11:08',
+    description: 'Visite : heure, omise si elle n’a pas été relevée.',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(VISITE_TIME_PATTERN)
+  visitTime?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Visite : entreprise du visiteur.' })
+  @IsOptional()
+  @IsUUID()
+  entrepriseId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Visite : objet de la visite.' })
+  @IsOptional()
+  @IsUUID()
+  objetId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Visite : direction ou étage visé.' })
+  @IsOptional()
+  @IsUUID()
+  directionId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Visite : destinataire visé.' })
+  @IsOptional()
+  @IsUUID()
+  destinataireId?: string;
 }
 
 export class SyncOperationDto {
@@ -316,6 +431,11 @@ export function dependencyKeyOf(operation: {
 
   if (operation.entity === SyncEntity.CALL_ATTEMPT) {
     return `prospect:${operation.data?.prospectId ?? operation.entityId}`;
+  }
+
+  // Une visite ne dépend de rien : chaque inscription est sa propre partition.
+  if (operation.entity === SyncEntity.VISITE) {
+    return `visite:${operation.entityId}`;
   }
 
   const parent = operation.data?.representantId;
@@ -456,6 +576,59 @@ export class SyncPullQueryDto {
   appVersion?: string;
 }
 
+/**
+ * La campagne telle que le terrain la voit : son nom, son etat, rien de son
+ * tirage. Le telephone en a besoin pour dire A QUELLE FILE une fiche appartient,
+ * sans quoi deux campagnes se melangent dans une seule liste.
+ */
+export class SyncCallCampaignDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty({ enum: CampaignStatus, enumName: 'CampaignStatus' }) status!: CampaignStatus;
+  @ApiProperty({ type: Number, description: 'Journees d’etalement de la file.' })
+  spreadDays!: number;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  closedAt!: string | null;
+}
+
+/** Une ligne de la file d’un teleconseiller : quelle fiche, quel rang, quel jour. */
+export class SyncCallTaskDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ format: 'uuid' }) campaignId!: string;
+  @ApiProperty({ format: 'uuid' }) prospectId!: string;
+  @ApiProperty({ type: Number, description: 'Rang dans le programme, a partir de 1.' })
+  position!: number;
+  @ApiProperty({ type: Number, description: 'Journee d’etalement, a partir de 0.' })
+  dayIndex!: number;
+  @ApiProperty({ enum: CallTaskStatus, enumName: 'CallTaskStatus' }) status!: CallTaskStatus;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
+/**
+ * Une ligne du registre, telle qu'elle voyage vers le téléphone. Le serveur
+ * seul l'écrit : pas de `rev`, un pull rejoué recopie simplement la même ligne.
+ */
+export class SyncVisiteDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ example: 'V-2026-000412' }) reference!: string;
+  @ApiProperty({ example: '2026-01-06' }) date!: string;
+  @ApiProperty({ type: String, nullable: true, example: '11:08' }) time!: string | null;
+  @ApiProperty() visitorName!: string;
+  @ApiProperty({ type: String, nullable: true }) phone!: string | null;
+  @ApiProperty({ type: String, nullable: true }) phoneE164!: string | null;
+  @ApiProperty({ type: () => VisiteReferentielRefDto }) entreprise!: VisiteReferentielRefDto;
+  @ApiProperty({ type: () => VisiteReferentielRefDto }) objet!: VisiteReferentielRefDto;
+  @ApiProperty({ type: () => VisiteReferentielRefDto, nullable: true })
+  direction!: VisiteReferentielRefDto | null;
+  @ApiProperty({ type: () => VisiteReferentielRefDto, nullable: true })
+  destinataire!: VisiteReferentielRefDto | null;
+  @ApiProperty({ type: String, nullable: true }) comment!: string | null;
+  @ApiProperty({ format: 'uuid' }) createdById!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
 export class SyncChangesDto {
   @ApiProperty({ type: () => [DepartementDto] }) departements!: DepartementDto[];
   @ApiProperty({ type: () => [IefDto] }) iefs!: IefDto[];
@@ -463,6 +636,9 @@ export class SyncChangesDto {
   @ApiProperty({ type: () => [SyndicatDto] }) syndicats!: SyndicatDto[];
   @ApiProperty({ type: () => [RepresentantDto] }) representants!: RepresentantDto[];
   @ApiProperty({ type: () => [ProspectDto] }) prospects!: ProspectDto[];
+  @ApiProperty({ type: () => [SyncCallCampaignDto] }) callCampaigns!: SyncCallCampaignDto[];
+  @ApiProperty({ type: () => [SyncCallTaskDto] }) callTasks!: SyncCallTaskDto[];
+  @ApiProperty({ type: () => [SyncVisiteDto] }) visites!: SyncVisiteDto[];
 }
 
 export class SyncDeletionDto {

@@ -1,4 +1,5 @@
 import 'package:cpi_go/core/providers/app_providers.dart';
+import 'package:crm_api_client/crm_api_client.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/sync/phase2_directory_sync.dart';
 import 'package:cpi_go/core/settings/display_settings.dart';
@@ -7,16 +8,23 @@ import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/draft_repository.dart';
 import 'package:cpi_go/core/updates/app_update_controller.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
+import 'package:cpi_go/features/campagnes/presentation/campagne_file_screen.dart';
+import 'package:cpi_go/features/campagnes/presentation/campagnes_screen.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/auth/presentation/login_screen.dart';
 import 'package:cpi_go/features/notifications/presentation/notifications_screen.dart';
 import 'package:cpi_go/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:cpi_go/features/updates/presentation/app_update_screen.dart';
 import 'package:cpi_go/features/about/presentation/about_screen.dart';
+import 'package:cpi_go/features/accueil/presentation/registre_screen.dart';
+import 'package:cpi_go/features/accueil/presentation/visite_form_screen.dart';
+import 'package:cpi_go/features/accueil/visites_repository.dart';
 import 'package:cpi_go/features/corrections/presentation/corrections_screen.dart';
 import 'package:cpi_go/features/historique/presentation/historique_screen.dart';
 import 'package:cpi_go/features/home/presentation/home_screen.dart';
 import 'package:cpi_go/features/permissions/presentation/battery_help_screen.dart';
+import 'package:cpi_go/features/shell/grand_public_screen.dart';
+import 'package:cpi_go/features/shell/hub_screen.dart';
 import 'package:cpi_go/features/phase2/presentation/callback_picker.dart';
 import 'package:cpi_go/features/phase2/presentation/phase2_screen.dart';
 import 'package:cpi_go/features/prospect/presentation/prospect_entry_screen.dart';
@@ -101,6 +109,51 @@ void main() {
       authorName: 'Ndeye Astou Mbengue Sarr',
     );
 
+    // Une campagne dans son état le plus large : un nom rédigé depuis le web,
+    // une file étalée sur assez de jours pour que l'en-tête porte deux nombres,
+    // et un rang à trois chiffres devant un nom complet.
+    await insertCampagne(
+      db,
+      id: 'campFiche',
+      name: 'Enseignants du moyen secondaire, region de Ziguinchor',
+      spreadDays: 7,
+    );
+    await insertProspect(
+      db,
+      id: 'proCampagne',
+      representantId: 'repFiche',
+      phone: '+221780000003',
+      nom: 'Kane Diagne',
+      prenom: 'Abdoulaye Ousseynou',
+    );
+    await insertTache(
+      db,
+      id: 'tacheCampagne',
+      campaignId: 'campFiche',
+      prospectId: 'proCampagne',
+      position: 128,
+      dayIndex: 3,
+    );
+
+    // Le registre dans son état le plus large : les intitulés les plus longs
+    // du classeur, une référence, un téléphone et les quatre listes remplies.
+    await insertVisite(
+      db,
+      id: 'v1',
+      date: '2026-08-12',
+      time: '11:08',
+      visitorName: 'Abdoulaye Ousseynou Kane Diagne',
+      phone: '+33 6 12 34 56 78',
+      entrepriseId: 'e1',
+      entrepriseLabel: 'MAKE-UP ADDICTION',
+      objetId: 'o1',
+      objetLabel: 'ACHAT PRODUITS SANTARGILE ET/OU MAKE-UP',
+      directionId: 'd1',
+      directionLabel: 'MARKETING COMMUNICATION',
+      destinataireId: 't1',
+      destinataireLabel: 'MME. DIOUM YAMA (Ass Rh et Commerciale Argile)',
+    );
+
     // Un brouillon vieux d'une heure sur chaque formulaire : entre 60 s et
     // 7 jours, `DraftRepository` le classe « reprenable » et l'écran affiche le
     // bandeau de reprise. Ce bandeau porte deux `TextButton` dans la même ligne
@@ -167,6 +220,7 @@ void main() {
         clockProvider.overrideWithValue(FakeClock(t0)),
         sharedPreferencesProvider.overrideWithValue(prefs),
         authControllerProvider.overrideWith(_SignedInController.new),
+        visitesPortProvider.overrideWithValue(const _VisitesFigees()),
       ],
       child: MaterialApp(
         theme: AppTheme.light,
@@ -253,6 +307,11 @@ void main() {
   /// hauteur DISPONIBLE, et un `RenderFlex` déborde à la peinture avec ou sans
   /// lui : le motif de l'exclusion ne tenait pas.
   final Map<String, Widget Function()> screens = <String, Widget Function()>{
+    // Le hub est le premier ecran d'une session : trois tuiles d'icone,
+    // titre et sous-titre sur une seule ligne de `Row`, c'est-a-dire la
+    // geometrie qui deborde en premier quand le texte grandit.
+    'Projets': HubScreen.new,
+    'Projet Grand Public': GrandPublicScreen.new,
     'Accueil': HomeScreen.new,
     'Réglages': ReglagesScreen.new,
     'Historique': HistoriqueScreen.new,
@@ -287,9 +346,24 @@ void main() {
     // Les quatre que la liste oubliait en se croyant complète. Trois sont
     // atteignables sans session ou juste après, donc jamais vus par un
     // balayage qui partait de l'accueil.
+    // Le registre des visites : la ligne empile heure, référence, nom et une
+    // suite d'intitulés du classeur qui ne tiennent pas sur une ligne, et le
+    // formulaire empile quatre champs de choix sous une barre épinglée.
+    // Le registre se cloisonne sur le rôle : peint sous le compte du
+    // téléconseiller, il ne rendrait que son refus d'accès.
+    'Registre des visites': () => ProviderScope(
+      overrides: [authControllerProvider.overrideWith(_AccueilController.new)],
+      child: const RegistreScreen(),
+    ),
+    'Inscrire un visiteur': VisiteFormScreen.new,
     'Connexion': LoginScreen.new,
     'Premier lancement': OnboardingScreen.new,
     'Notifications': NotificationsScreen.new,
+    // Les campagnes : le nom que l'équipe du client a rédigé, suivi d'un compte
+    // et d'un nombre de jours sur la même ligne de sous-titre. La file, elle,
+    // porte un en-tête de jour et un rang collé au nom de la fiche.
+    'Campagnes': CampagnesScreen.new,
+    'File de campagne': () => const CampagneFileScreen(campaignId: 'campFiche'),
     // Le contenu de la feuille des issues négatives quand l'issue est
     // « À rappeler » : six puces de largeurs très inégales, dont
     // « Cet après-midi (15 h) ».
@@ -401,6 +475,18 @@ class _SignedInController extends AuthController {
   );
 }
 
+/// L'accueil, pour peindre le registre des visites plutôt que son refus d'accès.
+class _AccueilController extends AuthController {
+  @override
+  AuthState build() => const AuthState(
+    status: AuthStatus.authenticated,
+    userId: 'u-2',
+    fullName: 'Fatou Sarr',
+    role: 'ACCUEIL',
+    email: 'fatou.sarr@cpi.sn',
+  );
+}
+
 /// Des motifs aussi longs que ce que l'équipe du client peut écrire, sur les
 /// quatre effets que la feuille regroupe.
 const List<CallReason> _reasons = <CallReason>[
@@ -436,3 +522,35 @@ const List<CallReason> _reasons = <CallReason>[
     sortOrder: 50,
   ),
 ];
+
+
+/// Les intitulés les plus longs du classeur : c'est eux qui débordent.
+class _VisitesFigees implements VisitesPort {
+  const _VisitesFigees();
+
+  static VisiteReferentielDto _entree(String id, String label) => VisiteReferentielDto(
+    id: id,
+    code: id.toUpperCase(),
+    label: label,
+    isActive: true,
+    isSystem: true,
+    sortOrder: 1,
+    updatedAt: DateTime.utc(2026),
+  );
+
+  @override
+  Future<VisiteReferentielsBundleDto> referentiels() async =>
+      VisiteReferentielsBundleDto(
+        entreprises: <VisiteReferentielDto>[_entree('e1', 'MAKE-UP ADDICTION')],
+        directions: <VisiteReferentielDto>[
+          _entree('d1', 'MARKETING COMMUNICATION'),
+        ],
+        destinataires: <VisiteReferentielDto>[
+          _entree('t1', 'MME. DIOUM YAMA (Ass Rh et Commerciale Argile)'),
+        ],
+        objets: <VisiteReferentielDto>[
+          _entree('o1', 'ACHAT PRODUITS SANTARGILE ET/OU MAKE-UP'),
+        ],
+      );
+
+}

@@ -31,7 +31,17 @@ if ! node_modules/.bin/prisma migrate deploy; then
   echo "  Vérifiez DATABASE_URL et que Postgres est joignable." >&2
   exit 1
 fi
-echo "✓ Base à jour."
+
+DEMO_DATABASE_URL="$(node -e 'const url = new URL(process.env.DATABASE_URL); url.searchParams.set("schema", "demo"); process.stdout.write(url.toString())')"
+if [ -z "$DEMO_DATABASE_URL" ]; then
+  echo "✗ URL du schéma démo introuvable, l'API ne démarre pas." >&2
+  exit 1
+fi
+if ! DATABASE_URL="$DEMO_DATABASE_URL" node_modules/.bin/prisma migrate deploy; then
+  echo "✗ Migrations du schéma démo en échec, l'API ne démarre pas." >&2
+  exit 1
+fi
+echo "✓ Espaces réel et démo à jour."
 
 # ── Amorçage ────────────────────────────────────────────────────────────────
 # Les référentiels : 46 départements, banques, syndicats, workflow bancaire

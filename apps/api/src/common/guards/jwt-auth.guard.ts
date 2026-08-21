@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 import type { AuthenticatedUser } from '../decorators/current-user.decorator.js';
 import { readEnv } from '../../env.js';
+import { WorkspaceContext, type Workspace } from '../../workspaces/workspace.js';
 
 export interface AccessTokenPayload {
   sub: string;
@@ -12,6 +13,7 @@ export interface AccessTokenPayload {
   username: string;
   fullName: string;
   role: AuthenticatedUser['role'];
+  workspace?: Workspace;
   typ: string;
 }
 
@@ -20,6 +22,7 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly jwt: JwtService,
+    private readonly workspace: WorkspaceContext,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
@@ -53,12 +56,15 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Jeton d’accès invalide');
     }
 
+    const workspace = payload.workspace === 'demo' ? 'demo' : 'public';
+    this.workspace.enter(workspace);
     request.user = {
       id: payload.sub,
       email: payload.email,
       username: payload.username,
       fullName: payload.fullName,
       role: payload.role,
+      workspace,
     };
     return true;
   }

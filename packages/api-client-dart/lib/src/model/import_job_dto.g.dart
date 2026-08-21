@@ -383,6 +383,7 @@ const _$ImportKindEnumMap = {
   ImportKind.REPRESENTANTS: 'REPRESENTANTS',
   ImportKind.PROSPECTS: 'PROSPECTS',
   ImportKind.VISITES: 'VISITES',
+  ImportKind.PROSPECTS_GRAND_PUBLIC: 'PROSPECTS_GRAND_PUBLIC',
   ImportKind.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

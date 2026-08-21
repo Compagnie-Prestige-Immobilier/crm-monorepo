@@ -323,20 +323,6 @@ export class RepresentantsImportAdapter implements ImportAdapter<RepresentantImp
       unique.push(row);
     }
 
-    // SECONDE FAMILLE : le fichier contre la base, en UNE requête pour la
-    // tranche entière. Une lecture par ligne rendrait l'import inutilisable sur
-    // cinquante mille lignes et saturerait le pool de connexions.
-    //
-    // LECTURE GLOBALE délibérée, sans cloisonnement de démonstration : l'index
-    // unique partiel `representants_phone_e164_active_key` est GLOBAL, il ne
-    // connaît pas le mode démonstration. Filtré, ce contrôle déclarerait libres
-    // des numéros tenus par des fiches fictives, `skipDuplicates` les écarterait
-    // ensuite en silence, et le rapport annoncerait « 40 créés » pour 38 écrits.
-    // Même raisonnement que `assertPhoneFree`.
-    // Lue PAR TRANCHES de mille numéros : la taille de tranche du moteur est
-    // réglable jusqu'à cinq mille, et un `IN (...)` de cette taille approche des
-    // bornes de la requête. Le découpage est celui de `existingPhones`, repris
-    // tel quel.
     const known = new Set<string>();
     for (const slice of chunkOf(
       unique.map((row) => row.phoneE164),
@@ -387,11 +373,6 @@ export class RepresentantsImportAdapter implements ImportAdapter<RepresentantImp
         // de l'écriture, jamais une date inventée. Les statistiques d'activité
         // s'appuient dessus, une valeur fabriquée les fausserait.
         clientCreatedAt: now,
-        // EN TOUTES LETTRES, et sans consulter l'interrupteur de démonstration.
-        // Ce chemin est exécuté par une tâche planifiée, hors de portée de
-        // `DemoReadOnlyGuard` : lire le mode ici écrirait des fiches fictives
-        // qu'aucune purge ne saurait reprendre. Même doctrine que les rappels.
-        isDemo: false,
       })),
       // L'index partiel double la contrainte : une ligne qui s'y heurterait
       // malgré nos contrôles est ignorée plutôt que de faire échouer les 499

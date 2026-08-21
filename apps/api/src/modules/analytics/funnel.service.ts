@@ -5,33 +5,25 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
 import { prospectConditions, PROSPECT_FROM } from './analytics.sql.js';
-import { BANK_CASE, demoScopeOn } from './pilotage.sql.js';
+import { BANK_CASE } from './pilotage.sql.js';
 import { closedAtLateral } from '../bank-cases/bank-cases.sql.js';
 import type { AnalyticsFinanceDto, AnalyticsFunnelDto, FunnelStageDto } from './funnel.dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 /** Date d'encaissement ou de rejet lue dans l'HISTORIQUE : `updatedAt` bouge à chaque écriture et fausserait délai et montant 30 jours. */
 const CLOSED_AT = closedAtLateral(BANK_CASE);
 
 @Injectable()
 export class FunnelService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async funnel(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<AnalyticsFunnelDto> {
-    const demoEnabled = await this.demo.enabled();
-    const where = prospectConditions(user, filter, demoEnabled);
+    const where = prospectConditions(user, filter);
 
-    const [stages, finance] = await Promise.all([
-      this.stages(where, demoEnabled),
-      this.finance(where, demoEnabled),
-    ]);
+    const [stages, finance] = await Promise.all([this.stages(where), this.finance(where)]);
 
     return { etapes: stages, finance };
   }
 
-  private async stages(where: Prisma.Sql, demoEnabled: boolean): Promise<FunnelStageDto[]> {
+  private async stages(where: Prisma.Sql): Promise<FunnelStageDto[]> {
     const rows = await this.prisma.$queryRaw<
       {
         prospects: number;
@@ -53,7 +45,7 @@ export class FunnelService {
       LEFT JOIN "bank_cases" bc
         ON bc."prospectId" = p."id"
        AND bc."deletedAt" IS NULL
-       AND ${demoScopeOn(BANK_CASE, demoEnabled)}
+       AND TRUE
       LEFT JOIN "bank_case_stages" st
         ON st."id" = bc."currentStageId"
       WHERE ${where}
@@ -77,7 +69,7 @@ export class FunnelService {
     ];
   }
 
-  private async finance(where: Prisma.Sql, demoEnabled: boolean): Promise<AnalyticsFinanceDto> {
+  private async finance(where: Prisma.Sql): Promise<AnalyticsFinanceDto> {
     const rows = await this.prisma.$queryRaw<
       {
         dossiers: number;
@@ -95,7 +87,7 @@ export class FunnelService {
         JOIN "bank_cases" bc
           ON bc."prospectId" = p."id"
          AND bc."deletedAt" IS NULL
-         AND ${demoScopeOn(BANK_CASE, demoEnabled)}
+         AND TRUE
         JOIN "bank_case_stages" st
           ON st."id" = bc."currentStageId"
         ${CLOSED_AT}

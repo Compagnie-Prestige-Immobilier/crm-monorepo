@@ -3,14 +3,11 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { PROSPECT_FROM, prospectConditions } from './analytics.sql.js';
 import {
-  BANK_CASE,
   PROSPECT_OUTCOME_AGGREGATES,
-  TRANSITION,
   days,
-  demoScopeOn,
+  ALL_ROWS,
   prospectOutcomeColumns,
   rate,
 } from './pilotage.sql.js';
@@ -33,16 +30,12 @@ const BUCKETS: { key: BankAgeBucket; label: string }[] = [
 
 @Injectable()
 export class PortfolioService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async bankAging(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<BankAgingDto> {
-    const demoEnabled = await this.demo.enabled();
-    const where = prospectConditions(user, filter, demoEnabled);
-    const caseScope = demoScopeOn(BANK_CASE, demoEnabled);
-    const transitionScope = demoScopeOn(TRANSITION, demoEnabled);
+    const where = prospectConditions(user, filter);
+    const caseScope = ALL_ROWS;
+    const transitionScope = ALL_ROWS;
 
     const rows = await this.prisma.$queryRaw<
       {
@@ -127,15 +120,14 @@ export class PortfolioService {
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
   ): Promise<WeeklyCohortListDto> {
-    const demoEnabled = await this.demo.enabled();
-    const where = prospectConditions(user, filter, demoEnabled);
+    const where = prospectConditions(user, filter);
 
     const rows = await this.prisma.$queryRaw<(ProspectOutcomeRow & { semaine: string })[]>`
       WITH base AS (
         SELECT
           -- Semaine de clientCreatedAt, la saisie terrain, pas l'arrivée en base.
           to_char(date_trunc('week', p."clientCreatedAt"), 'YYYY-MM-DD') AS semaine,
-          ${prospectOutcomeColumns(demoEnabled)}
+          ${prospectOutcomeColumns()}
         ${PROSPECT_FROM}
         WHERE ${where}
       )
@@ -165,8 +157,7 @@ export class PortfolioService {
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
   ): Promise<DepartementYieldListDto> {
-    const demoEnabled = await this.demo.enabled();
-    const where = prospectConditions(user, filter, demoEnabled);
+    const where = prospectConditions(user, filter);
 
     const rows = await this.prisma.$queryRaw<
       (ProspectOutcomeRow & { id: string; label: string })[]
@@ -175,7 +166,7 @@ export class PortfolioService {
         SELECT
           d."id"   AS departement_id,
           d."name" AS departement_label,
-          ${prospectOutcomeColumns(demoEnabled)}
+          ${prospectOutcomeColumns()}
         ${PROSPECT_FROM}
         INNER JOIN "departements" d ON d."id" = r."departementId"
         WHERE ${where}

@@ -73,7 +73,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
   if (detail.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/dossiers">Tous les dossiers</DetailBackLink>
+        <DetailBackLink href="/chues/dossiers">Tous les dossiers</DetailBackLink>
         <QueryErrorState
           error={detail.error}
           onRetry={() => {
@@ -88,7 +88,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
   if (stages.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/dossiers">Tous les dossiers</DetailBackLink>
+        <DetailBackLink href="/chues/dossiers">Tous les dossiers</DetailBackLink>
         <QueryErrorState
           error={stages.error}
           onRetry={() => {
@@ -113,7 +113,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
 
   return (
     <div className="flex flex-col gap-6">
-      <DetailBackLink href="/dossiers">Tous les dossiers</DetailBackLink>
+      <DetailBackLink href="/chues/dossiers">Tous les dossiers</DetailBackLink>
 
       {/* ─── En-tête ─────────────────────────────────────────────────── */}
       <Card className="animate-rise">

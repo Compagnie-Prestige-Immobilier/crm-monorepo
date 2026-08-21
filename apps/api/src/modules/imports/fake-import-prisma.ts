@@ -10,7 +10,6 @@ export interface FakeRepresentant {
   createdById: string;
   clientCreatedAt: Date;
   deletedAt: Date | null;
-  isDemo: boolean;
 }
 
 export interface FakeDepartement {
@@ -91,7 +90,6 @@ export const fakeJob = (seed: FakeJobSeed = {}): ImportJob => ({
   startedAt: seed.startedAt ?? null,
   finishedAt: null,
   expiresAt: new Date(BASE.getTime() + 24 * 3_600_000),
-  isDemo: false,
   createdAt: BASE,
   updatedAt: BASE,
 });
@@ -261,7 +259,6 @@ export class FakeImportPrisma {
             createdById: row.createdById as string,
             clientCreatedAt: row.clientCreatedAt as Date,
             deletedAt: null,
-            isDemo: row.isDemo === true,
           });
           count += 1;
         }

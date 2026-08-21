@@ -75,6 +75,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/auth/workspace': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Change d’espace de travail. */
+    post: operations['switchWorkspace'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/users': {
     parameters: {
       query?: never;
@@ -197,6 +214,41 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/api/v1/referentiels/canaux-provenance': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Canaux de provenance du Grand Public. */
+    get: operations['listCanauxProvenance'];
+    put?: never;
+    /** Ajoute un canal. Le code est immuable : les fiches le désignent. */
+    post: operations['createCanalProvenance'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/referentiels/canaux-provenance/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Renomme un canal, ou le retire des listes via isActive. */
+    patch: operations['updateCanalProvenance'];
     trace?: never;
   };
   '/api/v1/referentiels/departements': {
@@ -797,6 +849,160 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites/referentiels': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Les quatre listes de l’accueil, en un appel. */
+    get: operations['listVisiteReferentiels'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites/referentiels/{kind}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Une liste, entrées retirées comprises. */
+    get: operations['listVisiteReferentiel'];
+    put?: never;
+    /**
+     * Ajoute une entrée à une liste.
+     * @description Le code est immuable : les visites déjà enregistrées le désignent.
+     */
+    post: operations['createVisiteReferentiel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites/referentiels/{kind}/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Renomme ou déplace une entrée. */
+    patch: operations['updateVisiteReferentiel'];
+    trace?: never;
+  };
+  '/api/v1/visites/referentiels/{kind}/{id}/active': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Retire une entrée des listes, ou l’y remet.
+     * @description Jamais de suppression : le registre des années passées continue de désigner l’entrée.
+     */
+    post: operations['setVisiteReferentielActive'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites/referentiels/{kind}/reorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Fixe l’ordre d’affichage d’une liste. */
+    post: operations['reorderVisiteReferentiel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites/statistiques': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Le registre compté sur une période.
+     * @description Total, répartitions par entreprise, direction, destinataire et objet, puis la marche du mois et du jour. Une répartition liste TOUTES les entrées de sa liste, y compris à zéro ; sa somme peut être inférieure au total, l’écart étant rendu par sansDirection et sansDestinataire.
+     */
+    get: operations['getVisiteStats'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Le registre, du plus récent au plus ancien. */
+    get: operations['listVisites'];
+    put?: never;
+    /**
+     * Inscrit un visiteur au registre.
+     * @description La référence est engendrée par le serveur. Le téléphone est facultatif et accepté sous n’importe quelle forme : un numéro que la normalisation ne reconnaît pas est conservé tel quel, avec phoneE164 nul.
+     */
+    post: operations['createVisite'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/visites/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Une ligne du registre. */
+    get: operations['getVisite'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Corrige une ligne du registre.
+     * @description Ni la date ni la référence : elles fixent la ligne dans le registre.
+     */
+    patch: operations['updateVisite'];
     trace?: never;
   };
   '/api/v1/phase2/callbacks': {
@@ -1811,6 +2017,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/analytics/ambassador-conversion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Part des représentants travaillés devenus ambassadeurs.
+     * @description La période borne la DATE DE LA BASCULE, pas l’arrivée en base : un statut poussé avec trois jours de retard reste compté le jour où il a été décidé. Le dénominateur ne retient que les représentants dont la relation a bougé dans la période ; `untracked` compte, hors période, ceux de l’annuaire sans aucune trace, qui ne sont donc mesurés ni au numérateur ni au dénominateur. Seuls `dateFrom`, `dateTo`, `commercialId`, `departementId` et `representantId` agissent : les autres filtres qualifient un prospect, pas un représentant.
+     */
+    get: operations['getAmbassadorConversion'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/analytics/data-quality': {
     parameters: {
       query?: never;
@@ -1898,8 +2124,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** État du mode démonstration, compteurs et autorisation de bascule. */
-    get: operations['getDemoStatus'];
+    /** État du workspace démo. */
+    get: operations['getDemoWorkspaceStatus'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1908,7 +2134,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/admin/demo/enable': {
+  '/api/v1/admin/demo/reset': {
     parameters: {
       query?: never;
       header?: never;
@@ -1917,51 +2143,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /**
-     * Peuple la plateforme de données de démonstration.
-     * @description Idempotent : activer une seconde fois ne double pas le jeu. Refusé en production tant que DEMO_MODE_ALLOWED ne vaut pas true. CONSÉQUENCE À ANNONCER AVANT LA CONFIRMATION : tant que le mode est actif, la plateforme passe en LECTURE SEULE pour tout le monde. Les écritures interactives (POST, PATCH, PUT, DELETE) sont refusées en 409 `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).
-     */
-    post: operations['enableDemoMode'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/demo/purge': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Supprime définitivement le jeu de démonstration.
-     * @description IRRÉVERSIBLE, et distinct de la désactivation. Supprime exactement les lignes enregistrées à l’ensemencement, dans l’ordre inverse de création. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration. L’interface doit faire confirmer.
-     */
-    post: operations['purgeDemoData'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/demo/disable': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Masque les données de démonstration.
-     * @description NE SUPPRIME RIEN. Les lignes de démonstration restent en base, invisibles pour toute lecture, export Excel compris. Pour les effacer définitivement, utiliser /purge. REND AUSSI L’ÉCRITURE à toute la plateforme : c’est cette route qui lève la lecture seule posée par /enable.
-     */
-    post: operations['disableDemoMode'];
+    /** Réinitialise le workspace démo. */
+    post: operations['resetDemoWorkspace'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2044,6 +2227,26 @@ export interface paths {
      * @description En-têtes figés, une ligne d’exemple grisée, un onglet Instructions, et des listes déroulantes alimentées depuis les référentiels VIVANTS. Banque et Syndicat sont des listes et non du texte libre : leur croisement détermine le segment BDD, et une valeur saisie à la main range la fiche dans le mauvais segment.
      */
     get: operations['downloadProspectsTemplateXlsx'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/export/prospects-grand-public-modele.xlsx': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Modèle vide pour l’import de prospects Grand Public.
+     * @description Syndicat, banque de domiciliation, fonctionnaire et canal de provenance sont des listes déroulantes, tirées des référentiels VIVANTS. Seuls le nom et le téléphone sont exigés : toute autre colonne peut rester vide, ou même manquer du fichier, car les colonnes sont retrouvées par le texte de leur en-tête et non par leur rang.
+     */
+    get: operations['downloadProspectsGrandPublicTemplateXlsx'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2161,7 +2364,7 @@ export interface paths {
     put?: never;
     /**
      * Demande un export intégral de la base (schéma et données).
-     * @description Rend IMMÉDIATEMENT, avec un identifiant et un état ; `pg_dump` tourne en arrière-plan. Un avis part ensuite dans la boîte de réception et par e-mail, SANS aucun lien : le fichier ne se télécharge que dans une session authentifiée, par `GET admin/database-dump/download`. Un export déjà en cours est renvoyé tel quel, aucun second `pg_dump` n’est lancé. Refusé pendant une démonstration, un export y mêlerait des lignes fictives aux vraies. Le fichier est détruit dès son téléchargement, et de toute façon à son échéance.
+     * @description Rend IMMÉDIATEMENT, avec un identifiant et un état ; `pg_dump` tourne en arrière-plan. Un avis part ensuite dans la boîte de réception et par e-mail, SANS aucun lien : le fichier ne se télécharge que dans une session authentifiée, par `GET admin/database-dump/download`. Un export déjà en cours est renvoyé tel quel, aucun second `pg_dump` n’est lancé. Refusé dans l’espace démo. Le fichier est détruit dès son téléchargement, et de toute façon à son échéance.
      */
     post: operations['requestDatabaseDump'];
     delete?: never;
@@ -2247,6 +2450,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/imports/prospects-grand-public': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Dépose un classeur de prospects Grand Public et inscrit le travail. Rend immédiatement.
+     * @description NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Les colonnes sont retrouvées par le TEXTE de leur en-tête, en ligne 1, jamais par leur rang. SEULS le nom et le téléphone sont exigés : profession, syndicat, banque, fonctionnaire, durée du système et canal de provenance se lisent vides sans faire refuser la ligne, et leur colonne peut même manquer du fichier. « Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE ; à « non », le type reste vide, car le fichier ne dit pas lequel des trois autres il serait. Le modèle de classeur se télécharge par `GET /export/prospects-grand-public-modele.xlsx`.
+     */
+    post: operations['createProspectsGrandPublicImport'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/imports/visites': {
     parameters: {
       query?: never;
@@ -2307,160 +2530,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/visites/referentiels': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Les quatre listes de l’accueil, en un appel. */
-    get: operations['listVisiteReferentiels'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites/referentiels/{kind}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Une liste, entrées retirées comprises. */
-    get: operations['listVisiteReferentiel'];
-    put?: never;
-    /**
-     * Ajoute une entrée à une liste.
-     * @description Le code est immuable : les visites déjà enregistrées le désignent.
-     */
-    post: operations['createVisiteReferentiel'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites/referentiels/{kind}/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Renomme ou déplace une entrée. */
-    patch: operations['updateVisiteReferentiel'];
-    trace?: never;
-  };
-  '/api/v1/visites/referentiels/{kind}/{id}/active': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Retire une entrée des listes, ou l’y remet.
-     * @description Jamais de suppression : le registre des années passées continue de désigner l’entrée.
-     */
-    post: operations['setVisiteReferentielActive'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites/referentiels/{kind}/reorder': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Fixe l’ordre d’affichage d’une liste. */
-    post: operations['reorderVisiteReferentiel'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites/statistiques': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Le registre compté sur une période.
-     * @description Total, répartitions par entreprise, direction, destinataire et objet, puis la marche du mois et du jour. Une répartition liste TOUTES les entrées de sa liste, y compris à zéro ; sa somme peut être inférieure au total, l’écart étant rendu par sansDirection et sansDestinataire.
-     */
-    get: operations['getVisiteStats'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Le registre, du plus récent au plus ancien. */
-    get: operations['listVisites'];
-    put?: never;
-    /**
-     * Inscrit un visiteur au registre.
-     * @description La référence est engendrée par le serveur. Le téléphone est facultatif et accepté sous n’importe quelle forme : un numéro que la normalisation ne reconnaît pas est conservé tel quel, avec phoneE164 nul.
-     */
-    post: operations['createVisite'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Une ligne du registre. */
-    get: operations['getVisite'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /**
-     * Corrige une ligne du registre.
-     * @description Ni la date ni la référence : elles fixent la ligne dans le registre.
-     */
-    patch: operations['updateVisite'];
-    trace?: never;
-  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2484,6 +2553,8 @@ export interface components {
       fullName: string;
       role: components['schemas']['Role'];
       isActive: boolean;
+      /** @enum {string} */
+      workspace: 'public' | 'demo';
       /** Format: uuid */
       departementId?: string | null;
       phoneE164?: string | null;
@@ -2506,7 +2577,7 @@ export interface components {
        */
       statusCode: number;
       /**
-       * @description Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR). DEUX CODES TRANSVERSES méritent d’être traités une fois pour toutes côté client. Ils sortent tous deux en 409 sur TOUTE requête POST, PATCH, PUT ou DELETE, ne dépendent d’aucune opération en particulier, et leur `message` est déjà rédigé pour être affiché tel quel : `DEMO_MODE_READ_ONLY` tant que le mode démonstration est actif ; `DEMO_MODE_STATE_UNKNOWN` quand le serveur n’arrive pas à lire l’état de ce mode et refuse d’écrire une ligne dont il ne saurait pas dire si elle est réelle. Le second N’ANNONCE PAS une démonstration en cours : il invite à réessayer, et non à faire éteindre un interrupteur. Ces routes-là, et elles seules, n’émettent JAMAIS ces codes : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).
+       * @description Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR).
        * @example BANK_CASE_NOT_FOUND
        */
       code: string;
@@ -2531,6 +2602,10 @@ export interface components {
     };
     LogoutResponseDto: {
       revoked: boolean;
+    };
+    SwitchWorkspaceDto: {
+      /** @enum {string} */
+      workspace: 'public' | 'demo';
     };
     UserDto: {
       /** Format: uuid */
@@ -2571,7 +2646,10 @@ export interface components {
       password: string;
       /** @default COMMERCIAL */
       role: components['schemas']['Role'];
-      /** Format: uuid */
+      /**
+       * Format: uuid
+       * @description Chaîne vide pour retirer le rattachement.
+       */
       departementId?: string;
       /** @description Téléphone, normalisé en E.164 par le serveur. */
       phone?: string;
@@ -2584,11 +2662,13 @@ export interface components {
       fullName?: string;
       /** @default COMMERCIAL */
       role: components['schemas']['Role'];
-      /** Format: uuid */
+      /**
+       * Format: uuid
+       * @description Chaîne vide pour retirer le rattachement.
+       */
       departementId?: string;
       /** @description Téléphone, normalisé en E.164 par le serveur. */
       phone?: string;
-      isActive?: boolean;
     };
     SetActiveDto: {
       isActive: boolean;
@@ -2644,6 +2724,29 @@ export interface components {
       syndicats: components['schemas']['SyndicatDto'][];
       departements: components['schemas']['DepartementDto'][];
       regions: components['schemas']['RegionDto'][];
+    };
+    CanalProvenanceDto: {
+      /** Format: uuid */
+      id: string;
+      /** @description Clé stable, jamais réécrite : les fiches la désignent. */
+      code: string;
+      label: string;
+      position: number;
+      isActive: boolean;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    CreateCanalProvenanceDto: {
+      /** @description Immuable une fois posé. */
+      code: string;
+      label: string;
+      position?: number;
+    };
+    UpdateCanalProvenanceDto: {
+      label?: string;
+      position?: number;
+      /** @description Le retirer des listes, jamais le supprimer. */
+      isActive?: boolean;
     };
     IefDto: {
       /** Format: uuid */
@@ -2985,6 +3088,10 @@ export interface components {
       clientCreatedAt?: string;
     };
     /** @enum {string} */
+    Projet: 'CHUES' | 'GRAND_PUBLIC';
+    /** @enum {string} */
+    ProspectType: 'FONCTIONNAIRE' | 'SECTEUR_PRIVE' | 'INFORMEL' | 'DIASPORA';
+    /** @enum {string} */
     ProspectStatut: 'NOUVEAU' | 'CONTACTE' | 'CONVERTI' | 'PERDU';
     /** @enum {string} */
     BddSegment: 'BDD1' | 'BDD2' | 'BDD3' | 'BDD4';
@@ -3008,24 +3115,35 @@ export interface components {
       phoneE164: string;
       rev: number;
       statut: components['schemas']['ProspectStatut'];
+      projet: components['schemas']['Projet'];
       /** Format: uuid */
-      banqueId: string;
-      banqueName: string;
+      banqueId: string | null;
+      banqueName: string | null;
       /** Format: uuid */
-      syndicatId: string;
-      syndicatSigle: string;
+      syndicatId: string | null;
+      syndicatSigle: string | null;
       /** Format: uuid */
-      representantId: string;
-      representantName: string;
-      representantPhoneE164: string;
+      representantId: string | null;
+      representantName: string | null;
+      representantPhoneE164: string | null;
       /** Format: uuid */
-      departementId: string;
-      departementName: string;
+      departementId: string | null;
+      departementName: string | null;
       /** Format: uuid */
       ownedByCommercialId: string;
       ownedByCommercialName: string;
-      /** @description Calculé par croisement syndicat × banque. Jamais stocké en base. */
-      segment: components['schemas']['BddSegment'];
+      /** @description Hors CHUES : ce qu’est le prospect. Nul si la question n’a pas été posée. */
+      type: components['schemas']['ProspectType'] | null;
+      /** @description Métier déclaré, en clair. */
+      profession: string | null;
+      /** @description Durée du système de paiement retenue, en MOIS. */
+      dureeSystemeMois: number | null;
+      /** Format: uuid */
+      canalProvenanceId: string | null;
+      /** @description Par où le prospect est arrivé. Référentiel ouvert. */
+      canalProvenanceLabel: string | null;
+      /** @description Calculé par croisement syndicat × banque, jamais stocké. NUL dès qu’il manque l’un des deux : le segment ne se devine pas. */
+      segment: components['schemas']['BddSegment'] | null;
       phase2Status: components['schemas']['Phase2Status'];
       /** @description Renseignée si et seulement si `phase2Status` vaut METHOD_OBTAINED. */
       enrollmentMethod: components['schemas']['EnrollmentMethod'] | null;
@@ -3067,18 +3185,30 @@ export interface components {
        */
       id?: string;
       nom: string;
-      prenom: string;
+      prenom?: string;
       /**
        * @description Téléphone en saisie libre. Normalisé en E.164 par le serveur.
        * @example 77 123 45 67
        */
       phone: string;
       /** Format: uuid */
-      banqueId: string;
+      banqueId?: string;
       /** Format: uuid */
-      syndicatId: string;
+      syndicatId?: string;
       /** Format: uuid */
-      representantId: string;
+      representantId?: string;
+      /** @description CHUES par défaut. Les deux projets ne se mélangent nulle part. */
+      projet?: components['schemas']['Projet'];
+      type?: components['schemas']['ProspectType'];
+      /** @description Métier déclaré, en clair. */
+      profession?: string;
+      /** @description Durée du système de paiement, en MOIS. */
+      dureeSystemeMois?: number;
+      /**
+       * Format: uuid
+       * @description Canal de provenance, choisi dans le référentiel.
+       */
+      canalProvenanceId?: string;
       statut?: components['schemas']['ProspectStatut'];
       /**
        * Format: date-time
@@ -3092,8 +3222,8 @@ export interface components {
       nom: string;
       prenom: string;
       /** Format: uuid */
-      representantId: string;
-      representantName: string;
+      representantId: string | null;
+      representantName: string | null;
       /** Format: uuid */
       ownedByCommercialId: string;
       ownedByCommercialName: string;
@@ -3107,7 +3237,7 @@ export interface components {
        */
       statusCode: number;
       /**
-       * @description Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR). DEUX CODES TRANSVERSES méritent d’être traités une fois pour toutes côté client. Ils sortent tous deux en 409 sur TOUTE requête POST, PATCH, PUT ou DELETE, ne dépendent d’aucune opération en particulier, et leur `message` est déjà rédigé pour être affiché tel quel : `DEMO_MODE_READ_ONLY` tant que le mode démonstration est actif ; `DEMO_MODE_STATE_UNKNOWN` quand le serveur n’arrive pas à lire l’état de ce mode et refuse d’écrire une ligne dont il ne saurait pas dire si elle est réelle. Le second N’ANNONCE PAS une démonstration en cours : il invite à réessayer, et non à faire éteindre un interrupteur. Ces routes-là, et elles seules, n’émettent JAMAIS ces codes : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).
+       * @description Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR).
        * @example BANK_CASE_NOT_FOUND
        * @enum {string}
        */
@@ -3147,6 +3277,18 @@ export interface components {
       syndicatId?: string;
       /** Format: uuid */
       representantId?: string;
+      /** @description CHUES par défaut. Les deux projets ne se mélangent nulle part. */
+      projet?: components['schemas']['Projet'];
+      type?: components['schemas']['ProspectType'];
+      /** @description Métier déclaré, en clair. */
+      profession?: string;
+      /** @description Durée du système de paiement, en MOIS. */
+      dureeSystemeMois?: number;
+      /**
+       * Format: uuid
+       * @description Canal de provenance, choisi dans le référentiel.
+       */
+      canalProvenanceId?: string;
       statut?: components['schemas']['ProspectStatut'];
       /**
        * Format: date-time
@@ -3235,7 +3377,7 @@ export interface components {
       prospectIds: string[];
     };
     /** @enum {string} */
-    SyncEntity: 'representant' | 'representant_comment' | 'prospect' | 'call_attempt';
+    SyncEntity: 'representant' | 'representant_comment' | 'prospect' | 'call_attempt' | 'visite';
     /** @enum {string} */
     SyncOp: 'create' | 'update' | 'delete';
     SyncEntityDataDto: {
@@ -3281,8 +3423,21 @@ export interface components {
       whatsappStatus?: components['schemas']['WhatsappStatus'];
       /** @description Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO. */
       whatsappE164?: string;
-      /** @description Représentant : profession déclarée. */
+      /** @description Profession déclarée. Sert au représentant comme au prospect. */
       profession?: string;
+      /** @description Représentant : l’établissement où il exerce. Ni l’IEF ni le département. */
+      etablissement?: string;
+      /** @description Prospect : le projet dont il relève. CHUES par défaut côté serveur. */
+      projet?: components['schemas']['Projet'];
+      /** @description Prospect hors CHUES : ce qu’il est. Jamais obligatoire. */
+      type?: components['schemas']['ProspectType'];
+      /** @description Prospect : durée du système de paiement, en MOIS. */
+      dureeSystemeMois?: number;
+      /**
+       * Format: uuid
+       * @description Prospect : canal de provenance, choisi dans le référentiel.
+       */
+      canalProvenanceId?: string;
       /**
        * Format: date-time
        * @description Horodatage de la saisie terrain.
@@ -3305,6 +3460,38 @@ export interface components {
        * @description Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut CALLBACK. Une version ancienne de l’application ne l’envoie pas.
        */
       callbackAt?: string;
+      /** @description Visite : nom et prénom du visiteur. */
+      visitorName?: string;
+      /**
+       * @description Visite : jour, à Dakar.
+       * @example 2026-01-06
+       */
+      visitDate?: string;
+      /**
+       * @description Visite : heure, omise si elle n’a pas été relevée.
+       * @example 11:08
+       */
+      visitTime?: string;
+      /**
+       * Format: uuid
+       * @description Visite : entreprise du visiteur.
+       */
+      entrepriseId?: string;
+      /**
+       * Format: uuid
+       * @description Visite : objet de la visite.
+       */
+      objetId?: string;
+      /**
+       * Format: uuid
+       * @description Visite : direction ou étage visé.
+       */
+      directionId?: string;
+      /**
+       * Format: uuid
+       * @description Visite : destinataire visé.
+       */
+      destinataireId?: string;
     };
     SyncOperationDto: {
       /**
@@ -3326,7 +3513,7 @@ export interface components {
       /** @description Révision serveur sur laquelle le client s’est basé. Fournie sur update/delete, elle transforme une écriture aveugle en écriture conditionnelle. */
       baseRev?: number;
       data?: components['schemas']['SyncEntityDataDto'];
-      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession. */
+      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement. */
       clearedFields?: string[];
     };
     SyncPushDto: {
@@ -3368,6 +3555,67 @@ export interface components {
       /** @description Toujours null : le serveur ignore la position de pull du client, et en fabriquer une lui ferait sauter les écritures des autres appareils. Le client conserve son propre curseur. */
       nextCursor: string | null;
     };
+    /** @enum {string} */
+    CampaignStatus: 'ACTIVE' | 'CLOSED';
+    SyncCallCampaignDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      status: components['schemas']['CampaignStatus'];
+      /** @description Journees d’etalement de la file. */
+      spreadDays: number;
+      /** Format: date-time */
+      updatedAt: string;
+      /** Format: date-time */
+      closedAt?: string | null;
+    };
+    /** @enum {string} */
+    CallTaskStatus: 'OPEN' | 'DONE' | 'CANCELLED';
+    SyncCallTaskDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      campaignId: string;
+      /** Format: uuid */
+      prospectId: string;
+      /** @description Rang dans le programme, a partir de 1. */
+      position: number;
+      /** @description Journee d’etalement, a partir de 0. */
+      dayIndex: number;
+      status: components['schemas']['CallTaskStatus'];
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    VisiteReferentielRefDto: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      label: string;
+    };
+    SyncVisiteDto: {
+      /** Format: uuid */
+      id: string;
+      /** @example V-2026-000412 */
+      reference: string;
+      /** @example 2026-01-06 */
+      date: string;
+      /** @example 11:08 */
+      time: string | null;
+      visitorName: string;
+      phone: string | null;
+      phoneE164: string | null;
+      entreprise: components['schemas']['VisiteReferentielRefDto'];
+      objet: components['schemas']['VisiteReferentielRefDto'];
+      direction: components['schemas']['VisiteReferentielRefDto'] | null;
+      destinataire: components['schemas']['VisiteReferentielRefDto'] | null;
+      comment: string | null;
+      /** Format: uuid */
+      createdById: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
     SyncChangesDto: {
       departements: components['schemas']['DepartementDto'][];
       iefs: components['schemas']['IefDto'][];
@@ -3375,6 +3623,9 @@ export interface components {
       syndicats: components['schemas']['SyndicatDto'][];
       representants: components['schemas']['RepresentantDto'][];
       prospects: components['schemas']['ProspectDto'][];
+      callCampaigns: components['schemas']['SyncCallCampaignDto'][];
+      callTasks: components['schemas']['SyncCallTaskDto'][];
+      visites: components['schemas']['SyncVisiteDto'][];
     };
     SyncDeletionDto: {
       entity: components['schemas']['SyncEntity'];
@@ -3420,8 +3671,6 @@ export interface components {
       /** Format: date-time */
       serverTime: string;
     };
-    /** @enum {string} */
-    CampaignStatus: 'ACTIVE' | 'CLOSED';
     /** @enum {string} */
     CampaignScope: 'BDD1' | 'BDD2' | 'BDD3' | 'BDD4' | 'ALL';
     CampaignProgressDto: {
@@ -3535,6 +3784,157 @@ export interface components {
       commerciaux: components['schemas']['CampaignCommercialDto'][];
       /** @description Les vingt dernières tentatives, de la plus récente à la plus ancienne. */
       recentAttempts: components['schemas']['CampaignAttemptDto'][];
+    };
+    VisiteReferentielDto: {
+      /** Format: uuid */
+      id: string;
+      /** @description Code stable, jamais modifiable après création. */
+      code: string;
+      label: string;
+      isActive: boolean;
+      /** @description Entrée reprise du classeur d’origine : renommable, désactivable, jamais effacée. */
+      isSystem: boolean;
+      sortOrder: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    VisiteReferentielsBundleDto: {
+      entreprises: components['schemas']['VisiteReferentielDto'][];
+      directions: components['schemas']['VisiteReferentielDto'][];
+      destinataires: components['schemas']['VisiteReferentielDto'][];
+      objets: components['schemas']['VisiteReferentielDto'][];
+    };
+    /** @enum {string} */
+    VisiteReferentielKind: 'entreprises' | 'directions' | 'destinataires' | 'objets';
+    VisiteReferentielListDto: {
+      items: components['schemas']['VisiteReferentielDto'][];
+    };
+    CreateVisiteReferentielDto: {
+      /** @description Majuscules, chiffres et tirets bas. Immuable une fois créé. */
+      code: string;
+      label: string;
+      /** @default 100 */
+      sortOrder: number;
+    };
+    UpdateVisiteReferentielDto: {
+      label?: string;
+      sortOrder?: number;
+    };
+    SetVisiteReferentielActiveDto: {
+      isActive: boolean;
+    };
+    ReorderVisiteReferentielDto: {
+      /** @description Les entrées dans leur nouvel ordre. Celles omises gardent leur rang. */
+      ids: string[];
+    };
+    VisiteStatBucketDto: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      label: string;
+      count: number;
+    };
+    VisiteStatMoisDto: {
+      /** @example 2025-01 */
+      month: string;
+      count: number;
+    };
+    VisiteStatJourDto: {
+      /** @example 2025-01-06 */
+      date: string;
+      count: number;
+    };
+    VisiteStatsDto: {
+      /** @example 2025-01-01 */
+      from: string;
+      /** @example 2025-12-31 */
+      to: string;
+      /** @description Nombre de visites. La somme d’une répartition peut lui être inférieure : direction et destinataire sont facultatifs. */
+      total: number;
+      /** @description Toutes les entrées actives du référentiel, y compris celles à zéro. */
+      parEntreprise: components['schemas']['VisiteStatBucketDto'][];
+      parDirection: components['schemas']['VisiteStatBucketDto'][];
+      parDestinataire: components['schemas']['VisiteStatBucketDto'][];
+      parObjet: components['schemas']['VisiteStatBucketDto'][];
+      /** @description Chaque mois de la période. */
+      parMois: components['schemas']['VisiteStatMoisDto'][];
+      /** @description Seuls les jours ayant reçu au moins une visite. */
+      parJour: components['schemas']['VisiteStatJourDto'][];
+      sansDirection: number;
+      sansDestinataire: number;
+    };
+    VisiteDto: {
+      /** Format: uuid */
+      id: string;
+      /**
+       * @description Le « N° » du registre. Engendré par le serveur, immuable.
+       * @example V-2026-000412
+       */
+      reference: string;
+      /**
+       * @description Jour de la visite, à Dakar.
+       * @example 2026-01-06
+       */
+      date: string;
+      /**
+       * @description Nul quand l’heure n’a pas été relevée.
+       * @example 11:08
+       */
+      time: string | null;
+      visitorName: string;
+      /** @description Le numéro tel qu’il a été donné. */
+      phone: string | null;
+      /** @description Forme E.164, nulle quand le numéro donné n’a pas pu être reconnu. */
+      phoneE164: string | null;
+      entreprise: components['schemas']['VisiteReferentielRefDto'];
+      objet: components['schemas']['VisiteReferentielRefDto'];
+      direction: components['schemas']['VisiteReferentielRefDto'] | null;
+      destinataire: components['schemas']['VisiteReferentielRefDto'] | null;
+      comment: string | null;
+      /** Format: uuid */
+      createdById: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    VisiteListDto: {
+      items: components['schemas']['VisiteDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    CreateVisiteDto: {
+      /** @example 2026-01-06 */
+      date: string;
+      /**
+       * @description Omise si elle n’a pas été relevée.
+       * @example 11:08
+       */
+      time?: string;
+      visitorName: string;
+      /** @description Accepté sous n’importe quelle forme, y compris étrangère ou incomplète. */
+      phone?: string;
+      /** Format: uuid */
+      entrepriseId: string;
+      /** Format: uuid */
+      objetId: string;
+      /** Format: uuid */
+      directionId?: string;
+      /** Format: uuid */
+      destinataireId?: string;
+      comment?: string;
+    };
+    UpdateVisiteDto: {
+      /** @example 11:08 */
+      time?: string | null;
+      visitorName?: string;
+      phone?: string | null;
+      /** Format: uuid */
+      entrepriseId?: string;
+      /** Format: uuid */
+      objetId?: string;
+      /** Format: uuid */
+      directionId?: string | null;
+      /** Format: uuid */
+      destinataireId?: string | null;
+      comment?: string | null;
     };
     /** @enum {string} */
     CallbackScope: 'today' | 'overdue' | 'week';
@@ -4303,6 +4703,7 @@ export interface components {
       category?: components['schemas']['NotificationCategory'];
       titleTemplate?: string;
       bodyTemplate?: string;
+      /** @description Chaîne vide pour retirer le lien. */
       route?: string;
       isActive?: boolean;
     };
@@ -4630,6 +5031,18 @@ export interface components {
       /** @description Seuil de dormance retenu, en jours. */
       dormantDays: number;
     };
+    AmbassadorConversionDto: {
+      /** @description Représentants dont la relation a bougé au moins une fois dans la période. Dénominateur : un taux rapporté à l’annuaire entier mesurerait la taille du fichier, pas le travail. */
+      contacted: number;
+      /** @description Parmi eux, ceux passés au moins une fois AMBASSADEUR dans la période. Comptés une seule fois, quel que soit le nombre d’allers-retours. */
+      ambassadors: number;
+      /** @description Ambassadeurs rapportés aux représentants travaillés, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %. */
+      conversionRate: number | null;
+      /** @description Parmi les convertis de la période, ceux dont le statut COURANT n’est plus AMBASSADEUR. Ils restent au numérateur : la bascule a eu lieu et elle est datée. Les retirer ferait bouger le taux d’un mois clos à chaque changement de statut d’aujourd’hui. */
+      reverted: number;
+      /** @description Représentants du périmètre sans AUCUNE trace de relation, à aucune date. Hors du taux dans les deux termes : ils mesurent ce que la période ne dit pas. */
+      untracked: number;
+    };
     DataQualityRowDto: {
       /** Format: uuid */
       id: string;
@@ -4762,30 +5175,17 @@ export interface components {
       /** @description Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre. */
       teleconseillers: components['schemas']['SupervisionTeleconseillerDto'][];
     };
-    DemoCountsDto: {
+    DemoWorkspaceCountsDto: {
       users: number;
       representants: number;
       prospects: number;
       campaigns: number;
-      campaignCommerciaux: number;
-      callTasks: number;
-      callAttempts: number;
       bankCases: number;
-      bankCaseTransitions: number;
     };
-    DemoStatusDto: {
-      /** @description Vrai si des données de démonstration sont actuellement en place ET visibles. ATTENTION, ce booléen a une SECONDE conséquence, que l’interface doit annoncer avant la bascule : tant qu’il vaut vrai, la plateforme est en LECTURE SEULE. Toute requête POST, PATCH, PUT ou DELETE est refusée en 409 avec le code `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST). Les lignes créées par ces chemins sont du travail RÉEL : elles sont écrites `isDemo: false` et survivent à l’extinction. */
-      enabled: boolean;
-      /**
-       * Format: date-time
-       * @description Date du dernier ensemencement, nulle si le mode n’a jamais été activé.
-       */
-      seededAt: string | null;
-      /** @description Faux quand l’environnement interdit la bascule : en production, tant que DEMO_MODE_ALLOWED ne vaut pas true. L’interface doit afficher `reason`, pas se contenter de griser le bouton. */
-      canToggle: boolean;
-      /** @description Explication lisible quand canToggle est faux. */
-      reason: string | null;
-      counts: components['schemas']['DemoCountsDto'];
+    DemoWorkspaceStatusDto: {
+      /** @enum {string} */
+      workspace: 'demo';
+      counts: components['schemas']['DemoWorkspaceCountsDto'];
     };
     /** @enum {string} */
     PurgeDomainKey:
@@ -4952,7 +5352,7 @@ export interface components {
       downloadable: boolean;
     };
     /** @enum {string} */
-    ImportKind: 'REPRESENTANTS' | 'PROSPECTS' | 'VISITES';
+    ImportKind: 'REPRESENTANTS' | 'PROSPECTS' | 'VISITES' | 'PROSPECTS_GRAND_PUBLIC';
     /** @enum {string} */
     ImportStatus: 'queued' | 'running' | 'succeeded' | 'failed' | 'expired';
     /**
@@ -5027,163 +5427,6 @@ export interface components {
     ImportJobListDto: {
       items: components['schemas']['ImportJobDto'][];
       meta: components['schemas']['PageMetaDto'];
-    };
-    VisiteReferentielDto: {
-      /** Format: uuid */
-      id: string;
-      /** @description Code stable, jamais modifiable après création. */
-      code: string;
-      label: string;
-      isActive: boolean;
-      /** @description Entrée reprise du classeur d’origine : renommable, désactivable, jamais effacée. */
-      isSystem: boolean;
-      sortOrder: number;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    VisiteReferentielsBundleDto: {
-      entreprises: components['schemas']['VisiteReferentielDto'][];
-      directions: components['schemas']['VisiteReferentielDto'][];
-      destinataires: components['schemas']['VisiteReferentielDto'][];
-      objets: components['schemas']['VisiteReferentielDto'][];
-    };
-    /** @enum {string} */
-    VisiteReferentielKind: 'entreprises' | 'directions' | 'destinataires' | 'objets';
-    VisiteReferentielListDto: {
-      items: components['schemas']['VisiteReferentielDto'][];
-    };
-    CreateVisiteReferentielDto: {
-      /** @description Majuscules, chiffres et tirets bas. Immuable une fois créé. */
-      code: string;
-      label: string;
-      /** @default 100 */
-      sortOrder: number;
-    };
-    UpdateVisiteReferentielDto: {
-      label?: string;
-      sortOrder?: number;
-    };
-    SetVisiteReferentielActiveDto: {
-      isActive: boolean;
-    };
-    ReorderVisiteReferentielDto: {
-      /** @description Les entrées dans leur nouvel ordre. Celles omises gardent leur rang. */
-      ids: string[];
-    };
-    VisiteStatBucketDto: {
-      /** Format: uuid */
-      id: string;
-      code: string;
-      label: string;
-      count: number;
-    };
-    VisiteStatMoisDto: {
-      /** @example 2025-01 */
-      month: string;
-      count: number;
-    };
-    VisiteStatJourDto: {
-      /** @example 2025-01-06 */
-      date: string;
-      count: number;
-    };
-    VisiteStatsDto: {
-      /** @example 2025-01-01 */
-      from: string;
-      /** @example 2025-12-31 */
-      to: string;
-      /** @description Nombre de visites. La somme d’une répartition peut lui être inférieure : direction et destinataire sont facultatifs. */
-      total: number;
-      /** @description Toutes les entrées actives du référentiel, y compris celles à zéro. */
-      parEntreprise: components['schemas']['VisiteStatBucketDto'][];
-      parDirection: components['schemas']['VisiteStatBucketDto'][];
-      parDestinataire: components['schemas']['VisiteStatBucketDto'][];
-      parObjet: components['schemas']['VisiteStatBucketDto'][];
-      /** @description Chaque mois de la période. */
-      parMois: components['schemas']['VisiteStatMoisDto'][];
-      /** @description Seuls les jours ayant reçu au moins une visite. */
-      parJour: components['schemas']['VisiteStatJourDto'][];
-      sansDirection: number;
-      sansDestinataire: number;
-    };
-    VisiteReferentielRefDto: {
-      /** Format: uuid */
-      id: string;
-      code: string;
-      label: string;
-    };
-    VisiteDto: {
-      /** Format: uuid */
-      id: string;
-      /**
-       * @description Le « N° » du registre. Engendré par le serveur, immuable.
-       * @example V-2026-000412
-       */
-      reference: string;
-      /**
-       * @description Jour de la visite, à Dakar.
-       * @example 2026-01-06
-       */
-      date: string;
-      /**
-       * @description Nul quand l’heure n’a pas été relevée.
-       * @example 11:08
-       */
-      time: string | null;
-      visitorName: string;
-      /** @description Le numéro tel qu’il a été donné. */
-      phone: string | null;
-      /** @description Forme E.164, nulle quand le numéro donné n’a pas pu être reconnu. */
-      phoneE164: string | null;
-      entreprise: components['schemas']['VisiteReferentielRefDto'];
-      objet: components['schemas']['VisiteReferentielRefDto'];
-      direction: components['schemas']['VisiteReferentielRefDto'] | null;
-      destinataire: components['schemas']['VisiteReferentielRefDto'] | null;
-      comment: string | null;
-      /** Format: uuid */
-      createdById: string;
-      /** Format: date-time */
-      createdAt: string;
-    };
-    VisiteListDto: {
-      items: components['schemas']['VisiteDto'][];
-      meta: components['schemas']['PageMetaDto'];
-    };
-    CreateVisiteDto: {
-      /** @example 2026-01-06 */
-      date: string;
-      /**
-       * @description Omise si elle n’a pas été relevée.
-       * @example 11:08
-       */
-      time?: string;
-      visitorName: string;
-      /** @description Accepté sous n’importe quelle forme, y compris étrangère ou incomplète. */
-      phone?: string;
-      /** Format: uuid */
-      entrepriseId: string;
-      /** Format: uuid */
-      objetId: string;
-      /** Format: uuid */
-      directionId?: string;
-      /** Format: uuid */
-      destinataireId?: string;
-      comment?: string;
-    };
-    UpdateVisiteDto: {
-      /** @example 11:08 */
-      time?: string | null;
-      visitorName?: string;
-      phone?: string | null;
-      /** Format: uuid */
-      entrepriseId?: string;
-      /** Format: uuid */
-      objetId?: string;
-      /** Format: uuid */
-      directionId?: string | null;
-      /** Format: uuid */
-      destinataireId?: string | null;
-      comment?: string | null;
     };
   };
   responses: never;
@@ -5309,6 +5552,31 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AuthUserDto'];
+        };
+      };
+    };
+  };
+  switchWorkspace: {
+    parameters: {
+      query?: never;
+      header: {
+        'user-agent': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SwitchWorkspaceDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthTokensDto'];
         };
       };
     };
@@ -5892,6 +6160,157 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SyndicatDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listCanauxProvenance: {
+    parameters: {
+      query?: {
+        /** @description Ne renvoyer que les entrées actives. */
+        activeOnly?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanalProvenanceDto'][];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createCanalProvenance: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCanalProvenanceDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanalProvenanceDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateCanalProvenance: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateCanalProvenanceDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CanalProvenanceDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
@@ -7257,6 +7676,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -7863,7 +8288,10 @@ export interface operations {
         /** @description Version de l’application mobile, telle qu’elle s’annonce. Facultative. */
         appVersion?: string;
       };
-      header?: never;
+      header: {
+        /** @description Format de données que le client sait lire. En dessous de 4, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder. */
+        'X-CPI-Payload-Version': number;
+      };
       path?: never;
       cookie?: never;
     };
@@ -7897,6 +8325,15 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description APP_UPDATE_REQUIRED. Le client n’annonce pas de format, ou en annonce un que cette réponse dépasse. La remontée par `pushSyncBatch` reste ouverte : rien de ce qui est saisi hors ligne n’est perdu pendant que l’appareil se met à jour. */
+      426: {
         headers: {
           [name: string]: unknown;
         };
@@ -8353,6 +8790,608 @@ export interface operations {
         };
       };
       /** @description PHASE2_CAMPAIGN_COMMERCIAL_NOT_FOUND · PHASE2_CAMPAIGN_DAY_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listVisiteReferentiels: {
+    parameters: {
+      query?: {
+        activeOnly?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielsBundleDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listVisiteReferentiel: {
+    parameters: {
+      query?: {
+        activeOnly?: boolean;
+      };
+      header?: never;
+      path: {
+        kind: components['schemas']['VisiteReferentielKind'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createVisiteReferentiel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kind: components['schemas']['VisiteReferentielKind'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateVisiteReferentielDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description VISITE_REFERENTIEL_CODE_CONFLICT ou VISITE_REFERENTIEL_LABEL_CONFLICT. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateVisiteReferentiel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kind: components['schemas']['VisiteReferentielKind'];
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateVisiteReferentielDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description VISITE_REFERENTIEL_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  setVisiteReferentielActive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kind: components['schemas']['VisiteReferentielKind'];
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetVisiteReferentielActiveDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  reorderVisiteReferentiel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kind: components['schemas']['VisiteReferentielKind'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReorderVisiteReferentielDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteReferentielListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getVisiteStats: {
+    parameters: {
+      query: {
+        /** @description Premier jour compté, inclus. */
+        from: string;
+        /** @description Dernier jour compté, inclus. */
+        to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteStatsDto'];
+        };
+      };
+      /** @description VISITE_STATS_RANGE_INVALID ou VISITE_STATS_RANGE_TOO_WIDE. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listVisites: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+        entrepriseId?: string;
+        directionId?: string;
+        destinataireId?: string;
+        objetId?: string;
+        /** @description Nom du visiteur, ou référence du registre. */
+        search?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createVisite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateVisiteDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteDto'];
+        };
+      };
+      /** @description VISITE_REFERENTIEL_UNAVAILABLE ou VISITE_REFERENCE_EXHAUSTED. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getVisite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description VISITE_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateVisite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateVisiteDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VisiteDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description VISITE_NOT_FOUND. */
       404: {
         headers: {
           [name: string]: unknown;
@@ -10861,6 +11900,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -10937,6 +11982,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11013,6 +12064,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11090,6 +12147,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11167,6 +12230,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11243,6 +12312,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11319,6 +12394,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11395,6 +12476,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11471,6 +12558,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11547,6 +12640,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11623,6 +12722,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11700,6 +12805,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11776,6 +12887,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11852,6 +12969,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -11928,6 +13051,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12004,6 +13133,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12080,6 +13215,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12148,6 +13289,88 @@ export interface operations {
       };
     };
   };
+  getAmbassadorConversion: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        representantId?: string;
+        banqueId?: string;
+        syndicatId?: string;
+        departementId?: string;
+        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
+        commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
+        statut?: components['schemas']['ProspectStatut'];
+        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+        segment?: components['schemas']['BddSegment'];
+        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+        phase2Status?: components['schemas']['Phase2Status'];
+        /** @description Méthode d’enrôlement obtenue en phase 2. */
+        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
+        campaignId?: string;
+        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
+        assignedToId?: string;
+        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
+        enrollmentCapturedById?: string;
+        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
+        origin?: 'BANQUE';
+        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
+        dateTo?: string;
+        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
+        includeDeleted?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AmbassadorConversionDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   getDataQuality: {
     parameters: {
       query?: {
@@ -12159,6 +13382,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12294,6 +13523,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12411,7 +13646,7 @@ export interface operations {
       };
     };
   };
-  getDemoStatus: {
+  getDemoWorkspaceStatus: {
     parameters: {
       query?: never;
       header?: never;
@@ -12425,39 +13660,12 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
+          'application/json': components['schemas']['DemoWorkspaceStatusDto'];
         };
       };
     };
   };
-  enableDemoMode: {
+  resetDemoWorkspace: {
     parameters: {
       query?: never;
       header?: never;
@@ -12471,126 +13679,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  purgeDemoData: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  disableDemoMode: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
+          'application/json': components['schemas']['DemoWorkspaceStatusDto'];
         };
       };
     };
@@ -12748,6 +13837,12 @@ export interface operations {
         departementId?: string;
         /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
         commercialId?: string;
+        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+        projet?: components['schemas']['Projet'];
+        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+        type?: components['schemas']['ProspectType'];
+        /** @description Grand Public : canal de provenance. */
+        canalProvenanceId?: string;
         statut?: components['schemas']['ProspectStatut'];
         /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
         segment?: components['schemas']['BddSegment'];
@@ -12781,7 +13876,7 @@ export interface operations {
       /** @description Classeur Excel. En mode `filtered` : feuilles Prospects, Représentants et Synthèse. En mode `consolidated` : Consolidé, BDD1, BDD2, BDD3, BDD4. */
       200: {
         headers: {
-          /** @description Vrai si le classeur a été produit en mode démonstration, donc s’il mêle des lignes fictives à des lignes réelles. */
+          /** @description Vrai si le classeur provient de l’espace démo et contient des données fictives. */
           'X-Demo-Mode'?: 'true' | 'false';
           [name: string]: unknown;
         };
@@ -12828,6 +13923,53 @@ export interface operations {
     requestBody?: never;
     responses: {
       /** @description Classeur Excel à trois feuilles : Prospects, Instructions, Listes (masquée). */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': string;
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  downloadProspectsGrandPublicTemplateXlsx: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Classeur Excel à trois feuilles : Prospects Grand Public, Instructions, Listes (masquée). */
       200: {
         headers: {
           [name: string]: unknown;
@@ -12937,7 +14079,7 @@ export interface operations {
       /** @description Classeur Excel à une feuille. */
       200: {
         headers: {
-          /** @description Vrai si le classeur a été produit en mode démonstration, donc s’il mêle des lignes fictives à des lignes réelles. */
+          /** @description Vrai si le classeur provient de l’espace démo et contient des données fictives. */
           'X-Demo-Mode'?: 'true' | 'false';
           [name: string]: unknown;
         };
@@ -13184,7 +14326,7 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif. DATABASE_DUMP_IN_PROGRESS · un export démarre à l’instant même. */
+      /** @description DATABASE_DUMP_IN_PROGRESS · un export démarre à l’instant même. */
       409: {
         headers: {
           [name: string]: unknown;
@@ -13361,15 +14503,6 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
       /** @description IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille. */
       413: {
         headers: {
@@ -13441,8 +14574,70 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé. */
-      409: {
+      /** @description IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille. */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Trop de requêtes : réessayez plus tard. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createProspectsGrandPublicImport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** Format: binary */
+          file: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportJobDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
         headers: {
           [name: string]: unknown;
         };
@@ -13514,15 +14709,6 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé. */
-      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -13662,610 +14848,8 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée. DEMO_MODE_READ_ONLY · le mode démonstration est actif. */
+      /** @description IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée. */
       409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listVisiteReferentiels: {
-    parameters: {
-      query?: {
-        activeOnly?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielsBundleDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listVisiteReferentiel: {
-    parameters: {
-      query?: {
-        activeOnly?: boolean;
-      };
-      header?: never;
-      path: {
-        kind: components['schemas']['VisiteReferentielKind'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  createVisiteReferentiel: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        kind: components['schemas']['VisiteReferentielKind'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateVisiteReferentielDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description VISITE_REFERENTIEL_CODE_CONFLICT ou VISITE_REFERENTIEL_LABEL_CONFLICT. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  updateVisiteReferentiel: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        kind: components['schemas']['VisiteReferentielKind'];
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateVisiteReferentielDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description VISITE_REFERENTIEL_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  setVisiteReferentielActive: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        kind: components['schemas']['VisiteReferentielKind'];
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SetVisiteReferentielActiveDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  reorderVisiteReferentiel: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        kind: components['schemas']['VisiteReferentielKind'];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ReorderVisiteReferentielDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteReferentielListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getVisiteStats: {
-    parameters: {
-      query: {
-        /** @description Premier jour compté, inclus. */
-        from: string;
-        /** @description Dernier jour compté, inclus. */
-        to: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteStatsDto'];
-        };
-      };
-      /** @description VISITE_STATS_RANGE_INVALID ou VISITE_STATS_RANGE_TOO_WIDE. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listVisites: {
-    parameters: {
-      query?: {
-        from?: string;
-        to?: string;
-        entrepriseId?: string;
-        directionId?: string;
-        destinataireId?: string;
-        objetId?: string;
-        /** @description Nom du visiteur, ou référence du registre. */
-        search?: string;
-        page?: number;
-        pageSize?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  createVisite: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateVisiteDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteDto'];
-        };
-      };
-      /** @description VISITE_REFERENTIEL_UNAVAILABLE ou VISITE_REFERENCE_EXHAUSTED. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getVisite: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description VISITE_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  updateVisite: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateVisiteDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VisiteDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description VISITE_NOT_FOUND. */
-      404: {
         headers: {
           [name: string]: unknown;
         };

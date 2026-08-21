@@ -249,23 +249,7 @@ export function DatabaseDumpCard() {
               <li>Tous les dossiers bancaires, avec les montants en francs CFA.</li>
               <li>Tous les comptes utilisateurs, avec les empreintes de leurs mots de passe.</li>
               <li>Toutes les campagnes, les demandes clients et l’historique des actions.</li>
-              {/*
-                CE POINT-LÀ SURPREND, DONC IL EST ÉCRIT.
-
-                Éteindre le mode démonstration ne supprime pas les lignes
-                semées : il les MASQUE. L'export, lui, ne masque rien, il copie
-                les tables entières. Un administrateur qui a fait une
-                démonstration le mois dernier et qui n'a pas purgé emporte donc
-                des prospects fictifs mêlés aux vrais, dans un fichier qui a
-                toutes les apparences d'un export de production. Le dire ici
-                coûte une ligne ; le découvrir six mois plus tard, dans une base
-                de travail alimentée par cet export, coûte beaucoup plus.
-              */}
-              <li>
-                Les lignes de démonstration éventuellement encore en base&nbsp;: elles sont masquées
-                à l’écran, pas dans l’archive. Purgez le jeu de démonstration avant l’export si vous
-                ne les voulez pas.
-              </li>
+              <li>L’espace démo possède sa propre base et ne peut pas produire cette archive.</li>
             </ul>
 
             <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.875rem] text-warning">

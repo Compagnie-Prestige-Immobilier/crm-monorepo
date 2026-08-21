@@ -1,6 +1,13 @@
 abstract final class Routes {
   static const String login = '/login';
+
+  /// L'écran-hub des trois projets. Le tableau de bord CHUES, lui, est sur
+  /// [chues] : `HomeScreen` a quitté `/` quand le hub l'a pris.
   static const String home = '/';
+
+  static const String accueil = '/accueil';
+  static const String chues = '/chues';
+  static const String grandPublic = '/grand-public';
 
   static const String representants = '/representants';
   static const String newRepresentant = '/representants/nouveau';
@@ -35,6 +42,13 @@ abstract final class Routes {
     if (draftId != null) q[draftParam] = draftId;
     return Uri(path: newProspect, queryParameters: q).toString();
   }
+
+  /// La fiche d'un représentant DÉJÀ enregistré, ouverte pour la compléter.
+  /// Même écran que la création, et donc même chemin : `app_router` lit `id`.
+  static String representantFormFor(String id) => Uri(
+    path: newRepresentant,
+    queryParameters: <String, String>{'id': id},
+  ).toString();
 
   static String newRepresentantWithDraft(String draftId) => Uri(
     path: newRepresentant,

@@ -57,6 +57,9 @@ describe('classifySegment : matrice complète', () => {
     for (const syndicatSigle of syndicats) {
       for (const banqueShortName of banques) {
         const segment = classifySegment({ syndicatSigle, banqueShortName });
+        // Les deux axes sont fournis : un segment nul serait le defaut que ce
+        // test existe justement pour interdire.
+        if (segment === null) throw new Error(`${syndicatSigle} x ${banqueShortName} sans segment`);
         expect(ALL_SEGMENTS).toContain(segment);
         vus.add(segment);
       }
@@ -104,7 +107,7 @@ describe('scopeWhere', () => {
 
 describe('eligibleForCampaignWhere', () => {
   it('exclut les supprimés, les non-PENDING, ceux déjà pourvus et ceux déjà attribués', () => {
-    const where = eligibleForCampaignWhere('ALL', false);
+    const where = eligibleForCampaignWhere('ALL');
 
     expect(where.deletedAt).toBeNull();
     expect(where.phase2Status).toBe('PENDING');
@@ -113,26 +116,35 @@ describe('eligibleForCampaignWhere', () => {
   });
 
   it('combine le périmètre de segment avec les conditions d’éligibilité', () => {
-    const where = eligibleForCampaignWhere('BDD1', false);
+    const where = eligibleForCampaignWhere('BDD1');
 
     expect(where.syndicat).toEqual({ sigle: CHUES_SIGLE });
     expect(where.banque).toEqual({ shortName: CBAO_SHORT_NAME });
     expect(where.phase2Status).toBe('PENDING');
   });
 
-  it('exclut les fiches de démonstration quand le mode est éteint', () => {
-    expect(eligibleForCampaignWhere('ALL', false).isDemo).toBe(false);
-  });
-
-  it('ne tire QUE des fiches de démonstration quand le mode est allumé', () => {
-    expect(eligibleForCampaignWhere('ALL', true).isDemo).toBe(true);
-  });
-
   it('ne borne PAS le blocage par population, l’index ne le fait pas non plus', () => {
-    for (const demoEnabled of [true, false]) {
-      expect(eligibleForCampaignWhere('ALL', demoEnabled).callTasks).toEqual({
-        none: { isActive: true },
-      });
-    }
+    expect(eligibleForCampaignWhere('ALL').callTasks).toEqual({ none: { isActive: true } });
+  });
+});
+
+describe('un axe manquant n’est pas un segment', () => {
+  // Rendre BDD4 par defaut serait le pire choix : « autre syndicat / autre
+  // banque » est une reponse, et une fiche Grand Public s'y retrouverait comptee.
+  it('sans syndicat, il n’y a pas de segment', () => {
+    expect(classifySegment({ syndicatSigle: null, banqueShortName: 'CBAO' })).toBeNull();
+  });
+
+  it('sans banque, il n’y a pas de segment', () => {
+    expect(classifySegment({ syndicatSigle: 'CHUES', banqueShortName: null })).toBeNull();
+  });
+
+  it('sans rien, il n’y a pas de segment', () => {
+    expect(classifySegment({ syndicatSigle: null, banqueShortName: null })).toBeNull();
+  });
+
+  it('les deux axes presents rendent toujours un segment', () => {
+    expect(classifySegment({ syndicatSigle: 'CHUES', banqueShortName: 'CBAO' })).toBe('BDD1');
+    expect(classifySegment({ syndicatSigle: 'AUTRE', banqueShortName: 'AUTRE' })).toBe('BDD4');
   });
 });
