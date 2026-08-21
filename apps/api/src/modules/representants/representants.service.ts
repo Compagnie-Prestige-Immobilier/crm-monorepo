@@ -35,8 +35,6 @@ import type {
 } from './dto.js';
 import { applyRelationChange, toRelationChangeDto } from './relation-change.js';
 import { hasReachableWhatsapp, resolveWhatsappPatch, whatsappNumberOf } from './whatsapp.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 
 export const REPRESENTANT_INCLUDE = {
@@ -141,10 +139,7 @@ export function toRepresentantCommentDto(row: CommentRow): RepresentantCommentDt
 
 @Injectable()
 export class RepresentantsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async list(user: AuthenticatedUser, query: RepresentantQueryDto): Promise<RepresentantListDto> {
     const page = query.page ?? 1;
@@ -155,7 +150,6 @@ export class RepresentantsService {
     const where: Prisma.RepresentantWhereInput = {
       deletedAt: null,
       ...readScope(user),
-      ...demoScope(await this.demo.enabled()),
     };
     if (query.commercialId) {
       where.createdById = readsEveryone(user)
@@ -211,7 +205,7 @@ export class RepresentantsService {
 
   async get(user: AuthenticatedUser, id: string): Promise<RepresentantDto> {
     const row = await this.prisma.representant.findFirst({
-      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+      where: { id, deletedAt: null },
       include: INCLUDE,
     });
     if (!row) {
@@ -247,7 +241,7 @@ export class RepresentantsService {
   async lookup(user: AuthenticatedUser, phone: string): Promise<RepresentantLookupDto> {
     const phoneE164 = normalizePhone(phone);
     const row = await this.prisma.representant.findFirst({
-      where: { phoneE164, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+      where: { phoneE164, deletedAt: null },
       include: INCLUDE,
     });
 
@@ -303,14 +297,6 @@ export class RepresentantsService {
         iefId: input.iefId ?? null,
         createdById: user.id,
         clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
-        // Aucune ligne source dont hériter : un représentant est une racine,
-        // l'interrupteur décide donc seul.
-        //
-        // Sans cette valeur, la fiche saisie pendant une démonstration est
-        // une VRAIE fiche de l'annuaire : encore listée après l'extinction,
-        // comptée dans la productivité, et que rien ne désigne comme fictive,
-        // ni le filtre d'affichage ni un nettoyage ultérieur par `isDemo`.
-        isDemo: await this.demo.enabledForWrite(),
       },
       include: INCLUDE,
     });
@@ -323,7 +309,7 @@ export class RepresentantsService {
     input: UpdateRepresentantDto,
   ): Promise<RepresentantDto> {
     const existing = await this.prisma.representant.findFirst({
-      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+      where: { id, deletedAt: null },
     });
     if (!existing) {
       throw new NotFoundException({
@@ -350,7 +336,6 @@ export class RepresentantsService {
           reason: input.relationReason?.trim() || null,
           changedById: user.id,
           source: ChangeSource.WEB,
-          isDemo: existing.isDemo,
         });
       }
 
@@ -383,7 +368,7 @@ export class RepresentantsService {
     id: string,
   ): Promise<RepresentantRelationChangeListDto> {
     const representant = await this.prisma.representant.findFirst({
-      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+      where: { id, deletedAt: null },
       select: { id: true, createdById: true },
     });
     if (!representant) {
@@ -416,10 +401,8 @@ export class RepresentantsService {
   ): Promise<RepresentantCommentListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
-    const demoEnabled = await this.demo.enabled();
-
     const representant = await this.prisma.representant.findFirst({
-      where: { id, deletedAt: null, ...demoScope(demoEnabled) },
+      where: { id, deletedAt: null },
       select: { id: true, createdById: true },
     });
     if (!representant) {
@@ -433,7 +416,6 @@ export class RepresentantsService {
     const where: Prisma.RepresentantCommentWhereInput = {
       representantId: id,
       deletedAt: null,
-      ...demoScope(demoEnabled),
     };
 
     // `id` en second critère : l'UUID v7 est lexicographiquement ordonné, il
@@ -468,8 +450,8 @@ export class RepresentantsService {
     input: CreateRepresentantCommentDto,
   ): Promise<RepresentantCommentDto> {
     const representant = await this.prisma.representant.findFirst({
-      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
-      select: { id: true, createdById: true, isDemo: true },
+      where: { id, deletedAt: null },
+      select: { id: true, createdById: true },
     });
     if (!representant) {
       throw new NotFoundException({
@@ -489,7 +471,6 @@ export class RepresentantsService {
           authorId: user.id,
           body: input.body.trim(),
           clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
-          isDemo: representant.isDemo,
         },
       ],
       skipDuplicates: true,
@@ -529,7 +510,7 @@ export class RepresentantsService {
 
   async remove(user: AuthenticatedUser, id: string, query: DeleteQueryDto): Promise<OkDto> {
     const existing = await this.prisma.representant.findFirst({
-      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+      where: { id, deletedAt: null },
       include: { _count: { select: { prospects: { where: { deletedAt: null } } } } },
     });
     if (!existing) {
@@ -593,22 +574,6 @@ export class RepresentantsService {
     });
   }
 
-  /**
-   * Refuse un numéro déjà pris, sans révéler la fiche qui le porte.
-   *
-   * LECTURE GLOBALE délibérée, sans `demoScope` : l'index unique partiel
-   * `representants_phone_e164_active_key` est global, il ne connaît pas le mode
-   * démonstration. Filtrer ici ferait répondre « numéro libre » sur un numéro
-   * que la base refusera ensuite, et le commercial recevrait un 409
-   * UNIQUE_CONSTRAINT_VIOLATION générique au lieu de ce message-ci. Même
-   * raisonnement que `existingPhones` dans l'import de masse.
-   *
-   * Le corps de l'erreur suit la même règle que `lookup` : quand la fiche
-   * appartient à quelqu'un d'autre, seul le nom du propriétaire sort. Renvoyer
-   * son identifiant, son nom complet et sa date de saisie donnait à n'importe
-   * quel compte un moyen d'énumérer l'annuaire numéro par numéro, à raison
-   * d'une tentative de création par ligne.
-   */
   private async assertPhoneFree(user: AuthenticatedUser, phoneE164: string): Promise<void> {
     const clash = await this.prisma.representant.findFirst({
       where: { phoneE164, deletedAt: null },

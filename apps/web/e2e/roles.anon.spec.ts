@@ -1,4 +1,5 @@
-import { expect, request, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { BANQUIER, ensureWorkspaceFixtures, FIXTURE_PASSWORD, TELECONSEILLERS } from './fixtures';
 
 /**
  * Navigation dépendante du rôle, éprouvée SUR UN VRAI NAVIGATEUR.
@@ -35,14 +36,12 @@ import { expect, request, test, type Page } from '@playwright/test';
  * éprouvent.
  */
 
-const BANK_IDENTIFIER = process.env.E2E_BANK_IDENTIFIER ?? 'demo.banque@cpi.sn';
-const BANK_PASSWORD = process.env.E2E_BANK_PASSWORD ?? 'Demo1-CPI-Sunugal';
+const BANK_IDENTIFIER = process.env.E2E_BANK_IDENTIFIER ?? BANQUIER.email;
+const BANK_PASSWORD = process.env.E2E_BANK_PASSWORD ?? FIXTURE_PASSWORD;
 
-/** Même provenance que le compte bancaire : le jeu de démonstration semé ci-dessous. */
-const TELECONSEILLER_IDENTIFIER = process.env.E2E_TELECONSEILLER_IDENTIFIER ?? 'demo.awa@cpi.sn';
-const TELECONSEILLER_PASSWORD = process.env.E2E_TELECONSEILLER_PASSWORD ?? 'Demo1-CPI-Sunugal';
-
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const TELECONSEILLER_IDENTIFIER =
+  process.env.E2E_TELECONSEILLER_IDENTIFIER ?? TELECONSEILLERS[0].email;
+const TELECONSEILLER_PASSWORD = process.env.E2E_TELECONSEILLER_PASSWORD ?? FIXTURE_PASSWORD;
 
 /**
  * Recopié plutôt qu'importé de `auth.setup.ts`.
@@ -53,73 +52,9 @@ const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
  * `playwright.config.ts`) : c'est le prix d'une constante qui ne peut pas
  * voyager sans traîner un effet de bord.
  */
-const ADMIN_STORAGE_STATE = 'e2e/.auth/admin.json';
-
-/** Vrai si c'est CE fichier qui a allumé le mode démonstration. */
-let seededHere = false;
-
-/**
- * Le mode démonstration est posé par l'API, pas par le navigateur.
- *
- * On emprunte le relais `/api/v1/*` de Next avec l'état de session de
- * l'administrateur déjà rangé sur disque : aucune connexion supplémentaire
- * n'est consommée, alors que l'API n'en accepte que dix par minute et par IP,
- * et que le projet anonyme en dépense déjà huit.
- */
 test.beforeAll(async () => {
-  // L'ensemencement écrit plusieurs milliers de lignes : le délai par défaut
-  // d'un crochet est celui d'un test, et il ne suffit pas.
   test.setTimeout(180_000);
-
-  const api = await request.newContext({
-    baseURL: WEB_URL,
-    storageState: ADMIN_STORAGE_STATE,
-  });
-
-  try {
-    const status = await api.get('/api/v1/admin/demo');
-    expect(
-      status.ok(),
-      `L’état du mode démonstration n’a pas pu être lu (${String(status.status())}). ` +
-        'Vérifiez que la pile est démarrée et que `e2e/.auth/admin.json` est frais.',
-    ).toBe(true);
-
-    const { enabled } = (await status.json()) as { enabled: boolean };
-    if (enabled) return;
-
-    const enable = await api.post('/api/v1/admin/demo/enable', { timeout: 150_000 });
-    expect(
-      enable.ok(),
-      `Le mode démonstration n’a pas pu être activé (${String(enable.status())}). ` +
-        'Sans lui, le compte BANQUE_FINANCE de démonstration n’existe pas et ces ' +
-        'parcours n’ont rien à éprouver.',
-    ).toBe(true);
-    seededHere = true;
-  } finally {
-    await api.dispose();
-  }
-});
-
-/**
- * On ne laisse pas derrière soi ce qu'on a semé.
- *
- * `purge` et non `disable` : la désactivation ne fait que masquer les lignes,
- * et une base de développement qui accumule un jeu de démonstration invisible
- * par exécution finit par mentir sur ses compteurs.
- */
-test.afterAll(async () => {
-  if (!seededHere) return;
-  test.setTimeout(180_000);
-
-  const api = await request.newContext({
-    baseURL: WEB_URL,
-    storageState: ADMIN_STORAGE_STATE,
-  });
-  try {
-    await api.post('/api/v1/admin/demo/purge', { timeout: 150_000 });
-  } finally {
-    await api.dispose();
-  }
+  await ensureWorkspaceFixtures();
 });
 
 /**

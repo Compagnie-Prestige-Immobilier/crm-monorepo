@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { CurrentUser, type AuthenticatedUser } from '../decorators/current-user.decorator.js';
 import { Roles } from '../decorators/roles.decorator.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { WorkspaceContext } from '../../workspaces/workspace.js';
+import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { FreshSessionGuard } from './fresh-session.guard.js';
 import { RolesGuard } from './roles.guard.js';
@@ -28,12 +29,11 @@ const TOKEN_USER: AuthenticatedUser = {
 interface UserRow {
   role: Role;
   isActive: boolean;
-  isDemo: boolean;
   deletedAt: Date | null;
 }
 
 class FakeUsers {
-  row: UserRow | null = { role: Role.ADMIN, isActive: true, isDemo: false, deletedAt: null };
+  row: UserRow | null = { role: Role.ADMIN, isActive: true, deletedAt: null };
 
   readonly user = {
     findUnique: (): Promise<UserRow | null> => Promise.resolve(this.row),
@@ -41,18 +41,6 @@ class FakeUsers {
 
   asService(): PrismaService {
     return this as unknown as PrismaService;
-  }
-}
-
-class FakeDemoVisibility {
-  current: 'on' | 'off' | 'unknown' = 'off';
-
-  state(): Promise<'on' | 'off' | 'unknown'> {
-    return Promise.resolve(this.current);
-  }
-
-  asService(): DemoVisibilityService {
-    return this as unknown as DemoVisibilityService;
   }
 }
 
@@ -78,19 +66,17 @@ class EssaiController {
 
 let app: NestFastifyApplication;
 let users: FakeUsers;
-let demo: FakeDemoVisibility;
 
 beforeEach(async () => {
   users = new FakeUsers();
-  demo = new FakeDemoVisibility();
 
   @Global()
   @Module({
     providers: [
       { provide: PrismaService, useValue: users.asService() },
-      { provide: DemoVisibilityService, useValue: demo.asService() },
+      { provide: WorkspaceContext, useValue: fakeWorkspace() },
     ],
-    exports: [PrismaService, DemoVisibilityService],
+    exports: [PrismaService, WorkspaceContext],
   })
   class FakePrismaModule {}
 
@@ -126,7 +112,7 @@ afterEach(async () => {
 
 describe('rôle rétrogradé pendant la vie du jeton', () => {
   it('refuse la route ADMIN dès que la base a rétrogradé le compte', async () => {
-    users.row = { role: Role.COMMERCIAL, isActive: true, isDemo: false, deletedAt: null };
+    users.row = { role: Role.COMMERCIAL, isActive: true, deletedAt: null };
 
     const response = await app.inject({ method: 'GET', url: ADMIN_URL });
 
@@ -134,7 +120,7 @@ describe('rôle rétrogradé pendant la vie du jeton', () => {
   });
 
   it('remplace le rôle du jeton par celui de la base sur une route à deux rôles', async () => {
-    users.row = { role: Role.COMMERCIAL, isActive: true, isDemo: false, deletedAt: null };
+    users.row = { role: Role.COMMERCIAL, isActive: true, deletedAt: null };
 
     const response = await app.inject({ method: 'GET', url: PARTAGE_URL });
 
@@ -143,7 +129,7 @@ describe('rôle rétrogradé pendant la vie du jeton', () => {
   });
 
   it('relit l’autorité sur une route qui n’exige AUCUN rôle', async () => {
-    users.row = { role: Role.COMMERCIAL, isActive: true, isDemo: false, deletedAt: null };
+    users.row = { role: Role.COMMERCIAL, isActive: true, deletedAt: null };
 
     const response = await app.inject({ method: 'GET', url: OUVERT_URL });
 
@@ -152,14 +138,7 @@ describe('rôle rétrogradé pendant la vie du jeton', () => {
   });
 
   it('refuse un compte désactivé sur une route sans rôle exigé', async () => {
-    users.row = { role: Role.COMMERCIAL, isActive: false, isDemo: false, deletedAt: null };
-
-    expect((await app.inject({ method: 'GET', url: OUVERT_URL })).statusCode).toBe(401);
-  });
-
-  it('refuse un jeton de démonstration sur une route sans rôle exigé', async () => {
-    users.row = { role: Role.COMMERCIAL, isActive: true, isDemo: true, deletedAt: null };
-    demo.current = 'off';
+    users.row = { role: Role.COMMERCIAL, isActive: false, deletedAt: null };
 
     expect((await app.inject({ method: 'GET', url: OUVERT_URL })).statusCode).toBe(401);
   });
@@ -174,7 +153,7 @@ describe('rôle rétrogradé pendant la vie du jeton', () => {
 
 describe('compte qui n’a plus de session légitime', () => {
   it('refuse un compte désactivé, sans attendre l’expiration du jeton', async () => {
-    users.row = { role: Role.ADMIN, isActive: false, isDemo: false, deletedAt: null };
+    users.row = { role: Role.ADMIN, isActive: false, deletedAt: null };
 
     expect((await app.inject({ method: 'GET', url: ADMIN_URL })).statusCode).toBe(401);
   });
@@ -183,30 +162,5 @@ describe('compte qui n’a plus de session légitime', () => {
     users.row = null;
 
     expect((await app.inject({ method: 'GET', url: ADMIN_URL })).statusCode).toBe(401);
-  });
-});
-
-describe('session de démonstration après extinction du mode', () => {
-  it('refuse un jeton de démonstration une fois l’interrupteur éteint', async () => {
-    users.row = { role: Role.ADMIN, isActive: true, isDemo: true, deletedAt: null };
-    demo.current = 'off';
-
-    const response = await app.inject({ method: 'GET', url: ADMIN_URL });
-
-    expect(response.statusCode).toBe(401);
-  });
-
-  it('refuse aussi quand l’état de la démonstration est indéterminé', async () => {
-    users.row = { role: Role.ADMIN, isActive: true, isDemo: true, deletedAt: null };
-    demo.current = 'unknown';
-
-    expect((await app.inject({ method: 'GET', url: ADMIN_URL })).statusCode).toBe(401);
-  });
-
-  it('laisse travailler le compte de démonstration pendant la démonstration', async () => {
-    users.row = { role: Role.ADMIN, isActive: true, isDemo: true, deletedAt: null };
-    demo.current = 'on';
-
-    expect((await app.inject({ method: 'GET', url: ADMIN_URL })).statusCode).toBe(200);
   });
 });

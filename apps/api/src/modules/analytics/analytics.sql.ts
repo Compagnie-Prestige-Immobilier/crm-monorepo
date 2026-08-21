@@ -6,21 +6,15 @@ import { tryNormalizePhone } from '../../common/phone.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
-import { TASK, demoScopeOn } from './pilotage.sql.js';
 
 export function prospectConditions(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   filter: ProspectFilterDto,
-  demoEnabled: boolean,
 ): Prisma.Sql {
   const conditions: Prisma.Sql[] = [];
 
   if (!readsEveryone(user)) {
     conditions.push(Prisma.sql`p."createdById" = ${user.id}`);
-  }
-
-  if (!demoEnabled) {
-    conditions.push(Prisma.sql`p."isDemo" = FALSE`);
   }
 
   if (filter.commercialId) {
@@ -75,14 +69,13 @@ export function prospectConditions(
     const attribuee = filter.assignedToId
       ? Prisma.sql`AND ct."assignedToId" = ${filter.assignedToId}`
       : Prisma.empty;
-    // `call_tasks` porte son propre `isDemo` : le `p."isDemo"` posé plus haut ne le couvre pas.
     conditions.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "call_tasks" ct
         WHERE ct."prospectId" = p."id"
           ${campagne}
           ${attribuee}
-          AND ${demoScopeOn(TASK, demoEnabled)}
+          AND TRUE
       )`,
     );
   }
@@ -115,17 +108,12 @@ export function prospectConditions(
 export function representantConditions(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   filter: ProspectFilterDto,
-  demoEnabled: boolean,
 ): Prisma.Sql {
   const conditions: Prisma.Sql[] = [Prisma.sql`r."deletedAt" IS NULL`];
 
   if (!readsEveryone(user)) {
     conditions.push(Prisma.sql`r."createdById" = ${user.id}`);
   }
-  if (!demoEnabled) {
-    conditions.push(Prisma.sql`r."isDemo" = FALSE`);
-  }
-
   if (filter.commercialId) {
     const target = readsEveryone(user)
       ? filter.commercialId

@@ -81,7 +81,7 @@ describe('classeur en mode démonstration', () => {
     const sheet = workbook.getWorksheet('Prospects');
     const row = sheet?.getRow(2);
 
-    expect(cellText(row?.getCell(1).value)).toContain('MODE DÉMONSTRATION');
+    expect(cellText(row?.getCell(1).value)).toContain('données fictives');
     expect(row?.font.bold).toBe(true);
     expect(row?.font.color?.argb).toBe('FFB00020');
   });
@@ -89,7 +89,7 @@ describe('classeur en mode démonstration', () => {
   it('renseigne les métadonnées du classeur', async () => {
     const workbook = await roundTrip(true);
     expect(workbook.creator).toContain('démonstration');
-    expect(cellText(workbook.description)).toContain('MODE DÉMONSTRATION');
+    expect(cellText(workbook.description)).toContain('données fictives');
   });
 
   it('repousse la première ligne de données en ligne 3', async () => {

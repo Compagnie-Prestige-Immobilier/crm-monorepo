@@ -4,44 +4,29 @@ import { Prisma } from '@crm/database';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { PROSPECT_FROM, prospectConditions } from './analytics.sql.js';
-import {
-  ATTEMPT,
-  BANK_CASE,
-  CAMPAIGN,
-  TASK,
-  TRANSITION,
-  UNUSABLE_OUTCOMES,
-  days,
-  demoScopeOn,
-  rate,
-} from './pilotage.sql.js';
+import { UNUSABLE_OUTCOMES, days, ALL_ROWS, rate } from './pilotage.sql.js';
 import { DelayLeg } from './pilotage.dto.js';
 import type { AnalyticsDelaysDto, CampaignPilotageDto, DelayLegDto } from './pilotage.dto.js';
 
 @Injectable()
 export class PilotageService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async campaignPilotage(
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
   ): Promise<CampaignPilotageDto> {
-    const demoEnabled = await this.demo.enabled();
-    const where = prospectConditions(user, filter, demoEnabled);
+    const where = prospectConditions(user, filter);
     // Sans campagne précisée, la mesure porte sur les campagnes ACTIVES, pas sur
     // le cumul historique.
     const scope = filter.campaignId
       ? Prisma.sql`cc."id" = ${filter.campaignId}`
       : Prisma.sql`cc."status" = 'ACTIVE'`;
 
-    const taskScope = demoScopeOn(TASK, demoEnabled);
-    const attemptScope = demoScopeOn(ATTEMPT, demoEnabled);
-    const campaignScope = demoScopeOn(CAMPAIGN, demoEnabled);
+    const taskScope = ALL_ROWS;
+    const attemptScope = ALL_ROWS;
+    const campaignScope = ALL_ROWS;
 
     const [totals, perDay] = await Promise.all([
       this.prisma.$queryRaw<
@@ -143,10 +128,9 @@ export class PilotageService {
   }
 
   async delays(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<AnalyticsDelaysDto> {
-    const demoEnabled = await this.demo.enabled();
-    const where = prospectConditions(user, filter, demoEnabled);
-    const caseScope = demoScopeOn(BANK_CASE, demoEnabled);
-    const transitionScope = demoScopeOn(TRANSITION, demoEnabled);
+    const where = prospectConditions(user, filter);
+    const caseScope = ALL_ROWS;
+    const transitionScope = ALL_ROWS;
 
     const cree = Prisma.sql`cree`;
     const methode = Prisma.sql`methode`;

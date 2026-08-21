@@ -1,8 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 import { dakarWallClock, inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 import { dakarDate } from './visites.service.js';
 import type {
@@ -81,10 +79,7 @@ const monthKey = (instant: Date): string => {
  */
 @Injectable()
 export class VisitesStatsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async compute(query: VisiteStatsQueryDto): Promise<VisiteStatsDto> {
     const from = inclusiveDateFrom(query.from);
@@ -103,8 +98,7 @@ export class VisitesStatsService {
       });
     }
 
-    const demoEnabled = await this.demo.enabled();
-    const where = { visitedAt: { gte: from, lte: to }, ...demoScope(demoEnabled) };
+    const where = { visitedAt: { gte: from, lte: to } };
 
     const [rows, entreprises, directions, destinataires, objets] = await Promise.all([
       this.prisma.visite.findMany({

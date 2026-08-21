@@ -533,9 +533,6 @@ def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
             "PHONE_DEFAULT_REGION=SN",
             "SYNC_MAX_BATCH_SIZE=200",
             "IDEMPOTENCY_TTL_DAYS=7",
-            # Instance de présentation. À repasser à false le jour où de vraies
-            # fiches entrent dans cette base.
-            "DEMO_MODE_ALLOWED=true",
             "SEED_ADMIN_EMAIL=admin@cpi.sn",
             "SEED_ADMIN_USERNAME=admin",
             f"SEED_ADMIN_PASSWORD={s['ADMIN_PASSWORD']}",
@@ -882,14 +879,13 @@ VÉRIFICATION, une fois les trois services verts
 
 AMORÇAGE, une seule fois, depuis un terminal du conteneur API
 
-  pnpm --filter @crm/database db:deploy   # migrations
   pnpm --filter @crm/database db:seed     # référentiels + compte administrateur
+  pnpm --filter @crm/database db:seed:demo # espace démo, via la factory
 
   Sans le seed, aucune saisie n'est possible : banques, syndicats et
   départements sont des clés étrangères obligatoires.
 
-  Les données de démonstration s'activent depuis le panel web
-  (Paramètres → Mode démonstration), jamais en ligne de commande.
+  L'espace démo peut ensuite être réinitialisé depuis le panel web.
 
 IDENTIFIANTS
   {API_DOMAIN}        API

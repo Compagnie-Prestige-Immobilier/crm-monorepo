@@ -47,6 +47,7 @@ export const envSchema = z
     API_TRUST_PROXY_HEADERS: booleanFlag(false),
 
     DATABASE_URL: z.url(),
+    DATABASE_POOL_SIZE: z.coerce.number().int().min(2).default(10),
 
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
     JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
@@ -84,11 +85,6 @@ export const envSchema = z
     DB_DUMP_DIR: z.string().min(1).default('./storage/db-dumps'),
 
     DB_DUMP_ENABLED: booleanFlag(false),
-
-    DEMO_MODE_ALLOWED: z
-      .enum(['true', 'false'])
-      .default('false')
-      .transform((value) => value === 'true'),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== 'production') return;

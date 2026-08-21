@@ -2,7 +2,6 @@ import { Role } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { UsersService } from './users.service.js';
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -12,7 +11,7 @@ interface MockDb {
   refreshToken: Record<'updateMany', MockFn>;
 }
 
-const createdRow = (isDemo: boolean): Record<string, unknown> => ({
+const createdRow = (): Record<string, unknown> => ({
   id: 'usr-1',
   email: 'awa@cpi.sn',
   username: 'awa',
@@ -24,7 +23,6 @@ const createdRow = (isDemo: boolean): Record<string, unknown> => ({
   phoneE164: null,
   lastLoginAt: null,
   createdAt: new Date('2026-08-01T09:00:00.000Z'),
-  isDemo,
   _count: { prospects: 0 },
 });
 
@@ -41,36 +39,21 @@ beforeEach(() => {
   db = {
     user: {
       findFirst: vi.fn().mockResolvedValue(null),
-      create: vi.fn().mockResolvedValue(createdRow(false)),
-      update: vi.fn().mockResolvedValue(createdRow(false)),
+      create: vi.fn().mockResolvedValue(createdRow()),
+      update: vi.fn().mockResolvedValue(createdRow()),
     },
     refreshToken: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
   };
 });
 
-const dataOf = (): Record<string, unknown> =>
-  (db.user.create.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
-
-const service = (demoEnabled: boolean): UsersService =>
-  new UsersService(db as unknown as PrismaService, fakeDemoVisibility(demoEnabled));
+const service = (): UsersService => new UsersService(db as unknown as PrismaService);
 
 describe('nature du compte créé', () => {
-  it('mode ÉTEINT : le compte est réel', async () => {
-    await service(false).create(saisie);
-    expect(dataOf().isDemo).toBe(false);
-  });
-
-  it('mode ALLUMÉ : le compte est un compte de démonstration', async () => {
-    await service(true).create(saisie);
-    expect(dataOf().isDemo).toBe(true);
-  });
-
   it('cherche le doublon d’identifiants SANS cloisonner', async () => {
-    await service(true).create(saisie);
+    await service().create(saisie);
 
     const where = (db.user.findFirst.mock.calls[0]?.[0] as { where: Record<string, unknown> })
       .where;
-    expect(where.isDemo).toBeUndefined();
     expect(where.OR).toEqual([{ email: 'awa@cpi.sn' }, { username: 'awa' }]);
   });
 });
@@ -89,7 +72,7 @@ describe('sessions et changement de rôle', () => {
   });
 
   it('révoque les jetons quand le rôle change', async () => {
-    await service(false).update('usr-1', { role: Role.COMMERCIAL });
+    await service().update('usr-1', { role: Role.COMMERCIAL });
 
     expect(db.refreshToken.updateMany).toHaveBeenCalledTimes(1);
     const call = db.refreshToken.updateMany.mock.calls[0]?.[0] as {
@@ -100,13 +83,13 @@ describe('sessions et changement de rôle', () => {
   });
 
   it('ne révoque rien quand le rôle est réécrit à l’identique', async () => {
-    await service(false).update('usr-1', { role: Role.ADMIN, fullName: 'Awa Diop' });
+    await service().update('usr-1', { role: Role.ADMIN, fullName: 'Awa Diop' });
 
     expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
   });
 
   it('ne révoque rien quand le rôle n’est pas touché', async () => {
-    await service(false).update('usr-1', { fullName: 'Awa Diop' });
+    await service().update('usr-1', { fullName: 'Awa Diop' });
 
     expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
   });
@@ -114,11 +97,11 @@ describe('sessions et changement de rôle', () => {
 
 describe('cloisonnement des comptes réels', () => {
   beforeEach(() => {
-    db.user.findFirst.mockResolvedValue(createdRow(false));
+    db.user.findFirst.mockResolvedValue(createdRow());
   });
 
   it('filtre aussi les accès directs quand le mode démonstration est éteint', async () => {
-    const users = service(false);
+    const users = service();
 
     await users.get('usr-1');
     await users.update('usr-1', { fullName: 'Awa Ndiaye' });
@@ -130,7 +113,6 @@ describe('cloisonnement des comptes réels', () => {
       expect((args as { where: Record<string, unknown> }).where).toMatchObject({
         id: 'usr-1',
         deletedAt: null,
-        isDemo: false,
       });
     }
   });

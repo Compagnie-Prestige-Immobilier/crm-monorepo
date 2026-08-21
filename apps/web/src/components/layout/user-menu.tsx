@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDownIcon, LogOutIcon, UserIcon } from 'lucide-react';
+import { ChevronDownIcon, FlaskConicalIcon, LogOutIcon, UserIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -20,10 +20,27 @@ import { ROLE_LABELS, type SessionUser } from '@/lib/types';
 
 export function UserMenu({ user }: { user: SessionUser }) {
   const router = useRouter();
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState<'workspace' | 'logout' | null>(null);
+
+  async function switchWorkspace(): Promise<void> {
+    setPending('workspace');
+    try {
+      const workspace = user.workspace === 'demo' ? 'public' : 'demo';
+      const response = await fetch('/api/auth/workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace }),
+      });
+      if (!response.ok) throw new Error('workspace switch failed');
+      router.refresh();
+    } catch {
+      toast.error('Le changement d’espace a échoué. Réessayez.');
+      setPending(null);
+    }
+  }
 
   async function signOut(): Promise<void> {
-    setPending(true);
+    setPending('logout');
     try {
       const response = await fetch('/api/auth/logout', { method: 'POST' });
       if (!response.ok) throw new Error('logout failed');
@@ -31,7 +48,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
       router.refresh();
     } catch {
       toast.error('La déconnexion a échoué. Réessayez.');
-      setPending(false);
+      setPending(null);
     }
   }
 
@@ -68,8 +85,19 @@ export function UserMenu({ user }: { user: SessionUser }) {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
+          disabled={pending !== null}
+          closeOnClick={false}
+          onClick={() => {
+            void switchWorkspace();
+          }}
+        >
+          <FlaskConicalIcon aria-hidden="true" />
+          {user.workspace === 'demo' ? 'Quitter l’espace démo' : 'Ouvrir l’espace démo'}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
           variant="destructive"
-          disabled={pending}
+          disabled={pending !== null}
           closeOnClick={false}
           onClick={() => {
             void signOut();

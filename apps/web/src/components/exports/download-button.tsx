@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
-import { isDemoResponse, withDemoSuffix } from '@/lib/demo-marking';
+import { isDemoExport, withDemoSuffix } from '@/lib/demo-marking';
 import { apiErrorMessage } from '@/lib/utils';
 
 export function useFileDownload(): {
@@ -24,7 +24,7 @@ export function useFileDownload(): {
           return;
         }
 
-        const fileName = withDemoSuffix(input.fileName, isDemoResponse(response.headers));
+        const fileName = withDemoSuffix(input.fileName, isDemoExport(response.headers));
 
         const blob = await response.blob();
         const objectUrl = URL.createObjectURL(blob);

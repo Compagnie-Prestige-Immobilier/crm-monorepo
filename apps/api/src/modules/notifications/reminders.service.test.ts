@@ -15,7 +15,7 @@ import {
   remindersCron,
 } from './reminders.service.js';
 import { FakeActivity, FakeBrevoTransport, FakePrisma } from './fake-prisma.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
+import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
 
 const NOW = new Date('2026-08-13T08:00:00Z');
 
@@ -25,13 +25,8 @@ let activite: FakeActivity;
 let reminders: RemindersService;
 
 const restart = (): RemindersService => {
-  const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
-  return new RemindersService(
-    db.asService(),
-    notifications,
-    fakeDemoVisibility(),
-    activite.asService(),
-  );
+  const notifications = new NotificationsService(db.asService(), fakeWorkspace(), brevo);
+  return new RemindersService(db.asService(), notifications, activite.asService());
 };
 
 beforeEach(() => {
@@ -440,8 +435,7 @@ describe('expédition des envois programmés', () => {
 
     const moribond = new RemindersService(
       db.asService(),
-      new NotificationsService(db.asService(), fakeDemoVisibility(), fige),
-      fakeDemoVisibility(),
+      new NotificationsService(db.asService(), fakeWorkspace(), fige),
       activite.asService(),
     );
 
@@ -492,7 +486,6 @@ describe('expédition des envois programmés', () => {
       {
         dispatch: () => new Promise<never>(() => {}),
       } as unknown as NotificationsService,
-      fakeDemoVisibility(),
       activite.asService(),
     );
     void moribond.remindOpenCallTasks(NOW);
@@ -569,8 +562,7 @@ describe('expédition plus longue que le bail', () => {
         if (this.calls === 2) {
           repris = await new RemindersService(
             db.asService(),
-            new NotificationsService(db.asService(), fakeDemoVisibility(), this),
-            fakeDemoVisibility(),
+            new NotificationsService(db.asService(), fakeWorkspace(), this),
             activite.asService(),
           ).dispatchDue(APRES_LE_BAIL);
         }
@@ -583,13 +575,8 @@ describe('expédition plus longue que le bail', () => {
       }
     })();
 
-    const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(), lent);
-    const service = new RemindersService(
-      db.asService(),
-      notifications,
-      fakeDemoVisibility(),
-      activite.asService(),
-    );
+    const notifications = new NotificationsService(db.asService(), fakeWorkspace(), lent);
+    const service = new RemindersService(db.asService(), notifications, activite.asService());
 
     expect(await service.dispatchDue(NOW)).toBe(1);
 
@@ -597,173 +584,6 @@ describe('expédition plus longue que le bail', () => {
 
     expect(lent.servies).toHaveLength(TOTAL);
     expect(new Set(lent.servies).size).toBe(TOTAL);
-  });
-});
-
-describe('visibilité de démonstration', () => {
-  const enDemonstration = (): RemindersService => {
-    const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(true), brevo);
-    return new RemindersService(
-      db.asService(),
-      notifications,
-      fakeDemoVisibility(true),
-      activite.asService(),
-    );
-  };
-
-  const boiteModeEteint = async (userId: string) => {
-    const notifications = new NotificationsService(db.asService(), fakeDemoVisibility(), brevo);
-    return notifications.inbox(
-      {
-        id: userId,
-        email: `${userId}@cpi.sn`,
-        username: userId,
-        fullName: userId,
-        role: Role.COMMERCIAL,
-      },
-      {},
-    );
-  };
-
-  beforeEach(() => {
-    db.addUser({ id: 'usr-1', fullName: 'Awa Diop' });
-  });
-
-  it('mode ÉTEINT : la relance et sa livraison sont réelles', async () => {
-    db.addCallTask({ assignedToId: 'usr-1' });
-
-    await reminders.remindOpenCallTasks(NOW);
-
-    expect(db.notifications.map((row) => row.isDemo)).toEqual([false]);
-    expect(db.deliveries.map((row) => row.isDemo)).toEqual([false]);
-  });
-
-  it('mode ALLUMÉ : le rappel dû à un vrai commercial reste dans sa boîte une fois le mode ÉTEINT', async () => {
-    db.addCallTask({ assignedToId: 'usr-1' });
-
-    const run = await enDemonstration().remindOpenCallTasks(NOW);
-
-    expect(run.created).toBe(1);
-    expect(db.notifications.map((row) => row.isDemo)).toEqual([false]);
-    expect(db.deliveries.map((row) => row.isDemo)).toEqual([false]);
-
-    const boite = await boiteModeEteint('usr-1');
-    expect(boite.items).toHaveLength(1);
-    expect(boite.items[0]?.body).toContain('1 fiche(s)');
-    expect(boite.unreadCount).toBe(1);
-  });
-
-  it('mode ALLUMÉ : le décompte ignore les fiches de démonstration', async () => {
-    db.addCallTask({ assignedToId: 'usr-1' });
-    db.addCallTask({ assignedToId: 'usr-1', isDemo: true });
-    db.addCallTask({ assignedToId: 'usr-1', isDemo: true });
-
-    await enDemonstration().remindOpenCallTasks(NOW);
-
-    expect(db.notifications).toHaveLength(1);
-    expect(db.notifications[0]?.body).toContain('1 fiche(s)');
-  });
-
-  it('mode ALLUMÉ : un commercial FICTIF ne reçoit aucun rappel', async () => {
-    db.addUser({ id: 'usr-demo', fullName: 'Awa (démo)', isDemo: true });
-    db.addCallTask({ assignedToId: 'usr-demo' });
-    db.addCallTask({ assignedToId: 'usr-demo' });
-
-    const run = await enDemonstration().remindOpenCallTasks(NOW);
-
-    expect(run.created).toBe(0);
-    expect(db.notifications).toHaveLength(0);
-  });
-
-  it('mode ALLUMÉ : les dossiers et les agents fictifs sortent aussi des rappels bancaires', async () => {
-    db.addUser({ id: 'usr-banque', role: Role.BANQUE_FINANCE, fullName: 'Fatou Ndiaye' });
-    db.addUser({
-      id: 'usr-banque-demo',
-      role: Role.BANQUE_FINANCE,
-      fullName: 'Agent (démo)',
-      isDemo: true,
-    });
-    db.addBankCase({ createdAt: new Date('2026-08-01T08:00:00Z') });
-    db.addBankCase({ createdAt: new Date('2026-08-01T08:00:00Z'), isDemo: true });
-
-    await enDemonstration().remindBankCasesPending(NOW);
-
-    expect(db.deliveries.map((row) => row.userId)).toEqual(['usr-banque']);
-    expect(db.notifications[0]?.body).toContain('1 dossier(s)');
-    expect(db.notifications[0]?.isDemo).toBe(false);
-  });
-
-  it('mode ALLUMÉ : « sans mouvement » ne compte pas les dossiers fictifs', async () => {
-    db.addUser({ id: 'usr-banque', role: Role.BANQUE_FINANCE, fullName: 'Fatou Ndiaye' });
-    db.addBankCase({ createdAt: new Date('2026-07-01T08:00:00Z'), lastTransitionAt: null });
-    db.addBankCase({
-      createdAt: new Date('2026-07-01T08:00:00Z'),
-      lastTransitionAt: null,
-      isDemo: true,
-    });
-
-    await enDemonstration().remindBankCasesStale(NOW);
-
-    expect(db.notifications[0]?.body).toContain('1 dossier(s)');
-  });
-
-  it('la clé du jour est occupée par la VRAIE relance, des deux côtés de l’interrupteur', async () => {
-    db.addCallTask({ assignedToId: 'usr-1' });
-
-    const pendant = await enDemonstration().remindOpenCallTasks(NOW);
-    const apres = await reminders.remindOpenCallTasks(new Date('2026-08-13T09:00:00Z'));
-
-    expect(pendant.created).toBe(1);
-    expect(apres.created).toBe(0);
-    expect(apres.skipped).toBe(1);
-    expect(db.notifications).toHaveLength(1);
-    expect((await boiteModeEteint('usr-1')).items).toHaveLength(1);
-  });
-
-  it('un échec passager survenu PENDANT la démonstration est réessayé après l’extinction', async () => {
-    db.addUser({ id: 'usr-tc', role: Role.COMMERCIAL, email: 'tc@cpi.sn', fullName: 'Modou Sarr' });
-    db.addCallTask({ assignedToId: 'usr-tc' });
-    db.clock = () => NOW;
-
-    let refuse = true;
-    brevo = new FakeBrevoTransport((email) =>
-      refuse ? { email, ok: false, errorCode: 'HTTP_429', kind: 'transient' } : { email, ok: true },
-    );
-    brevo.configured = true;
-    reminders = restart();
-
-    await enDemonstration().remindOpenCallTasks(NOW);
-    const stalled = db.deliveries.find((row) => row.userId === 'usr-tc');
-    expect(stalled?.status).toBe(NotificationDeliveryStatus.PENDING);
-    expect(stalled?.error).toBe(DELIVERY_RETRY_ERROR);
-
-    refuse = false;
-    const uneHeurePlusTard = new Date('2026-08-13T09:00:00Z');
-    db.clock = () => uneHeurePlusTard;
-    const second = await reminders.remindOpenCallTasks(uneHeurePlusTard);
-
-    expect(second.created).toBe(0);
-    expect(db.deliveries.find((row) => row.userId === 'usr-tc')?.status).toBe(
-      NotificationDeliveryStatus.SENT,
-    );
-  });
-
-  it('n’expédie PAS un envoi programmé de démonstration quand le mode est éteint', async () => {
-    await db.notification.create({
-      data: {
-        title: 'Annonce de démonstration',
-        body: 'Corps',
-        status: NotificationStatus.SCHEDULED,
-        scheduledFor: new Date('2026-08-13T07:00:00Z'),
-        isDemo: true,
-        deliveries: { createMany: { data: [{ userId: 'usr-1', isDemo: true }] } },
-      },
-    });
-
-    expect(await reminders.dispatchDue(NOW)).toBe(0);
-    expect(brevo.sent).toHaveLength(0);
-
-    expect(await enDemonstration().dispatchDue(NOW)).toBe(1);
   });
 });
 
@@ -819,8 +639,7 @@ describe('réessai d’un rappel et tick d’échéance qui se croisent', () => 
     const passage = (): RemindersService =>
       new RemindersService(
         db.asService(),
-        new NotificationsService(db.asService(), fakeDemoVisibility(), croise),
-        fakeDemoVisibility(),
+        new NotificationsService(db.asService(), fakeWorkspace(), croise),
         activite.asService(),
       );
 
@@ -886,12 +705,6 @@ describe('rappel « rappels à passer »', () => {
     db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'DONE' });
     db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'CANCELLED' });
     db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: HIER, status: 'SUPERSEDED' });
-
-    expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
-  });
-
-  it('ne relance jamais sur une file de démonstration', async () => {
-    db.addScheduledCallback({ assignedToId: 'usr-1', scheduledAt: AUJOURDHUI, isDemo: true });
 
     expect((await reminders.remindDueCallbacks(NOW)).created).toBe(0);
   });

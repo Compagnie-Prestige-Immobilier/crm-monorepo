@@ -10,8 +10,6 @@ import {
   type ActivitySignals,
 } from './presence.js';
 import type { SupervisedUserDto, SupervisionDto } from './supervision.dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 
 /**
  * Supervision des comptes.
@@ -59,10 +57,7 @@ function latest(a: Date | undefined, b: Date | undefined): Date | null {
 
 @Injectable()
 export class SupervisionService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async overview(): Promise<SupervisionDto> {
     const now = new Date();
@@ -73,7 +68,6 @@ export class SupervisionService {
         where: {
           role: { in: [...SUPERVISED_ROLES] },
           deletedAt: null,
-          ...demoScope(await this.demo.enabled()),
         },
         select: {
           id: true,
@@ -107,22 +101,6 @@ export class SupervisionService {
         _max: { createdAt: true },
       }),
 
-      /**
-       * LECTURE GLOBALE délibérée : ces deux agrégats rendent une DATE PAR
-       * COMPTE, et rien d'autre. Le tableau ne montre que les comptes de la
-       * liste ci-dessus, elle-même cloisonnée : une ligne de démonstration ne
-       * peut donc apparaître qu'en face d'un compte de démonstration, déjà
-       * masqué. Filtrer ici ferait en revanche paraître « inactif depuis
-       * toujours » un vrai compte dont la dernière action porte, elle, sur une
-       * fiche de démonstration, ce qui est un contresens sur un écran dont le
-       * seul objet est de repérer les comptes dormants.
-       *
-       * Bornés à trente et un jours : au-delà, la date ne change plus rien à
-       * l'affichage, la présence se joue sur vingt-quatre heures et une famille
-       * de jetons meurt à trente et un jours. Sans cette borne, l'écran
-       * parcourait tout l'historique des appels toutes les dix secondes et par
-       * onglet ouvert.
-       */
       this.prisma.callAttempt.groupBy({
         by: ['performedById'],
         where: { createdAt: { gte: since } },

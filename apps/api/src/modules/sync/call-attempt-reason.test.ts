@@ -10,7 +10,6 @@ import { SyncService } from './sync.service.js';
 import { FakePrisma, type ProspectRow } from './fake-prisma.js';
 import { SyncEntity, SyncOp, SyncOpStatus } from './dto.js';
 import type { SyncOperationDto, SyncPushDto } from './dto.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const alice: AuthenticatedUser = {
   id: 'com-alice',
@@ -49,7 +48,6 @@ const seedProspect = (id: string): void => {
     createdAt: new Date('2026-08-10T10:00:00.000Z'),
     updatedAt: new Date('2026-08-10T10:00:00.000Z'),
     deletedAt: null,
-    isDemo: false,
   } satisfies ProspectRow);
 };
 
@@ -76,12 +74,7 @@ beforeEach(() => {
   seedProspect(PROSPECT_B);
 
   const prisma = db as unknown as PrismaService;
-  sync = new SyncService(
-    prisma,
-    new SyncBatchStore(prisma),
-    new Phase2SyncService(),
-    fakeDemoVisibility(),
-  );
+  sync = new SyncService(prisma, new SyncBatchStore(prisma), new Phase2SyncService());
 });
 
 const attempt = (

@@ -9,24 +9,17 @@ import { randomUUID } from 'node:crypto';
 import { CampaignScope, PrismaClient, PrismaPg, Role } from '@crm/database';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
 import { SyncBatchStore } from './batch-store.js';
 import { SyncService } from './sync.service.js';
 import { SyncEntity, SyncOp, SyncOpStatus } from './dto.js';
 import type { SyncOperationDto, SyncPushDto } from './dto.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
-const sync = new SyncService(
-  prisma as unknown as PrismaService,
-  new SyncBatchStore(prisma as unknown as PrismaService),
-  new Phase2SyncService(),
-  fakeDemoVisibility(),
-);
+const sync = new SyncService(prisma, new SyncBatchStore(prisma), new Phase2SyncService());
 
 const TAG = 'it-sync';
 
@@ -446,9 +439,8 @@ describe('la file d’une campagne descend sur le téléphone de qui elle est', 
             phone: nextPhone(),
             banqueId,
             syndicatId,
-            representantId: (
-              await prisma.prospect.findUniqueOrThrow({ where: { id: prospectId } })
-            ).representantId as string,
+            representantId: (await prisma.prospect.findUniqueOrThrow({ where: { id: prospectId } }))
+              .representantId as string,
           },
         },
       ]),
@@ -459,9 +451,8 @@ describe('la file d’une campagne descend sur le téléphone de qui elle est', 
 
   it('sans campagne, écrire la fiche d’un autre reste un CONFLIT', async () => {
     const { prospectId } = await ficheDeBobConfieeA(null);
-    const representantId = (
-      await prisma.prospect.findUniqueOrThrow({ where: { id: prospectId } })
-    ).representantId;
+    const representantId = (await prisma.prospect.findUniqueOrThrow({ where: { id: prospectId } }))
+      .representantId;
 
     const results: Awaited<ReturnType<typeof sync.push>> = await sync.push(
       alice,

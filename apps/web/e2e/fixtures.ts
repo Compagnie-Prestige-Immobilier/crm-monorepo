@@ -1,42 +1,5 @@
 import { expect, request, type APIRequestContext } from '@playwright/test';
 
-/**
- * Le jeu de données des parcours, et pourquoi il n'est PAS le mode démonstration.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * Le mode démonstration ne peut pas servir de fixture : il met la plateforme
- * en LECTURE SEULE.
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `workspaces.spec.ts` tirait ses prospects du mode démonstration, puis
- * éprouvait des écritures : créer une campagne, ouvrir un dossier, clôturer.
- * Depuis que l'activation suspend l'écriture pour toute la plateforme, la
- * première de ces écritures rend `409 DEMO_MODE_READ_ONLY`, et le mode série
- * emporte les treize parcours suivants.
- *
- * Éteindre le mode ne rattrape rien : la désactivation MASQUE les lignes de
- * démonstration au lieu de les rendre réelles. Mesuré sur la pile de
- * développement : 120 prospects visibles mode allumé, 0 mode éteint. Il
- * n'existe donc aucun état où le parcours a À LA FOIS les données et le droit
- * d'écrire.
- *
- * Ce module crée donc des lignes RÉELLES (`isDemo: false`), par l'API, mode
- * démonstration éteint. Le mode démonstration redevient ce qu'il est : une
- * fonctionnalité qu'on éprouve pour elle-même, pas un fournisseur de données.
- *
- * ── Idempotent, et par des clés naturelles ──────────────────────────────────
- *
- * Chaque entité est cherchée avant d'être créée, sur la clé que la base tient
- * pour unique : l'e-mail d'un compte, le téléphone d'un représentant ou d'un
- * prospect. Une suite rejouée sur la même base ne duplique donc rien, et n'a
- * pas besoin d'un nettoyage préalable pour repartir.
- *
- * Les numéros vivent dans une plage qui n'appartient ni au seed (qui n'en pose
- * aucun) ni au jeu de démonstration (+221 77 501 00 xx) : sans cela, la
- * déduplication sur le téléphone rapprocherait une fixture d'une fiche de
- * démonstration, et la purge emporterait l'une en croyant retirer l'autre.
- */
-
 const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
 const ADMIN_STORAGE_STATE = 'e2e/.auth/admin.json';
 
@@ -56,7 +19,7 @@ const BANQUE_SHORT_NAME = 'CBAO';
  * répartir : un seul destinataire ne prouverait pas que la distribution
  * distribue.
  */
-const TELECONSEILLERS = [
+export const TELECONSEILLERS = [
   { email: 'fixture.awa@cpi.sn', username: 'fixture.awa', fullName: 'Awa Fixture' },
   { email: 'fixture.fatou@cpi.sn', username: 'fixture.fatou', fullName: 'Fatou Fixture' },
 ] as const;
@@ -118,16 +81,6 @@ async function json<T>(response: Awaited<ReturnType<APIRequestContext['get']>>):
     `${response.url()} a répondu ${String(response.status())} : ${await response.text()}`,
   ).toBe(true);
   return (await response.json()) as T;
-}
-
-/** Le mode démonstration doit être ÉTEINT : voir l'en-tête de ce fichier. */
-async function assertDemoOff(api: APIRequestContext): Promise<void> {
-  const status = await json<{ enabled: boolean }>(await api.get('/api/v1/admin/demo'));
-  expect(
-    status.enabled,
-    'Le mode démonstration est actif : la plateforme est en lecture seule et aucune ' +
-      'fixture ne peut être écrite. Purgez-le avant de lancer la suite.',
-  ).toBe(false);
 }
 
 async function ensureUser(
@@ -256,8 +209,6 @@ export async function ensureWorkspaceFixtures(): Promise<{
 }> {
   const api = await adminApi();
   try {
-    await assertDemoOff(api);
-
     const banques = await json<{ id: string; shortName: string }[]>(
       await api.get('/api/v1/referentiels/banques', { params: { activeOnly: 'false' } }),
     );
@@ -344,32 +295,4 @@ async function ensureBankEligibleClient(api: APIRequestContext): Promise<void> {
       ],
     },
   });
-}
-
-/** Le mode démonstration, allumé pour être éprouvé — jamais pour semer. */
-export async function enableDemo(): Promise<void> {
-  const api = await adminApi();
-  try {
-    const response = await api.post('/api/v1/admin/demo/enable', { timeout: 150_000 });
-    expect(response.ok(), `Activation du mode démonstration : ${String(response.status())}`).toBe(
-      true,
-    );
-  } finally {
-    await api.dispose();
-  }
-}
-
-/**
- * `purge` et non `disable` : la désactivation masque les lignes, la purge les
- * retire. Une base de développement qui accumule un jeu invisible par
- * exécution finit par mentir sur ses compteurs.
- */
-export async function purgeDemo(): Promise<void> {
-  const api = await adminApi();
-  try {
-    const response = await api.post('/api/v1/admin/demo/purge', { timeout: 150_000 });
-    expect(response.ok(), `Purge du mode démonstration : ${String(response.status())}`).toBe(true);
-  } finally {
-    await api.dispose();
-  }
 }

@@ -124,14 +124,6 @@ describe('moteur d’import', () => {
     expect(job?.finishedAt).not.toBeNull();
   });
 
-  it('écrit isDemo à faux EN TOUTES LETTRES, sans consulter le mode démonstration', async () => {
-    prisma.jobs.push(fakeJob({ mode: ImportMode.APPLY }));
-
-    await runnerOn(prisma, new FakeRowReader(validRows(1)), [adapter]).run('job-1', NOW);
-
-    expect(prisma.representants.map((row) => row.isDemo)).toEqual([false]);
-  });
-
   it('en simulation, ne crée RIEN et annonce ce qui serait créé', async () => {
     prisma.jobs.push(fakeJob({ mode: ImportMode.DRY_RUN }));
 
@@ -309,7 +301,6 @@ describe('moteur d’import', () => {
         createdById: 'com-1',
         clientCreatedAt: NOW,
         deletedAt: null,
-        isDemo: false,
       });
 
       await runnerOn(prisma, new FakeRowReader(validRows(2)), [adapter]).run('job-1', NOW);

@@ -71,8 +71,8 @@ import 'package:crm_api_client/src/model/data_quality_dto.dart';
 import 'package:crm_api_client/src/model/data_quality_row_dto.dart';
 import 'package:crm_api_client/src/model/database_dump_job_dto.dart';
 import 'package:crm_api_client/src/model/delay_leg_dto.dart';
-import 'package:crm_api_client/src/model/demo_counts_dto.dart';
-import 'package:crm_api_client/src/model/demo_status_dto.dart';
+import 'package:crm_api_client/src/model/demo_workspace_counts_dto.dart';
+import 'package:crm_api_client/src/model/demo_workspace_status_dto.dart';
 import 'package:crm_api_client/src/model/departement_dto.dart';
 import 'package:crm_api_client/src/model/departement_yield_dto.dart';
 import 'package:crm_api_client/src/model/departement_yield_list_dto.dart';
@@ -170,6 +170,7 @@ import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
 import 'package:crm_api_client/src/model/supervision_dto.dart';
 import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
+import 'package:crm_api_client/src/model/switch_workspace_dto.dart';
 import 'package:crm_api_client/src/model/sync_call_campaign_dto.dart';
 import 'package:crm_api_client/src/model/sync_call_task_dto.dart';
 import 'package:crm_api_client/src/model/sync_changes_dto.dart';
@@ -465,11 +466,11 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'DelayLeg':
     case 'DelayLegDto':
       return DelayLegDto.fromJson(value as Map<String, dynamic>) as ReturnType;
-    case 'DemoCountsDto':
-      return DemoCountsDto.fromJson(value as Map<String, dynamic>)
+    case 'DemoWorkspaceCountsDto':
+      return DemoWorkspaceCountsDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
-    case 'DemoStatusDto':
-      return DemoStatusDto.fromJson(value as Map<String, dynamic>)
+    case 'DemoWorkspaceStatusDto':
+      return DemoWorkspaceStatusDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'DepartementDto':
       return DepartementDto.fromJson(value as Map<String, dynamic>)
@@ -788,6 +789,9 @@ ReturnType deserialize<ReturnType, BaseType>(
       return SupervisionTeleconseillerDto.fromJson(
             value as Map<String, dynamic>,
           )
+          as ReturnType;
+    case 'SwitchWorkspaceDto':
+      return SwitchWorkspaceDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SyncCallCampaignDto':
       return SyncCallCampaignDto.fromJson(value as Map<String, dynamic>)

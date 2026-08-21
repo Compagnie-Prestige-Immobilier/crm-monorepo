@@ -19,7 +19,6 @@ import {
   STAGE_EN_TRAITEMENT,
   STAGE_REJETE,
 } from './fake-prisma.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const user = (fake: { id: string; fullName: string; role: Role }): AuthenticatedUser => ({
   id: fake.id,
@@ -58,7 +57,7 @@ let service: BankCasesService;
 
 beforeEach(() => {
   db = new FakePrisma();
-  service = new BankCasesService(db.asService(), fakeDemoVisibility());
+  service = new BankCasesService(db.asService());
   db.addProspect({ id: 'psp-enrole', nom: 'Diop', prenom: 'Awa', phoneE164: '+221771234567' });
   db.addProspect({
     id: 'psp-en-cours',
@@ -163,17 +162,6 @@ describe('ouverture d’un dossier', () => {
         await refusal(() => service.create(agent, { prospectId: 'psp-efface', reference: 'R2' })),
       ).code,
     ).toBe(BankCaseError.PROSPECT_NOT_FOUND);
-  });
-
-  it('refuse un prospect fictif quand le mode démonstration est éteint', async () => {
-    db.addProspect({ id: 'psp-demo', isDemo: true });
-
-    const error = await refusal(() =>
-      service.create(agent, { prospectId: 'psp-demo', reference: 'REF-DEMO' }),
-    );
-
-    expect(bodyOf(error).code).toBe(BankCaseError.PROSPECT_NOT_FOUND);
-    expect(db.cases).toHaveLength(0);
   });
 
   it('refuse une banque de traitement inconnue, en 422 et sous le nom banqueId', async () => {
@@ -705,29 +693,10 @@ describe('autocomplétion prospect', () => {
       },
     } as unknown as ReturnType<FakePrisma['asService']>;
 
-    const isole = new BankCasesService(prisma, fakeDemoVisibility());
+    const isole = new BankCasesService(prisma);
     await isole.prospectSearch({ search: 'Ndiaye' });
 
     const valeurs = requetes.flat().flatMap((sql) => (sql as { values?: unknown[] }).values ?? []);
     expect(valeurs).toContain('%ndiaye%');
-  });
-
-  it('masque les prospects fictifs quand le mode démonstration est éteint', async () => {
-    const requetes: unknown[][] = [];
-    const prisma = {
-      $queryRaw: (...args: unknown[]) => {
-        requetes.push(args);
-        return Promise.resolve([]);
-      },
-    } as unknown as ReturnType<FakePrisma['asService']>;
-
-    const isole = new BankCasesService(prisma, fakeDemoVisibility(false));
-    await isole.prospectSearch({ search: 'Ndiaye' });
-
-    const sql = requetes
-      .flat()
-      .flatMap((query) => (query as { strings?: string[] }).strings ?? [])
-      .join(' ');
-    expect(sql).toContain('p."isDemo" = FALSE');
   });
 });

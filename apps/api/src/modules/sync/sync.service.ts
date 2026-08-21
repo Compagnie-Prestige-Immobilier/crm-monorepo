@@ -43,8 +43,6 @@ import {
   type SyncPushDto,
   type SyncPushResponseDto,
 } from './dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 
 /**
  * Retard de sécurité du pull.
@@ -150,9 +148,7 @@ const assignedTo = (userId: string): Prisma.CallTaskListRelationFilter => ({
 const mineOrAssignedProspect = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
 ): Prisma.ProspectWhereInput =>
-  isAdmin(user)
-    ? {}
-    : { OR: [{ createdById: user.id }, { callTasks: assignedTo(user.id) }] };
+  isAdmin(user) ? {} : { OR: [{ createdById: user.id }, { callTasks: assignedTo(user.id) }] };
 
 const mineOrAssignedRepresentant = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
@@ -160,10 +156,7 @@ const mineOrAssignedRepresentant = (
   isAdmin(user)
     ? {}
     : {
-        OR: [
-          { createdById: user.id },
-          { prospects: { some: { callTasks: assignedTo(user.id) } } },
-        ],
+        OR: [{ createdById: user.id }, { prospects: { some: { callTasks: assignedTo(user.id) } } }],
       };
 
 @Injectable()
@@ -174,7 +167,6 @@ export class SyncService {
     private readonly prisma: PrismaService,
     private readonly batches: SyncBatchStore,
     private readonly phase2Sync: Phase2SyncService,
-    private readonly demo: DemoVisibilityService,
   ) {}
 
   // PUSH
@@ -267,43 +259,7 @@ export class SyncService {
       .map((operations) => [...operations].sort((left, right) => left.seq - right.seq))
       .sort((left, right) => (left[0]?.seq ?? 0) - (right[0]?.seq ?? 0));
 
-    // L'AUTORITÉ DU LOT EST LUE UNE FOIS, ET ELLE VAUT POUR TOUT LE LOT
-    //
-    // ═══ CE QUI N'ALLAIT PAS : UN LOT À DEUX AUTORITÉS ═══
-    //
-    // Un lot traverse ses groupes sur une fenêtre longue, deux cents opérations
-    // et autant de transactions. Deux faits sur l'auteur y étaient traités
-    // différemment, et rien ne le justifiait :
-    //
-    //   · `isDemo` était relu à CHAQUE groupe, dans la transaction du groupe ;
-    //   · le RÔLE et l'état du compte venaient de `request.user`, figés par
-    //     `FreshSessionGuard` à l'entrée de la requête, et jamais revus.
-    //
-    // Un lot pouvait donc écrire ses cent premières lignes en réel et les cent
-    // suivantes en fictif (l'interrupteur ayant basculé), tout en appliquant du
-    // début à la fin le rôle d'avant une rétrogradation. Le lot n'était
-    // cohérent avec personne : ni avec l'autorité d'entrée, ni avec celle de
-    // sortie.
-    //
-    // ═══ POURQUOI FIGER PLUTÔT QUE RAFRAÎCHIR ═══
-    //
-    // Rafraîchir par groupe aurait rendu le lot cohérent avec la fin, au prix
-    // d'un lot PARTIELLEMENT APPLIQUÉ : les groupes déjà écrits restent écrits,
-    // les suivants repartent en échec. Or ce module a déjà tranché cette
-    // question exacte, et dans l'autre sens : la synchronisation est DISPENSÉE
-    // de `DemoReadOnlyGuard` (voir `BatchAuthority.isDemo`) parce que refuser la file
-    // d'un commercial revenu d'un village sans réseau, à cause d'un
-    // interrupteur basculé au bureau pendant sa remontée, ferait basculer des
-    // saisies valides dans « À corriger ». Une rétrogradation en cours de lot
-    // produirait le même écran, pour la même raison.
-    //
-    // Le lot est donc UNE unité d'autorité, celle que `FreshSessionGuard` a
-    // validée à la porte, et la fenêtre est bornée par le lot lui-même :
-    // `SYNC_MAX_BATCH_SIZE` opérations dans une requête HTTP. La remontée
-    // SUIVANTE, elle, est refusée en entier par la garde, quelques secondes
-    // plus tard.
-    //
-    // Effet de bord agréable : une lecture par lot au lieu d'une par groupe.
+    // Le rôle est figé une fois pour éviter deux autorités dans un même lot.
     const author = await this.readAuthority(user);
 
     const results: SyncOperationResultDto[] = [];
@@ -342,36 +298,13 @@ export class SyncService {
     );
   }
 
-  /**
-   * Lit l'autorité du lot, UNE FOIS, avant le premier groupe.
-   *
-   * ═══ LE RÔLE VIENT DE LA BASE, PAS DU JETON ═══
-   *
-   * `request.user.role` est celui que `FreshSessionGuard` a posé à l'entrée de
-   * la requête, et c'est déjà la bonne valeur. On la relit tout de même ici,
-   * dans la MÊME lecture que `isDemo`, pour que les deux faits que le lot
-   * consulte proviennent d'un seul instant : deux lectures à deux moments
-   * finissent par décrire deux personnes.
-   *
-   * ═══ POURQUOI UN AUTEUR INTROUVABLE NE FAIT PAS ÉCHOUER LE LOT ═══
-   *
-   * Le repli n'est pas une négligence, c'est la règle que ce fichier appliquait
-   * déjà : le jeton vient d'être validé sur une ligne existante, et la garde
-   * refuse la requête AVANT d'arriver ici si le compte a disparu. Une ligne
-   * absente à cet instant décrit une base qui répond de travers, pas un compte
-   * supprimé ; refuser le lot ferait alors basculer dans « À corriger » des
-   * saisies valides qu'aucune reprise ne repêcherait. On garde donc l'identité
-   * validée à la porte, et `isDemo: false`, qui est ce que la version
-   * précédente écrivait déjà dans ce cas.
-   */
   private async readAuthority(user: AuthenticatedUser): Promise<BatchAuthority> {
     const author = await this.prisma.user.findUnique({
       where: { id: user.id },
-      select: { role: true, isDemo: true },
+      select: { role: true },
     });
     return {
       user: author?.role ? { ...user, role: author.role } : user,
-      isDemo: author?.isDemo ?? false,
     };
   }
 
@@ -380,7 +313,7 @@ export class SyncService {
     batchKey: string,
     operations: SyncOperationDto[],
   ): Promise<SyncOperationResultDto[]> {
-    const { user, isDemo: authorIsDemo } = author;
+    const { user } = author;
     return this.prisma.$transaction(
       async (tx) => {
         const results: SyncOperationResultDto[] = [];
@@ -410,7 +343,7 @@ export class SyncService {
               error: 'Le représentant de rattachement n’a pas pu être enregistré.',
             };
           } else {
-            outcome = await this.applyOperation(tx, user, operation, authorIsDemo);
+            outcome = await this.applyOperation(tx, user, operation);
             if (
               operation.entity === SyncEntity.REPRESENTANT &&
               outcome.status !== SyncOpStatus.APPLIED
@@ -439,11 +372,10 @@ export class SyncService {
     tx: Prisma.TransactionClient,
     user: AuthenticatedUser,
     operation: SyncOperationDto,
-    authorIsDemo: boolean,
   ): Promise<OperationOutcome> {
     try {
       if (operation.entity === SyncEntity.REPRESENTANT) {
-        return await this.applyRepresentant(tx, user, operation, authorIsDemo);
+        return await this.applyRepresentant(tx, user, operation);
       }
       if (operation.entity === SyncEntity.REPRESENTANT_COMMENT) {
         return await this.applyRepresentantComment(tx, user, operation);
@@ -453,7 +385,7 @@ export class SyncService {
         // rien à transmettre ici.
         return await this.applyCallAttempt(tx, user, operation);
       }
-      return await this.applyProspect(tx, user, operation, authorIsDemo);
+      return await this.applyProspect(tx, user, operation);
     } catch (error) {
       if (error instanceof OperationError) {
         return {
@@ -523,7 +455,6 @@ export class SyncService {
           authorId: user.id,
           body: data.body.trim(),
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
-          isDemo: representant.isDemo,
           createdAt,
         },
       ],
@@ -538,7 +469,6 @@ export class SyncService {
     tx: Prisma.TransactionClient,
     user: AuthenticatedUser,
     operation: SyncOperationDto,
-    authorIsDemo: boolean,
   ): Promise<OperationOutcome> {
     const existing = await tx.representant.findUnique({ where: { id: operation.entityId } });
 
@@ -548,14 +478,11 @@ export class SyncService {
       // Une campagne confie des fiches que le teleconseiller n'a pas saisies.
       // Sans cette porte, il tirait la file sur son telephone et chaque
       // qualification repartait en CONFLIT, sans qu'il puisse rien y faire.
-      // `isDemo` accorde au plus ce que l'auteur est : une file fictive
-      // n'ouvre pas l'ecriture sur une vraie fiche, ni l'inverse.
       const assigned = await tx.callTask.findFirst({
         where: {
           prospectId: existing.id,
           assignedToId: user.id,
           isActive: true,
-          isDemo: authorIsDemo,
         },
         select: { id: true },
       });
@@ -615,12 +542,6 @@ export class SyncService {
           ...(data.iefId ? { iefId: data.iefId } : {}),
           createdById: user.id,
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
-          // LA FICHE SUIT SON AUTEUR. Voir `BatchAuthority.isDemo` : la remontée hors
-          // ligne est dispensée de la garde, et l'animateur d'une démonstration
-          // saisit sur le téléphone avec un compte de démonstration. Sans cette
-          // valeur, la colonne prenait son défaut `false` et la fiche fictive
-          // entrait dans l'annuaire RÉEL.
-          isDemo: authorIsDemo,
         },
         update: {
           fullName: data.fullName.trim(),
@@ -634,7 +555,6 @@ export class SyncService {
       });
       // Inscrite au registre pour que la purge sache la reprendre : sans cela
       // elle retiendrait le compte semé qui l'a créée. Voir `recordDemoEntity`.
-      if (authorIsDemo) await recordDemoEntity(tx, 'representant', row.id);
       return applied(row.id, row.rev, row.updatedAt);
     }
 
@@ -797,7 +717,6 @@ export class SyncService {
     tx: Prisma.TransactionClient,
     user: AuthenticatedUser,
     operation: SyncOperationDto,
-    authorIsDemo: boolean,
   ): Promise<OperationOutcome> {
     const existing = await tx.prospect.findUnique({ where: { id: operation.entityId } });
 
@@ -805,14 +724,11 @@ export class SyncService {
       // Une campagne confie des fiches que le teleconseiller n'a pas saisies.
       // Sans cette porte, il tirait la file sur son telephone et chaque
       // qualification repartait en CONFLIT, sans qu'il puisse rien y faire.
-      // `isDemo` accorde au plus ce que l'auteur est : une file fictive
-      // n'ouvre pas l'ecriture sur une vraie fiche, ni l'inverse.
       const assigned = await tx.callTask.findFirst({
         where: {
           prospectId: existing.id,
           assignedToId: user.id,
           isActive: true,
-          isDemo: authorIsDemo,
         },
         select: { id: true },
       });
@@ -848,9 +764,9 @@ export class SyncService {
       // Banque, syndicat et representant sont FACULTATIFS. Un teleconseiller au
       // telephone ne les obtient pas toujours, et une fiche Grand Public n'en a
       // aucun : les exiger faisait abandonner la saisie entiere.
-      const parent = data.representantId
-        ? await assertRepresentantUsable(tx, user, data.representantId)
-        : null;
+      if (data.representantId) {
+        await assertRepresentantUsable(tx, user, data.representantId);
+      }
       await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
 
       const row = await tx.prospect.upsert({
@@ -875,20 +791,6 @@ export class SyncService {
             : { canalProvenanceId: data.canalProvenanceId }),
           ...(data.statut ? { statut: data.statut } : {}),
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
-          // DEUX SOURCES, EXACTEMENT COMME `prospects.service.ts`. La route
-          // HTTP composait déjà `interrupteur || representant.isDemo` ; ce
-          // chemin-ci ne posait rien du tout et la colonne prenait son défaut
-          // `false`. Une fiche fictive naissait donc RÉELLE sous un
-          // représentant fictif : elle entrait dans les listes, les exports et
-          // les tirages de campagne (un faux numéro sur une vraie feuille
-          // d'appel), et comme `representantId` et `createdById` sont en
-          // `onDelete: Restrict`, la purge de démonstration s'arrêtait dessus,
-          // rendant le jeu de démonstration indéboulonnable.
-          //
-          // L'auteur ET le parent, parce qu'aucun des deux ne suffit :
-          // l'annuaire de phase 2 n'est pas cloisonné par commercial, un
-          // commercial réel peut donc rattacher au représentant d'un autre.
-          isDemo: authorIsDemo || (parent?.isDemo ?? false),
         },
         update: {
           nom: data.nom.trim(),
@@ -911,7 +813,6 @@ export class SyncService {
           rev: { increment: 1 },
         },
       });
-      if (authorIsDemo || (parent?.isDemo ?? false)) await recordDemoEntity(tx, 'prospect', row.id);
       return applied(row.id, row.rev, row.updatedAt);
     }
 
@@ -919,10 +820,9 @@ export class SyncService {
     if (phoneE164 !== existing.phoneE164) {
       await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
     }
-    const reassignedRepresentant =
-      data.representantId && data.representantId !== existing.representantId
-        ? await assertRepresentantUsable(tx, user, data.representantId)
-        : null;
+    if (data.representantId && data.representantId !== existing.representantId) {
+      await assertRepresentantUsable(tx, user, data.representantId);
+    }
 
     const row = await tx.prospect.update({
       where: { id: existing.id },
@@ -936,22 +836,14 @@ export class SyncService {
         ...(data.projet ? { projet: data.projet } : {}),
         ...(data.type ? { type: data.type } : {}),
         ...(data.profession === undefined ? {} : { profession: data.profession }),
-        ...(data.dureeSystemeMois === undefined
-          ? {}
-          : { dureeSystemeMois: data.dureeSystemeMois }),
+        ...(data.dureeSystemeMois === undefined ? {} : { dureeSystemeMois: data.dureeSystemeMois }),
         ...(data.canalProvenanceId === undefined
           ? {}
           : { canalProvenanceId: data.canalProvenanceId }),
         ...(data.statut ? { statut: data.statut } : {}),
-        ...(reassignedRepresentant && (authorIsDemo || reassignedRepresentant.isDemo)
-          ? { isDemo: true }
-          : {}),
         rev: { increment: 1 },
       },
     });
-    if (reassignedRepresentant && (authorIsDemo || reassignedRepresentant.isDemo)) {
-      await recordDemoEntity(tx, 'prospect', row.id);
-    }
     return applied(row.id, row.rev, row.updatedAt);
   }
 
@@ -1004,14 +896,11 @@ export class SyncService {
     hasMore ||= syndicats.length === limit;
 
     // ─ Métier : ce que le compte a saisi, ET ce qu'une campagne lui a confié ─
-    //
-    // Le filtre de démonstration ne fait pas doublon avec le cloisonnement : il
-    // couvre le compte de démonstration lui-même, qui ne doit plus rien recevoir
-    // une fois le mode éteint.
-    const demoEnabled = await this.demo.enabled();
-
     const representants = await this.prisma.representant.findMany({
-      where: { ...keyset(cursor.streams.representants, safeNow), ...demoScope(demoEnabled), ...mineOrAssignedRepresentant(user) },
+      where: {
+        ...keyset(cursor.streams.representants, safeNow),
+        ...mineOrAssignedRepresentant(user),
+      },
       include: REPRESENTANT_INCLUDE,
       orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
       take: limit,
@@ -1020,7 +909,7 @@ export class SyncService {
     hasMore ||= representants.length === limit;
 
     const prospects = await this.prisma.prospect.findMany({
-      where: { ...keyset(cursor.streams.prospects, safeNow), ...demoScope(demoEnabled), ...mineOrAssignedProspect(user) },
+      where: { ...keyset(cursor.streams.prospects, safeNow), ...mineOrAssignedProspect(user) },
       include: PROSPECT_INCLUDE,
       orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
       take: limit,
@@ -1033,7 +922,6 @@ export class SyncService {
     const callCampaigns = await this.prisma.callCampaign.findMany({
       where: {
         ...keyset(cursor.streams.callCampaigns, safeNow),
-        ...demoScope(demoEnabled),
         ...(isAdmin(user) ? {} : { tasks: { some: { assignedToId: user.id, isActive: true } } }),
       },
       orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
@@ -1045,7 +933,6 @@ export class SyncService {
     const callTasks = await this.prisma.callTask.findMany({
       where: {
         ...keyset(cursor.streams.callTasks, safeNow),
-        ...demoScope(demoEnabled),
         isActive: true,
         ...(isAdmin(user) ? {} : { assignedToId: user.id }),
       },
@@ -1330,92 +1217,16 @@ const clientDate = (clientCreatedAt: string | undefined, fallback: string): Date
  */
 interface BatchAuthority {
   readonly user: AuthenticatedUser;
-  /**
-   * Nature de l'AUTEUR d'une remontée hors ligne.
-   *
-   * ═══ POURQUOI CE CHEMIN A BESOIN DE LE SAVOIR ═══
-   *
-   * `DemoReadOnlyGuard` suspend les écritures pendant une démonstration, mais
-   * la synchronisation en est DISPENSÉE, sans condition : refuser la file d'un
-   * commercial revenu d'un village sans réseau parce qu'un administrateur a
-   * basculé un interrupteur au bureau ferait remonter des saisies valides dans
-   * « À corriger ». Cette dispense est une exigence dure.
-   *
-   * L'en-tête de la garde en tirait la conclusion que « tout ce qui arrive
-   * encore par un chemin dispensé est du travail RÉEL, ces chemins écrivent
-   * donc isDemo: false ». Cette conclusion était FAUSSE, et elle l'était déjà :
-   * l'animateur d'une démonstration se connecte sur le téléphone avec un compte
-   * de démonstration, précisément pour montrer la saisie terrain. Ce qu'il
-   * pousse n'est pas du travail réel.
-   *
-   * On lit donc la nature de l'auteur plutôt que de la supposer.
-   */
-  readonly isDemo: boolean;
-}
-
-/**
- * Inscrit au registre de purge une ligne fictive née HORS ensemenceur.
- *
- * ═══ POURQUOI L'HÉRITAGE D'`isDemo` NE SUFFIT PAS ═══
- *
- * `DemoService.purge()` ne supprime QUE les identifiants inscrits dans
- * `demo_entities`, et c'est une propriété qu'il ne faut surtout pas
- * assouplir : purger « tout ce qui porte isDemo » effacerait le jour où un
- * vrai prospect s'y retrouverait par erreur.
- *
- * Mais une ligne fictive absente du registre n'est pas seulement non
- * supprimée : elle BLOQUE la purge entière. `Prospect.representantId`,
- * `Prospect.createdById` et `Representant.createdById` sont tous en
- * `onDelete: Restrict`, si bien qu'un prospect poussé par l'animateur retient
- * le représentant semé, qui retient le compte semé. La purge échoue, et le jeu
- * de démonstration devient indéboulonnable.
- *
- * L'inscription se fait DANS la transaction du groupe : une remontée annulée
- * ne laisse ni la ligne ni son entrée de registre, jamais l'une sans l'autre.
- *
- * `upsert` et non `create` : une fiche supprimée puis ressaisie repasse par la
- * branche de création, et `(entityType, entityId)` est unique.
- *
- * ═══ POURQUOI `update: {}`, C'EST-À-DIRE AUCUNE RE-NUMÉROTATION ═══
- *
- * Une ligne déjà inscrite garde son rang, même si elle vient d'être rattachée
- * à un parent inscrit APRÈS elle. Ce n'est pas un oubli, et le réparer ici
- * serait une faute : hisser la ligne au sommet la ferait passer avant ses
- * propres enfants (tâches d'appel, dossiers bancaires semés sur un prospect),
- * et la purge casserait dans l'autre sens. Aucun rang chronologique ne peut
- * satisfaire les deux contraintes à la fois.
- *
- * C'est donc `DemoService.purge` qui ne s'appuie plus sur la séquence pour
- * l'ordre de suppression, mais sur l'ordre des TYPES, structurellement juste.
- * La séquence ne sert plus qu'à départager deux lignes d'un même type.
- */
-async function recordDemoEntity(
-  tx: Prisma.TransactionClient,
-  entityType: 'representant' | 'prospect',
-  entityId: string,
-): Promise<void> {
-  // Rang le plus élevé, pour que l'inscription reste lisible dans l'ordre où
-  // elle a eu lieu. L'ordre de suppression, lui, vient des types.
-  const highest = await tx.demoEntity.aggregate({ _max: { sequence: true } });
-
-  await tx.demoEntity.upsert({
-    where: { entityType_entityId: { entityType, entityId } },
-    create: { entityType, entityId, sequence: (highest._max.sequence ?? -1) + 1 },
-    update: {},
-  });
 }
 
 async function assertRepresentantUsable(
   tx: Prisma.TransactionClient,
   user: AuthenticatedUser,
   representantId: string,
-): Promise<{ isDemo: boolean }> {
+): Promise<void> {
   const representant = await tx.representant.findFirst({
     where: { id: representantId, deletedAt: null },
-    // `isDemo` est LU ici, et c'est le seul endroit où le chemin de
-    // synchronisation peut apprendre la nature du parent : le prospect créé en
-    // hérite, comme sur la route HTTP.
-    select: { id: true, createdById: true, isDemo: true },
+    select: { id: true, createdById: true },
   });
   if (!representant) {
     throw new OperationError(
@@ -1431,7 +1242,6 @@ async function assertRepresentantUsable(
       'Ce représentant appartient à un autre commercial.',
     );
   }
-  return { isDemo: representant.isDemo };
 }
 
 /**
@@ -1449,11 +1259,6 @@ async function assertProspectPhoneFree(
   phoneE164: string,
   exceptId: string,
 ): Promise<void> {
-  // LECTURE GLOBALE : contrôle d'unicité adossé à l'index global sur le
-  // téléphone. Une fiche de démonstration occupe la ligne aussi sûrement
-  // qu'une vraie ; la masquer ferait annoncer « numéro libre » puis échouer
-  // l'insertion sur une violation d'index, à l'intérieur du lot, sans message
-  // exploitable pour l'appareil qui a poussé l'opération.
   const clash = await tx.prospect.findFirst({
     where: { phoneE164, deletedAt: null, id: { not: exceptId } },
     include: {
