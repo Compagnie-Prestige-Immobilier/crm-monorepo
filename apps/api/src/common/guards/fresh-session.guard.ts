@@ -1,7 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 
 import type { AuthenticatedUser } from '../decorators/current-user.decorator.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 
 /**
@@ -14,10 +13,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
  */
 @Injectable()
 export class FreshSessionGuard implements CanActivate {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     if (context.getType() !== 'http') return true;
@@ -28,7 +24,7 @@ export class FreshSessionGuard implements CanActivate {
 
     const fresh = await this.prisma.user.findUnique({
       where: { id: user.id },
-      select: { role: true, isActive: true, isDemo: true, deletedAt: true },
+      select: { role: true, isActive: true, deletedAt: true },
     });
 
     if (!fresh || fresh.deletedAt !== null) {
@@ -42,15 +38,6 @@ export class FreshSessionGuard implements CanActivate {
       throw new UnauthorizedException({
         code: 'ACCOUNT_DISABLED',
         message: 'Ce compte est désactivé. Contactez un administrateur.',
-      });
-    }
-
-    if (fresh.isDemo && (await this.demo.state()) !== 'on') {
-      throw new UnauthorizedException({
-        code: 'ACCOUNT_DISABLED',
-        message:
-          'Ce compte n’existe que pour les démonstrations, et le mode démonstration est ' +
-          'éteint. Connectez-vous avec un compte réel.',
       });
     }
 

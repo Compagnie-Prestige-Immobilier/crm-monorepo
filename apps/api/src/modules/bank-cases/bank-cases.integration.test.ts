@@ -8,7 +8,6 @@ import { EnrollmentMethod, PrismaClient, PrismaPg, Phase2Status, Role } from '@c
 import { v7 as uuidv7 } from 'uuid';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { BankCasesService } from './bank-cases.service.js';
 import { BankCaseAnalyticsService } from './bank-cases-analytics.service.js';
@@ -16,17 +15,13 @@ import { BankCaseStagesService } from './bank-case-stages.service.js';
 import { BankCaseError } from './errors.js';
 import { BankCaseSortField } from './dto.js';
 import { SortOrder } from '../../common/dto/prospect-filter.dto.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
-const service = new BankCasesService(prisma as unknown as PrismaService, fakeDemoVisibility());
-const analytics = new BankCaseAnalyticsService(
-  prisma as unknown as PrismaService,
-  fakeDemoVisibility(),
-);
-const stages = new BankCaseStagesService(prisma as unknown as PrismaService);
+const service = new BankCasesService(prisma);
+const analytics = new BankCaseAnalyticsService(prisma);
+const stages = new BankCaseStagesService(prisma);
 
 const TAG = 'ITBC';
 

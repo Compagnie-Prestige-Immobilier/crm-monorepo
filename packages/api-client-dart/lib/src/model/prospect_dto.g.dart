@@ -19,29 +19,41 @@ abstract class _$ProspectDtoCWProxy {
 
   ProspectDto statut(ProspectStatut statut);
 
-  ProspectDto banqueId(String banqueId);
+  ProspectDto projet(Projet projet);
 
-  ProspectDto banqueName(String banqueName);
+  ProspectDto banqueId(String? banqueId);
 
-  ProspectDto syndicatId(String syndicatId);
+  ProspectDto banqueName(String? banqueName);
 
-  ProspectDto syndicatSigle(String syndicatSigle);
+  ProspectDto syndicatId(String? syndicatId);
 
-  ProspectDto representantId(String representantId);
+  ProspectDto syndicatSigle(String? syndicatSigle);
 
-  ProspectDto representantName(String representantName);
+  ProspectDto representantId(String? representantId);
 
-  ProspectDto representantPhoneE164(String representantPhoneE164);
+  ProspectDto representantName(String? representantName);
 
-  ProspectDto departementId(String departementId);
+  ProspectDto representantPhoneE164(String? representantPhoneE164);
 
-  ProspectDto departementName(String departementName);
+  ProspectDto departementId(String? departementId);
+
+  ProspectDto departementName(String? departementName);
 
   ProspectDto ownedByCommercialId(String ownedByCommercialId);
 
   ProspectDto ownedByCommercialName(String ownedByCommercialName);
 
-  ProspectDto segment(BddSegment segment);
+  ProspectDto type(ProspectType? type);
+
+  ProspectDto profession(String? profession);
+
+  ProspectDto dureeSystemeMois(num? dureeSystemeMois);
+
+  ProspectDto canalProvenanceId(String? canalProvenanceId);
+
+  ProspectDto canalProvenanceLabel(String? canalProvenanceLabel);
+
+  ProspectDto segment(BddSegment? segment);
 
   ProspectDto phase2Status(Phase2Status phase2Status);
 
@@ -84,18 +96,24 @@ abstract class _$ProspectDtoCWProxy {
     String phoneE164,
     num rev,
     ProspectStatut statut,
-    String banqueId,
-    String banqueName,
-    String syndicatId,
-    String syndicatSigle,
-    String representantId,
-    String representantName,
-    String representantPhoneE164,
-    String departementId,
-    String departementName,
+    Projet projet,
+    String? banqueId,
+    String? banqueName,
+    String? syndicatId,
+    String? syndicatSigle,
+    String? representantId,
+    String? representantName,
+    String? representantPhoneE164,
+    String? departementId,
+    String? departementName,
     String ownedByCommercialId,
     String ownedByCommercialName,
-    BddSegment segment,
+    ProspectType? type,
+    String? profession,
+    num? dureeSystemeMois,
+    String? canalProvenanceId,
+    String? canalProvenanceLabel,
+    BddSegment? segment,
     Phase2Status phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? enrollmentCapturedById,
@@ -138,36 +156,39 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
   ProspectDto statut(ProspectStatut statut) => this(statut: statut);
 
   @override
-  ProspectDto banqueId(String banqueId) => this(banqueId: banqueId);
+  ProspectDto projet(Projet projet) => this(projet: projet);
 
   @override
-  ProspectDto banqueName(String banqueName) => this(banqueName: banqueName);
+  ProspectDto banqueId(String? banqueId) => this(banqueId: banqueId);
 
   @override
-  ProspectDto syndicatId(String syndicatId) => this(syndicatId: syndicatId);
+  ProspectDto banqueName(String? banqueName) => this(banqueName: banqueName);
 
   @override
-  ProspectDto syndicatSigle(String syndicatSigle) =>
+  ProspectDto syndicatId(String? syndicatId) => this(syndicatId: syndicatId);
+
+  @override
+  ProspectDto syndicatSigle(String? syndicatSigle) =>
       this(syndicatSigle: syndicatSigle);
 
   @override
-  ProspectDto representantId(String representantId) =>
+  ProspectDto representantId(String? representantId) =>
       this(representantId: representantId);
 
   @override
-  ProspectDto representantName(String representantName) =>
+  ProspectDto representantName(String? representantName) =>
       this(representantName: representantName);
 
   @override
-  ProspectDto representantPhoneE164(String representantPhoneE164) =>
+  ProspectDto representantPhoneE164(String? representantPhoneE164) =>
       this(representantPhoneE164: representantPhoneE164);
 
   @override
-  ProspectDto departementId(String departementId) =>
+  ProspectDto departementId(String? departementId) =>
       this(departementId: departementId);
 
   @override
-  ProspectDto departementName(String departementName) =>
+  ProspectDto departementName(String? departementName) =>
       this(departementName: departementName);
 
   @override
@@ -179,7 +200,25 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
       this(ownedByCommercialName: ownedByCommercialName);
 
   @override
-  ProspectDto segment(BddSegment segment) => this(segment: segment);
+  ProspectDto type(ProspectType? type) => this(type: type);
+
+  @override
+  ProspectDto profession(String? profession) => this(profession: profession);
+
+  @override
+  ProspectDto dureeSystemeMois(num? dureeSystemeMois) =>
+      this(dureeSystemeMois: dureeSystemeMois);
+
+  @override
+  ProspectDto canalProvenanceId(String? canalProvenanceId) =>
+      this(canalProvenanceId: canalProvenanceId);
+
+  @override
+  ProspectDto canalProvenanceLabel(String? canalProvenanceLabel) =>
+      this(canalProvenanceLabel: canalProvenanceLabel);
+
+  @override
+  ProspectDto segment(BddSegment? segment) => this(segment: segment);
 
   @override
   ProspectDto phase2Status(Phase2Status phase2Status) =>
@@ -247,6 +286,7 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? phoneE164 = const $CopyWithPlaceholder(),
     Object? rev = const $CopyWithPlaceholder(),
     Object? statut = const $CopyWithPlaceholder(),
+    Object? projet = const $CopyWithPlaceholder(),
     Object? banqueId = const $CopyWithPlaceholder(),
     Object? banqueName = const $CopyWithPlaceholder(),
     Object? syndicatId = const $CopyWithPlaceholder(),
@@ -258,6 +298,11 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? departementName = const $CopyWithPlaceholder(),
     Object? ownedByCommercialId = const $CopyWithPlaceholder(),
     Object? ownedByCommercialName = const $CopyWithPlaceholder(),
+    Object? type = const $CopyWithPlaceholder(),
+    Object? profession = const $CopyWithPlaceholder(),
+    Object? dureeSystemeMois = const $CopyWithPlaceholder(),
+    Object? canalProvenanceId = const $CopyWithPlaceholder(),
+    Object? canalProvenanceLabel = const $CopyWithPlaceholder(),
     Object? segment = const $CopyWithPlaceholder(),
     Object? phase2Status = const $CopyWithPlaceholder(),
     Object? enrollmentMethod = const $CopyWithPlaceholder(),
@@ -299,43 +344,47 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.statut
           // ignore: cast_nullable_to_non_nullable
           : statut as ProspectStatut,
+      projet: projet == const $CopyWithPlaceholder()
+          ? _value.projet
+          // ignore: cast_nullable_to_non_nullable
+          : projet as Projet,
       banqueId: banqueId == const $CopyWithPlaceholder()
           ? _value.banqueId
           // ignore: cast_nullable_to_non_nullable
-          : banqueId as String,
+          : banqueId as String?,
       banqueName: banqueName == const $CopyWithPlaceholder()
           ? _value.banqueName
           // ignore: cast_nullable_to_non_nullable
-          : banqueName as String,
+          : banqueName as String?,
       syndicatId: syndicatId == const $CopyWithPlaceholder()
           ? _value.syndicatId
           // ignore: cast_nullable_to_non_nullable
-          : syndicatId as String,
+          : syndicatId as String?,
       syndicatSigle: syndicatSigle == const $CopyWithPlaceholder()
           ? _value.syndicatSigle
           // ignore: cast_nullable_to_non_nullable
-          : syndicatSigle as String,
+          : syndicatSigle as String?,
       representantId: representantId == const $CopyWithPlaceholder()
           ? _value.representantId
           // ignore: cast_nullable_to_non_nullable
-          : representantId as String,
+          : representantId as String?,
       representantName: representantName == const $CopyWithPlaceholder()
           ? _value.representantName
           // ignore: cast_nullable_to_non_nullable
-          : representantName as String,
+          : representantName as String?,
       representantPhoneE164:
           representantPhoneE164 == const $CopyWithPlaceholder()
           ? _value.representantPhoneE164
           // ignore: cast_nullable_to_non_nullable
-          : representantPhoneE164 as String,
+          : representantPhoneE164 as String?,
       departementId: departementId == const $CopyWithPlaceholder()
           ? _value.departementId
           // ignore: cast_nullable_to_non_nullable
-          : departementId as String,
+          : departementId as String?,
       departementName: departementName == const $CopyWithPlaceholder()
           ? _value.departementName
           // ignore: cast_nullable_to_non_nullable
-          : departementName as String,
+          : departementName as String?,
       ownedByCommercialId: ownedByCommercialId == const $CopyWithPlaceholder()
           ? _value.ownedByCommercialId
           // ignore: cast_nullable_to_non_nullable
@@ -345,10 +394,30 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.ownedByCommercialName
           // ignore: cast_nullable_to_non_nullable
           : ownedByCommercialName as String,
+      type: type == const $CopyWithPlaceholder()
+          ? _value.type
+          // ignore: cast_nullable_to_non_nullable
+          : type as ProspectType?,
+      profession: profession == const $CopyWithPlaceholder()
+          ? _value.profession
+          // ignore: cast_nullable_to_non_nullable
+          : profession as String?,
+      dureeSystemeMois: dureeSystemeMois == const $CopyWithPlaceholder()
+          ? _value.dureeSystemeMois
+          // ignore: cast_nullable_to_non_nullable
+          : dureeSystemeMois as num?,
+      canalProvenanceId: canalProvenanceId == const $CopyWithPlaceholder()
+          ? _value.canalProvenanceId
+          // ignore: cast_nullable_to_non_nullable
+          : canalProvenanceId as String?,
+      canalProvenanceLabel: canalProvenanceLabel == const $CopyWithPlaceholder()
+          ? _value.canalProvenanceLabel
+          // ignore: cast_nullable_to_non_nullable
+          : canalProvenanceLabel as String?,
       segment: segment == const $CopyWithPlaceholder()
           ? _value.segment
           // ignore: cast_nullable_to_non_nullable
-          : segment as BddSegment,
+          : segment as BddSegment?,
       phase2Status: phase2Status == const $CopyWithPlaceholder()
           ? _value.phase2Status
           // ignore: cast_nullable_to_non_nullable
@@ -433,6 +502,7 @@ ProspectDto _$ProspectDtoFromJson(
       'phoneE164',
       'rev',
       'statut',
+      'projet',
       'banqueId',
       'banqueName',
       'syndicatId',
@@ -444,6 +514,11 @@ ProspectDto _$ProspectDtoFromJson(
       'departementName',
       'ownedByCommercialId',
       'ownedByCommercialName',
+      'type',
+      'profession',
+      'dureeSystemeMois',
+      'canalProvenanceId',
+      'canalProvenanceLabel',
       'segment',
       'phase2Status',
       'enrollmentMethod',
@@ -475,18 +550,26 @@ ProspectDto _$ProspectDtoFromJson(
         unknownValue: ProspectStatut.unknownDefaultOpenApi,
       ),
     ),
-    banqueId: $checkedConvert('banqueId', (v) => v as String),
-    banqueName: $checkedConvert('banqueName', (v) => v as String),
-    syndicatId: $checkedConvert('syndicatId', (v) => v as String),
-    syndicatSigle: $checkedConvert('syndicatSigle', (v) => v as String),
-    representantId: $checkedConvert('representantId', (v) => v as String),
-    representantName: $checkedConvert('representantName', (v) => v as String),
+    projet: $checkedConvert(
+      'projet',
+      (v) => $enumDecode(
+        _$ProjetEnumMap,
+        v,
+        unknownValue: Projet.unknownDefaultOpenApi,
+      ),
+    ),
+    banqueId: $checkedConvert('banqueId', (v) => v as String?),
+    banqueName: $checkedConvert('banqueName', (v) => v as String?),
+    syndicatId: $checkedConvert('syndicatId', (v) => v as String?),
+    syndicatSigle: $checkedConvert('syndicatSigle', (v) => v as String?),
+    representantId: $checkedConvert('representantId', (v) => v as String?),
+    representantName: $checkedConvert('representantName', (v) => v as String?),
     representantPhoneE164: $checkedConvert(
       'representantPhoneE164',
-      (v) => v as String,
+      (v) => v as String?,
     ),
-    departementId: $checkedConvert('departementId', (v) => v as String),
-    departementName: $checkedConvert('departementName', (v) => v as String),
+    departementId: $checkedConvert('departementId', (v) => v as String?),
+    departementName: $checkedConvert('departementName', (v) => v as String?),
     ownedByCommercialId: $checkedConvert(
       'ownedByCommercialId',
       (v) => v as String,
@@ -495,9 +578,27 @@ ProspectDto _$ProspectDtoFromJson(
       'ownedByCommercialName',
       (v) => v as String,
     ),
+    type: $checkedConvert(
+      'type',
+      (v) => $enumDecodeNullable(
+        _$ProspectTypeEnumMap,
+        v,
+        unknownValue: ProspectType.unknownDefaultOpenApi,
+      ),
+    ),
+    profession: $checkedConvert('profession', (v) => v as String?),
+    dureeSystemeMois: $checkedConvert('dureeSystemeMois', (v) => v as num?),
+    canalProvenanceId: $checkedConvert(
+      'canalProvenanceId',
+      (v) => v as String?,
+    ),
+    canalProvenanceLabel: $checkedConvert(
+      'canalProvenanceLabel',
+      (v) => v as String?,
+    ),
     segment: $checkedConvert(
       'segment',
-      (v) => $enumDecode(
+      (v) => $enumDecodeNullable(
         _$BddSegmentEnumMap,
         v,
         unknownValue: BddSegment.unknownDefaultOpenApi,
@@ -568,6 +669,7 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'phoneE164': instance.phoneE164,
       'rev': instance.rev,
       'statut': _$ProspectStatutEnumMap[instance.statut]!,
+      'projet': _$ProjetEnumMap[instance.projet]!,
       'banqueId': instance.banqueId,
       'banqueName': instance.banqueName,
       'syndicatId': instance.syndicatId,
@@ -579,7 +681,12 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'departementName': instance.departementName,
       'ownedByCommercialId': instance.ownedByCommercialId,
       'ownedByCommercialName': instance.ownedByCommercialName,
-      'segment': _$BddSegmentEnumMap[instance.segment]!,
+      'type': _$ProspectTypeEnumMap[instance.type],
+      'profession': instance.profession,
+      'dureeSystemeMois': instance.dureeSystemeMois,
+      'canalProvenanceId': instance.canalProvenanceId,
+      'canalProvenanceLabel': instance.canalProvenanceLabel,
+      'segment': _$BddSegmentEnumMap[instance.segment],
       'phase2Status': _$Phase2StatusEnumMap[instance.phase2Status]!,
       'enrollmentMethod': _$EnrollmentMethodEnumMap[instance.enrollmentMethod],
       'enrollmentCapturedById': instance.enrollmentCapturedById,
@@ -602,6 +709,20 @@ const _$ProspectStatutEnumMap = {
   ProspectStatut.CONVERTI: 'CONVERTI',
   ProspectStatut.PERDU: 'PERDU',
   ProspectStatut.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$ProjetEnumMap = {
+  Projet.CHUES: 'CHUES',
+  Projet.GRAND_PUBLIC: 'GRAND_PUBLIC',
+  Projet.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$ProspectTypeEnumMap = {
+  ProspectType.FONCTIONNAIRE: 'FONCTIONNAIRE',
+  ProspectType.SECTEUR_PRIVE: 'SECTEUR_PRIVE',
+  ProspectType.INFORMEL: 'INFORMEL',
+  ProspectType.DIASPORA: 'DIASPORA',
+  ProspectType.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$BddSegmentEnumMap = {

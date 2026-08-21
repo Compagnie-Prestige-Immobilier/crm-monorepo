@@ -4,14 +4,13 @@ process.env.DATABASE_URL ??= 'postgresql://crm:crm@localhost:5434/crm?schema=pub
 import { PrismaClient, PrismaPg, Role } from '@crm/database';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { PrismaService } from '../../prisma/prisma.service.js';
 import { HeartbeatService } from './heartbeat.service.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
 
-const heartbeat = new HeartbeatService(prisma as unknown as PrismaService);
+const heartbeat = new HeartbeatService(prisma);
 
 const TAG = 'it-heartbeat';
 let userId: string;

@@ -26,8 +26,14 @@ const SAMPLE_BACKGROUND = 'FFF3F3F3';
 /** `dataValidation` est posée cellule par cellule : au-delà, le modèle vide pèse des mégaoctets. */
 const LAST_VALIDATED_ROW = 1_000;
 
+export const COLUMNS_BY_POSITION_RULE =
+  'Ne modifiez ni l’ordre ni le nombre des colonnes : le fichier est relu par position, pas par le texte de l’en-tête.';
+
+export const COLUMNS_BY_HEADER_RULE =
+  'Les colonnes sont retrouvées par le TEXTE de leur en-tête, en ligne 1 : vous pouvez les déplacer, en intercaler d’autres, ou retirer une colonne facultative.';
+
 export const COMMON_TEMPLATE_RULES: readonly string[] = [
-  'Ne modifiez ni l’ordre ni le nombre des colonnes : le fichier est relu par position, pas par le texte de l’en-tête.',
+  COLUMNS_BY_POSITION_RULE,
   'La ligne 2 est un exemple grisé : elle n’est JAMAIS lue à l’import. Laissez-la en place et commencez votre saisie en ligne 3.',
   'Les lignes entièrement vides sont ignorées, pas comptées en erreur.',
   'L’import se fait en deux temps : une simulation qui liste les erreurs ligne par ligne, puis l’application, qui écrit.',

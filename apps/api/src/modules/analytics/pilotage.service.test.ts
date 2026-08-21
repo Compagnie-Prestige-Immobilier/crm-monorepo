@@ -2,7 +2,6 @@ import { Role } from '@crm/database';
 import { describe, expect, it } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { makeAnalyticsPrisma } from './fake-analytics-prisma.js';
 import { PilotageService } from './pilotage.service.js';
 
@@ -32,28 +31,9 @@ const totals = (over: Record<string, number> = {}): Record<string, number> => ({
 });
 
 describe('pilotage de campagne', () => {
-  it('pose la visibilité de démonstration sur CHAQUE table jointe', async () => {
-    const { service, sql } = makeAnalyticsPrisma();
-    await new PilotageService(service, fakeDemoVisibility()).campaignPilotage(admin, {});
-
-    expect(sql()).toContain('p."isDemo" = FALSE');
-    expect(sql()).toContain('ct."isDemo" = FALSE');
-    expect(sql()).toContain('ca."isDemo" = FALSE');
-    expect(sql()).toContain('cc."isDemo" = FALSE');
-  });
-
-  it('mode démonstration allumé : aucune table n’est filtrée', async () => {
-    const { service, sql } = makeAnalyticsPrisma();
-    await new PilotageService(service, fakeDemoVisibility(true)).campaignPilotage(admin, {});
-    expect(sql()).not.toContain('isDemo');
-  });
-
   it('sans campagne précisée, porte sur les campagnes ACTIVES', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    const result = await new PilotageService(service, fakeDemoVisibility()).campaignPilotage(
-      admin,
-      {},
-    );
+    const result = await new PilotageService(service).campaignPilotage(admin, {});
 
     expect(sql()).toContain(`cc."status" = 'ACTIVE'`);
     expect(result.campaignId).toBeNull();
@@ -61,10 +41,9 @@ describe('pilotage de campagne', () => {
 
   it('borne la mesure à la campagne demandée', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    const result = await new PilotageService(service, fakeDemoVisibility()).campaignPilotage(
-      admin,
-      { campaignId: 'camp-1' },
-    );
+    const result = await new PilotageService(service).campaignPilotage(admin, {
+      campaignId: 'camp-1',
+    });
 
     expect(sql()).toContain('cc."id" = "camp-1"');
     expect(result.campaignId).toBe('camp-1');
@@ -72,16 +51,13 @@ describe('pilotage de campagne', () => {
 
   it('un COMMERCIAL reste borné à ses lignes', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new PilotageService(service, fakeDemoVisibility()).campaignPilotage(alice, {});
+    await new PilotageService(service).campaignPilotage(alice, {});
     expect(sql()).toContain('p."createdById" = "com-alice"');
   });
 
   it('base vide : charge utile complète, aucun taux inventé', async () => {
     const { service, calls } = makeAnalyticsPrisma();
-    const result = await new PilotageService(service, fakeDemoVisibility()).campaignPilotage(
-      admin,
-      {},
-    );
+    const result = await new PilotageService(service).campaignPilotage(admin, {});
 
     expect(calls()).toBe(2);
     expect(result.tasks).toBe(0);
@@ -95,10 +71,7 @@ describe('pilotage de campagne', () => {
 
   it('aucune méthode obtenue : le rapport vaut 0, jamais l’infini', async () => {
     const { service } = makeAnalyticsPrisma([totals({ tentatives: 12, methodes: 0 })], []);
-    const result = await new PilotageService(service, fakeDemoVisibility()).campaignPilotage(
-      admin,
-      {},
-    );
+    const result = await new PilotageService(service).campaignPilotage(admin, {});
     expect(result.attemptsPerMethodObtained).toBe(0);
   });
 
@@ -118,10 +91,7 @@ describe('pilotage de campagne', () => {
       [{ jour: '2026-08-10', id: 'com-alice', nom: 'Alice Diop', done: 12 }],
     );
 
-    const result = await new PilotageService(service, fakeDemoVisibility()).campaignPilotage(
-      admin,
-      {},
-    );
+    const result = await new PilotageService(service).campaignPilotage(admin, {});
 
     expect(result.contactRate).toBe(75);
     expect(result.reachRate).toBe(80);
@@ -141,7 +111,7 @@ describe('délais de la chaîne', () => {
       { m1: 2.34, p1: 9.87, n1: 40, m2: 5, p2: 12, n2: 10, m3: 30.05, p3: 61, n3: 3 },
     ]);
 
-    const result = await new PilotageService(service, fakeDemoVisibility()).delays(admin, {});
+    const result = await new PilotageService(service).delays(admin, {});
 
     expect(result.legs.map((leg) => leg.leg)).toEqual([
       'CREATION_TO_METHOD',
@@ -159,7 +129,7 @@ describe('délais de la chaîne', () => {
       { m1: null, p1: null, n1: 0, m2: null, p2: null, n2: 0, m3: null, p3: null, n3: 0 },
     ]);
 
-    const result = await new PilotageService(service, fakeDemoVisibility()).delays(admin, {});
+    const result = await new PilotageService(service).delays(admin, {});
 
     for (const leg of result.legs) {
       expect(leg.medianDays).toBeNull();
@@ -170,7 +140,7 @@ describe('délais de la chaîne', () => {
 
   it('base vide : la charge utile garde ses trois tronçons', async () => {
     const { service, calls } = makeAnalyticsPrisma();
-    const result = await new PilotageService(service, fakeDemoVisibility()).delays(admin, {});
+    const result = await new PilotageService(service).delays(admin, {});
 
     expect(calls()).toBe(1);
     expect(result.legs).toHaveLength(3);
@@ -179,12 +149,10 @@ describe('délais de la chaîne', () => {
 
   it('n’agrège que des durées positives, et filtre la démonstration', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new PilotageService(service, fakeDemoVisibility()).delays(admin, {});
+    await new PilotageService(service).delays(admin, {});
 
     expect(sql()).toContain('percentile_cont(0.5)');
     expect(sql()).toContain('percentile_cont(0.9)');
     expect(sql()).toContain('>=');
-    expect(sql()).toContain('bc."isDemo" = FALSE');
-    expect(sql()).toContain('tr."isDemo" = FALSE');
   });
 });

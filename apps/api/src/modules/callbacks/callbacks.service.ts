@@ -2,8 +2,6 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { Prisma, ScheduledCallbackStatus } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 import { dakarWallClock, inclusiveDateTo } from '../../common/date-bounds.js';
 import { isAdmin, readsEveryone } from '../../common/scope.js';
 import { shortCode } from '../../common/short-code.js';
@@ -55,10 +53,7 @@ const toDto = (row: CallbackRow, now: Date): CallbackDto => ({
 
 @Injectable()
 export class CallbacksService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * File des rappels encore dus. Le RETARD n'est pas un statut : un rappel de
@@ -71,7 +66,6 @@ export class CallbacksService {
     const assignedToId = readsEveryone(user) ? query.assignedToId : user.id;
 
     const where: Prisma.ScheduledCallbackWhereInput = {
-      ...demoScope(await this.demo.enabled()),
       status: ScheduledCallbackStatus.PENDING,
       ...(assignedToId === undefined ? {} : { assignedToId }),
       scheduledAt:
@@ -94,7 +88,7 @@ export class CallbacksService {
   async cancel(user: AuthenticatedUser, id: string): Promise<CallbackDto> {
     const now = new Date();
     const row = await this.prisma.scheduledCallback.findFirst({
-      where: { id, ...demoScope(await this.demo.enabled()) },
+      where: { id },
       select: { ...CALLBACK_SELECT, status: true },
     });
 

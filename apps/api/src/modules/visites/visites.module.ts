@@ -8,5 +8,6 @@ import { VisiteReferentielsService } from './visite-referentiels.service.js';
 @Module({
   controllers: [VisitesController],
   providers: [VisitesService, VisitesStatsService, VisiteReferentielsService],
+  exports: [VisitesService],
 })
 export class VisitesModule {}

@@ -31,33 +31,6 @@ import { Roles } from '../../common/decorators/roles.decorator.js';
 import { ImportJobDto, ImportJobListDto, ImportJobQueryDto } from './dto.js';
 import { ImportsService } from './imports.service.js';
 
-/**
- * Les imports de masse, en arrière-plan. ADMIN uniquement.
- *
- * `@Roles(ADMIN)` est posé sur la CLASSE : une route ajoutée demain reste fermée
- * plutôt que d'être ouverte par oubli. Un import écrit des milliers de fiches
- * d'un coup ; c'est le geste le plus lourd de conséquences de tout le panel.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- * AUCUNE ROUTE NE PORTE `@DemoWritable`, ET C'EST LA DÉCISION
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * `DemoReadOnlyGuard` refuse tout POST tant que le mode démonstration est
- * allumé. Le dépôt d'un classeur en est un, donc il est refusé — et il doit
- * l'être : un import lancé pendant une démonstration mêlerait des milliers de
- * fiches réelles au jeu fictif affiché à l'écran.
- *
- * Le SUIVI reste un GET : il continue de répondre pendant une démonstration, ce
- * qui est correct. Un travail en cours a nécessairement été déposé alors que
- * l'interrupteur était éteint.
- *
- * LES MODÈLES DE CLASSEUR ne sont PAS servis ici : ils le sont par
- * `GET /export/representants-modele.xlsx` et `GET /export/prospects-modele.xlsx`,
- * dans le module d'export, qui est le seul endroit à savoir écrire un classeur.
- * Les dupliquer ferait exister deux modèles capables de diverger d'une colonne,
- * ce que `import-template.ts` et `prospects-import-template.ts` existent
- * précisément pour empêcher.
- */
 @ApiTags('imports')
 @ApiBearerAuth()
 @Roles(Role.ADMIN)
@@ -108,7 +81,6 @@ export class ImportsController {
   })
   @ApiResponse({ status: 201, type: ImportJobDto })
   @ApiErrors({
-    409: 'DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé.',
     413: 'IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.',
     429: true,
   })
@@ -151,7 +123,6 @@ export class ImportsController {
   })
   @ApiResponse({ status: 201, type: ImportJobDto })
   @ApiErrors({
-    409: 'DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé.',
     413: 'IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.',
     429: true,
   })
@@ -160,6 +131,44 @@ export class ImportsController {
     @Req() request: FastifyRequest,
   ): Promise<ImportJobDto> {
     return this.imports.create(user, request, ImportKind.PROSPECTS);
+  }
+
+  @Post('prospects-grand-public')
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    operationId: 'createProspectsGrandPublicImport',
+    summary:
+      'Dépose un classeur de prospects Grand Public et inscrit le travail. Rend immédiatement.',
+    description:
+      'NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, ' +
+      'et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que ' +
+      '`POST /imports/{id}/apply` n’a pas été appelé. Les colonnes sont retrouvées par le TEXTE ' +
+      'de leur en-tête, en ligne 1, jamais par leur rang. SEULS le nom et le téléphone sont ' +
+      'exigés : profession, syndicat, banque, fonctionnaire, durée du système et canal de ' +
+      'provenance se lisent vides sans faire refuser la ligne, et leur colonne peut même manquer ' +
+      'du fichier. « Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE ; à « non », le ' +
+      'type reste vide, car le fichier ne dit pas lequel des trois autres il serait. Le modèle de ' +
+      'classeur se télécharge par `GET /export/prospects-grand-public-modele.xlsx`.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiResponse({ status: 201, type: ImportJobDto })
+  @ApiErrors({
+    413: 'IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.',
+    429: true,
+  })
+  createProspectsGrandPublic(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: FastifyRequest,
+  ): Promise<ImportJobDto> {
+    return this.imports.create(user, request, ImportKind.PROSPECTS_GRAND_PUBLIC);
   }
 
   /**
@@ -192,7 +201,6 @@ export class ImportsController {
   })
   @ApiResponse({ status: 201, type: ImportJobDto })
   @ApiErrors({
-    409: 'DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé.',
     413: 'IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.',
     429: true,
   })
@@ -233,9 +241,7 @@ export class ImportsController {
   @ApiResponse({ status: 200, type: ImportJobDto })
   @ApiErrors({
     404: 'IMPORT_JOB_NOT_FOUND · ce travail d’import n’existe pas.',
-    409:
-      'IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance ' +
-      'est passée. DEMO_MODE_READ_ONLY · le mode démonstration est actif.',
+    409: 'IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée.',
   })
   apply(@Param('id', ParseUUIDPipe) id: string): Promise<ImportJobDto> {
     return this.imports.apply(id);

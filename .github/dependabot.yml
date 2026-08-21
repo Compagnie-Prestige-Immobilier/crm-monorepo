@@ -17,7 +17,22 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # UNE seule pull request pour tout le lot, et non cinq.
+    #
+    # Chaque PR declenche la suite complete : ~25 minutes facturees. A cinq
+    # actions plus cinq paquets npm par semaine, Dependabot depensait a lui seul
+    # la moitie des 2 000 minutes mensuelles incluses, pour des montees de
+    # version qui se relisent tres bien ensemble.
+    #
+    # Le groupe ne masque rien : le corps de la PR liste chaque dependance et sa
+    # version. Ce qu'on perd, c'est de pouvoir fusionner l'une sans les autres ;
+    # c'est le prix, et il est faible sur des montees hebdomadaires.
+    groups:
+      actions:
+        patterns: ['*']
+    # UNE pull request ouverte a la fois, par ecosysteme. Avec npm, cela plafonne
+    # a deux le nombre de series de verification declenchees par semaine.
+    open-pull-requests-limit: 1
     cooldown:
       default-days: 7
       semver-major-days: 7
@@ -29,7 +44,21 @@ updates:
     schedule:
       interval: weekly
     versioning-strategy: increase
-    open-pull-requests-limit: 5
+    # Deux groupes et non un seul : un majeur se relit, se teste et se fusionne
+    # autrement qu'un correctif, et les melanger obligerait a tout retenir pour
+    # une seule montee qui coince.
+    groups:
+      npm-mineur-et-correctif:
+        patterns: ['*']
+        update-types: [minor, patch]
+      npm-majeur:
+        patterns: ['*']
+        update-types: [major]
+    # Le plafond porte sur les pull requests OUVERTES, pas sur les groupes : les
+    # deux groupes existent toujours, mais le second attend que le premier soit
+    # fusionne. Les correctifs passent donc en premier, et un majeur qui coince
+    # ne les retient plus.
+    open-pull-requests-limit: 1
     cooldown:
       default-days: 7
       semver-major-days: 7
@@ -40,7 +69,10 @@ updates:
     directory: /infra/docker
     schedule:
       interval: monthly
-    open-pull-requests-limit: 2
+    groups:
+      docker:
+        patterns: ['*']
+    open-pull-requests-limit: 1
     cooldown:
       default-days: 7
       semver-major-days: 7

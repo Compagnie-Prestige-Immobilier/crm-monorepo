@@ -130,24 +130,122 @@ Future<void> insertProspect(
   required String id,
   required String representantId,
   required String phone,
+  String nom = 'Nom',
+  String prenom = 'Prénom',
   String createdById = 'me',
   DateTime? serverUpdatedAt,
+  DateTime? deletedAt,
 }) {
   return db
       .into(db.prospects)
       .insert(
         ProspectsCompanion.insert(
           id: id,
-          nom: 'Nom',
-          prenom: 'Prénom',
+          nom: nom,
+          prenom: prenom,
+          deletedAt: Value<DateTime?>(deletedAt),
           phoneE164: phone,
-          banqueId: 'bq-1',
-          syndicatId: 'sy-1',
-          representantId: representantId,
+          banqueId: const Value<String?>('bq-1'),
+          syndicatId: const Value<String?>('sy-1'),
+          representantId: Value<String?>(representantId),
           createdById: createdById,
           clientCreatedAt: t0,
           localUpdatedAt: t0,
           serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
+        ),
+      );
+}
+
+Future<void> insertCampagne(
+  AppDatabase db, {
+  required String id,
+  String name = 'Campagne',
+  String status = 'ACTIVE',
+  int spreadDays = 1,
+  DateTime? closedAt,
+  DateTime? updatedAt,
+}) {
+  return db
+      .into(db.callCampaigns)
+      .insert(
+        CallCampaignsCompanion.insert(
+          id: id,
+          name: name,
+          status: Value<String>(status),
+          spreadDays: Value<int>(spreadDays),
+          closedAt: Value<DateTime?>(closedAt),
+          updatedAt: updatedAt ?? t0,
+        ),
+      );
+}
+
+Future<void> insertTache(
+  AppDatabase db, {
+  required String id,
+  required String campaignId,
+  required String prospectId,
+  required int position,
+  int dayIndex = 0,
+  String status = 'OPEN',
+}) {
+  return db
+      .into(db.callTasks)
+      .insert(
+        CallTasksCompanion.insert(
+          id: id,
+          campaignId: campaignId,
+          prospectId: prospectId,
+          position: position,
+          dayIndex: Value<int>(dayIndex),
+          status: Value<String>(status),
+          updatedAt: t0,
+        ),
+      );
+}
+
+Future<void> insertVisite(
+  AppDatabase db, {
+  required String id,
+  String? reference = 'V-2026-000412',
+  required String date,
+  String? time,
+  String visitorName = 'Awa Ndiaye',
+  String? phone,
+  String entrepriseId = 'e1',
+  String entrepriseLabel = 'CPI',
+  String objetId = 'o1',
+  String objetLabel = 'Achat terrain',
+  String? directionId,
+  String? directionLabel,
+  String? destinataireId,
+  String? destinataireLabel,
+  String? comment,
+  String createdById = 'me',
+  DateTime? createdAt,
+  DateTime? updatedAt,
+}) {
+  return db
+      .into(db.visites)
+      .insert(
+        VisitesCompanion.insert(
+          id: id,
+          reference: Value<String?>(reference),
+          date: date,
+          time: Value<String?>(time),
+          visitorName: visitorName,
+          phone: Value<String?>(phone),
+          entrepriseId: entrepriseId,
+          entrepriseLabel: entrepriseLabel,
+          objetId: objetId,
+          objetLabel: objetLabel,
+          directionId: Value<String?>(directionId),
+          directionLabel: Value<String?>(directionLabel),
+          destinataireId: Value<String?>(destinataireId),
+          destinataireLabel: Value<String?>(destinataireLabel),
+          comment: Value<String?>(comment),
+          createdById: createdById,
+          createdAt: createdAt ?? t0,
+          updatedAt: updatedAt ?? t0,
         ),
       );
 }

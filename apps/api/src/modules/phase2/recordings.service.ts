@@ -17,8 +17,6 @@ import type { MultipartFile } from '@fastify/multipart';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { readEnv } from '../../env.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { CallRecordingDto } from './dto.js';
 
@@ -28,10 +26,7 @@ const AUDIO_MIMES = new Set(['audio/mp4', 'audio/x-m4a']);
 export class CallRecordingsService {
   private readonly logger = new Logger(CallRecordingsService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Toutes les heures, et non une fois par jour: la duree de conservation est
@@ -187,7 +182,7 @@ export class CallRecordingsService {
     upload: boolean,
   ): Promise<void> {
     const attempt = await this.prisma.callAttempt.findFirst({
-      where: { id: attemptId, ...demoScope(await this.demo.enabled()) },
+      where: { id: attemptId },
       select: { performedById: true },
     });
     if (!attempt) {

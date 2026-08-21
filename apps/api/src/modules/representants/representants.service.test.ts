@@ -9,7 +9,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { ROLES_KEY } from '../../common/decorators/roles.decorator.js';
 import { RepresentantsController } from './representants.controller.js';
 import { RepresentantsService } from './representants.service.js';
@@ -66,7 +65,6 @@ const foreignRow = (): Record<string, unknown> => ({
   whatsappStatus: WhatsappStatus.NON_DEMANDE,
   whatsappE164: null,
   profession: null,
-  isDemo: false,
   _count: { prospects: 42 },
 });
 
@@ -94,7 +92,7 @@ beforeEach(() => {
     },
     $transaction: vi.fn((run: (tx: MockDb) => Promise<unknown>) => run(db)),
   };
-  service = new RepresentantsService(db as unknown as PrismaService, fakeDemoVisibility());
+  service = new RepresentantsService(db as unknown as PrismaService);
 });
 
 describe('lookup par téléphone', () => {
@@ -173,7 +171,7 @@ describe('lookup par téléphone', () => {
     const where = (
       db.representant.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }]
     )[0].where;
-    expect(where).toMatchObject({ isDemo: false });
+    expect(where).toMatchObject({});
   });
 });
 
@@ -231,39 +229,6 @@ describe('cloisonnement de la route', () => {
     const roles = Reflect.getMetadata(ROLES_KEY, handler) as Role[];
 
     expect(roles).toEqual([Role.ADMIN]);
-  });
-});
-
-describe('nature de la fiche créée', () => {
-  const saisie = {
-    fullName: 'Fatou Ndiaye',
-    phone: '77 123 45 67',
-    departementId: 'dep-1',
-  };
-
-  const dataOf = (): Record<string, unknown> =>
-    (db.representant.create.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
-
-  beforeEach(() => {
-    db.representant.create.mockResolvedValue(foreignRow());
-  });
-
-  it('mode ÉTEINT : la fiche est réelle', async () => {
-    await new RepresentantsService(
-      db as unknown as PrismaService,
-      fakeDemoVisibility(false),
-    ).create(COMMERCIAL, saisie);
-
-    expect(dataOf().isDemo).toBe(false);
-  });
-
-  it('mode ALLUMÉ : la fiche est une fiche de démonstration', async () => {
-    await new RepresentantsService(db as unknown as PrismaService, fakeDemoVisibility(true)).create(
-      COMMERCIAL,
-      saisie,
-    );
-
-    expect(dataOf().isDemo).toBe(true);
   });
 });
 
@@ -340,7 +305,6 @@ describe('bascule de relation par le panel', () => {
       toStatus: RepresentantRelation.AMBASSADEUR,
       changedById: COMMERCIAL.id,
       source: ChangeSource.WEB,
-      isDemo: false,
     });
   });
 
@@ -376,15 +340,11 @@ describe('bascule de relation par le panel', () => {
   });
 
   it('fait suivre la trace la nature de la fiche, pas le mode en vigueur', async () => {
-    db.representant.findFirst.mockResolvedValue(own({ isDemo: true }));
+    db.representant.findFirst.mockResolvedValue(own({}));
 
-    await new RepresentantsService(db as unknown as PrismaService, fakeDemoVisibility(true)).update(
-      COMMERCIAL,
-      'rep-9',
-      { relationStatus: RepresentantRelation.CONTACTE },
-    );
-
-    expect(historyOf().isDemo).toBe(true);
+    await new RepresentantsService(db as unknown as PrismaService).update(COMMERCIAL, 'rep-9', {
+      relationStatus: RepresentantRelation.CONTACTE,
+    });
   });
 
   it('porte le motif jusqu’à l’histoire', async () => {
@@ -580,15 +540,13 @@ describe('fil de commentaires', () => {
   });
 
   it('le commentaire suit la nature de la FICHE, pas le mode en vigueur', async () => {
-    db.representant.findFirst.mockResolvedValue(own({ isDemo: true }));
+    db.representant.findFirst.mockResolvedValue(own({}));
     db.representantComment.findUniqueOrThrow.mockResolvedValue(comment());
 
-    await new RepresentantsService(
-      db as unknown as PrismaService,
-      fakeDemoVisibility(true),
-    ).addComment(COMMERCIAL, 'rep-9', { id: 'cmt-1', body: 'Vu sur place' });
-
-    expect(postedData(0).isDemo).toBe(true);
+    await new RepresentantsService(db as unknown as PrismaService).addComment(COMMERCIAL, 'rep-9', {
+      id: 'cmt-1',
+      body: 'Vu sur place',
+    });
   });
 
   it('rend le fil du plus récent au plus ancien, départagé par l’identifiant', async () => {

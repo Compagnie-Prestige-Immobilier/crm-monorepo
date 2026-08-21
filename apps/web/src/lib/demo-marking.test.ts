@@ -3,16 +3,16 @@ import { describe, expect, it } from 'vitest';
 import {
   DEMO_FILENAME_SUFFIX,
   DEMO_MODE_HEADER,
-  isDemoResponse,
+  isDemoExport,
   withDemoSuffix,
 } from '@/lib/demo-marking';
 
-describe('isDemoResponse', () => {
+describe('isDemoExport', () => {
   it('ne retient que le `true` explicite', () => {
-    expect(isDemoResponse(new Headers({ [DEMO_MODE_HEADER]: 'true' }))).toBe(true);
-    expect(isDemoResponse(new Headers({ [DEMO_MODE_HEADER]: 'TRUE' }))).toBe(true);
-    expect(isDemoResponse(new Headers({ [DEMO_MODE_HEADER]: 'false' }))).toBe(false);
-    expect(isDemoResponse(new Headers())).toBe(false);
+    expect(isDemoExport(new Headers({ [DEMO_MODE_HEADER]: 'true' }))).toBe(true);
+    expect(isDemoExport(new Headers({ [DEMO_MODE_HEADER]: 'TRUE' }))).toBe(true);
+    expect(isDemoExport(new Headers({ [DEMO_MODE_HEADER]: 'false' }))).toBe(false);
+    expect(isDemoExport(new Headers())).toBe(false);
   });
 });
 

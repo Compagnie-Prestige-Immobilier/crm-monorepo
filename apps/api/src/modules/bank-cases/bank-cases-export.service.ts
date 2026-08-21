@@ -12,7 +12,7 @@ import type { BankCaseRow, BankTransitionRow } from './mappers.js';
 import { moneyToNumber, moneyToString } from './money.js';
 import type { BankCaseFilterDto } from './dto.js';
 import { markWorkbook, writeDemoWarningRow } from '../export/demo-marking.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { CPI_BURGUNDY_ARGB } from '../../common/brand.js';
 
 /**
@@ -53,7 +53,7 @@ export class BankCasesExportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly analytics: BankCaseAnalyticsService,
-    private readonly demo: DemoVisibilityService,
+    private readonly demo: WorkspaceContext,
   ) {}
 
   /**
@@ -67,10 +67,14 @@ export class BankCasesExportService {
    * Le filtre est celui de la liste, mot pour mot : l'agent exporte exactement
    * ce qu'il voit à l'écran.
    */
-  async write(filter: BankCaseFilterDto, stream: Writable): Promise<void> {
+  async write(
+    filter: BankCaseFilterDto,
+    stream: Writable,
+    currentDemoEnabled?: boolean,
+  ): Promise<void> {
     // Lu UNE fois pour tout le classeur : une bascule survenue en cours
     // d'export laisserait sinon une feuille avertie et l'autre muette.
-    const demoEnabled = await this.demo.enabled();
+    const demoEnabled = currentDemoEnabled ?? this.demo.current() === 'demo';
 
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
     markWorkbook(workbook, demoEnabled);
@@ -243,7 +247,7 @@ export class BankCasesExportService {
 
   /** Une page d'identifiants, filtrée par la MÊME requête que la liste et les agrégats. */
   private async pageIds(filter: BankCaseFilterDto, after: string | undefined): Promise<string[]> {
-    const where = bankCaseConditions(filter, await this.demo.enabled());
+    const where = bankCaseConditions(filter);
     const keyset = after === undefined ? Prisma.sql`` : Prisma.sql`AND c."id" > ${after}`;
     const rows = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT c."id" ${BANK_CASE_FROM} WHERE ${where} ${keyset}

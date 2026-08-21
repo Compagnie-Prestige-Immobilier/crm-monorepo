@@ -7,8 +7,8 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 const TABS: readonly { href: string; label: string; icon: typeof MegaphoneIcon }[] = [
-  { href: '/campagnes', label: 'Appels prospects', icon: MegaphoneIcon },
-  { href: '/campagnes/representants', label: 'Appels représentants', icon: UsersRoundIcon },
+  { href: '/chues/campagnes', label: 'Appels prospects', icon: MegaphoneIcon },
+  { href: '/chues/campagnes/representants', label: 'Appels représentants', icon: UsersRoundIcon },
 ];
 
 export function CampaignsTabs() {
@@ -19,8 +19,8 @@ export function CampaignsTabs() {
       <ul className="inline-flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
         {TABS.map((tab) => {
           const active =
-            tab.href === '/campagnes'
-              ? pathname === '/campagnes' || /^\/campagnes\/(?!representants)/u.test(pathname)
+            tab.href === '/chues/campagnes'
+              ? pathname === '/chues/campagnes' || /^\/campagnes\/(?!representants)/u.test(pathname)
               : pathname === tab.href || pathname.startsWith(`${tab.href}/`);
           const Icon = tab.icon;
 

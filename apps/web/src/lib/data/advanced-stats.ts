@@ -15,6 +15,7 @@ export type RepresentantProductivityList = Schemas['RepresentantProductivityList
 export type DataQuality = Schemas['DataQualityDto'];
 export type DepartementYieldList = Schemas['DepartementYieldListDto'];
 export type OriginBreakdown = Schemas['OriginBreakdownDto'];
+export type AmbassadorConversion = Schemas['AmbassadorConversionDto'];
 
 export async function fetchCampaignPilotage(
   filters: ProspectFilters,
@@ -95,6 +96,17 @@ export async function fetchOriginBreakdown(
 ): Promise<OriginBreakdown> {
   return unwrap(
     await client.GET('/api/v1/analytics/origin-breakdown', {
+      params: { query: toFilterQuery(filters) },
+    }),
+  );
+}
+
+export async function fetchAmbassadorConversion(
+  filters: ProspectFilters,
+  client: ApiClient = getApiClient(),
+): Promise<AmbassadorConversion> {
+  return unwrap(
+    await client.GET('/api/v1/analytics/ambassador-conversion', {
       params: { query: toFilterQuery(filters) },
     }),
   );

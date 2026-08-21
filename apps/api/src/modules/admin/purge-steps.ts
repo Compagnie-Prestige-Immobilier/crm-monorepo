@@ -179,6 +179,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.visiteObjet.count(),
     remove: async (db) => (await db.visiteObjet.deleteMany({})).count,
   },
+  canauxProvenance: {
+    table: 'canaux_provenance',
+    count: (db) => db.canalProvenance.count(),
+    remove: async (db) => (await db.canalProvenance.deleteMany({})).count,
+  },
   banques: {
     table: 'banques',
     count: (db) => db.banque.count(),
@@ -205,22 +210,3 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     remove: async (db) => (await db.region.deleteMany({})).count,
   },
 };
-
-// Étapes après lesquelles le registre `demo_entities` ne désigne plus rien : l'interrupteur
-// de démonstration est remis à zéro dans la MÊME transaction, sinon l'écran l'annonce encore.
-export const DEMO_TRACKED_STEPS: readonly PurgeStepKey[] = [
-  'commercialAccounts',
-  'representants',
-  'prospects',
-  'campaigns',
-  'campaignMembers',
-  'callTasks',
-  'callAttempts',
-  'repCampaigns',
-  'repCampaignMembers',
-  'repCallTasks',
-  'repCallAttempts',
-  'clientRequests',
-  'bankCases',
-  'bankCaseTransitions',
-];

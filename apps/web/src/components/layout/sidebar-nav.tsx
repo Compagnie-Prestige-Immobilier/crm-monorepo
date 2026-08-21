@@ -1,21 +1,20 @@
 'use client';
 
+import { LayoutGridIcon } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { homePathForRole, isNavItemActive, navSections } from '@/components/layout/nav-items';
+import {
+  COQUES,
+  coqueOf,
+  HUB_PATH,
+  isNavItemActive,
+  navSections,
+} from '@/components/layout/nav-items';
+import { UesMark } from '@/components/layout/ues-mark';
 import type { Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
-
-const PANEL_LABELS: Record<Role, string> = {
-  ADMIN: 'Panneau d’administration',
-  BANQUE_FINANCE: 'Espace Banque & Finance',
-  COMMERCIAL: 'Espace téléconseiller',
-  SUPERVISEUR: 'Espace supervision',
-  DIRECTION: 'Espace direction',
-  ACCUEIL: 'Espace accueil',
-};
 
 export function SidebarNav({
   role,
@@ -29,7 +28,9 @@ export function SidebarNav({
   navId?: string | undefined;
 }) {
   const pathname = usePathname();
-  const sections = navSections(role);
+  const coque = coqueOf(pathname);
+  const sections = coque === null ? [] : navSections(role, coque);
+  const coqueLabel = COQUES.find((entry) => entry.id === coque)?.label ?? 'CPI GO';
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -40,24 +41,29 @@ export function SidebarNav({
         )}
       >
         <Link
-          href={homePathForRole(role)}
+          href={HUB_PATH}
           onClick={onNavigate}
+          aria-label="Tous les espaces"
           className="flex items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sidebar-ring"
         >
-          {/*
-            Réduite, la barre passe au logo CARRÉ. Le logo en bandeau mesuré
-            pour 17 rem se retrouverait à moins de 40 px de large : le texte
-            « Compagnie Prestige Immobilier » y devient une bavure grise, et une
-            marque illisible vaut moins qu'une marque absente.
-          */}
-          <Image
-            src={collapsed ? '/brand/icon-512.png' : '/brand/cpi-header.png'}
-            alt="CPI GO, retour à l’accueil"
-            width={collapsed ? 512 : 489}
-            height={collapsed ? 512 : 200}
-            priority
-            className={cn('w-auto', collapsed ? 'size-9 rounded-sm' : 'h-8')}
-          />
+          {coque === 'chues' ? (
+            <UesMark compact={collapsed} />
+          ) : (
+            /*
+              Réduite, la barre passe au logo CARRÉ. Le logo en bandeau mesuré
+              pour 17 rem se retrouverait à moins de 40 px de large : le texte
+              « Compagnie Prestige Immobilier » y devient une bavure grise, et une
+              marque illisible vaut moins qu'une marque absente.
+            */
+            <Image
+              src={collapsed ? '/brand/icon-512.png' : '/brand/cpi-header.png'}
+              alt="CPI GO"
+              width={collapsed ? 512 : 489}
+              height={collapsed ? 512 : 200}
+              priority
+              className={cn('w-auto', collapsed ? 'size-9 rounded-sm' : 'h-8')}
+            />
+          )}
         </Link>
       </div>
 
@@ -125,15 +131,27 @@ export function SidebarNav({
         ))}
       </nav>
 
-      {collapsed ? null : (
-        <div className="border-t border-sidebar-border px-5 py-4">
-          <p className="eyebrow text-sidebar-muted-foreground">CPI GO</p>
-          {/* Token explicite, plus d'`opacity`. Une opacité posée sur une couleur
-              déjà atténuée ne se mesure dans aucun tableau de tokens : c'est
-              précisément le défaut qui a délavé le panel. 7,07:1 en clair. */}
-          <p className="text-caption text-sidebar-muted-foreground">{PANEL_LABELS[role]}</p>
-        </div>
-      )}
+      {/* Le retour au hub est un LIEN VISIBLE, pas seulement le logo : personne
+          ne devine qu'un logo change de projet. */}
+      <div className={cn('border-t border-sidebar-border', collapsed ? 'p-2' : 'px-3 py-3')}>
+        <Link
+          href={HUB_PATH}
+          onClick={onNavigate}
+          title={collapsed ? 'Tous les espaces' : undefined}
+          className={cn(
+            'flex min-h-11 items-center rounded-md text-[0.875rem] font-[600] text-sidebar-foreground',
+            collapsed ? 'justify-center px-2' : 'gap-3 px-3',
+            'transition-colors duration-150 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring',
+          )}
+        >
+          <LayoutGridIcon className="size-4 shrink-0" aria-hidden="true" />
+          <span className={cn(collapsed ? 'sr-only' : 'truncate')}>Tous les espaces</span>
+        </Link>
+        {collapsed ? null : (
+          <p className="eyebrow px-3 pt-2 text-sidebar-muted-foreground">{coqueLabel}</p>
+        )}
+      </div>
     </div>
   );
 }

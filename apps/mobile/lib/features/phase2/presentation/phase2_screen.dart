@@ -23,7 +23,12 @@ import 'callback_picker.dart';
 import 'call_audio_recorder.dart';
 
 class Phase2Screen extends ConsumerStatefulWidget {
-  const Phase2Screen({super.key});
+  const Phase2Screen({super.key, this.prefillPhone});
+
+  /// Le numero de la fiche depuis laquelle on arrive, quand on vient d'une file
+  /// de campagne. Sans lui, ouvrir une ligne du programme rendait un ecran vide
+  /// et le teleconseiller retapait le numero qu'il venait de choisir.
+  final String? prefillPhone;
 
   @override
   ConsumerState<Phase2Screen> createState() => _Phase2ScreenState();
@@ -43,6 +48,8 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   @override
   void initState() {
     super.initState();
+    final String? prefill = widget.prefillPhone;
+    if (prefill != null && prefill.isNotEmpty) _phone.text = prefill;
     _phone.addListener(_onPhoneChanged);
   }
 

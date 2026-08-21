@@ -14,23 +14,42 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 14;
 
   /// L'effet d'une tentative saisie avant la v10, déduit de son issue. Sans
   /// cette dérivation, la recopie de table poserait le défaut `KEEP_OPEN`
   /// partout : la progression personnelle du téléconseiller repartirait à zéro,
   /// puisqu'elle se compte désormais sur l'effet.
-  static const CustomExpression<String> _effectFromOutcome = CustomExpression<String>(
-    'CASE outcome '
-    'WHEN \'METHOD_OBTAINED\' THEN \'CLOSE_METHOD\' '
-    'WHEN \'REFUSED\' THEN \'CLOSE_REFUSED\' '
-    'WHEN \'WRONG_NUMBER\' THEN \'CLOSE_WRONG_NUMBER\' '
-    'WHEN \'CALLBACK\' THEN \'SCHEDULE_CALLBACK\' '
-    'ELSE \'KEEP_OPEN\' END',
-  );
+  static const CustomExpression<String> _effectFromOutcome =
+      CustomExpression<String>(
+        'CASE outcome '
+        'WHEN \'METHOD_OBTAINED\' THEN \'CLOSE_METHOD\' '
+        'WHEN \'REFUSED\' THEN \'CLOSE_REFUSED\' '
+        'WHEN \'WRONG_NUMBER\' THEN \'CLOSE_WRONG_NUMBER\' '
+        'WHEN \'CALLBACK\' THEN \'SCHEDULE_CALLBACK\' '
+        'ELSE \'KEEP_OPEN\' END',
+      );
 
   static const CustomExpression<bool> _commentRequiredFromOutcome =
       CustomExpression<bool>('CASE WHEN outcome = \'OTHER\' THEN 1 ELSE 0 END');
+
+  /// La recopie de `prospects`, quel que soit le palier qui la declenche.
+  ///
+  /// `alterTable` engendre TOUJOURS la forme COURANTE de la table. Toute colonne
+  /// ajoutee APRES le palier d'origine doit donc etre declaree ici, sinon la
+  /// recopie va la chercher dans une table qui ne l'a pas encore et la migration
+  /// echoue. Ce piege a deja coute trois fois sur ce fichier.
+  static TableMigration _prospectsCopy(Prospects prospects) => TableMigration(
+    prospects,
+    newColumns: <GeneratedColumn<Object>>[
+      prospects.projet,
+      prospects.type,
+      prospects.profession,
+    ],
+    columnTransformer: <GeneratedColumn<Object>, Expression<Object>>{
+      prospects.projet: const Constant<String>('CHUES'),
+    },
+  );
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -59,7 +78,7 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(outbox, outbox.blockedAttempts);
       }
       if (from < 6 && to >= 6) {
-        await m.alterTable(TableMigration(prospects));
+        await m.alterTable(_prospectsCopy(prospects));
         await m.alterTable(TableMigration(phase2Directory));
         // `callbackAt` et `reasonCode` n'existent pas encore à la v6 : sans les
         // déclarer neufs, la recopie irait les lire dans l'ancienne table.
@@ -93,7 +112,9 @@ class AppDatabase extends _$AppDatabase {
         // base ne redescend plus jamais, et `region_name` resterait vide à vie
         // sur les appareils existants. Effacer le curseur force un pull complet.
         // Le référentiel n'est jamais écrit localement : rien à perdre.
-        await customStatement('DELETE FROM sync_state WHERE collection = \'all\'');
+        await customStatement(
+          'DELETE FROM sync_state WHERE collection = \'all\'',
+        );
       }
       if (from < 9 && to >= 9) {
         await m.createTable(representantComments);
@@ -126,6 +147,24 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(representants, representants.whatsappStatus);
         await m.addColumn(representants, representants.whatsappE164);
         await m.addColumn(representants, representants.profession);
+      }
+      if (from < 12 && to >= 12) {
+        // Deux tables neuves, aucune recopie : rien ici ne peut lire une colonne
+        // qui n'existait pas encore au palier d'origine.
+        await m.createTable(callCampaigns);
+        await m.createTable(callTasks);
+        await m.createIndex(callTasksCampaignIdx);
+        await m.createIndex(callTasksProspectIdx);
+      }
+      if (from < 13 && to >= 13) {
+        // Trois liens relaches et trois colonnes ajoutees : SQLite recree la table.
+        await m.alterTable(_prospectsCopy(prospects));
+      }
+      if (from < 14 && to >= 14) {
+        // Table neuve, aucune recopie : rien ici ne peut lire une colonne qui
+        // n'existait pas encore au palier d'origine.
+        await m.createTable(visites);
+        await m.createIndex(visitesDateIdx);
       }
     },
     beforeOpen: (OpeningDetails details) async {

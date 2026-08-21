@@ -13,9 +13,9 @@ abstract class _$ProspectConflictExistingDtoCWProxy {
 
   ProspectConflictExistingDto prenom(String prenom);
 
-  ProspectConflictExistingDto representantId(String representantId);
+  ProspectConflictExistingDto representantId(String? representantId);
 
-  ProspectConflictExistingDto representantName(String representantName);
+  ProspectConflictExistingDto representantName(String? representantName);
 
   ProspectConflictExistingDto ownedByCommercialId(String ownedByCommercialId);
 
@@ -35,8 +35,8 @@ abstract class _$ProspectConflictExistingDtoCWProxy {
     String id,
     String nom,
     String prenom,
-    String representantId,
-    String representantName,
+    String? representantId,
+    String? representantName,
     String ownedByCommercialId,
     String ownedByCommercialName,
     DateTime createdAt,
@@ -60,11 +60,11 @@ class _$ProspectConflictExistingDtoCWProxyImpl
   ProspectConflictExistingDto prenom(String prenom) => this(prenom: prenom);
 
   @override
-  ProspectConflictExistingDto representantId(String representantId) =>
+  ProspectConflictExistingDto representantId(String? representantId) =>
       this(representantId: representantId);
 
   @override
-  ProspectConflictExistingDto representantName(String representantName) =>
+  ProspectConflictExistingDto representantName(String? representantName) =>
       this(representantName: representantName);
 
   @override
@@ -113,11 +113,11 @@ class _$ProspectConflictExistingDtoCWProxyImpl
       representantId: representantId == const $CopyWithPlaceholder()
           ? _value.representantId
           // ignore: cast_nullable_to_non_nullable
-          : representantId as String,
+          : representantId as String?,
       representantName: representantName == const $CopyWithPlaceholder()
           ? _value.representantName
           // ignore: cast_nullable_to_non_nullable
-          : representantName as String,
+          : representantName as String?,
       ownedByCommercialId: ownedByCommercialId == const $CopyWithPlaceholder()
           ? _value.ownedByCommercialId
           // ignore: cast_nullable_to_non_nullable
@@ -166,8 +166,8 @@ ProspectConflictExistingDto _$ProspectConflictExistingDtoFromJson(
     id: $checkedConvert('id', (v) => v as String),
     nom: $checkedConvert('nom', (v) => v as String),
     prenom: $checkedConvert('prenom', (v) => v as String),
-    representantId: $checkedConvert('representantId', (v) => v as String),
-    representantName: $checkedConvert('representantName', (v) => v as String),
+    representantId: $checkedConvert('representantId', (v) => v as String?),
+    representantName: $checkedConvert('representantName', (v) => v as String?),
     ownedByCommercialId: $checkedConvert(
       'ownedByCommercialId',
       (v) => v as String,

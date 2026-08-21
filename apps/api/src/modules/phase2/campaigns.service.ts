@@ -37,8 +37,6 @@ import type {
   CampaignSummaryDto,
   CreateCampaignDto,
 } from './dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 
 /** Bornes de transaction pour matérialiser une grande campagne. */
@@ -82,10 +80,7 @@ function tallyInto(index: ProgressIndex, key: string, status: CallTaskStatus, co
 export class Phase2CampaignsService {
   private readonly logger = new Logger(Phase2CampaignsService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // Création
 
@@ -101,11 +96,6 @@ export class Phase2CampaignsService {
     const commerciaux = await this.resolveCommerciaux(body.commercialIds);
     const seed = newCampaignSeed();
     const spreadDays = body.spreadDays ?? MIN_SPREAD_DAYS;
-    // `enabledForWrite` : cette valeur est ÉCRITE sur la campagne, puis héritée
-    // par ses tâches. Un repli `false` sur panne de lecture laisserait une
-    // campagne fictive dans la liste réelle, programmes imprimables compris.
-    const demoEnabled = await this.demo.enabledForWrite();
-
     const campaignId = await this.prisma
       .$transaction(
         async (tx) => {
@@ -116,11 +106,6 @@ export class Phase2CampaignsService {
               seed,
               spreadDays,
               createdById: user.id,
-              // Une campagne créée pendant une démonstration EST de
-              // démonstration. Sans ce drapeau, éteindre le mode laisse une
-              // campagne fictive dans la liste réelle, avec ses tâches et ses
-              // programmes imprimables.
-              isDemo: demoEnabled,
             },
           });
 
@@ -139,7 +124,7 @@ export class Phase2CampaignsService {
           // SQL ici ferait exister une seconde définition de BDD1 : un PDF
           // « BDD1 » cesserait de correspondre au graphique « BDD1 ».
           const eligible = await tx.prospect.findMany({
-            where: eligibleForCampaignWhere(body.scope, demoEnabled),
+            where: eligibleForCampaignWhere(body.scope),
             select: { id: true },
             // Ordre d'entrée déterministe : sans lui, le mélange partirait d'une
             // permutation arbitraire et la graine ne rejouerait plus rien.
@@ -189,7 +174,6 @@ export class Phase2CampaignsService {
                 // deux populations (voir `eligibleForCampaignWhere`), et la
                 // recopie ici garde la file d'appels invisible en même temps
                 // que la campagne qui l'a produite.
-                isDemo: demoEnabled,
               },
             ];
           });
@@ -215,29 +199,6 @@ export class Phase2CampaignsService {
     return this.get(campaignId);
   }
 
-  /**
-   * Contrôle la liste de commerciaux AVANT d'ouvrir la transaction.
-   *
-   * Un compte désactivé ou d'un autre rôle recevrait un programme que personne
-   * n'appellerait : les prospects seraient marqués « affectés », donc exclus
-   * de toute campagne ultérieure, et dormiraient indéfiniment.
-   *
-   * ═══ CE N'EST PAS UNE LECTURE, C'EST UNE ADMISSION ═══
-   *
-   * `demoScope` manquait ici, alors que le module jumeau des campagnes
-   * représentants le composait déjà. La dissymétrie n'était pas anodine : mode
-   * ÉTEINT, un POST portant l'UUID d'un compte de démonstration était ACCEPTÉ,
-   * puisque ce compte a bien le rôle COMMERCIAL et qu'il est actif. La campagne
-   * créée était RÉELLE, mais ses adhésions et ses tâches pointaient vers des
-   * comptes que plus aucun écran ne montre, et `onDelete: Restrict` sur les
-   * deux relations bloquait ensuite la purge de démonstration.
-   *
-   * La dispense écrite dans le balayage de visibilité, « relecture par lot de
-   * clés primaires », est juste pour ce qu'elle vise, empêcher une FUITE : ces
-   * identifiants viennent du client, ils ne révèlent rien. Elle ne dit rien du
-   * cas inverse, ADMETTRE une ligne fictive dans une écriture réelle, et c'est
-   * pourtant le même appel qui décide des deux.
-   */
   private async resolveCommerciaux(
     ids: readonly string[],
   ): Promise<{ id: string; fullName: string; username: string }[]> {
@@ -245,7 +206,6 @@ export class Phase2CampaignsService {
       where: {
         id: { in: [...ids] },
         deletedAt: null,
-        ...demoScope(await this.demo.enabled()),
       },
       select: { id: true, fullName: true, username: true, role: true, isActive: true },
     });
@@ -309,7 +269,6 @@ export class Phase2CampaignsService {
     const search = query.search?.trim();
     const assignedToId = isAdmin(user) ? undefined : user.id;
     const where: Prisma.CallCampaignWhereInput = {
-      ...demoScope(await this.demo.enabled()),
       ...(assignedToId === undefined ? {} : { tasks: { some: { assignedToId } } }),
       ...(query.status ? { status: query.status } : {}),
       ...(query.scope ? { scope: query.scope } : {}),
@@ -369,20 +328,8 @@ export class Phase2CampaignsService {
   }
 
   async get(id: string): Promise<CampaignDetailDto> {
-    // CLOISONNÉE, comme la LISTE juste au-dessus. Une résolution par clé
-    // primaire semble inoffensive, elle ne l'est pas : l'identifiant d'une
-    // campagne de démonstration reste dans l'historique du navigateur, dans un
-    // signet et dans un lien collé en conversation. Sans ce filtre, le mode
-    // éteint, la campagne fictive s'ouvrait quand même, et ses chiffres
-    // passaient pour des chiffres de production.
-    //
-    // Le balayage `demo-visibility.sweep.test.ts` ne dénonce pas ce site : il
-    // tient une lecture par `id` pour une résolution d'entité et la dispense,
-    // délibérément. Le module campagnes REPRÉSENTANTS cloisonnait déjà
-    // (`rep-campaigns.service.ts`, `get`) ; les deux modules divergeaient sur
-    // la même question.
     const campaign = await this.prisma.callCampaign.findFirst({
-      where: { id, ...demoScope(await this.demo.enabled()) },
+      where: { id },
       include: {
         createdBy: { select: { fullName: true } },
         commerciaux: {
@@ -487,7 +434,7 @@ export class Phase2CampaignsService {
   ): Promise<{ overall: number[]; byUser: Map<string, number[]> }> {
     const grouped = await this.prisma.callTask.groupBy({
       by: ['assignedToId', 'dayIndex'],
-      where: { campaignId, ...demoScope(await this.demo.enabled()) },
+      where: { campaignId },
       _count: { _all: true },
     });
 
@@ -534,7 +481,6 @@ export class Phase2CampaignsService {
       where: {
         campaignId: { in: [...ids] },
         ...(assignedToId === undefined ? {} : { assignedToId }),
-        ...demoScope(await this.demo.enabled()),
       },
       _count: { _all: true },
     });
@@ -558,15 +504,9 @@ export class Phase2CampaignsService {
    * pas une faute à signaler.
    */
   async close(id: string): Promise<CampaignDetailDto> {
-    const demoEnabled = await this.demo.enabled();
     await this.prisma.$transaction(async (tx) => {
-      // CLOISONNÉE, et ici la lecture décide d'une ÉCRITURE. Sans le filtre,
-      // le mode éteint, un identifiant conservé dans un signet permettait
-      // d'annuler pour de bon les tâches d'une campagne de démonstration :
-      // une mutation sur des lignes que la plateforme prétend ne pas voir.
-      // Miroir de `rep-campaigns.service.ts`, `close`.
       const campaign = await tx.callCampaign.findFirst({
-        where: { id, ...demoScope(demoEnabled) },
+        where: { id },
         select: { status: true },
       });
       if (!campaign) {
@@ -645,9 +585,8 @@ export class Phase2CampaignsService {
     // jours n'a que trois journées, et les jours 4 à 7 ne portent aucune ligne.
     // Comparer à `spreadDays` laissait donc passer `?jour=5` et rendait
     // exactement le PDF vide que ce refus existe pour empêcher.
-    const demoWhere = demoScope(await this.demo.enabled());
     const taskCount = await this.prisma.callTask.count({
-      where: { campaignId, assignedToId: userId, ...demoWhere },
+      where: { campaignId, assignedToId: userId },
     });
     const effectiveDays = Math.max(1, Math.min(spreadDays, taskCount));
 
@@ -662,7 +601,6 @@ export class Phase2CampaignsService {
       where: {
         campaignId,
         assignedToId: userId,
-        ...demoWhere,
         ...(jour === undefined ? {} : { dayIndex: jour - 1 }),
       },
       orderBy: { position: 'asc' },

@@ -89,7 +89,7 @@ class FakeApi implements ApiPort {
   Future<void> logout({required String refreshToken}) async {}
 
   @override
-  Future<PullPage> pull({String? cursor, int limit = 200}) async {
+  Future<PullPage> pull({String? cursor, int limit = 200, required int payloadVersion}) async {
     if (pullPages.isEmpty) return emptyPullPage(cursor: cursor);
     return pullPages.removeAt(0);
   }
@@ -311,6 +311,9 @@ PullPage emptyPullPage({String? cursor}) => PullPage(
     syndicats: const <SyndicatDto>[],
     representants: const <RepresentantDto>[],
     prospects: const <ProspectDto>[],
+    callCampaigns: const <SyncCallCampaignDto>[],
+    callTasks: const <SyncCallTaskDto>[],
+    visites: const <SyncVisiteDto>[],
   ),
   deletions: const <SyncDeletionDto>[],
   nextCursor: cursor ?? '',
@@ -411,7 +414,7 @@ class ExplodingApi implements ApiPort {
   Future<void> logout({required String refreshToken}) => _boom();
 
   @override
-  Future<PullPage> pull({String? cursor, int limit = 200}) => _boom();
+  Future<PullPage> pull({String? cursor, int limit = 200, required int payloadVersion}) => _boom();
 
   @override
   Future<PushResult> push({

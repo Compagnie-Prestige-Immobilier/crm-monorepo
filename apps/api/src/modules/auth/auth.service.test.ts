@@ -6,7 +6,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import { AuthService, hashRefreshToken, toAuthUser, ttlToSeconds } from './auth.service.js';
 import { ARGON2_OPTIONS, hashPassword, verifyPassword } from './password.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
+import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
 
 const ACCESS_SECRET = 'x'.repeat(40);
 const REFRESH_SECRET = 'y'.repeat(40);
@@ -39,7 +39,6 @@ const userRow = (overrides: Record<string, unknown> = {}): Record<string, unknow
   passwordHash: 'remplacé-par-le-test',
   role: Role.COMMERCIAL,
   isActive: true,
-  isDemo: false,
   lastLoginAt: null,
   departementId: null,
   phoneE164: null,
@@ -71,15 +70,8 @@ beforeEach(() => {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
   };
-  auth = new AuthService(
-    prisma as unknown as PrismaService,
-    new JwtService({}),
-    fakeDemoVisibility(),
-  );
+  auth = new AuthService(prisma as unknown as PrismaService, new JwtService({}), fakeWorkspace());
 });
-
-const authWithDemo = (demo: boolean | 'unknown'): AuthService =>
-  new AuthService(prisma as unknown as PrismaService, new JwtService({}), fakeDemoVisibility(demo));
 
 describe('paramètres argon2id', () => {
   it('correspondent EXACTEMENT à ceux du seed', () => {
@@ -153,77 +145,6 @@ describe('login', () => {
     expect(stored.tokenHash).not.toBe(tokens.refreshToken);
     expect(JSON.stringify(prisma.refreshToken.create.mock.calls)).not.toContain(
       tokens.refreshToken,
-    );
-  });
-});
-
-describe('comptes de démonstration, mode éteint', () => {
-  const demoRow = async (): Promise<Record<string, unknown>> =>
-    userRow({
-      id: 'demo-admin',
-      email: 'demo.admin@cpi.sn',
-      username: 'demo.admin',
-      role: Role.ADMIN,
-      isDemo: true,
-      passwordHash: await hashPassword('Demo1-CPI-Sunugal'),
-    });
-
-  it('LE COMPTE ADMIN DE DÉMONSTRATION NE PEUT PAS SE CONNECTER', async () => {
-    prisma.user.findFirst.mockResolvedValue(await demoRow());
-
-    const error = (await authWithDemo(false)
-      .login('demo.admin@cpi.sn', 'Demo1-CPI-Sunugal')
-      .catch((e: unknown) => e)) as UnauthorizedException;
-
-    expect(error).toBeInstanceOf(UnauthorizedException);
-    expect(error.getResponse()).toMatchObject({ code: 'ACCOUNT_DISABLED' });
-    expect(prisma.user.update).not.toHaveBeenCalled();
-  });
-
-  it('le même compte se connecte NORMALEMENT pendant la démonstration', async () => {
-    prisma.user.findFirst.mockResolvedValue(await demoRow());
-
-    const tokens = await authWithDemo(true).login('demo.admin@cpi.sn', 'Demo1-CPI-Sunugal');
-    expect(tokens.accessToken).toBeTruthy();
-  });
-
-  it('une lecture de réglage EN ÉCHEC refuse, elle ne laisse pas entrer', async () => {
-    prisma.user.findFirst.mockResolvedValue(await demoRow());
-
-    const error = (await authWithDemo('unknown')
-      .login('demo.admin@cpi.sn', 'Demo1-CPI-Sunugal')
-      .catch((e: unknown) => e)) as UnauthorizedException;
-
-    expect(error.getResponse()).toMatchObject({ code: 'ACCOUNT_DISABLED' });
-  });
-
-  it('un compte RÉEL n’est pas touché par l’interrupteur', async () => {
-    prisma.user.findFirst.mockResolvedValue(
-      userRow({ passwordHash: await hashPassword('secret12') }),
-    );
-    await expect(authWithDemo(false).login('alice', 'secret12')).resolves.toBeTruthy();
-  });
-
-  it('la session DÉJÀ OUVERTE meurt au renouvellement, et sa famille est révoquée', async () => {
-    const token = new JwtService({}).sign(
-      { sub: 'demo-admin', jti: 'j1', fam: 'fam-demo', typ: 'refresh' },
-      { secret: REFRESH_SECRET, expiresIn: 3600 },
-    );
-    prisma.refreshToken.findUnique.mockResolvedValue({
-      id: 'rt-demo',
-      familyId: 'fam-demo',
-      revokedAt: null,
-      expiresAt: new Date(Date.now() + 3_600_000),
-      user: await demoRow(),
-    });
-
-    const error = (await authWithDemo(false)
-      .refresh(token)
-      .catch((e: unknown) => e)) as UnauthorizedException;
-
-    expect(error.getResponse()).toMatchObject({ code: 'ACCOUNT_DISABLED' });
-    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { familyId: 'fam-demo', revokedAt: null } }),
     );
   });
 });

@@ -163,7 +163,7 @@ abstract interface class ApiPort {
 
   Future<void> logout({required String refreshToken});
 
-  Future<PullPage> pull({String? cursor, int limit});
+  Future<PullPage> pull({String? cursor, int limit, required int payloadVersion});
 
   Future<PushResult> push({
     required String batchId,

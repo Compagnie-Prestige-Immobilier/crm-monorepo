@@ -59,6 +59,7 @@ jobs:
   node:
     name: node — format, lint, types, tests, build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
@@ -103,6 +104,19 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test:coverage
 
+      # Le job `sonar` a besoin de ces deux fichiers et de rien d'autre. Les
+      # partager évite d'y relancer `pnpm test:coverage` en entier une seconde
+      # fois : même suite de tests, même résultat, ~4 minutes de moins.
+      - name: Publier la couverture pour Sonar
+        if: vars.SONAR_ENABLED == 'true' && github.ref != 'refs/heads/prod'
+        uses: actions/upload-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lcov-coverage
+          path: |
+            apps/api/coverage/lcov.info
+            apps/web/coverage/lcov.info
+          retention-days: 1
+
       - name: Migrations
         run: pnpm db:deploy
 
@@ -145,6 +159,16 @@ jobs:
   # les attendre — et sur un push vers `prod` ils ne tournaient même pas.
   securite:
     name: sécurité — secrets, SAST, dépendances, image
+    # Sur un PUSH vers `dev`, la pull request vient de tout verifier sur le meme
+    # arbre. Seul `node` est rejoue, parce qu'il est le seul a pouvoir attraper
+    # ce qu'une FUSION introduit et qu'une PR ne pouvait pas voir : un conflit
+    # semantique entre deux branches vertes separement. Le reste - contrat,
+    # Flutter, scanners, qualite - porte sur le meme code, deja eprouve.
+    #
+    # Les 2 000 minutes mensuelles incluses etaient epuisees a mi-mois, et ce
+    # doublon en representait la moitie. Un merge coute desormais ~11 minutes au
+    # lieu de ~25.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/prod'
     uses: ./.github/workflows/security.yml
     permissions:
       contents: read
@@ -152,6 +176,7 @@ jobs:
   sonar:
     name: SonarQube Cloud — quality gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: node
     # Configure SONAR_TOKEN as a repository secret and the two repository
     # variables before enabling this gate. A missing token must be visible,
@@ -173,12 +198,13 @@ jobs:
     #
     # La garantie est conservée là où elle s'exerce vraiment : rien n'atteint
     # `prod` sans être passé par `dev`, où ce job tourne et bloque.
-    if: ${{ vars.SONAR_ENABLED == 'true' && github.ref != 'refs/heads/prod' }}
+    # Meme raison que les autres : voir la garde de `contract`. La qualite se
+    # mesure sur la pull request, ou elle peut encore changer une decision.
+    if: >-
+      ${{ vars.SONAR_ENABLED == 'true'
+      && github.ref != 'refs/heads/prod'
+      && github.event_name != 'push' }}
     env:
-      NODE_ENV: test
-      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
-      JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
-      JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
       SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
@@ -192,9 +218,16 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/setup-node
-      - run: pnpm db:generate
-      - run: pnpm test:coverage
+
+      # Couverture produite par le job `node`, pas rejouée ici : voir le
+      # commentaire sur l'étape d'upload dans ce même fichier.
+      # `path: apps`, et non `.` : `upload-artifact` retire le préfixe commun
+      # `apps/` des deux fichiers avant de les stocker, `download-artifact` ne
+      # le restitue donc qu'en le précisant ici.
+      - uses: actions/download-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lcov-coverage
+          path: apps
       - name: Rendre les chemins LCOV lisibles par Sonar
         run: |
           sed -i 's#^SF:src/#SF:apps/api/src/#' apps/api/coverage/lcov.info
@@ -216,6 +249,18 @@ jobs:
   contract:
     name: contrat — dérive du code généré + ruptures ascendantes
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Sur un PUSH vers `dev`, la pull request vient de tout verifier sur le meme
+    # arbre. Seul `node` est rejoue, parce qu'il est le seul a pouvoir attraper
+    # ce qu'une FUSION introduit et qu'une PR ne pouvait pas voir : un conflit
+    # semantique entre deux branches vertes separement. Le reste - contrat,
+    # Flutter, scanners, qualite - porte sur le meme code, deja eprouve.
+    #
+    # Les 2 000 minutes mensuelles incluses etaient epuisees a mi-mois, et ce
+    # doublon en representait la moitie. Un merge coute desormais ~11 minutes au
+    # lieu de ~25.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/prod'
+
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
@@ -471,6 +516,18 @@ jobs:
   mobile:
     name: flutter — analyze + test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Sur un PUSH vers `dev`, la pull request vient de tout verifier sur le meme
+    # arbre. Seul `node` est rejoue, parce qu'il est le seul a pouvoir attraper
+    # ce qu'une FUSION introduit et qu'une PR ne pouvait pas voir : un conflit
+    # semantique entre deux branches vertes separement. Le reste - contrat,
+    # Flutter, scanners, qualite - porte sur le meme code, deja eprouve.
+    #
+    # Les 2 000 minutes mensuelles incluses etaient epuisees a mi-mois, et ce
+    # doublon en representait la moitie. Un merge coute desormais ~11 minutes au
+    # lieu de ~25.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/prod'
+
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
@@ -536,6 +593,7 @@ jobs:
   deploy:
     name: déploiement Dokploy (prod)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [node, sonar, contract, mobile, securite]
     if: >-
       !cancelled()

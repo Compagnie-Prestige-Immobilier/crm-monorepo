@@ -203,9 +203,13 @@ function TemplateFormDialog({
         category,
         titleTemplate,
         bodyTemplate,
-        ...(route.trim() === '' ? {} : { route: route.trim() }),
       };
-      return isEdit ? updateTemplate(template.id, payload) : createTemplate(payload);
+      // A la MODIFICATION, le vide est pose : c'est ce qui retire le lien. Omis,
+      // il voudrait dire « ne change rien », et un lien efface revenait tout
+      // seul. A la creation il n'y a rien a retirer, on l'omet.
+      return isEdit
+        ? updateTemplate(template.id, { ...payload, route: route.trim() })
+        : createTemplate(route.trim() === '' ? payload : { ...payload, route: route.trim() });
     },
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.templates });

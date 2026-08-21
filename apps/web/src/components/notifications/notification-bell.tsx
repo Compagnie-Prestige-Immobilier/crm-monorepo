@@ -179,7 +179,7 @@ export function NotificationBell() {
           Le PIED DE PANNEAU, qui manquait.
 
           Le commentaire du composant promettait « un lien vers l'écran complet
-          au-delà de vingt lignes » ; ce lien n'existait pas, et `/notifications`
+          au-delà de vingt lignes » ; ce lien n'existait pas, et `/admin/notifications`
           était le composeur, réservé à l'ADMIN. La vingt-et-unième notification
           reçue était donc inatteignable, pour tous les rôles. Le panneau mène
           maintenant à une vraie boîte de réception, paginée, et permet de tout
@@ -190,7 +190,7 @@ export function NotificationBell() {
           {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
               poserait `role="button"` sur le `<a>`. */}
           <Link
-            href="/notifications?onglet=reception"
+            href="/admin/notifications?onglet=reception"
             className={buttonVariants({ variant: 'ghost', size: 'sm' })}
             onClick={() => {
               setOpen(false);

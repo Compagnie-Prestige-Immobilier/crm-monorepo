@@ -17,7 +17,7 @@ async function login(page: Page): Promise<void> {
   await page.getByLabel('E-mail ou identifiant').fill(IDENTIFIER);
   await page.getByLabel('Mot de passe').fill(PASSWORD);
   await page.getByRole('button', { name: 'Se connecter' }).click();
-  await page.waitForURL('**/tableau-de-bord');
+  await page.waitForURL('**/espaces');
 }
 
 test('l’écran de connexion ne présente aucune violation axe', async ({ page }) => {
@@ -28,17 +28,29 @@ test('l’écran de connexion ne présente aucune violation axe', async ({ page 
   expect(results.violations, JSON.stringify(results.violations)).toEqual([]);
 });
 
-test('la connexion pose une session utilisable et mène au tableau de bord', async ({ page }) => {
+test('la connexion pose une session utilisable et mène au hub des espaces', async ({ page }) => {
   await login(page);
 
   // Rendu PAR LE SERVEUR avec la session : si le layout avait renvoyé vers
   // /connexion, ce titre serait absent.
-  await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choisissez un espace', level: 1 })).toBeVisible();
 
   const cookies = await page.context().cookies();
   expect(cookies.map((cookie) => cookie.name)).toEqual(
     expect.arrayContaining(['cpi_at', 'cpi_rt']),
   );
+
+  // Les quatre tuiles sont OUVERTES à un administrateur, et la session
+  // traverse bien la tuile : le titre du document est celui de la PAGE, pas
+  // celui de la coquille montée par le layout.
+  const tuiles = page.getByRole('main');
+  for (const espace of ['Accueil', 'Projet CHUES', 'Projet Grand Public', 'Admin']) {
+    await expect(tuiles.getByRole('link', { name: new RegExp(`^${espace}`) })).toBeVisible();
+  }
+
+  await tuiles.getByRole('link', { name: /^Projet CHUES/ }).click();
+  await page.waitForURL('**/chues/tableau-de-bord');
+  await expect(page).toHaveTitle(/Tableau de bord/);
 });
 
 test('la déconnexion efface la session et reverrouille le panel', async ({ page }) => {

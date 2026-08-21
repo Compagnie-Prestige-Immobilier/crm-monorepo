@@ -411,7 +411,7 @@ export function RepScript() {
       },
       r: () => {
         if (current !== undefined) {
-          router.push(`/representants/${encodeURIComponent(current.id)}`);
+          router.push(`/chues/representants/${encodeURIComponent(current.id)}`);
         }
       },
       '?': () => {

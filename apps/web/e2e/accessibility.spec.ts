@@ -20,6 +20,9 @@ import { expect, test, type Page } from '@playwright/test';
  * ne suffit pas à prouver qu'on est bien arrivé.
  */
 const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: string | null])[] = [
+  // Le hub, atterrissage de tous les rôles. Son titre est celui de la PAGE et
+  // non de la barre supérieure, qu'il ne porte pas : aucun repère à ajouter.
+  ['/espaces', 'Choisissez un espace', null],
   ['/tableau-de-bord', 'Tableau de bord', null],
   ['/statistiques', 'Statistiques', null],
   ['/prospects', 'Prospects', null],

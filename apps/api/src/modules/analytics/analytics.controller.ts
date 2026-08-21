@@ -30,6 +30,7 @@ import { QualityService } from './quality.service.js';
 import { AnalyticsDelaysDto, CampaignPilotageDto } from './pilotage.dto.js';
 import { BankAgingDto, DepartementYieldListDto, WeeklyCohortListDto } from './portfolio.dto.js';
 import {
+  AmbassadorConversionDto,
   DataQualityDto,
   OriginBreakdownDto,
   RepresentantProductivityListDto,
@@ -292,6 +293,28 @@ export class AnalyticsController {
     @Query() query: RepresentantProductivityQueryDto,
   ): Promise<RepresentantProductivityListDto> {
     return this.quality.representantProductivity(user, query);
+  }
+
+  @Get('ambassador-conversion')
+  @ApiOperation({
+    operationId: 'getAmbassadorConversion',
+    summary: 'Part des représentants travaillés devenus ambassadeurs.',
+    description:
+      'La période borne la DATE DE LA BASCULE, pas l’arrivée en base : un statut ' +
+      'poussé avec trois jours de retard reste compté le jour où il a été décidé. ' +
+      'Le dénominateur ne retient que les représentants dont la relation a bougé ' +
+      'dans la période ; `untracked` compte, hors période, ceux de l’annuaire sans ' +
+      'aucune trace, qui ne sont donc mesurés ni au numérateur ni au dénominateur. ' +
+      'Seuls `dateFrom`, `dateTo`, `commercialId`, `departementId` et ' +
+      '`representantId` agissent : les autres filtres qualifient un prospect, pas ' +
+      'un représentant.',
+  })
+  @ApiResponse({ status: 200, type: AmbassadorConversionDto })
+  ambassadorConversion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: AnalyticsQueryDto,
+  ): Promise<AmbassadorConversionDto> {
+    return this.quality.ambassadorConversion(user, query);
   }
 
   @Get('data-quality')

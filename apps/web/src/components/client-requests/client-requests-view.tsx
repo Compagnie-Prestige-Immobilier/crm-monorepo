@@ -355,7 +355,7 @@ function RequestCard({
           ) : null}
 
           {/*
-            `/prospects` est réservé à l'ADMIN : proposer ce lien à un agent
+            `/chues/prospects` est réservé à l'ADMIN : proposer ce lien à un agent
             bancaire l'enverrait droit sur un refus de droits. Il retrouve son
             client par la recherche du formulaire d'ouverture de dossier.
 
@@ -365,7 +365,7 @@ function RequestCard({
 
             `request.createdProspectId` est connu, et l'ignorer paraît être un
             raccourci paresseux. Ce n'en est pas un : le panel n'a pas d'écran de
-            détail de prospect. Il n'existe ni route `/prospects/[id]`, ni critère
+            détail de prospect. Il n'existe ni route `/chues/prospects/[id]`, ni critère
             par identifiant dans `ProspectFilters` : la fiche s'ouvre dans un
             dialogue, depuis la ligne du tableau. Un lien par identifiant n'aurait
             donc aucune destination.
@@ -382,7 +382,7 @@ function RequestCard({
               poserait `role="button"` sur le `<a>`. */}
           {request.createdProspectId !== null && canReview ? (
             <Link
-              href={`/prospects?search=${encodeURIComponent(request.phoneE164)}`}
+              href={`/chues/prospects?search=${encodeURIComponent(request.phoneE164)}`}
               className={buttonVariants({ variant: 'outline' })}
             >
               Voir le prospect créé
@@ -390,7 +390,7 @@ function RequestCard({
           ) : null}
 
           {request.createdProspectId !== null && !canReview ? (
-            <Link href="/dossiers/nouveau" className={buttonVariants({ variant: 'outline' })}>
+            <Link href="/chues/dossiers/nouveau" className={buttonVariants({ variant: 'outline' })}>
               Ouvrir un dossier pour ce client
             </Link>
           ) : null}

@@ -13,7 +13,7 @@ import { ExportService } from './export.service.js';
 import { ExportMode, ExportQueryDto } from './dto.js';
 import { formatDakarDate } from './dakar.js';
 import { DEMO_MODE_HEADER, demoFilenameSuffix, setDemoHeader } from './demo-marking.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { RepresentantsExportService } from './representants-export.service.js';
 import { RepresentantExportQueryDto } from '../representants/dto.js';
 
@@ -30,7 +30,7 @@ export class ExportController {
   constructor(
     private readonly exports: ExportService,
     private readonly representants: RepresentantsExportService,
-    private readonly demo: DemoVisibilityService,
+    private readonly demo: WorkspaceContext,
   ) {}
 
   // ADMIN et COMMERCIAL, les mêmes qu'`AnalyticsController` : la feuille Synthèse porte
@@ -51,7 +51,7 @@ export class ExportController {
     headers: {
       [DEMO_MODE_HEADER]: {
         description:
-          'Vrai si le classeur a été produit en mode démonstration, donc s’il mêle des lignes fictives à des lignes réelles.',
+          'Vrai si le classeur provient de l’espace démo et contient des données fictives.',
         schema: { type: 'string', enum: ['true', 'false'] },
       },
     },
@@ -66,8 +66,8 @@ export class ExportController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const mode = query.mode ?? ExportMode.FILTERED;
-    const demoEnabled = await this.demo.enabled();
-    // Date de Dakar, et suffixe de démonstration : seule marque lisible sans ouvrir le fichier.
+    const demoEnabled = this.demo.current() === 'demo';
+
     const prefix = mode === ExportMode.CONSOLIDATED ? 'prospects-cpi-consolide' : 'prospects-cpi';
     const filename = `${prefix}-${formatDakarDate(new Date())}${demoFilenameSuffix(demoEnabled)}.xlsx`;
 
@@ -113,6 +113,40 @@ export class ExportController {
 
     try {
       await this.exports.writeProspectsImportTemplate(reply.raw);
+    } catch (error) {
+      // Les en-têtes sont partis : couper vaut mieux qu'un classeur tronqué.
+      reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  /** ADMIN seul, comme `POST /v1/imports/prospects-grand-public` qu'il sert. */
+  @Get('prospects-grand-public-modele.xlsx')
+  @Roles(Role.ADMIN)
+  @ApiProduces(XLSX_MIME)
+  @ApiOperation({
+    operationId: 'downloadProspectsGrandPublicTemplateXlsx',
+    summary: 'Modèle vide pour l’import de prospects Grand Public.',
+    description:
+      'Syndicat, banque de domiciliation, fonctionnaire et canal de provenance sont des listes déroulantes, tirées des référentiels VIVANTS. Seuls le nom et le téléphone sont exigés : toute autre colonne peut rester vide, ou même manquer du fichier, car les colonnes sont retrouvées par le texte de leur en-tête et non par leur rang.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Classeur Excel à trois feuilles : Prospects Grand Public, Instructions, Listes (masquée).',
+    // Binaire explicite : sinon le générateur Dart désérialise le classeur en JSON.
+    content: { [XLSX_MIME]: { schema: { type: 'string', format: 'binary' } } },
+  })
+  async prospectsGrandPublicTemplate(@Res() reply: FastifyReply): Promise<void> {
+    const filename = `modele-import-prospects-grand-public-${formatDakarDate(new Date())}.xlsx`;
+
+    reply.hijack();
+    reply.raw.setHeader('Content-Type', XLSX_MIME);
+    reply.raw.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    reply.raw.setHeader('Cache-Control', 'no-store');
+
+    try {
+      await this.exports.writeProspectsGrandPublicImportTemplate(reply.raw);
     } catch (error) {
       // Les en-têtes sont partis : couper vaut mieux qu'un classeur tronqué.
       reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
@@ -171,7 +205,7 @@ export class ExportController {
     headers: {
       [DEMO_MODE_HEADER]: {
         description:
-          'Vrai si le classeur a été produit en mode démonstration, donc s’il mêle des lignes fictives à des lignes réelles.',
+          'Vrai si le classeur provient de l’espace démo et contient des données fictives.',
         schema: { type: 'string', enum: ['true', 'false'] },
       },
     },
@@ -182,7 +216,7 @@ export class ExportController {
     @Query() query: RepresentantExportQueryDto,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const demoEnabled = await this.demo.enabled();
+    const demoEnabled = this.demo.current() === 'demo';
     const filename = `representants-cpi-${formatDakarDate(new Date())}${demoFilenameSuffix(demoEnabled)}.xlsx`;
 
     reply.hijack();

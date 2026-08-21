@@ -275,7 +275,7 @@ void main() {
       final DioApi api = apiAnswering('', contentType: null);
 
       await expectLater(
-        api.pull(),
+        api.pull(payloadVersion: 4),
         throwsA(
           isA<ApiException>()
               .having(

@@ -130,6 +130,7 @@ const MODULES: Record<string, string[]> = {
     'exportBankCasesXlsx',
     'exportProspectsXlsx',
     'downloadProspectsTemplateXlsx',
+    'downloadProspectsGrandPublicTemplateXlsx',
     'downloadRepresentantsTemplateXlsx',
     'exportRepresentantsXlsx',
   ],

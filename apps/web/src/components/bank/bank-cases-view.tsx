@@ -85,7 +85,7 @@ export function BankCasesView() {
           <BankExportMenu filters={filters} />
           {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
               poserait `role="button"` sur le `<a>`. */}
-          <Link href="/dossiers/nouveau" className={buttonVariants()}>
+          <Link href="/chues/dossiers/nouveau" className={buttonVariants()}>
             <PlusIcon aria-hidden="true" />
             Nouveau dossier
           </Link>
@@ -119,7 +119,7 @@ export function BankCasesView() {
           }
           action={
             countActiveBankFilters(filters) === 0 ? (
-              <Link href="/dossiers/nouveau" className={buttonVariants()}>
+              <Link href="/chues/dossiers/nouveau" className={buttonVariants()}>
                 <PlusIcon aria-hidden="true" />
                 Nouveau dossier
               </Link>
@@ -180,12 +180,12 @@ export function BankCasesView() {
                     className="cursor-pointer focus-within:bg-muted/60"
                     onClick={(event) => {
                       if (isTextSelected() || !isPlainAreaClick(event.target)) return;
-                      router.push(`/dossiers/${bankCase.id}`);
+                      router.push(`/chues/dossiers/${bankCase.id}`);
                     }}
                   >
                     <TableCell>
                       <Link
-                        href={`/dossiers/${bankCase.id}`}
+                        href={`/chues/dossiers/${bankCase.id}`}
                         className="rounded-sm font-[600] tabular-nums hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                       >
                         {bankCase.reference}
@@ -351,14 +351,14 @@ function BankCaseCard({ bankCase }: { bankCase: BankCase }) {
       className="animate-rise cursor-pointer transition-shadow hover:shadow-elev-hover focus-within:shadow-elev-hover focus-within:ring-2 focus-within:ring-ring"
       onClick={(event) => {
         if (isTextSelected() || !isPlainAreaClick(event.target)) return;
-        router.push(`/dossiers/${bankCase.id}`);
+        router.push(`/chues/dossiers/${bankCase.id}`);
       }}
     >
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <h3 className="min-w-0 font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
             <Link
-              href={`/dossiers/${bankCase.id}`}
+              href={`/chues/dossiers/${bankCase.id}`}
               className="rounded-sm tabular-nums hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               {bankCase.reference}

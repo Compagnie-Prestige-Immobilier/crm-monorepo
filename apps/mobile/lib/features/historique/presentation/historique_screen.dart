@@ -19,6 +19,7 @@ import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/search_field.dart';
 import '../../../ui/widgets/sync_badge.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
+import '../../../ui/async_value_x.dart';
 
 class HistoriqueScreen extends ConsumerWidget {
   const HistoriqueScreen({super.key});
@@ -54,7 +55,7 @@ class HistoriqueScreen extends ConsumerWidget {
             ),
           ),
           Expanded(
-            child: rows.when(
+            child: rows.whenEchecDAbord(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (Object e, StackTrace _) =>
                   Center(child: Text('Lecture impossible : $e')),
@@ -226,7 +227,7 @@ class _ProspectList extends ConsumerWidget {
     );
     final ThemeData theme = Theme.of(context);
 
-    return rows.when(
+    return rows.whenEchecDAbord(
       loading: () => const Padding(
         padding: EdgeInsets.all(CpiSpacing.md),
         child: LinearProgressIndicator(),

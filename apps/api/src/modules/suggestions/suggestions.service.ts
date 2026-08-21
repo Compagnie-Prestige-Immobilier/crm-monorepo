@@ -2,8 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma, SuggestionStatus } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 import { shortCode } from '../../common/short-code.js';
 import type { SuggestionDto, SuggestionListDto, SuggestionQueryDto } from './dto.js';
 
@@ -15,10 +13,7 @@ const suggestionNotFound = (): NotFoundException =>
 
 @Injectable()
 export class SuggestionsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async list(query: SuggestionQueryDto): Promise<SuggestionListDto> {
     const page = query.page ?? 1;
@@ -26,7 +21,6 @@ export class SuggestionsService {
 
     const where: Prisma.RepresentantSuggestionWhereInput = {
       deletedAt: null,
-      ...demoScope(await this.demo.enabled()),
       ...(query.status ? { status: query.status } : {}),
     };
 
@@ -49,7 +43,7 @@ export class SuggestionsService {
 
   async setStatus(id: string, status: SuggestionStatus): Promise<SuggestionDto> {
     const updated = await this.prisma.representantSuggestion.updateMany({
-      where: { id, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+      where: { id, deletedAt: null },
       data: { status },
     });
     if (updated.count === 0) throw suggestionNotFound();

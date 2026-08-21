@@ -21,6 +21,7 @@ import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import 'discard_confirmation.dart';
 import 'ownership_sheet.dart';
+import '../../../ui/async_value_x.dart';
 
 class CorrectionsScreen extends ConsumerWidget {
   const CorrectionsScreen({super.key});
@@ -51,7 +52,7 @@ class CorrectionsScreen extends ConsumerWidget {
     WidgetRef ref,
     AsyncValue<List<OutboxData>> rows,
   ) {
-    return rows.when(
+    return rows.whenEchecDAbord(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (Object e, StackTrace _) => const Center(
         child: Padding(

@@ -3,18 +3,23 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { seconds, Throttle } from '@nestjs/throttler';
 
-import { DemoWritable } from '../../common/decorators/demo-writable.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
 import { AuthService } from './auth.service.js';
-import { AuthTokensDto, AuthUserDto, LoginDto, LogoutResponseDto, RefreshDto } from './dto.js';
+import {
+  AuthTokensDto,
+  AuthUserDto,
+  LoginDto,
+  LogoutResponseDto,
+  RefreshDto,
+  SwitchWorkspaceDto,
+} from './dto.js';
 import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
 
 @ApiTags('auth')
-@DemoWritable('ouvrir et fermer une session n’écrit aucune donnée métier')
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
@@ -78,6 +83,20 @@ export class AuthController {
   @ApiOperation({ operationId: 'getCurrentUser', summary: 'Profil de l’utilisateur authentifié.' })
   @ApiResponse({ status: 200, type: AuthUserDto })
   me(@CurrentUser() user: AuthenticatedUser): Promise<AuthUserDto> {
-    return this.auth.me(user.id);
+    return this.auth.me(user.id, user.workspace ?? 'public');
+  }
+
+  @Post('workspace')
+  @Roles(...ANY_AUTHENTICATED)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ operationId: 'switchWorkspace', summary: 'Change d’espace de travail.' })
+  @ApiResponse({ status: 200, type: AuthTokensDto })
+  switchWorkspace(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: SwitchWorkspaceDto,
+    @Headers('user-agent') userAgent?: string,
+  ): Promise<AuthTokensDto> {
+    return this.auth.switchWorkspace(user.id, body.workspace, userAgent);
   }
 }

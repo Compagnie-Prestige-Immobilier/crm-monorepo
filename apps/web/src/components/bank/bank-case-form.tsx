@@ -114,7 +114,7 @@ export function BankCaseForm() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.bankCasesRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.bankAnalyticsRoot });
       toast.success(`Dossier ${bankCase.reference} ouvert.`);
-      router.push(`/dossiers/${bankCase.id}`);
+      router.push(`/chues/dossiers/${bankCase.id}`);
     },
     onError: (error) => {
       if (error instanceof ApiError && error.status === 409) {
@@ -325,7 +325,7 @@ export function BankCaseForm() {
               <AlertTriangleIcon className="size-3.5 shrink-0" aria-hidden="true" />
               La référence « {duplicate.reference} » existe déjà.
               <Link
-                href={`/dossiers/${duplicate.id}`}
+                href={`/chues/dossiers/${duplicate.id}`}
                 className="rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 Ouvrir ce dossier
@@ -382,7 +382,7 @@ export function BankCaseForm() {
         <div className="mx-auto flex max-w-2xl items-center justify-end gap-3">
           {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
               poserait `role="button"` sur le `<a>`. */}
-          <Link href="/dossiers" className={buttonVariants({ variant: 'ghost' })}>
+          <Link href="/chues/dossiers" className={buttonVariants({ variant: 'ghost' })}>
             Annuler
           </Link>
           <Button type="submit" size="lg" disabled={!canSubmit} className="flex-1 sm:flex-none">

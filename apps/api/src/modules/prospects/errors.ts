@@ -15,6 +15,14 @@ export const prospectNotFound = (): NotFoundException =>
     message: 'Prospect introuvable.',
   });
 
+/** Une fiche sans banque ni syndicat n'est dans aucun segment : rien a basculer. */
+export const segmentUnavailable = (): UnprocessableEntityException =>
+  new UnprocessableEntityException({
+    code: 'PROSPECT_SEGMENT_UNAVAILABLE',
+    message:
+      'Cette fiche n’a pas de banque ou de syndicat : renseignez-les d’abord, un segment ne se devine pas.',
+  });
+
 export const segmentUnchanged = (segment: BddSegment): UnprocessableEntityException =>
   new UnprocessableEntityException({
     code: ProspectSegmentError.UNCHANGED,

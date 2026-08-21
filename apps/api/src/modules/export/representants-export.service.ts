@@ -7,8 +7,7 @@ import type { Prisma } from '@crm/database';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readScope, readsEveryone } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
+import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { IMPORT_COLUMNS, IMPORT_SHEET_NAME } from '../representants/import-template.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
 import { RepresentantSortField } from '../representants/dto.js';
@@ -66,7 +65,7 @@ const EXPORT_COLUMNS: readonly ExportColumn[] = [
 export class RepresentantsExportService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
+    private readonly demo: WorkspaceContext,
   ) {}
 
   // Modèle vide
@@ -115,8 +114,8 @@ export class RepresentantsExportService {
     query: RepresentantExportQueryDto,
     stream: Writable,
   ): Promise<void> {
-    const demoEnabled = await this.demo.enabled();
-    const where = this.buildWhere(user, query, demoEnabled);
+    const demoEnabled = this.demo.current() === 'demo';
+    const where = this.buildWhere(user, query);
 
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
     markWorkbook(workbook, demoEnabled);
@@ -187,12 +186,10 @@ export class RepresentantsExportService {
   private buildWhere(
     user: AuthenticatedUser,
     query: RepresentantExportQueryDto,
-    demoEnabled: boolean,
   ): Prisma.RepresentantWhereInput {
     const where: Prisma.RepresentantWhereInput = {
       deletedAt: null,
       ...readScope(user),
-      ...demoScope(demoEnabled),
     };
 
     if (query.commercialId) {
