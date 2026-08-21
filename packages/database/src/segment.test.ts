@@ -57,6 +57,9 @@ describe('classifySegment : matrice complète', () => {
     for (const syndicatSigle of syndicats) {
       for (const banqueShortName of banques) {
         const segment = classifySegment({ syndicatSigle, banqueShortName });
+        // Les deux axes sont fournis : un segment nul serait le defaut que ce
+        // test existe justement pour interdire.
+        if (segment === null) throw new Error(`${syndicatSigle} x ${banqueShortName} sans segment`);
         expect(ALL_SEGMENTS).toContain(segment);
         vus.add(segment);
       }
