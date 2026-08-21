@@ -263,8 +263,8 @@ export const BANK_STAGE_TYPE_LABELS: Record<BankStageType, string> = {
   REJECTED: 'Rejeté',
 };
 
-export type DemoStatus = Schemas['DemoStatusDto'];
-export type DemoCounts = Schemas['DemoCountsDto'];
+export type DemoStatus = Schemas['DemoWorkspaceStatusDto'];
+export type DemoCounts = Schemas['DemoWorkspaceCountsDto'];
 
 export type DashboardKpis = Schemas['AnalyticsTotalsDto'];
 

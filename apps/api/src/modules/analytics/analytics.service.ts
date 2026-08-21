@@ -25,17 +25,13 @@ import type {
   TopQueryDto,
   TopRepresentantListDto,
 } from './dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
 @Injectable()
 export class AnalyticsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async totals(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<AnalyticsTotalsDto> {
-    const where = prospectConditions(user, filter, await this.demo.enabled());
+    const where = prospectConditions(user, filter);
     const rows = await this.prisma.$queryRaw<
       {
         prospects: number;
@@ -84,7 +80,7 @@ export class AnalyticsService {
   }
 
   async overTime(user: AuthenticatedUser, query: TimeSeriesQueryDto): Promise<AnalyticsSeriesDto> {
-    const where = prospectConditions(user, query, await this.demo.enabled());
+    const where = prospectConditions(user, query);
     // `date_trunc` exige un littéral, jamais un paramètre : l'unité vient d'une
     // énumération fermée, toute autre valeur retombant sur 'day'.
     const unit =
@@ -117,7 +113,7 @@ export class AnalyticsService {
   }
 
   async topCommerciaux(user: AuthenticatedUser, query: TopQueryDto): Promise<TopCommercialListDto> {
-    const where = prospectConditions(user, query, await this.demo.enabled());
+    const where = prospectConditions(user, query);
     const rows = await this.prisma.$queryRaw<
       {
         id: string;
@@ -184,7 +180,7 @@ export class AnalyticsService {
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
   ): Promise<Phase2StatusListDto> {
-    const where = prospectConditions(user, filter, await this.demo.enabled());
+    const where = prospectConditions(user, filter);
     const rows = await this.prisma.$queryRaw<{ key: Phase2Status; prospects: number }[]>`
       SELECT p."phase2Status" AS key, COUNT(*)::int AS prospects
       ${PROSPECT_FROM}
@@ -214,7 +210,7 @@ export class AnalyticsService {
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
   ): Promise<EnrollmentMethodListDto> {
-    const where = prospectConditions(user, filter, await this.demo.enabled());
+    const where = prospectConditions(user, filter);
     const rows = await this.prisma.$queryRaw<{ key: EnrollmentMethod; prospects: number }[]>`
       SELECT p."enrollmentMethod" AS key, COUNT(*)::int AS prospects
       ${PROSPECT_FROM}
@@ -240,7 +236,7 @@ export class AnalyticsService {
   }
 
   async bySegment(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<SegmentListDto> {
-    const where = prospectConditions(user, filter, await this.demo.enabled());
+    const where = prospectConditions(user, filter);
     const rows = await this.prisma.$queryRaw<
       { segment: BddSegment; prospects: number; obtained: number }[]
     >`
@@ -276,7 +272,7 @@ export class AnalyticsService {
     user: AuthenticatedUser,
     query: TopQueryDto,
   ): Promise<TopRepresentantListDto> {
-    const where = prospectConditions(user, query, await this.demo.enabled());
+    const where = prospectConditions(user, query);
     const rows = await this.prisma.$queryRaw<
       {
         id: string;
@@ -323,7 +319,7 @@ export class AnalyticsService {
     idColumn: Prisma.Sql,
     labelColumn: Prisma.Sql,
   ): Promise<NamedCountListDto> {
-    const where = prospectConditions(user, filter, await this.demo.enabled());
+    const where = prospectConditions(user, filter);
     const rows = await this.prisma.$queryRaw<{ id: string; label: string; prospects: number }[]>`
       SELECT ${idColumn} AS id, ${labelColumn} AS label, COUNT(*)::int AS prospects
       ${PROSPECT_FROM}

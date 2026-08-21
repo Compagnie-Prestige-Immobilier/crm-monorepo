@@ -75,6 +75,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/auth/workspace': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Change d’espace de travail. */
+    post: operations['switchWorkspace'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/users': {
     parameters: {
       query?: never;
@@ -1953,8 +1970,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** État du mode démonstration, compteurs et autorisation de bascule. */
-    get: operations['getDemoStatus'];
+    /** État du workspace démo. */
+    get: operations['getDemoWorkspaceStatus'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1963,7 +1980,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/admin/demo/enable': {
+  '/api/v1/admin/demo/reset': {
     parameters: {
       query?: never;
       header?: never;
@@ -1972,51 +1989,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /**
-     * Peuple la plateforme de données de démonstration.
-     * @description Idempotent : activer une seconde fois ne double pas le jeu. Refusé en production tant que DEMO_MODE_ALLOWED ne vaut pas true. CONSÉQUENCE À ANNONCER AVANT LA CONFIRMATION : tant que le mode est actif, la plateforme passe en LECTURE SEULE pour tout le monde. Les écritures interactives (POST, PATCH, PUT, DELETE) sont refusées en 409 `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).
-     */
-    post: operations['enableDemoMode'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/demo/purge': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Supprime définitivement le jeu de démonstration.
-     * @description IRRÉVERSIBLE, et distinct de la désactivation. Supprime exactement les lignes enregistrées à l’ensemencement, dans l’ordre inverse de création. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration. L’interface doit faire confirmer.
-     */
-    post: operations['purgeDemoData'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/demo/disable': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Masque les données de démonstration.
-     * @description NE SUPPRIME RIEN. Les lignes de démonstration restent en base, invisibles pour toute lecture, export Excel compris. Pour les effacer définitivement, utiliser /purge. REND AUSSI L’ÉCRITURE à toute la plateforme : c’est cette route qui lève la lecture seule posée par /enable.
-     */
-    post: operations['disableDemoMode'];
+    /** Réinitialise le workspace démo. */
+    post: operations['resetDemoWorkspace'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2236,7 +2210,7 @@ export interface paths {
     put?: never;
     /**
      * Demande un export intégral de la base (schéma et données).
-     * @description Rend IMMÉDIATEMENT, avec un identifiant et un état ; `pg_dump` tourne en arrière-plan. Un avis part ensuite dans la boîte de réception et par e-mail, SANS aucun lien : le fichier ne se télécharge que dans une session authentifiée, par `GET admin/database-dump/download`. Un export déjà en cours est renvoyé tel quel, aucun second `pg_dump` n’est lancé. Refusé pendant une démonstration, un export y mêlerait des lignes fictives aux vraies. Le fichier est détruit dès son téléchargement, et de toute façon à son échéance.
+     * @description Rend IMMÉDIATEMENT, avec un identifiant et un état ; `pg_dump` tourne en arrière-plan. Un avis part ensuite dans la boîte de réception et par e-mail, SANS aucun lien : le fichier ne se télécharge que dans une session authentifiée, par `GET admin/database-dump/download`. Un export déjà en cours est renvoyé tel quel, aucun second `pg_dump` n’est lancé. Refusé dans l’espace démo. Le fichier est détruit dès son téléchargement, et de toute façon à son échéance.
      */
     post: operations['requestDatabaseDump'];
     delete?: never;
@@ -2579,6 +2553,8 @@ export interface components {
       fullName: string;
       role: components['schemas']['Role'];
       isActive: boolean;
+      /** @enum {string} */
+      workspace: 'public' | 'demo';
       /** Format: uuid */
       departementId?: string | null;
       phoneE164?: string | null;
@@ -2601,7 +2577,7 @@ export interface components {
        */
       statusCode: number;
       /**
-       * @description Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR). DEUX CODES TRANSVERSES méritent d’être traités une fois pour toutes côté client. Ils sortent tous deux en 409 sur TOUTE requête POST, PATCH, PUT ou DELETE, ne dépendent d’aucune opération en particulier, et leur `message` est déjà rédigé pour être affiché tel quel : `DEMO_MODE_READ_ONLY` tant que le mode démonstration est actif ; `DEMO_MODE_STATE_UNKNOWN` quand le serveur n’arrive pas à lire l’état de ce mode et refuse d’écrire une ligne dont il ne saurait pas dire si elle est réelle. Le second N’ANNONCE PAS une démonstration en cours : il invite à réessayer, et non à faire éteindre un interrupteur. Ces routes-là, et elles seules, n’émettent JAMAIS ces codes : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).
+       * @description Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR).
        * @example BANK_CASE_NOT_FOUND
        */
       code: string;
@@ -2626,6 +2602,10 @@ export interface components {
     };
     LogoutResponseDto: {
       revoked: boolean;
+    };
+    SwitchWorkspaceDto: {
+      /** @enum {string} */
+      workspace: 'public' | 'demo';
     };
     UserDto: {
       /** Format: uuid */
@@ -3251,7 +3231,7 @@ export interface components {
        */
       statusCode: number;
       /**
-       * @description Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR). DEUX CODES TRANSVERSES méritent d’être traités une fois pour toutes côté client. Ils sortent tous deux en 409 sur TOUTE requête POST, PATCH, PUT ou DELETE, ne dépendent d’aucune opération en particulier, et leur `message` est déjà rédigé pour être affiché tel quel : `DEMO_MODE_READ_ONLY` tant que le mode démonstration est actif ; `DEMO_MODE_STATE_UNKNOWN` quand le serveur n’arrive pas à lire l’état de ce mode et refuse d’écrire une ligne dont il ne saurait pas dire si elle est réelle. Le second N’ANNONCE PAS une démonstration en cours : il invite à réessayer, et non à faire éteindre un interrupteur. Ces routes-là, et elles seules, n’émettent JAMAIS ces codes : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).
+       * @description Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR).
        * @example BANK_CASE_NOT_FOUND
        * @enum {string}
        */
@@ -4974,30 +4954,17 @@ export interface components {
       /** @description Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre. */
       teleconseillers: components['schemas']['SupervisionTeleconseillerDto'][];
     };
-    DemoCountsDto: {
+    DemoWorkspaceCountsDto: {
       users: number;
       representants: number;
       prospects: number;
       campaigns: number;
-      campaignCommerciaux: number;
-      callTasks: number;
-      callAttempts: number;
       bankCases: number;
-      bankCaseTransitions: number;
     };
-    DemoStatusDto: {
-      /** @description Vrai si des données de démonstration sont actuellement en place ET visibles. ATTENTION, ce booléen a une SECONDE conséquence, que l’interface doit annoncer avant la bascule : tant qu’il vaut vrai, la plateforme est en LECTURE SEULE. Toute requête POST, PATCH, PUT ou DELETE est refusée en 409 avec le code `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST). Les lignes créées par ces chemins sont du travail RÉEL : elles sont écrites `isDemo: false` et survivent à l’extinction. */
-      enabled: boolean;
-      /**
-       * Format: date-time
-       * @description Date du dernier ensemencement, nulle si le mode n’a jamais été activé.
-       */
-      seededAt: string | null;
-      /** @description Faux quand l’environnement interdit la bascule : en production, tant que DEMO_MODE_ALLOWED ne vaut pas true. L’interface doit afficher `reason`, pas se contenter de griser le bouton. */
-      canToggle: boolean;
-      /** @description Explication lisible quand canToggle est faux. */
-      reason: string | null;
-      counts: components['schemas']['DemoCountsDto'];
+    DemoWorkspaceStatusDto: {
+      /** @enum {string} */
+      workspace: 'demo';
+      counts: components['schemas']['DemoWorkspaceCountsDto'];
     };
     /** @enum {string} */
     PurgeDomainKey:
@@ -5521,6 +5488,31 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AuthUserDto'];
+        };
+      };
+    };
+  };
+  switchWorkspace: {
+    parameters: {
+      query?: never;
+      header: {
+        'user-agent': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SwitchWorkspaceDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthTokensDto'];
         };
       };
     };
@@ -12976,7 +12968,7 @@ export interface operations {
       };
     };
   };
-  getDemoStatus: {
+  getDemoWorkspaceStatus: {
     parameters: {
       query?: never;
       header?: never;
@@ -12990,39 +12982,12 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
+          'application/json': components['schemas']['DemoWorkspaceStatusDto'];
         };
       };
     };
   };
-  enableDemoMode: {
+  resetDemoWorkspace: {
     parameters: {
       query?: never;
       header?: never;
@@ -13036,126 +13001,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  purgeDemoData: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  disableDemoMode: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DemoStatusDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
+          'application/json': components['schemas']['DemoWorkspaceStatusDto'];
         };
       };
     };
@@ -13352,7 +13198,7 @@ export interface operations {
       /** @description Classeur Excel. En mode `filtered` : feuilles Prospects, Représentants et Synthèse. En mode `consolidated` : Consolidé, BDD1, BDD2, BDD3, BDD4. */
       200: {
         headers: {
-          /** @description Vrai si le classeur a été produit en mode démonstration, donc s’il mêle des lignes fictives à des lignes réelles. */
+          /** @description Vrai si le classeur provient de l’espace démo et contient des données fictives. */
           'X-Demo-Mode'?: 'true' | 'false';
           [name: string]: unknown;
         };
@@ -13555,7 +13401,7 @@ export interface operations {
       /** @description Classeur Excel à une feuille. */
       200: {
         headers: {
-          /** @description Vrai si le classeur a été produit en mode démonstration, donc s’il mêle des lignes fictives à des lignes réelles. */
+          /** @description Vrai si le classeur provient de l’espace démo et contient des données fictives. */
           'X-Demo-Mode'?: 'true' | 'false';
           [name: string]: unknown;
         };
@@ -13802,7 +13648,7 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif. DATABASE_DUMP_IN_PROGRESS · un export démarre à l’instant même. */
+      /** @description DATABASE_DUMP_IN_PROGRESS · un export démarre à l’instant même. */
       409: {
         headers: {
           [name: string]: unknown;
@@ -13979,15 +13825,6 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
       /** @description IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille. */
       413: {
         headers: {
@@ -14052,15 +13889,6 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé. */
-      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -14139,15 +13967,6 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
       /** @description IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille. */
       413: {
         headers: {
@@ -14212,15 +14031,6 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé. */
-      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -14360,7 +14170,7 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée. DEMO_MODE_READ_ONLY · le mode démonstration est actif. */
+      /** @description IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée. */
       409: {
         headers: {
           [name: string]: unknown;

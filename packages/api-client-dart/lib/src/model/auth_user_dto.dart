@@ -32,6 +32,8 @@ class AuthUserDto {
 
     required this.isActive,
 
+    required this.workspace,
+
     this.departementId,
 
     this.phoneE164,
@@ -62,6 +64,14 @@ class AuthUserDto {
   @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
+  @JsonKey(
+    name: r'workspace',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: AuthUserDtoWorkspaceEnum.unknownDefaultOpenApi,
+  )
+  final AuthUserDtoWorkspaceEnum workspace;
+
   @JsonKey(name: r'departementId', required: false, includeIfNull: false)
   final String? departementId;
 
@@ -83,6 +93,7 @@ class AuthUserDto {
                 fullName,
                 role,
                 isActive,
+                workspace,
                 departementId,
                 phoneE164,
                 lastLoginAt,
@@ -94,6 +105,7 @@ class AuthUserDto {
                 other.fullName,
                 other.role,
                 other.isActive,
+                other.workspace,
                 other.departementId,
                 other.phoneE164,
                 other.lastLoginAt,
@@ -111,6 +123,7 @@ class AuthUserDto {
         fullName,
         role,
         isActive,
+        workspace,
         departementId,
         phoneE164,
         lastLoginAt,
@@ -125,4 +138,20 @@ class AuthUserDto {
   String toString() {
     return toJson().toString();
   }
+}
+
+enum AuthUserDtoWorkspaceEnum {
+  @JsonValue(r'public')
+  public(r'public'),
+  @JsonValue(r'demo')
+  demo(r'demo'),
+  @JsonValue(r'unknown_default_open_api')
+  unknownDefaultOpenApi(r'unknown_default_open_api');
+
+  const AuthUserDtoWorkspaceEnum(this.value);
+
+  final String value;
+
+  @override
+  String toString() => value;
 }

@@ -19,7 +19,6 @@ import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
-import { DemoWritable } from '../../common/decorators/demo-writable.decorator.js';
 import { SyncService } from './sync.service.js';
 import { SyncPullQueryDto, SyncPullResponseDto, SyncPushDto, SyncPushResponseDto } from './dto.js';
 import { MOBILE_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
@@ -35,7 +34,6 @@ export class SyncController {
     private readonly heartbeat: HeartbeatService,
   ) {}
 
-  @DemoWritable('la remontée hors ligne ne doit JAMAIS être refusée')
   @Post('push')
   @Roles(...MOBILE_ROLES)
   @HttpCode(HttpStatus.OK)

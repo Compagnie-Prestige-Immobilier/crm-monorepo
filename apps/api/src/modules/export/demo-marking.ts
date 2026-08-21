@@ -2,17 +2,13 @@ import type { ServerResponse } from 'node:http';
 
 import type ExcelJS from 'exceljs';
 
-// Un export de demo melange lignes fictives et reelles et survit a la banniere de l'interface :
-// il est marque a quatre endroits (nom de fichier, metadonnees, ligne 2 de chaque feuille, en-tete HTTP)
-// car aucun ne survit seul a un renommage, une extraction de feuille ou un envoi par courriel.
-
 /** Pose dans LES DEUX etats : un en-tete absent ne distingue pas mode eteint et proxy filtrant. */
 export const DEMO_MODE_HEADER = 'X-Demo-Mode';
 
 export const DEMO_FILENAME_SUFFIX = '-DEMONSTRATION';
 
 const WARNING_TEXT =
-  'ATTENTION : ce fichier a été produit en MODE DÉMONSTRATION. Il mêle des lignes fictives à des lignes réelles et ne doit servir à aucune décision ni à aucun reporting.';
+  'ATTENTION : ce fichier provient de l’espace démo et contient des données fictives. Il ne doit servir à aucune décision ni à aucun reporting.';
 
 const WARNING_RED = 'FFB00020';
 const WARNING_BACKGROUND = 'FFFDECEE';

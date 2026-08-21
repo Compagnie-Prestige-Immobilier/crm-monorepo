@@ -27,7 +27,6 @@ export interface FakeVisiteRow {
   createdById: string;
   createdAt: Date;
   updatedAt: Date;
-  isDemo: boolean;
 }
 
 export const fakeRef = (over: Partial<FakeRefRow> & { id: string; code: string }): FakeRefRow => ({
@@ -49,7 +48,6 @@ interface RefWhere {
 
 interface VisiteWhere {
   id?: string;
-  isDemo?: false;
   reference?: { startsWith?: string; contains?: string };
   visitedAt?: { gte?: Date; lte?: Date };
   entrepriseId?: string;
@@ -65,7 +63,6 @@ interface VisiteWhere {
 const matchesVisite = (row: FakeVisiteRow, where: VisiteWhere | undefined): boolean => {
   if (!where) return true;
   if (where.id !== undefined && row.id !== where.id) return false;
-  if (where.isDemo !== undefined && row.isDemo !== where.isDemo) return false;
   if (
     where.reference?.startsWith !== undefined &&
     !row.reference.startsWith(where.reference.startsWith)
@@ -254,15 +251,5 @@ export class FakeVisitesPrisma {
         return Promise.resolve(row);
       },
     };
-  }
-}
-
-export class FakeDemo {
-  constructor(private readonly on = false) {}
-  enabled(): Promise<boolean> {
-    return Promise.resolve(this.on);
-  }
-  enabledForWrite(): Promise<boolean> {
-    return Promise.resolve(this.on);
   }
 }

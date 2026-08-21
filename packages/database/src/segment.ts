@@ -77,14 +77,10 @@ export function scopeWhere(scope: CampaignScope): Prisma.ProspectWhereInput {
   return scope === 'ALL' ? {} : segmentWhere(scope);
 }
 
-export function eligibleForCampaignWhere(
-  scope: CampaignScope,
-  demoEnabled: boolean,
-): Prisma.ProspectWhereInput {
+export function eligibleForCampaignWhere(scope: CampaignScope): Prisma.ProspectWhereInput {
   return {
     ...scopeWhere(scope),
     deletedAt: null,
-    isDemo: demoEnabled,
     phase2Status: 'PENDING',
     enrollmentMethod: null,
     callTasks: { none: { isActive: true } },

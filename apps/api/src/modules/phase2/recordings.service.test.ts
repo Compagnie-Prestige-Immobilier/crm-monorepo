@@ -12,7 +12,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { PrismaService } from '../../prisma/prisma.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { CallRecordingsService } from './recordings.service.js';
 import { Phase2Controller } from './phase2.controller.js';
 import type { Phase2CampaignsService } from './campaigns.service.js';
@@ -39,33 +38,29 @@ const FICTIVE = 'attempt-demo';
 interface AttemptRow {
   id: string;
   performedById: string;
-  isDemo: boolean;
 }
 
 const ROWS: AttemptRow[] = [
-  { id: OWNED, performedById: awa.id, isDemo: false },
-  { id: FOREIGN, performedById: moussa.id, isDemo: false },
-  { id: FICTIVE, performedById: awa.id, isDemo: true },
+  { id: OWNED, performedById: awa.id },
+  { id: FOREIGN, performedById: moussa.id },
+  { id: FICTIVE, performedById: awa.id },
 ];
 
 let parent: string;
 let directory: string;
 
-function serviceFor(demoEnabled = false, rows: AttemptRow[] = ROWS): CallRecordingsService {
+function serviceFor(rows: AttemptRow[] = ROWS): CallRecordingsService {
   const prisma = {
     callAttempt: {
-      findFirst: ({ where }: { where: { id: string; isDemo?: false } }) =>
-        Promise.resolve(
-          rows.find((row) => row.id === where.id && (where.isDemo === undefined || !row.isDemo)) ??
-            null,
-        ),
+      findFirst: ({ where }: { where: { id: string } }) =>
+        Promise.resolve(rows.find((row) => row.id === where.id) ?? null),
       // Le balayage cherche l'EXISTENCE, pas la visibilite: un fichier survit a
       // sa ligne, donc la portee demo ne s'applique pas ici.
       findUnique: ({ where }: { where: { id: string } }) =>
         Promise.resolve(rows.find((row) => row.id === where.id) ?? null),
     },
   } as unknown as PrismaService;
-  return new CallRecordingsService(prisma, fakeDemoVisibility(demoEnabled));
+  return new CallRecordingsService(prisma);
 }
 
 function audio(
@@ -192,34 +187,6 @@ describe('note vocale, autorisation', () => {
       code: 'CALL_ATTEMPT_NOT_FOUND',
     });
   });
-
-  it('la portée démonstration masque la tentative fictive, sans fuir son existence', async () => {
-    const service = serviceFor(false);
-
-    const masked = await failure(() => service.open(directrice, FICTIVE));
-    const absent = await failure(() => service.open(directrice, 'attempt-fantome'));
-
-    expect(masked).toBeInstanceOf(NotFoundException);
-    expect((masked as HttpException).getResponse()).toEqual(
-      (absent as HttpException).getResponse(),
-    );
-  });
-
-  it('la tentative fictive redevient atteignable quand la démonstration est allumée', async () => {
-    const service = serviceFor(true);
-
-    expect(await service.upload(awa, FICTIVE, audio('premier'))).toEqual({
-      attemptId: FICTIVE,
-      bytes: 7,
-    });
-  });
-
-  it('la tentative fictive reste refusée au téléversement quand la démonstration est éteinte', async () => {
-    expect(await codeOf(() => serviceFor(false).upload(awa, FICTIVE, audio('premier')))).toBe(
-      'CALL_ATTEMPT_NOT_FOUND',
-    );
-    expect(await stored()).toEqual([]);
-  });
 });
 
 describe('note vocale, le fichier', () => {
@@ -330,10 +297,10 @@ describe('note vocale, le fichier', () => {
 
   it('un identifiant qui remonte l’arborescence reste dans le répertoire', async () => {
     const rows: AttemptRow[] = [
-      { id: '../evasion', performedById: awa.id, isDemo: false },
-      { id: '/etc/passwd', performedById: awa.id, isDemo: false },
+      { id: '../evasion', performedById: awa.id },
+      { id: '/etc/passwd', performedById: awa.id },
     ];
-    const service = serviceFor(false, rows);
+    const service = serviceFor(rows);
 
     await service.upload(awa, '../evasion', audio('premier'));
     await service.upload(awa, '/etc/passwd', audio('deuxième'));
@@ -343,10 +310,10 @@ describe('note vocale, le fichier', () => {
   });
 
   it('l’écoute ne sort pas non plus du répertoire', async () => {
-    const rows: AttemptRow[] = [{ id: '../secret', performedById: awa.id, isDemo: false }];
+    const rows: AttemptRow[] = [{ id: '../secret', performedById: awa.id }];
     await writeFile(join(parent, 'secret.m4a'), 'hors périmètre');
 
-    expect(await codeOf(() => serviceFor(false, rows).open(awa, '../secret'))).toBe(
+    expect(await codeOf(() => serviceFor(rows).open(awa, '../secret'))).toBe(
       'CALL_RECORDING_NOT_FOUND',
     );
   });

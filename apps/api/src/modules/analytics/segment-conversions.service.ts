@@ -2,8 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 import { readsEveryone } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
@@ -19,10 +17,7 @@ const DEFAULT_PAGE_SIZE = 25;
 
 @Injectable()
 export class SegmentConversionsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async conversions(
     user: AuthenticatedUser,
@@ -30,7 +25,7 @@ export class SegmentConversionsService {
   ): Promise<SegmentConversionListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
-    const where = this.buildWhere(user, query, await this.demo.enabled());
+    const where = this.buildWhere(user, query);
 
     const [total, rows, byOrigin, byAuthor] = await Promise.all([
       this.prisma.segmentChange.count({ where }),
@@ -103,7 +98,6 @@ export class SegmentConversionsService {
   private buildWhere(
     user: AuthenticatedUser,
     query: SegmentConversionsQueryDto,
-    demoEnabled: boolean,
   ): Prisma.SegmentChangeWhereInput {
     const changedAt: Prisma.DateTimeFilter = {};
     if (query.dateFrom !== undefined) changedAt.gte = inclusiveDateFrom(query.dateFrom);
@@ -114,7 +108,6 @@ export class SegmentConversionsService {
     const author = readsEveryone(user) ? query.changedById : user.id;
 
     return {
-      ...demoScope(demoEnabled),
       ...(author !== undefined ? { changedById: author } : {}),
       ...(query.fromSegment !== undefined ? { fromSegment: query.fromSegment } : {}),
       ...(query.toSegment !== undefined ? { toSegment: query.toSegment } : {}),

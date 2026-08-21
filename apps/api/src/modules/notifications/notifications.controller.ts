@@ -5,7 +5,6 @@ import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { Role } from '@crm/database';
 
 import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
-import { DemoWritable } from '../../common/decorators/demo-writable.decorator.js';
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -120,7 +119,6 @@ export class NotificationsController {
     return this.notifications.cancel(id);
   }
 
-  @DemoWritable('acte personnel et inoffensif, sans effet sur les chiffres')
   @Roles(...ANY_AUTHENTICATED)
   @Post(':id/read')
   @ApiOperation({

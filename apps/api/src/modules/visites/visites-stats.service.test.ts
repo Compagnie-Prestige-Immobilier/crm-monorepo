@@ -2,8 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
-import type { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { FakeDemo, FakeVisitesPrisma, fakeRef } from './fake-visites-prisma.js';
+import { FakeVisitesPrisma, fakeRef } from './fake-visites-prisma.js';
 import { VisitesStatsService } from './visites-stats.service.js';
 import { VisitesService } from './visites.service.js';
 
@@ -33,14 +32,8 @@ describe('statistiques du registre', () => {
     prisma.destinataires = [NDOYE];
     prisma.objets = [SUIVI, ACHAT];
 
-    visites = new VisitesService(
-      prisma as unknown as PrismaService,
-      new FakeDemo() as unknown as DemoVisibilityService,
-    );
-    stats = new VisitesStatsService(
-      prisma as unknown as PrismaService,
-      new FakeDemo() as unknown as DemoVisibilityService,
-    );
+    visites = new VisitesService(prisma as unknown as PrismaService);
+    stats = new VisitesStatsService(prisma as unknown as PrismaService);
   });
 
   const inscrire = (
@@ -132,20 +125,6 @@ describe('statistiques du registre', () => {
     expect(labelled(result.parDirection)).toEqual({ COMMERCIALE: 0, FONCIERE: 1 });
 
     FONCIERE.isActive = true;
-  });
-
-  it('ne compte pas une ligne de démonstration quand le mode est éteint', async () => {
-    const demoVisites = new VisitesService(
-      prisma as unknown as PrismaService,
-      new FakeDemo(true) as unknown as DemoVisibilityService,
-    );
-    await demoVisites.create(
-      { date: '2026-01-06', visitorName: 'FICTIF', entrepriseId: CPI.id, objetId: SUIVI.id },
-      ACCUEIL,
-    );
-    await inscrire({});
-
-    expect((await stats.compute({ from: '2026-01-01', to: '2026-01-31' })).total).toBe(1);
   });
 
   it('refuse une période inversée ou trop large plutôt que de tout charger', async () => {

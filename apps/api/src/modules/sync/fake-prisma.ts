@@ -34,7 +34,6 @@ export interface RepresentantRow {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
-  isDemo?: boolean;
 }
 
 export interface CallAttemptRow {
@@ -48,7 +47,6 @@ export interface CallAttemptRow {
   method: string | null;
   comment: string | null;
   clientCreatedAt: Date;
-  isDemo: boolean;
 }
 
 interface RepresentantCommentRow {
@@ -58,7 +56,6 @@ interface RepresentantCommentRow {
   body: string;
   clientCreatedAt: Date;
   createdAt: Date;
-  isDemo: boolean;
 }
 
 export interface CallOutcomeReasonRow {
@@ -90,7 +87,6 @@ export interface ProspectRow {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
-  isDemo?: boolean;
 }
 
 type Row = Record<string, unknown>;
@@ -128,17 +124,16 @@ export class FakePrisma {
   callAttempts = new Map<string, CallAttemptRow>();
   representantComments = new Map<string, RepresentantCommentRow>();
   callOutcomeReasons = new Map<string, CallOutcomeReasonRow>();
-  users = new Map<string, { id: string; isDemo: boolean; role?: string }>();
+  users = new Map<string, { id: string; role?: string }>();
   demoEntities: { entityType: string; entityId: string; sequence: number }[] = [];
 
   addDemoUser(id: string): void {
-    this.users.set(id, { id, isDemo: true });
+    this.users.set(id, { id });
   }
 
-  addUser(id: string, row: { role?: string; isDemo?: boolean } = {}): void {
+  addUser(id: string, row: { role?: string } = {}): void {
     this.users.set(id, {
       id,
-      isDemo: row.isDemo ?? false,
       ...(row.role ? { role: row.role } : {}),
     });
   }

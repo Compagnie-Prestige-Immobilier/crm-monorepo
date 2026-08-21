@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { BankCaseAnalyticsService } from './bank-cases-analytics.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 
 const prismaReturning = (rows: unknown[]): PrismaService =>
@@ -21,7 +20,6 @@ describe('byBank', () => {
           meanSeconds: 45000,
         },
       ]),
-      fakeDemoVisibility(),
     );
 
     const [banque] = await service.byBank({});

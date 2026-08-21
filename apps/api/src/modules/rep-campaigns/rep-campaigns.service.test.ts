@@ -19,8 +19,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { shortCode } from '../../common/short-code.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
-import type { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { RepresentantsService } from '../representants/representants.service.js';
 import { REP_CHECKBOX_GROUPS, RepCampaignsService } from './rep-campaigns.service.js';
 import { RepCallAttemptApplyStatus } from './dto.js';
@@ -110,14 +108,10 @@ function prismaStub(): MockDb {
   return db;
 }
 
-const build = (
-  db: MockDb,
-  demo: DemoVisibilityService = fakeDemoVisibility(),
-): RepCampaignsService =>
+const build = (db: MockDb): RepCampaignsService =>
   new RepCampaignsService(
     db as unknown as PrismaService,
-    demo,
-    new RepresentantsService(db as unknown as PrismaService, demo),
+    new RepresentantsService(db as unknown as PrismaService),
   );
 
 const campaignRow = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
@@ -189,7 +183,6 @@ describe('RepCampaignsService : création', () => {
     )[0].where;
     expect(where).toMatchObject({
       deletedAt: null,
-      isDemo: false,
       repCallTasks: { none: { isActive: true } },
     });
   });
@@ -216,32 +209,6 @@ describe('RepCampaignsService : création', () => {
     expect(terminal).toContain(RepCallOutcome.REACHED);
     expect(terminal).not.toContain(RepCallOutcome.CALLBACK);
     expect(terminal).not.toContain(RepCallOutcome.UNREACHABLE);
-  });
-
-  it('MARQUE la campagne et ses tâches quand le mode démonstration est allumé', async () => {
-    const db = prismaStub();
-    db.user.findMany.mockResolvedValue([
-      { id: 'com-1', fullName: 'Awa', username: 'awa', role: Role.COMMERCIAL, isActive: true },
-    ]);
-    db.repCallCampaign.create.mockResolvedValue({ id: 'camp-1' });
-    db.representant.findMany.mockResolvedValue([{ id: 'rep-1' }]);
-    db.$queryRawUnsafe.mockResolvedValue([{ id: 'rep-1' }]);
-    db.repCallCampaign.findFirst.mockResolvedValue(campaignRow());
-
-    await build(db, fakeDemoVisibility(true)).create(ADMIN, {
-      name: 'Relance',
-      commercialIds: ['com-1'],
-    });
-
-    const campaign = (
-      db.repCallCampaign.create.mock.calls[0] as [{ data: Record<string, unknown> }]
-    )[0];
-    expect(campaign.data.isDemo).toBe(true);
-
-    const tasks = (
-      db.repCallTask.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }]
-    )[0];
-    expect(tasks.data[0]?.isDemo).toBe(true);
   });
 
   it('ÉTALE la file de chaque commercial en tranches contiguës', async () => {
@@ -698,42 +665,14 @@ describe('RepCampaignsService : tentatives', () => {
     expect(db.repCallAttempt.createMany).toHaveBeenCalled();
   });
 
-  it('écrit isDemo depuis le REPRÉSENTANT, mode démonstration allumé', async () => {
-    const db = prismaStub();
-    db.repCallAttempt.findUnique.mockResolvedValue(null);
-    db.representant.findFirst.mockResolvedValue({ id: 'rep-1', isDemo: false });
-    db.repCallTask.findFirst.mockResolvedValue(null);
-
-    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, attempt);
-
-    const written = (
-      db.repCallAttempt.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }]
-    )[0].data[0];
-    expect(written?.isDemo).toBe(false);
-  });
-
-  it('et le suit AUSSI quand la fiche appelée est fictive', async () => {
-    const db = prismaStub();
-    db.repCallAttempt.findUnique.mockResolvedValue(null);
-    db.representant.findFirst.mockResolvedValue({ id: 'rep-1', isDemo: true });
-    db.repCallTask.findFirst.mockResolvedValue(null);
-
-    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, attempt);
-
-    const written = (
-      db.repCallAttempt.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }]
-    )[0].data[0];
-    expect(written?.isDemo).toBe(true);
-  });
-
   const relationOf = (db: MockDb): Record<string, unknown> =>
     (db.representantRelationChange.create.mock.calls[0]?.[0] as { data: Record<string, unknown> })
       .data;
 
-  const readyFor = (relationStatus: RepresentantRelation, isDemo = false): MockDb => {
+  const readyFor = (relationStatus: RepresentantRelation): MockDb => {
     const db = prismaStub();
     db.repCallAttempt.findUnique.mockResolvedValue(null);
-    db.representant.findFirst.mockResolvedValue({ id: 'rep-1', isDemo, relationStatus });
+    db.representant.findFirst.mockResolvedValue({ id: 'rep-1', relationStatus });
     db.repCallTask.findFirst.mockResolvedValue(null);
     return db;
   };
@@ -763,7 +702,6 @@ describe('RepCampaignsService : tentatives', () => {
       toStatus: RepresentantRelation.AMBASSADEUR,
       changedById: COMMERCIAL.id,
       source: ChangeSource.WEB,
-      isDemo: false,
     });
   });
 
@@ -841,17 +779,6 @@ describe('RepCampaignsService : tentatives', () => {
     expect(db.representantRelationChange.create).not.toHaveBeenCalled();
   });
 
-  it('la trace suit la fiche fictive, pas le mode en vigueur', async () => {
-    const db = readyFor(RepresentantRelation.INCONNU, true);
-
-    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, {
-      ...attempt,
-      relationStatus: RepresentantRelation.CONTACTE,
-    });
-
-    expect(relationOf(db).isDemo).toBe(true);
-  });
-
   it('exige un commentaire sur « Autre » et refuse une promesse hors contexte', async () => {
     const db = prismaStub();
     const service = build(db);
@@ -903,19 +830,18 @@ describe('RepCampaignsService : numéro suggéré', () => {
     createdAt: date,
     updatedAt: date,
     relationStatus: RepresentantRelation.INCONNU,
-    isDemo: false,
     _count: { prospects: 3 },
   });
 
   /** Une seule mesure `representant.findFirst` sert la fiche appelée ET le numéro suggéré. */
-  const ready = (byPhone: Record<string, unknown> | null, isDemo = false): MockDb => {
+  const ready = (byPhone: Record<string, unknown> | null): MockDb => {
     const db = prismaStub();
     db.repCallAttempt.findUnique.mockResolvedValue(null);
     db.repCallTask.findFirst.mockResolvedValue(null);
     db.representant.findFirst.mockImplementation((args: { where: Record<string, unknown> }) =>
       'phoneE164' in args.where
         ? byPhone
-        : { id: 'rep-1', isDemo, relationStatus: RepresentantRelation.INCONNU },
+        : { id: 'rep-1', relationStatus: RepresentantRelation.INCONNU },
     );
     return db;
   };
@@ -941,7 +867,6 @@ describe('RepCampaignsService : numéro suggéré', () => {
       suggestedById: COMMERCIAL.id,
       sourceAttemptId: attempt.id,
       resolvedRepresentantId: null,
-      isDemo: false,
     });
     expect(result.suggestion?.found).toBe(false);
     expect(result.suggestion?.phoneE164).toBe(SUGGESTED_E164);
@@ -993,7 +918,7 @@ describe('RepCampaignsService : numéro suggéré', () => {
     second.representant.findFirst.mockImplementation((args: { where: Record<string, unknown> }) =>
       'phoneE164' in args.where
         ? null
-        : { id: 'rep-2', isDemo: false, relationStatus: RepresentantRelation.INCONNU },
+        : { id: 'rep-2', relationStatus: RepresentantRelation.INCONNU },
     );
 
     await build(second).recordAttempt(ADMIN, {
@@ -1027,14 +952,6 @@ describe('RepCampaignsService : numéro suggéré', () => {
 
     expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
     expect(db.representantSuggestion.create).not.toHaveBeenCalled();
-  });
-
-  it('la suggestion suit la fiche fictive, pas le mode en vigueur', async () => {
-    const db = ready(null, true);
-
-    await build(db, fakeDemoVisibility(true)).recordAttempt(COMMERCIAL, attempt);
-
-    expect(written(db).isDemo).toBe(true);
   });
 
   it('REFUSE la tentative ENTIÈRE sur un numéro illisible, plutôt que de perdre la piste', async () => {
@@ -1103,7 +1020,6 @@ describe('RepCampaignsService : WhatsApp et profession recueillis pendant l’ap
         ? byPhone
         : {
             id: 'rep-1',
-            isDemo: false,
             relationStatus: RepresentantRelation.INCONNU,
             whatsappStatus: WhatsappStatus.NON_DEMANDE,
             whatsappE164: null,
