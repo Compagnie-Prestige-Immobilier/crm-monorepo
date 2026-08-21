@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { BankCaseAnalyticsService } from './bank-cases-analytics.service.js';
 import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
@@ -28,5 +28,18 @@ describe('byBank', () => {
 
     expect(banque?.banqueId).toBe('bnq-cbao');
     expect(Object.keys(banque ?? {})).not.toContain('bankId');
+  });
+});
+
+describe('overview', () => {
+  it('fige le mode démonstration pour tous les agrégats de la réponse', async () => {
+    const enabled = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
+    const service = new BankCaseAnalyticsService(prismaReturning([]), {
+      enabled,
+    } as never);
+
+    await service.overview({});
+
+    expect(enabled).toHaveBeenCalledTimes(1);
   });
 });

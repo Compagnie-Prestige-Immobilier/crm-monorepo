@@ -354,3 +354,23 @@ describe('filtrage', () => {
     expect(column(sheetOf(workbook, 'Dossiers'), 'Référence')).toEqual([]);
   });
 });
+
+describe('cohérence du mode démonstration', () => {
+  it('utilise le mode fourni pour les lignes et la synthèse sans le relire', async () => {
+    const analytics = stubAnalytics();
+    const enabled = vi.fn().mockResolvedValue(true);
+    const service = new BankCasesExportService(db.asService(), analytics, { enabled } as never);
+    const stream = new PassThrough();
+    const workbook = new ExcelJS.Workbook();
+    const reading = workbook.xlsx.read(stream);
+
+    await service.write({}, stream, false);
+    await reading;
+
+    expect(enabled).not.toHaveBeenCalled();
+    expect(analytics.totals).toHaveBeenCalledWith({}, false);
+    expect(analytics.byStage).toHaveBeenCalledWith({}, false);
+    expect(analytics.byBank).toHaveBeenCalledWith({}, false);
+    expect(analytics.byRejectionReason).toHaveBeenCalledWith({}, false);
+  });
+});
