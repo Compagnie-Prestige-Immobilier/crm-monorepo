@@ -36,7 +36,7 @@ const seededReason = (code: string): Record<string, unknown> | null => {
   };
 };
 
-const prospectRow = (isDemo: boolean): Record<string, unknown> => ({
+const prospectRow = (): Record<string, unknown> => ({
   id: 'p-1',
   phase2Status: Phase2Status.PENDING,
   enrollmentMethod: null,
@@ -44,12 +44,11 @@ const prospectRow = (isDemo: boolean): Record<string, unknown> => ({
   updatedAt: new Date('2026-08-01T09:00:00.000Z'),
   enrollmentCapturedById: null,
   enrollmentCapturedAt: null,
-  isDemo,
 });
 
 let tx: MockTx;
 
-const prepare = (isDemo: boolean): void => {
+const prepare = (): void => {
   tx = {
     callAttempt: {
       findUnique: vi.fn().mockResolvedValue(null),
@@ -65,7 +64,7 @@ const prepare = (isDemo: boolean): void => {
       ),
     },
     prospect: {
-      findFirst: vi.fn().mockResolvedValue(prospectRow(isDemo)),
+      findFirst: vi.fn().mockResolvedValue(prospectRow()),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     scheduledCallback: {
@@ -94,32 +93,11 @@ const writtenRow = (): Record<string, unknown> =>
 
 describe('nature de la tentative écrite', () => {
   beforeEach(() => {
-    prepare(false);
+    prepare();
   });
 
   it('prospect réel : la tentative est réelle', async () => {
     await apply();
-    expect(writtenRow().isDemo).toBe(false);
-  });
-
-  it('prospect de démonstration : la tentative le suit', async () => {
-    prepare(true);
-    await apply();
-    expect(writtenRow().isDemo).toBe(true);
-  });
-
-  it('lit la nature du prospect dans la MÊME lecture que son état', async () => {
-    await apply();
-
-    const select = (
-      tx.prospect.findFirst.mock.calls[0]?.[0] as { select?: Record<string, unknown> }
-    ).select;
-    expect(select?.isDemo).toBe(true);
-  });
-
-  it('ne divulgue pas la nature de la fiche dans l’état rendu', async () => {
-    const result = (await apply()) as { state: Record<string, unknown> };
-    expect(Object.keys(result.state)).not.toContain('isDemo');
   });
 });
 
@@ -131,7 +109,7 @@ const callbackWritten = (): Record<string, unknown> =>
 
 describe('rappel planifié', () => {
   beforeEach(() => {
-    prepare(false);
+    prepare();
   });
 
   it('CALLBACK avec date : le rappel est créé sur la tentative qui l’a promis', async () => {
@@ -142,7 +120,6 @@ describe('rappel planifié', () => {
     expect(row.sourceAttemptId).toBe('att-1');
     expect(row.assignedToId).toBe('com-1');
     expect((row.scheduledAt as Date).toISOString()).toBe(RAPPEL);
-    expect(row.isDemo).toBe(false);
   });
 
   it('rattache le rappel à la campagne quand l’appel en vient', async () => {
@@ -228,7 +205,7 @@ const codeOf = async (run: Promise<unknown>): Promise<string> => {
 
 describe('résolution du motif d’issue', () => {
   beforeEach(() => {
-    prepare(false);
+    prepare();
   });
 
   it('un lot sans reasonCode résout le motif système dont le code égale outcome', async () => {
@@ -257,11 +234,11 @@ describe('résolution du motif d’issue', () => {
         ...(system.requiresComment ? { comment: 'motif' } : {}),
       };
 
-      prepare(false);
+      prepare();
       await apply(saisie);
       const implicite = writtenRow();
 
-      prepare(false);
+      prepare();
       await apply({ ...saisie, reasonCode: system.code });
       expect(writtenRow()).toEqual(implicite);
     },
@@ -307,7 +284,7 @@ describe('résolution du motif d’issue', () => {
 
     expect(await codeOf(apply({ reasonCode: 'BOITE_VOCALE' }))).toBe('PHASE2_COMMENT_REQUIRED');
 
-    prepare(false);
+    prepare();
     tx.callOutcomeReason.findUnique.mockResolvedValue({
       ...seededReason(CallOutcome.UNREACHABLE),
       id: 'reason-BOITE_VOCALE',

@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { IMPORT_COLUMNS } from './import-template.js';
 import {
   IMPORT_MAX_BYTES,
@@ -82,7 +81,7 @@ let service: RepresentantsImportService;
 
 beforeEach(() => {
   db = prismaStub();
-  service = new RepresentantsImportService(db as unknown as PrismaService, fakeDemoVisibility());
+  service = new RepresentantsImportService(db as unknown as PrismaService);
 });
 
 describe('normalizeKey', () => {

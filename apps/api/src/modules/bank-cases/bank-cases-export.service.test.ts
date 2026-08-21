@@ -16,7 +16,7 @@ import {
   STAGE_ENCAISSE,
   STAGE_EN_TRAITEMENT,
 } from './fake-prisma.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
+import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
 
 class ExportFakePrisma extends FakePrisma {
   lastAfter: string | undefined;
@@ -173,7 +173,7 @@ async function build(
   predicate?: (row: { id: string }) => boolean,
 ): Promise<ExcelJS.Workbook> {
   if (predicate) db.filterPredicate = predicate;
-  const service = new BankCasesExportService(db.asService(), stubAnalytics(), fakeDemoVisibility());
+  const service = new BankCasesExportService(db.asService(), stubAnalytics(), fakeWorkspace());
 
   const stream = new PassThrough();
   const workbook = new ExcelJS.Workbook();
@@ -321,7 +321,7 @@ describe('feuille Synthèse', () => {
       rejectionRate: 0,
       meanDelayHours: null,
     });
-    const service = new BankCasesExportService(db.asService(), analytics, fakeDemoVisibility());
+    const service = new BankCasesExportService(db.asService(), analytics, fakeWorkspace());
 
     const stream = new PassThrough();
     const workbook = new ExcelJS.Workbook();
@@ -336,30 +336,6 @@ describe('feuille Synthèse', () => {
 });
 
 describe('filtrage', () => {
-  it('fige le mode démonstration pour les lignes et la synthèse', async () => {
-    const analytics = stubAnalytics();
-    const totals = vi.spyOn(analytics, 'totals');
-    const byStage = vi.spyOn(analytics, 'byStage');
-    const byBank = vi.spyOn(analytics, 'byBank');
-    const byRejectionReason = vi.spyOn(analytics, 'byRejectionReason');
-    const enabled = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
-    const service = new BankCasesExportService(db.asService(), analytics, {
-      enabled,
-    } as never);
-
-    const stream = new PassThrough();
-    const workbook = new ExcelJS.Workbook();
-    const reading = workbook.xlsx.read(stream);
-    await service.write({}, stream);
-    await reading;
-
-    expect(enabled).toHaveBeenCalledTimes(1);
-    expect(totals).toHaveBeenCalledWith({}, false);
-    expect(byStage).toHaveBeenCalledWith({}, false);
-    expect(byBank).toHaveBeenCalledWith({}, false);
-    expect(byRejectionReason).toHaveBeenCalledWith({}, false);
-  });
-
   it('n’exporte QUE les dossiers retenus par le filtre, historique compris', async () => {
     const workbook = await build({ banqueId: 'bnq-bhs' }, (row) => row.id === 'case-002');
 
@@ -382,8 +358,9 @@ describe('filtrage', () => {
 describe('cohérence du mode démonstration', () => {
   it('utilise le mode fourni pour les lignes et la synthèse sans le relire', async () => {
     const analytics = stubAnalytics();
-    const enabled = vi.fn().mockResolvedValue(true);
-    const service = new BankCasesExportService(db.asService(), analytics, { enabled } as never);
+    const espace = fakeWorkspace(true);
+    const current = vi.spyOn(espace, 'current');
+    const service = new BankCasesExportService(db.asService(), analytics, espace);
     const stream = new PassThrough();
     const workbook = new ExcelJS.Workbook();
     const reading = workbook.xlsx.read(stream);
@@ -391,14 +368,17 @@ describe('cohérence du mode démonstration', () => {
     await service.write({}, stream, false);
     await reading;
 
-    expect(enabled).not.toHaveBeenCalled();
+    // Le mode fourni par l'appelant fait autorite : le classeur ne le relit pas.
+    expect(current).not.toHaveBeenCalled();
     // Vu comme un jeu d'espions et non comme un service : `expect(objet.methode)`
     // sur un type de classe detache la methode de son porteur, ce que la regle
     // `unbound-method` refuse a juste titre.
     const espions = analytics as unknown as Record<string, Mock>;
-    expect(espions.totals).toHaveBeenCalledWith({}, false);
-    expect(espions.byStage).toHaveBeenCalledWith({}, false);
-    expect(espions.byBank).toHaveBeenCalledWith({}, false);
-    expect(espions.byRejectionReason).toHaveBeenCalledWith({}, false);
+    // Plus de mode passe en argument : l'espace de travail est ambiant, les
+    // agregats lisent le meme schema que les lignes par construction.
+    expect(espions.totals).toHaveBeenCalledWith({});
+    expect(espions.byStage).toHaveBeenCalledWith({});
+    expect(espions.byBank).toHaveBeenCalledWith({});
+    expect(espions.byRejectionReason).toHaveBeenCalledWith({});
   });
 });

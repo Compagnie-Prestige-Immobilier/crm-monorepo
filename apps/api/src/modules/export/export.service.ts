@@ -16,7 +16,7 @@ import { EXPORT_INCLUDE, PROSPECT_COLUMNS, cellValue } from './columns.js';
 import type { ExportRow } from './columns.js';
 import { CONSOLIDATED_SHEET, ExportMode } from './dto.js';
 import { markWorkbook, writeDemoWarningRow } from './demo-marking.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { CPI_BURGUNDY_ARGB } from '../../common/brand.js';
 import {
   ENROLLMENT_METHOD_TOKENS,
@@ -65,7 +65,7 @@ export class ExportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly analytics: AnalyticsService,
-    private readonly demo: DemoVisibilityService,
+    private readonly demo: WorkspaceContext,
   ) {}
 
   /** Banque et Syndicat sont des listes, pas du texte libre : leur croisement est le segment BDD. */
@@ -171,7 +171,7 @@ export class ExportService {
   ): Promise<void> {
     // Lu UNE fois pour tout le classeur : une bascule en cours d'export marquerait
     // une feuille et pas l'autre.
-    const demoEnabled = await this.demo.enabled();
+    const demoEnabled = this.demo.current() === 'demo';
 
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
     markWorkbook(workbook, demoEnabled);
@@ -191,7 +191,7 @@ export class ExportService {
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
     demoEnabled: boolean,
   ): Promise<void> {
-    const where = buildProspectWhere(user, filter, demoEnabled);
+    const where = buildProspectWhere(user, filter);
     const { rows: total, representants } = await this.writeProspectSheet(
       workbook,
       'Prospects',
@@ -314,7 +314,7 @@ export class ExportService {
     await this.writeProspectSheet(
       workbook,
       CONSOLIDATED_SHEET,
-      buildProspectWhere(user, filterForSegment(filter, undefined), demoEnabled),
+      buildProspectWhere(user, filterForSegment(filter, undefined)),
       demoEnabled,
     );
 
@@ -322,7 +322,7 @@ export class ExportService {
       await this.writeProspectSheet(
         workbook,
         segment,
-        buildProspectWhere(user, filterForSegment(filter, segment), demoEnabled),
+        buildProspectWhere(user, filterForSegment(filter, segment)),
         demoEnabled,
       );
     }

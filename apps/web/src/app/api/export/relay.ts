@@ -14,7 +14,7 @@ import {
   toAuthTokens,
 } from '@/lib/api/server';
 import { rotateRefreshTokenDetailed } from '@/lib/api/tokens';
-import { DEMO_MODE_HEADER, isDemoResponse, withDemoSuffix } from '@/lib/demo-marking';
+import { DEMO_MODE_HEADER, isDemoExport, withDemoSuffix } from '@/lib/demo-marking';
 import { getSession } from '@/lib/session';
 import type { Role } from '@/lib/types';
 
@@ -101,7 +101,7 @@ export async function relayXlsx(options: XlsxRelayOptions): Promise<Response> {
     );
   }
 
-  const demo = isDemoResponse(upstream.headers);
+  const demo = isDemoExport(upstream.headers);
 
   return new Response(upstream.body, {
     status: 200,

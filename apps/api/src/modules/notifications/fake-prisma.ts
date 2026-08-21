@@ -35,7 +35,6 @@ export interface UserRow {
   isActive: boolean;
   deletedAt: Date | null;
   departementId: string | null;
-  isDemo: boolean;
 }
 
 export interface NotificationRow {
@@ -60,7 +59,6 @@ export interface NotificationRow {
   createdAt: Date;
   updatedAt: Date;
   dispatchClaim: string | null;
-  isDemo: boolean;
 }
 
 export interface DeliveryRow {
@@ -76,7 +74,6 @@ export interface DeliveryRow {
   reminderKey: string | null;
   period: string | null;
   createdAt: Date;
-  isDemo: boolean;
 }
 
 export interface CallTaskRow {
@@ -85,7 +82,6 @@ export interface CallTaskRow {
   status: string;
   isActive: boolean;
   campaignStatus: string;
-  isDemo: boolean;
 }
 
 export interface ScheduledCallbackRow {
@@ -94,7 +90,6 @@ export interface ScheduledCallbackRow {
   status: string;
   scheduledAt: Date;
   updatedAt: Date;
-  isDemo: boolean;
 }
 
 export interface BankCaseRow {
@@ -103,7 +98,6 @@ export interface BankCaseRow {
   createdAt: Date;
   lastTransitionAt: Date | null;
   deletedAt: Date | null;
-  isDemo: boolean;
 }
 
 export const ADMIN: UserRow = {
@@ -113,7 +107,6 @@ export const ADMIN: UserRow = {
   email: 'admin@cpi.sn',
   isActive: true,
   deletedAt: null,
-  isDemo: false,
   departementId: null,
 };
 
@@ -270,7 +263,6 @@ export class FakePrisma {
       isActive: row.isActive ?? true,
       deletedAt: row.deletedAt ?? null,
       departementId: row.departementId ?? null,
-      isDemo: row.isDemo ?? false,
       id: row.id,
     };
     this.users.push(user);
@@ -284,7 +276,6 @@ export class FakePrisma {
       status: row.status ?? 'OPEN',
       isActive: row.isActive ?? true,
       campaignStatus: row.campaignStatus ?? 'ACTIVE',
-      isDemo: row.isDemo ?? false,
     };
     this.callTasks.push(task);
     return task;
@@ -297,7 +288,6 @@ export class FakePrisma {
       status: row.status ?? 'OPEN',
       isActive: row.isActive ?? true,
       campaignStatus: row.campaignStatus ?? 'ACTIVE',
-      isDemo: row.isDemo ?? false,
     };
     this.repCallTasks.push(task);
     return task;
@@ -312,7 +302,6 @@ export class FakePrisma {
       status: row.status ?? 'PENDING',
       scheduledAt: row.scheduledAt,
       updatedAt: row.updatedAt ?? row.scheduledAt,
-      isDemo: row.isDemo ?? false,
     };
     this.scheduledCallbacks.push(callback);
     return callback;
@@ -325,7 +314,6 @@ export class FakePrisma {
       createdAt: row.createdAt ?? new Date(),
       lastTransitionAt: row.lastTransitionAt ?? null,
       deletedAt: row.deletedAt ?? null,
-      isDemo: row.isDemo ?? false,
     };
     this.bankCases.push(bankCase);
     return bankCase;
@@ -380,7 +368,6 @@ export class FakePrisma {
           createdAt: this.clock(),
           updatedAt: this.clock(),
           dispatchClaim: (data.dispatchClaim as string | null | undefined) ?? null,
-          isDemo: data.isDemo === true,
         };
 
         const nested = data.deliveries as
@@ -405,7 +392,6 @@ export class FakePrisma {
             reminderKey: (seed.reminderKey as string | null | undefined) ?? null,
             period: (seed.period as string | null | undefined) ?? null,
             createdAt: new Date(),
-            isDemo: seed.isDemo === true,
           };
 
           const clash =

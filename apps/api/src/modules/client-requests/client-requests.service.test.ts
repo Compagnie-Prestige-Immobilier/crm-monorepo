@@ -11,7 +11,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { ClientRequestsService } from './client-requests.service.js';
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -64,7 +63,6 @@ const requestRow = (over: Record<string, unknown> = {}): Record<string, unknown>
   createdProspectId: null,
   createdAt: date,
   updatedAt: date,
-  isDemo: false,
   ...over,
 });
 
@@ -99,7 +97,6 @@ beforeEach(() => {
   service = new ClientRequestsService(
     db as unknown as PrismaService,
     notify as unknown as NotificationsService,
-    fakeDemoVisibility(),
   );
 });
 
@@ -120,7 +117,6 @@ describe('dépôt d’une demande', () => {
     expect(args.where).toMatchObject({
       phoneE164: '+221771234567',
       deletedAt: null,
-      isDemo: false,
     });
   });
 
@@ -298,32 +294,6 @@ describe('approbation', () => {
     await expect(service.reject(ADMIN, 'req-1', { reason: 'Doublon' })).rejects.toMatchObject({
       response: { code: 'CLIENT_REQUEST_ALREADY_REVIEWED' },
     });
-  });
-
-  it('PROPAGE isDemo : une demande fictive ne doit pas créer un prospect réel', async () => {
-    db.clientCreationRequest.findFirst.mockResolvedValue(requestRow({ isDemo: true }));
-    await service.approve(ADMIN, 'req-1', body);
-
-    const args = (db.prospect.create.mock.calls[0] as [{ data: Record<string, unknown> }])[0];
-    expect(args.data.isDemo).toBe(true);
-  });
-
-  it('rattache une demande fictive à un représentant fictif sans relire le mode', async () => {
-    const enabled = vi.fn().mockResolvedValue(true);
-    service = new ClientRequestsService(
-      db as unknown as PrismaService,
-      notify as unknown as NotificationsService,
-      { enabled } as never,
-    );
-    db.clientCreationRequest.findFirst.mockResolvedValue(requestRow({ isDemo: true }));
-
-    await service.approve(ADMIN, 'req-1', body);
-
-    const args = (db.representant.findFirst.mock.calls[0] as [
-      { where: Record<string, unknown> },
-    ])[0];
-    expect(args.where).toMatchObject({ id: 'rep-1', isDemo: true });
-    expect(enabled).toHaveBeenCalledTimes(1);
   });
 
   it('relit le téléphone JUSTE AVANT d’écrire', async () => {

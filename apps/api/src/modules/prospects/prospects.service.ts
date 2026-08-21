@@ -26,7 +26,6 @@ import type {
   ReassignResultDto,
   UpdateProspectDto,
 } from './dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 
 export const PROSPECT_INCLUDE = {
   // `shortName` en plus de `name` : c'est lui, et non le nom complet, qui porte
@@ -98,17 +97,14 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
 
 @Injectable()
 export class ProspectsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async list(user: AuthenticatedUser, query: ProspectQueryDto): Promise<ProspectListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
     // Cloisonnement inclus dans buildProspectWhere : la liste, les agrégats et
     // l'export partagent la même clause, donc la même portée.
-    const where = buildProspectWhere(user, query, await this.demo.enabled());
+    const where = buildProspectWhere(user, query);
 
     const sortBy = query.sortBy ?? ProspectSortField.CLIENT_CREATED_AT;
     const sortOrder = query.sortOrder ?? SortOrder.DESC;
@@ -159,9 +155,7 @@ export class ProspectsService {
 
     await this.assertIdAvailable(user, id);
     // Le rattachement est facultatif : une fiche Grand Public n'en a aucun.
-    const representant = input.representantId
-      ? await this.assertRepresentantUsable(user, input.representantId)
-      : null;
+    if (input.representantId) await this.assertRepresentantUsable(user, input.representantId);
     await this.assertPhoneFree(phoneE164);
 
     const created = await this.prisma.prospect.create({
@@ -183,17 +177,7 @@ export class ProspectsService {
         ...(input.canalProvenanceId === undefined
           ? {}
           : { canalProvenanceId: input.canalProvenanceId }),
-        // DEUX SOURCES, ET IL FAUT LES DEUX.
-        //
-        // Le mode allumé d'abord : une fiche saisie pendant une démonstration
-        // est une fiche de démonstration, sans quoi elle survit à l'extinction
-        // et ressort dans un export transmis au siège.
-        //
-        // Le représentant ensuite : la liste des prospects AFFICHE son
-        // représentant. Un prospect visible accroché à une fiche de
-        // rattachement filtrée montrerait un représentant que l'annuaire ne
-        // connaît pas, et la paire se désolidariserait à l'extinction.
-        isDemo: (await this.demo.enabledForWrite()) || (representant?.isDemo ?? false),
+
         ...(input.statut ? { statut: input.statut } : {}),
         clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
       },
@@ -354,9 +338,7 @@ export class ProspectsService {
     });
     if (!rows.length) return { updated: 0, prospectIds: [] };
 
-    const representant = input.representantId
-      ? await this.assertRepresentantUsable(user, input.representantId)
-      : null;
+    if (input.representantId) await this.assertRepresentantUsable(user, input.representantId);
     if (input.commercialId) {
       const owner = await this.prisma.user.findFirst({
         where: { id: input.commercialId, deletedAt: null },
@@ -376,9 +358,6 @@ export class ProspectsService {
       data: {
         ...(input.representantId ? { representantId: input.representantId } : {}),
         ...(input.commercialId ? { createdById: input.commercialId } : {}),
-        ...(representant && ((await this.demo.enabledForWrite()) || representant.isDemo)
-          ? { isDemo: true }
-          : {}),
         rev: { increment: 1 },
       },
     });
@@ -394,13 +373,10 @@ export class ProspectsService {
   private async assertRepresentantUsable(
     user: AuthenticatedUser,
     representantId: string,
-  ): Promise<{ id: string; createdById: string; isDemo: boolean }> {
+  ): Promise<{ id: string; createdById: string }> {
     const representant = await this.prisma.representant.findFirst({
       where: { id: representantId, deletedAt: null },
-      // `isDemo` est lu ICI et non relu ailleurs : c'est la fiche de
-      // rattachement qui décide de la nature du prospect, et elle est déjà
-      // chargée à cet endroit.
-      select: { id: true, createdById: true, isDemo: true },
+      select: { id: true, createdById: true },
     });
     if (!representant) {
       throw new NotFoundException({

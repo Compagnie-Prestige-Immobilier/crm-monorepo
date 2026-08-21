@@ -109,7 +109,7 @@ const ADMISES: readonly string[] = [
   'AuthController.me',
   'CallOutcomeReasonsController.list',
   'CallbacksController.list',
-  'DemoController.status',
+  'AuthController.switchWorkspace',
   'NotificationsController.mine',
   'NotificationsController.markRead',
 
@@ -160,7 +160,7 @@ const SOCLE: readonly string[] = [
   'AuthController.me',
   'AuthController.refresh',
   'CallOutcomeReasonsController.list',
-  'DemoController.status',
+  'AuthController.switchWorkspace',
   'HealthController.live',
   'HealthController.ready',
   'NotificationsController.markRead',

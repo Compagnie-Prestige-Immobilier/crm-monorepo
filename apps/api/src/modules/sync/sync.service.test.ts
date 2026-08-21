@@ -11,7 +11,6 @@ import { SyncService } from './sync.service.js';
 import { FakePrisma } from './fake-prisma.js';
 import { SyncEntity, SyncOp, SyncOpStatus, dependencyKeyOf } from './dto.js';
 import type { SyncOperationDto, SyncPushDto } from './dto.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const alice: AuthenticatedUser = {
   id: 'com-alice',
@@ -41,8 +40,7 @@ beforeEach(() => {
     prisma,
     new SyncBatchStore(prisma),
     new Phase2SyncService(),
-    fakeDemoVisibility(),
-    new VisitesService(prisma, fakeDemoVisibility()),
+    new VisitesService(prisma),
   );
 });
 
@@ -281,7 +279,6 @@ describe('nature du prospect lors d’un rattachement', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
-      isDemo: false,
     });
     db.representants.set(REP_B, {
       id: REP_B,
@@ -295,7 +292,6 @@ describe('nature du prospect lors d’un rattachement', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
-      isDemo: true,
     });
     db.prospects.set('prospect-1', {
       id: 'prospect-1',
@@ -312,7 +308,6 @@ describe('nature du prospect lors d’un rattachement', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
-      isDemo: false,
     });
 
     const operation: SyncOperationDto = {
@@ -329,7 +324,6 @@ describe('nature du prospect lors d’un rattachement', () => {
     const result = await sync.push(alice, batch([operation], 'demo-reassignment'));
 
     expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
-    expect(db.prospects.get('prospect-1')?.isDemo).toBe(true);
   });
 });
 
@@ -534,7 +528,6 @@ describe('une campagne ouvre l’écriture sur la fiche d’un autre', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
-      isDemo: false,
     });
   }
 
@@ -571,7 +564,6 @@ describe('une campagne ouvre l’écriture sur la fiche d’un autre', () => {
       prospectId: PROSPECT_DE_BOB,
       assignedToId: alice.id,
       isActive: true,
-      isDemo: false,
     });
 
     const result = await sync.push(alice, batch([qualifier()]));
@@ -586,7 +578,6 @@ describe('une campagne ouvre l’écriture sur la fiche d’un autre', () => {
       prospectId: PROSPECT_DE_BOB,
       assignedToId: 'com-carine',
       isActive: true,
-      isDemo: false,
     });
 
     const result = await sync.push(alice, batch([qualifier()]));
@@ -601,7 +592,6 @@ describe('une campagne ouvre l’écriture sur la fiche d’un autre', () => {
       prospectId: PROSPECT_DE_BOB,
       assignedToId: alice.id,
       isActive: false,
-      isDemo: false,
     });
 
     const result = await sync.push(alice, batch([qualifier()]));
@@ -653,15 +643,12 @@ describe('mode démonstration allumé, la remontée hors ligne reste du travail 
       prisma,
       new SyncBatchStore(prisma),
       new Phase2SyncService(),
-      fakeDemoVisibility(true),
-      new VisitesService(prisma, fakeDemoVisibility(true)),
+      new VisitesService(prisma),
     );
   });
 
   it('un représentant remonté n’est PAS marqué de démonstration', async () => {
     await demoSync.push(alice, batch([createRep(REP_A, '77 123 45 67')]));
-
-    expect(demoDb.representants.get(REP_A)?.isDemo ?? false).toBe(false);
   });
 
   it('un prospect remonté n’est PAS marqué de démonstration', async () => {
@@ -673,116 +660,6 @@ describe('mode démonstration allumé, la remontée hors ligne reste du travail 
         createProspect(prospectId, REP_A, '78 222 33 44', 1),
       ]),
     );
-
-    expect(demoDb.prospects.get(prospectId)?.isDemo ?? false).toBe(false);
-  });
-});
-
-describe('la remontée d’un COMPTE de démonstration écrit du fictif', () => {
-  const animateur: AuthenticatedUser = { ...alice, id: 'demo-awa', username: 'demo.awa' };
-  const PROSPECT = '0198f000-0000-7000-8000-000000000009';
-
-  beforeEach(() => {
-    db.addDemoUser(animateur.id);
-  });
-
-  it('LE REPRÉSENTANT SAISI PAR L’ANIMATEUR EST FICTIF', async () => {
-    await sync.push(animateur, batch([createRep(REP_A, '77 123 45 67')]));
-
-    expect(db.representants.get(REP_A)?.isDemo).toBe(true);
-  });
-
-  it('et il est INSCRIT AU REGISTRE, sans quoi la purge resterait bloquée', async () => {
-    await sync.push(animateur, batch([createRep(REP_A, '77 123 45 67')]));
-
-    expect(db.demoEntities).toContainEqual(
-      expect.objectContaining({ entityType: 'representant', entityId: REP_A }),
-    );
-  });
-
-  it('le prospect suit, et part du registre AVANT son représentant', async () => {
-    await sync.push(
-      animateur,
-      batch([
-        createRep(REP_A, '77 123 45 67', 0),
-        createProspect(PROSPECT, REP_A, '78 222 33 44', 1),
-      ]),
-    );
-
-    expect(db.prospects.get(PROSPECT)?.isDemo).toBe(true);
-
-    const rang = (entityId: string): number =>
-      db.demoEntities.find((row) => row.entityId === entityId)?.sequence ?? -1;
-    expect(rang(PROSPECT)).toBeGreaterThan(rang(REP_A));
-  });
-
-  it('UN VRAI COMMERCIAL rattaché à un représentant FICTIF écrit du fictif', async () => {
-    await sync.push(animateur, batch([createRep(REP_A, '77 123 45 67')]));
-
-    const admin: AuthenticatedUser = { ...alice, id: 'com-admin', role: Role.ADMIN };
-    await sync.push(admin, batch([createProspect(PROSPECT, REP_A, '78 222 33 44', 0)]));
-
-    expect(db.prospects.get(PROSPECT)?.isDemo).toBe(true);
-  });
-
-  it('un compte RÉEL sur un représentant RÉEL n’écrit rien de fictif', async () => {
-    await sync.push(
-      alice,
-      batch([
-        createRep(REP_B, '77 999 88 77', 0),
-        createProspect(PROSPECT, REP_B, '78 222 33 44', 1),
-      ]),
-    );
-
-    expect(db.representants.get(REP_B)?.isDemo ?? false).toBe(false);
-    expect(db.prospects.get(PROSPECT)?.isDemo ?? false).toBe(false);
-    expect(db.demoEntities).toHaveLength(0);
-  });
-});
-
-describe('autorité d’un lot', () => {
-  const basculerApresLePremierGroupe = (mute: () => void): void => {
-    const original = db.$transaction;
-    let groupes = 0;
-    db.$transaction = async <T>(fn: (tx: FakePrisma) => Promise<T>): Promise<T> => {
-      const outcome = await original(fn);
-      groupes += 1;
-      if (groupes === 1) mute();
-      return outcome;
-    };
-  };
-
-  const deuxGroupes = (): SyncPushDto =>
-    batch([createRep(REP_A, '+221770000001', 0), createRep(REP_B, '+221770000002', 1)], opId());
-
-  it('LES DEUX GROUPES ÉCRIVENT LA MÊME NATURE, même si l’auteur bascule au milieu', async () => {
-    db.addUser('com-alice', { role: Role.COMMERCIAL, isDemo: false });
-    basculerApresLePremierGroupe(() => {
-      db.addUser('com-alice', { role: Role.COMMERCIAL, isDemo: true });
-    });
-
-    await sync.push(alice, deuxGroupes());
-
-    expect(db.transactionCount).toBeGreaterThanOrEqual(2);
-    const natures = [...db.representants.values()].map((row) => row.isDemo);
-    expect(natures).toHaveLength(2);
-    expect(new Set(natures).size).toBe(1);
-    expect(natures[0]).toBe(false);
-  });
-
-  it('l’autorité est lue EN BASE, une seule fois, et non reprise du jeton', async () => {
-    let lectures = 0;
-    const original = db.user.findUnique;
-    db.user.findUnique = (args: { where: { id: string } }) => {
-      lectures += 1;
-      return original(args);
-    };
-    db.addUser('com-alice', { role: Role.COMMERCIAL, isDemo: true });
-
-    await sync.push(alice, deuxGroupes());
-
-    expect(lectures).toBe(1);
-    expect([...db.representants.values()].every((row) => row.isDemo)).toBe(true);
   });
 });
 
@@ -901,15 +778,4 @@ describe('visite (registre d’accueil, hors ligne)', () => {
     expect(result.body.results[0]?.errorCode).toBe('OP_NOT_SUPPORTED');
   });
 
-  it('inscrite par un compte de démonstration, elle est fictive ET inscrite au registre', async () => {
-    const animateur: AuthenticatedUser = { ...accueil, id: 'demo-accueil' };
-    db.addUser(animateur.id, { role: Role.ACCUEIL, isDemo: true });
-
-    await sync.push(animateur, batch([createVisite(VISITE_A)]));
-
-    expect(db.visites.get(VISITE_A)?.isDemo).toBe(true);
-    expect(db.demoEntities).toContainEqual(
-      expect.objectContaining({ entityType: 'visite', entityId: VISITE_A }),
-    );
-  });
 });

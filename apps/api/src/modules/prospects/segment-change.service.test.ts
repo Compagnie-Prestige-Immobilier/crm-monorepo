@@ -143,15 +143,13 @@ describe('la fiche et sa trace partent ENSEMBLE', () => {
 
   it('la trace suit la NATURE de la fiche, pas celle du moment', async () => {
     const prisma = new FakeSegmentPrisma();
-    prisma.addProspect({ id: 'p-1', isDemo: true, banqueId: BANQUE_BHS.id });
+    prisma.addProspect({ id: 'p-1', banqueId: BANQUE_BHS.id });
 
     await service(prisma).migrate(admin, 'p-1', {
       banqueId: BANQUE_CBAO.id,
       reason: 'Fiche de démonstration, bascule montrée à l’écran.',
       expectedRev: 1,
     });
-
-    expect(prisma.segmentChanges[0]?.isDemo).toBe(true);
   });
 });
 

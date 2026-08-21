@@ -5,17 +5,14 @@ import type { AuthenticatedUser } from './decorators/current-user.decorator.js';
 import { isAdmin, readScope, readsEveryone } from './scope.js';
 import { tryNormalizePhone } from './phone.js';
 import type { ProspectFilterDto } from './dto/prospect-filter.dto.js';
-import { demoScope } from '../prisma/demo-visibility.js';
 import { inclusiveDateFrom, inclusiveDateTo } from './date-bounds.js';
 
 export function buildProspectWhere(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   filter: ProspectFilterDto,
-  demoEnabled: boolean,
 ): Prisma.ProspectWhereInput {
   const where: Prisma.ProspectWhereInput = {
     ...readScope(user),
-    ...demoScope(demoEnabled),
   };
 
   if (filter.commercialId) {

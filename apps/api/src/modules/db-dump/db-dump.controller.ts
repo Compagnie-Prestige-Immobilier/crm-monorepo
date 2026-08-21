@@ -1,4 +1,12 @@
-import { Controller, Get, HttpCode, Post, Res, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
@@ -31,6 +39,15 @@ import { DatabaseDumpJobDto } from './dto.js';
 export class DbDumpController {
   constructor(private readonly dumps: DbDumpService) {}
 
+  private assertPublicWorkspace(user: AuthenticatedUser): void {
+    if (user.workspace === 'demo') {
+      throw new ForbiddenException({
+        code: 'DEMO_WORKSPACE_EXTERNAL_OPERATION_FORBIDDEN',
+        message: 'Quittez l’espace démo pour exporter la base.',
+      });
+    }
+  }
+
   @Get()
   @ApiOperation({
     operationId: 'getDatabaseDump',
@@ -42,7 +59,8 @@ export class DbDumpController {
       'plutôt que de bloquer indéfiniment toute nouvelle demande.',
   })
   @ApiResponse({ status: 200, type: DatabaseDumpJobDto })
-  state(): Promise<DatabaseDumpJobDto> {
+  state(@CurrentUser() user: AuthenticatedUser): Promise<DatabaseDumpJobDto> {
+    this.assertPublicWorkspace(user);
     return this.dumps.state();
   }
 
@@ -58,18 +76,16 @@ export class DbDumpController {
       'e-mail, SANS aucun lien : le fichier ne se télécharge que dans une session ' +
       'authentifiée, par `GET admin/database-dump/download`. Un export déjà en ' +
       'cours est renvoyé tel quel, aucun second `pg_dump` n’est lancé. Refusé ' +
-      'pendant une démonstration, un export y mêlerait des lignes fictives aux ' +
-      'vraies. Le fichier est détruit dès son téléchargement, et de toute façon à ' +
+      'dans l’espace démo. Le fichier est détruit dès son téléchargement, et de toute façon à ' +
       'son échéance.',
   })
   @ApiResponse({ status: 202, type: DatabaseDumpJobDto })
   @ApiErrors({
-    409:
-      'DEMO_MODE_READ_ONLY · le mode démonstration est actif. ' +
-      'DATABASE_DUMP_IN_PROGRESS · un export démarre à l’instant même.',
+    409: 'DATABASE_DUMP_IN_PROGRESS · un export démarre à l’instant même.',
     429: true,
   })
   request(@CurrentUser() user: AuthenticatedUser): Promise<DatabaseDumpJobDto> {
+    this.assertPublicWorkspace(user);
     return this.dumps.request(user);
   }
 
@@ -94,6 +110,7 @@ export class DbDumpController {
     content: { 'application/json': { schema: { $ref: getSchemaPath(ApiErrorDto) } } },
   })
   download(@CurrentUser() user: AuthenticatedUser, @Res() reply: FastifyReply): Promise<void> {
+    this.assertPublicWorkspace(user);
     return this.dumps.download(user, reply);
   }
 }

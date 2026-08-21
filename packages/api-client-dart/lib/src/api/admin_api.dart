@@ -410,7 +410,7 @@ class AdminApi {
   }
 
   /// Demande un export intégral de la base (schéma et données).
-  /// Rend IMMÉDIATEMENT, avec un identifiant et un état ; &#x60;pg_dump&#x60; tourne en arrière-plan. Un avis part ensuite dans la boîte de réception et par e-mail, SANS aucun lien : le fichier ne se télécharge que dans une session authentifiée, par &#x60;GET admin/database-dump/download&#x60;. Un export déjà en cours est renvoyé tel quel, aucun second &#x60;pg_dump&#x60; n’est lancé. Refusé pendant une démonstration, un export y mêlerait des lignes fictives aux vraies. Le fichier est détruit dès son téléchargement, et de toute façon à son échéance.
+  /// Rend IMMÉDIATEMENT, avec un identifiant et un état ; &#x60;pg_dump&#x60; tourne en arrière-plan. Un avis part ensuite dans la boîte de réception et par e-mail, SANS aucun lien : le fichier ne se télécharge que dans une session authentifiée, par &#x60;GET admin/database-dump/download&#x60;. Un export déjà en cours est renvoyé tel quel, aucun second &#x60;pg_dump&#x60; n’est lancé. Refusé dans l’espace démo. Le fichier est détruit dès son téléchargement, et de toute façon à son échéance.
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation

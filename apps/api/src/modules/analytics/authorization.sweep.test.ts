@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { rendered } from './fake-analytics-prisma.js';
 import { AnalyticsController } from './analytics.controller.js';
 import { AnalyticsService } from './analytics.service.js';
@@ -81,14 +80,13 @@ function tracingPrisma(): { service: PrismaService; traces: () => string[] } {
 }
 
 function controllerFor(prisma: PrismaService): AnalyticsController {
-  const demo = fakeDemoVisibility();
   return new AnalyticsController(
-    new AnalyticsService(prisma, demo),
-    new FunnelService(prisma, demo),
-    new PilotageService(prisma, demo),
-    new PortfolioService(prisma, demo),
-    new QualityService(prisma, demo),
-    new SegmentConversionsService(prisma, demo),
+    new AnalyticsService(prisma),
+    new FunnelService(prisma),
+    new PilotageService(prisma),
+    new PortfolioService(prisma),
+    new QualityService(prisma),
+    new SegmentConversionsService(prisma),
   );
 }
 

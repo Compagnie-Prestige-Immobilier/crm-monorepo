@@ -2,7 +2,6 @@ import { Role } from '@crm/database';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { SupervisionService } from './supervision.service.js';
 
 interface HeartbeatRow {
@@ -27,7 +26,7 @@ const prismaWith = (
     agentHeartbeat: { findMany: vi.fn().mockResolvedValue(heartbeats) },
   };
   return {
-    service: new SupervisionService(prisma as unknown as PrismaService, fakeDemoVisibility()),
+    service: new SupervisionService(prisma as unknown as PrismaService),
     findMany,
   };
 };

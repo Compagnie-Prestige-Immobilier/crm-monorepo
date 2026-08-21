@@ -7,7 +7,6 @@ import { v7 as uuidv7 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { IMPORT_COLUMNS } from './import-template.js';
 import type {
   ImportQueryDto,
@@ -68,10 +67,7 @@ interface ParsedRow {
 export class RepresentantsImportService {
   private readonly logger = new Logger(RepresentantsImportService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async import(
     user: AuthenticatedUser,
@@ -236,17 +232,6 @@ export class RepresentantsImportService {
     return result.count;
   }
 
-  /**
-   * Téléphones déjà pris, lus par tranches pour ne pas dépasser la taille de
-   * requête.
-   *
-   * LECTURE GLOBALE délibérée, sans `demoScope` : l'index unique partiel
-   * `representants_phone_e164_active_key` est global, il ne connaît pas le mode
-   * démonstration. Filtré, ce contrôle déclarait libres des numéros tenus par
-   * des fiches de démonstration, `skipDuplicates` les écartait ensuite en
-   * silence, et le rapport annonçait « 40 créés » pour 38 écrits. Même
-   * raisonnement que `assertPhoneFree`.
-   */
   private async existingPhones(phones: readonly string[]): Promise<Set<string>> {
     const found = new Set<string>();
     const CHUNK = 1_000;

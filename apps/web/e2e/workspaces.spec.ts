@@ -7,45 +7,12 @@ import {
   adminApi,
   BANK_CLIENT_PHONE,
   BANQUIER,
-  enableDemo,
   ensureWorkspaceFixtures,
   FIXTURE_PASSWORD,
-  purgeDemo,
   REPRESENTANT,
 } from './fixtures';
 
-/**
- * Parcours de bout en bout des trois surfaces livrées : mode démonstration,
- * campagnes de phase 2, dossiers bancaires.
- *
- * UN SEUL fichier, en `describe.serial`, et c'est nécessaire : ces parcours
- * partagent un ÉTAT DE BASE DE DONNÉES. Les campagnes ont besoin de prospects
- * en attente, les dossiers bancaires de clients dont la méthode d'enrôlement
- * est obtenue, et c'est précisément le mode démonstration qui les crée. Répartis
- * en trois fichiers, Playwright les jouerait dans l'ordre alphabétique, donc
- * les dossiers AVANT l'ensemencement, et la suite échouerait pour une raison
- * qui n'a rien à voir avec le code testé.
- *
- * L'ordre est donc : on ensemence, on éprouve, on nettoie. Le nettoyage final
- * n'est pas une politesse, c'est le dernier parcours à vérifier, celui de la
- * désactivation.
- *
- * La CONNEXION n'est jouée qu'une fois, par `auth.setup.ts`, et son état est
- * relu sur disque : l'API limite les connexions à dix par minute et par IP, et
- * une suite qui se reconnecte par test épuise le quota avant d'avoir rien
- * prouvé.
- */
-
 test.describe.configure({ mode: 'serial' });
-
-/**
- * Les données viennent d'un AMORÇAGE RÉEL, plus du mode démonstration.
- *
- * Voir l'en-tête de `fixtures.ts` : le mode démonstration met la plateforme en
- * lecture seule, et la moitié de ce fichier écrit. Les deux ne peuvent pas
- * coexister. Le mode démonstration reste éprouvé ici — mais pour lui-même, en
- * ouverture et en clôture, et il est purgé entre les deux.
- */
 test.beforeAll(async () => {
   test.setTimeout(180_000);
   await ensureWorkspaceFixtures();
@@ -96,67 +63,25 @@ async function expectNoErrorState(page: Page): Promise<void> {
   ).toHaveCount(0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. Mode démonstration : activation
-// ─────────────────────────────────────────────────────────────────────────────
-
-test('le mode démonstration s’active et pose un bandeau sur tous les écrans', async ({ page }) => {
+test('l’espace démo se réinitialise et reste isolé', async ({ page }) => {
   await page.goto('/parametres');
   await expect(page.getByRole('heading', { name: 'Paramètres', level: 1 })).toBeVisible();
 
-  const enable = page.getByRole('button', { name: 'Activer le mode démonstration' });
-  const disable = page.getByRole('button', {
-    name: 'Retirer les données de démonstration',
+  await page.getByRole('button', { name: 'Réinitialiser l’espace démo' }).click();
+  await expect(page.getByText('Espace démo réinitialisé.')).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole('button', { name: /^Compte de / }).click();
+  await page.getByRole('menuitem', { name: 'Ouvrir l’espace démo' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Espace démo' })).toBeVisible({
+    timeout: 30_000,
   });
 
-  // Idempotent côté API : si un jeu traîne d'une exécution précédente, on part
-  // de l'état propre plutôt que d'échouer sur une précondition.
-  if (await disable.isVisible().catch(() => false)) {
-    await disable.click();
-    await page.getByRole('checkbox').check();
-    await page.getByRole('button', { name: 'Supprimer définitivement' }).click();
-    await expect(enable).toBeVisible({ timeout: 60_000 });
-  }
-
-  await expect(enable).toBeVisible();
-  await enable.click();
-
-  /**
-   * L'activation passe par une CONFIRMATION, et le parcours doit la traverser.
-   *
-   * Le bouton de la carte n'appelle plus l'API : il ouvre un dialogue qui nomme
-   * ce qui va être créé et prévient que toute la plateforme passe en lecture
-   * seule. Le parcours cliquait donc « Activer » puis attendait quatre-vingt-dix
-   * secondes un bouton qui ne pouvait pas apparaître, personne n'ayant confirmé.
-   */
-  await page.getByRole('button', { name: 'Créer le jeu de démonstration' }).click();
-
-  // Le succès n'est PAS annoncé avant la réponse du serveur : le bouton part en
-  // état occupé, et c'est l'apparition du bouton inverse qui prouve que
-  // l'opération a abouti.
-  await expect(disable).toBeVisible({ timeout: 90_000 });
-
-  // Le bandeau global est rendu par le layout SERVEUR : il doit apparaître sans
-  // que l'utilisateur recharge, et sur un écran qui n'est pas celui de la
-  // bascule.
-  const banner = page.getByRole('status').filter({ hasText: 'Mode démonstration actif' });
-  await expect(banner).toBeVisible();
-
   await page.goto('/prospects');
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Mode démonstration actif' }),
-  ).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Espace démo' })).toBeVisible();
 
-  /**
-   * PURGE ICI, et pas à la fin du fichier.
-   *
-   * Tant que le mode est actif, toute la plateforme refuse l'écriture : les
-   * parcours suivants créent des campagnes et des dossiers, et prendraient un
-   * `409 DEMO_MODE_READ_ONLY`. Le mode démonstration est éprouvé par ce
-   * parcours-ci, du bandeau à la purge ; il est rallumé par le dernier
-   * parcours du fichier, qui éprouve la désactivation depuis l'écran.
-   */
-  await purgeDemo();
+  await page.getByRole('button', { name: /^Compte de / }).click();
+  await page.getByRole('menuitem', { name: 'Quitter l’espace démo' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Espace démo' })).toHaveCount(0);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -210,18 +135,7 @@ test('le menu d’export produit les DEUX classeurs', async ({ page }) => {
     page.waitForEvent('download'),
     page.getByRole('menuitem', { name: /Exporter la vue filtrée/ }).click(),
   ]);
-  /**
-   * Le suffixe `-DEMONSTRATION` est ATTENDU, pas toléré.
-   *
-   * Ce parcours s'exécute après l'activation du mode démonstration (le fichier
-   * est en `describe.serial`), et l'API marque alors chaque classeur dans son
-   * nom : c'est la promesse faite à l'écran de bascule, « les classeurs exportés
-   * porteront la mention DEMONSTRATION ». L'expression d'origine, écrite avant
-   * ce marquage, refusait donc le comportement correct.
-   */
-  expect(filteredDownload.suggestedFilename()).toMatch(
-    /^cpi-prospects-\d{4}-\d{2}-\d{2}(-DEMONSTRATION)?\.xlsx$/,
-  );
+  expect(filteredDownload.suggestedFilename()).toMatch(/^cpi-prospects-\d{4}-\d{2}-\d{2}\.xlsx$/);
   const filteredPath = await filteredDownload.path();
   expect((await stat(filteredPath)).size).toBeGreaterThan(1_000);
   // Un VRAI classeur, pas un JSON d'erreur renommé.
@@ -234,7 +148,7 @@ test('le menu d’export produit les DEUX classeurs', async ({ page }) => {
     page.getByRole('menuitem', { name: /Classeur consolidé/ }).click(),
   ]);
   expect(consolidated.suggestedFilename()).toMatch(
-    /^cpi-prospects-consolide-\d{4}-\d{2}-\d{2}(-DEMONSTRATION)?\.xlsx$/,
+    /^cpi-prospects-consolide-\d{4}-\d{2}-\d{2}\.xlsx$/,
   );
   const consolidatedPath = await consolidated.path();
   expect((await stat(consolidatedPath)).size).toBeGreaterThan(1_000);
@@ -436,13 +350,6 @@ test('chaque téléconseiller a son programme PDF de campagne représentants', a
 // 5. Demandes de création de client : la banque dépose, l'administration crée
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Le compte bancaire vient des FIXTURES, plus du jeu de démonstration.
- *
- * `demo.banque@cpi.sn` n'existe que mode démonstration allumé — et il est
- * emporté par la purge. Depuis que ce fichier s'amorce sur des données réelles,
- * c'est le compte posé par `ensureWorkspaceFixtures` qu'il faut viser.
- */
 const BANK_IDENTIFIER = process.env.E2E_BANK_IDENTIFIER ?? BANQUIER.email;
 const BANK_PASSWORD = process.env.E2E_BANK_PASSWORD ?? FIXTURE_PASSWORD;
 const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
@@ -826,50 +733,4 @@ test('la configuration des étapes se réordonne au clavier, sans glisser-dépos
   // Les étapes système ne se désactivent pas.
   await expect(page.getByText('Étapes terminales', { exact: true })).toBeVisible();
   await expect(page.getByText('Non modifiable').first()).toBeVisible();
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 7. Mode démonstration : désactivation
-// ─────────────────────────────────────────────────────────────────────────────
-
-test('la désactivation exige une confirmation et affirme que le réel est intact', async ({
-  page,
-}) => {
-  // Rallumé par l'API : ce parcours éprouve la DÉSACTIVATION depuis l'écran,
-  // pas l'activation, qui a déjà son propre parcours en tête de fichier.
-  await enableDemo();
-
-  await page.goto('/parametres');
-
-  await page.getByRole('button', { name: 'Retirer les données de démonstration' }).click();
-
-  const dialog = page.getByRole('dialog');
-  // La phrase qui décide si le bouton sera pressé un jour.
-  await expect(dialog).toContainText('Les données réelles ne sont pas supprimées.');
-  await expect(dialog).toContainText('Seules les lignes créées par le mode démonstration le sont.');
-
-  const confirm = dialog.getByRole('button', { name: 'Supprimer définitivement' });
-  // Le geste ne part PAS sans confirmation explicite : c'est tout l'objet de
-  // cette case à cocher.
-  await expect(confirm).toBeDisabled();
-
-  await dialog.getByRole('checkbox').check();
-  await expect(confirm).toBeEnabled();
-  await confirm.click();
-
-  // Aucun succès n'est annoncé avant la réponse du serveur : c'est l'apparition
-  // du bouton d'activation qui prouve l'aboutissement.
-  await expect(page.getByRole('button', { name: 'Activer le mode démonstration' })).toBeVisible({
-    timeout: 90_000,
-  });
-
-  // Et le bandeau global disparaît de tous les écrans.
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Mode démonstration actif' }),
-  ).toHaveCount(0);
-
-  await page.goto('/tableau-de-bord');
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Mode démonstration actif' }),
-  ).toHaveCount(0);
 });

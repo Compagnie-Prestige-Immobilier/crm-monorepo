@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AnalyticsService } from '../analytics/analytics.service.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
+import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
 import {
   FONCTIONNAIRE_CHOICES,
   GRAND_PUBLIC_IMPORT_COLUMNS,
@@ -31,7 +31,7 @@ function makeExports(canaux = CANAUX): { exports: ExportService; prisma: FakePri
     exports: new ExportService(
       prisma as unknown as PrismaService,
       {} as unknown as AnalyticsService,
-      fakeDemoVisibility(),
+      fakeWorkspace(),
     ),
     prisma,
   };

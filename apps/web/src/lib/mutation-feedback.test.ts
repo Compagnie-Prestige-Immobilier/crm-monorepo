@@ -2,7 +2,7 @@ import { ApiError } from '@crm/api-client/query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiConfigurationError } from '@/lib/api/config';
-import { apiErrorText, demoReadOnlyMessage, toastApiError } from '@/lib/mutation-feedback';
+import { apiErrorText, toastApiError } from '@/lib/mutation-feedback';
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock('sonner', () => ({ toast: { error: toastError, success: vi.fn() } }));
@@ -83,113 +83,14 @@ describe('les phrases de repli, quand le serveur ne dit rien', () => {
   });
 });
 
-const DEMO_MESSAGE =
-  'La plateforme est en mode démonstration : les écritures sont suspendues. ' +
-  'Vos saisies mobiles hors ligne continuent d’être acceptées. Demandez à un ' +
-  'administrateur de désactiver le mode démonstration pour reprendre la saisie.';
-
-const demoRefusal = (body: unknown = { code: 'DEMO_MODE_READ_ONLY', message: DEMO_MESSAGE }) =>
-  fail(409, body);
-
-describe('le refus d’écriture du mode démonstration', () => {
+describe('notification des erreurs', () => {
   beforeEach(() => {
     toastError.mockClear();
   });
 
-  it('rend la phrase du serveur telle quelle : elle est écrite pour l’écran', () => {
-    expect(apiErrorText(demoRefusal(), 'Enregistrement impossible.')).toBe(DEMO_MESSAGE);
-  });
-
-  it('n’accuse PAS un doublon quand le corps porte le code sans prose', () => {
-    const text = apiErrorText(demoRefusal({ code: 'DEMO_MODE_READ_ONLY' }), 'Échec.');
-
-    expect(text).not.toMatch(/existe déjà/u);
-    expect(text).toMatch(/mode démonstration/u);
-  });
-
-  it('branche sur le code et non sur le statut : un 409 ordinaire reste un conflit', () => {
-    expect(demoReadOnlyMessage(fail(409, { message: 'Numéro déjà enregistré.' }))).toBeNull();
-    expect(demoReadOnlyMessage(fail(409, { code: 'PROSPECT_DUPLICATE' }))).toBeNull();
-    expect(demoReadOnlyMessage(new TypeError('fetch failed'))).toBeNull();
-    expect(demoReadOnlyMessage(demoRefusal())).toBe(DEMO_MESSAGE);
-  });
-
-  it('laisse au message trois phrases le temps d’être lu', () => {
-    toastApiError(demoRefusal(), 'Échec.');
-
-    const [text, options] = toastError.mock.calls[0] as [string, { duration?: number }];
-    expect(text).toBe(DEMO_MESSAGE);
-    expect(options.duration).toBeGreaterThan(8000);
-  });
-
-  it('n’empile pas un pavé identique par mutation partie', () => {
-    toastApiError(demoRefusal(), 'Échec.');
-    toastApiError(demoRefusal(), 'Échec.');
-    toastApiError(demoRefusal(), 'Échec.');
-
-    const ids = toastError.mock.calls.map((call) => (call[1] as { id?: string } | undefined)?.id);
-    expect(new Set(ids).size).toBe(1);
-    expect(ids[0]).toBe('DEMO_MODE_READ_ONLY');
-  });
-
-  it('ne colle ni identifiant ni durée sur les autres erreurs', () => {
+  it('affiche le message sans options spéciales', () => {
     toastApiError(fail(400, { message: 'Le nom est obligatoire.' }), 'Échec.');
 
     expect(toastError.mock.calls[0]).toEqual(['Le nom est obligatoire.']);
-  });
-});
-
-const UNKNOWN_MESSAGE =
-  'Impossible de lire l’état du mode démonstration : l’écriture est refusée pour ne pas ' +
-  'enregistrer une ligne dont on ne saurait pas dire si elle est réelle. Réessayez.';
-
-const stateUnknown = (
-  body: unknown = { code: 'DEMO_MODE_STATE_UNKNOWN', message: UNKNOWN_MESSAGE },
-) => fail(409, body);
-
-describe('le refus d’écriture quand l’état du mode est inconnu', () => {
-  beforeEach(() => {
-    toastError.mockClear();
-  });
-
-  it('laisse au message le temps d’être lu, comme l’autre refus transverse', () => {
-    toastApiError(stateUnknown(), 'Échec.');
-
-    const [text, options] = toastError.mock.calls[0] as [string, { duration?: number } | undefined];
-    expect(text).toBe(UNKNOWN_MESSAGE);
-    expect(options?.duration).toBeGreaterThan(8000);
-  });
-
-  it('n’empile pas un pavé identique par écriture partie', () => {
-    toastApiError(stateUnknown(), 'Échec.');
-    toastApiError(stateUnknown(), 'Échec.');
-    toastApiError(stateUnknown(), 'Échec.');
-
-    const ids = toastError.mock.calls.map((call) => (call[1] as { id?: string } | undefined)?.id);
-    expect(new Set(ids).size).toBe(1);
-    expect(ids[0]).toBe('DEMO_MODE_STATE_UNKNOWN');
-  });
-
-  it('n’efface PAS le refus de lecture seule : deux états distincts, deux toasts', () => {
-    toastApiError(demoRefusal(), 'Échec.');
-    toastApiError(stateUnknown(), 'Échec.');
-
-    const ids = toastError.mock.calls.map((call) => (call[1] as { id?: string } | undefined)?.id);
-    expect(ids).toEqual(['DEMO_MODE_READ_ONLY', 'DEMO_MODE_STATE_UNKNOWN']);
-  });
-
-  it('n’annonce AUCUNE démonstration en cours', () => {
-    expect(demoReadOnlyMessage(stateUnknown())).toBeNull();
-
-    const text = apiErrorText(stateUnknown({ code: 'DEMO_MODE_STATE_UNKNOWN' }), 'Échec.');
-    expect(text).not.toMatch(/désactiver le mode démonstration/u);
-    expect(text).not.toMatch(/écritures sont suspendues/u);
-    expect(text).toMatch(/Réessayez/u);
-  });
-
-  it('n’accuse PAS un doublon quand le corps porte le code sans prose', () => {
-    const text = apiErrorText(stateUnknown({ code: 'DEMO_MODE_STATE_UNKNOWN' }), 'Échec.');
-
-    expect(text).not.toMatch(/existe déjà/u);
   });
 });

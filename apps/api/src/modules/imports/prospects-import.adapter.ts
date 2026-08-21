@@ -69,14 +69,8 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
         select: { id: true, sigle: true },
         orderBy: [{ sortOrder: 'asc' }, { sigle: 'asc' }],
       }),
-      // `isDemo: false` est un FILTRE, pas un oubli. Un prospect réel accroché
-      // à un représentant de démonstration afficherait, dans la liste, un
-      // représentant que l'annuaire ne connaît plus dès l'extinction du mode
-      // démonstration. La ligne est alors signalée « représentant inconnu »,
-      // ce qui est exactement ce qu'elle est du point de vue des vraies
-      // données.
       ctx.tx.representant.findMany({
-        where: { deletedAt: null, isDemo: false },
+        where: { deletedAt: null },
         select: { id: true, phoneE164: true },
       }),
     ]);
@@ -405,13 +399,6 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
         // de l'import plutôt qu'une date fabriquée. Les statistiques
         // d'activité s'appuient dessus.
         clientCreatedAt: now,
-        // EXPLICITE, alors que la colonne vaut déjà `false` par défaut. Un
-        // import est une reprise de données réelles ; s'il empruntait la règle
-        // de la saisie web (« le mode démonstration allumé teinte l'écriture »),
-        // un administrateur qui importe pendant une démonstration verrait ses
-        // cent cinquante mille fiches disparaître à l'extinction, sans rien
-        // pour l'en avertir et sans qu'elles soient pour autant supprimées.
-        isDemo: false,
       })),
       // La contrainte est doublée par l'index unique partiel : une ligne qui
       // s'y heurterait malgré nos contrôles est écartée plutôt que de faire
@@ -423,20 +410,6 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
     return { created: result.count, skipped: retained.length - result.count, errors };
   }
 
-  /**
-   * Prospects vivants portant l'un de ces numéros, et leur représentant.
-   *
-   * LECTURE GLOBALE délibérée, sans filtre de démonstration : l'index unique
-   * partiel `prospects_phone_e164_active_key` est global, il ne connaît pas le
-   * mode démonstration. Filtré, ce contrôle déclarerait libres des numéros
-   * tenus par des fiches de démonstration, `skipDuplicates` les écarterait
-   * ensuite en silence, et le rapport annoncerait des créations qui n'ont pas
-   * eu lieu.
-   *
-   * Découpé en sous-tranches : le moteur choisit la taille de ses tranches, et
-   * un `IN` de plusieurs dizaines de milliers de littéraux dépasse ce que le
-   * protocole accepte de paramètres.
-   */
   private async existingProspects(
     phones: readonly string[],
     ctx: ImportRunContext,

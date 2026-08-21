@@ -7,7 +7,7 @@ import type { FastifyReply } from 'fastify';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { formatDakarDate } from '../export/dakar.js';
 import { DEMO_MODE_HEADER, demoFilenameSuffix, setDemoHeader } from '../export/demo-marking.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
+import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { BankCasesExportService } from './bank-cases-export.service.js';
 import { BankCaseFilterDto } from './dto.js';
 
@@ -21,7 +21,7 @@ const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.s
 export class BankCasesExportController {
   constructor(
     private readonly exports: BankCasesExportService,
-    private readonly demo: DemoVisibilityService,
+    private readonly demo: WorkspaceContext,
   ) {}
 
   @Get('bank-cases.xlsx')
@@ -46,7 +46,7 @@ export class BankCasesExportController {
     },
   })
   async bankCases(@Query() query: BankCaseFilterDto, @Res() reply: FastifyReply): Promise<void> {
-    const demoEnabled = await this.demo.enabled();
+    const demoEnabled = this.demo.current() === 'demo';
     const filename = `dossiers-bancaires-${formatDakarDate(new Date())}${demoFilenameSuffix(demoEnabled)}.xlsx`;
 
     reply.hijack();

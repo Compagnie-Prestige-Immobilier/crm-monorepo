@@ -33,29 +33,4 @@ setup('authentifier l’administrateur', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Choisissez un espace', level: 1 })).toBeVisible();
 
   await page.context().storageState({ path: STORAGE_STATE });
-
-  /**
-   * La suite part TOUJOURS mode démonstration ÉTEINT.
-   *
-   * Le mode démonstration met la plateforme en lecture seule et suffixe le nom
-   * des classeurs exportés par « DEMONSTRATION ». Laissé allumé par une
-   * exécution précédente — interrompue, ou dont le parcours de désactivation
-   * n'a pas été atteint — il fait échouer tout ce qui écrit, et les échecs
-   * tombent sur des écrans qui n'y sont pour rien. Une suite ne doit pas
-   * dépendre de la façon dont la précédente s'est terminée.
-   *
-   * `purge` et non `disable` : la désactivation masque les lignes, la purge les
-   * retire. Sans effet si le mode est déjà éteint.
-   *
-   * Ici et pas dans `global-setup.ts` : la purge demande une session
-   * administrateur, et c'est ce parcours qui vient de la poser. La faire en
-   * amont obligerait à dépenser une connexion de plus sur un point d'entrée
-   * limité à dix par minute.
-   */
-  const purge = await page.request.post('/api/v1/admin/demo/purge', { timeout: 150_000 });
-  expect(
-    purge.ok(),
-    `La purge du mode démonstration a répondu ${String(purge.status())} : la suite ne ` +
-      'peut pas partir d’un état connu.',
-  ).toBe(true);
 });
