@@ -13,7 +13,14 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { BddSegment, EnrollmentMethod, Phase2Status, ProspectStatut } from '@crm/database';
+import {
+  BddSegment,
+  EnrollmentMethod,
+  Phase2Status,
+  Projet,
+  ProspectStatut,
+  ProspectType,
+} from '@crm/database';
 
 import { queryBoolean } from './query-boolean.js';
 import { PROSPECT_ORIGINS } from '../prospect-origin.js';
@@ -69,6 +76,30 @@ export class ProspectFilterDto {
   @IsOptional()
   @IsUUID()
   commercialId?: string;
+
+  @ApiPropertyOptional({
+    enum: Projet,
+    enumName: 'Projet',
+    description:
+      'Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.',
+  })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
+
+  @ApiPropertyOptional({
+    enum: ProspectType,
+    enumName: 'ProspectType',
+    description: 'Grand Public : fonctionnaire, secteur privé, informel, diaspora.',
+  })
+  @IsOptional()
+  @IsEnum(ProspectType)
+  type?: ProspectType;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Grand Public : canal de provenance.' })
+  @IsOptional()
+  @IsUUID()
+  canalProvenanceId?: string;
 
   @ApiPropertyOptional({ enum: ProspectStatut, enumName: 'ProspectStatut' })
   @IsOptional()

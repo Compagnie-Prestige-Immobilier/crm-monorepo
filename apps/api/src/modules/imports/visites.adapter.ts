@@ -420,12 +420,9 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow> {
       unique.push(row);
     }
 
-    // Le registre de démonstration est un jeu d'affichage : une visite fictive
-    // ne doit pas faire passer une vraie visite pour déjà enregistrée.
     const known = new Set<string>();
     const existing = await ctx.tx.visite.findMany({
       where: {
-        isDemo: false,
         visitedAt: { in: unique.map((row) => visiteInstant(row.date, row.time ?? undefined)) },
         entrepriseId: { in: unique.map((row) => row.entrepriseId) },
       },
@@ -469,9 +466,6 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow> {
         destinataireId: row.destinataireId,
         comment: row.comment,
         createdById: ctx.requestedById,
-        // La reprise d'un historique réel n'emprunte pas l'interrupteur de
-        // démonstration : les lignes disparaîtraient à son extinction.
-        isDemo: false,
       })),
       skipDuplicates: true,
     });
@@ -498,9 +492,6 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow> {
     const next = new Map<number, number>();
 
     for (const year of years) {
-      // LECTURE GLOBALE : l'unicité de la référence est portée par un index
-      // global, lignes de démonstration comprises. Cloisonner ici rendrait un
-      // rang déjà pris. Même motif que `VisitesService.nextSequence`.
       const last = await ctx.tx.visite.findFirst({
         where: { reference: { startsWith: visiteReferencePrefix(year) } },
         orderBy: { reference: 'desc' },

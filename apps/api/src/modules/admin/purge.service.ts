@@ -3,7 +3,6 @@ import type { Prisma } from '@crm/database';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { DEMO_MODE_SETTING, DEMO_SEEDED_AT_SETTING } from '../demo/demo-registry.js';
 import type { PurgeCatalogDto, PurgeRequestDto, PurgeResultDto } from './dto.js';
 import { findFirstAdmin, matchesConfirmation, type FirstAdmin } from './first-admin.js';
 import {
@@ -14,7 +13,7 @@ import {
   type PurgeDomainKey,
   type PurgeStepKey,
 } from './purge-plan.js';
-import { DEMO_TRACKED_STEPS, PURGE_STEPS, type PurgeContext } from './purge-steps.js';
+import { PURGE_STEPS, type PurgeContext } from './purge-steps.js';
 
 // Le défaut Prisma (5 s) fait échouer une purge de plusieurs centaines de milliers de lignes.
 const PURGE_TRANSACTION_TIMEOUT_MS = 300_000;
@@ -65,20 +64,6 @@ export class PurgeService {
       async (tx) => {
         for (const step of steps) {
           removed.set(step, await PURGE_STEPS[step].remove(tx, context));
-        }
-
-        if (steps.some((step) => DEMO_TRACKED_STEPS.includes(step))) {
-          await tx.demoEntity.deleteMany({});
-          for (const [key, value] of [
-            [DEMO_MODE_SETTING, 'false'],
-            [DEMO_SEEDED_AT_SETTING, ''],
-          ] as const) {
-            await tx.appSetting.upsert({
-              where: { key },
-              create: { key, value, updatedById: actor.id },
-              update: { value, updatedById: actor.id },
-            });
-          }
         }
 
         // APRÈS les suppressions : l'étape `auditLogs` effacerait une trace écrite en amont.

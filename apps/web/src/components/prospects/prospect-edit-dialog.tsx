@@ -84,9 +84,9 @@ export function ProspectEditDialog({
       nom: prospect.nom,
       prenom: prospect.prenom,
       phone: prospect.phoneE164,
-      banqueId: prospect.banqueId,
-      syndicatId: prospect.syndicatId,
-      representantId: prospect.representantId,
+      banqueId: prospect.banqueId ?? '',
+      syndicatId: prospect.syndicatId ?? '',
+      representantId: prospect.representantId ?? '',
       statut: prospect.statut,
     });
   }, [prospect, reset]);
@@ -298,7 +298,7 @@ export function ProspectEditDialog({
             <p className="text-[0.8125rem]">
               <span className="text-muted-foreground">Segment actuel&nbsp;: </span>
               <span className="font-[600]">
-                {prospect === null ? '–' : SEGMENT_LABELS[prospect.segment]}
+                {prospect?.segment == null ? 'Aucun' : SEGMENT_LABELS[prospect.segment]}
               </span>
             </p>
 
@@ -312,7 +312,7 @@ export function ProspectEditDialog({
                 */}
                 <div role="alert" className="flex flex-col gap-1.5">
                   <p className="flex flex-wrap items-center gap-1.5 text-[0.8125rem]">
-                    <span>{SEGMENT_LABELS[prospect.segment]}</span>
+                    <span>{prospect.segment === null ? 'Aucun' : SEGMENT_LABELS[prospect.segment]}</span>
                     <ArrowRightIcon className="size-3.5" aria-hidden="true" />
                     <span className="font-[600]">
                       {nextSegment === null ? 'segment indéterminé' : SEGMENT_LABELS[nextSegment]}

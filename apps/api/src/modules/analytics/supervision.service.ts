@@ -2,9 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, Role } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
-import { ATTEMPT, TASK, UNUSABLE_OUTCOMES, demoScopeOn, rate } from './pilotage.sql.js';
+import { UNUSABLE_OUTCOMES, ALL_ROWS, rate } from './pilotage.sql.js';
 import { SupervisionGranularity } from './supervision.dto.js';
 import type {
   SupervisionActivityDto,
@@ -12,10 +11,6 @@ import type {
   SupervisionQueryDto,
   SupervisionTeleconseillerDto,
 } from './supervision.dto.js';
-
-const PROSPECT = Prisma.sql`p`;
-const REP_ATTEMPT = Prisma.sql`rca`;
-const USER = Prisma.sql`u`;
 
 interface ActivityRow {
   jour: string;
@@ -43,21 +38,17 @@ interface RosterRow {
 
 @Injectable()
 export class SupervisionActivityService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async activite(query: SupervisionQueryDto): Promise<SupervisionActivityDto> {
-    const demoEnabled = await this.demo.enabled();
     const granularity = query.granularity ?? SupervisionGranularity.DAY;
     // `date_trunc` exige un littéral, jamais un paramètre.
     const unit =
       granularity === SupervisionGranularity.WEEK ? Prisma.sql`'week'` : Prisma.sql`'day'`;
 
-    const attemptScope = demoScopeOn(ATTEMPT, demoEnabled);
-    const taskScope = demoScopeOn(TASK, demoEnabled);
-    const userScope = demoScopeOn(USER, demoEnabled);
+    const attemptScope = ALL_ROWS;
+    const taskScope = ALL_ROWS;
+    const userScope = ALL_ROWS;
     const teleconseiller = Prisma.sql`u."role" = ${Role.COMMERCIAL}::"Role" AND u."deletedAt" IS NULL AND ${userScope}`;
 
     const [rows, roster] = await Promise.all([
@@ -85,7 +76,7 @@ export class SupervisionActivityService {
             p."createdById", date_trunc(${unit}, p."clientCreatedAt"),
             0, 0, 0, 0, 0, 0, 0, 0, 1, NULL::text, 0
           FROM "prospects" p
-          WHERE p."deletedAt" IS NULL AND ${demoScopeOn(PROSPECT, demoEnabled)}
+          WHERE p."deletedAt" IS NULL AND TRUE
             AND ${withinWindow(Prisma.sql`p."clientCreatedAt"`, query)}
 
           UNION ALL
@@ -93,7 +84,7 @@ export class SupervisionActivityService {
             rca."performedById", date_trunc(${unit}, rca."clientCreatedAt"),
             0, 0, 0, 0, 0, 0, 0, 0, 0, rca."representantId", 0
           FROM "rep_call_attempts" rca
-          WHERE ${demoScopeOn(REP_ATTEMPT, demoEnabled)}
+          WHERE TRUE
             AND ${withinWindow(Prisma.sql`rca."clientCreatedAt"`, query)}
 
           UNION ALL

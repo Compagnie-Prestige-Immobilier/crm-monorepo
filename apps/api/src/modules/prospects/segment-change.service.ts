@@ -11,6 +11,7 @@ import {
   banqueNotFound,
   prospectNotFound,
   prospectRevConflict,
+  segmentUnavailable,
   segmentUnchanged,
   syndicatNotFound,
 } from './errors.js';
@@ -22,6 +23,12 @@ import type {
 } from './dto.js';
 
 /** Sentinelle interne : la transaction n'a rien mis à jour, la révision a bougé. */
+/** `classifySegment` rend `null` quand un axe manque ; ici les deux sont deja verifies. */
+function requireSegment(segment: BddSegment | null): BddSegment {
+  if (segment === null) throw segmentUnavailable();
+  return segment;
+}
+
 const REV_MISMATCH = Symbol('rev-mismatch');
 
 /**
@@ -59,36 +66,39 @@ export class SegmentChangeService {
     if (!existing) throw prospectNotFound();
     assertOwnership(user, existing);
 
+    // On ne bascule pas un segment qui n'existe pas. Une fiche sans banque ni
+    // syndicat n'est dans aucun BDD : il faut d'abord la renseigner, et c'est
+    // une correction de saisie, pas un changement de segment.
+    const { banque, syndicat, banqueId: fromBanqueId, syndicatId: fromSyndicatId } = existing;
+    if (banque === null || syndicat === null || fromBanqueId === null || fromSyndicatId === null) {
+      throw segmentUnavailable();
+    }
+
     // Le segment AVANT, calculé par la définition PARTAGÉE et non par une
     // reformulation locale : une seconde définition finirait par diverger, et
     // l'histoire enregistrée ne décrirait plus les mêmes populations que les
     // listes et les exports.
-    const fromSegment: BddSegment = classifySegment({
-      syndicatSigle: existing.syndicat.sigle,
-      banqueShortName: existing.banque.shortName,
-    });
+    const fromSegment: BddSegment = requireSegment(
+      classifySegment({ syndicatSigle: syndicat.sigle, banqueShortName: banque.shortName }),
+    );
 
-    const toBanqueId = input.banqueId ?? existing.banqueId;
-    const toSyndicatId = input.syndicatId ?? existing.syndicatId;
+    const toBanqueId = input.banqueId ?? fromBanqueId;
+    const toSyndicatId = input.syndicatId ?? fromSyndicatId;
 
     // Le refus porte sur les CLÉS, pas sur le segment obtenu. Passer d'une
     // banque non-CBAO à une autre laisse la fiche en BDD4 et mérite quand même
     // sa ligne : c'est un changement réel, dont on veut pouvoir retrouver
     // l'auteur. Seul le geste qui ne change rien est refusé.
-    if (toBanqueId === existing.banqueId && toSyndicatId === existing.syndicatId) {
+    if (toBanqueId === fromBanqueId && toSyndicatId === fromSyndicatId) {
       throw segmentUnchanged(fromSegment);
     }
 
     const banqueShortName =
-      toBanqueId === existing.banqueId
-        ? existing.banque.shortName
-        : await this.resolveBanque(toBanqueId);
+      toBanqueId === fromBanqueId ? banque.shortName : await this.resolveBanque(toBanqueId);
     const syndicatSigle =
-      toSyndicatId === existing.syndicatId
-        ? existing.syndicat.sigle
-        : await this.resolveSyndicat(toSyndicatId);
+      toSyndicatId === fromSyndicatId ? syndicat.sigle : await this.resolveSyndicat(toSyndicatId);
 
-    const toSegment = classifySegment({ syndicatSigle, banqueShortName });
+    const toSegment = requireSegment(classifySegment({ syndicatSigle, banqueShortName }));
 
     const outcome = await this.prisma.$transaction(async (tx) => {
       // La garde de révision est DANS la mise à jour, jamais avant : une
@@ -106,9 +116,9 @@ export class SegmentChangeService {
           prospectId: id,
           fromSegment,
           toSegment,
-          fromBanqueId: existing.banqueId,
+          fromBanqueId,
           toBanqueId,
-          fromSyndicatId: existing.syndicatId,
+          fromSyndicatId,
           toSyndicatId,
           reason: input.reason.trim(),
           changedById: user.id,
@@ -118,10 +128,6 @@ export class SegmentChangeService {
           // depuis le corps de la requête permettrait à n'importe quel appelant
           // de se faire passer pour l'autre.
           source: ChangeSource.WEB,
-          // La trace suit SA FICHE, pas le mode en vigueur à la seconde du
-          // clic : une bascule non marquée sur un prospect de démonstration
-          // entrerait dans le décompte réel des conversions du mois.
-          isDemo: existing.isDemo,
         },
       });
       return null;
@@ -146,15 +152,6 @@ export class SegmentChangeService {
     return toProspectDto(saved, attempts.get(saved.id));
   }
 
-  /**
-   * L'historique d'UNE fiche, du plus récent au plus ancien.
-   *
-   * Sert l'index `(prospectId, changedAt)`. La lecture n'est PAS bornée par le
-   * mode démonstration : le prospect vient d'être résolu par sa clé primaire et
-   * son cloisonnement s'est joué là. Rejouer un filtre ici rendrait une fiche
-   * sans son historique, ce qui se lit à l'écran comme une fiche jamais
-   * convertie.
-   */
   async history(user: AuthenticatedUser, id: string): Promise<SegmentChangeListDto> {
     const prospect = await this.prisma.prospect.findFirst({
       where: { id, deletedAt: null },
@@ -163,11 +160,6 @@ export class SegmentChangeService {
     if (!prospect) throw prospectNotFound();
     assertOwnership(user, prospect);
 
-    // LECTURE GLOBALE délibérée : l'historique d'une fiche DÉJÀ résolue par sa
-    // clé primaire juste au-dessus, et dont le cloisonnement s'est joué là. Une
-    // trace suit toujours la nature de son prospect ; filtrer ici rendrait donc
-    // soit exactement le même ensemble, soit une fiche de démonstration privée
-    // de son histoire, ce qui se lit à l'écran comme une fiche jamais convertie.
     const rows = await this.prisma.segmentChange.findMany({
       where: { prospectId: id },
       include: { changedBy: { select: { id: true, fullName: true } } },

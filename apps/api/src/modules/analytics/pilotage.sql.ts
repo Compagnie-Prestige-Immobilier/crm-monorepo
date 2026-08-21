@@ -1,17 +1,13 @@
 import { Prisma } from '@crm/database';
 
-/**
- * Chaque table jointe porte son propre `isDemo` : la visibilité doit être posée
- * sur chaque alias, sinon un dossier fictif accroché à un prospect réel ressort.
- */
-export const demoScopeOn = (alias: Prisma.Sql, demoEnabled: boolean): Prisma.Sql =>
-  demoEnabled ? Prisma.sql`TRUE` : Prisma.sql`${alias}."isDemo" = FALSE`;
+export const ALL_ROWS = Prisma.sql`TRUE`;
 
 export const TASK = Prisma.sql`ct`;
 export const ATTEMPT = Prisma.sql`ca`;
 export const CAMPAIGN = Prisma.sql`cc`;
 export const BANK_CASE = Prisma.sql`bc`;
 export const TRANSITION = Prisma.sql`tr`;
+export const RELATION_CHANGE = Prisma.sql`rc`;
 
 /** Clés de `CallOutcome` comptant pour un numéro inexploitable. */
 export const UNUSABLE_OUTCOMES = Prisma.sql`('UNREACHABLE', 'WRONG_NUMBER')`;
@@ -20,24 +16,23 @@ export const UNUSABLE_OUTCOMES = Prisma.sql`('UNREACHABLE', 'WRONG_NUMBER')`;
  * Sous-requêtes et non jointures : un prospect porte plusieurs dossiers, une
  * jointure multiplierait sa ligne. Encaissé se lit sur l'ÉTAPE COURANTE.
  */
-export function prospectOutcomeColumns(demoEnabled: boolean): Prisma.Sql {
-  const scope = demoScopeOn(BANK_CASE, demoEnabled);
+export function prospectOutcomeColumns(): Prisma.Sql {
   return Prisma.sql`
     (p."phase2Status" = 'METHOD_OBTAINED')                                AS methode,
     EXISTS (
       SELECT 1 FROM "bank_cases" bc
-      WHERE bc."prospectId" = p."id" AND bc."deletedAt" IS NULL AND ${scope}
+      WHERE bc."prospectId" = p."id" AND bc."deletedAt" IS NULL
     )                                                                     AS dossier,
     EXISTS (
       SELECT 1 FROM "bank_cases" bc
       INNER JOIN "bank_case_stages" st ON st."id" = bc."currentStageId"
-      WHERE bc."prospectId" = p."id" AND bc."deletedAt" IS NULL AND ${scope}
+      WHERE bc."prospectId" = p."id" AND bc."deletedAt" IS NULL
         AND st."type" = 'CASHED'
     )                                                                     AS encaisse,
     COALESCE((
       SELECT SUM(bc."amountXof") FROM "bank_cases" bc
       INNER JOIN "bank_case_stages" st ON st."id" = bc."currentStageId"
-      WHERE bc."prospectId" = p."id" AND bc."deletedAt" IS NULL AND ${scope}
+      WHERE bc."prospectId" = p."id" AND bc."deletedAt" IS NULL
         AND st."type" = 'CASHED'
     ), 0)                                                                 AS montant
   `;

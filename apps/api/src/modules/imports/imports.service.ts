@@ -132,11 +132,6 @@ export class ImportsService {
           fileBytes: stored.bytes,
           storagePath: stored.storagePath,
           expiresAt: new Date(now.getTime() + this.config.IMPORTS_TTL_HOURS * 3_600_000),
-          // EN TOUTES LETTRES. Le travail est repris par une tâche planifiée,
-          // hors de portée de `DemoReadOnlyGuard` : consulter l'interrupteur de
-          // démonstration ici écrirait un travail fictif que la purge ne saurait
-          // pas reprendre.
-          isDemo: false,
         },
       });
 
@@ -278,12 +273,6 @@ export class ImportsService {
    * clore.
    */
   async expireDue(now = new Date()): Promise<number> {
-    // LECTURE GLOBALE délibérée : l'échéance est une règle de RÉTENTION de
-    // fichiers sur un volume, et elle ne connaît pas le mode démonstration. Un
-    // classeur laissé sur le disque parce qu'une démonstration était allumée
-    // resterait un second exemplaire, hors base et sans chiffrement, de noms et
-    // de téléphones réels. Le doute se tranche du côté de la destruction, comme
-    // pour l'export intégral de la base.
     const due = await this.prisma.importJob.findMany({
       where: { expiresAt: { lte: now }, status: { not: ImportStatus.expired } },
       select: { id: true, storagePath: true },

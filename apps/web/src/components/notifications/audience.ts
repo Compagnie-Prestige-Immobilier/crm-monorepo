@@ -100,6 +100,6 @@ export const KNOWN_ROUTES: readonly { path: string; label: string }[] = [
   { path: '/historique', label: 'Historique' },
   { path: '/phase2', label: 'Phase 2 : saisie des méthodes' },
   { path: '/a-corriger', label: 'File de synchronisation' },
-  { path: '/notifications', label: 'Centre de notifications' },
+  { path: '/admin/notifications', label: 'Centre de notifications' },
   { path: '/reglages', label: 'Réglages' },
 ];

@@ -31,7 +31,6 @@ export interface FakeProspect {
   syndicatId: string;
   representantId: string;
   createdById: string;
-  isDemo: boolean;
   deletedAt: Date | null;
 }
 
@@ -48,7 +47,6 @@ export interface FakeSegmentChange {
   changedById: string;
   source: ChangeSource;
   changedAt: Date;
-  isDemo: boolean;
 }
 
 const BASE = new Date('2026-08-01T08:00:00.000Z');
@@ -99,7 +97,6 @@ export class FakeSegmentPrisma {
       syndicatId: SYNDICAT_SAES.id,
       representantId: 'rep-1',
       createdById: ALICE.id,
-      isDemo: false,
       deletedAt: null,
       ...over,
     };
@@ -198,7 +195,6 @@ export class FakeSegmentPrisma {
         changedById: data.changedById as string,
         source: data.source as ChangeSource,
         changedAt: this.clock(),
-        isDemo: data.isDemo as boolean,
       };
       this.segmentChanges.push(row);
       return Promise.resolve({ ...row });

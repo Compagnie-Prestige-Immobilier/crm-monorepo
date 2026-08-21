@@ -110,7 +110,7 @@ export function RepresentantsView({
           {canAdminister ? (
             // Un LIEN habillé en bouton : la primitive `Button` de Base UI
             // poserait `role="button"` sur le `<a>`.
-            <Link href="/representants/import" className={buttonVariants({ variant: 'outline' })}>
+            <Link href="/chues/representants/import" className={buttonVariants({ variant: 'outline' })}>
               <UploadIcon aria-hidden="true" />
               Import Excel
             </Link>
@@ -219,7 +219,7 @@ export function RepresentantsView({
                   <TableRow key={representant.id}>
                     <TableCell className="font-[600]">
                       <Link
-                        href={`/representants/${representant.id}`}
+                        href={`/chues/representants/${representant.id}`}
                         className="hover:underline focus-visible:underline"
                       >
                         {representant.fullName}
@@ -355,7 +355,7 @@ function RepresentantCard({
         <div className="min-w-0">
           <p className="truncate font-[600]">
             <Link
-              href={`/representants/${representant.id}`}
+              href={`/chues/representants/${representant.id}`}
               className="hover:underline focus-visible:underline"
             >
               {representant.fullName}

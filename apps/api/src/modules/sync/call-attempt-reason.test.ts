@@ -4,13 +4,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
+import { VisitesService } from '../visites/visites.service.js';
 import { SYSTEM_OUTCOME_REASONS } from '../referentiels/call-outcome-rules.js';
 import { SyncBatchStore } from './batch-store.js';
 import { SyncService } from './sync.service.js';
 import { FakePrisma, type ProspectRow } from './fake-prisma.js';
 import { SyncEntity, SyncOp, SyncOpStatus } from './dto.js';
 import type { SyncOperationDto, SyncPushDto } from './dto.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const alice: AuthenticatedUser = {
   id: 'com-alice',
@@ -49,7 +49,6 @@ const seedProspect = (id: string): void => {
     createdAt: new Date('2026-08-10T10:00:00.000Z'),
     updatedAt: new Date('2026-08-10T10:00:00.000Z'),
     deletedAt: null,
-    isDemo: false,
   } satisfies ProspectRow);
 };
 
@@ -80,7 +79,7 @@ beforeEach(() => {
     prisma,
     new SyncBatchStore(prisma),
     new Phase2SyncService(),
-    fakeDemoVisibility(),
+    new VisitesService(prisma),
   );
 });
 

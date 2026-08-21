@@ -21,8 +21,6 @@ import {
 } from '../phase2/distribution.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import type { CheckboxGroup, ProgrammeRow } from '../phase2/programme-pdf.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { demoScope } from '../../prisma/demo-visibility.js';
 import {
   commentRequired,
   commercialInactive,
@@ -106,7 +104,6 @@ export class RepCampaignsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
     private readonly representants: RepresentantsService,
   ) {}
 
@@ -114,8 +111,6 @@ export class RepCampaignsService {
     const commerciaux = await this.resolveCommerciaux(body.commercialIds);
     const seed = newCampaignSeed();
     const spreadDays = body.spreadDays ?? MIN_SPREAD_DAYS;
-    const demoEnabled = await this.demo.enabledForWrite();
-
     const campaignId = await this.prisma
       .$transaction(
         async (tx) => {
@@ -128,7 +123,6 @@ export class RepCampaignsService {
               iefId: body.iefId ?? null,
               onlyWithoutProspects: body.onlyWithoutProspects ?? false,
               createdById: user.id,
-              isDemo: demoEnabled,
             },
           });
 
@@ -141,7 +135,7 @@ export class RepCampaignsService {
           });
 
           const eligible = await tx.representant.findMany({
-            where: eligibleWhere(body, demoEnabled),
+            where: eligibleWhere(body),
             select: { id: true },
             orderBy: { id: 'asc' },
           });
@@ -174,7 +168,6 @@ export class RepCampaignsService {
                   queueSize[assignment.bucket] ?? 0,
                   spreadDays,
                 ),
-                isDemo: demoEnabled,
               },
             ];
           });
@@ -201,7 +194,7 @@ export class RepCampaignsService {
     ids: readonly string[],
   ): Promise<{ id: string; fullName: string; username: string }[]> {
     const found = await this.prisma.user.findMany({
-      where: { id: { in: [...ids] }, deletedAt: null, ...demoScope(await this.demo.enabled()) },
+      where: { id: { in: [...ids] }, deletedAt: null },
       select: { id: true, fullName: true, username: true, role: true, isActive: true },
     });
 
@@ -225,7 +218,7 @@ export class RepCampaignsService {
 
   async preview(query: RepCampaignPreviewQueryDto): Promise<RepCampaignPreviewDto> {
     const eligible = await this.prisma.representant.count({
-      where: eligibleWhere(query, await this.demo.enabled()),
+      where: eligibleWhere(query),
     });
 
     const commercialCount = Math.max(1, query.commercialCount ?? 1);
@@ -245,7 +238,6 @@ export class RepCampaignsService {
     const search = query.search?.trim();
 
     const where: Prisma.RepCallCampaignWhereInput = {
-      ...demoScope(await this.demo.enabled()),
       ...(query.status ? { status: query.status } : {}),
       ...(query.createdById ? { createdById: query.createdById } : {}),
       ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
@@ -305,7 +297,7 @@ export class RepCampaignsService {
 
   async get(id: string): Promise<RepCampaignDetailDto> {
     const campaign = await this.prisma.repCallCampaign.findFirst({
-      where: { id, ...demoScope(await this.demo.enabled()) },
+      where: { id },
       include: {
         createdBy: { select: { fullName: true } },
         departement: { select: { name: true } },
@@ -319,11 +311,9 @@ export class RepCampaignsService {
 
     if (!campaign) throw repCampaignNotFound();
 
-    const demoWhere = demoScope(await this.demo.enabled());
-
     const grouped = await this.prisma.repCallTask.groupBy({
       by: ['assignedToId', 'status'],
-      where: { campaignId: id, ...demoWhere },
+      where: { campaignId: id },
       _count: { _all: true },
     });
 
@@ -337,7 +327,7 @@ export class RepCampaignsService {
     const perDay = await this.dayCounts(id, campaign.spreadDays);
 
     const attempts = await this.prisma.repCallAttempt.findMany({
-      where: { campaignId: id, ...demoWhere },
+      where: { campaignId: id },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: RECENT_ATTEMPTS,
       include: {
@@ -397,7 +387,7 @@ export class RepCampaignsService {
 
     const grouped = await this.prisma.repCallTask.groupBy({
       by: ['campaignId', 'status'],
-      where: { campaignId: { in: [...ids] }, ...demoScope(await this.demo.enabled()) },
+      where: { campaignId: { in: [...ids] } },
       _count: { _all: true },
     });
 
@@ -412,7 +402,7 @@ export class RepCampaignsService {
   ): Promise<{ overall: number[]; byUser: Map<string, number[]> }> {
     const grouped = await this.prisma.repCallTask.groupBy({
       by: ['assignedToId', 'dayIndex'],
-      where: { campaignId, ...demoScope(await this.demo.enabled()) },
+      where: { campaignId },
       _count: { _all: true },
     });
 
@@ -439,10 +429,9 @@ export class RepCampaignsService {
   }
 
   async close(id: string): Promise<RepCampaignDetailDto> {
-    const demoEnabled = await this.demo.enabled();
     await this.prisma.$transaction(async (tx) => {
       const campaign = await tx.repCallCampaign.findFirst({
-        where: { id, ...demoScope(demoEnabled) },
+        where: { id },
         select: { status: true },
       });
       if (!campaign) throw repCampaignNotFound();
@@ -492,10 +481,8 @@ export class RepCampaignsService {
     if (!membership) throw programmeNotFound();
 
     const spreadDays = membership.campaign.spreadDays;
-    const demoWhere = demoScope(await this.demo.enabled());
-
     const taskCount = await this.prisma.repCallTask.count({
-      where: { campaignId, assignedToId: userId, ...demoWhere },
+      where: { campaignId, assignedToId: userId },
     });
     const effectiveDays = Math.max(1, Math.min(spreadDays, taskCount));
 
@@ -505,7 +492,6 @@ export class RepCampaignsService {
       where: {
         campaignId,
         assignedToId: userId,
-        ...demoWhere,
         ...(jour === undefined ? {} : { dayIndex: jour - 1 }),
       },
       orderBy: { position: 'asc' },
@@ -559,12 +545,10 @@ export class RepCampaignsService {
       };
     }
 
-    const demoEnabled = await this.demo.enabled();
     const representant = await this.prisma.representant.findFirst({
-      where: { id: body.representantId, deletedAt: null, ...demoScope(demoEnabled) },
+      where: { id: body.representantId, deletedAt: null },
       select: {
         id: true,
-        isDemo: true,
         relationStatus: true,
         whatsappStatus: true,
         whatsappE164: true,
@@ -575,7 +559,7 @@ export class RepCampaignsService {
     const whatsapp = resolveWhatsappPatch(body, representant);
 
     const task = await this.prisma.repCallTask.findFirst({
-      where: { representantId: body.representantId, isActive: true, ...demoScope(demoEnabled) },
+      where: { representantId: body.representantId, isActive: true },
       select: { id: true, campaignId: true },
       orderBy: { createdAt: 'asc' },
     });
@@ -595,7 +579,6 @@ export class RepCampaignsService {
             promisedProspects: body.promisedProspects ?? null,
             comment,
             clientCreatedAt: new Date(body.clientCreatedAt),
-            isDemo: representant.isDemo,
           },
         ],
         skipDuplicates: true,
@@ -614,7 +597,6 @@ export class RepCampaignsService {
             resolvedRepresentantId: suggested.resolvedRepresentantId,
             sourceAttemptId: body.id,
             clientCreatedAt: new Date(body.clientCreatedAt),
-            isDemo: representant.isDemo,
           },
         });
       }
@@ -639,7 +621,6 @@ export class RepCampaignsService {
           toStatus: body.relationStatus,
           changedById: user.id,
           source: ChangeSource.WEB,
-          isDemo: representant.isDemo,
         });
       }
 
@@ -692,7 +673,6 @@ export class RepCampaignsService {
       where: {
         phoneE164: lookup.phoneE164,
         deletedAt: null,
-        ...demoScope(await this.demo.enabled()),
       },
       select: { id: true },
     });
@@ -721,10 +701,9 @@ export class RepCampaignsService {
   }
 }
 
-function eligibleWhere(scope: ScopeInput, demoPopulation: boolean): Prisma.RepresentantWhereInput {
+function eligibleWhere(scope: ScopeInput): Prisma.RepresentantWhereInput {
   return {
     deletedAt: null,
-    isDemo: demoPopulation,
     ...(scope.departementId ? { departementId: scope.departementId } : {}),
     ...(scope.iefId ? { iefId: scope.iefId } : {}),
     ...(scope.onlyWithoutProspects ? { prospects: { none: { deletedAt: null } } } : {}),

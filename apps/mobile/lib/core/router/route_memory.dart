@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/campagnes/campagnes.dart';
 import 'route_paths.dart';
 
 class RouteMemory {
@@ -15,6 +16,9 @@ class RouteMemory {
 
   static const List<String> allowList = <String>[
     Routes.home,
+    Routes.accueil,
+    Routes.chues,
+    Routes.grandPublic,
     Routes.representants,
     Routes.newRepresentant,
     Routes.prospects,
@@ -22,6 +26,7 @@ class RouteMemory {
     Routes.corrections,
     Routes.historique,
     Routes.phase2,
+    CampagnesRoutes.liste,
     Routes.notifications,
   ];
 

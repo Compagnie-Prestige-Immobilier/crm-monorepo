@@ -1,9 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
-import type { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { FakeDemo, FakeVisitesPrisma, fakeRef } from './fake-visites-prisma.js';
+import { FakeVisitesPrisma, fakeRef } from './fake-visites-prisma.js';
 import { VisiteError, VisitesService } from './visites.service.js';
 
 const CPI = fakeRef({ id: 'ent-cpi', code: 'CPI', label: 'CPI' });
@@ -13,17 +12,14 @@ const SUIVI = fakeRef({ id: 'obj-suivi', code: 'SUIVI_DOSSIER' });
 
 const ACCUEIL = 'usr-accueil';
 
-const build = (demoOn = false): { prisma: FakeVisitesPrisma; service: VisitesService } => {
+const build = (): { prisma: FakeVisitesPrisma; service: VisitesService } => {
   const prisma = new FakeVisitesPrisma();
   prisma.entreprises = [CPI, fakeRef({ id: 'ent-old', code: 'ANCIENNE', isActive: false })];
   prisma.directions = [COMMERCIALE];
   prisma.destinataires = [NDOYE];
   prisma.objets = [SUIVI];
 
-  const service = new VisitesService(
-    prisma as unknown as PrismaService,
-    new FakeDemo(demoOn) as unknown as DemoVisibilityService,
-  );
+  const service = new VisitesService(prisma as unknown as PrismaService);
   return { prisma, service };
 };
 
@@ -100,22 +96,6 @@ describe('registre des visites', () => {
     const visite = await service.create({ ...base }, ACCUEIL);
     expect(visite.direction).toBeNull();
     expect(visite.destinataire).toBeNull();
-  });
-
-  it('cloisonne la lecture : mode éteint, une ligne de démonstration reste invisible', async () => {
-    const { prisma: demoPrisma, service: demoService } = build(true);
-    await demoService.create({ ...base }, ACCUEIL);
-
-    const reel = new VisitesService(
-      demoPrisma as unknown as PrismaService,
-      new FakeDemo(false) as unknown as DemoVisibilityService,
-    );
-
-    const fictive = demoPrisma.visites[0];
-    expect(fictive?.isDemo).toBe(true);
-    expect((await reel.list({})).meta.total).toBe(0);
-    expect((await demoService.list({})).meta.total).toBe(1);
-    await expect(reel.get(fictive?.id ?? '')).rejects.toThrow(NotFoundException);
   });
 
   it('borne la période sur la journée entière, à Dakar', async () => {

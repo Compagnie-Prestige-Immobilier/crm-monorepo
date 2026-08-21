@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../data/local/database.dart';
+import '../../campagnes/campagnes.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_colors.dart';
@@ -33,7 +35,12 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CPI GO'),
+        leading: IconButton(
+          icon: const Icon(PhosphorIconsRegular.squaresFour),
+          tooltip: 'Projets',
+          onPressed: () => context.go(Routes.home),
+        ),
+        title: const Text('Projet CHUES'),
         actions: const <Widget>[
           OfflineIndicator(),
           NotificationBell(),
@@ -59,7 +66,7 @@ class HomeScreen extends ConsumerWidget {
                     CpiSpacing.xs,
                   ),
                   physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: 7,
+                  itemCount: 8,
                   itemBuilder: (BuildContext context, int index) {
                     final Widget child = switch (index) {
                       0 => _Greeting(name: auth.fullName),
@@ -106,9 +113,31 @@ class HomeScreen extends ConsumerWidget {
                       ),
                       4 => Padding(
                         padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
+                        child: Consumer(
+                          builder: (BuildContext context, WidgetRef ref, Widget? _) {
+                            final AsyncValue<List<CampaignsWithOpenWorkResult>> campagnes = ref
+                                .watch(campagnesProvider);
+                            final int reste = (campagnes.value ?? <CampaignsWithOpenWorkResult>[])
+                                .fold<int>(
+                                  0,
+                                  (int total, CampaignsWithOpenWorkResult c) => total + c.ouvertes,
+                                );
+                            return SummaryCard(
+                              label: 'À appeler',
+                              value: '$reste',
+                              isLoading: campagnes.isLoading,
+                              icon: PhosphorIconsRegular.phoneCall,
+                              accentColor: cpi.accentText,
+                              onTap: () => context.go(CampagnesRoutes.liste),
+                            );
+                          },
+                        ),
+                      ),
+                      5 => Padding(
+                        padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
                         child: _ActivityCard(days: activity),
                       ),
-                      5 => const Padding(
+                      6 => const Padding(
                         padding: EdgeInsets.only(bottom: CpiSpacing.xs),
                         child: _Phase2Entry(),
                       ),

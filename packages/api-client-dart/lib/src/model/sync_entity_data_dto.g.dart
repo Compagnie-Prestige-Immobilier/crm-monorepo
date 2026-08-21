@@ -37,6 +37,16 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto profession(String? profession);
 
+  SyncEntityDataDto etablissement(String? etablissement);
+
+  SyncEntityDataDto projet(Projet? projet);
+
+  SyncEntityDataDto type(ProspectType? type);
+
+  SyncEntityDataDto dureeSystemeMois(num? dureeSystemeMois);
+
+  SyncEntityDataDto canalProvenanceId(String? canalProvenanceId);
+
   SyncEntityDataDto clientCreatedAt(DateTime? clientCreatedAt);
 
   SyncEntityDataDto prospectId(String? prospectId);
@@ -50,6 +60,20 @@ abstract class _$SyncEntityDataDtoCWProxy {
   SyncEntityDataDto comment(String? comment);
 
   SyncEntityDataDto callbackAt(DateTime? callbackAt);
+
+  SyncEntityDataDto visitorName(String? visitorName);
+
+  SyncEntityDataDto visitDate(String? visitDate);
+
+  SyncEntityDataDto visitTime(String? visitTime);
+
+  SyncEntityDataDto entrepriseId(String? entrepriseId);
+
+  SyncEntityDataDto objetId(String? objetId);
+
+  SyncEntityDataDto directionId(String? directionId);
+
+  SyncEntityDataDto destinataireId(String? destinataireId);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncEntityDataDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
@@ -73,6 +97,11 @@ abstract class _$SyncEntityDataDtoCWProxy {
     WhatsappStatus? whatsappStatus,
     String? whatsappE164,
     String? profession,
+    String? etablissement,
+    Projet? projet,
+    ProspectType? type,
+    num? dureeSystemeMois,
+    String? canalProvenanceId,
     DateTime? clientCreatedAt,
     String? prospectId,
     CallOutcome? outcome,
@@ -80,6 +109,13 @@ abstract class _$SyncEntityDataDtoCWProxy {
     EnrollmentMethod? method,
     String? comment,
     DateTime? callbackAt,
+    String? visitorName,
+    String? visitDate,
+    String? visitTime,
+    String? entrepriseId,
+    String? objetId,
+    String? directionId,
+    String? destinataireId,
   });
 }
 
@@ -141,6 +177,24 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
       this(profession: profession);
 
   @override
+  SyncEntityDataDto etablissement(String? etablissement) =>
+      this(etablissement: etablissement);
+
+  @override
+  SyncEntityDataDto projet(Projet? projet) => this(projet: projet);
+
+  @override
+  SyncEntityDataDto type(ProspectType? type) => this(type: type);
+
+  @override
+  SyncEntityDataDto dureeSystemeMois(num? dureeSystemeMois) =>
+      this(dureeSystemeMois: dureeSystemeMois);
+
+  @override
+  SyncEntityDataDto canalProvenanceId(String? canalProvenanceId) =>
+      this(canalProvenanceId: canalProvenanceId);
+
+  @override
   SyncEntityDataDto clientCreatedAt(DateTime? clientCreatedAt) =>
       this(clientCreatedAt: clientCreatedAt);
 
@@ -166,6 +220,31 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
       this(callbackAt: callbackAt);
 
   @override
+  SyncEntityDataDto visitorName(String? visitorName) =>
+      this(visitorName: visitorName);
+
+  @override
+  SyncEntityDataDto visitDate(String? visitDate) => this(visitDate: visitDate);
+
+  @override
+  SyncEntityDataDto visitTime(String? visitTime) => this(visitTime: visitTime);
+
+  @override
+  SyncEntityDataDto entrepriseId(String? entrepriseId) =>
+      this(entrepriseId: entrepriseId);
+
+  @override
+  SyncEntityDataDto objetId(String? objetId) => this(objetId: objetId);
+
+  @override
+  SyncEntityDataDto directionId(String? directionId) =>
+      this(directionId: directionId);
+
+  @override
+  SyncEntityDataDto destinataireId(String? destinataireId) =>
+      this(destinataireId: destinataireId);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncEntityDataDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -188,6 +267,11 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? whatsappStatus = const $CopyWithPlaceholder(),
     Object? whatsappE164 = const $CopyWithPlaceholder(),
     Object? profession = const $CopyWithPlaceholder(),
+    Object? etablissement = const $CopyWithPlaceholder(),
+    Object? projet = const $CopyWithPlaceholder(),
+    Object? type = const $CopyWithPlaceholder(),
+    Object? dureeSystemeMois = const $CopyWithPlaceholder(),
+    Object? canalProvenanceId = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? prospectId = const $CopyWithPlaceholder(),
     Object? outcome = const $CopyWithPlaceholder(),
@@ -195,6 +279,13 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? method = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
     Object? callbackAt = const $CopyWithPlaceholder(),
+    Object? visitorName = const $CopyWithPlaceholder(),
+    Object? visitDate = const $CopyWithPlaceholder(),
+    Object? visitTime = const $CopyWithPlaceholder(),
+    Object? entrepriseId = const $CopyWithPlaceholder(),
+    Object? objetId = const $CopyWithPlaceholder(),
+    Object? directionId = const $CopyWithPlaceholder(),
+    Object? destinataireId = const $CopyWithPlaceholder(),
   }) {
     return SyncEntityDataDto(
       fullName: fullName == const $CopyWithPlaceholder()
@@ -257,6 +348,26 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.profession
           // ignore: cast_nullable_to_non_nullable
           : profession as String?,
+      etablissement: etablissement == const $CopyWithPlaceholder()
+          ? _value.etablissement
+          // ignore: cast_nullable_to_non_nullable
+          : etablissement as String?,
+      projet: projet == const $CopyWithPlaceholder()
+          ? _value.projet
+          // ignore: cast_nullable_to_non_nullable
+          : projet as Projet?,
+      type: type == const $CopyWithPlaceholder()
+          ? _value.type
+          // ignore: cast_nullable_to_non_nullable
+          : type as ProspectType?,
+      dureeSystemeMois: dureeSystemeMois == const $CopyWithPlaceholder()
+          ? _value.dureeSystemeMois
+          // ignore: cast_nullable_to_non_nullable
+          : dureeSystemeMois as num?,
+      canalProvenanceId: canalProvenanceId == const $CopyWithPlaceholder()
+          ? _value.canalProvenanceId
+          // ignore: cast_nullable_to_non_nullable
+          : canalProvenanceId as String?,
       clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -285,6 +396,34 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.callbackAt
           // ignore: cast_nullable_to_non_nullable
           : callbackAt as DateTime?,
+      visitorName: visitorName == const $CopyWithPlaceholder()
+          ? _value.visitorName
+          // ignore: cast_nullable_to_non_nullable
+          : visitorName as String?,
+      visitDate: visitDate == const $CopyWithPlaceholder()
+          ? _value.visitDate
+          // ignore: cast_nullable_to_non_nullable
+          : visitDate as String?,
+      visitTime: visitTime == const $CopyWithPlaceholder()
+          ? _value.visitTime
+          // ignore: cast_nullable_to_non_nullable
+          : visitTime as String?,
+      entrepriseId: entrepriseId == const $CopyWithPlaceholder()
+          ? _value.entrepriseId
+          // ignore: cast_nullable_to_non_nullable
+          : entrepriseId as String?,
+      objetId: objetId == const $CopyWithPlaceholder()
+          ? _value.objetId
+          // ignore: cast_nullable_to_non_nullable
+          : objetId as String?,
+      directionId: directionId == const $CopyWithPlaceholder()
+          ? _value.directionId
+          // ignore: cast_nullable_to_non_nullable
+          : directionId as String?,
+      destinataireId: destinataireId == const $CopyWithPlaceholder()
+          ? _value.destinataireId
+          // ignore: cast_nullable_to_non_nullable
+          : destinataireId as String?,
     );
   }
 }
@@ -332,6 +471,28 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
         ),
         whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
         profession: $checkedConvert('profession', (v) => v as String?),
+        etablissement: $checkedConvert('etablissement', (v) => v as String?),
+        projet: $checkedConvert(
+          'projet',
+          (v) => $enumDecodeNullable(
+            _$ProjetEnumMap,
+            v,
+            unknownValue: Projet.unknownDefaultOpenApi,
+          ),
+        ),
+        type: $checkedConvert(
+          'type',
+          (v) => $enumDecodeNullable(
+            _$ProspectTypeEnumMap,
+            v,
+            unknownValue: ProspectType.unknownDefaultOpenApi,
+          ),
+        ),
+        dureeSystemeMois: $checkedConvert('dureeSystemeMois', (v) => v as num?),
+        canalProvenanceId: $checkedConvert(
+          'canalProvenanceId',
+          (v) => v as String?,
+        ),
         clientCreatedAt: $checkedConvert(
           'clientCreatedAt',
           (v) => v == null ? null : DateTime.parse(v as String),
@@ -359,41 +520,61 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
           'callbackAt',
           (v) => v == null ? null : DateTime.parse(v as String),
         ),
+        visitorName: $checkedConvert('visitorName', (v) => v as String?),
+        visitDate: $checkedConvert('visitDate', (v) => v as String?),
+        visitTime: $checkedConvert('visitTime', (v) => v as String?),
+        entrepriseId: $checkedConvert('entrepriseId', (v) => v as String?),
+        objetId: $checkedConvert('objetId', (v) => v as String?),
+        directionId: $checkedConvert('directionId', (v) => v as String?),
+        destinataireId: $checkedConvert('destinataireId', (v) => v as String?),
       );
       return val;
     });
 
-Map<String, dynamic> _$SyncEntityDataDtoToJson(SyncEntityDataDto instance) =>
-    <String, dynamic>{
-      if (instance.fullName case final value?) 'fullName': value,
-      if (instance.nom case final value?) 'nom': value,
-      if (instance.prenom case final value?) 'prenom': value,
-      if (instance.phone case final value?) 'phone': value,
-      if (instance.departementId case final value?) 'departementId': value,
-      if (instance.iefId case final value?) 'iefId': value,
-      if (instance.banqueId case final value?) 'banqueId': value,
-      if (instance.syndicatId case final value?) 'syndicatId': value,
-      if (instance.representantId case final value?) 'representantId': value,
-      if (instance.body case final value?) 'body': value,
-      if (_$ProspectStatutEnumMap[instance.statut] case final value?)
-        'statut': value,
-      if (instance.notes case final value?) 'notes': value,
-      if (_$WhatsappStatusEnumMap[instance.whatsappStatus] case final value?)
-        'whatsappStatus': value,
-      if (instance.whatsappE164 case final value?) 'whatsappE164': value,
-      if (instance.profession case final value?) 'profession': value,
-      if (instance.clientCreatedAt?.toIso8601String() case final value?)
-        'clientCreatedAt': value,
-      if (instance.prospectId case final value?) 'prospectId': value,
-      if (_$CallOutcomeEnumMap[instance.outcome] case final value?)
-        'outcome': value,
-      if (instance.reasonCode case final value?) 'reasonCode': value,
-      if (_$EnrollmentMethodEnumMap[instance.method] case final value?)
-        'method': value,
-      if (instance.comment case final value?) 'comment': value,
-      if (instance.callbackAt?.toIso8601String() case final value?)
-        'callbackAt': value,
-    };
+Map<String, dynamic> _$SyncEntityDataDtoToJson(
+  SyncEntityDataDto instance,
+) => <String, dynamic>{
+  if (instance.fullName case final value?) 'fullName': value,
+  if (instance.nom case final value?) 'nom': value,
+  if (instance.prenom case final value?) 'prenom': value,
+  if (instance.phone case final value?) 'phone': value,
+  if (instance.departementId case final value?) 'departementId': value,
+  if (instance.iefId case final value?) 'iefId': value,
+  if (instance.banqueId case final value?) 'banqueId': value,
+  if (instance.syndicatId case final value?) 'syndicatId': value,
+  if (instance.representantId case final value?) 'representantId': value,
+  if (instance.body case final value?) 'body': value,
+  if (_$ProspectStatutEnumMap[instance.statut] case final value?)
+    'statut': value,
+  if (instance.notes case final value?) 'notes': value,
+  if (_$WhatsappStatusEnumMap[instance.whatsappStatus] case final value?)
+    'whatsappStatus': value,
+  if (instance.whatsappE164 case final value?) 'whatsappE164': value,
+  if (instance.profession case final value?) 'profession': value,
+  if (instance.etablissement case final value?) 'etablissement': value,
+  if (_$ProjetEnumMap[instance.projet] case final value?) 'projet': value,
+  if (_$ProspectTypeEnumMap[instance.type] case final value?) 'type': value,
+  if (instance.dureeSystemeMois case final value?) 'dureeSystemeMois': value,
+  if (instance.canalProvenanceId case final value?) 'canalProvenanceId': value,
+  if (instance.clientCreatedAt?.toIso8601String() case final value?)
+    'clientCreatedAt': value,
+  if (instance.prospectId case final value?) 'prospectId': value,
+  if (_$CallOutcomeEnumMap[instance.outcome] case final value?)
+    'outcome': value,
+  if (instance.reasonCode case final value?) 'reasonCode': value,
+  if (_$EnrollmentMethodEnumMap[instance.method] case final value?)
+    'method': value,
+  if (instance.comment case final value?) 'comment': value,
+  if (instance.callbackAt?.toIso8601String() case final value?)
+    'callbackAt': value,
+  if (instance.visitorName case final value?) 'visitorName': value,
+  if (instance.visitDate case final value?) 'visitDate': value,
+  if (instance.visitTime case final value?) 'visitTime': value,
+  if (instance.entrepriseId case final value?) 'entrepriseId': value,
+  if (instance.objetId case final value?) 'objetId': value,
+  if (instance.directionId case final value?) 'directionId': value,
+  if (instance.destinataireId case final value?) 'destinataireId': value,
+};
 
 const _$ProspectStatutEnumMap = {
   ProspectStatut.NOUVEAU: 'NOUVEAU',
@@ -409,6 +590,20 @@ const _$WhatsappStatusEnumMap = {
   WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
   WhatsappStatus.AUCUN: 'AUCUN',
   WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$ProjetEnumMap = {
+  Projet.CHUES: 'CHUES',
+  Projet.GRAND_PUBLIC: 'GRAND_PUBLIC',
+  Projet.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$ProspectTypeEnumMap = {
+  ProspectType.FONCTIONNAIRE: 'FONCTIONNAIRE',
+  ProspectType.SECTEUR_PRIVE: 'SECTEUR_PRIVE',
+  ProspectType.INFORMEL: 'INFORMEL',
+  ProspectType.DIASPORA: 'DIASPORA',
+  ProspectType.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$CallOutcomeEnumMap = {

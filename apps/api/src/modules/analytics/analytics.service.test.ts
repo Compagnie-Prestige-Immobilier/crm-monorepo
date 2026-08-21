@@ -6,7 +6,6 @@ import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { AnalyticsService } from './analytics.service.js';
 import { SEGMENT_EXPR, prospectConditions, segmentCondition } from './analytics.sql.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const alice: AuthenticatedUser = {
   id: 'com-alice',
@@ -89,28 +88,22 @@ describe('traduction SQL du segment', () => {
 
 describe('conditions communes', () => {
   it('borne un COMMERCIAL à ses lignes, avant tout filtre', () => {
-    expect(rendered(prospectConditions(alice, {}, false))).toContain(
-      'p."createdById" = "com-alice"',
-    );
+    expect(rendered(prospectConditions(alice, {}))).toContain('p."createdById" = "com-alice"');
   });
 
   it('un COMMERCIAL qui vise un collègue obtient l’ensemble vide', () => {
-    const sql = rendered(prospectConditions(alice, { commercialId: 'com-bob' }, false));
+    const sql = rendered(prospectConditions(alice, { commercialId: 'com-bob' }));
     expect(sql).not.toContain('"com-bob"');
     expect(sql).toContain('"__aucun__"');
   });
 
   it('traduit les filtres de phase 2 sur les bonnes colonnes', () => {
     const sql = rendered(
-      prospectConditions(
-        admin,
-        {
-          phase2Status: 'METHOD_OBTAINED',
-          enrollmentMethod: 'PLATFORM',
-          enrollmentCapturedById: 'com-bob',
-        },
-        false,
-      ),
+      prospectConditions(admin, {
+        phase2Status: 'METHOD_OBTAINED',
+        enrollmentMethod: 'PLATFORM',
+        enrollmentCapturedById: 'com-bob',
+      }),
     );
 
     expect(sql).toContain('p."phase2Status" = "METHOD_OBTAINED"');
@@ -120,38 +113,32 @@ describe('conditions communes', () => {
   });
 
   it('filtre la campagne par une sous-requête sur les tâches', () => {
-    const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }, false));
+    const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }));
     expect(sql).toContain('"call_tasks"');
     expect(sql).toContain('ct."campaignId" = "camp-1"');
   });
 
   it('borne la sous-requête à la file d’un seul téléconseiller', () => {
     const sql = rendered(
-      prospectConditions(admin, { campaignId: 'camp-1', assignedToId: 'com-bob' }, false),
+      prospectConditions(admin, { campaignId: 'camp-1', assignedToId: 'com-bob' }),
     );
     expect(sql).toContain('ct."campaignId" = "camp-1"');
     expect(sql).toContain('ct."assignedToId" = "com-bob"');
   });
 
   it('l’attribution filtre même sans campagne', () => {
-    const sql = rendered(prospectConditions(admin, { assignedToId: 'com-bob' }, false));
+    const sql = rendered(prospectConditions(admin, { assignedToId: 'com-bob' }));
     expect(sql).toContain('ct."assignedToId" = "com-bob"');
     expect(sql).not.toContain('ct."campaignId"');
   });
 
-  it('CLOISONNE la sous-requête de campagne, mode éteint', () => {
-    const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }, false));
-    expect(sql).toContain('ct."isDemo" = FALSE');
-  });
-
-  it('et l’ouvre quand le mode est allumé', () => {
-    const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }, true));
-    expect(sql).not.toContain('ct."isDemo" = FALSE');
+  it('ne filtre pas le workspace dans la requête métier', () => {
+    const sql = rendered(prospectConditions(admin, { campaignId: 'camp-1' }));
     expect(sql).toContain('AND TRUE');
   });
 
   it('exclut les fiches supprimées et celles d’un représentant supprimé', () => {
-    const sql = rendered(prospectConditions(admin, {}, false));
+    const sql = rendered(prospectConditions(admin, {}));
     expect(sql).toContain('p."deletedAt" IS NULL');
     expect(sql).toContain('r."deletedAt" IS NULL');
   });
@@ -164,10 +151,7 @@ describe('séries de phase 2', () => {
       { key: 'METHOD_OBTAINED', prospects: 3 },
     ]);
 
-    const result = await new AnalyticsService(service, fakeDemoVisibility()).byPhase2Status(
-      admin,
-      {},
-    );
+    const result = await new AnalyticsService(service).byPhase2Status(admin, {});
 
     expect(result.items.map((item) => item.status)).toEqual([
       'PENDING',
@@ -184,10 +168,7 @@ describe('séries de phase 2', () => {
   it('ne compte comme méthodes que les fiches qui en portent une', async () => {
     const { service, sql } = makePrisma([{ key: 'PLATFORM', prospects: 4 }]);
 
-    const result = await new AnalyticsService(service, fakeDemoVisibility()).byEnrollmentMethod(
-      admin,
-      {},
-    );
+    const result = await new AnalyticsService(service).byEnrollmentMethod(admin, {});
 
     expect(sql()).toContain('p."enrollmentMethod" IS NOT NULL');
     expect(result.items.map((item) => item.method)).toEqual([
@@ -205,7 +186,7 @@ describe('séries de phase 2', () => {
       { segment: 'BDD4', prospects: 5, obtained: 0 },
     ]);
 
-    const result = await new AnalyticsService(service, fakeDemoVisibility()).bySegment(admin, {});
+    const result = await new AnalyticsService(service).bySegment(admin, {});
 
     expect(result.items.map((item) => item.segment)).toEqual(['BDD1', 'BDD2', 'BDD3', 'BDD4']);
     expect(result.items.map((item) => item.prospects)).toEqual([5, 0, 0, 5]);
@@ -216,7 +197,7 @@ describe('séries de phase 2', () => {
 
   it('agrège en SQL : une requête par série, aucune ligne remontée', async () => {
     const { service, calls } = makePrisma([]);
-    const analytics = new AnalyticsService(service, fakeDemoVisibility());
+    const analytics = new AnalyticsService(service);
 
     await analytics.bySegment(admin, {});
     await analytics.byPhase2Status(admin, {});
@@ -227,7 +208,7 @@ describe('séries de phase 2', () => {
 
   it('applique le filtre reçu à chaque série', async () => {
     const { service, queries } = makePrisma([]);
-    const analytics = new AnalyticsService(service, fakeDemoVisibility());
+    const analytics = new AnalyticsService(service);
     const filter = { segment: 'BDD2', campaignId: 'camp-1' } as const;
 
     await analytics.bySegment(admin, filter);
@@ -243,10 +224,7 @@ describe('séries de phase 2', () => {
 
   it('rend zéro plutôt qu’une division par zéro sur une base vide', async () => {
     const { service } = makePrisma([]);
-    const result = await new AnalyticsService(service, fakeDemoVisibility()).byPhase2Status(
-      admin,
-      {},
-    );
+    const result = await new AnalyticsService(service).byPhase2Status(admin, {});
     expect(result.total).toBe(0);
     expect(result.items.every((item) => item.share === 0)).toBe(true);
   });
@@ -255,7 +233,7 @@ describe('séries de phase 2', () => {
 describe('cloisonnement des agrégats', () => {
   it('un COMMERCIAL ne lit jamais les chiffres de ses collègues', async () => {
     const { service, sql } = makePrisma([]);
-    const analytics = new AnalyticsService(service, fakeDemoVisibility());
+    const analytics = new AnalyticsService(service);
 
     await analytics.bySegment(alice, {});
     await analytics.byPhase2Status(alice, {});
@@ -267,7 +245,7 @@ describe('cloisonnement des agrégats', () => {
 
   it('un ADMIN n’est borné par rien', async () => {
     const { service, sql } = makePrisma([]);
-    await new AnalyticsService(service, fakeDemoVisibility()).totals(admin, {});
+    await new AnalyticsService(service).totals(admin, {});
     expect(sql()).not.toContain('p."createdById" =');
   });
 });
@@ -276,7 +254,7 @@ describe('totaux des téléconseillers', () => {
   it('compte les téléconseillers encore actifs, pas les auteurs historiques', async () => {
     const { service, sql } = makePrisma([{ commerciaux: 1 }]);
 
-    await new AnalyticsService(service, fakeDemoVisibility()).totals(admin, {});
+    await new AnalyticsService(service).totals(admin, {});
 
     expect(sql()).toContain('COUNT(DISTINCT u."id") FILTER');
     expect(sql()).toContain('u."role" = \'COMMERCIAL\'');
@@ -287,7 +265,7 @@ describe('totaux des téléconseillers', () => {
 describe('granularité temporelle', () => {
   it('n’injecte jamais la valeur reçue dans le date_trunc', async () => {
     const { service, sql } = makePrisma([]);
-    await new AnalyticsService(service, fakeDemoVisibility()).overTime(admin, {
+    await new AnalyticsService(service).overTime(admin, {
       granularity: "day'); DROP TABLE prospects; --" as never,
     });
 

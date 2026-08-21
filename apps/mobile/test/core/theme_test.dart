@@ -289,6 +289,86 @@ void main() {
     });
   });
 
+  /// La coque CHUES porte l'identité de l'Union des Enseignants du Senegal :
+  /// un « UES » noir massif souligne d'un filet bleu. Le bleu tient les aplats
+  /// et le noir la barre de navigation ; le bordeaux CPI n'y entre pas.
+  group('Palette CHUES', () {
+    final ColorScheme scheme = AppTheme.chuesColorScheme;
+    const CpiColors cpi = CpiColors.chues;
+
+    test('le bleu profond et le noir sont ceux du logo', () {
+      expect(scheme.primary, const Color(0xFF0B2E6F));
+      expect(scheme.onSurface, const Color(0xFF0B0D12));
+      expect(cpi.navSurface, const Color(0xFF0B0D12));
+      expect(scheme.primary, isNot(AppTheme.colorScheme.primary));
+    });
+
+    test('les paires texte/fond de la coque tiennent AA', () {
+      for (final (String name, Color fg, Color bg) in <(String, Color, Color)>[
+        ('onSurface', scheme.onSurface, scheme.surface),
+        ('onPrimary', scheme.onPrimary, scheme.primary),
+        ('onSurfaceVariant sur carte', scheme.onSurfaceVariant, scheme.surfaceContainerLowest),
+        ('onSurfaceVariant sur fond', scheme.onSurfaceVariant, scheme.surface),
+        ('onSecondaryContainer', scheme.onSecondaryContainer, scheme.secondaryContainer),
+        ('onTertiaryContainer', scheme.onTertiaryContainer, scheme.tertiaryContainer),
+        ('onErrorContainer', scheme.onErrorContainer, scheme.errorContainer),
+        ('onError', scheme.onError, scheme.error),
+        ('navForeground', cpi.navForeground, cpi.navSurface),
+        ('navActiveForeground', cpi.navActiveForeground, cpi.navActive),
+        ('accentText sur carte', cpi.accentText, scheme.surfaceContainerLowest),
+        ('accentText sur sa surface', cpi.accentText, cpi.accentSurface),
+        ('accentForeground', cpi.accentForeground, cpi.accent),
+      ]) {
+        expect(
+          contrast(fg, bg),
+          greaterThanOrEqualTo(4.5),
+          reason: '$name est illisible sur la coque CHUES',
+        );
+      }
+      expect(contrast(scheme.outline, scheme.surface), greaterThanOrEqualTo(3.0));
+    });
+
+    test('sur le bleu plein, le rouge d\'erreur cede la place', () {
+      // Meme piege que sur le bordeaux : `colorScheme.error` pose a meme un
+      // aplat de marque tombe sous 3:1 et devient illisible.
+      expect(contrast(scheme.error, scheme.primary), lessThan(3.0));
+      expect(
+        contrast(cpi.destructiveOnDark, scheme.primary),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(contrast(cpi.accentOnDark, scheme.primary), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(cpi.accentOnDark, scheme.primary),
+        greaterThan(contrast(cpi.accent, scheme.primary)),
+      );
+    });
+
+    test('les statuts passent AA sur leur surface', () {
+      expect(contrast(cpi.success, cpi.successSurface), greaterThanOrEqualTo(4.5));
+      expect(contrast(cpi.warning, cpi.warningSurface), greaterThanOrEqualTo(4.5));
+      expect(contrast(cpi.info, cpi.infoSurface), greaterThanOrEqualTo(4.5));
+    });
+
+    test('cinq series et cinq familles de synchronisation se distinguent', () {
+      expect(cpi.chartSeries.toSet(), hasLength(5));
+      expect(
+        <Color>{
+          cpi.syncDraft,
+          cpi.syncSyncing,
+          cpi.syncSynced,
+          cpi.syncConflict,
+          cpi.syncFailed,
+        },
+        hasLength(5),
+      );
+    });
+
+    test('chaque coque emporte SON extension de couleurs', () {
+      expect(AppTheme.chues.extension<CpiColors>(), same(CpiColors.chues));
+      expect(AppTheme.light.extension<CpiColors>(), same(CpiColors.light));
+    });
+  });
+
   group('CpiMotion', () {
     testWidgets('les durées tombent à zéro si les animations sont désactivées', (
       WidgetTester tester,

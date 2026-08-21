@@ -82,6 +82,52 @@ export class RepresentantProductivityListDto {
   dormantDays!: number;
 }
 
+export class AmbassadorConversionDto {
+  @ApiProperty({
+    type: Number,
+    description:
+      'Représentants dont la relation a bougé au moins une fois dans la période. ' +
+      'Dénominateur : un taux rapporté à l’annuaire entier mesurerait la taille du ' +
+      'fichier, pas le travail.',
+  })
+  contacted!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Parmi eux, ceux passés au moins une fois AMBASSADEUR dans la période. Comptés ' +
+      'une seule fois, quel que soit le nombre d’allers-retours.',
+  })
+  ambassadors!: number;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Ambassadeurs rapportés aux représentants travaillés, en pourcentage. ' +
+      'Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %.',
+  })
+  conversionRate!: number | null;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Parmi les convertis de la période, ceux dont le statut COURANT n’est plus ' +
+      'AMBASSADEUR. Ils restent au numérateur : la bascule a eu lieu et elle est ' +
+      'datée. Les retirer ferait bouger le taux d’un mois clos à chaque changement ' +
+      'de statut d’aujourd’hui.',
+  })
+  reverted!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Représentants du périmètre sans AUCUNE trace de relation, à aucune date. Hors ' +
+      'du taux dans les deux termes : ils mesurent ce que la période ne dit pas.',
+  })
+  untracked!: number;
+}
+
 export class DataQualityRowDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;

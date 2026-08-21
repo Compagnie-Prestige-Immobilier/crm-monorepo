@@ -4,10 +4,11 @@ import { Prisma } from '@crm/database';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
-import { DemoVisibilityService } from '../../prisma/demo-visibility.service.js';
-import { PROSPECT_FROM, prospectConditions } from './analytics.sql.js';
-import { ATTEMPT, UNUSABLE_OUTCOMES, demoScopeOn, rate } from './pilotage.sql.js';
+import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
+import { PROSPECT_FROM, prospectConditions, representantConditions } from './analytics.sql.js';
+import { UNUSABLE_OUTCOMES, ALL_ROWS, rate } from './pilotage.sql.js';
 import type {
+  AmbassadorConversionDto,
   DataQualityDto,
   DataQualityRowDto,
   OriginBreakdownDto,
@@ -29,16 +30,13 @@ const originLabel = (origin: string | null): string =>
 
 @Injectable()
 export class QualityService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly demo: DemoVisibilityService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async representantProductivity(
     user: AuthenticatedUser,
     query: RepresentantProductivityQueryDto,
   ): Promise<RepresentantProductivityListDto> {
-    const where = prospectConditions(user, query, await this.demo.enabled());
+    const where = prospectConditions(user, query);
     const dormantDays = query.dormantDays ?? DORMANT_DAYS;
 
     const rows = await this.prisma.$queryRaw<
@@ -92,10 +90,66 @@ export class QualityService {
     };
   }
 
+  /**
+   * Conversion en ambassadeur, datée sur la BASCULE et non sur l'arrivée en
+   * base : la fiche ne garde que son dernier état, `representant_relation_changes`
+   * garde l'acte et sa date.
+   */
+  async ambassadorConversion(
+    user: AuthenticatedUser,
+    filter: ProspectFilterDto,
+  ): Promise<AmbassadorConversionDto> {
+    const perimetre = representantConditions(user, filter);
+    const traceVisible = ALL_ROWS;
+
+    const bornes: Prisma.Sql[] = [perimetre, traceVisible];
+    if (filter.dateFrom) {
+      bornes.push(Prisma.sql`rc."changedAt" >= ${inclusiveDateFrom(filter.dateFrom)}`);
+    }
+    if (filter.dateTo) {
+      bornes.push(Prisma.sql`rc."changedAt" <= ${inclusiveDateTo(filter.dateTo)}`);
+    }
+
+    const [bascules, jamaisTravailles] = await Promise.all([
+      this.prisma.$queryRaw<{ contactes: number; ambassadeurs: number; revenus: number }[]>`
+        SELECT
+          COUNT(DISTINCT rc."representantId")::int AS contactes,
+          COUNT(DISTINCT rc."representantId") FILTER (
+            WHERE rc."toStatus" = 'AMBASSADEUR'
+          )::int AS ambassadeurs,
+          COUNT(DISTINCT rc."representantId") FILTER (
+            WHERE rc."toStatus" = 'AMBASSADEUR' AND r."relationStatus" <> 'AMBASSADEUR'
+          )::int AS revenus
+        FROM "representant_relation_changes" rc
+        INNER JOIN "representants" r ON r."id" = rc."representantId"
+        WHERE ${Prisma.join(bornes, ' AND ')}
+      `,
+      this.prisma.$queryRaw<{ orphelins: number }[]>`
+        SELECT COUNT(*)::int AS orphelins
+        FROM "representants" r
+        WHERE ${perimetre}
+          AND NOT EXISTS (
+            SELECT 1 FROM "representant_relation_changes" rc
+            WHERE rc."representantId" = r."id" AND ${traceVisible}
+          )
+      `,
+    ]);
+
+    const contacted = bascules[0]?.contactes ?? 0;
+    const ambassadors = bascules[0]?.ambassadeurs ?? 0;
+
+    return {
+      contacted,
+      ambassadors,
+      conversionRate: rate(ambassadors, contacted),
+      reverted: bascules[0]?.revenus ?? 0,
+      untracked: jamaisTravailles[0]?.orphelins ?? 0,
+    };
+  }
+
   async dataQuality(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<DataQualityDto> {
-    const demoEnabled = await this.demo.enabled();
-    const where = prospectConditions(user, filter, demoEnabled);
-    const scope = demoScopeOn(ATTEMPT, demoEnabled);
+    const where = prospectConditions(user, filter);
+    const scope = ALL_ROWS;
 
     const [representants, departements] = await Promise.all([
       this.qualityBy(where, scope, Prisma.empty, Prisma.sql`r."id"`, Prisma.sql`r."fullName"`),
@@ -123,7 +177,7 @@ export class QualityService {
     user: AuthenticatedUser,
     filter: ProspectFilterDto,
   ): Promise<OriginBreakdownDto> {
-    const where = prospectConditions(user, filter, await this.demo.enabled());
+    const where = prospectConditions(user, filter);
 
     const [origins, labels] = await Promise.all([
       this.prisma.$queryRaw<{ origin: string | null; prospects: number }[]>`

@@ -80,7 +80,7 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
       toast.success(`${prospect.prenom} ${prospect.nom} enregistré.`);
 
       if (!variables.andNext) {
-        router.push(`/prospects?search=${encodeURIComponent(prospect.phoneE164)}`);
+        router.push(`/chues/prospects?search=${encodeURIComponent(prospect.phoneE164)}`);
         return;
       }
 
@@ -233,7 +233,7 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
                 {conflict.ownedByCommercialName} le {formatDateTime(conflict.createdAt)}.
               </p>
               <Link
-                href={`/prospects?search=${encodeURIComponent(toE164Senegal(phone) ?? phone)}`}
+                href={`/chues/prospects?search=${encodeURIComponent(toE164Senegal(phone) ?? phone)}`}
                 className="w-fit rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 Ouvrir la fiche existante

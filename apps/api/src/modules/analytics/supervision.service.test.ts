@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { makeAnalyticsPrisma } from './fake-analytics-prisma.js';
 import { SupervisionGranularity } from './supervision.dto.js';
 import { SupervisionActivityService } from './supervision.service.js';
@@ -26,7 +25,7 @@ const ligne = (over: Record<string, unknown> = {}): Record<string, unknown> => (
 describe('activité des téléconseillers', () => {
   it('mesure la date de l’ACTE, jamais l’arrivée en base', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new SupervisionActivityService(service, fakeDemoVisibility()).activite({});
+    await new SupervisionActivityService(service).activite({});
 
     expect(sql()).toContain('ca."clientCreatedAt"');
     expect(sql()).toContain('p."clientCreatedAt"');
@@ -37,7 +36,7 @@ describe('activité des téléconseillers', () => {
 
   it('borne la fenêtre sur la journée de Dakar, bornes incluses', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new SupervisionActivityService(service, fakeDemoVisibility()).activite({
+    await new SupervisionActivityService(service).activite({
       actFrom: '2026-08-17',
       actTo: '2026-08-17',
     });
@@ -48,7 +47,7 @@ describe('activité des téléconseillers', () => {
 
   it('sans fenêtre, aucune borne de date n’est posée', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    const result = await new SupervisionActivityService(service, fakeDemoVisibility()).activite({});
+    const result = await new SupervisionActivityService(service).activite({});
 
     expect(sql()).not.toContain('>=');
     expect(result.from).toBeNull();
@@ -57,7 +56,7 @@ describe('activité des téléconseillers', () => {
 
   it('n’injecte jamais la granularité reçue dans le date_trunc', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new SupervisionActivityService(service, fakeDemoVisibility()).activite({
+    await new SupervisionActivityService(service).activite({
       granularity: SupervisionGranularity.WEEK,
     });
 
@@ -65,24 +64,9 @@ describe('activité des téléconseillers', () => {
     expect(sql()).not.toContain('date_trunc("week"');
   });
 
-  it('pose la visibilité de démonstration sur CHAQUE table lue', async () => {
-    const { service, sql } = makeAnalyticsPrisma();
-    await new SupervisionActivityService(service, fakeDemoVisibility()).activite({});
-
-    for (const alias of ['ca', 'p', 'rca', 'ct', 'u']) {
-      expect(sql()).toContain(`${alias}."isDemo" = FALSE`);
-    }
-  });
-
-  it('mode démonstration allumé : aucune table n’est filtrée', async () => {
-    const { service, sql } = makeAnalyticsPrisma();
-    await new SupervisionActivityService(service, fakeDemoVisibility(true)).activite({});
-    expect(sql()).not.toContain('isDemo');
-  });
-
   it('ne compte que les téléconseillers', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new SupervisionActivityService(service, fakeDemoVisibility()).activite({});
+    await new SupervisionActivityService(service).activite({});
 
     expect(sql()).toContain('u."role" = "COMMERCIAL"');
     expect(sql()).toContain('u."deletedAt" IS NULL');
@@ -108,7 +92,7 @@ describe('activité des téléconseillers', () => {
       [{ id: 'com-alice', nom: 'Alice Diop', actif: true, ouvertes: 12 }],
     );
 
-    const result = await new SupervisionActivityService(service, fakeDemoVisibility()).activite({});
+    const result = await new SupervisionActivityService(service).activite({});
     const row = result.items[0];
 
     expect(row).toEqual({
@@ -134,7 +118,7 @@ describe('activité des téléconseillers', () => {
 
   it('aucun appel : le taux vaut null, jamais 0', async () => {
     const { service } = makeAnalyticsPrisma([ligne({ prospects: 3 })], []);
-    const result = await new SupervisionActivityService(service, fakeDemoVisibility()).activite({});
+    const result = await new SupervisionActivityService(service).activite({});
 
     expect(result.items[0]?.calls).toBe(0);
     expect(result.items[0]?.reachRate).toBeNull();
@@ -142,7 +126,7 @@ describe('activité des téléconseillers', () => {
 
   it('base vide : charge utile complète, deux requêtes', async () => {
     const { service, calls } = makeAnalyticsPrisma();
-    const result = await new SupervisionActivityService(service, fakeDemoVisibility()).activite({});
+    const result = await new SupervisionActivityService(service).activite({});
 
     expect(calls()).toBe(2);
     expect(result.items).toEqual([]);

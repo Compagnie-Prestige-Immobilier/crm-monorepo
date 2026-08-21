@@ -2,7 +2,6 @@ import { Role } from '@crm/database';
 import { describe, expect, it } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { makeAnalyticsPrisma } from './fake-analytics-prisma.js';
 import { PortfolioService } from './portfolio.service.js';
 
@@ -17,17 +16,15 @@ const admin: AuthenticatedUser = {
 describe('vieillissement du portefeuille bancaire', () => {
   it('ne regarde que les dossiers vivants, et filtre la démonstration', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new PortfolioService(service, fakeDemoVisibility()).bankAging(admin, {});
+    await new PortfolioService(service).bankAging(admin, {});
 
     expect(sql()).toContain(`st."type" = 'OPEN'`);
     expect(sql()).toContain('bc."deletedAt" IS NULL');
-    expect(sql()).toContain('bc."isDemo" = FALSE');
-    expect(sql()).toContain('tr."isDemo" = FALSE');
   });
 
   it('base vide : les cinq tranches restent présentes, à zéro', async () => {
     const { service } = makeAnalyticsPrisma();
-    const result = await new PortfolioService(service, fakeDemoVisibility()).bankAging(admin, {});
+    const result = await new PortfolioService(service).bankAging(admin, {});
 
     expect(result.total).toBe(0);
     expect(result.stages).toEqual([]);
@@ -69,7 +66,7 @@ describe('vieillissement du portefeuille bancaire', () => {
       },
     ]);
 
-    const result = await new PortfolioService(service, fakeDemoVisibility()).bankAging(admin, {});
+    const result = await new PortfolioService(service).bankAging(admin, {});
 
     expect(result.total).toBe(10);
     expect(result.buckets.map((bucket) => bucket.dossiers)).toEqual([3, 2, 2, 1, 2]);
@@ -83,11 +80,9 @@ describe('vieillissement du portefeuille bancaire', () => {
 describe('cohortes hebdomadaires', () => {
   it('suit la semaine de SAISIE TERRAIN, pas celle de l’arrivée en base', async () => {
     const { service, sql } = makeAnalyticsPrisma();
-    await new PortfolioService(service, fakeDemoVisibility()).weeklyCohorts(admin, {});
+    await new PortfolioService(service).weeklyCohorts(admin, {});
 
     expect(sql()).toContain(`date_trunc('week', p."clientCreatedAt")`);
-    expect(sql()).toContain('p."isDemo" = FALSE');
-    expect(sql()).toContain('bc."isDemo" = FALSE');
   });
 
   it('rend le montant en chaîne et le taux rapporté aux entrées', async () => {
@@ -110,10 +105,7 @@ describe('cohortes hebdomadaires', () => {
       },
     ]);
 
-    const result = await new PortfolioService(service, fakeDemoVisibility()).weeklyCohorts(
-      admin,
-      {},
-    );
+    const result = await new PortfolioService(service).weeklyCohorts(admin, {});
 
     expect(result.items[0]?.week).toBe('2026-07-06');
     expect(result.items[0]?.cashedAmountXof).toBe('18000000');
@@ -125,10 +117,7 @@ describe('cohortes hebdomadaires', () => {
 
   it('base vide : charge utile bien formée', async () => {
     const { service, calls } = makeAnalyticsPrisma();
-    const result = await new PortfolioService(service, fakeDemoVisibility()).weeklyCohorts(
-      admin,
-      {},
-    );
+    const result = await new PortfolioService(service).weeklyCohorts(admin, {});
 
     expect(calls()).toBe(1);
     expect(result).toEqual({ items: [], total: 0 });
@@ -158,10 +147,7 @@ describe('rendement par département', () => {
       },
     ]);
 
-    const result = await new PortfolioService(service, fakeDemoVisibility()).departementYield(
-      admin,
-      {},
-    );
+    const result = await new PortfolioService(service).departementYield(admin, {});
 
     expect(result.items[0]?.conversionRate).toBe(1);
     expect(result.items[0]?.methodRate).toBe(25);
@@ -172,10 +158,7 @@ describe('rendement par département', () => {
 
   it('base vide : aucune division par zéro', async () => {
     const { service } = makeAnalyticsPrisma();
-    const result = await new PortfolioService(service, fakeDemoVisibility()).departementYield(
-      admin,
-      {},
-    );
+    const result = await new PortfolioService(service).departementYield(admin, {});
     expect(result).toEqual({ items: [], total: 0 });
   });
 });

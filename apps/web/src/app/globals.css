@@ -258,6 +258,136 @@
   --elev-hover: 0 6px 22px rgba(0, 0, 0, 0.44);
 }
 
+/* ─── Coque « Projet CHUES » : identité UES, noir et bleu ────────────────────
+   Le bordeaux CPI reste la couleur d'Accueil, Grand Public et Admin. Entrer
+   dans `/chues/*` monte un conteneur `data-coque="chues"` qui redéfinit les
+   tokens de marque ; en sortir démonte le conteneur et rend la palette. Aucun
+   thème global n'est muté, donc rien à défaire, et deux onglets ouverts sur
+   deux projets ne se contaminent pas.
+
+   Le second sélecteur porte les mêmes tokens sur `html` TANT QUE la coque est
+   montée : les dialogues, popovers et menus de Base UI sont téléportés dans
+   `body`, hors du conteneur, et resteraient bordeaux au milieu d'un écran
+   bleu. C'est le DOM affiché qui commande, pas une classe posée par un effet.
+
+   Les deux blocs déclarent le MÊME jeu de tokens : `html:has(...)` bat `.dark`
+   en spécificité, si bien qu'un token oublié ici rendrait sa version claire
+   sur fond sombre.
+   Contrastes mesurés par `components/layout/coque-chues.test.ts`, qui lit ce
+   fichier. */
+[data-coque='chues'],
+html:has([data-coque='chues']) {
+  --background: #ffffff;
+  --foreground: #0a0f1a;
+  --card: #f9fafc;
+  --card-foreground: #0a0f1a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0f1a;
+  --border: rgba(15, 46, 107, 0.14);
+  --input-background: #edf1f8;
+  --input-border: #7c8ca8;
+  --switch-background: #9ba9c2;
+  --scrim: rgba(6, 10, 20, 0.55);
+
+  /* Le bleu profond du filet sous le « UES ». */
+  --primary: #0f2e6b;
+  --primary-hover: #16408f;
+  --primary-foreground: #ffffff;
+  --primary-text: #0f2e6b;
+  --secondary: #f1f3f8;
+  --secondary-foreground: #0f2e6b;
+  --muted: #eceff5;
+  --muted-foreground: #47546b;
+  --ring: #0f2e6b;
+
+  /* L'or CPI n'a pas cours ici : le marqueur est le bleu vif du filet. */
+  --accent: #1f63ce;
+  --accent-foreground: #ffffff;
+  --accent-text: #17509e;
+  --accent-border: #2f6fd6;
+  --accent-on-dark: #7fb4ff;
+  --accent-surface: #eaf1fc;
+
+  --info: #1f63ce;
+  --info-foreground: #ffffff;
+  --info-surface: #eaf1fc;
+  --info-on-dark: #7fb4ff;
+
+  /* Le noir massif du logo, pas un gris. */
+  --sidebar: #0b0c10;
+  --sidebar-foreground: #c6d2e6;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #0b0c10;
+  --sidebar-accent: #17233a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #7fb4ff;
+  --sidebar-muted-foreground: #a8b6ce;
+
+  --chart-1: #0f2e6b;
+  --chart-4: #2f6fd6;
+  --chart-grid: rgba(15, 46, 107, 0.1);
+  --chart-tick: #47546b;
+
+  --elev-hover: 0 6px 22px rgba(15, 46, 107, 0.12);
+}
+
+.dark [data-coque='chues'],
+html.dark:has([data-coque='chues']) {
+  --background: #101216;
+  --foreground: #eef1f6;
+  --card: #191b20;
+  --card-foreground: #eef1f6;
+  --popover: #191b20;
+  --popover-foreground: #eef1f6;
+  --border: rgba(255, 255, 255, 0.12);
+  --input-background: #1e2128;
+  --input-border: #808ea6;
+  --switch-background: #2a3244;
+  --scrim: rgba(0, 0, 0, 0.65);
+
+  /* Le bleu profond du mode clair ne porte plus de blanc lisible sur fond
+     sombre ; on remonte d'un cran sans quitter le bleu du filet. */
+  --primary: #2a6ad0;
+  --primary-hover: #3172da;
+  --primary-foreground: #ffffff;
+  --primary-text: #8db8ff;
+  --secondary: #1e2128;
+  --secondary-foreground: #dce5f2;
+  --muted: #1e2128;
+  --muted-foreground: #a9b6cb;
+  --ring: #8db8ff;
+
+  --accent: #2a6ad0;
+  --accent-foreground: #ffffff;
+  --accent-text: #8db8ff;
+  --accent-border: #2a6ad0;
+  --accent-on-dark: #8db8ff;
+  --accent-surface: #142138;
+
+  --info: #8db8ff;
+  --info-foreground: #0a0f1a;
+  --info-surface: #142138;
+  --info-on-dark: #8db8ff;
+
+  --sidebar: #08090c;
+  --sidebar-foreground: #c6d2e6;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #08090c;
+  --sidebar-accent: #172236;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.12);
+  --sidebar-ring: #8db8ff;
+  --sidebar-muted-foreground: #a8b6ce;
+
+  --chart-1: #6fa5ff;
+  --chart-4: #8db8ff;
+  --chart-grid: rgba(255, 255, 255, 0.1);
+  --chart-tick: #a9b6cb;
+
+  --elev-hover: 0 6px 22px rgba(0, 0, 0, 0.44);
+}
+
 /* ─── Exposition Tailwind v4 ─────────────────────────────────────────────── */
 @theme inline {
   --color-background: var(--background);

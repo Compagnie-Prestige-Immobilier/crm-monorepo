@@ -25,7 +25,7 @@ export default async function NotFound() {
           Base UI poserait `role="button"` sur le `<a>` et lui retirerait sa
           sémantique de lien. Seule la peau est empruntée. */}
       <Link href={home} className={buttonVariants()}>
-        {session === null ? 'Aller à la connexion' : 'Retour à l’accueil'}
+        {session === null ? 'Aller à la connexion' : 'Revenir aux espaces'}
       </Link>
     </main>
   );

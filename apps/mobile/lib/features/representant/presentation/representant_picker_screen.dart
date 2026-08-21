@@ -17,6 +17,7 @@ import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/search_field.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
+import '../../../ui/async_value_x.dart';
 
 class RepresentantPickerScreen extends ConsumerStatefulWidget {
   const RepresentantPickerScreen({super.key});
@@ -65,7 +66,7 @@ class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScr
                 ),
               ),
               Expanded(
-                child: rows.when(
+                child: rows.whenEchecDAbord(
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (Object e, StackTrace _) =>
                       Center(child: Text('Lecture impossible : $e')),
@@ -126,12 +127,14 @@ class _RepresentantRow extends StatelessWidget {
         Expanded(
           child: Semantics(
             button: true,
-            label: '${data.fullName}, $subtitle. Ajouter des prospects.',
+            label: '${data.fullName}, $subtitle. Compléter la fiche.',
             child: ExcludeSemantics(
               child: InkWell(
+                // Les fiches sont importées : choisir mène au formulaire
+                // prérempli, jamais directement aux prospects.
                 onTap: () {
                   unawaited(HapticFeedback.selectionClick());
-                  context.pushOnce(Routes.newProspectFor(data.id));
+                  context.pushOnce(Routes.representantFormFor(data.id));
                 },
                 onLongPress: openDetail,
                 child: ConstrainedBox(
@@ -166,7 +169,7 @@ class _RepresentantRow extends StatelessWidget {
                           ),
                         ),
                         Icon(
-                          PhosphorIconsRegular.userPlus,
+                          PhosphorIconsRegular.pencilSimple,
                           size: 20,
                           color: context.cpi.accentText,
                         ),

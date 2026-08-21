@@ -98,11 +98,14 @@ export function UserFormDialog({
 
   const mutation = useMutation({
     mutationFn: async (values: UserFormInput) => {
+      // La chaine VIDE et non `undefined` : sur un PATCH, un champ absent veut
+      // dire « ne change rien ». « Aucun » ne retirait donc jamais le
+      // rattachement, il le laissait en place en silence.
       const departementId =
         values.departementId === NO_DEPARTEMENT || values.departementId === ''
-          ? undefined
+          ? ''
           : values.departementId;
-      const phone = values.phone === '' ? undefined : values.phone;
+      const phone = values.phone;
 
       if (isEdit) {
         const patch: UpdateUserInput = {
@@ -111,8 +114,9 @@ export function UserFormDialog({
           fullName: values.fullName,
           role: values.role,
         };
-        if (departementId !== undefined) patch.departementId = departementId;
-        if (phone !== undefined) patch.phone = phone;
+        // Toujours poses, vides compris : c'est ce qui EFFACE.
+        patch.departementId = departementId;
+        patch.phone = phone;
         return updateUser(user.id, patch);
       }
 
@@ -123,8 +127,9 @@ export function UserFormDialog({
         password: values.password,
         role: values.role,
       };
-      if (departementId !== undefined) body.departementId = departementId;
-      if (phone !== undefined) body.phone = phone;
+      // A la creation, en revanche, un vide n'a rien a effacer : on l'omet.
+      if (departementId !== '') body.departementId = departementId;
+      if (phone !== '') body.phone = phone;
       return createUser(body);
     },
     onSuccess: (saved) => {

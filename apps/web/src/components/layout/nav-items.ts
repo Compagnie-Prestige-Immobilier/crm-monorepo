@@ -4,6 +4,7 @@ import {
   ChartColumnIcon,
   ClipboardListIcon,
   ClockIcon,
+  CompassIcon,
   FileSpreadsheetIcon,
   FolderOpenIcon,
   HeadsetIcon,
@@ -23,6 +24,57 @@ import {
 
 import type { Role } from '@/lib/types';
 
+/** Écran de choix, seul atterrissage après connexion. */
+export const HUB_PATH = '/espaces';
+
+export type Coque = 'accueil' | 'chues' | 'grand-public' | 'admin';
+
+export interface CoqueEntry {
+  id: Coque;
+  label: string;
+  /** Racine de la coque ; toute route en dessous en porte la palette. */
+  path: string;
+  description: string;
+  roles: readonly Role[];
+}
+
+/**
+ * Les quatre entrées de l'application. CHUES et Grand Public visent la même
+ * vente et ne partagent NI écran NI route : le processus d'acquisition et le
+ * programme d'appels diffèrent, et un prospect de l'un n'est pas du travail
+ * pour l'autre.
+ */
+export const COQUES: readonly CoqueEntry[] = [
+  {
+    id: 'accueil',
+    label: 'Accueil',
+    path: '/accueil',
+    description: 'Registre des visites du comptoir',
+    roles: ['ADMIN', 'DIRECTION', 'ACCUEIL'],
+  },
+  {
+    id: 'chues',
+    label: 'Projet CHUES',
+    path: '/chues',
+    description: 'Enrôlement des enseignants syndiqués',
+    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'BANQUE_FINANCE'],
+  },
+  {
+    id: 'grand-public',
+    label: 'Projet Grand Public',
+    path: '/grand-public',
+    description: 'Vente hors syndicat, en préparation',
+    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL'],
+  },
+  {
+    id: 'admin',
+    label: 'Admin',
+    path: '/admin',
+    description: 'Comptes, référentiels, imports et paramètres',
+    roles: ['ADMIN'],
+  },
+];
+
 export interface NavItem {
   href: string;
   label: string;
@@ -33,19 +85,19 @@ export interface NavItem {
 }
 
 export interface NavSection {
-  /** `null` pour la première section, qui n'a pas besoin d'intitulé. */
+  coque: Coque;
+  /** `null` pour la première section d'une coque, qui n'a pas besoin d'intitulé. */
   title: string | null;
   items: readonly NavItem[];
 }
 
-/** Navigation filtrée par rôle ; l'autorisation serveur reste la règle. */
+/** Navigation filtrée par coque puis par rôle ; l'autorisation serveur reste la règle. */
 const SECTIONS: readonly NavSection[] = [
   {
+    coque: 'accueil',
     title: null,
     items: [
       {
-        // En tête parce que c'est l'écran où la Directrice passe sa journée, et
-        // le seul du panneau pour un compte d'accueil.
         href: '/accueil',
         label: 'Registre des visites',
         icon: ClipboardListIcon,
@@ -53,44 +105,57 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN', 'DIRECTION', 'ACCUEIL'],
       },
       {
-        // Écran d'accueil du SUPERVISEUR : c'est le seul qui montre le travail
-        // de chaque téléconseiller ligne à ligne.
-        href: '/supervision',
-        label: 'Supervision',
-        icon: ActivityIcon,
-        description: 'Activité et présence des téléconseillers',
-        roles: ['SUPERVISEUR', 'DIRECTION'],
+        href: '/accueil/tableau-de-bord',
+        label: 'Tableau de bord',
+        icon: LayoutDashboardIcon,
+        description: 'Affluence et motifs de visite',
+        roles: ['ADMIN', 'DIRECTION', 'ACCUEIL'],
       },
+    ],
+  },
+  {
+    coque: 'chues',
+    title: null,
+    items: [
       {
-        href: '/tableau-de-bord',
+        href: '/chues/tableau-de-bord',
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
         description: 'Indicateurs et graphiques',
         roles: ['ADMIN'],
       },
       {
-        href: '/banque',
+        // Écran d'accueil du SUPERVISEUR : c'est le seul qui montre le travail
+        // de chaque téléconseiller ligne à ligne.
+        href: '/chues/supervision',
+        label: 'Supervision',
+        icon: ActivityIcon,
+        description: 'Activité et présence des téléconseillers',
+        roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
+      },
+      {
+        href: '/chues/banque',
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
         description: 'Encaissements, rejets et délais',
         roles: ['BANQUE_FINANCE'],
       },
       {
-        href: '/statistiques',
+        href: '/chues/statistiques',
         label: 'Statistiques',
         icon: ChartColumnIcon,
         description: 'Téléconseil et banques',
         roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
-        href: '/prospects',
+        href: '/chues/prospects',
         label: 'Prospects',
         icon: UsersIcon,
         description: 'Liste filtrable et export',
         roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
-        href: '/campagnes',
+        href: '/chues/campagnes',
         label: 'Campagnes',
         icon: MegaphoneIcon,
         description: 'Campagnes d’appels prospects et représentants',
@@ -99,38 +164,39 @@ const SECTIONS: readonly NavSection[] = [
     ],
   },
   {
+    coque: 'chues',
     title: 'Terrain',
     items: [
       {
-        href: '/console',
+        href: '/chues/console',
         label: 'Console d’appel',
         icon: HeadsetIcon,
         description: 'File d’appels et qualification',
         roles: ['ADMIN', 'COMMERCIAL'],
       },
       {
-        href: '/rappels',
+        href: '/chues/rappels',
         label: 'Rappels',
         icon: ClockIcon,
         description: 'Échéances promises et retards',
         roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
-        href: '/representants',
+        href: '/chues/representants',
         label: 'Représentants',
         icon: UsersRoundIcon,
         description: 'Fiches et coordonnées',
         roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
-        href: '/suggestions',
+        href: '/chues/suggestions',
         label: 'Numéros suggérés',
         icon: PhoneForwardedIcon,
         description: 'Contacts nommés par les représentants',
         roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
-        href: '/prospects/nouveau',
+        href: '/chues/prospects/nouveau',
         label: 'Nouveau prospect',
         icon: PlusCircleIcon,
         description: 'Saisie d’un contact',
@@ -139,47 +205,58 @@ const SECTIONS: readonly NavSection[] = [
     ],
   },
   {
+    coque: 'chues',
     title: 'Banque & Finance',
     items: [
       {
-        href: '/dossiers',
+        href: '/chues/dossiers',
         label: 'Dossiers',
         icon: FolderOpenIcon,
         description: 'Dossiers bancaires',
         roles: ['ADMIN', 'BANQUE_FINANCE'],
       },
       {
-        href: '/dossiers/nouveau',
+        href: '/chues/dossiers/nouveau',
         label: 'Nouveau dossier',
         icon: PlusCircleIcon,
         description: 'Ouverture de dossier',
         roles: ['ADMIN', 'BANQUE_FINANCE'],
       },
       {
-        href: '/dossiers/export',
+        href: '/chues/dossiers/export',
         label: 'Export',
         icon: FileSpreadsheetIcon,
         description: 'Classeur Dossiers · Historique · Synthèse',
         roles: ['ADMIN', 'BANQUE_FINANCE'],
       },
       {
+        // L'arbitrage des demandes déposées par les banques. Sans entrée de
+        // menu, l'écran n'était atteignable qu'en tapant son URL, et la
+        // demande d'une banque restait en attente indéfiniment.
+        href: '/chues/demandes-clients',
+        label: 'Demandes clients',
+        icon: UserPlusIcon,
+        description: 'Créations demandées par les banques',
+        roles: ['ADMIN'],
+      },
+      {
         /**
          * Le SUIVI de ses propres demandes, pour un agent bancaire.
          *
          * Refuser une demande lui envoie une notification dont la route est
-         * `/demandes-clients` : sans cette entrée, le seul chemin vers l'écran
+         * `/chues/demandes-clients` : sans cette entrée, le seul chemin vers l'écran
          * était ce lien-là, et rien ne permettait d'y revenir ensuite. L'API
          * restreint la liste à `requestedById = user.id` : il n'y voit que ses
          * demandes, et l'écran ne lui propose aucun geste d'arbitrage.
          */
-        href: '/demandes-clients',
+        href: '/chues/demandes-clients',
         label: 'Mes demandes',
         icon: UserPlusIcon,
         description: 'Créations de client demandées',
         roles: ['BANQUE_FINANCE'],
       },
       {
-        href: '/dossiers/etapes',
+        href: '/chues/dossiers/etapes',
         label: 'Étapes bancaires',
         icon: ListOrderedIcon,
         description: 'Flux de traitement',
@@ -188,44 +265,31 @@ const SECTIONS: readonly NavSection[] = [
     ],
   },
   {
-    title: 'Administration',
+    coque: 'grand-public',
+    title: null,
     items: [
       {
-        // L'arbitrage des demandes déposées par les banques. Sans entrée de
-        // menu, l'écran n'était atteignable qu'en tapant son URL, et la
-        // demande d'une banque restait en attente indéfiniment.
-        href: '/demandes-clients',
-        label: 'Demandes clients',
-        icon: UserPlusIcon,
-        description: 'Créations demandées par les banques',
-        roles: ['ADMIN'],
+        href: '/grand-public',
+        label: 'Projet Grand Public',
+        icon: CompassIcon,
+        description: 'Ce qui est en préparation',
+        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL'],
       },
+    ],
+  },
+  {
+    coque: 'admin',
+    title: null,
+    items: [
       {
-        // Même défaut, même correction : le composeur existait depuis le début
-        // et ne figurait dans aucune section. La cloche montre ce qu'on
-        // REÇOIT ; cet écran sert à ÉMETTRE, et les deux se cherchaient.
-        href: '/notifications',
-        label: 'Notifications',
-        icon: BellIcon,
-        description: 'Annonces et rappels envoyés',
-        roles: ['ADMIN'],
-      },
-      {
-        href: '/commerciaux',
+        href: '/admin/commerciaux',
         label: 'Utilisateurs',
         icon: UsersIcon,
         description: 'Comptes, rôles et accès',
         roles: ['ADMIN'],
       },
       {
-        href: '/supervision',
-        label: 'Supervision',
-        icon: ActivityIcon,
-        description: 'Présence et dernière activité',
-        roles: ['ADMIN'],
-      },
-      {
-        href: '/referentiels',
+        href: '/admin/referentiels',
         label: 'Référentiels',
         icon: LibraryIcon,
         description: 'Départements, banques, syndicats',
@@ -234,14 +298,22 @@ const SECTIONS: readonly NavSection[] = [
       {
         // Après les référentiels : un classeur ne peut nommer que des banques,
         // syndicats, départements et IEF déjà enregistrés.
-        href: '/imports',
+        href: '/admin/imports',
         label: 'Imports',
         icon: UploadIcon,
         description: 'Dépôt de classeurs et suivi des travaux',
         roles: ['ADMIN'],
       },
       {
-        href: '/parametres',
+        // La cloche montre ce qu'on REÇOIT ; cet écran sert à ÉMETTRE.
+        href: '/admin/notifications',
+        label: 'Notifications',
+        icon: BellIcon,
+        description: 'Annonces et rappels envoyés',
+        roles: ['ADMIN'],
+      },
+      {
+        href: '/admin/parametres',
         label: 'Paramètres',
         icon: SettingsIcon,
         description: 'Démonstration et suppression',
@@ -251,65 +323,84 @@ const SECTIONS: readonly NavSection[] = [
   },
 ];
 
-/** Sections visibles par ce rôle. Une section devenue vide disparaît. */
-export function navSections(role: Role): NavSection[] {
-  return SECTIONS.map((section) => ({
-    title: section.title,
-    items: section.items.filter((item) => item.roles.includes(role)),
-  })).filter((section) => section.items.length > 0);
+/** Coque d'une route, comparée sur le SEGMENT : `/administration` n'est pas `/admin`. */
+export function coqueOf(pathname: string): Coque | null {
+  const match = COQUES.find(
+    (coque) => pathname === coque.path || pathname.startsWith(`${coque.path}/`),
+  );
+  return match?.id ?? null;
 }
 
-/** À plat, pour les recherches par chemin. */
-export function navItems(role: Role): NavItem[] {
-  return navSections(role).flatMap((section) => section.items);
+export function coqueAllowed(role: Role, coque: Coque): boolean {
+  return COQUES.find((entry) => entry.id === coque)?.roles.includes(role) === true;
 }
 
 /**
- * Écran d'atterrissage après connexion.
+ * Les QUATRE tuiles, toujours, avec l'autorisation de chacune.
  *
- * Un rôle sans écran d'accueil retombe sur la connexion, que `/connexion`
- * renvoie aussitôt ici : la valeur par défaut n'existe que pour un rôle ajouté
- * demain au contrat, jamais pour un rôle admis dans le panel.
+ * Le hub ne cache pas les projets hors de portée : il les grise. Un compte
+ * d'accueil voit ainsi que CHUES existe sans pouvoir l'ouvrir, plutôt que de
+ * découvrir six mois plus tard qu'on lui parlait d'un écran invisible.
+ */
+export function coquesForRole(role: Role): { entry: CoqueEntry; allowed: boolean }[] {
+  return COQUES.map((entry) => ({ entry, allowed: entry.roles.includes(role) }));
+}
+
+/** Sections de cette coque visibles par ce rôle. Une section vide disparaît. */
+export function navSections(role: Role, coque: Coque): NavSection[] {
+  return SECTIONS.filter((section) => section.coque === coque)
+    .map((section) => ({
+      coque: section.coque,
+      title: section.title,
+      items: section.items.filter((item) => item.roles.includes(role)),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
+/** À plat, pour les recherches par chemin. */
+export function navItems(role: Role, coque: Coque): NavItem[] {
+  return navSections(role, coque).flatMap((section) => section.items);
+}
+
+/** Premier écran d'une coque pour ce rôle. */
+export function coqueHomePath(role: Role, coque: Coque): string {
+  const first = navItems(role, coque)[0];
+  return first?.href ?? HUB_PATH;
+}
+
+/**
+ * Écran d'atterrissage après connexion : le hub, pour TOUT LE MONDE.
+ *
+ * Y compris un compte d'accueil, qui n'a qu'une tuile ouverte : le détour
+ * coûte un clic et donne à tous le même point de départ, donc la même
+ * explication au téléphone. Un rôle sans aucune coque n'a rien à faire dans le
+ * panel et retombe sur la connexion.
  */
 export function homePathForRole(role: Role): string {
-  switch (role) {
-    case 'ADMIN':
-      return '/tableau-de-bord';
-    case 'BANQUE_FINANCE':
-      return '/dossiers';
-    case 'COMMERCIAL':
-      return '/console';
-    case 'SUPERVISEUR':
-      return '/supervision';
-    // Le registre, pas le tableau de bord général : la direction commerciale a
-    // le sien, et l'accueil n'atteint que celui-là.
-    case 'DIRECTION':
-    case 'ACCUEIL':
-      return '/accueil';
-    default:
-      return '/connexion';
-  }
+  return coquesForRole(role).some(({ allowed }) => allowed) ? HUB_PATH : '/connexion';
 }
 
 /**
  * Titre de la barre supérieure, dérivé de la route.
  *
- * Correspondance par PRÉFIXE le plus long : `/dossiers/nouveau` doit afficher
- * « Nouveau dossier » et non « Dossiers », alors que `/dossiers/abc-123` doit
- * bien afficher « Dossiers ». Trier par longueur décroissante règle les deux
- * cas d'un coup.
+ * Correspondance par PRÉFIXE le plus long : `/chues/dossiers/nouveau` doit
+ * afficher « Nouveau dossier » et non « Dossiers », alors que
+ * `/chues/dossiers/abc-123` doit bien afficher « Dossiers ». Trier par longueur
+ * décroissante règle les deux cas d'un coup.
  */
 export function navTitle(role: Role, pathname: string): string {
-  const match = [...navItems(role)]
-    .sort((a, b) => b.href.length - a.href.length)
-    .find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
-  return match?.label ?? 'CPI GO';
+  return matchNavItem(role, pathname)?.label ?? 'CPI GO';
 }
 
 /** L'entrée est-elle celle de la page courante ? Même règle que `navTitle`. */
 export function isNavItemActive(role: Role, pathname: string, item: NavItem): boolean {
-  const match = [...navItems(role)]
+  return matchNavItem(role, pathname)?.href === item.href;
+}
+
+function matchNavItem(role: Role, pathname: string): NavItem | undefined {
+  const coque = coqueOf(pathname);
+  if (coque === null) return undefined;
+  return [...navItems(role, coque)]
     .sort((a, b) => b.href.length - a.href.length)
-    .find((candidate) => pathname === candidate.href || pathname.startsWith(`${candidate.href}/`));
-  return match?.href === item.href;
+    .find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 }

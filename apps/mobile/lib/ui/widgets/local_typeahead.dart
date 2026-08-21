@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/cpi_colors.dart';
@@ -80,6 +81,8 @@ class LocalTypeahead extends StatefulWidget {
     this.selectedId,
     this.textInputAction = TextInputAction.next,
     this.onChanged,
+    this.freeText = false,
+    this.maxLength,
   });
 
   final TextEditingController controller;
@@ -92,6 +95,14 @@ class LocalTypeahead extends StatefulWidget {
   final TextInputAction textInputAction;
   final ValueChanged<TypeaheadOption> onSelected;
   final ValueChanged<String>? onChanged;
+
+  /// La liste ASSISTE la saisie sans la borner. Une valeur absente du
+  /// référentiel est légitime, et « Aucun résultat » s'y lirait comme un refus.
+  final bool freeText;
+
+  /// Coupe la saisie à la longueur que le serveur accepte : au-delà, c'est le
+  /// LOT de synchronisation entier qui serait refusé, pas cette seule fiche.
+  final int? maxLength;
 
   @override
   State<LocalTypeahead> createState() => _LocalTypeaheadState();
@@ -146,6 +157,7 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
 
   String? _inlineMessage(String text) {
     if (widget.options.isEmpty) return widget.emptyHint;
+    if (widget.freeText) return null;
     if (!widget.focusNode.hasFocus) return null;
     if (widget.selectedId != null) return null;
     final String query = text.trim();
@@ -244,6 +256,11 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                   controller: textController,
                   focusNode: node,
                   textInputAction: widget.textInputAction,
+                  inputFormatters: widget.maxLength == null
+                      ? null
+                      : <TextInputFormatter>[
+                          LengthLimitingTextInputFormatter(widget.maxLength),
+                        ],
                   onTap: () => setState(() => _browsing = true),
                   onChanged: widget.onChanged,
                   onSubmitted: (String _) => onFieldSubmitted(),

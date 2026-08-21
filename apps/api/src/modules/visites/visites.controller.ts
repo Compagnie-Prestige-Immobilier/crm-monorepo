@@ -19,7 +19,7 @@ import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
-import { VisitesService } from './visites.service.js';
+import { VISITE_REGISTRE_ROLES, VisitesService } from './visites.service.js';
 import { VisitesStatsService } from './visites-stats.service.js';
 import { VisiteReferentielsService } from './visite-referentiels.service.js';
 import {
@@ -42,12 +42,6 @@ import {
   VisiteStatsQueryDto,
   type VisiteReferentielKind,
 } from './dto.js';
-
-/**
- * Le registre est celui de l'accueil et de la direction. Le superviseur en est
- * volontairement absent : il supervise les teleconseillers, pas les visiteurs.
- */
-const REGISTRE_ROLES = [Role.ADMIN, Role.DIRECTION, Role.ACCUEIL] as const;
 
 /** Les quatre listes du registre appartiennent au metier, pas a la technique. */
 const LISTES_ROLES = [Role.ADMIN, Role.DIRECTION] as const;
@@ -162,7 +156,7 @@ export class VisitesController {
     return this.referentiels.reorder(kind, body);
   }
 
-  @Roles(...REGISTRE_ROLES)
+  @Roles(...VISITE_REGISTRE_ROLES)
   @Get('statistiques')
   @ApiOperation({
     operationId: 'getVisiteStats',
@@ -180,7 +174,7 @@ export class VisitesController {
     return this.stats.compute(query);
   }
 
-  @Roles(...REGISTRE_ROLES)
+  @Roles(...VISITE_REGISTRE_ROLES)
   @Get()
   @ApiOperation({
     operationId: 'listVisites',
@@ -191,7 +185,7 @@ export class VisitesController {
     return this.visites.list(query);
   }
 
-  @Roles(...REGISTRE_ROLES)
+  @Roles(...VISITE_REGISTRE_ROLES)
   @Get(':id')
   @ApiOperation({ operationId: 'getVisite', summary: 'Une ligne du registre.' })
   @ApiParam({ name: 'id', format: 'uuid' })
@@ -201,7 +195,7 @@ export class VisitesController {
     return this.visites.get(id);
   }
 
-  @Roles(...REGISTRE_ROLES)
+  @Roles(...VISITE_REGISTRE_ROLES)
   @Post()
   @ApiOperation({
     operationId: 'createVisite',
@@ -222,7 +216,7 @@ export class VisitesController {
     return this.visites.create(body, user.id);
   }
 
-  @Roles(...REGISTRE_ROLES)
+  @Roles(...VISITE_REGISTRE_ROLES)
   @Patch(':id')
   @ApiOperation({
     operationId: 'updateVisite',

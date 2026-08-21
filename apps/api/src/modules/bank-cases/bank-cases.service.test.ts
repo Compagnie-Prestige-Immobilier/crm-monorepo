@@ -19,7 +19,6 @@ import {
   STAGE_EN_TRAITEMENT,
   STAGE_REJETE,
 } from './fake-prisma.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 
 const user = (fake: { id: string; fullName: string; role: Role }): AuthenticatedUser => ({
   id: fake.id,
@@ -58,7 +57,7 @@ let service: BankCasesService;
 
 beforeEach(() => {
   db = new FakePrisma();
-  service = new BankCasesService(db.asService(), fakeDemoVisibility());
+  service = new BankCasesService(db.asService());
   db.addProspect({ id: 'psp-enrole', nom: 'Diop', prenom: 'Awa', phoneE164: '+221771234567' });
   db.addProspect({
     id: 'psp-en-cours',
@@ -694,7 +693,7 @@ describe('autocomplétion prospect', () => {
       },
     } as unknown as ReturnType<FakePrisma['asService']>;
 
-    const isole = new BankCasesService(prisma, fakeDemoVisibility());
+    const isole = new BankCasesService(prisma);
     await isole.prospectSearch({ search: 'Ndiaye' });
 
     const valeurs = requetes.flat().flatMap((sql) => (sql as { values?: unknown[] }).values ?? []);

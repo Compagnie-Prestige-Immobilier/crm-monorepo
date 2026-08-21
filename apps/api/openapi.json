@@ -165,6 +165,50 @@
         "tags": ["auth"]
       }
     },
+    "/api/v1/auth/workspace": {
+      "post": {
+        "operationId": "switchWorkspace",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwitchWorkspaceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokensDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change d’espace de travail.",
+        "tags": ["auth"]
+      }
+    },
     "/api/v1/users": {
       "get": {
         "operationId": "listUsers",
@@ -1018,6 +1062,213 @@
           }
         ],
         "summary": "Ajoute un syndicat.",
+        "tags": ["referentiels"]
+      }
+    },
+    "/api/v1/referentiels/canaux-provenance": {
+      "get": {
+        "operationId": "listCanauxProvenance",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "description": "Ne renvoyer que les entrées actives.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CanalProvenanceDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Canaux de provenance du Grand Public.",
+        "tags": ["referentiels"]
+      },
+      "post": {
+        "operationId": "createCanalProvenance",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCanalProvenanceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanalProvenanceDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajoute un canal. Le code est immuable : les fiches le désignent.",
+        "tags": ["referentiels"]
+      }
+    },
+    "/api/v1/referentiels/canaux-provenance/{id}": {
+      "patch": {
+        "operationId": "updateCanalProvenance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCanalProvenanceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanalProvenanceDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renomme un canal, ou le retire des listes via isActive.",
         "tags": ["referentiels"]
       }
     },
@@ -3006,6 +3257,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -3951,6 +4230,16 @@
               "maxLength": 32,
               "type": "string"
             }
+          },
+          {
+            "name": "X-CPI-Payload-Version",
+            "in": "header",
+            "description": "Format de données que le client sait lire. En dessous de 4, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 4
+            }
           }
         ],
         "responses": {
@@ -3986,6 +4275,16 @@
           },
           "403": {
             "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "APP_UPDATE_REQUIRED. Le client n’annonce pas de format, ou en annonce un que cette réponse dépasse. La remontée par `pushSyncBatch` reste ouverte : rien de ce qui est saisi hors ligne n’est perdu pendant que l’appareil se met à jour.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4691,6 +4990,919 @@
         ],
         "summary": "Programme d’appels imprimable d’un commercial.",
         "tags": ["phase2"]
+      }
+    },
+    "/api/v1/visites/referentiels": {
+      "get": {
+        "operationId": "listVisiteReferentiels",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielsBundleDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les quatre listes de l’accueil, en un appel.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/referentiels/{kind}": {
+      "get": {
+        "operationId": "listVisiteReferentiel",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/VisiteReferentielKind"
+            }
+          },
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Une liste, entrées retirées comprises.",
+        "tags": ["visites"]
+      },
+      "post": {
+        "description": "Le code est immuable : les visites déjà enregistrées le désignent.",
+        "operationId": "createVisiteReferentiel",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/VisiteReferentielKind"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVisiteReferentielDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "VISITE_REFERENTIEL_CODE_CONFLICT ou VISITE_REFERENTIEL_LABEL_CONFLICT.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajoute une entrée à une liste.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/referentiels/{kind}/{id}": {
+      "patch": {
+        "operationId": "updateVisiteReferentiel",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/VisiteReferentielKind"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVisiteReferentielDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "VISITE_REFERENTIEL_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renomme ou déplace une entrée.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/referentiels/{kind}/{id}/active": {
+      "post": {
+        "description": "Jamais de suppression : le registre des années passées continue de désigner l’entrée.",
+        "operationId": "setVisiteReferentielActive",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/VisiteReferentielKind"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVisiteReferentielActiveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retire une entrée des listes, ou l’y remet.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/referentiels/{kind}/reorder": {
+      "post": {
+        "operationId": "reorderVisiteReferentiel",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/VisiteReferentielKind"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderVisiteReferentielDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fixe l’ordre d’affichage d’une liste.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/statistiques": {
+      "get": {
+        "description": "Total, répartitions par entreprise, direction, destinataire et objet, puis la marche du mois et du jour. Une répartition liste TOUTES les entrées de sa liste, y compris à zéro ; sa somme peut être inférieure au total, l’écart étant rendu par sansDirection et sansDestinataire.",
+        "operationId": "getVisiteStats",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Premier jour compté, inclus.",
+            "schema": {
+              "example": "2025-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Dernier jour compté, inclus.",
+            "schema": {
+              "example": "2025-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteStatsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VISITE_STATS_RANGE_INVALID ou VISITE_STATS_RANGE_TOO_WIDE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Le registre compté sur une période.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites": {
+      "get": {
+        "operationId": "listVisites",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-01-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "entrepriseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "directionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "destinataireId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "objetId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Nom du visiteur, ou référence du registre.",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Le registre, du plus récent au plus ancien.",
+        "tags": ["visites"]
+      },
+      "post": {
+        "description": "La référence est engendrée par le serveur. Le téléphone est facultatif et accepté sous n’importe quelle forme : un numéro que la normalisation ne reconnaît pas est conservé tel quel, avec phoneE164 nul.",
+        "operationId": "createVisite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVisiteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VISITE_REFERENTIEL_UNAVAILABLE ou VISITE_REFERENCE_EXHAUSTED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Inscrit un visiteur au registre.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/{id}": {
+      "get": {
+        "operationId": "getVisite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "VISITE_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Une ligne du registre.",
+        "tags": ["visites"]
+      },
+      "patch": {
+        "description": "Ni la date ni la référence : elles fixent la ligne dans le registre.",
+        "operationId": "updateVisite",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVisiteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "VISITE_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Corrige une ligne du registre.",
+        "tags": ["visites"]
       }
     },
     "/api/v1/phase2/callbacks": {
@@ -8560,6 +9772,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -8777,6 +10017,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -8988,6 +10256,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -9213,6 +10509,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -9447,6 +10771,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -9664,6 +11016,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -9875,6 +11255,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -10099,6 +11507,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -10311,6 +11747,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -10535,6 +11999,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -10746,6 +12238,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -10981,6 +12501,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -11193,6 +12741,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -11417,6 +12993,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -11635,6 +13239,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -11846,6 +13478,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -12070,6 +13730,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -12249,6 +13937,252 @@
         "tags": ["analytics"]
       }
     },
+    "/api/v1/analytics/ambassador-conversion": {
+      "get": {
+        "description": "La période borne la DATE DE LA BASCULE, pas l’arrivée en base : un statut poussé avec trois jours de retard reste compté le jour où il a été décidé. Le dénominateur ne retient que les représentants dont la relation a bougé dans la période ; `untracked` compte, hors période, ceux de l’annuaire sans aucune trace, qui ne sont donc mesurés ni au numérateur ni au dénominateur. Seuls `dateFrom`, `dateTo`, `commercialId`, `departementId` et `representantId` agissent : les autres filtres qualifient un prospect, pas un représentant.",
+        "operationId": "getAmbassadorConversion",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Recherche libre sur le nom, le prénom ou le téléphone.",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "representantId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "banqueId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "syndicatId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "departementId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "commercialId",
+            "required": false,
+            "in": "query",
+            "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "statut",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectStatut"
+            }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "description": "Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.",
+            "schema": {
+              "$ref": "#/components/schemas/BddSegment"
+            }
+          },
+          {
+            "name": "phase2Status",
+            "required": false,
+            "in": "query",
+            "description": "Avancement de la phase 2. Dimension indépendante de `statut`.",
+            "schema": {
+              "$ref": "#/components/schemas/Phase2Status"
+            }
+          },
+          {
+            "name": "enrollmentMethod",
+            "required": false,
+            "in": "query",
+            "description": "Méthode d’enrôlement obtenue en phase 2.",
+            "schema": {
+              "$ref": "#/components/schemas/EnrollmentMethod"
+            }
+          },
+          {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "enrollmentCapturedById",
+            "required": false,
+            "in": "query",
+            "description": "Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "origin",
+            "required": false,
+            "in": "query",
+            "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
+            "schema": {
+              "type": "string",
+              "enum": ["BANQUE"]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "required": false,
+            "in": "query",
+            "description": "Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmbassadorConversionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Part des représentants travaillés devenus ambassadeurs.",
+        "tags": ["analytics"]
+      }
+    },
     "/api/v1/analytics/data-quality": {
       "get": {
         "description": "Se branche sur les issues d’appel UNREACHABLE et WRONG_NUMBER. Les deux listes comptent la même population de tentatives selon deux axes.",
@@ -12305,6 +14239,34 @@
             "required": false,
             "in": "query",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -12655,6 +14617,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -12898,7 +14888,7 @@
     },
     "/api/v1/admin/demo": {
       "get": {
-        "operationId": "getDemoStatus",
+        "operationId": "getDemoWorkspaceStatus",
         "parameters": [],
         "responses": {
           "200": {
@@ -12906,37 +14896,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DemoStatusDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
+                  "$ref": "#/components/schemas/DemoWorkspaceStatusDto"
                 }
               }
             }
@@ -12947,14 +14907,13 @@
             "bearer": []
           }
         ],
-        "summary": "État du mode démonstration, compteurs et autorisation de bascule.",
+        "summary": "État du workspace démo.",
         "tags": ["demo"]
       }
     },
-    "/api/v1/admin/demo/enable": {
+    "/api/v1/admin/demo/reset": {
       "post": {
-        "description": "Idempotent : activer une seconde fois ne double pas le jeu. Refusé en production tant que DEMO_MODE_ALLOWED ne vaut pas true. CONSÉQUENCE À ANNONCER AVANT LA CONFIRMATION : tant que le mode est actif, la plateforme passe en LECTURE SEULE pour tout le monde. Les écritures interactives (POST, PATCH, PUT, DELETE) sont refusées en 409 `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).",
-        "operationId": "enableDemoMode",
+        "operationId": "resetDemoWorkspace",
         "parameters": [],
         "responses": {
           "200": {
@@ -12962,37 +14921,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DemoStatusDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
+                  "$ref": "#/components/schemas/DemoWorkspaceStatusDto"
                 }
               }
             }
@@ -13003,119 +14932,7 @@
             "bearer": []
           }
         ],
-        "summary": "Peuple la plateforme de données de démonstration.",
-        "tags": ["demo"]
-      }
-    },
-    "/api/v1/admin/demo/purge": {
-      "post": {
-        "description": "IRRÉVERSIBLE, et distinct de la désactivation. Supprime exactement les lignes enregistrées à l’ensemencement, dans l’ordre inverse de création. Aucune donnée réelle n’est touchée, quelle que soit sa ressemblance avec une donnée de démonstration. L’interface doit faire confirmer.",
-        "operationId": "purgeDemoData",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DemoStatusDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Supprime définitivement le jeu de démonstration.",
-        "tags": ["demo"]
-      }
-    },
-    "/api/v1/admin/demo/disable": {
-      "post": {
-        "description": "NE SUPPRIME RIEN. Les lignes de démonstration restent en base, invisibles pour toute lecture, export Excel compris. Pour les effacer définitivement, utiliser /purge. REND AUSSI L’ÉCRITURE à toute la plateforme : c’est cette route qui lève la lecture seule posée par /enable.",
-        "operationId": "disableDemoMode",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DemoStatusDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Masque les données de démonstration.",
+        "summary": "Réinitialise le workspace démo.",
         "tags": ["demo"]
       }
     },
@@ -13357,6 +15174,34 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "schema": {
+              "$ref": "#/components/schemas/ProspectType"
+            }
+          },
+          {
+            "name": "canalProvenanceId",
+            "required": false,
+            "in": "query",
+            "description": "Grand Public : canal de provenance.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "statut",
             "required": false,
             "in": "query",
@@ -13476,7 +15321,7 @@
             "description": "Classeur Excel. En mode `filtered` : feuilles Prospects, Représentants et Synthèse. En mode `consolidated` : Consolidé, BDD1, BDD2, BDD3, BDD4.",
             "headers": {
               "X-Demo-Mode": {
-                "description": "Vrai si le classeur a été produit en mode démonstration, donc s’il mêle des lignes fictives à des lignes réelles.",
+                "description": "Vrai si le classeur provient de l’espace démo et contient des données fictives.",
                 "schema": {
                   "type": "string",
                   "enum": ["true", "false"]
@@ -13586,6 +15431,63 @@
           }
         ],
         "summary": "Modèle vide pour l’import de prospects.",
+        "tags": ["export"]
+      }
+    },
+    "/api/v1/export/prospects-grand-public-modele.xlsx": {
+      "get": {
+        "description": "Syndicat, banque de domiciliation, fonctionnaire et canal de provenance sont des listes déroulantes, tirées des référentiels VIVANTS. Seuls le nom et le téléphone sont exigés : toute autre colonne peut rester vide, ou même manquer du fichier, car les colonnes sont retrouvées par le texte de leur en-tête et non par leur rang.",
+        "operationId": "downloadProspectsGrandPublicTemplateXlsx",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Classeur Excel à trois feuilles : Prospects Grand Public, Instructions, Listes (masquée).",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modèle vide pour l’import de prospects Grand Public.",
         "tags": ["export"]
       }
     },
@@ -13724,7 +15626,7 @@
             "description": "Classeur Excel à une feuille.",
             "headers": {
               "X-Demo-Mode": {
-                "description": "Vrai si le classeur a été produit en mode démonstration, donc s’il mêle des lignes fictives à des lignes réelles.",
+                "description": "Vrai si le classeur provient de l’espace démo et contient des données fictives.",
                 "schema": {
                   "type": "string",
                   "enum": ["true", "false"]
@@ -13988,7 +15890,7 @@
         "tags": ["admin"]
       },
       "post": {
-        "description": "Rend IMMÉDIATEMENT, avec un identifiant et un état ; `pg_dump` tourne en arrière-plan. Un avis part ensuite dans la boîte de réception et par e-mail, SANS aucun lien : le fichier ne se télécharge que dans une session authentifiée, par `GET admin/database-dump/download`. Un export déjà en cours est renvoyé tel quel, aucun second `pg_dump` n’est lancé. Refusé pendant une démonstration, un export y mêlerait des lignes fictives aux vraies. Le fichier est détruit dès son téléchargement, et de toute façon à son échéance.",
+        "description": "Rend IMMÉDIATEMENT, avec un identifiant et un état ; `pg_dump` tourne en arrière-plan. Un avis part ensuite dans la boîte de réception et par e-mail, SANS aucun lien : le fichier ne se télécharge que dans une session authentifiée, par `GET admin/database-dump/download`. Un export déjà en cours est renvoyé tel quel, aucun second `pg_dump` n’est lancé. Refusé dans l’espace démo. Le fichier est détruit dès son téléchargement, et de toute façon à son échéance.",
         "operationId": "requestDatabaseDump",
         "parameters": [],
         "responses": {
@@ -14033,7 +15935,7 @@
             }
           },
           "409": {
-            "description": "DEMO_MODE_READ_ONLY · le mode démonstration est actif. DATABASE_DUMP_IN_PROGRESS · un export démarre à l’instant même.",
+            "description": "DATABASE_DUMP_IN_PROGRESS · un export démarre à l’instant même.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14285,16 +16187,6 @@
               }
             }
           },
-          "409": {
-            "description": "DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
           "413": {
             "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
             "content": {
@@ -14388,16 +16280,6 @@
               }
             }
           },
-          "409": {
-            "description": "DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
           "413": {
             "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
             "content": {
@@ -14428,10 +16310,10 @@
         "tags": ["imports"]
       }
     },
-    "/api/v1/imports/visites": {
+    "/api/v1/imports/prospects-grand-public": {
       "post": {
-        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Seuls les onglets « BDD VISITES » sont lus, en-tête en ligne 3, données à partir de la colonne C. La colonne « N° » n’est pas reprise : elle repart à 1 chaque mois. CET IMPORT NE CRÉE AUCUNE ENTRÉE DE RÉFÉRENTIEL : une entreprise, une direction, un destinataire ou un objet absent des quatre listes fait refuser la ligne, avec sa valeur exacte, son onglet et son numéro de ligne au rapport.",
-        "operationId": "createVisitesImport",
+        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Les colonnes sont retrouvées par le TEXTE de leur en-tête, en ligne 1, jamais par leur rang. SEULS le nom et le téléphone sont exigés : profession, syndicat, banque, fonctionnaire, durée du système et canal de provenance se lisent vides sans faire refuser la ligne, et leur colonne peut même manquer du fichier. « Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE ; à « non », le type reste vide, car le fichier ne dit pas lequel des trois autres il serait. Le modèle de classeur se télécharge par `GET /export/prospects-grand-public-modele.xlsx`.",
+        "operationId": "createProspectsGrandPublicImport",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -14491,8 +16373,91 @@
               }
             }
           },
-          "409": {
-            "description": "DEMO_MODE_READ_ONLY · le mode démonstration est actif, aucun import ne peut être déposé.",
+          "413": {
+            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dépose un classeur de prospects Grand Public et inscrit le travail. Rend immédiatement.",
+        "tags": ["imports"]
+      }
+    },
+    "/api/v1/imports/visites": {
+      "post": {
+        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Seuls les onglets « BDD VISITES » sont lus, en-tête en ligne 3, données à partir de la colonne C. La colonne « N° » n’est pas reprise : elle repart à 1 chaque mois. CET IMPORT NE CRÉE AUCUNE ENTRÉE DE RÉFÉRENTIEL : une entreprise, une direction, un destinataire ou un objet absent des quatre listes fait refuser la ligne, avec sa valeur exacte, son onglet et son numéro de ligne au rapport.",
+        "operationId": "createVisitesImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14674,7 +16639,7 @@
             }
           },
           "409": {
-            "description": "IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée. DEMO_MODE_READ_ONLY · le mode démonstration est actif.",
+            "description": "IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14691,919 +16656,6 @@
         ],
         "summary": "Applique une simulation terminée : le même fichier est réécrit en base.",
         "tags": ["imports"]
-      }
-    },
-    "/api/v1/visites/referentiels": {
-      "get": {
-        "operationId": "listVisiteReferentiels",
-        "parameters": [
-          {
-            "name": "activeOnly",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": true,
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VisiteReferentielsBundleDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Les quatre listes de l’accueil, en un appel.",
-        "tags": ["visites"]
-      }
-    },
-    "/api/v1/visites/referentiels/{kind}": {
-      "get": {
-        "operationId": "listVisiteReferentiel",
-        "parameters": [
-          {
-            "name": "kind",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "$ref": "#/components/schemas/VisiteReferentielKind"
-            }
-          },
-          {
-            "name": "activeOnly",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": true,
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VisiteReferentielListDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Une liste, entrées retirées comprises.",
-        "tags": ["visites"]
-      },
-      "post": {
-        "description": "Le code est immuable : les visites déjà enregistrées le désignent.",
-        "operationId": "createVisiteReferentiel",
-        "parameters": [
-          {
-            "name": "kind",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "$ref": "#/components/schemas/VisiteReferentielKind"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateVisiteReferentielDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VisiteReferentielDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "VISITE_REFERENTIEL_CODE_CONFLICT ou VISITE_REFERENTIEL_LABEL_CONFLICT.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Ajoute une entrée à une liste.",
-        "tags": ["visites"]
-      }
-    },
-    "/api/v1/visites/referentiels/{kind}/{id}": {
-      "patch": {
-        "operationId": "updateVisiteReferentiel",
-        "parameters": [
-          {
-            "name": "kind",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "$ref": "#/components/schemas/VisiteReferentielKind"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateVisiteReferentielDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VisiteReferentielDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "VISITE_REFERENTIEL_NOT_FOUND.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Renomme ou déplace une entrée.",
-        "tags": ["visites"]
-      }
-    },
-    "/api/v1/visites/referentiels/{kind}/{id}/active": {
-      "post": {
-        "description": "Jamais de suppression : le registre des années passées continue de désigner l’entrée.",
-        "operationId": "setVisiteReferentielActive",
-        "parameters": [
-          {
-            "name": "kind",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "$ref": "#/components/schemas/VisiteReferentielKind"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetVisiteReferentielActiveDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VisiteReferentielDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Retire une entrée des listes, ou l’y remet.",
-        "tags": ["visites"]
-      }
-    },
-    "/api/v1/visites/referentiels/{kind}/reorder": {
-      "post": {
-        "operationId": "reorderVisiteReferentiel",
-        "parameters": [
-          {
-            "name": "kind",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "$ref": "#/components/schemas/VisiteReferentielKind"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReorderVisiteReferentielDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VisiteReferentielListDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Fixe l’ordre d’affichage d’une liste.",
-        "tags": ["visites"]
-      }
-    },
-    "/api/v1/visites/statistiques": {
-      "get": {
-        "description": "Total, répartitions par entreprise, direction, destinataire et objet, puis la marche du mois et du jour. Une répartition liste TOUTES les entrées de sa liste, y compris à zéro ; sa somme peut être inférieure au total, l’écart étant rendu par sansDirection et sansDestinataire.",
-        "operationId": "getVisiteStats",
-        "parameters": [
-          {
-            "name": "from",
-            "required": true,
-            "in": "query",
-            "description": "Premier jour compté, inclus.",
-            "schema": {
-              "example": "2025-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "to",
-            "required": true,
-            "in": "query",
-            "description": "Dernier jour compté, inclus.",
-            "schema": {
-              "example": "2025-12-31",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VisiteStatsDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VISITE_STATS_RANGE_INVALID ou VISITE_STATS_RANGE_TOO_WIDE.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Le registre compté sur une période.",
-        "tags": ["visites"]
-      }
-    },
-    "/api/v1/visites": {
-      "get": {
-        "operationId": "listVisites",
-        "parameters": [
-          {
-            "name": "from",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "to",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "example": "2026-01-31",
-              "type": "string"
-            }
-          },
-          {
-            "name": "entrepriseId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "directionId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "destinataireId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "objetId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "description": "Nom du visiteur, ou référence du registre.",
-            "schema": {
-              "maxLength": 120,
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 200,
-              "default": 25,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VisiteListDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Le registre, du plus récent au plus ancien.",
-        "tags": ["visites"]
-      },
-      "post": {
-        "description": "La référence est engendrée par le serveur. Le téléphone est facultatif et accepté sous n’importe quelle forme : un numéro que la normalisation ne reconnaît pas est conservé tel quel, avec phoneE164 nul.",
-        "operationId": "createVisite",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateVisiteDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VisiteDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VISITE_REFERENTIEL_UNAVAILABLE ou VISITE_REFERENCE_EXHAUSTED.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Inscrit un visiteur au registre.",
-        "tags": ["visites"]
-      }
-    },
-    "/api/v1/visites/{id}": {
-      "get": {
-        "operationId": "getVisite",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VisiteDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "VISITE_NOT_FOUND.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Une ligne du registre.",
-        "tags": ["visites"]
-      },
-      "patch": {
-        "description": "Ni la date ni la référence : elles fixent la ligne dans le registre.",
-        "operationId": "updateVisite",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateVisiteDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VisiteDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "VISITE_NOT_FOUND.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Corrige une ligne du registre.",
-        "tags": ["visites"]
       }
     }
   },
@@ -15672,6 +16724,10 @@
           "isActive": {
             "type": "boolean"
           },
+          "workspace": {
+            "type": "string",
+            "enum": ["public", "demo"]
+          },
           "departementId": {
             "type": "string",
             "format": "uuid",
@@ -15687,7 +16743,7 @@
             "format": "date-time"
           }
         },
-        "required": ["id", "email", "username", "fullName", "role", "isActive"]
+        "required": ["id", "email", "username", "fullName", "role", "isActive", "workspace"]
       },
       "AuthTokensDto": {
         "type": "object",
@@ -15721,7 +16777,7 @@
           "code": {
             "type": "string",
             "example": "BANK_CASE_NOT_FOUND",
-            "description": "Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR). DEUX CODES TRANSVERSES méritent d’être traités une fois pour toutes côté client. Ils sortent tous deux en 409 sur TOUTE requête POST, PATCH, PUT ou DELETE, ne dépendent d’aucune opération en particulier, et leur `message` est déjà rédigé pour être affiché tel quel : `DEMO_MODE_READ_ONLY` tant que le mode démonstration est actif ; `DEMO_MODE_STATE_UNKNOWN` quand le serveur n’arrive pas à lire l’état de ce mode et refuse d’écrire une ligne dont il ne saurait pas dire si elle est réelle. Le second N’ANNONCE PAS une démonstration en cours : il invite à réessayer, et non à faire éteindre un interrupteur. Ces routes-là, et elles seules, n’émettent JAMAIS ces codes : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST)."
+            "description": "Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR)."
           },
           "message": {
             "type": "string",
@@ -15761,6 +16817,16 @@
           }
         },
         "required": ["revoked"]
+      },
+      "SwitchWorkspaceDto": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": ["public", "demo"]
+          }
+        },
+        "required": ["workspace"]
       },
       "UserDto": {
         "type": "object",
@@ -15897,7 +16963,8 @@
           },
           "departementId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Chaîne vide pour retirer le rattachement."
           },
           "phone": {
             "type": "string",
@@ -15934,14 +17001,12 @@
           },
           "departementId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Chaîne vide pour retirer le rattachement."
           },
           "phone": {
             "type": "string",
             "description": "Téléphone, normalisé en E.164 par le serveur."
-          },
-          "isActive": {
-            "type": "boolean"
           }
         }
       },
@@ -16106,6 +17171,71 @@
           }
         },
         "required": ["banques", "syndicats", "departements", "regions"]
+      },
+      "CanalProvenanceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Clé stable, jamais réécrite : les fiches la désignent."
+          },
+          "label": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "code", "label", "position", "isActive", "updatedAt"]
+      },
+      "CreateCanalProvenanceDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Immuable une fois posé."
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          }
+        },
+        "required": ["code", "label"]
+      },
+      "UpdateCanalProvenanceDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Le retirer des listes, jamais le supprimer."
+          }
+        }
       },
       "IefDto": {
         "type": "object",
@@ -17028,6 +18158,14 @@
         },
         "required": ["id", "body"]
       },
+      "Projet": {
+        "type": "string",
+        "enum": ["CHUES", "GRAND_PUBLIC"]
+      },
+      "ProspectType": {
+        "type": "string",
+        "enum": ["FONCTIONNAIRE", "SECTEUR_PRIVE", "INFORMEL", "DIASPORA"]
+      },
       "ProspectStatut": {
         "type": "string",
         "enum": ["NOUVEAU", "CONTACTE", "CONVERTI", "PERDU"]
@@ -17079,36 +18217,52 @@
               }
             ]
           },
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
           "banqueId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "banqueName": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "syndicatId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "syndicatSigle": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "representantId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "representantName": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "representantPhoneE164": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "departementId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "departementName": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "ownedByCommercialId": {
             "type": "string",
@@ -17117,8 +18271,38 @@
           "ownedByCommercialName": {
             "type": "string"
           },
+          "type": {
+            "nullable": true,
+            "description": "Hors CHUES : ce qu’est le prospect. Nul si la question n’a pas été posée.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProspectType"
+              }
+            ]
+          },
+          "profession": {
+            "type": "string",
+            "nullable": true,
+            "description": "Métier déclaré, en clair."
+          },
+          "dureeSystemeMois": {
+            "type": "number",
+            "nullable": true,
+            "description": "Durée du système de paiement retenue, en MOIS."
+          },
+          "canalProvenanceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "canalProvenanceLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Par où le prospect est arrivé. Référentiel ouvert."
+          },
           "segment": {
-            "description": "Calculé par croisement syndicat × banque. Jamais stocké en base.",
+            "nullable": true,
+            "description": "Calculé par croisement syndicat × banque, jamais stocké. NUL dès qu’il manque l’un des deux : le segment ne se devine pas.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/BddSegment"
@@ -17210,6 +18394,7 @@
           "phoneE164",
           "rev",
           "statut",
+          "projet",
           "banqueId",
           "banqueName",
           "syndicatId",
@@ -17221,6 +18406,11 @@
           "departementName",
           "ownedByCommercialId",
           "ownedByCommercialName",
+          "type",
+          "profession",
+          "dureeSystemeMois",
+          "canalProvenanceId",
+          "canalProvenanceLabel",
           "segment",
           "phase2Status",
           "enrollmentMethod",
@@ -17287,6 +18477,37 @@
             "type": "string",
             "format": "uuid"
           },
+          "projet": {
+            "description": "CHUES par défaut. Les deux projets ne se mélangent nulle part.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProspectType"
+              }
+            ]
+          },
+          "profession": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Métier déclaré, en clair."
+          },
+          "dureeSystemeMois": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 600,
+            "description": "Durée du système de paiement, en MOIS."
+          },
+          "canalProvenanceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Canal de provenance, choisi dans le référentiel."
+          },
           "statut": {
             "allOf": [
               {
@@ -17300,7 +18521,7 @@
             "description": "Horodatage de la saisie terrain."
           }
         },
-        "required": ["nom", "prenom", "phone", "banqueId", "syndicatId", "representantId"]
+        "required": ["nom", "phone"]
       },
       "ProspectConflictExistingDto": {
         "type": "object",
@@ -17317,10 +18538,12 @@
           },
           "representantId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true
           },
           "representantName": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "ownedByCommercialId": {
             "type": "string",
@@ -17356,7 +18579,7 @@
           "code": {
             "type": "string",
             "example": "BANK_CASE_NOT_FOUND",
-            "description": "Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR). DEUX CODES TRANSVERSES méritent d’être traités une fois pour toutes côté client. Ils sortent tous deux en 409 sur TOUTE requête POST, PATCH, PUT ou DELETE, ne dépendent d’aucune opération en particulier, et leur `message` est déjà rédigé pour être affiché tel quel : `DEMO_MODE_READ_ONLY` tant que le mode démonstration est actif ; `DEMO_MODE_STATE_UNKNOWN` quand le serveur n’arrive pas à lire l’état de ce mode et refuse d’écrire une ligne dont il ne saurait pas dire si elle est réelle. Le second N’ANNONCE PAS une démonstration en cours : il invite à réessayer, et non à faire éteindre un interrupteur. Ces routes-là, et elles seules, n’émettent JAMAIS ces codes : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST).",
+            "description": "Clé stable et machinable de l’erreur. C’est SUR ELLE qu’un client branche, jamais sur `message`. Les codes métier sont énumérés dans la description de chaque opération ; les codes génériques dérivent du statut HTTP (BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, UNPROCESSABLE_ENTITY, VALIDATION_FAILED, INTERNAL_SERVER_ERROR).",
             "enum": ["PROSPECT_PHONE_CONFLICT"]
           },
           "message": {
@@ -17415,6 +18638,37 @@
           "representantId": {
             "type": "string",
             "format": "uuid"
+          },
+          "projet": {
+            "description": "CHUES par défaut. Les deux projets ne se mélangent nulle part.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProspectType"
+              }
+            ]
+          },
+          "profession": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Métier déclaré, en clair."
+          },
+          "dureeSystemeMois": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 600,
+            "description": "Durée du système de paiement, en MOIS."
+          },
+          "canalProvenanceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Canal de provenance, choisi dans le référentiel."
           },
           "statut": {
             "allOf": [
@@ -17613,7 +18867,7 @@
       },
       "SyncEntity": {
         "type": "string",
-        "enum": ["representant", "representant_comment", "prospect", "call_attempt"]
+        "enum": ["representant", "representant_comment", "prospect", "call_attempt", "visite"]
       },
       "SyncOp": {
         "type": "string",
@@ -17700,7 +18954,39 @@
           "profession": {
             "type": "string",
             "maxLength": 120,
-            "description": "Représentant : profession déclarée."
+            "description": "Profession déclarée. Sert au représentant comme au prospect."
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Représentant : l’établissement où il exerce. Ni l’IEF ni le département."
+          },
+          "projet": {
+            "description": "Prospect : le projet dont il relève. CHUES par défaut côté serveur.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "type": {
+            "description": "Prospect hors CHUES : ce qu’il est. Jamais obligatoire.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProspectType"
+              }
+            ]
+          },
+          "dureeSystemeMois": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 600,
+            "description": "Prospect : durée du système de paiement, en MOIS."
+          },
+          "canalProvenanceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Prospect : canal de provenance, choisi dans le référentiel."
           },
           "clientCreatedAt": {
             "type": "string",
@@ -17741,6 +19027,41 @@
             "type": "string",
             "format": "date-time",
             "description": "Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut CALLBACK. Une version ancienne de l’application ne l’envoie pas."
+          },
+          "visitorName": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Visite : nom et prénom du visiteur."
+          },
+          "visitDate": {
+            "type": "string",
+            "example": "2026-01-06",
+            "description": "Visite : jour, à Dakar."
+          },
+          "visitTime": {
+            "type": "string",
+            "example": "11:08",
+            "description": "Visite : heure, omise si elle n’a pas été relevée."
+          },
+          "entrepriseId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Visite : entreprise du visiteur."
+          },
+          "objetId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Visite : objet de la visite."
+          },
+          "directionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Visite : direction ou étage visé."
+          },
+          "destinataireId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Visite : destinataire visé."
           }
         }
       },
@@ -17788,7 +19109,7 @@
             "$ref": "#/components/schemas/SyncEntityDataDto"
           },
           "clearedFields": {
-            "description": "Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession.",
+            "description": "Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement.",
             "type": "array",
             "items": {
               "type": "string"
@@ -17899,6 +19220,198 @@
         },
         "required": ["batchId", "serverTime", "results", "nextCursor"]
       },
+      "CampaignStatus": {
+        "type": "string",
+        "enum": ["ACTIVE", "CLOSED"]
+      },
+      "SyncCallCampaignDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CampaignStatus"
+              }
+            ]
+          },
+          "spreadDays": {
+            "type": "number",
+            "description": "Journees d’etalement de la file."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["id", "name", "status", "spreadDays", "updatedAt"]
+      },
+      "CallTaskStatus": {
+        "type": "string",
+        "enum": ["OPEN", "DONE", "CANCELLED"]
+      },
+      "SyncCallTaskDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "campaignId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "prospectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "position": {
+            "type": "number",
+            "description": "Rang dans le programme, a partir de 1."
+          },
+          "dayIndex": {
+            "type": "number",
+            "description": "Journee d’etalement, a partir de 0."
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CallTaskStatus"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "campaignId",
+          "prospectId",
+          "position",
+          "dayIndex",
+          "status",
+          "updatedAt"
+        ]
+      },
+      "VisiteReferentielRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "code", "label"]
+      },
+      "SyncVisiteDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "example": "V-2026-000412"
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-01-06"
+          },
+          "time": {
+            "type": "string",
+            "nullable": true,
+            "example": "11:08"
+          },
+          "visitorName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneE164": {
+            "type": "string",
+            "nullable": true
+          },
+          "entreprise": {
+            "$ref": "#/components/schemas/VisiteReferentielRefDto"
+          },
+          "objet": {
+            "$ref": "#/components/schemas/VisiteReferentielRefDto"
+          },
+          "direction": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VisiteReferentielRefDto"
+              }
+            ]
+          },
+          "destinataire": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VisiteReferentielRefDto"
+              }
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "date",
+          "time",
+          "visitorName",
+          "phone",
+          "phoneE164",
+          "entreprise",
+          "objet",
+          "direction",
+          "destinataire",
+          "comment",
+          "createdById",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "SyncChangesDto": {
         "type": "object",
         "properties": {
@@ -17937,9 +19450,37 @@
             "items": {
               "$ref": "#/components/schemas/ProspectDto"
             }
+          },
+          "callCampaigns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncCallCampaignDto"
+            }
+          },
+          "callTasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncCallTaskDto"
+            }
+          },
+          "visites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncVisiteDto"
+            }
           }
         },
-        "required": ["departements", "iefs", "banques", "syndicats", "representants", "prospects"]
+        "required": [
+          "departements",
+          "iefs",
+          "banques",
+          "syndicats",
+          "representants",
+          "prospects",
+          "callCampaigns",
+          "callTasks",
+          "visites"
+        ]
       },
       "SyncDeletionDto": {
         "type": "object",
@@ -18070,10 +19611,6 @@
           }
         },
         "required": ["entries", "nextCursor", "hasMore", "serverTime"]
-      },
-      "CampaignStatus": {
-        "type": "string",
-        "enum": ["ACTIVE", "CLOSED"]
       },
       "CampaignScope": {
         "type": "string",
@@ -18424,6 +19961,448 @@
           "commerciaux",
           "recentAttempts"
         ]
+      },
+      "VisiteReferentielDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Code stable, jamais modifiable après création."
+          },
+          "label": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isSystem": {
+            "type": "boolean",
+            "description": "Entrée reprise du classeur d’origine : renommable, désactivable, jamais effacée."
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "code", "label", "isActive", "isSystem", "sortOrder", "updatedAt"]
+      },
+      "VisiteReferentielsBundleDto": {
+        "type": "object",
+        "properties": {
+          "entreprises": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielDto"
+            }
+          },
+          "directions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielDto"
+            }
+          },
+          "destinataires": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielDto"
+            }
+          },
+          "objets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielDto"
+            }
+          }
+        },
+        "required": ["entreprises", "directions", "destinataires", "objets"]
+      },
+      "VisiteReferentielKind": {
+        "type": "string",
+        "enum": ["entreprises", "directions", "destinataires", "objets"]
+      },
+      "VisiteReferentielListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "CreateVisiteReferentielDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 48,
+            "description": "Majuscules, chiffres et tirets bas. Immuable une fois créé."
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "sortOrder": {
+            "type": "number",
+            "default": 100
+          }
+        },
+        "required": ["code", "label"]
+      },
+      "UpdateVisiteReferentielDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        }
+      },
+      "SetVisiteReferentielActiveDto": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": ["isActive"]
+      },
+      "ReorderVisiteReferentielDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "Les entrées dans leur nouvel ordre. Celles omises gardent leur rang.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": ["ids"]
+      },
+      "VisiteStatBucketDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "code", "label", "count"]
+      },
+      "VisiteStatMoisDto": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "example": "2025-01"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["month", "count"]
+      },
+      "VisiteStatJourDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2025-01-06"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["date", "count"]
+      },
+      "VisiteStatsDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2025-01-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2025-12-31"
+          },
+          "total": {
+            "type": "number",
+            "description": "Nombre de visites. La somme d’une répartition peut lui être inférieure : direction et destinataire sont facultatifs."
+          },
+          "parEntreprise": {
+            "description": "Toutes les entrées actives du référentiel, y compris celles à zéro.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatBucketDto"
+            }
+          },
+          "parDirection": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatBucketDto"
+            }
+          },
+          "parDestinataire": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatBucketDto"
+            }
+          },
+          "parObjet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatBucketDto"
+            }
+          },
+          "parMois": {
+            "description": "Chaque mois de la période.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatMoisDto"
+            }
+          },
+          "parJour": {
+            "description": "Seuls les jours ayant reçu au moins une visite.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatJourDto"
+            }
+          },
+          "sansDirection": {
+            "type": "number"
+          },
+          "sansDestinataire": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "total",
+          "parEntreprise",
+          "parDirection",
+          "parDestinataire",
+          "parObjet",
+          "parMois",
+          "parJour",
+          "sansDirection",
+          "sansDestinataire"
+        ]
+      },
+      "VisiteDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "example": "V-2026-000412",
+            "description": "Le « N° » du registre. Engendré par le serveur, immuable."
+          },
+          "date": {
+            "type": "string",
+            "example": "2026-01-06",
+            "description": "Jour de la visite, à Dakar."
+          },
+          "time": {
+            "type": "string",
+            "nullable": true,
+            "example": "11:08",
+            "description": "Nul quand l’heure n’a pas été relevée."
+          },
+          "visitorName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Le numéro tel qu’il a été donné."
+          },
+          "phoneE164": {
+            "type": "string",
+            "nullable": true,
+            "description": "Forme E.164, nulle quand le numéro donné n’a pas pu être reconnu."
+          },
+          "entreprise": {
+            "$ref": "#/components/schemas/VisiteReferentielRefDto"
+          },
+          "objet": {
+            "$ref": "#/components/schemas/VisiteReferentielRefDto"
+          },
+          "direction": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VisiteReferentielRefDto"
+              }
+            ]
+          },
+          "destinataire": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VisiteReferentielRefDto"
+              }
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "date",
+          "time",
+          "visitorName",
+          "phone",
+          "phoneE164",
+          "entreprise",
+          "objet",
+          "direction",
+          "destinataire",
+          "comment",
+          "createdById",
+          "createdAt"
+        ]
+      },
+      "VisiteListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": ["items", "meta"]
+      },
+      "CreateVisiteDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2026-01-06"
+          },
+          "time": {
+            "type": "string",
+            "example": "11:08",
+            "description": "Omise si elle n’a pas été relevée."
+          },
+          "visitorName": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Accepté sous n’importe quelle forme, y compris étrangère ou incomplète."
+          },
+          "entrepriseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "directionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destinataireId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": ["date", "visitorName", "entrepriseId", "objetId"]
+      },
+      "UpdateVisiteDto": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "example": "11:08",
+            "nullable": true
+          },
+          "visitorName": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "entrepriseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "directionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "destinataireId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 2000,
+            "nullable": true
+          }
+        }
       },
       "CallbackScope": {
         "type": "string",
@@ -20618,7 +22597,8 @@
           },
           "route": {
             "type": "string",
-            "maxLength": 300
+            "maxLength": 300,
+            "description": "Chaîne vide pour retirer le lien."
           },
           "isActive": {
             "type": "boolean"
@@ -21501,6 +23481,33 @@
         },
         "required": ["items", "total", "dormantDays"]
       },
+      "AmbassadorConversionDto": {
+        "type": "object",
+        "properties": {
+          "contacted": {
+            "type": "number",
+            "description": "Représentants dont la relation a bougé au moins une fois dans la période. Dénominateur : un taux rapporté à l’annuaire entier mesurerait la taille du fichier, pas le travail."
+          },
+          "ambassadors": {
+            "type": "number",
+            "description": "Parmi eux, ceux passés au moins une fois AMBASSADEUR dans la période. Comptés une seule fois, quel que soit le nombre d’allers-retours."
+          },
+          "conversionRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Ambassadeurs rapportés aux représentants travaillés, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %."
+          },
+          "reverted": {
+            "type": "number",
+            "description": "Parmi les convertis de la période, ceux dont le statut COURANT n’est plus AMBASSADEUR. Ils restent au numérateur : la bascule a eu lieu et elle est datée. Les retirer ferait bouger le taux d’un mois clos à chaque changement de statut d’aujourd’hui."
+          },
+          "untracked": {
+            "type": "number",
+            "description": "Représentants du périmètre sans AUCUNE trace de relation, à aucune date. Hors du taux dans les deux termes : ils mesurent ce que la période ne dit pas."
+          }
+        },
+        "required": ["contacted", "ambassadors", "conversionRate", "reverted", "untracked"]
+      },
       "DataQualityRowDto": {
         "type": "object",
         "properties": {
@@ -21895,7 +23902,7 @@
         },
         "required": ["from", "to", "granularity", "items", "teleconseillers"]
       },
-      "DemoCountsDto": {
+      "DemoWorkspaceCountsDto": {
         "type": "object",
         "properties": {
           "users": {
@@ -21910,61 +23917,24 @@
           "campaigns": {
             "type": "number"
           },
-          "campaignCommerciaux": {
-            "type": "number"
-          },
-          "callTasks": {
-            "type": "number"
-          },
-          "callAttempts": {
-            "type": "number"
-          },
           "bankCases": {
             "type": "number"
-          },
-          "bankCaseTransitions": {
-            "type": "number"
           }
         },
-        "required": [
-          "users",
-          "representants",
-          "prospects",
-          "campaigns",
-          "campaignCommerciaux",
-          "callTasks",
-          "callAttempts",
-          "bankCases",
-          "bankCaseTransitions"
-        ]
+        "required": ["users", "representants", "prospects", "campaigns", "bankCases"]
       },
-      "DemoStatusDto": {
+      "DemoWorkspaceStatusDto": {
         "type": "object",
         "properties": {
-          "enabled": {
-            "type": "boolean",
-            "description": "Vrai si des données de démonstration sont actuellement en place ET visibles. ATTENTION, ce booléen a une SECONDE conséquence, que l’interface doit annoncer avant la bascule : tant qu’il vaut vrai, la plateforme est en LECTURE SEULE. Toute requête POST, PATCH, PUT ou DELETE est refusée en 409 avec le code `DEMO_MODE_READ_ONLY`. Restent ouvertes, et ce sont les seules : la bascule de démonstration elle-même (sans quoi le mode ne pourrait plus être éteint), l’authentification, la remontée hors ligne du mobile (`POST /v1/sync/push`, qui n’est JAMAIS refusée), le marquage en lu d’une notification personnelle, et l’aperçu d’un gabarit de notification (`POST /v1/notification-templates/render`, un calcul qui n’écrit rien malgré la méthode POST). Les lignes créées par ces chemins sont du travail RÉEL : elles sont écrites `isDemo: false` et survivent à l’extinction."
-          },
-          "seededAt": {
+          "workspace": {
             "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "description": "Date du dernier ensemencement, nulle si le mode n’a jamais été activé."
-          },
-          "canToggle": {
-            "type": "boolean",
-            "description": "Faux quand l’environnement interdit la bascule : en production, tant que DEMO_MODE_ALLOWED ne vaut pas true. L’interface doit afficher `reason`, pas se contenter de griser le bouton."
-          },
-          "reason": {
-            "type": "string",
-            "nullable": true,
-            "description": "Explication lisible quand canToggle est faux."
+            "enum": ["demo"]
           },
           "counts": {
-            "$ref": "#/components/schemas/DemoCountsDto"
+            "$ref": "#/components/schemas/DemoWorkspaceCountsDto"
           }
         },
-        "required": ["enabled", "seededAt", "canToggle", "reason", "counts"]
+        "required": ["workspace", "counts"]
       },
       "PurgeDomainKey": {
         "type": "string",
@@ -22381,7 +24351,7 @@
       },
       "ImportKind": {
         "type": "string",
-        "enum": ["REPRESENTANTS", "PROSPECTS", "VISITES"]
+        "enum": ["REPRESENTANTS", "PROSPECTS", "VISITES", "PROSPECTS_GRAND_PUBLIC"]
       },
       "ImportStatus": {
         "type": "string",
@@ -22615,464 +24585,6 @@
           }
         },
         "required": ["items", "meta"]
-      },
-      "VisiteReferentielDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "code": {
-            "type": "string",
-            "description": "Code stable, jamais modifiable après création."
-          },
-          "label": {
-            "type": "string"
-          },
-          "isActive": {
-            "type": "boolean"
-          },
-          "isSystem": {
-            "type": "boolean",
-            "description": "Entrée reprise du classeur d’origine : renommable, désactivable, jamais effacée."
-          },
-          "sortOrder": {
-            "type": "number"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": ["id", "code", "label", "isActive", "isSystem", "sortOrder", "updatedAt"]
-      },
-      "VisiteReferentielsBundleDto": {
-        "type": "object",
-        "properties": {
-          "entreprises": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteReferentielDto"
-            }
-          },
-          "directions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteReferentielDto"
-            }
-          },
-          "destinataires": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteReferentielDto"
-            }
-          },
-          "objets": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteReferentielDto"
-            }
-          }
-        },
-        "required": ["entreprises", "directions", "destinataires", "objets"]
-      },
-      "VisiteReferentielKind": {
-        "type": "string",
-        "enum": ["entreprises", "directions", "destinataires", "objets"]
-      },
-      "VisiteReferentielListDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteReferentielDto"
-            }
-          }
-        },
-        "required": ["items"]
-      },
-      "CreateVisiteReferentielDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "maxLength": 48,
-            "description": "Majuscules, chiffres et tirets bas. Immuable une fois créé."
-          },
-          "label": {
-            "type": "string",
-            "maxLength": 120
-          },
-          "sortOrder": {
-            "type": "number",
-            "default": 100
-          }
-        },
-        "required": ["code", "label"]
-      },
-      "UpdateVisiteReferentielDto": {
-        "type": "object",
-        "properties": {
-          "label": {
-            "type": "string",
-            "maxLength": 120
-          },
-          "sortOrder": {
-            "type": "number"
-          }
-        }
-      },
-      "SetVisiteReferentielActiveDto": {
-        "type": "object",
-        "properties": {
-          "isActive": {
-            "type": "boolean"
-          }
-        },
-        "required": ["isActive"]
-      },
-      "ReorderVisiteReferentielDto": {
-        "type": "object",
-        "properties": {
-          "ids": {
-            "description": "Les entrées dans leur nouvel ordre. Celles omises gardent leur rang.",
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        },
-        "required": ["ids"]
-      },
-      "VisiteStatBucketDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "code": {
-            "type": "string"
-          },
-          "label": {
-            "type": "string"
-          },
-          "count": {
-            "type": "number"
-          }
-        },
-        "required": ["id", "code", "label", "count"]
-      },
-      "VisiteStatMoisDto": {
-        "type": "object",
-        "properties": {
-          "month": {
-            "type": "string",
-            "example": "2025-01"
-          },
-          "count": {
-            "type": "number"
-          }
-        },
-        "required": ["month", "count"]
-      },
-      "VisiteStatJourDto": {
-        "type": "object",
-        "properties": {
-          "date": {
-            "type": "string",
-            "example": "2025-01-06"
-          },
-          "count": {
-            "type": "number"
-          }
-        },
-        "required": ["date", "count"]
-      },
-      "VisiteStatsDto": {
-        "type": "object",
-        "properties": {
-          "from": {
-            "type": "string",
-            "example": "2025-01-01"
-          },
-          "to": {
-            "type": "string",
-            "example": "2025-12-31"
-          },
-          "total": {
-            "type": "number",
-            "description": "Nombre de visites. La somme d’une répartition peut lui être inférieure : direction et destinataire sont facultatifs."
-          },
-          "parEntreprise": {
-            "description": "Toutes les entrées actives du référentiel, y compris celles à zéro.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteStatBucketDto"
-            }
-          },
-          "parDirection": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteStatBucketDto"
-            }
-          },
-          "parDestinataire": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteStatBucketDto"
-            }
-          },
-          "parObjet": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteStatBucketDto"
-            }
-          },
-          "parMois": {
-            "description": "Chaque mois de la période.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteStatMoisDto"
-            }
-          },
-          "parJour": {
-            "description": "Seuls les jours ayant reçu au moins une visite.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteStatJourDto"
-            }
-          },
-          "sansDirection": {
-            "type": "number"
-          },
-          "sansDestinataire": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "from",
-          "to",
-          "total",
-          "parEntreprise",
-          "parDirection",
-          "parDestinataire",
-          "parObjet",
-          "parMois",
-          "parJour",
-          "sansDirection",
-          "sansDestinataire"
-        ]
-      },
-      "VisiteReferentielRefDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "code": {
-            "type": "string"
-          },
-          "label": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "code", "label"]
-      },
-      "VisiteDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "reference": {
-            "type": "string",
-            "example": "V-2026-000412",
-            "description": "Le « N° » du registre. Engendré par le serveur, immuable."
-          },
-          "date": {
-            "type": "string",
-            "example": "2026-01-06",
-            "description": "Jour de la visite, à Dakar."
-          },
-          "time": {
-            "type": "string",
-            "nullable": true,
-            "example": "11:08",
-            "description": "Nul quand l’heure n’a pas été relevée."
-          },
-          "visitorName": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string",
-            "nullable": true,
-            "description": "Le numéro tel qu’il a été donné."
-          },
-          "phoneE164": {
-            "type": "string",
-            "nullable": true,
-            "description": "Forme E.164, nulle quand le numéro donné n’a pas pu être reconnu."
-          },
-          "entreprise": {
-            "$ref": "#/components/schemas/VisiteReferentielRefDto"
-          },
-          "objet": {
-            "$ref": "#/components/schemas/VisiteReferentielRefDto"
-          },
-          "direction": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/VisiteReferentielRefDto"
-              }
-            ]
-          },
-          "destinataire": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/VisiteReferentielRefDto"
-              }
-            ]
-          },
-          "comment": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdById": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "reference",
-          "date",
-          "time",
-          "visitorName",
-          "phone",
-          "phoneE164",
-          "entreprise",
-          "objet",
-          "direction",
-          "destinataire",
-          "comment",
-          "createdById",
-          "createdAt"
-        ]
-      },
-      "VisiteListDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VisiteDto"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/PageMetaDto"
-          }
-        },
-        "required": ["items", "meta"]
-      },
-      "CreateVisiteDto": {
-        "type": "object",
-        "properties": {
-          "date": {
-            "type": "string",
-            "example": "2026-01-06"
-          },
-          "time": {
-            "type": "string",
-            "example": "11:08",
-            "description": "Omise si elle n’a pas été relevée."
-          },
-          "visitorName": {
-            "type": "string",
-            "maxLength": 160
-          },
-          "phone": {
-            "type": "string",
-            "maxLength": 40,
-            "description": "Accepté sous n’importe quelle forme, y compris étrangère ou incomplète."
-          },
-          "entrepriseId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "objetId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "directionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "destinataireId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "comment": {
-            "type": "string",
-            "maxLength": 2000
-          }
-        },
-        "required": ["date", "visitorName", "entrepriseId", "objetId"]
-      },
-      "UpdateVisiteDto": {
-        "type": "object",
-        "properties": {
-          "time": {
-            "type": "string",
-            "example": "11:08",
-            "nullable": true
-          },
-          "visitorName": {
-            "type": "string",
-            "maxLength": 160
-          },
-          "phone": {
-            "type": "string",
-            "maxLength": 40,
-            "nullable": true
-          },
-          "entrepriseId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "objetId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "directionId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "destinataireId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "comment": {
-            "type": "string",
-            "maxLength": 2000,
-            "nullable": true
-          }
-        }
       }
     }
   }

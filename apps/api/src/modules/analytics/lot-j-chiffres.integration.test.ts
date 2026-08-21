@@ -22,7 +22,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { fakeDemoVisibility } from '../../prisma/fake-demo-visibility.js';
 import { PilotageService } from './pilotage.service.js';
 import { PortfolioService } from './portfolio.service.js';
 import { QualityService } from './quality.service.js';
@@ -224,9 +223,9 @@ async function semer(tx: Prisma.TransactionClient): Promise<Decor> {
   }) as unknown as PrismaService;
 
   return {
-    pilotage: new PilotageService(client, fakeDemoVisibility()),
-    portfolio: new PortfolioService(client, fakeDemoVisibility()),
-    quality: new QualityService(client, fakeDemoVisibility()),
+    pilotage: new PilotageService(client),
+    portfolio: new PortfolioService(client),
+    quality: new QualityService(client),
     campaignId: campagne.id,
     departementId: departement.id,
     representantIds: [rep1, rep2],

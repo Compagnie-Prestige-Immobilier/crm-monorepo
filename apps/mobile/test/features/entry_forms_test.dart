@@ -7,6 +7,7 @@ import 'package:drift/native.dart';
 import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/sync/token_store.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
+import 'package:cpi_go/core/utils/whatsapp.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/write_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
@@ -119,6 +120,57 @@ void main() {
             GoRoute(
               path: Routes.newRepresentant,
               builder: (BuildContext context, GoRouterState state) => screen,
+            ),
+            GoRoute(
+              path: Routes.newProspect,
+              builder: (BuildContext context, GoRouterState state) =>
+                  const Scaffold(body: Text('prospects')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// L'annuaire et la fiche sur le même routeur : c'est l'enchaînement réel,
+  /// et il ne s'observe pas sur un écran monté seul.
+  Widget hostPicker() {
+    return ProviderScope(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        apiPortProvider.overrideWithValue(api),
+        tokenStoreProvider.overrideWithValue(
+          InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        ),
+        syncCoordinatorProvider.overrideWith(_IdleSyncCoordinator.new),
+      ],
+      child: MaterialApp.router(
+        theme: AppTheme.light,
+        locale: const Locale('fr'),
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        supportedLocales: const <Locale>[Locale('fr')],
+        routerConfig: GoRouter(
+          initialLocation: Routes.representants,
+          routes: <RouteBase>[
+            GoRoute(
+              path: Routes.representants,
+              builder: (BuildContext context, GoRouterState state) =>
+                  const RepresentantPickerScreen(),
+            ),
+            GoRoute(
+              path: Routes.newRepresentant,
+              builder: (BuildContext context, GoRouterState state) =>
+                  RepresentantFormScreen(
+                    draftId: state.uri.queryParameters[Routes.draftParam],
+                    representantId: state.uri.queryParameters['id'],
+                    prefillName: state.uri.queryParameters[Routes.prefillNameParam],
+                    prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam],
+                  ),
+            ),
+            GoRoute(
+              path: Routes.representantDetail,
+              builder: (BuildContext context, GoRouterState state) =>
+                  const Scaffold(body: Text('fiche')),
             ),
             GoRoute(
               path: Routes.newProspect,
@@ -669,7 +721,9 @@ void main() {
 
       await tester.tap(find.widgetWithText(ChoiceChip, 'Même numéro'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Instituteur'));
+      await tester.tap(find.widgetWithText(TextField, 'Profession (facultatif)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Instituteur').last);
       await tester.pumpAndSettle();
 
       // Aucun second champ de numéro n'apparaît : il n'y a rien à taper.
@@ -711,7 +765,7 @@ void main() {
         'Ousmane Fall',
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Enregistrer'));
+      await tester.tap(find.text('Enregistrer et saisir des prospects'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -1024,6 +1078,146 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('77 123 45 67'), findsOneWidget);
     });
+
+    /// Les fiches sont IMPORTÉES : on ne les crée quasiment jamais, on les
+    /// choisit. Choisir sautait par-dessus la fiche et tombait directement sur
+    /// la saisie de prospects : plus rien ne permettait de corriger un numéro
+    /// ou de compléter une profession recueillie au téléphone.
+    formTestWidgets('choisir un représentant ouvre SA fiche, préremplie', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        fullName: 'Ousmane Fall',
+        profession: 'Instituteur',
+        relationStatus: 'AMBASSADEUR',
+      );
+
+      await tester.pumpWidget(hostPicker());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Ousmane Fall'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('prospects'),
+        findsNothing,
+        reason: 'le formulaire ne se saute pas',
+      );
+      expect(
+        find.descendant(
+          of: find.widgetWithText(TextField, 'Nom complet'),
+          matching: find.text('Ousmane Fall'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.widgetWithText(TextField, 'Téléphone'),
+          matching: find.text('77 000 00 01'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Instituteur'), findsWidgets);
+      // Où en est la relation, sans quitter la fiche.
+      expect(find.text('Relation : Ambassadeur'), findsOneWidget);
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  group('profession : une liste, pas une frappe libre', () {
+    formTestWidgets('elle se choisit parmi les valeurs connues', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(hostRouted(const RepresentantFormScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Nom complet'),
+        'Ousmane Fall',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextField, 'Département'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dakar').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Téléphone'), '77 123 45 67');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(TextField, 'Profession (facultatif)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Instituteur').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Enregistrer et saisir des prospects'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final Representant row = await db.select(db.representants).getSingle();
+      expect(row.profession, 'Instituteur');
+    });
+
+    /// La liste ASSISTE la saisie, elle ne la borne pas : un métier absent du
+    /// référentiel s'enregistre tel quel, et sans « Aucun résultat » qui ferait
+    /// croire à un refus.
+    formTestWidgets('un métier hors liste s\'enregistre quand même', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(hostRouted(const RepresentantFormScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Nom complet'),
+        'Ousmane Fall',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextField, 'Département'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dakar').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Téléphone'), '77 123 45 67');
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Profession (facultatif)'),
+        'Surveillant général',
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Aucun résultat'), findsNothing);
+
+      await tester.tap(find.text('Enregistrer et saisir des prospects'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final Representant row = await db.select(db.representants).getSingle();
+      expect(row.profession, 'Surveillant général');
+    });
+
+    /// Le serveur plafonne la profession à 120 caractères, et un champ trop
+    /// long fait refuser le LOT de synchronisation entier, pas cette fiche.
+    formTestWidgets('la saisie s\'arrête au plafond du serveur', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(host(const RepresentantFormScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Profession (facultatif)'),
+        'a' * 400,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextField>(find.widgetWithText(TextField, 'Profession (facultatif)'))
+            .controller!
+            .text
+            .length,
+        kProfessionMaxLength,
+      );
+    });
   });
 }
 
@@ -1047,10 +1241,15 @@ class _SlowWrites extends WriteRepository {
     required String nom,
     required String prenom,
     required String phoneE164,
-    required String banqueId,
-    required String syndicatId,
-    required String representantId,
     required String createdById,
+    String? banqueId,
+    String? syndicatId,
+    String? representantId,
+    String? projet,
+    String? type,
+    String? profession,
+    int? dureeSystemeMois,
+    String? canalProvenanceId,
     String? id,
     String? draftId,
   }) async {
