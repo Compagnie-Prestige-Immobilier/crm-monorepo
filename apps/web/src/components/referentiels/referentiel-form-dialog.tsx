@@ -193,11 +193,20 @@ export function SyndicatFormDialog({
         name: values.name,
         sigle: values.sigle,
         sortOrder: values.sortOrder,
-        ...(values.secteur === '' ? {} : { secteur: values.secteur }),
       };
+      // A la MODIFICATION le vide est pose, c'est ce qui efface le secteur. A la
+      // creation il n'y a rien a effacer, on l'omet.
       return isEdit
-        ? updateSyndicat(syndicat.id, { ...body, isActive: syndicat.isActive })
-        : createSyndicat({ ...body, isActive: true });
+        ? updateSyndicat(syndicat.id, {
+            ...body,
+            secteur: values.secteur,
+            isActive: syndicat.isActive,
+          })
+        : createSyndicat({
+            ...body,
+            ...(values.secteur === '' ? {} : { secteur: values.secteur }),
+            isActive: true,
+          });
     },
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.referentielsRoot });

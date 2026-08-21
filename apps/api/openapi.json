@@ -17118,7 +17118,8 @@
           },
           "departementId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Chaîne vide pour retirer le rattachement."
           },
           "phone": {
             "type": "string",
@@ -17155,7 +17156,8 @@
           },
           "departementId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Chaîne vide pour retirer le rattachement."
           },
           "phone": {
             "type": "string",
@@ -22750,7 +22752,8 @@
           },
           "route": {
             "type": "string",
-            "maxLength": 300
+            "maxLength": 300,
+            "description": "Chaîne vide pour retirer le lien."
           },
           "isActive": {
             "type": "boolean"

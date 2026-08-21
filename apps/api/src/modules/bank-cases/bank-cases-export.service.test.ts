@@ -2,7 +2,7 @@ import { PassThrough } from 'node:stream';
 
 import ExcelJS from 'exceljs';
 import { Prisma } from '@crm/database';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { BankCasesExportService } from './bank-cases-export.service.js';
 import type { BankCaseAnalyticsService } from './bank-cases-analytics.service.js';
@@ -376,5 +376,29 @@ describe('filtrage', () => {
       'Synthèse',
     ]);
     expect(column(sheetOf(workbook, 'Dossiers'), 'Référence')).toEqual([]);
+  });
+});
+
+describe('cohérence du mode démonstration', () => {
+  it('utilise le mode fourni pour les lignes et la synthèse sans le relire', async () => {
+    const analytics = stubAnalytics();
+    const enabled = vi.fn().mockResolvedValue(true);
+    const service = new BankCasesExportService(db.asService(), analytics, { enabled } as never);
+    const stream = new PassThrough();
+    const workbook = new ExcelJS.Workbook();
+    const reading = workbook.xlsx.read(stream);
+
+    await service.write({}, stream, false);
+    await reading;
+
+    expect(enabled).not.toHaveBeenCalled();
+    // Vu comme un jeu d'espions et non comme un service : `expect(objet.methode)`
+    // sur un type de classe detache la methode de son porteur, ce que la regle
+    // `unbound-method` refuse a juste titre.
+    const espions = analytics as unknown as Record<string, Mock>;
+    expect(espions.totals).toHaveBeenCalledWith({}, false);
+    expect(espions.byStage).toHaveBeenCalledWith({}, false);
+    expect(espions.byBank).toHaveBeenCalledWith({}, false);
+    expect(espions.byRejectionReason).toHaveBeenCalledWith({}, false);
   });
 });

@@ -6,6 +6,7 @@ import { useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { QueryErrorInline } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -77,7 +78,11 @@ function ApproveDialog({
     setMethod(null);
   }, [request?.id]);
 
-  const { data: reference } = useQuery({
+  const {
+    data: reference,
+    error: referenceError,
+    refetch: refetchReference,
+  } = useQuery({
     queryKey: queryKeys.reference,
     queryFn: () => fetchReferenceData(),
     staleTime: 5 * 60_000,
@@ -129,84 +134,85 @@ function ApproveDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
-          {/* `required` : le champ bloque l'envoi au même titre que ses deux
+        {referenceError === null ? (
+          <div className="flex flex-col gap-4">
+            {/* `required` : le champ bloque l'envoi au même titre que ses deux
               voisins, il doit donc porter la même marque. */}
-          <FilterCombobox
-            label="Représentant de rattachement"
-            placeholder="Choisir un représentant"
-            value={representant}
-            options={reference?.representants ?? []}
-            onChange={setRepresentant}
-            required
-          />
+            <FilterCombobox
+              label="Représentant de rattachement"
+              placeholder="Choisir un représentant"
+              value={representant}
+              options={reference?.representants ?? []}
+              onChange={setRepresentant}
+              required
+            />
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={syndicatId}>
-              Syndicat
-              <span className="text-destructive" aria-label="obligatoire">
-                *
-              </span>
-            </Label>
-            {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={syndicatId}>
+                Syndicat
+                <span className="text-destructive" aria-label="obligatoire">
+                  *
+                </span>
+              </Label>
+              {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
                 pas le texte de l'item — ici, l'identifiant du syndicat. */}
-            <Select
-              items={(reference?.syndicats ?? []).map((item) => ({
-                value: item.id,
-                label: `${item.sigle}, ${item.name}`,
-              }))}
-              value={syndicat ?? ''}
-              onValueChange={(value) => {
-                if (value === null) return;
-                setSyndicat(value);
-              }}
-            >
-              <SelectTrigger id={syndicatId} className="w-full">
-                <SelectValue placeholder="Choisir un syndicat" />
-              </SelectTrigger>
-              <SelectContent>
-                {(reference?.syndicats ?? []).map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.sigle}, {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <Select
+                items={(reference?.syndicats ?? []).map((item) => ({
+                  value: item.id,
+                  label: `${item.sigle}, ${item.name}`,
+                }))}
+                value={syndicat ?? ''}
+                onValueChange={(value) => {
+                  if (value === null) return;
+                  setSyndicat(value);
+                }}
+              >
+                <SelectTrigger id={syndicatId} className="w-full">
+                  <SelectValue placeholder="Choisir un syndicat" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(reference?.syndicats ?? []).map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.sigle}, {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={methodId}>
-              Méthode d’enrôlement
-              <span className="text-destructive" aria-label="obligatoire">
-                *
-              </span>
-            </Label>
-            <Select
-              items={ENROLLMENT_METHOD_LABELS}
-              value={method ?? ''}
-              onValueChange={(value) => {
-                if (value === null) return;
-                setMethod(value as EnrollmentMethod);
-              }}
-            >
-              <SelectTrigger id={methodId} className="w-full">
-                <SelectValue placeholder="Choisir une méthode" />
-              </SelectTrigger>
-              <SelectContent>
-                {ENROLLMENT_METHODS.map((candidate) => (
-                  <SelectItem key={candidate} value={candidate}>
-                    {ENROLLMENT_METHOD_LABELS[candidate]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[0.75rem] text-muted-foreground">
-              Le prospect naît en « méthode obtenue » : c’est ce qui permet à la banque de lui
-              rattacher son dossier immédiatement.
-            </p>
-          </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={methodId}>
+                Méthode d’enrôlement
+                <span className="text-destructive" aria-label="obligatoire">
+                  *
+                </span>
+              </Label>
+              <Select
+                items={ENROLLMENT_METHOD_LABELS}
+                value={method ?? ''}
+                onValueChange={(value) => {
+                  if (value === null) return;
+                  setMethod(value as EnrollmentMethod);
+                }}
+              >
+                <SelectTrigger id={methodId} className="w-full">
+                  <SelectValue placeholder="Choisir une méthode" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENROLLMENT_METHODS.map((candidate) => (
+                    <SelectItem key={candidate} value={candidate}>
+                      {ENROLLMENT_METHOD_LABELS[candidate]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[0.75rem] text-muted-foreground">
+                Le prospect naît en « méthode obtenue » : c’est ce qui permet à la banque de lui
+                rattacher son dossier immédiatement.
+              </p>
+            </div>
 
-          {/*
+            {/*
             L'identifiant porté ici ne servait à RIEN : il était engendré pour le
             champ « Représentant », posé sur ce paragraphe, et le
             `FilterCombobox` ne le référençait nulle part. Un `id` qu'aucun
@@ -215,10 +221,19 @@ function ApproveDialog({
             champ est décrit. La phrase vaut pour le dialogue entier, pas pour un
             champ, et reste donc un simple paragraphe.
           */}
-          <p className="text-[0.75rem] text-muted-foreground">
-            La banque demandeuse devient la provenance de la fiche.
-          </p>
-        </div>
+            <p className="text-[0.75rem] text-muted-foreground">
+              La banque demandeuse devient la provenance de la fiche.
+            </p>
+          </div>
+        ) : (
+          <QueryErrorInline
+            error={referenceError}
+            fallback="Les listes nécessaires à l’approbation n’ont pas pu être chargées."
+            onRetry={() => {
+              void refetchReference();
+            }}
+          />
+        )}
 
         <DialogFooter>
           <Button type="button" variant="ghost" disabled={approve.isPending} onClick={onClose}>

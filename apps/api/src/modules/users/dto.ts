@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  ValidateIf,
   Matches,
   Max,
   MaxLength,
@@ -55,8 +56,16 @@ export class CreateUserDto {
   @IsEnum(Role)
   role?: Role;
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  /**
+   * La chaine VIDE efface le rattachement, un identifiant le pose.
+   *
+   * Sans ce vide, « Aucun » cote panneau ne pouvait qu'omettre le champ, et sur
+   * un PATCH l'omission veut dire « ne change rien » : un departement pose par
+   * erreur ne se retirait jamais.
+   */
+  @ApiPropertyOptional({ format: 'uuid', description: 'Chaîne vide pour retirer le rattachement.' })
   @IsOptional()
+  @ValidateIf((_object: object, value: unknown) => value !== '')
   @IsUUID()
   departementId?: string;
 

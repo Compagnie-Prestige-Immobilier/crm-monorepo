@@ -2666,7 +2666,10 @@ export interface components {
       password: string;
       /** @default COMMERCIAL */
       role: components['schemas']['Role'];
-      /** Format: uuid */
+      /**
+       * Format: uuid
+       * @description Chaîne vide pour retirer le rattachement.
+       */
       departementId?: string;
       /** @description Téléphone, normalisé en E.164 par le serveur. */
       phone?: string;
@@ -2679,7 +2682,10 @@ export interface components {
       fullName?: string;
       /** @default COMMERCIAL */
       role: components['schemas']['Role'];
-      /** Format: uuid */
+      /**
+       * Format: uuid
+       * @description Chaîne vide pour retirer le rattachement.
+       */
       departementId?: string;
       /** @description Téléphone, normalisé en E.164 par le serveur. */
       phone?: string;
@@ -4717,6 +4723,7 @@ export interface components {
       category?: components['schemas']['NotificationCategory'];
       titleTemplate?: string;
       bodyTemplate?: string;
+      /** @description Chaîne vide pour retirer le lien. */
       route?: string;
       isActive?: boolean;
     };
