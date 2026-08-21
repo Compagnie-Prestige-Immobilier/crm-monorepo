@@ -56,7 +56,7 @@ export class BankCasesExportController {
     setDemoHeader(reply.raw, demoEnabled);
 
     try {
-      await this.exports.write(query, reply.raw);
+      await this.exports.write(query, reply.raw, demoEnabled);
     } catch (error) {
       reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
       throw error;
