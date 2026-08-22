@@ -18,6 +18,7 @@ function endOfDay(isoDate: string): string {
 export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
   const query: AnalyticsQuery = {};
 
+  if (filters.projet !== null) query.projet = filters.projet;
   const search = filters.search.trim();
   if (search !== '') query.search = search;
   if (filters.commercialId !== null) query.commercialId = filters.commercialId;

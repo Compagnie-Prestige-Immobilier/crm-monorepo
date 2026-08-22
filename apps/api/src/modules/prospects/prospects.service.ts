@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, classifySegment } from '@crm/database';
+import { GrandPublicConsent, Prisma, Projet, classifySegment } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -19,6 +19,7 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import type { OkDto } from '../../common/dto/ok.dto.js';
 import type {
   CreateProspectDto,
+  ConfirmGrandPublicConversionDto,
   MergeProspectsDto,
   ProspectDto,
   ProspectListDto,
@@ -35,6 +36,19 @@ export const PROSPECT_INCLUDE = {
   createdBy: { select: { id: true, fullName: true } },
   enrollmentCapturedBy: { select: { id: true, fullName: true } },
   canalProvenance: { select: { label: true } },
+  professionRef: { select: { label: true, isTeaching: true } },
+  incomeBand: { select: { label: true } },
+  journeys: {
+    select: {
+      id: true,
+      projet: true,
+      statut: true,
+      consent: true,
+      consentAt: true,
+      convertedAt: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  },
   representant: {
     select: {
       fullName: true,
@@ -68,7 +82,17 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     ownedByCommercialId: row.createdBy.id,
     ownedByCommercialName: row.createdBy.fullName,
     type: row.type,
-    profession: row.profession,
+    profession: row.professionRef?.label ?? row.profession,
+    professionId: row.professionId ?? null,
+    professionIsTeaching: row.professionRef?.isTeaching ?? null,
+    incomeBandId: row.incomeBandId ?? null,
+    incomeBandLabel: row.incomeBand?.label ?? null,
+    paymentMode: row.paymentMode ?? null,
+    journeys: (row.journeys ?? []).map((journey) => ({
+      ...journey,
+      consentAt: journey.consentAt?.toISOString() ?? null,
+      convertedAt: journey.convertedAt?.toISOString() ?? null,
+    })),
     dureeSystemeMois: row.dureeSystemeMois,
     canalProvenanceId: row.canalProvenanceId,
     canalProvenanceLabel: row.canalProvenance?.label ?? null,
@@ -156,7 +180,11 @@ export class ProspectsService {
     await this.assertIdAvailable(user, id);
     // Le rattachement est facultatif : une fiche Grand Public n'en a aucun.
     if (input.representantId) await this.assertRepresentantUsable(user, input.representantId);
+    const projet = input.projet ?? Projet.CHUES;
+    const attached = await this.attachProjectByPhone(user, phoneE164, projet, input);
+    if (attached) return attached;
     await this.assertPhoneFree(phoneE164);
+    this.assertPayment(input.paymentMode, input.dureeSystemeMois);
 
     const created = await this.prisma.prospect.create({
       data: {
@@ -168,9 +196,12 @@ export class ProspectsService {
         syndicatId: input.syndicatId ?? null,
         representantId: input.representantId ?? null,
         createdById: user.id,
-        ...(input.projet ? { projet: input.projet } : {}),
+        ...(input.projet ? { projet } : {}),
         ...(input.type ? { type: input.type } : {}),
         ...(input.profession === undefined ? {} : { profession: input.profession.trim() }),
+        ...(input.professionId === undefined ? {} : { professionId: input.professionId }),
+        ...(input.incomeBandId === undefined ? {} : { incomeBandId: input.incomeBandId }),
+        ...(input.paymentMode === undefined ? {} : { paymentMode: input.paymentMode }),
         ...(input.dureeSystemeMois === undefined
           ? {}
           : { dureeSystemeMois: input.dureeSystemeMois }),
@@ -179,6 +210,17 @@ export class ProspectsService {
           : { canalProvenanceId: input.canalProvenanceId }),
 
         ...(input.statut ? { statut: input.statut } : {}),
+        journeys: {
+          create: {
+            projet,
+            ...(input.statut ? { statut: input.statut } : {}),
+            consent:
+              projet === Projet.GRAND_PUBLIC
+                ? GrandPublicConsent.INTERESSE
+                : GrandPublicConsent.NON_DEMANDE,
+            consentAt: projet === Projet.GRAND_PUBLIC ? new Date() : null,
+          },
+        },
         clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
       },
       include: PROSPECT_INCLUDE,
@@ -202,6 +244,27 @@ export class ProspectsService {
     if (input.representantId && input.representantId !== existing.representantId) {
       await this.assertRepresentantUsable(user, input.representantId);
     }
+    this.assertPayment(
+      input.paymentMode ?? existing.paymentMode,
+      input.dureeSystemeMois ?? existing.dureeSystemeMois,
+    );
+
+    if (input.projet) {
+      await this.prisma.prospectJourney.upsert({
+        where: { prospectId_projet: { prospectId: id, projet: input.projet } },
+        create: {
+          prospectId: id,
+          projet: input.projet,
+          ...(input.statut ? { statut: input.statut } : {}),
+          consent:
+            input.projet === Projet.GRAND_PUBLIC
+              ? GrandPublicConsent.INTERESSE
+              : GrandPublicConsent.NON_DEMANDE,
+          consentAt: input.projet === Projet.GRAND_PUBLIC ? new Date() : null,
+        },
+        update: input.statut === undefined ? {} : { statut: input.statut },
+      });
+    }
 
     const updated = await this.prisma.prospect.update({
       where: { id },
@@ -215,6 +278,9 @@ export class ProspectsService {
         ...(input.projet ? { projet: input.projet } : {}),
         ...(input.type ? { type: input.type } : {}),
         ...(input.profession === undefined ? {} : { profession: input.profession.trim() }),
+        ...(input.professionId === undefined ? {} : { professionId: input.professionId }),
+        ...(input.incomeBandId === undefined ? {} : { incomeBandId: input.incomeBandId }),
+        ...(input.paymentMode === undefined ? {} : { paymentMode: input.paymentMode }),
         ...(input.dureeSystemeMois === undefined
           ? {}
           : { dureeSystemeMois: input.dureeSystemeMois }),
@@ -233,6 +299,18 @@ export class ProspectsService {
     return toProspectDto(updated, attempts.get(updated.id));
   }
 
+  private assertPayment(
+    paymentMode: string | null | undefined,
+    durationMonths: number | null | undefined,
+  ): void {
+    if (paymentMode === 'COMPTANT' && durationMonths != null) {
+      throw new BadRequestException({
+        code: 'PROSPECT_PAYMENT_DURATION_INVALID',
+        message: 'La durée ne concerne que le paiement échelonné.',
+      });
+    }
+  }
+
   async remove(user: AuthenticatedUser, id: string): Promise<OkDto> {
     const existing = await this.prisma.prospect.findFirst({ where: { id, deletedAt: null } });
     if (!existing) {
@@ -248,6 +326,89 @@ export class ProspectsService {
       data: { deletedAt: new Date(), rev: { increment: 1 } },
     });
     return { ok: true };
+  }
+
+  async setGrandPublicConsent(
+    user: AuthenticatedUser,
+    id: string,
+    consent: GrandPublicConsent,
+  ): Promise<ProspectDto> {
+    const prospect = await this.prisma.prospect.findFirst({ where: { id, deletedAt: null } });
+    if (!prospect) {
+      throw new NotFoundException({ code: 'PROSPECT_NOT_FOUND', message: 'Prospect introuvable.' });
+    }
+    assertOwnership(user, prospect);
+    const at = consent === GrandPublicConsent.NON_DEMANDE ? null : new Date();
+    await this.prisma.prospectJourney.upsert({
+      where: { prospectId_projet: { prospectId: id, projet: Projet.GRAND_PUBLIC } },
+      create: {
+        prospectId: id,
+        projet: Projet.GRAND_PUBLIC,
+        consent,
+        consentAt: at,
+        consentById: consent === GrandPublicConsent.NON_DEMANDE ? null : user.id,
+      },
+      update: {
+        consent,
+        consentAt: at,
+        consentById: consent === GrandPublicConsent.NON_DEMANDE ? null : user.id,
+      },
+    });
+    return this.get(user, id);
+  }
+
+  async confirmGrandPublicConversion(
+    user: AuthenticatedUser,
+    id: string,
+    input: ConfirmGrandPublicConversionDto,
+  ): Promise<ProspectDto> {
+    this.assertPayment(input.paymentMode, input.durationMonths);
+    const prospect = await this.prisma.prospect.findFirst({ where: { id, deletedAt: null } });
+    if (!prospect) {
+      throw new NotFoundException({ code: 'PROSPECT_NOT_FOUND', message: 'Prospect introuvable.' });
+    }
+    assertOwnership(user, prospect);
+    const journey = await this.prisma.prospectJourney.findUnique({
+      where: { prospectId_projet: { prospectId: id, projet: Projet.GRAND_PUBLIC } },
+    });
+    if (!journey || journey.consent !== GrandPublicConsent.INTERESSE) {
+      throw new BadRequestException({
+        code: 'GRAND_PUBLIC_CONSENT_REQUIRED',
+        message: 'Le parcours Grand Public doit être accepté avant sa conversion.',
+      });
+    }
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.prospectJourney.update({
+        where: { id: journey.id },
+        data: { statut: 'CONVERTI', convertedAt: now, convertedById: user.id },
+      }),
+      this.prisma.prospectConversion.upsert({
+        where: { journeyId: journey.id },
+        create: {
+          journeyId: journey.id,
+          offerId: input.offerId,
+          ...(input.paymentMode ? { paymentMode: input.paymentMode } : {}),
+          ...(input.amountXof === undefined ? {} : { amountXof: input.amountXof }),
+          ...(input.durationMonths === undefined ? {} : { durationMonths: input.durationMonths }),
+          confirmedById: user.id,
+          confirmedAt: now,
+        },
+        update: {
+          offerId: input.offerId,
+          ...(input.paymentMode ? { paymentMode: input.paymentMode } : {}),
+          ...(input.amountXof === undefined ? {} : { amountXof: input.amountXof }),
+          ...(input.durationMonths === undefined ? {} : { durationMonths: input.durationMonths }),
+          confirmedById: user.id,
+          confirmedAt: now,
+        },
+      }),
+      this.prisma.prospect.update({
+        where: { id },
+        data: { statut: 'CONVERTI', rev: { increment: 1 } },
+      }),
+    ]);
+    return this.get(user, id);
   }
 
   /**
@@ -449,5 +610,49 @@ export class ProspectsService {
         createdAt: clash.createdAt.toISOString(),
       },
     });
+  }
+
+  private async attachProjectByPhone(
+    user: AuthenticatedUser,
+    phoneE164: string,
+    projet: Projet,
+    input: CreateProspectDto,
+  ): Promise<ProspectDto | null> {
+    const existing = await this.prisma.prospect.findFirst({
+      where: { phoneE164, deletedAt: null },
+      select: {
+        id: true,
+        createdById: true,
+        journeys: { where: { projet }, select: { id: true } },
+      },
+    });
+    if (!existing || (existing.journeys ?? []).length > 0) return null;
+    if (!isAdmin(user) && existing.createdById !== user.id) return null;
+
+    await this.prisma.prospectJourney.create({
+      data: {
+        prospectId: existing.id,
+        projet,
+        ...(input.statut ? { statut: input.statut } : {}),
+        consent:
+          projet === Projet.GRAND_PUBLIC
+            ? GrandPublicConsent.INTERESSE
+            : GrandPublicConsent.NON_DEMANDE,
+        consentAt: projet === Projet.GRAND_PUBLIC ? new Date() : null,
+      },
+    });
+    const updated = await this.prisma.prospect.update({
+      where: { id: existing.id },
+      data: {
+        ...(input.type ? { type: input.type } : {}),
+        ...(input.professionId ? { professionId: input.professionId } : {}),
+        ...(input.incomeBandId ? { incomeBandId: input.incomeBandId } : {}),
+        ...(input.paymentMode ? { paymentMode: input.paymentMode } : {}),
+        ...(input.canalProvenanceId ? { canalProvenanceId: input.canalProvenanceId } : {}),
+        rev: { increment: 1 },
+      },
+      include: PROSPECT_INCLUDE,
+    });
+    return toProspectDto(updated);
   }
 }

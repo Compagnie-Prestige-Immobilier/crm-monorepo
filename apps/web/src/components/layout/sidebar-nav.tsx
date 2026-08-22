@@ -31,6 +31,7 @@ export function SidebarNav({
   const coque = coqueOf(pathname);
   const sections = coque === null ? [] : navSections(role, coque);
   const coqueLabel = COQUES.find((entry) => entry.id === coque)?.label ?? 'CPI GO';
+  const hubHref = `${HUB_PATH}?retour=${encodeURIComponent(pathname)}`;
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -41,7 +42,7 @@ export function SidebarNav({
         )}
       >
         <Link
-          href={HUB_PATH}
+          href={hubHref}
           onClick={onNavigate}
           aria-label="Tous les espaces"
           className="flex items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sidebar-ring"
@@ -135,7 +136,7 @@ export function SidebarNav({
           ne devine qu'un logo change de projet. */}
       <div className={cn('border-t border-sidebar-border', collapsed ? 'p-2' : 'px-3 py-3')}>
         <Link
-          href={HUB_PATH}
+          href={hubHref}
           onClick={onNavigate}
           title={collapsed ? 'Tous les espaces' : undefined}
           className={cn(

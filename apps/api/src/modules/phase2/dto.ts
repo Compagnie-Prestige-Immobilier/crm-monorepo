@@ -22,6 +22,7 @@ import {
   CampaignStatus,
   EnrollmentMethod,
   Phase2Status,
+  Projet,
 } from '@crm/database';
 
 import { COMMENT_MAX_LENGTH } from './attempt-rules.js';
@@ -35,6 +36,11 @@ export class CreateCampaignDto {
   @MaxLength(120)
   name!: string;
 
+  @ApiPropertyOptional({ enum: Projet, enumName: 'Projet', default: Projet.CHUES })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
+
   @ApiProperty({
     enum: CampaignScope,
     enumName: 'CampaignScope',
@@ -43,6 +49,26 @@ export class CreateCampaignDto {
   })
   @IsEnum(CampaignScope)
   scope!: CampaignScope;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Offre ciblée, pour Grand Public.' })
+  @IsOptional()
+  @IsUUID()
+  offerId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  canalProvenanceId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  professionId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  incomeBandId?: string;
 
   @ApiProperty({
     type: 'array',
@@ -144,10 +170,12 @@ export class CallRecordingDto {
 export class CampaignSummaryDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() name!: string;
+  @ApiProperty({ enum: Projet, enumName: 'Projet' }) projet!: Projet;
   @ApiProperty({ enum: CampaignScope, enumName: 'CampaignScope' }) scope!: CampaignScope;
   @ApiProperty({ description: 'Libellé lisible du périmètre, issu de la définition partagée.' })
   scopeLabel!: string;
   @ApiProperty({ enum: CampaignStatus, enumName: 'CampaignStatus' }) status!: CampaignStatus;
+  @ApiProperty({ type: String, nullable: true }) offerLabel!: string | null;
 
   @ApiProperty({
     description:
@@ -170,9 +198,11 @@ export class CampaignSummaryDto {
 export class CampaignDetailDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() name!: string;
+  @ApiProperty({ enum: Projet, enumName: 'Projet' }) projet!: Projet;
   @ApiProperty({ enum: CampaignScope, enumName: 'CampaignScope' }) scope!: CampaignScope;
   @ApiProperty() scopeLabel!: string;
   @ApiProperty({ enum: CampaignStatus, enumName: 'CampaignStatus' }) status!: CampaignStatus;
+  @ApiProperty({ type: String, nullable: true }) offerLabel!: string | null;
   @ApiProperty() seed!: string;
   @ApiProperty({ format: 'uuid' }) createdById!: string;
   @ApiProperty() createdByName!: string;
@@ -207,6 +237,10 @@ export class CampaignListDto {
 }
 
 export class CampaignQueryDto {
+  @ApiPropertyOptional({ enum: Projet, enumName: 'Projet' })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
   @ApiPropertyOptional({ enum: CampaignStatus, enumName: 'CampaignStatus' })
   @IsOptional()
   @IsEnum(CampaignStatus)

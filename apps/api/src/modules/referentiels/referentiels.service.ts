@@ -12,6 +12,15 @@ import type {
   CreateSyndicatDto,
   DepartementDto,
   IefDto,
+  IncomeBandDto,
+  CreateIncomeBandDto,
+  UpdateIncomeBandDto,
+  ProfessionDto,
+  CreateProfessionDto,
+  UpdateProfessionDto,
+  OfferDto,
+  CreateOfferDto,
+  UpdateOfferDto,
   ReferentielQueryDto,
   ReferentielsBundleDto,
   RegionDto,
@@ -86,18 +95,53 @@ const toIef = (row: IefRow): IefDto => ({
 
 const toRegion = (row: Region): RegionDto => ({ id: row.id, code: row.code, name: row.name });
 
+const toProfession = (row: {
+  id: string;
+  code: string;
+  label: string;
+  isTeaching: boolean;
+  position: number;
+  isActive: boolean;
+  updatedAt: Date;
+}): ProfessionDto => ({ ...row, updatedAt: row.updatedAt.toISOString() });
+
+const toIncomeBand = (row: {
+  id: string;
+  code: string;
+  label: string;
+  minXof: number | null;
+  maxXof: number | null;
+  position: number;
+  isActive: boolean;
+  updatedAt: Date;
+}): IncomeBandDto => ({ ...row, updatedAt: row.updatedAt.toISOString() });
+
+const toOffer = (row: {
+  id: string;
+  code: string;
+  label: string;
+  description: string | null;
+  position: number;
+  isActive: boolean;
+  updatedAt: Date;
+}): OfferDto => ({ ...row, updatedAt: row.updatedAt.toISOString() });
+
 @Injectable()
 export class ReferentielsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async bundle(query: ReferentielQueryDto): Promise<ReferentielsBundleDto> {
-    const [banques, syndicats, departements, regions] = await Promise.all([
-      this.listBanques(query),
-      this.listSyndicats(query),
-      this.listDepartements(query),
-      this.listRegions(),
-    ]);
-    return { banques, syndicats, departements, regions };
+    const [banques, syndicats, departements, regions, professions, incomeBands, offers] =
+      await Promise.all([
+        this.listBanques(query),
+        this.listSyndicats(query),
+        this.listDepartements(query),
+        this.listRegions(),
+        this.listProfessions(query),
+        this.listIncomeBands(query),
+        this.listOffers(query),
+      ]);
+    return { banques, syndicats, departements, regions, professions, incomeBands, offers };
   }
 
   async listBanques(query: ReferentielQueryDto): Promise<BanqueDto[]> {
@@ -194,6 +238,57 @@ export class ReferentielsService {
     return toCanal(await this.prisma.canalProvenance.update({ where: { id }, data: input }));
   }
 
+  async listProfessions(query: ReferentielQueryDto): Promise<ProfessionDto[]> {
+    return (
+      await this.prisma.profession.findMany({
+        where: activeFilter(query),
+        orderBy: [{ position: 'asc' }, { label: 'asc' }],
+      })
+    ).map(toProfession);
+  }
+
+  async createProfession(input: CreateProfessionDto): Promise<ProfessionDto> {
+    return toProfession(await this.prisma.profession.create({ data: input }));
+  }
+
+  async updateProfession(id: string, input: UpdateProfessionDto): Promise<ProfessionDto> {
+    return toProfession(await this.prisma.profession.update({ where: { id }, data: input }));
+  }
+
+  async listIncomeBands(query: ReferentielQueryDto): Promise<IncomeBandDto[]> {
+    return (
+      await this.prisma.incomeBand.findMany({
+        where: activeFilter(query),
+        orderBy: [{ position: 'asc' }, { minXof: 'asc' }],
+      })
+    ).map(toIncomeBand);
+  }
+
+  async createIncomeBand(input: CreateIncomeBandDto): Promise<IncomeBandDto> {
+    return toIncomeBand(await this.prisma.incomeBand.create({ data: input }));
+  }
+
+  async updateIncomeBand(id: string, input: UpdateIncomeBandDto): Promise<IncomeBandDto> {
+    return toIncomeBand(await this.prisma.incomeBand.update({ where: { id }, data: input }));
+  }
+
+  async listOffers(query: ReferentielQueryDto): Promise<OfferDto[]> {
+    return (
+      await this.prisma.offer.findMany({
+        where: activeFilter(query),
+        orderBy: [{ position: 'asc' }, { label: 'asc' }],
+      })
+    ).map(toOffer);
+  }
+
+  async createOffer(input: CreateOfferDto): Promise<OfferDto> {
+    return toOffer(await this.prisma.offer.create({ data: input }));
+  }
+
+  async updateOffer(id: string, input: UpdateOfferDto): Promise<OfferDto> {
+    return toOffer(await this.prisma.offer.update({ where: { id }, data: input }));
+  }
+
   async createSyndicat(input: CreateSyndicatDto): Promise<SyndicatDto> {
     return toSyndicat(await this.prisma.syndicat.create({ data: input }));
   }
@@ -212,7 +307,9 @@ export class ReferentielsService {
           ...(input.sigle === undefined ? {} : { sigle: input.sigle }),
           ...(input.sortOrder === undefined ? {} : { sortOrder: input.sortOrder }),
           ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
-          ...(input.secteur === undefined ? {} : { secteur: input.secteur === '' ? null : input.secteur }),
+          ...(input.secteur === undefined
+            ? {}
+            : { secteur: input.secteur === '' ? null : input.secteur }),
         },
       }),
     );

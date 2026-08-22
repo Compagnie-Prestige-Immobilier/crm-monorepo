@@ -6,6 +6,7 @@ import { PermissionDenied } from '@/components/permission-denied';
 import { QueryErrorState } from '@/components/query-error-state';
 import { getServerApiClient } from '@/lib/api/server';
 import { fetchProspect } from '@/lib/data/prospects';
+import { fetchOffers } from '@/lib/data/reference';
 import { guardRoles } from '@/lib/session';
 import type { ProspectRow } from '@/lib/types';
 
@@ -25,12 +26,20 @@ export default async function GrandPublicProspectPage({
   const { id } = await params;
 
   let prospect: ProspectRow;
+  let offers;
   try {
-    prospect = await fetchProspect(id, getServerApiClient());
+    const client = getServerApiClient();
+    [prospect, offers] = await Promise.all([fetchProspect(id, client), fetchOffers(client)]);
   } catch (error) {
     unstable_rethrow(error);
     return <QueryErrorState error={error} fallback="Cette fiche n’a pas pu être chargée." />;
   }
 
-  return <GrandPublicProspectDetail prospect={prospect} />;
+  return (
+    <GrandPublicProspectDetail
+      prospect={prospect}
+      offers={offers}
+      canEdit={guard.user.role === 'ADMIN' || guard.user.role === 'COMMERCIAL'}
+    />
+  );
 }

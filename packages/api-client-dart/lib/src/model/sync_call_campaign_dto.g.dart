@@ -158,7 +158,9 @@ Map<String, dynamic> _$SyncCallCampaignDtoToJson(
 };
 
 const _$CampaignStatusEnumMap = {
+  CampaignStatus.DRAFT: 'DRAFT',
   CampaignStatus.ACTIVE: 'ACTIVE',
+  CampaignStatus.PAUSED: 'PAUSED',
   CampaignStatus.CLOSED: 'CLOSED',
   CampaignStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

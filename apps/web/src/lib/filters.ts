@@ -20,10 +20,13 @@ import {
   type SortDirection,
 } from '@/lib/types';
 
+const PROJETS = ['CHUES', 'GRAND_PUBLIC'] as const;
+
 export const DEFAULT_PAGE_SIZE = 25;
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
 export const EMPTY_FILTERS: ProspectFilters = {
+  projet: null,
   search: '',
   commercialId: null,
   representantId: null,
@@ -63,6 +66,7 @@ function readSortDir(params: RawSearchParams | URLSearchParams): SortDirection {
 export function parseProspectFilters(params: RawSearchParams | URLSearchParams): ProspectFilters {
   const pageSize = readPositiveInt(params, 'pageSize', DEFAULT_PAGE_SIZE);
   return {
+    projet: readEnum(params, 'projet', PROJETS),
     search: readString(params, 'search') ?? '',
     commercialId: readString(params, 'commercialId'),
     representantId: readString(params, 'representantId'),
@@ -93,6 +97,7 @@ export function serializeProspectFilters(filters: ProspectFilters): URLSearchPar
   };
 
   put('search', filters.search.trim());
+  put('projet', filters.projet);
   put('commercialId', filters.commercialId);
   put('representantId', filters.representantId);
   put('departementId', filters.departementId);

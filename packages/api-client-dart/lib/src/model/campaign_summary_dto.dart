@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/campaign_status.dart';
 import 'package:crm_api_client/src/model/campaign_progress_dto.dart';
 import 'package:crm_api_client/src/model/campaign_scope.dart';
@@ -26,11 +27,15 @@ class CampaignSummaryDto {
 
     required this.name,
 
+    required this.projet,
+
     required this.scope,
 
     required this.scopeLabel,
 
     required this.status,
+
+    required this.offerLabel,
 
     required this.seed,
 
@@ -56,6 +61,14 @@ class CampaignSummaryDto {
   final String name;
 
   @JsonKey(
+    name: r'projet',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: Projet.unknownDefaultOpenApi,
+  )
+  final Projet projet;
+
+  @JsonKey(
     name: r'scope',
     required: true,
     includeIfNull: false,
@@ -74,6 +87,9 @@ class CampaignSummaryDto {
     unknownEnumValue: CampaignStatus.unknownDefaultOpenApi,
   )
   final CampaignStatus status;
+
+  @JsonKey(name: r'offerLabel', required: true, includeIfNull: true)
+  final String? offerLabel;
 
   /// Graine du tirage, persistée pour pouvoir rejouer et auditer la répartition. Les affectations, elles, sont matérialisées.
   @JsonKey(name: r'seed', required: true, includeIfNull: false)
@@ -109,9 +125,11 @@ class CampaignSummaryDto {
               [
                 id,
                 name,
+                projet,
                 scope,
                 scopeLabel,
                 status,
+                offerLabel,
                 seed,
                 createdById,
                 createdByName,
@@ -124,9 +142,11 @@ class CampaignSummaryDto {
               [
                 other.id,
                 other.name,
+                other.projet,
                 other.scope,
                 other.scopeLabel,
                 other.status,
+                other.offerLabel,
                 other.seed,
                 other.createdById,
                 other.createdByName,
@@ -145,9 +165,11 @@ class CampaignSummaryDto {
       mapPropsToHashCode([
         id,
         name,
+        projet,
         scope,
         scopeLabel,
         status,
+        offerLabel,
         seed,
         createdById,
         createdByName,

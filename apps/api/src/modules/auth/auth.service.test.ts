@@ -59,6 +59,7 @@ function firstArg(fn: ReturnType<typeof vi.fn>): PrismaCallArgs {
 
 let prisma: PrismaMock;
 let auth: AuthService;
+const demo = { ensureSeeded: vi.fn().mockResolvedValue(undefined) };
 
 beforeEach(() => {
   prisma = {
@@ -70,7 +71,29 @@ beforeEach(() => {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
   };
-  auth = new AuthService(prisma as unknown as PrismaService, new JwtService({}), fakeWorkspace());
+  demo.ensureSeeded.mockClear();
+  auth = new AuthService(
+    prisma as unknown as PrismaService,
+    new JwtService({}),
+    fakeWorkspace(),
+    demo as never,
+  );
+});
+
+describe('changement d’espace', () => {
+  beforeEach(() => {
+    prisma.user.findFirst.mockResolvedValue(userRow());
+  });
+
+  it('initialise la démo avant d’émettre ses jetons', async () => {
+    await auth.switchWorkspace('com-alice', 'demo');
+    expect(demo.ensureSeeded).toHaveBeenCalledTimes(1);
+  });
+
+  it('ne touche pas à la factory pour l’espace public', async () => {
+    await auth.switchWorkspace('com-alice', 'public');
+    expect(demo.ensureSeeded).not.toHaveBeenCalled();
+  });
 });
 
 describe('paramètres argon2id', () => {

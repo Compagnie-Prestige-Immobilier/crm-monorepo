@@ -19,6 +19,7 @@ import {
 import type { ProspectFilters } from '@/lib/types';
 
 const FULL: ProspectFilters = {
+  projet: 'CHUES',
   search: 'Ndiaye',
   commercialId: 'c-1',
   representantId: 'r-1',

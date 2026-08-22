@@ -6,8 +6,12 @@
 import 'package:json_annotation/json_annotation.dart';
 
 enum CampaignStatus {
+  @JsonValue(r'DRAFT')
+  DRAFT(r'DRAFT'),
   @JsonValue(r'ACTIVE')
   ACTIVE(r'ACTIVE'),
+  @JsonValue(r'PAUSED')
+  PAUSED(r'PAUSED'),
   @JsonValue(r'CLOSED')
   CLOSED(r'CLOSED'),
   @JsonValue(r'unknown_default_open_api')

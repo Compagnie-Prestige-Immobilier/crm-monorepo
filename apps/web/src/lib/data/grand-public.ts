@@ -40,7 +40,9 @@ export const PROSPECT_TYPE_LABELS: Record<ProspectType, string> = {
 };
 
 /** Les durées que le métier pratique. Un choix fermé plutôt qu'une frappe libre. */
-export const DUREES_MOIS = [6, 12, 18, 24, 36, 48, 60, 72, 84, 96, 120] as const;
+export const DUREES_MOIS = [
+  6, 12, 18, 24, 36, 48, 60, 72, 84, 96, 120, 144, 180, 240, 300,
+] as const;
 
 export function formatDureeMois(mois: number): string {
   if (mois % 12 !== 0) return `${String(mois)} mois`;
@@ -138,9 +140,7 @@ export function toGrandPublicQuery(filters: GrandPublicFilters): ProspectQuery {
     ...base,
     projet: GRAND_PUBLIC,
     ...(filters.type === null ? {} : { type: filters.type }),
-    ...(filters.canalProvenanceId === null
-      ? {}
-      : { canalProvenanceId: filters.canalProvenanceId }),
+    ...(filters.canalProvenanceId === null ? {} : { canalProvenanceId: filters.canalProvenanceId }),
     page: filters.page,
     pageSize: filters.pageSize,
     sortBy: 'clientCreatedAt',
@@ -173,6 +173,9 @@ export interface GrandPublicProspectInput {
   prenom: string;
   phone: string;
   profession?: string | undefined;
+  professionId?: string | undefined;
+  incomeBandId?: string | undefined;
+  paymentMode?: components['schemas']['PaymentMode'] | undefined;
   banqueId?: string | undefined;
   syndicatId?: string | undefined;
   type?: ProspectType | undefined;
@@ -191,6 +194,9 @@ export async function createGrandPublicProspect(
     projet: GRAND_PUBLIC,
   };
   if (input.profession !== undefined) body.profession = input.profession;
+  if (input.professionId !== undefined) body.professionId = input.professionId;
+  if (input.incomeBandId !== undefined) body.incomeBandId = input.incomeBandId;
+  if (input.paymentMode !== undefined) body.paymentMode = input.paymentMode;
   if (input.banqueId !== undefined) body.banqueId = input.banqueId;
   if (input.syndicatId !== undefined) body.syndicatId = input.syndicatId;
   if (input.type !== undefined) body.type = input.type;
@@ -198,6 +204,32 @@ export async function createGrandPublicProspect(
   if (input.canalProvenanceId !== undefined) body.canalProvenanceId = input.canalProvenanceId;
 
   return createProspect(body, client);
+}
+
+export async function updateGrandPublicConsent(
+  id: string,
+  consent: components['schemas']['GrandPublicConsent'],
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
+  return unwrap(
+    await client.PATCH('/api/v1/prospects/{id}/parcours/grand-public/consentement', {
+      params: { path: { id } },
+      body: { consent },
+    }),
+  );
+}
+
+export async function confirmGrandPublicConversion(
+  id: string,
+  body: components['schemas']['ConfirmGrandPublicConversionDto'],
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
+  return unwrap(
+    await client.POST('/api/v1/prospects/{id}/parcours/grand-public/conversion', {
+      params: { path: { id } },
+      body,
+    }),
+  );
 }
 
 /**

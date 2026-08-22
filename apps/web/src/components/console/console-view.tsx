@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CopyIcon, SparklesIcon } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -144,6 +144,8 @@ export function ConsoleView() {
 
 function ProspectConsole() {
   const router = useRouter();
+  const pathname = usePathname();
+  const projet = pathname.startsWith('/grand-public') ? 'GRAND_PUBLIC' : 'CHUES';
   const queryClient = useQueryClient();
   const live = useLive();
   const commentRef = useRef<HTMLTextAreaElement>(null);
@@ -167,21 +169,21 @@ function ProspectConsole() {
   const [helpOpen, setHelpOpen] = useState(false);
 
   const campaigns = useQuery({
-    queryKey: consoleKeys.campaigns,
-    queryFn: () => fetchConsoleCampaigns(),
+    queryKey: [...consoleKeys.campaigns, projet],
+    queryFn: () => fetchConsoleCampaigns(undefined, projet),
     retry: false,
     staleTime: 300_000,
   });
 
   const queue = useQuery({
-    queryKey: consoleKeys.queue(campaignId),
-    queryFn: () => fetchConsoleQueue(campaignId),
+    queryKey: [...consoleKeys.queue(campaignId), projet],
+    queryFn: () => fetchConsoleQueue(campaignId, undefined, projet),
     refetchInterval: live.refetchInterval,
   });
 
   const callbacks = useQuery({
-    queryKey: callbackKeys.list('week', null),
-    queryFn: () => fetchCallbacks('week'),
+    queryKey: [...callbackKeys.list('week', null), projet],
+    queryFn: () => fetchCallbacks('week', null, undefined, projet),
     refetchInterval: live.refetchInterval,
     retry: false,
   });

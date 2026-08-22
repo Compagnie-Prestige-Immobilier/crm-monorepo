@@ -75,3 +75,58 @@ export const COQUE_ICONS: Record<Coque, () => React.JSX.Element> = {
   'grand-public': GrandPublicIcon,
   admin: AdminIcon,
 };
+
+export function CoqueArt({ coque }: { coque: Coque }) {
+  const paths: Record<Coque, React.JSX.Element> = {
+    accueil: (
+      <>
+        <path d="M18 73h126M30 57h96M47 41h61" />
+        <circle cx="118" cy="28" r="14" />
+        <path d="m109 29 7 7 13-17" />
+      </>
+    ),
+    chues: (
+      <>
+        <path d="m26 35 55-22 55 22-55 22zM46 49v28c18 13 52 13 70 0V49" />
+        <path d="M137 35v41M128 83h18" />
+      </>
+    ),
+    'grand-public': (
+      <>
+        <circle cx="48" cy="35" r="16" />
+        <circle cx="108" cy="35" r="16" />
+        <circle cx="78" cy="26" r="18" />
+        <path d="M22 82c3-23 20-35 42-29M134 82c-3-23-20-35-42-29M45 88c2-28 15-43 33-43s31 15 33 43" />
+      </>
+    ),
+    admin: (
+      <>
+        <path d="m78 10 50 18v31c0 25-18 40-50 49-32-9-50-24-50-49V28z" />
+        <path d="M48 46h60M48 69h60M61 34v24M95 57v24" />
+        <circle cx="61" cy="46" r="7" />
+        <circle cx="95" cy="69" r="7" />
+      </>
+    ),
+  };
+
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-y-0 right-0 w-[52%] overflow-hidden [clip-path:polygon(34%_0,100%_0,100%_100%,0_100%)]"
+    >
+      <span className="absolute inset-0 bg-gradient-to-br from-accent/5 via-accent/10 to-primary/15" />
+      <svg
+        viewBox="0 0 156 118"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="absolute -right-3 top-1/2 h-[78%] -translate-y-1/2 text-primary/25"
+      >
+        {paths[coque]}
+      </svg>
+      <span className="absolute -right-8 -bottom-12 size-32 rounded-full border-[18px] border-accent/10" />
+    </span>
+  );
+}

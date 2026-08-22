@@ -46,6 +46,7 @@ import 'package:crm_api_client/src/model/canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/change_prospect_segment_dto.dart';
 import 'package:crm_api_client/src/model/client_request_dto.dart';
 import 'package:crm_api_client/src/model/client_request_list_dto.dart';
+import 'package:crm_api_client/src/model/confirm_grand_public_conversion_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_correction_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_stage_dto.dart';
@@ -56,8 +57,11 @@ import 'package:crm_api_client/src/model/create_campaign_dto.dart';
 import 'package:crm_api_client/src/model/create_canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/create_client_request_dto.dart';
 import 'package:crm_api_client/src/model/create_departement_dto.dart';
+import 'package:crm_api_client/src/model/create_income_band_dto.dart';
 import 'package:crm_api_client/src/model/create_notification_dto.dart';
 import 'package:crm_api_client/src/model/create_notification_template_dto.dart';
+import 'package:crm_api_client/src/model/create_offer_dto.dart';
+import 'package:crm_api_client/src/model/create_profession_dto.dart';
 import 'package:crm_api_client/src/model/create_prospect_dto.dart';
 import 'package:crm_api_client/src/model/create_rep_call_attempt_dto.dart';
 import 'package:crm_api_client/src/model/create_rep_campaign_dto.dart';
@@ -91,6 +95,7 @@ import 'package:crm_api_client/src/model/import_row_error_dto.dart';
 import 'package:crm_api_client/src/model/import_row_preview_dto.dart';
 import 'package:crm_api_client/src/model/inbox_dto.dart';
 import 'package:crm_api_client/src/model/inbox_item_dto.dart';
+import 'package:crm_api_client/src/model/income_band_dto.dart';
 import 'package:crm_api_client/src/model/login_dto.dart';
 import 'package:crm_api_client/src/model/logout_response_dto.dart';
 import 'package:crm_api_client/src/model/merge_prospects_dto.dart';
@@ -103,6 +108,7 @@ import 'package:crm_api_client/src/model/notification_list_dto.dart';
 import 'package:crm_api_client/src/model/notification_recipient_dto.dart';
 import 'package:crm_api_client/src/model/notification_template_dto.dart';
 import 'package:crm_api_client/src/model/notification_template_list_dto.dart';
+import 'package:crm_api_client/src/model/offer_dto.dart';
 import 'package:crm_api_client/src/model/ok_dto.dart';
 import 'package:crm_api_client/src/model/origin_breakdown_dto.dart';
 import 'package:crm_api_client/src/model/origin_count_dto.dart';
@@ -111,9 +117,11 @@ import 'package:crm_api_client/src/model/page_meta_dto.dart';
 import 'package:crm_api_client/src/model/phase2_status_count_dto.dart';
 import 'package:crm_api_client/src/model/phase2_status_list_dto.dart';
 import 'package:crm_api_client/src/model/presence_counts_dto.dart';
+import 'package:crm_api_client/src/model/profession_dto.dart';
 import 'package:crm_api_client/src/model/prospect_conflict_dto.dart';
 import 'package:crm_api_client/src/model/prospect_conflict_existing_dto.dart';
 import 'package:crm_api_client/src/model/prospect_dto.dart';
+import 'package:crm_api_client/src/model/prospect_journey_dto.dart';
 import 'package:crm_api_client/src/model/prospect_list_dto.dart';
 import 'package:crm_api_client/src/model/prospect_search_item_dto.dart';
 import 'package:crm_api_client/src/model/prospect_search_list_dto.dart';
@@ -194,7 +202,11 @@ import 'package:crm_api_client/src/model/update_banque_dto.dart';
 import 'package:crm_api_client/src/model/update_call_outcome_reason_dto.dart';
 import 'package:crm_api_client/src/model/update_canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/update_departement_dto.dart';
+import 'package:crm_api_client/src/model/update_grand_public_consent_dto.dart';
+import 'package:crm_api_client/src/model/update_income_band_dto.dart';
 import 'package:crm_api_client/src/model/update_notification_template_dto.dart';
+import 'package:crm_api_client/src/model/update_offer_dto.dart';
+import 'package:crm_api_client/src/model/update_profession_dto.dart';
 import 'package:crm_api_client/src/model/update_prospect_dto.dart';
 import 'package:crm_api_client/src/model/update_representant_dto.dart';
 import 'package:crm_api_client/src/model/update_suggestion_status_dto.dart';
@@ -388,6 +400,11 @@ ReturnType deserialize<ReturnType, BaseType>(
       return ClientRequestListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'ClientRequestStatus':
+    case 'ConfirmGrandPublicConversionDto':
+      return ConfirmGrandPublicConversionDto.fromJson(
+            value as Map<String, dynamic>,
+          )
+          as ReturnType;
     case 'CreateBankCaseCorrectionDto':
       return CreateBankCaseCorrectionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -418,6 +435,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CreateDepartementDto':
       return CreateDepartementDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'CreateIncomeBandDto':
+      return CreateIncomeBandDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'CreateNotificationDto':
       return CreateNotificationDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -425,6 +445,12 @@ ReturnType deserialize<ReturnType, BaseType>(
       return CreateNotificationTemplateDto.fromJson(
             value as Map<String, dynamic>,
           )
+          as ReturnType;
+    case 'CreateOfferDto':
+      return CreateOfferDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CreateProfessionDto':
+      return CreateProfessionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'CreateProspectDto':
       return CreateProspectDto.fromJson(value as Map<String, dynamic>)
@@ -499,6 +525,7 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'FunnelStageDto':
       return FunnelStageDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'GrandPublicConsent':
     case 'IefDto':
       return IefDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'ImportJobDto':
@@ -528,6 +555,9 @@ ReturnType deserialize<ReturnType, BaseType>(
       return InboxDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'InboxItemDto':
       return InboxItemDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'IncomeBandDto':
+      return IncomeBandDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'LoginDto':
       return LoginDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'LogoutResponseDto':
@@ -569,6 +599,8 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'NotificationTemplateListDto':
       return NotificationTemplateListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'OfferDto':
+      return OfferDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'OkDto':
       return OkDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'OriginBreakdownDto':
@@ -582,6 +614,7 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'PageMetaDto':
       return PageMetaDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'PaymentMode':
     case 'Phase2Status':
     case 'Phase2StatusCountDto':
       return Phase2StatusCountDto.fromJson(value as Map<String, dynamic>)
@@ -593,6 +626,9 @@ ReturnType deserialize<ReturnType, BaseType>(
       return PresenceCountsDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'PresenceState':
+    case 'ProfessionDto':
+      return ProfessionDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'Projet':
     case 'ProspectConflictDto':
       return ProspectConflictDto.fromJson(value as Map<String, dynamic>)
@@ -602,6 +638,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'ProspectDto':
       return ProspectDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ProspectJourneyDto':
+      return ProspectJourneyDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'ProspectListDto':
       return ProspectListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -865,10 +904,22 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'UpdateDepartementDto':
       return UpdateDepartementDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'UpdateGrandPublicConsentDto':
+      return UpdateGrandPublicConsentDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'UpdateIncomeBandDto':
+      return UpdateIncomeBandDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'UpdateNotificationTemplateDto':
       return UpdateNotificationTemplateDto.fromJson(
             value as Map<String, dynamic>,
           )
+          as ReturnType;
+    case 'UpdateOfferDto':
+      return UpdateOfferDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'UpdateProfessionDto':
+      return UpdateProfessionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'UpdateProspectDto':
       return UpdateProspectDto.fromJson(value as Map<String, dynamic>)

@@ -17,6 +17,7 @@ import {
 const H = GRAND_PUBLIC_IMPORT_HEADERS;
 
 interface FakeProspect {
+  id?: string;
   phoneE164: string;
   projet: Projet;
   deletedAt: Date | null;
@@ -40,10 +41,23 @@ interface WrittenProspect {
 interface Store {
   prospects: FakeProspect[];
   written: WrittenProspect[];
+  journeys: Set<string>;
 }
 
 function makeStore(prospects: FakeProspect[] = []): Store {
-  return { prospects, written: [] };
+  const normalized = prospects.map((prospect, index) => ({
+    id: prospect.id ?? `p-${String(index + 1)}`,
+    ...prospect,
+  }));
+  return {
+    prospects: normalized,
+    written: [],
+    journeys: new Set(
+      normalized
+        .filter((prospect) => prospect.projet === Projet.GRAND_PUBLIC)
+        .map((prospect) => prospect.id),
+    ),
+  };
 }
 
 function context(
@@ -85,7 +99,12 @@ function context(
                 args.where.phoneE164.in.includes(row.phoneE164) &&
                 (args.where.projet === undefined || args.where.projet === row.projet),
             )
-            .map((row) => ({ phoneE164: row.phoneE164, projet: row.projet })),
+            .map((row) => ({
+              id: row.id,
+              phoneE164: row.phoneE164,
+              projet: row.projet,
+              journeys: store.journeys.has(row.id ?? '') ? [{ id: 'journey' }] : [],
+            })),
         ),
       createMany: (args: { data: readonly WrittenProspect[]; skipDuplicates?: boolean }) => {
         let count = 0;
@@ -95,11 +114,23 @@ function context(
           );
           if (taken) continue;
           store.prospects.push({
+            id: `p-${String(store.prospects.length + 1)}`,
             phoneE164: row.phoneE164,
             projet: row.projet,
             deletedAt: null,
           });
           store.written.push(row);
+          count += 1;
+        }
+        return Promise.resolve({ count });
+      },
+    },
+    prospectJourney: {
+      createMany: (args: { data: readonly { prospectId: string }[] }) => {
+        let count = 0;
+        for (const row of args.data) {
+          if (store.journeys.has(row.prospectId)) continue;
+          store.journeys.add(row.prospectId);
           count += 1;
         }
         return Promise.resolve({ count });
@@ -329,8 +360,8 @@ describe('lecture du canal et de la durée', () => {
   it('lit une durée avec ou sans le mot « mois »', () => {
     expect(readDureeMois('24')).toBe(24);
     expect(readDureeMois('24 mois')).toBe(24);
-    expect(readDureeMois('600')).toBe(600);
-    expect(readDureeMois('601')).toBeNull();
+    expect(readDureeMois('300')).toBe(300);
+    expect(readDureeMois('301')).toBeNull();
     expect(readDureeMois('2 ans')).toBeNull();
   });
 
@@ -380,7 +411,7 @@ describe('écriture d’une tranche', () => {
     expect(outcome.errors[0]?.message).toContain('3');
   });
 
-  it('distingue un doublon Grand Public d’un numéro déjà tenu par une fiche CHUES', async () => {
+  it('ajoute un parcours à une fiche CHUES et refuse le doublon Grand Public', async () => {
     store = makeStore([
       { phoneE164: '+221771234567', projet: Projet.CHUES, deletedAt: null },
       { phoneE164: '+221781112233', projet: Projet.GRAND_PUBLIC, deletedAt: null },
@@ -392,13 +423,10 @@ describe('écriture d’une tranche', () => {
       context(store),
     );
 
-    expect(outcome.created).toBe(0);
+    expect(outcome.created).toBe(1);
     expect(outcome.errors.map((error) => error.code)).toEqual([
       GrandPublicImportError.DEJA_EN_BASE,
-      GrandPublicImportError.DEJA_EN_BASE,
     ]);
-    expect(outcome.errors[0]?.message).toContain('CHUES');
-    expect(outcome.errors[1]?.message).not.toContain('CHUES');
   });
 
   it('ne voit pas un numéro porté par une fiche supprimée', async () => {

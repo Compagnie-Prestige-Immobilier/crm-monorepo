@@ -99,6 +99,16 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.visite.count(),
     remove: async (db) => (await db.visite.deleteMany({})).count,
   },
+  prospectConversions: {
+    table: 'prospect_conversions',
+    count: (db) => db.prospectConversion.count(),
+    remove: async (db) => (await db.prospectConversion.deleteMany({})).count,
+  },
+  prospectJourneys: {
+    table: 'prospect_journeys',
+    count: (db) => db.prospectJourney.count(),
+    remove: async (db) => (await db.prospectJourney.deleteMany({})).count,
+  },
   prospects: {
     table: 'prospects',
     count: (db) => db.prospect.count(),
@@ -183,6 +193,21 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     table: 'canaux_provenance',
     count: (db) => db.canalProvenance.count(),
     remove: async (db) => (await db.canalProvenance.deleteMany({})).count,
+  },
+  offres: {
+    table: 'offers',
+    count: (db) => db.offer.count(),
+    remove: async (db) => (await db.offer.deleteMany({})).count,
+  },
+  tranchesRevenu: {
+    table: 'income_bands',
+    count: (db) => db.incomeBand.count(),
+    remove: async (db) => (await db.incomeBand.deleteMany({})).count,
+  },
+  professions: {
+    table: 'professions',
+    count: (db) => db.profession.count(),
+    remove: async (db) => (await db.profession.deleteMany({})).count,
   },
   banques: {
     table: 'banques',
