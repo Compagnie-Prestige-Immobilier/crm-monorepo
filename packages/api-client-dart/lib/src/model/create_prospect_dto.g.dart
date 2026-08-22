@@ -27,6 +27,12 @@ abstract class _$CreateProspectDtoCWProxy {
 
   CreateProspectDto profession(String? profession);
 
+  CreateProspectDto professionId(String? professionId);
+
+  CreateProspectDto incomeBandId(String? incomeBandId);
+
+  CreateProspectDto paymentMode(PaymentMode? paymentMode);
+
   CreateProspectDto dureeSystemeMois(num? dureeSystemeMois);
 
   CreateProspectDto canalProvenanceId(String? canalProvenanceId);
@@ -52,6 +58,9 @@ abstract class _$CreateProspectDtoCWProxy {
     Projet? projet,
     ProspectType? type,
     String? profession,
+    String? professionId,
+    String? incomeBandId,
+    PaymentMode? paymentMode,
     num? dureeSystemeMois,
     String? canalProvenanceId,
     ProspectStatut? statut,
@@ -99,6 +108,18 @@ class _$CreateProspectDtoCWProxyImpl implements _$CreateProspectDtoCWProxy {
       this(profession: profession);
 
   @override
+  CreateProspectDto professionId(String? professionId) =>
+      this(professionId: professionId);
+
+  @override
+  CreateProspectDto incomeBandId(String? incomeBandId) =>
+      this(incomeBandId: incomeBandId);
+
+  @override
+  CreateProspectDto paymentMode(PaymentMode? paymentMode) =>
+      this(paymentMode: paymentMode);
+
+  @override
   CreateProspectDto dureeSystemeMois(num? dureeSystemeMois) =>
       this(dureeSystemeMois: dureeSystemeMois);
 
@@ -131,6 +152,9 @@ class _$CreateProspectDtoCWProxyImpl implements _$CreateProspectDtoCWProxy {
     Object? projet = const $CopyWithPlaceholder(),
     Object? type = const $CopyWithPlaceholder(),
     Object? profession = const $CopyWithPlaceholder(),
+    Object? professionId = const $CopyWithPlaceholder(),
+    Object? incomeBandId = const $CopyWithPlaceholder(),
+    Object? paymentMode = const $CopyWithPlaceholder(),
     Object? dureeSystemeMois = const $CopyWithPlaceholder(),
     Object? canalProvenanceId = const $CopyWithPlaceholder(),
     Object? statut = const $CopyWithPlaceholder(),
@@ -177,6 +201,18 @@ class _$CreateProspectDtoCWProxyImpl implements _$CreateProspectDtoCWProxy {
           ? _value.profession
           // ignore: cast_nullable_to_non_nullable
           : profession as String?,
+      professionId: professionId == const $CopyWithPlaceholder()
+          ? _value.professionId
+          // ignore: cast_nullable_to_non_nullable
+          : professionId as String?,
+      incomeBandId: incomeBandId == const $CopyWithPlaceholder()
+          ? _value.incomeBandId
+          // ignore: cast_nullable_to_non_nullable
+          : incomeBandId as String?,
+      paymentMode: paymentMode == const $CopyWithPlaceholder()
+          ? _value.paymentMode
+          // ignore: cast_nullable_to_non_nullable
+          : paymentMode as PaymentMode?,
       dureeSystemeMois: dureeSystemeMois == const $CopyWithPlaceholder()
           ? _value.dureeSystemeMois
           // ignore: cast_nullable_to_non_nullable
@@ -236,6 +272,16 @@ CreateProspectDto _$CreateProspectDtoFromJson(Map<String, dynamic> json) =>
           ),
         ),
         profession: $checkedConvert('profession', (v) => v as String?),
+        professionId: $checkedConvert('professionId', (v) => v as String?),
+        incomeBandId: $checkedConvert('incomeBandId', (v) => v as String?),
+        paymentMode: $checkedConvert(
+          'paymentMode',
+          (v) => $enumDecodeNullable(
+            _$PaymentModeEnumMap,
+            v,
+            unknownValue: PaymentMode.unknownDefaultOpenApi,
+          ),
+        ),
         dureeSystemeMois: $checkedConvert('dureeSystemeMois', (v) => v as num?),
         canalProvenanceId: $checkedConvert(
           'canalProvenanceId',
@@ -270,6 +316,10 @@ Map<String, dynamic> _$CreateProspectDtoToJson(
   if (_$ProjetEnumMap[instance.projet] case final value?) 'projet': value,
   if (_$ProspectTypeEnumMap[instance.type] case final value?) 'type': value,
   if (instance.profession case final value?) 'profession': value,
+  if (instance.professionId case final value?) 'professionId': value,
+  if (instance.incomeBandId case final value?) 'incomeBandId': value,
+  if (_$PaymentModeEnumMap[instance.paymentMode] case final value?)
+    'paymentMode': value,
   if (instance.dureeSystemeMois case final value?) 'dureeSystemeMois': value,
   if (instance.canalProvenanceId case final value?) 'canalProvenanceId': value,
   if (_$ProspectStatutEnumMap[instance.statut] case final value?)
@@ -290,6 +340,12 @@ const _$ProspectTypeEnumMap = {
   ProspectType.INFORMEL: 'INFORMEL',
   ProspectType.DIASPORA: 'DIASPORA',
   ProspectType.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$PaymentModeEnumMap = {
+  PaymentMode.COMPTANT: 'COMPTANT',
+  PaymentMode.ECHELONNE: 'ECHELONNE',
+  PaymentMode.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$ProspectStatutEnumMap = {

@@ -7,8 +7,9 @@ const redirect = vi.hoisted(() =>
     throw new Error(`REDIRECT ${path}`);
   }),
 );
+const usePathname = vi.hoisted(() => vi.fn(() => '/accueil'));
 
-vi.mock('next/navigation', () => ({ redirect }));
+vi.mock('next/navigation', () => ({ redirect, usePathname }));
 vi.mock('@/lib/session', () => ({ guardRoles }));
 
 const AccueilLayout = (await import('@/app/(panel)/accueil/layout')).default;
@@ -54,5 +55,16 @@ describe('garde du registre des visites', () => {
       '/accueil/tableau-de-bord',
     );
     expect(screen.getByText('registre')).toBeTruthy();
+  });
+
+  it('indique la vue active dans les onglets', async () => {
+    guardRoles.mockResolvedValue({ status: 'allowed', user: { id: 'u-1', role: 'ACCUEIL' } });
+
+    await render_();
+
+    expect(screen.getByRole('link', { name: 'Liste' }).getAttribute('aria-current')).toBe('page');
+    expect(
+      screen.getByRole('link', { name: 'Tableau de bord' }).getAttribute('aria-current'),
+    ).toBeNull();
   });
 });

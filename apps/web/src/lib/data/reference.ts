@@ -2,11 +2,15 @@ import type { ApiClient } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
+import { formatPhone } from '@/lib/format';
 import type {
   Banque,
   Departement,
   FilterOption,
   Ief,
+  IncomeBand,
+  Offer,
+  Profession,
   ReferenceData,
   Region,
   Syndicat,
@@ -31,6 +35,9 @@ export async function fetchReferenceData(
     iefs: unwrap(iefs),
     banques: referentiels.banques,
     syndicats: referentiels.syndicats,
+    professions: referentiels.professions,
+    incomeBands: referentiels.incomeBands,
+    offers: referentiels.offers,
     commerciaux: unwrap(users).items.map((user): FilterOption => ({
       value: user.id,
       label: user.fullName,
@@ -38,7 +45,7 @@ export async function fetchReferenceData(
     })),
     representants: unwrap(representants).items.map((representant): FilterOption => ({
       value: representant.id,
-      label: representant.fullName,
+      label: `${representant.fullName} - ${formatPhone(representant.phoneE164)}`,
       hint: representant.departementName,
     })),
     campagnes: unwrap(campaigns).items.map((campaign): FilterOption => ({
@@ -88,4 +95,28 @@ export async function fetchSyndicats(client: ApiClient = getApiClient()): Promis
 
 export async function fetchRegions(client: ApiClient = getApiClient()): Promise<Region[]> {
   return unwrap(await client.GET('/api/v1/referentiels/regions'));
+}
+
+export async function fetchProfessions(client: ApiClient = getApiClient()): Promise<Profession[]> {
+  return unwrap(
+    await client.GET('/api/v1/referentiels/professions', {
+      params: { query: { activeOnly: false } },
+    }),
+  );
+}
+
+export async function fetchIncomeBands(client: ApiClient = getApiClient()): Promise<IncomeBand[]> {
+  return unwrap(
+    await client.GET('/api/v1/referentiels/tranches-revenu', {
+      params: { query: { activeOnly: false } },
+    }),
+  );
+}
+
+export async function fetchOffers(client: ApiClient = getApiClient()): Promise<Offer[]> {
+  return unwrap(
+    await client.GET('/api/v1/referentiels/offres', {
+      params: { query: { activeOnly: false } },
+    }),
+  );
 }

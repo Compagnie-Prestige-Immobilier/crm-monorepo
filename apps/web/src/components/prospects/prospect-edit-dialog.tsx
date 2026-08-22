@@ -312,7 +312,9 @@ export function ProspectEditDialog({
                 */}
                 <div role="alert" className="flex flex-col gap-1.5">
                   <p className="flex flex-wrap items-center gap-1.5 text-[0.8125rem]">
-                    <span>{prospect.segment === null ? 'Aucun' : SEGMENT_LABELS[prospect.segment]}</span>
+                    <span>
+                      {prospect.segment === null ? 'Aucun' : SEGMENT_LABELS[prospect.segment]}
+                    </span>
                     <ArrowRightIcon className="size-3.5" aria-hidden="true" />
                     <span className="font-[600]">
                       {nextSegment === null ? 'segment indéterminé' : SEGMENT_LABELS[nextSegment]}

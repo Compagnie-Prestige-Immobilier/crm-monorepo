@@ -283,8 +283,8 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
 
     const retained: GrandPublicImportRow[] = [];
     for (const row of unique) {
-      const projet = existing.get(row.phoneE164);
-      if (projet === undefined) {
+      const hasGrandPublicJourney = existing.get(row.phoneE164);
+      if (hasGrandPublicJourney !== true) {
         retained.push(row);
         continue;
       }
@@ -292,10 +292,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
         rowNumber: row.rowNumber,
         column: H.phone,
         code: GrandPublicImportError.DEJA_EN_BASE,
-        message:
-          projet === Projet.GRAND_PUBLIC
-            ? 'Ce prospect Grand Public existe déjà en base.'
-            : 'Ce numéro appartient déjà à une fiche CHUES. Le projet d’une fiche ne se change pas par un import.',
+        message: 'Ce prospect Grand Public existe déjà en base.',
       });
     }
 
@@ -304,8 +301,9 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
     }
 
     const now = new Date();
-    const written = await ctx.tx.prospect.createMany({
-      data: retained.map((row) => ({
+    const newRows = retained.filter((row) => !existing.has(row.phoneE164));
+    await ctx.tx.prospect.createMany({
+      data: newRows.map((row) => ({
         id: uuidv7(),
         projet: Projet.GRAND_PUBLIC,
         nom: row.nom,
@@ -326,14 +324,32 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
       skipDuplicates: true,
     });
 
-    return { created: written.count, skipped: retained.length - written.count, errors };
+    const prospects = await ctx.tx.prospect.findMany({
+      where: { phoneE164: { in: retained.map((row) => row.phoneE164) }, deletedAt: null },
+      select: { id: true },
+    });
+    const journeys = await ctx.tx.prospectJourney.createMany({
+      data: prospects.map((prospect) => ({
+        prospectId: prospect.id,
+        projet: Projet.GRAND_PUBLIC,
+        consent: 'INTERESSE',
+        consentAt: now,
+      })),
+      skipDuplicates: true,
+    });
+
+    return {
+      created: journeys.count,
+      skipped: retained.length - journeys.count,
+      errors,
+    };
   }
 
   private async existingProspects(
     phones: readonly string[],
     ctx: ImportRunContext,
-  ): Promise<Map<string, Projet>> {
-    const found = new Map<string, Projet>();
+  ): Promise<Map<string, boolean>> {
+    const found = new Map<string, boolean>();
 
     for (let start = 0; start < phones.length; start += EXISTING_LOOKUP_CHUNK) {
       const rows = await ctx.tx.prospect.findMany({
@@ -341,9 +357,18 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
           phoneE164: { in: phones.slice(start, start + EXISTING_LOOKUP_CHUNK) },
           deletedAt: null,
         },
-        select: { phoneE164: true, projet: true },
+        select: {
+          phoneE164: true,
+          projet: true,
+          journeys: { where: { projet: Projet.GRAND_PUBLIC }, select: { id: true } },
+        },
       });
-      for (const row of rows) found.set(row.phoneE164, row.projet);
+      for (const row of rows) {
+        found.set(
+          row.phoneE164,
+          (row.journeys ?? []).length > 0 || row.projet === Projet.GRAND_PUBLIC,
+        );
+      }
     }
 
     return found;

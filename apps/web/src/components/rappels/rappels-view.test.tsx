@@ -126,7 +126,7 @@ describe('RappelsView', () => {
     await waitFor(() => {
       expect(screen.getAllByRole('row')).toHaveLength(3);
     });
-    expect(fetchCallbacks).toHaveBeenCalledWith('today', null);
+    expect(fetchCallbacks).toHaveBeenCalledWith('today', null, undefined, 'CHUES');
   });
 
   it('cache le filtre à un téléconseiller, qui ne voit que sa file', async () => {
@@ -150,7 +150,7 @@ describe('RappelsView', () => {
     await userEvent.click(await screen.findByRole('option', { name: /Awa Ba/ }));
 
     await waitFor(() => {
-      expect(fetchCallbacks).toHaveBeenCalledWith('overdue', 'u-2');
+      expect(fetchCallbacks).toHaveBeenCalledWith('overdue', 'u-2', undefined, 'CHUES');
     });
   });
 

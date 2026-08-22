@@ -29,8 +29,8 @@ export default async function CampagnesPage({
   const filters = parseCampaignFilters(await searchParams);
   const queryClient = getQueryClient();
   await queryClient.prefetchQuery({
-    queryKey: queryKeys.campaigns(filters),
-    queryFn: () => fetchCampaigns(filters, getServerApiClient()),
+    queryKey: [...queryKeys.campaigns(filters), 'CHUES'],
+    queryFn: () => fetchCampaigns(filters, getServerApiClient(), 'CHUES'),
   });
 
   return (

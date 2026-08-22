@@ -10,6 +10,7 @@ import type {
   CampaignSummary,
   CreateCampaignInput,
   Paginated,
+  ProspectType,
 } from '@/lib/types';
 
 type CampaignQuery = NonNullable<operations['listCallCampaigns']['parameters']['query']>;
@@ -17,10 +18,14 @@ type CampaignQuery = NonNullable<operations['listCallCampaigns']['parameters']['
 const startOfDay = (isoDate: string): string => `${isoDate}T00:00:00.000Z`;
 const endOfDay = (isoDate: string): string => `${isoDate}T23:59:59.999Z`;
 
-export function toCampaignQuery(filters: CampaignFilters): CampaignQuery {
+export function toCampaignQuery(
+  filters: CampaignFilters,
+  projet?: 'CHUES' | 'GRAND_PUBLIC',
+): CampaignQuery {
   const query: CampaignQuery = {
     page: filters.page,
     pageSize: filters.pageSize,
+    ...(projet ? { projet } : {}),
   };
 
   const search = filters.search.trim();
@@ -37,10 +42,13 @@ export function toCampaignQuery(filters: CampaignFilters): CampaignQuery {
 export async function fetchCampaigns(
   filters: CampaignFilters,
   client: ApiClient = getApiClient(),
+  projet?: 'CHUES' | 'GRAND_PUBLIC',
 ): Promise<Paginated<CampaignSummary>> {
   return flattenPage(
     unwrap(
-      await client.GET('/api/v1/phase2/campaigns', { params: { query: toCampaignQuery(filters) } }),
+      await client.GET('/api/v1/phase2/campaigns', {
+        params: { query: toCampaignQuery(filters, projet) },
+      }),
     ),
   );
 }
@@ -81,6 +89,24 @@ export async function closeCampaign(
 ): Promise<CampaignDetail> {
   return unwrap(
     await client.POST('/api/v1/phase2/campaigns/{id}/close', { params: { path: { id } } }),
+  );
+}
+
+export async function pauseCampaign(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<CampaignDetail> {
+  return unwrap(
+    await client.POST('/api/v1/phase2/campaigns/{id}/pause', { params: { path: { id } } }),
+  );
+}
+
+export async function resumeCampaign(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<CampaignDetail> {
+  return unwrap(
+    await client.POST('/api/v1/phase2/campaigns/{id}/resume', { params: { path: { id } } }),
   );
 }
 
@@ -140,12 +166,22 @@ export function buildCampaignPreview(input: {
 
 export async function countPendingProspects(
   scope: CampaignScope,
+  projet: 'CHUES' | 'GRAND_PUBLIC' = 'CHUES',
   client: ApiClient = getApiClient(),
 ): Promise<number> {
-  const query =
-    scope === 'ALL'
-      ? ({ phase2Status: 'PENDING', pageSize: 1 } as const)
-      : ({ phase2Status: 'PENDING', pageSize: 1, segment: scope } as const);
+  const gpTypes: Partial<Record<CampaignScope, ProspectType>> = {
+    GP1: 'FONCTIONNAIRE',
+    GP2: 'SECTEUR_PRIVE',
+    GP3: 'INFORMEL',
+    GP4: 'DIASPORA',
+  };
+  const query = {
+    projet,
+    pageSize: 1,
+    ...(projet === 'CHUES' ? { phase2Status: 'PENDING' as const } : {}),
+    ...(scope.startsWith('BDD') ? { segment: scope as 'BDD1' | 'BDD2' | 'BDD3' | 'BDD4' } : {}),
+    ...(gpTypes[scope] ? { type: gpTypes[scope] } : {}),
+  };
 
   return unwrap(await client.GET('/api/v1/prospects', { params: { query } })).meta.total;
 }
@@ -163,10 +199,11 @@ export async function fetchCampaignPreview(
   scope: CampaignScope,
   commercialCount: number,
   spreadDays: number,
+  projet: 'CHUES' | 'GRAND_PUBLIC' = 'CHUES',
   client: ApiClient = getApiClient(),
 ): Promise<CampaignPreview> {
   const [pending, alreadyAssigned] = await Promise.all([
-    countPendingProspects(scope, client),
+    countPendingProspects(scope, projet, client),
     countOpenTasks(client),
   ]);
   return buildCampaignPreview({ scope, pending, alreadyAssigned, commercialCount, spreadDays });

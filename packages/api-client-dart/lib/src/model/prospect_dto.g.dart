@@ -47,6 +47,18 @@ abstract class _$ProspectDtoCWProxy {
 
   ProspectDto profession(String? profession);
 
+  ProspectDto professionId(String? professionId);
+
+  ProspectDto professionIsTeaching(bool? professionIsTeaching);
+
+  ProspectDto incomeBandId(String? incomeBandId);
+
+  ProspectDto incomeBandLabel(String? incomeBandLabel);
+
+  ProspectDto paymentMode(PaymentMode? paymentMode);
+
+  ProspectDto journeys(List<ProspectJourneyDto> journeys);
+
   ProspectDto dureeSystemeMois(num? dureeSystemeMois);
 
   ProspectDto canalProvenanceId(String? canalProvenanceId);
@@ -110,6 +122,12 @@ abstract class _$ProspectDtoCWProxy {
     String ownedByCommercialName,
     ProspectType? type,
     String? profession,
+    String? professionId,
+    bool? professionIsTeaching,
+    String? incomeBandId,
+    String? incomeBandLabel,
+    PaymentMode? paymentMode,
+    List<ProspectJourneyDto> journeys,
     num? dureeSystemeMois,
     String? canalProvenanceId,
     String? canalProvenanceLabel,
@@ -206,6 +224,30 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
   ProspectDto profession(String? profession) => this(profession: profession);
 
   @override
+  ProspectDto professionId(String? professionId) =>
+      this(professionId: professionId);
+
+  @override
+  ProspectDto professionIsTeaching(bool? professionIsTeaching) =>
+      this(professionIsTeaching: professionIsTeaching);
+
+  @override
+  ProspectDto incomeBandId(String? incomeBandId) =>
+      this(incomeBandId: incomeBandId);
+
+  @override
+  ProspectDto incomeBandLabel(String? incomeBandLabel) =>
+      this(incomeBandLabel: incomeBandLabel);
+
+  @override
+  ProspectDto paymentMode(PaymentMode? paymentMode) =>
+      this(paymentMode: paymentMode);
+
+  @override
+  ProspectDto journeys(List<ProspectJourneyDto> journeys) =>
+      this(journeys: journeys);
+
+  @override
   ProspectDto dureeSystemeMois(num? dureeSystemeMois) =>
       this(dureeSystemeMois: dureeSystemeMois);
 
@@ -300,6 +342,12 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? ownedByCommercialName = const $CopyWithPlaceholder(),
     Object? type = const $CopyWithPlaceholder(),
     Object? profession = const $CopyWithPlaceholder(),
+    Object? professionId = const $CopyWithPlaceholder(),
+    Object? professionIsTeaching = const $CopyWithPlaceholder(),
+    Object? incomeBandId = const $CopyWithPlaceholder(),
+    Object? incomeBandLabel = const $CopyWithPlaceholder(),
+    Object? paymentMode = const $CopyWithPlaceholder(),
+    Object? journeys = const $CopyWithPlaceholder(),
     Object? dureeSystemeMois = const $CopyWithPlaceholder(),
     Object? canalProvenanceId = const $CopyWithPlaceholder(),
     Object? canalProvenanceLabel = const $CopyWithPlaceholder(),
@@ -402,6 +450,30 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.profession
           // ignore: cast_nullable_to_non_nullable
           : profession as String?,
+      professionId: professionId == const $CopyWithPlaceholder()
+          ? _value.professionId
+          // ignore: cast_nullable_to_non_nullable
+          : professionId as String?,
+      professionIsTeaching: professionIsTeaching == const $CopyWithPlaceholder()
+          ? _value.professionIsTeaching
+          // ignore: cast_nullable_to_non_nullable
+          : professionIsTeaching as bool?,
+      incomeBandId: incomeBandId == const $CopyWithPlaceholder()
+          ? _value.incomeBandId
+          // ignore: cast_nullable_to_non_nullable
+          : incomeBandId as String?,
+      incomeBandLabel: incomeBandLabel == const $CopyWithPlaceholder()
+          ? _value.incomeBandLabel
+          // ignore: cast_nullable_to_non_nullable
+          : incomeBandLabel as String?,
+      paymentMode: paymentMode == const $CopyWithPlaceholder()
+          ? _value.paymentMode
+          // ignore: cast_nullable_to_non_nullable
+          : paymentMode as PaymentMode?,
+      journeys: journeys == const $CopyWithPlaceholder()
+          ? _value.journeys
+          // ignore: cast_nullable_to_non_nullable
+          : journeys as List<ProspectJourneyDto>,
       dureeSystemeMois: dureeSystemeMois == const $CopyWithPlaceholder()
           ? _value.dureeSystemeMois
           // ignore: cast_nullable_to_non_nullable
@@ -516,6 +588,12 @@ ProspectDto _$ProspectDtoFromJson(
       'ownedByCommercialName',
       'type',
       'profession',
+      'professionId',
+      'professionIsTeaching',
+      'incomeBandId',
+      'incomeBandLabel',
+      'paymentMode',
+      'journeys',
       'dureeSystemeMois',
       'canalProvenanceId',
       'canalProvenanceLabel',
@@ -587,6 +665,27 @@ ProspectDto _$ProspectDtoFromJson(
       ),
     ),
     profession: $checkedConvert('profession', (v) => v as String?),
+    professionId: $checkedConvert('professionId', (v) => v as String?),
+    professionIsTeaching: $checkedConvert(
+      'professionIsTeaching',
+      (v) => v as bool?,
+    ),
+    incomeBandId: $checkedConvert('incomeBandId', (v) => v as String?),
+    incomeBandLabel: $checkedConvert('incomeBandLabel', (v) => v as String?),
+    paymentMode: $checkedConvert(
+      'paymentMode',
+      (v) => $enumDecodeNullable(
+        _$PaymentModeEnumMap,
+        v,
+        unknownValue: PaymentMode.unknownDefaultOpenApi,
+      ),
+    ),
+    journeys: $checkedConvert(
+      'journeys',
+      (v) => (v as List<dynamic>)
+          .map((e) => ProspectJourneyDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
     dureeSystemeMois: $checkedConvert('dureeSystemeMois', (v) => v as num?),
     canalProvenanceId: $checkedConvert(
       'canalProvenanceId',
@@ -683,6 +782,12 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'ownedByCommercialName': instance.ownedByCommercialName,
       'type': _$ProspectTypeEnumMap[instance.type],
       'profession': instance.profession,
+      'professionId': instance.professionId,
+      'professionIsTeaching': instance.professionIsTeaching,
+      'incomeBandId': instance.incomeBandId,
+      'incomeBandLabel': instance.incomeBandLabel,
+      'paymentMode': _$PaymentModeEnumMap[instance.paymentMode],
+      'journeys': instance.journeys.map((e) => e.toJson()).toList(),
       'dureeSystemeMois': instance.dureeSystemeMois,
       'canalProvenanceId': instance.canalProvenanceId,
       'canalProvenanceLabel': instance.canalProvenanceLabel,
@@ -723,6 +828,12 @@ const _$ProspectTypeEnumMap = {
   ProspectType.INFORMEL: 'INFORMEL',
   ProspectType.DIASPORA: 'DIASPORA',
   ProspectType.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$PaymentModeEnumMap = {
+  PaymentMode.COMPTANT: 'COMPTANT',
+  PaymentMode.ECHELONNE: 'ECHELONNE',
+  PaymentMode.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$BddSegmentEnumMap = {

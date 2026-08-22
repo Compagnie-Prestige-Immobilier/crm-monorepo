@@ -209,6 +209,56 @@
         "tags": ["auth"]
       }
     },
+    "/api/v1/admin/demo": {
+      "get": {
+        "operationId": "getDemoWorkspaceStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoWorkspaceStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "État du workspace démo.",
+        "tags": ["demo"]
+      }
+    },
+    "/api/v1/admin/demo/reset": {
+      "post": {
+        "operationId": "resetDemoWorkspace",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoWorkspaceStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Réinitialise le workspace démo.",
+        "tags": ["demo"]
+      }
+    },
     "/api/v1/users": {
       "get": {
         "operationId": "listUsers",
@@ -1194,6 +1244,624 @@
           }
         ],
         "summary": "Ajoute un canal. Le code est immuable : les fiches le désignent.",
+        "tags": ["referentiels"]
+      }
+    },
+    "/api/v1/referentiels/professions": {
+      "get": {
+        "operationId": "listProfessions",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "description": "Ne renvoyer que les entrées actives.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProfessionDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Liste fermée des professions.",
+        "tags": ["referentiels"]
+      },
+      "post": {
+        "operationId": "createProfession",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProfessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfessionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajoute une profession.",
+        "tags": ["referentiels"]
+      }
+    },
+    "/api/v1/referentiels/professions/{id}": {
+      "patch": {
+        "operationId": "updateProfession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfessionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifie une profession.",
+        "tags": ["referentiels"]
+      }
+    },
+    "/api/v1/referentiels/tranches-revenu": {
+      "get": {
+        "operationId": "listIncomeBands",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "description": "Ne renvoyer que les entrées actives.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IncomeBandDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tranches de revenu mensuel.",
+        "tags": ["referentiels"]
+      },
+      "post": {
+        "operationId": "createIncomeBand",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIncomeBandDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncomeBandDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajoute une tranche de revenu.",
+        "tags": ["referentiels"]
+      }
+    },
+    "/api/v1/referentiels/tranches-revenu/{id}": {
+      "patch": {
+        "operationId": "updateIncomeBand",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateIncomeBandDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncomeBandDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifie une tranche de revenu.",
+        "tags": ["referentiels"]
+      }
+    },
+    "/api/v1/referentiels/offres": {
+      "get": {
+        "operationId": "listOffers",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "description": "Ne renvoyer que les entrées actives.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OfferDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Offres proposées au Grand Public.",
+        "tags": ["referentiels"]
+      },
+      "post": {
+        "operationId": "createOffer",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOfferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajoute une offre.",
+        "tags": ["referentiels"]
+      }
+    },
+    "/api/v1/referentiels/offres/{id}": {
+      "patch": {
+        "operationId": "updateOffer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOfferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifie une offre.",
         "tags": ["referentiels"]
       }
     },
@@ -3762,6 +4430,154 @@
         "tags": ["prospects"]
       }
     },
+    "/api/v1/prospects/{id}/parcours/grand-public/consentement": {
+      "patch": {
+        "operationId": "updateGrandPublicConsent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGrandPublicConsentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProspectDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Trace l’accord ou le refus de poursuivre en Grand Public.",
+        "tags": ["prospects"]
+      }
+    },
+    "/api/v1/prospects/{id}/parcours/grand-public/conversion": {
+      "post": {
+        "operationId": "confirmGrandPublicConversion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmGrandPublicConversionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProspectDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirme une vente ou adhésion Grand Public.",
+        "tags": ["prospects"]
+      }
+    },
     "/api/v1/prospects/merge": {
       "post": {
         "operationId": "mergeProspects",
@@ -4531,6 +5347,14 @@
         "operationId": "listCallCampaigns",
         "parameters": [
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
             "name": "status",
             "required": false,
             "in": "query",
@@ -4892,6 +5716,134 @@
           }
         ],
         "summary": "Clôt la campagne et annule toutes les tâches encore ouvertes.",
+        "tags": ["phase2"]
+      }
+    },
+    "/api/v1/phase2/campaigns/{id}/pause": {
+      "post": {
+        "operationId": "pauseCallCampaign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suspend temporairement les appels.",
+        "tags": ["phase2"]
+      }
+    },
+    "/api/v1/phase2/campaigns/{id}/resume": {
+      "post": {
+        "operationId": "resumeCallCampaign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reprend une campagne suspendue.",
         "tags": ["phase2"]
       }
     },
@@ -5910,6 +6862,14 @@
         "description": "Un téléconseiller ne voit que les rappels qu’il a promis. Les rappels en retard remontent dans la journée courante : le retard se déduit de la date, il n’est jamais écrit.",
         "operationId": "listScheduledCallbacks",
         "parameters": [
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
           {
             "name": "scope",
             "required": false,
@@ -14886,56 +15846,6 @@
         "tags": ["supervision"]
       }
     },
-    "/api/v1/admin/demo": {
-      "get": {
-        "operationId": "getDemoWorkspaceStatus",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DemoWorkspaceStatusDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "État du workspace démo.",
-        "tags": ["demo"]
-      }
-    },
-    "/api/v1/admin/demo/reset": {
-      "post": {
-        "operationId": "resetDemoWorkspace",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DemoWorkspaceStatusDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Réinitialise le workspace démo.",
-        "tags": ["demo"]
-      }
-    },
     "/api/v1/admin/purge": {
       "get": {
         "description": "`allowed` vaut false pour tout administrateur autre que le premier : l’écran masque alors la commande, et POST /admin/purge refuse de son côté.",
@@ -16828,6 +17738,40 @@
         },
         "required": ["workspace"]
       },
+      "DemoWorkspaceCountsDto": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "number"
+          },
+          "representants": {
+            "type": "number"
+          },
+          "prospects": {
+            "type": "number"
+          },
+          "campaigns": {
+            "type": "number"
+          },
+          "bankCases": {
+            "type": "number"
+          }
+        },
+        "required": ["users", "representants", "prospects", "campaigns", "bankCases"]
+      },
+      "DemoWorkspaceStatusDto": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "enum": ["demo"]
+          },
+          "counts": {
+            "$ref": "#/components/schemas/DemoWorkspaceCountsDto"
+          }
+        },
+        "required": ["workspace", "counts"]
+      },
       "UserDto": {
         "type": "object",
         "properties": {
@@ -17142,6 +18086,99 @@
         },
         "required": ["id", "code", "name"]
       },
+      "ProfessionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "isTeaching": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "code", "label", "isTeaching", "position", "isActive", "updatedAt"]
+      },
+      "IncomeBandDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "minXof": {
+            "type": "number",
+            "nullable": true
+          },
+          "maxXof": {
+            "type": "number",
+            "nullable": true
+          },
+          "position": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "code", "label", "minXof", "maxXof", "position", "isActive", "updatedAt"]
+      },
+      "OfferDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "position": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "code", "label", "description", "position", "isActive", "updatedAt"]
+      },
       "ReferentielsBundleDto": {
         "type": "object",
         "properties": {
@@ -17168,9 +18205,35 @@
             "items": {
               "$ref": "#/components/schemas/RegionDto"
             }
+          },
+          "professions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfessionDto"
+            }
+          },
+          "incomeBands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncomeBandDto"
+            }
+          },
+          "offers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfferDto"
+            }
           }
         },
-        "required": ["banques", "syndicats", "departements", "regions"]
+        "required": [
+          "banques",
+          "syndicats",
+          "departements",
+          "regions",
+          "professions",
+          "incomeBands",
+          "offers"
+        ]
       },
       "CanalProvenanceDto": {
         "type": "object",
@@ -17198,6 +18261,173 @@
           }
         },
         "required": ["id", "code", "label", "position", "isActive", "updatedAt"]
+      },
+      "CreateProfessionDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "isTeaching": {
+            "type": "boolean",
+            "default": false
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["code", "label"]
+      },
+      "UpdateProfessionDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "isTeaching": {
+            "type": "boolean",
+            "default": false
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "CreateIncomeBandDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "minXof": {
+            "type": "number",
+            "minimum": 0
+          },
+          "maxXof": {
+            "type": "number",
+            "minimum": 0
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["code", "label"]
+      },
+      "UpdateIncomeBandDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "minXof": {
+            "type": "number",
+            "minimum": 0
+          },
+          "maxXof": {
+            "type": "number",
+            "minimum": 0
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "CreateOfferDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["code", "label"]
+      },
+      "UpdateOfferDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        }
       },
       "CreateCanalProvenanceDto": {
         "type": "object",
@@ -18186,6 +19416,55 @@
         "type": "string",
         "enum": ["createdAt", "clientCreatedAt", "nom", "prenom", "statut"]
       },
+      "PaymentMode": {
+        "type": "string",
+        "enum": ["COMPTANT", "ECHELONNE"]
+      },
+      "GrandPublicConsent": {
+        "type": "string",
+        "enum": ["NON_DEMANDE", "INTERESSE", "REFUSE"]
+      },
+      "ProspectJourneyDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "statut": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProspectStatut"
+              }
+            ]
+          },
+          "consent": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GrandPublicConsent"
+              }
+            ]
+          },
+          "consentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "convertedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["id", "projet", "statut", "consent", "consentAt", "convertedAt"]
+      },
       "CallOutcome": {
         "type": "string",
         "enum": ["METHOD_OBTAINED", "UNREACHABLE", "CALLBACK", "REFUSED", "WRONG_NUMBER", "OTHER"],
@@ -18284,6 +19563,38 @@
             "type": "string",
             "nullable": true,
             "description": "Métier déclaré, en clair."
+          },
+          "professionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "professionIsTeaching": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "incomeBandId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "incomeBandLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentMode": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMode"
+              }
+            ]
+          },
+          "journeys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProspectJourneyDto"
+            }
           },
           "dureeSystemeMois": {
             "type": "number",
@@ -18408,6 +19719,12 @@
           "ownedByCommercialName",
           "type",
           "profession",
+          "professionId",
+          "professionIsTeaching",
+          "incomeBandId",
+          "incomeBandLabel",
+          "paymentMode",
+          "journeys",
           "dureeSystemeMois",
           "canalProvenanceId",
           "canalProvenanceLabel",
@@ -18497,10 +19814,27 @@
             "maxLength": 120,
             "description": "Métier déclaré, en clair."
           },
+          "professionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Profession choisie dans le référentiel."
+          },
+          "incomeBandId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Tranche de revenu mensuel déclaré."
+          },
+          "paymentMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMode"
+              }
+            ]
+          },
           "dureeSystemeMois": {
             "type": "number",
             "minimum": 1,
-            "maximum": 600,
+            "maximum": 300,
             "description": "Durée du système de paiement, en MOIS."
           },
           "canalProvenanceId": {
@@ -18659,10 +19993,27 @@
             "maxLength": 120,
             "description": "Métier déclaré, en clair."
           },
+          "professionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Profession choisie dans le référentiel."
+          },
+          "incomeBandId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Tranche de revenu mensuel déclaré."
+          },
+          "paymentMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMode"
+              }
+            ]
+          },
           "dureeSystemeMois": {
             "type": "number",
             "minimum": 1,
-            "maximum": 600,
+            "maximum": 300,
             "description": "Durée du système de paiement, en MOIS."
           },
           "canalProvenanceId": {
@@ -18683,6 +20034,45 @@
             "description": "Horodatage de la saisie terrain."
           }
         }
+      },
+      "UpdateGrandPublicConsentDto": {
+        "type": "object",
+        "properties": {
+          "consent": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GrandPublicConsent"
+              }
+            ]
+          }
+        },
+        "required": ["consent"]
+      },
+      "ConfirmGrandPublicConversionDto": {
+        "type": "object",
+        "properties": {
+          "offerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMode"
+              }
+            ]
+          },
+          "amountXof": {
+            "type": "number",
+            "minimum": 0
+          },
+          "durationMonths": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 300
+          }
+        },
+        "required": ["offerId"]
       },
       "MergeProspectsDto": {
         "type": "object",
@@ -19222,7 +20612,7 @@
       },
       "CampaignStatus": {
         "type": "string",
-        "enum": ["ACTIVE", "CLOSED"]
+        "enum": ["DRAFT", "ACTIVE", "PAUSED", "CLOSED"]
       },
       "SyncCallCampaignDto": {
         "type": "object",
@@ -19614,7 +21004,7 @@
       },
       "CampaignScope": {
         "type": "string",
-        "enum": ["BDD1", "BDD2", "BDD3", "BDD4", "ALL"]
+        "enum": ["BDD1", "BDD2", "BDD3", "BDD4", "GP1", "GP2", "GP3", "GP4", "ALL"]
       },
       "CampaignProgressDto": {
         "type": "object",
@@ -19648,6 +21038,13 @@
           "name": {
             "type": "string"
           },
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
           "scope": {
             "allOf": [
               {
@@ -19665,6 +21062,10 @@
                 "$ref": "#/components/schemas/CampaignStatus"
               }
             ]
+          },
+          "offerLabel": {
+            "type": "string",
+            "nullable": true
           },
           "seed": {
             "type": "string",
@@ -19700,9 +21101,11 @@
         "required": [
           "id",
           "name",
+          "projet",
           "scope",
           "scopeLabel",
           "status",
+          "offerLabel",
           "seed",
           "createdById",
           "createdByName",
@@ -19736,6 +21139,14 @@
             "maxLength": 120,
             "example": "Campagne CHUES, avril"
           },
+          "projet": {
+            "default": "CHUES",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
           "scope": {
             "description": "Périmètre du tirage. BDD1..BDD4 sont les segments partagés ; ALL réunit les quatre sans recouvrement.",
             "allOf": [
@@ -19743,6 +21154,23 @@
                 "$ref": "#/components/schemas/CampaignScope"
               }
             ]
+          },
+          "offerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Offre ciblée, pour Grand Public."
+          },
+          "canalProvenanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "professionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "incomeBandId": {
+            "type": "string",
+            "format": "uuid"
           },
           "commercialIds": {
             "type": "array",
@@ -19875,6 +21303,13 @@
           "name": {
             "type": "string"
           },
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
           "scope": {
             "allOf": [
               {
@@ -19891,6 +21326,10 @@
                 "$ref": "#/components/schemas/CampaignStatus"
               }
             ]
+          },
+          "offerLabel": {
+            "type": "string",
+            "nullable": true
           },
           "seed": {
             "type": "string"
@@ -19946,9 +21385,11 @@
         "required": [
           "id",
           "name",
+          "projet",
           "scope",
           "scopeLabel",
           "status",
+          "offerLabel",
           "seed",
           "createdById",
           "createdByName",
@@ -23901,40 +25342,6 @@
           }
         },
         "required": ["from", "to", "granularity", "items", "teleconseillers"]
-      },
-      "DemoWorkspaceCountsDto": {
-        "type": "object",
-        "properties": {
-          "users": {
-            "type": "number"
-          },
-          "representants": {
-            "type": "number"
-          },
-          "prospects": {
-            "type": "number"
-          },
-          "campaigns": {
-            "type": "number"
-          },
-          "bankCases": {
-            "type": "number"
-          }
-        },
-        "required": ["users", "representants", "prospects", "campaigns", "bankCases"]
-      },
-      "DemoWorkspaceStatusDto": {
-        "type": "object",
-        "properties": {
-          "workspace": {
-            "type": "string",
-            "enum": ["demo"]
-          },
-          "counts": {
-            "$ref": "#/components/schemas/DemoWorkspaceCountsDto"
-          }
-        },
-        "required": ["workspace", "counts"]
       },
       "PurgeDomainKey": {
         "type": "string",

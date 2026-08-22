@@ -68,12 +68,14 @@ export function RepresentantFormDialog({
   onOpenChange,
   representant,
   prefill = null,
+  onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   representant: RepresentantRow | null;
   /** Amorce d'une création : un numéro suggéré par un représentant. */
   prefill?: RepresentantPrefill | null;
+  onSaved?: ((representant: RepresentantRow) => void) | undefined;
 }) {
   const queryClient = useQueryClient();
   const nameId = useId();
@@ -199,6 +201,7 @@ export function RepresentantFormDialog({
       void queryClient.invalidateQueries({ queryKey: queryKeys.representantsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.reference });
       toast.success(isEdit ? `Fiche de ${saved.fullName} mise à jour.` : `${saved.fullName} créé.`);
+      onSaved?.(saved);
       onOpenChange(false);
     },
     onError: (error) => {

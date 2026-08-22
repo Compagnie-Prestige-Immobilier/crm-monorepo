@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/campaign_attempt_dto.dart';
 import 'package:crm_api_client/src/model/campaign_status.dart';
 import 'package:crm_api_client/src/model/campaign_progress_dto.dart';
@@ -28,11 +29,15 @@ class CampaignDetailDto {
 
     required this.name,
 
+    required this.projet,
+
     required this.scope,
 
     required this.scopeLabel,
 
     required this.status,
+
+    required this.offerLabel,
 
     required this.seed,
 
@@ -64,6 +69,14 @@ class CampaignDetailDto {
   final String name;
 
   @JsonKey(
+    name: r'projet',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: Projet.unknownDefaultOpenApi,
+  )
+  final Projet projet;
+
+  @JsonKey(
     name: r'scope',
     required: true,
     includeIfNull: false,
@@ -81,6 +94,9 @@ class CampaignDetailDto {
     unknownEnumValue: CampaignStatus.unknownDefaultOpenApi,
   )
   final CampaignStatus status;
+
+  @JsonKey(name: r'offerLabel', required: true, includeIfNull: true)
+  final String? offerLabel;
 
   @JsonKey(name: r'seed', required: true, includeIfNull: false)
   final String seed;
@@ -127,9 +143,11 @@ class CampaignDetailDto {
               [
                 id,
                 name,
+                projet,
                 scope,
                 scopeLabel,
                 status,
+                offerLabel,
                 seed,
                 createdById,
                 createdByName,
@@ -145,9 +163,11 @@ class CampaignDetailDto {
               [
                 other.id,
                 other.name,
+                other.projet,
                 other.scope,
                 other.scopeLabel,
                 other.status,
+                other.offerLabel,
                 other.seed,
                 other.createdById,
                 other.createdByName,
@@ -169,9 +189,11 @@ class CampaignDetailDto {
       mapPropsToHashCode([
         id,
         name,
+        projet,
         scope,
         scopeLabel,
         status,
+        offerLabel,
         seed,
         createdById,
         createdByName,

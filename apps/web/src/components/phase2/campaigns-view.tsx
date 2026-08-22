@@ -22,7 +22,13 @@ import { formatDate, formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import { CAMPAIGN_STATUS_LABELS, campaignScopeLabel } from '@/lib/types';
 
-export function CampaignsView({ canManage }: { canManage: boolean }) {
+export function CampaignsView({
+  canManage,
+  projet = 'CHUES',
+}: {
+  canManage: boolean;
+  projet?: 'CHUES' | 'GRAND_PUBLIC';
+}) {
   const { filters, setFilters } = useCampaignFilters();
   const [creating, setCreating] = useState(false);
   const activeFilterCount = countActiveCampaignFilters(filters);
@@ -34,8 +40,8 @@ export function CampaignsView({ canManage }: { canManage: boolean }) {
   }
 
   const { data, isPending, isError, error, refetch, isFetching } = useQuery({
-    queryKey: queryKeys.campaigns(filters),
-    queryFn: () => fetchCampaigns(filters),
+    queryKey: [...queryKeys.campaigns(filters), projet],
+    queryFn: () => fetchCampaigns(filters, undefined, projet),
     placeholderData: (previous) => previous,
   });
 
@@ -60,7 +66,7 @@ export function CampaignsView({ canManage }: { canManage: boolean }) {
         ) : null}
       </div>
 
-      <CampaignsFiltersBar />
+      <CampaignsFiltersBar projet={projet} />
 
       {isPending ? (
         <CampaignsSkeleton />
@@ -110,7 +116,7 @@ export function CampaignsView({ canManage }: { canManage: boolean }) {
                               sélection de texte et n'annonce aucun nom
                               accessible utile. */}
                           <Link
-                            href={`/chues/campagnes/${campaign.id}`}
+                            href={`${projet === 'GRAND_PUBLIC' ? '/grand-public' : '/chues'}/campagnes/${campaign.id}`}
                             className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                           >
                             {campaign.name}

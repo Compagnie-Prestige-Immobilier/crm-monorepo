@@ -204,6 +204,24 @@ export class Phase2Controller {
     return this.campaigns.close(id);
   }
 
+  @Post('campaigns/:id/pause')
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ operationId: 'pauseCallCampaign', summary: 'Suspend temporairement les appels.' })
+  @ApiResponse({ status: 200, type: CampaignDetailDto })
+  pauseCampaign(@Param('id', ParseUUIDPipe) id: string): Promise<CampaignDetailDto> {
+    return this.campaigns.pause(id);
+  }
+
+  @Post('campaigns/:id/resume')
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ operationId: 'resumeCallCampaign', summary: 'Reprend une campagne suspendue.' })
+  @ApiResponse({ status: 200, type: CampaignDetailDto })
+  resumeCampaign(@Param('id', ParseUUIDPipe) id: string): Promise<CampaignDetailDto> {
+    return this.campaigns.resume(id);
+  }
+
   @Get('campaigns/:id/commerciaux/:userId/programme.pdf')
   @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiProduces(PDF_MIME)

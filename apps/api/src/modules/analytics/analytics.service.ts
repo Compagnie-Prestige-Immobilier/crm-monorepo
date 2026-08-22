@@ -32,6 +32,13 @@ export class AnalyticsService {
 
   async totals(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<AnalyticsTotalsDto> {
     const where = prospectConditions(user, filter);
+    const statut = filter.projet
+      ? Prisma.sql`(
+          SELECT pj."statut" FROM "prospect_journeys" pj
+          WHERE pj."prospectId" = p."id" AND pj."projet" = ${filter.projet}::"Projet"
+          LIMIT 1
+        )`
+      : Prisma.sql`p."statut"`;
     const rows = await this.prisma.$queryRaw<
       {
         prospects: number;
@@ -53,10 +60,10 @@ export class AnalyticsService {
           WHERE u."role" = 'COMMERCIAL' AND u."isActive" = TRUE AND u."deletedAt" IS NULL
         )::int                                                                      AS commerciaux,
         COUNT(DISTINCT r."departementId")::int                                     AS departements,
-        COUNT(*) FILTER (WHERE p."statut" = 'NOUVEAU')::int                        AS nouveau,
-        COUNT(*) FILTER (WHERE p."statut" = 'CONTACTE')::int                       AS contacte,
-        COUNT(*) FILTER (WHERE p."statut" = 'CONVERTI')::int                       AS converti,
-        COUNT(*) FILTER (WHERE p."statut" = 'PERDU')::int                          AS perdu,
+        COUNT(*) FILTER (WHERE ${statut} = 'NOUVEAU')::int                         AS nouveau,
+        COUNT(*) FILTER (WHERE ${statut} = 'CONTACTE')::int                        AS contacte,
+        COUNT(*) FILTER (WHERE ${statut} = 'CONVERTI')::int                        AS converti,
+        COUNT(*) FILTER (WHERE ${statut} = 'PERDU')::int                           AS perdu,
         COUNT(*) FILTER (WHERE p."clientCreatedAt" >= now() - interval '7 days')::int  AS j7,
         COUNT(*) FILTER (WHERE p."clientCreatedAt" >= now() - interval '30 days')::int AS j30
       ${PROSPECT_FROM}

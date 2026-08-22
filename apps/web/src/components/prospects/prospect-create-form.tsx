@@ -9,6 +9,14 @@ import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { Field } from '@/components/forms/field';
+import {
+  InternationalPhoneField,
+  toInternationalE164,
+} from '@/components/forms/international-phone-field';
+import {
+  RepresentantFormDialog,
+  type RepresentantPrefill,
+} from '@/components/representants/representant-form-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -19,20 +27,14 @@ import {
   type ProspectPhoneConflict,
 } from '@/lib/data/prospects';
 import { fetchReferenceData } from '@/lib/data/reference';
-import { formatDateTime } from '@/lib/format';
+import { fetchRepresentants } from '@/lib/data/representants';
+import { formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import { EMPTY_REPRESENTANT_FILTERS } from '@/lib/representant-filters';
+import type { FilterOption } from '@/lib/types';
 
-const NATIONAL_LENGTH = 9;
-
-function toE164Senegal(raw: string): string | null {
-  if (/\p{Letter}/u.test(raw)) return null;
-  let digits = raw.replace(/\D/gu, '').replace(/^00/u, '');
-  if (digits.startsWith('221') && digits.length > NATIONAL_LENGTH) digits = digits.slice(3);
-  return digits.length === NATIONAL_LENGTH ? `+221${digits}` : null;
-}
-
-type FieldName = 'prenom' | 'nom' | 'phone' | 'banqueId' | 'syndicatId' | 'representantId';
+type FieldName = 'prenom' | 'nom' | 'phone' | 'representantId';
 
 type Errors = Partial<Record<FieldName, string>>;
 
@@ -50,7 +52,13 @@ function ChoiceError({ message }: { message: string | undefined }): ReactNode {
   );
 }
 
-export function ProspectCreateForm({ representantId }: { representantId: string | null }) {
+export function ProspectCreateForm({
+  representantId,
+  onSaved,
+}: {
+  representantId: string | null;
+  onSaved?: () => void;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const prenomRef = useRef<HTMLInputElement>(null);
@@ -58,9 +66,13 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
   const [prenom, setPrenom] = useState('');
   const [nom, setNom] = useState('');
   const [phone, setPhone] = useState('');
+  const [callingCode, setCallingCode] = useState('221');
   const [banqueId, setBanqueId] = useState<string | null>(null);
   const [syndicatId, setSyndicatId] = useState<string | null>(null);
   const [repId, setRepId] = useState<string | null>(representantId);
+  const [repSearch, setRepSearch] = useState('');
+  const [createdRep, setCreatedRep] = useState<FilterOption | null>(null);
+  const [repPrefill, setRepPrefill] = useState<RepresentantPrefill | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [conflict, setConflict] = useState<ProspectPhoneConflict | null>(null);
   const [saved, setSaved] = useState<string[]>([]);
@@ -69,6 +81,19 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
     queryKey: queryKeys.reference,
     queryFn: () => fetchReferenceData(),
     staleTime: 5 * 60_000,
+  });
+
+  const searchedRepresentants = useQuery({
+    queryKey: [...queryKeys.representantsRoot, 'select', repSearch.trim()],
+    queryFn: () =>
+      fetchRepresentants({
+        ...EMPTY_REPRESENTANT_FILTERS,
+        search: repSearch.trim(),
+        sortBy: 'fullName',
+        sortDir: 'asc',
+        pageSize: 20,
+      }),
+    enabled: representantId === null && repSearch.trim() !== '',
   });
 
   const save = useMutation({
@@ -80,6 +105,10 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
       toast.success(`${prospect.prenom} ${prospect.nom} enregistré.`);
 
       if (!variables.andNext) {
+        if (onSaved !== undefined) {
+          onSaved();
+          return;
+        }
         router.push(`/chues/prospects?search=${encodeURIComponent(prospect.phoneE164)}`);
         return;
       }
@@ -105,18 +134,16 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
   function submit(andNext: boolean): void {
     if (save.isPending) return;
 
-    const e164 = toE164Senegal(phone);
+    const e164 = toInternationalE164(phone, callingCode);
     const found: Errors = {};
     if (prenom.trim() === '') found.prenom = 'Le prénom est obligatoire.';
     if (nom.trim() === '') found.nom = 'Le nom est obligatoire.';
     if (phone.trim() === '') found.phone = 'Le numéro est obligatoire.';
-    else if (e164 === null) found.phone = 'Numéro invalide : 9 chiffres attendus.';
-    if (banqueId === null) found.banqueId = 'Choisissez une banque.';
-    if (syndicatId === null) found.syndicatId = 'Choisissez un syndicat.';
+    else if (e164 === null) found.phone = 'Numéro invalide pour le pays choisi.';
     if (repId === null) found.representantId = 'Choisissez un représentant.';
 
     setErrors(found);
-    if (e164 === null || banqueId === null || syndicatId === null || repId === null) return;
+    if (e164 === null || repId === null) return;
     if (Object.keys(found).length > 0) return;
 
     setConflict(null);
@@ -125,9 +152,9 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
         prenom: prenom.trim(),
         nom: nom.trim(),
         phone: e164,
-        banqueId,
-        syndicatId,
         representantId: repId,
+        ...(banqueId === null ? {} : { banqueId }),
+        ...(syndicatId === null ? {} : { syndicatId }),
       },
       andNext,
     });
@@ -135,6 +162,17 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
 
   const last = saved.at(-1);
   const plural = saved.length > 1 ? 's' : '';
+  const searchedOptions = (searchedRepresentants.data?.items ?? []).map((item) => ({
+    value: item.id,
+    label: `${item.fullName} - ${formatPhone(item.phoneE164)}`,
+    hint: item.departementName,
+  }));
+  const representantOptions = [
+    ...(createdRep === null ? [] : [createdRep]),
+    ...(repSearch.trim() === '' ? (reference.data?.representants ?? []) : searchedOptions),
+  ].filter(
+    (option, index, options) => options.findIndex((item) => item.value === option.value) === index,
+  );
 
   return (
     <form
@@ -156,8 +194,18 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
             placeholder="Choisir un représentant"
             required
             value={repId}
-            options={reference.data?.representants ?? []}
+            options={representantOptions}
             onChange={setRepId}
+            onSearchChange={setRepSearch}
+            filterOptions={false}
+            onCreate={(search) => {
+              const hasLetters = /\p{Letter}/u.test(search);
+              setRepPrefill({
+                fullName: hasLetters ? search : '',
+                phone: hasLetters ? '' : search,
+                notes: '',
+              });
+            }}
           />
           <ChoiceError message={errors.representantId} />
         </div>
@@ -195,27 +243,16 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
         </Field>
       </div>
 
-      <Field
-        label="Téléphone"
-        required
+      <InternationalPhoneField
+        value={phone}
+        callingCode={callingCode}
         error={errors.phone}
-        description="Neuf chiffres, enregistrés au format +221."
-      >
-        {(props) => (
-          <Input
-            {...props}
-            value={phone}
-            maxLength={40}
-            inputMode="tel"
-            autoComplete="off"
-            placeholder="77 123 45 67"
-            onChange={(event) => {
-              setPhone(event.target.value);
-              setConflict(null);
-            }}
-          />
-        )}
-      </Field>
+        onCallingCodeChange={setCallingCode}
+        onChange={(value) => {
+          setPhone(value);
+          setConflict(null);
+        }}
+      />
 
       {conflict !== null ? (
         <Card className="border-destructive/40">
@@ -233,7 +270,7 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
                 {conflict.ownedByCommercialName} le {formatDateTime(conflict.createdAt)}.
               </p>
               <Link
-                href={`/chues/prospects?search=${encodeURIComponent(toE164Senegal(phone) ?? phone)}`}
+                href={`/chues/prospects?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`}
                 className="w-fit rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 Ouvrir la fiche existante
@@ -248,21 +285,18 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
           <FilterCombobox
             label="Banque"
             placeholder="Choisir une banque"
-            required
             value={banqueId}
             options={(reference.data?.banques ?? [])
               .filter((banque) => banque.isActive)
               .map((banque) => ({ value: banque.id, label: banque.name, hint: banque.shortName }))}
             onChange={setBanqueId}
           />
-          <ChoiceError message={errors.banqueId} />
         </div>
 
         <div className="flex flex-col gap-1.5">
           <FilterCombobox
             label="Syndicat"
             placeholder="Choisir un syndicat"
-            required
             value={syndicatId}
             options={(reference.data?.syndicats ?? [])
               .filter((syndicat) => syndicat.isActive)
@@ -273,7 +307,6 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
               }))}
             onChange={setSyndicatId}
           />
-          <ChoiceError message={errors.syndicatId} />
         </div>
       </div>
 
@@ -304,6 +337,24 @@ export function ProspectCreateForm({ representantId }: { representantId: string 
           )}
         </Button>
       </div>
+
+      <RepresentantFormDialog
+        open={repPrefill !== null}
+        onOpenChange={(open) => {
+          if (!open) setRepPrefill(null);
+        }}
+        representant={null}
+        prefill={repPrefill}
+        onSaved={(representant) => {
+          setCreatedRep({
+            value: representant.id,
+            label: `${representant.fullName} - ${formatPhone(representant.phoneE164)}`,
+            hint: representant.departementName,
+          });
+          setRepId(representant.id);
+          setRepPrefill(null);
+        }}
+      />
     </form>
   );
 }
