@@ -6,7 +6,13 @@
  * donc une colonne dénormalisée se désynchroniserait dès qu'un admin corrige la
  * banque d'un prospect.
  */
-import type { BddSegment, CampaignScope, Prisma } from '@prisma/client';
+import {
+  Projet,
+  ProspectType,
+  type BddSegment,
+  type CampaignScope,
+  type Prisma,
+} from '@prisma/client';
 
 /** Clé naturelle de l'axe « CHUES » : voir `Syndicat.sigle`. */
 export const CHUES_SIGLE = 'CHUES';
@@ -73,16 +79,48 @@ export function segmentWhere(segment: BddSegment): Prisma.ProspectWhereInput {
   };
 }
 
-export function scopeWhere(scope: CampaignScope): Prisma.ProspectWhereInput {
-  return scope === 'ALL' ? {} : segmentWhere(scope);
+const GP_TYPES: Partial<Record<CampaignScope, ProspectType>> = {
+  GP1: ProspectType.FONCTIONNAIRE,
+  GP2: ProspectType.SECTEUR_PRIVE,
+  GP3: ProspectType.INFORMEL,
+  GP4: ProspectType.DIASPORA,
+};
+
+export function scopeWhere(scope: CampaignScope, projet?: Projet): Prisma.ProspectWhereInput {
+  if (projet === undefined) {
+    if (scope === 'ALL') return {};
+    const type = GP_TYPES[scope];
+    return type === undefined ? segmentWhere(scope as BddSegment) : { type };
+  }
+  if (projet === Projet.GRAND_PUBLIC) {
+    const type = GP_TYPES[scope];
+    return {
+      ...(type === undefined ? {} : { type }),
+      journeys: {
+        some: {
+          projet: Projet.GRAND_PUBLIC,
+          consent: 'INTERESSE',
+          statut: { notIn: ['CONVERTI', 'PERDU'] },
+        },
+      },
+    };
+  }
+  if (scope === 'ALL') return { journeys: { some: { projet: Projet.CHUES } } };
+  if (scope.startsWith('GP')) return { id: { equals: '__scope_invalide__' } };
+  return {
+    ...segmentWhere(scope as BddSegment),
+    journeys: { some: { projet: Projet.CHUES } },
+  };
 }
 
-export function eligibleForCampaignWhere(scope: CampaignScope): Prisma.ProspectWhereInput {
+export function eligibleForCampaignWhere(
+  scope: CampaignScope,
+  projet?: Projet,
+): Prisma.ProspectWhereInput {
   return {
-    ...scopeWhere(scope),
+    ...scopeWhere(scope, projet),
     deletedAt: null,
-    phase2Status: 'PENDING',
-    enrollmentMethod: null,
+    ...(projet !== Projet.GRAND_PUBLIC ? { phase2Status: 'PENDING', enrollmentMethod: null } : {}),
     callTasks: { none: { isActive: true } },
   };
 }

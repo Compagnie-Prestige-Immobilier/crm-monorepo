@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { Projet } from '@crm/database';
 
 export enum CallbackScope {
   TODAY = 'today',
@@ -8,6 +9,11 @@ export enum CallbackScope {
 }
 
 export class CallbackQueryDto {
+  @ApiPropertyOptional({ enum: Projet, enumName: 'Projet' })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
+
   @ApiPropertyOptional({
     enum: CallbackScope,
     enumName: 'CallbackScope',

@@ -1,17 +1,33 @@
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 
 import { GrandPublicProspectDetail } from '@/components/grand-public/prospect-detail';
 import type { ProspectRow } from '@/lib/types';
+import { renderWithQuery } from '@/test/render-query';
 
-const fiche = (over: Partial<ProspectRow> = {}): ProspectRow =>
-  ({
+const fiche = (over: Partial<ProspectRow> = {}): ProspectRow => {
+  const projet = over.projet ?? 'GRAND_PUBLIC';
+  return {
     id: 'p-1',
     nom: 'Fall',
     prenom: 'Moussa',
     phoneE164: '+221771234567',
     statut: 'NOUVEAU',
     projet: 'GRAND_PUBLIC',
+    journeys:
+      projet === 'GRAND_PUBLIC'
+        ? [
+            {
+              id: 'journey-gp',
+              projet,
+              statut: over.statut ?? 'NOUVEAU',
+              consent: 'NON_DEMANDE',
+              consentAt: null,
+              convertedAt: null,
+            },
+          ]
+        : [],
     type: null,
     profession: null,
     dureeSystemeMois: null,
@@ -30,7 +46,8 @@ const fiche = (over: Partial<ProspectRow> = {}): ProspectRow =>
     lastComment: null,
     lastAttemptAt: null,
     ...over,
-  }) as ProspectRow;
+  } as ProspectRow;
+};
 
 /** La valeur portée par la ligne dont l'intitulé est `label`. */
 function ligne(label: string): HTMLElement {
@@ -39,6 +56,8 @@ function ligne(label: string): HTMLElement {
   if (row === null) throw new Error(`Ligne « ${label} » introuvable.`);
   return row;
 }
+
+const render = (ui: ReactElement) => renderWithQuery(ui);
 
 describe('le segment absent', () => {
   it('écrit « Aucun » et jamais BDD4', () => {
@@ -52,7 +71,9 @@ describe('le segment absent', () => {
     render(<GrandPublicProspectDetail prospect={fiche()} />);
 
     expect(
-      within(ligne('Segment')).getByText('Ni banque ni syndicat : la fiche n’entre dans aucune base.'),
+      within(ligne('Segment')).getByText(
+        'Ni banque ni syndicat : la fiche n’entre dans aucune base.',
+      ),
     ).toBeTruthy();
   });
 

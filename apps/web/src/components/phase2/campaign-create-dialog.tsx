@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangleIcon, ArrowLeftIcon, CheckIcon, LoaderIcon, UsersIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -43,6 +43,13 @@ export function CampaignCreateDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const projet = pathname.startsWith('/grand-public') ? 'GRAND_PUBLIC' : 'CHUES';
+  const scopes = CAMPAIGN_SCOPES.filter(
+    (candidate) =>
+      candidate === 'ALL' ||
+      (projet === 'GRAND_PUBLIC' ? candidate.startsWith('GP') : candidate.startsWith('BDD')),
+  );
   const queryClient = useQueryClient();
   const nameId = useId();
 
@@ -63,7 +70,7 @@ export function CampaignCreateDialog({
 
   const preview = useQuery({
     queryKey: queryKeys.campaignPreview(scope, selected.length, spreadDays),
-    queryFn: () => fetchCampaignPreview(scope, selected.length, spreadDays),
+    queryFn: () => fetchCampaignPreview(scope, selected.length, spreadDays, projet),
     enabled: open && step === 'apercu' && selected.length > 0,
     staleTime: 15_000,
   });
@@ -74,7 +81,7 @@ export function CampaignCreateDialog({
 
   const create = useMutation({
     mutationFn: () =>
-      createCampaign({ name: trimmedName, scope, commercialIds: selected, spreadDays }),
+      createCampaign({ name: trimmedName, projet, scope, commercialIds: selected, spreadDays }),
     onSuccess: (campaign) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.campaignsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
@@ -84,7 +91,9 @@ export function CampaignCreateDialog({
       );
       reset();
       onOpenChange(false);
-      router.push(`/chues/campagnes/${campaign.id}`);
+      router.push(
+        `${projet === 'GRAND_PUBLIC' ? '/grand-public' : '/chues'}/campagnes/${campaign.id}`,
+      );
     },
     onError: (error) => {
       toastApiError(error, 'La campagne n’a pas pu être créée.');
@@ -164,7 +173,7 @@ export function CampaignCreateDialog({
                 Périmètre
               </legend>
               <div className="grid gap-2 sm:grid-cols-2">
-                {CAMPAIGN_SCOPES.map((candidate) => (
+                {scopes.map((candidate) => (
                   <label
                     key={candidate}
                     className={cn(

@@ -31,11 +31,13 @@ import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
 
 const STATUS_TABS: readonly { value: 'TOUTES' | CampaignStatus; label: string }[] = [
   { value: 'TOUTES', label: 'Toutes' },
+  { value: 'DRAFT', label: 'Brouillons' },
   { value: 'ACTIVE', label: 'En cours' },
+  { value: 'PAUSED', label: 'Suspendues' },
   { value: 'CLOSED', label: 'Clôturées' },
 ];
 
-export function CampaignsFiltersBar() {
+export function CampaignsFiltersBar({ projet = 'CHUES' }: { projet?: 'CHUES' | 'GRAND_PUBLIC' }) {
   const { filters, setFilters, resetFilters } = useCampaignFilters();
 
   const { data: creators } = useQuery({
@@ -73,6 +75,11 @@ export function CampaignsFiltersBar() {
 
   const activeCount = countActiveCampaignFilters(filters);
   const chips = buildChips(filters, creatorOptions);
+  const scopes = CAMPAIGN_SCOPES.filter(
+    (scope) =>
+      scope === 'ALL' ||
+      (projet === 'GRAND_PUBLIC' ? scope.startsWith('GP') : scope.startsWith('BDD')),
+  );
 
   return (
     <section
@@ -125,7 +132,7 @@ export function CampaignsFiltersBar() {
           <FilterCombobox
             label="Périmètre"
             placeholder="Tous les périmètres"
-            options={CAMPAIGN_SCOPES.map((scope) => ({
+            options={scopes.map((scope) => ({
               value: scope,
               label: campaignScopeLabel(scope),
             }))}

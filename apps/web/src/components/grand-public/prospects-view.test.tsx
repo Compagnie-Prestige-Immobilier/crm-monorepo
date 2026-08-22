@@ -151,7 +151,7 @@ describe('la liste', () => {
     setUrl('/grand-public');
     list.mockResolvedValue(page([]));
     mount();
-    await screen.findByRole('button', { name: 'Diaspora' });
+    await user.click(await screen.findByRole('button', { name: 'Filtres' }));
 
     await user.click(screen.getByRole('button', { name: 'Diaspora' }));
 

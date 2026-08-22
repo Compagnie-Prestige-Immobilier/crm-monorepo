@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { Role } from '@crm/database';
+import { GrandPublicConsent, Role } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -28,6 +28,13 @@ interface PrismaMock {
   };
   representant: { findFirst: ReturnType<typeof vi.fn> };
   user: { findFirst: ReturnType<typeof vi.fn> };
+  prospectJourney: {
+    findUnique: ReturnType<typeof vi.fn>;
+    upsert: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
+  prospectConversion: { upsert: ReturnType<typeof vi.fn> };
+  $transaction: ReturnType<typeof vi.fn>;
   $queryRaw: ReturnType<typeof vi.fn>;
 }
 
@@ -44,6 +51,13 @@ function makePrisma(): PrismaMock {
     },
     representant: { findFirst: vi.fn().mockResolvedValue(null) },
     user: { findFirst: vi.fn().mockResolvedValue(null) },
+    prospectJourney: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn(),
+      update: vi.fn(),
+    },
+    prospectConversion: { upsert: vi.fn() },
+    $transaction: vi.fn(),
     $queryRaw: vi.fn().mockResolvedValue([]),
   };
 }
@@ -51,6 +65,7 @@ function makePrisma(): PrismaMock {
 interface PrismaCallArgs {
   where?: Record<string, unknown>;
   data?: Record<string, unknown>;
+  update?: Record<string, unknown>;
 }
 
 function firstArg(fn: ReturnType<typeof vi.fn>): PrismaCallArgs {
@@ -626,5 +641,24 @@ describe('le panneau sait saisir une fiche Grand Public', () => {
     });
 
     expect(firstArg(prisma.prospect.create).data?.projet).toBeUndefined();
+  });
+
+  it('trace le consentement sur le parcours Grand Public', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: alice.id }));
+
+    await service(prisma).setGrandPublicConsent(alice, 'p-1', GrandPublicConsent.INTERESSE);
+
+    expect(firstArg(prisma.prospectJourney.upsert).update).toMatchObject({
+      consent: 'INTERESSE',
+      consentById: alice.id,
+    });
+  });
+
+  it('refuse une conversion avant le consentement', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: alice.id }));
+
+    await expect(
+      service(prisma).confirmGrandPublicConversion(alice, 'p-1', { offerId: 'offer-1' }),
+    ).rejects.toMatchObject({ response: { code: 'GRAND_PUBLIC_CONSENT_REQUIRED' } });
   });
 });

@@ -4,12 +4,17 @@ type Schemas = components['schemas'];
 
 export type Role = Schemas['Role'];
 export type ProspectStatut = Schemas['ProspectStatut'];
+export type ProspectType = Schemas['ProspectType'];
+export type PaymentMode = Schemas['PaymentMode'];
 
 export type Region = Schemas['RegionDto'];
 export type Departement = Schemas['DepartementDto'];
 export type Ief = Schemas['IefDto'];
 export type Banque = Schemas['BanqueDto'];
 export type Syndicat = Schemas['SyndicatDto'];
+export type Profession = Schemas['ProfessionDto'];
+export type IncomeBand = Schemas['IncomeBandDto'];
+export type Offer = Schemas['OfferDto'];
 
 export type SessionUser = Schemas['AuthUserDto'];
 export type UserRow = Schemas['UserDto'];
@@ -76,6 +81,7 @@ export type ProspectSortField = (typeof PROSPECT_SORT_FIELDS)[number];
 export type SortDirection = Schemas['SortOrder'];
 
 export interface ProspectFilters {
+  projet: Schemas['Projet'] | null;
   search: string;
   commercialId: string | null;
   representantId: string | null;
@@ -130,10 +136,22 @@ export const CAMPAIGN_SCOPES = [
   'BDD2',
   'BDD3',
   'BDD4',
+  'GP1',
+  'GP2',
+  'GP3',
+  'GP4',
 ] as const satisfies readonly CampaignScope[];
 
 export function campaignScopeLabel(scope: CampaignScope): string {
-  return scope === 'ALL' ? 'Toutes bases : BDD1 à BDD4' : SEGMENT_LABELS[scope];
+  const labels: Record<CampaignScope, string> = {
+    ALL: 'Tous les groupes',
+    ...SEGMENT_LABELS,
+    GP1: 'GP1 : Fonctionnaire',
+    GP2: 'GP2 : Secteur privé',
+    GP3: 'GP3 : Informel',
+    GP4: 'GP4 : Diaspora',
+  };
+  return labels[scope];
 }
 
 export const PHASE2_STATUSES = [
@@ -194,7 +212,9 @@ export const REP_CALL_OUTCOME_VARIANTS: Record<RepCallOutcome, BadgeVariant> = {
 };
 
 export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
+  DRAFT: 'Brouillon',
   ACTIVE: 'En cours',
+  PAUSED: 'Suspendue',
   CLOSED: 'Clôturée',
 };
 
@@ -301,6 +321,9 @@ export interface ReferenceData {
   iefs: Ief[];
   banques: Banque[];
   syndicats: Syndicat[];
+  professions: Profession[];
+  incomeBands: IncomeBand[];
+  offers: Offer[];
   regions: Region[];
   commerciaux: FilterOption[];
   representants: FilterOption[];

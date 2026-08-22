@@ -33,6 +33,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
       });
       if (!response.ok) throw new Error('workspace switch failed');
       router.refresh();
+      setPending(null);
     } catch {
       toast.error('Le changement d’espace a échoué. Réessayez.');
       setPending(null);
@@ -92,7 +93,11 @@ export function UserMenu({ user }: { user: SessionUser }) {
           }}
         >
           <FlaskConicalIcon aria-hidden="true" />
-          {user.workspace === 'demo' ? 'Quitter l’espace démo' : 'Ouvrir l’espace démo'}
+          {pending === 'workspace'
+            ? 'Changement d’espace…'
+            : user.workspace === 'demo'
+              ? 'Quitter l’espace démo'
+              : 'Ouvrir l’espace démo'}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

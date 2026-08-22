@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 
-import { Projet, ProspectType, type PrismaClient } from './index.js';
+import { GrandPublicConsent, Projet, ProspectType, type PrismaClient } from './index.js';
+
+export const DEMO_SEED_SETTING = 'demo.seed.version';
+export const DEMO_SEED_VERSION = '3';
 
 const MIRRORED_TABLES = [
   'regions',
@@ -9,6 +12,9 @@ const MIRRORED_TABLES = [
   'banques',
   'syndicats',
   'canaux_provenance',
+  'professions',
+  'income_bands',
+  'offers',
   'bank_case_stages',
   'bank_rejection_reasons',
   'call_outcome_reasons',
@@ -43,7 +49,7 @@ export class DemoWorkspaceFactory {
 
     for (const table of MIRRORED_TABLES) {
       await this.demoDb.$executeRawUnsafe(
-        `INSERT INTO demo."${table}" SELECT * FROM public."${table}"`,
+        `INSERT INTO demo."${table}" SELECT (json_populate_record(NULL::demo."${table}", row_to_json(source))).* FROM public."${table}" source`,
       );
     }
 
@@ -94,6 +100,18 @@ export class DemoWorkspaceFactory {
       };
     });
     await this.demoDb.prospect.createMany({ data: prospects });
+    await this.demoDb.prospectJourney.createMany({
+      data: prospects.map((prospect) => ({
+        id: demoId(`journey:${prospect.id}:${prospect.projet}`),
+        prospectId: prospect.id,
+        projet: prospect.projet,
+        consent:
+          prospect.projet === Projet.GRAND_PUBLIC
+            ? GrandPublicConsent.INTERESSE
+            : GrandPublicConsent.NON_DEMANDE,
+        consentAt: prospect.projet === Projet.GRAND_PUBLIC ? prospect.createdAt : null,
+      })),
+    });
 
     const assignee =
       (await this.demoDb.user.findFirst({
@@ -122,6 +140,29 @@ export class DemoWorkspaceFactory {
       })),
     });
 
+    const grandPublicCampaign = await this.demoDb.callCampaign.create({
+      data: {
+        id: demoId('campaign:grand-public'),
+        name: 'Campagne Grand Public de démonstration',
+        projet: Projet.GRAND_PUBLIC,
+        scope: 'ALL',
+        seed: 'cpi-demo-grand-public',
+        createdById: author.id,
+        createdAt,
+      },
+    });
+    await this.demoDb.callCampaignCommercial.create({
+      data: { campaignId: grandPublicCampaign.id, userId: assignee.id, position: 0 },
+    });
+    await this.demoDb.callTask.createMany({
+      data: prospects.slice(8, 14).map((prospect, index) => ({
+        campaignId: grandPublicCampaign.id,
+        prospectId: prospect.id,
+        assignedToId: assignee.id,
+        position: index + 1,
+      })),
+    });
+
     if (banque && stage) {
       await this.demoDb.bankCase.createMany({
         data: prospects.slice(0, 3).map((prospect, index) => ({
@@ -138,5 +179,9 @@ export class DemoWorkspaceFactory {
         })),
       });
     }
+
+    await this.demoDb.appSetting.create({
+      data: { key: DEMO_SEED_SETTING, value: DEMO_SEED_VERSION },
+    });
   }
 }

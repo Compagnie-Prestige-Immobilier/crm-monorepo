@@ -1,19 +1,49 @@
+'use client';
+
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeftIcon, PhoneIcon } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
 
 import { Absent } from '@/components/grand-public/absence';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PROSPECT_TYPE_LABELS, formatDureeMois } from '@/lib/data/grand-public';
+import {
+  PROSPECT_TYPE_LABELS,
+  confirmGrandPublicConversion,
+  formatDureeMois,
+  updateGrandPublicConsent,
+} from '@/lib/data/grand-public';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
+import { toastApiError } from '@/lib/mutation-feedback';
+import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
   type ProspectRow,
   type ProspectStatut,
+  type Offer,
+  type PaymentMode,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -52,17 +82,73 @@ function raisonSansSegment(prospect: ProspectRow): string {
   return 'Le syndicat manque pour le calculer.';
 }
 
-export function GrandPublicProspectDetail({ prospect }: { prospect: ProspectRow }) {
-  if (prospect.projet !== 'GRAND_PUBLIC') {
+export function GrandPublicProspectDetail({
+  prospect: initialProspect,
+  offers = [],
+  canEdit = false,
+}: {
+  prospect: ProspectRow;
+  offers?: Offer[];
+  canEdit?: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [prospect, setProspect] = useState(initialProspect);
+  const [conversionOpen, setConversionOpen] = useState(false);
+  const [offerId, setOfferId] = useState<string | null>(null);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
+  const [amountXof, setAmountXof] = useState('');
+  const [durationMonths, setDurationMonths] = useState('');
+  const journey = prospect.journeys?.find((item) => item.projet === 'GRAND_PUBLIC');
+
+  const refresh = (saved: ProspectRow) => {
+    setProspect(saved);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardRoot });
+  };
+
+  const consent = useMutation({
+    mutationFn: (value: 'INTERESSE' | 'REFUSE') => updateGrandPublicConsent(prospect.id, value),
+    onSuccess: (saved) => {
+      refresh(saved);
+      toast.success('Consentement enregistré.');
+    },
+    onError: (error) => toastApiError(error, 'Le consentement n’a pas pu être enregistré.'),
+  });
+
+  const conversion = useMutation({
+    mutationFn: () => {
+      if (offerId === null) throw new Error('Choisissez une offre.');
+      return confirmGrandPublicConversion(prospect.id, {
+        offerId,
+        ...(paymentMode === null ? {} : { paymentMode }),
+        ...(amountXof === '' ? {} : { amountXof: Number(amountXof) }),
+        ...(durationMonths === '' ? {} : { durationMonths: Number(durationMonths) }),
+      });
+    },
+    onSuccess: (saved) => {
+      refresh(saved);
+      setConversionOpen(false);
+      toast.success('Conversion confirmée.');
+    },
+    onError: (error) => toastApiError(error, 'La conversion n’a pas pu être confirmée.'),
+  });
+
+  if (journey === undefined) {
     return (
-      <Card role="alert" className="animate-rise mx-auto max-w-lg items-center gap-3 px-6 py-16 text-center">
+      <Card
+        role="alert"
+        className="animate-rise mx-auto max-w-lg items-center gap-3 px-6 py-16 text-center"
+      >
         <h1 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
           Cette fiche relève du projet CHUES
         </h1>
         <p className="max-w-md text-[0.9375rem] text-muted-foreground">
           Les deux projets ne partagent aucun écran. Elle se consulte depuis le suivi CHUES.
         </p>
-        <Link href="/chues/prospects" className={cn(buttonVariants({ variant: 'outline' }), 'mt-1')}>
+        <Link
+          href="/chues/prospects"
+          className={cn(buttonVariants({ variant: 'outline' }), 'mt-1')}
+        >
           Ouvrir le suivi CHUES
         </Link>
       </Card>
@@ -73,10 +159,13 @@ export function GrandPublicProspectDetail({ prospect }: { prospect: ProspectRow 
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <Button render={<Link href="/grand-public" />} variant="ghost" className="w-fit -ml-2">
+      <Link
+        href="/grand-public"
+        className={cn(buttonVariants({ variant: 'ghost' }), 'w-fit -ml-2')}
+      >
         <ArrowLeftIcon aria-hidden="true" />
         Prospects Grand Public
-      </Button>
+      </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
@@ -89,9 +178,32 @@ export function GrandPublicProspectDetail({ prospect }: { prospect: ProspectRow 
             {formatPhone(prospect.phoneE164)}
           </a>
         </div>
-        <Badge variant={STATUT_VARIANT[prospect.statut]} className="text-[0.8125rem]">
-          {PROSPECT_STATUT_LABELS[prospect.statut]}
-        </Badge>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Badge variant={STATUT_VARIANT[journey.statut]} className="text-[0.8125rem]">
+            {PROSPECT_STATUT_LABELS[journey.statut]}
+          </Badge>
+          {canEdit && journey.statut !== 'CONVERTI' ? (
+            <>
+              <Button
+                variant={journey.consent === 'INTERESSE' ? 'default' : 'outline'}
+                onClick={() => consent.mutate('INTERESSE')}
+                disabled={consent.isPending}
+              >
+                Intéressé
+              </Button>
+              <Button
+                variant={journey.consent === 'REFUSE' ? 'destructive' : 'outline'}
+                onClick={() => consent.mutate('REFUSE')}
+                disabled={consent.isPending}
+              >
+                Refusé
+              </Button>
+              {journey.consent === 'INTERESSE' ? (
+                <Button onClick={() => setConversionOpen(true)}>Confirmer la conversion</Button>
+              ) : null}
+            </>
+          ) : null}
+        </div>
       </div>
 
       <Card>
@@ -192,6 +304,87 @@ export function GrandPublicProspectDetail({ prospect }: { prospect: ProspectRow 
           </dl>
         </CardContent>
       </Card>
+
+      <Dialog open={conversionOpen} onOpenChange={setConversionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmer la conversion</DialogTitle>
+            <DialogDescription>
+              Associez l’offre retenue et, si connu, son paiement.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="gp-conversion-offer">Offre</Label>
+              <Select value={offerId} onValueChange={setOfferId}>
+                <SelectTrigger id="gp-conversion-offer">
+                  <SelectValue placeholder="Choisir une offre" />
+                </SelectTrigger>
+                <SelectContent>
+                  {offers
+                    .filter((offer) => offer.isActive)
+                    .map((offer) => (
+                      <SelectItem key={offer.id} value={offer.id}>
+                        {offer.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="gp-conversion-payment">Mode de paiement</Label>
+              <Select
+                value={paymentMode}
+                onValueChange={(value) => setPaymentMode(value as PaymentMode)}
+              >
+                <SelectTrigger id="gp-conversion-payment">
+                  <SelectValue placeholder="Non renseigné" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="COMPTANT">Comptant</SelectItem>
+                  <SelectItem value="ECHELONNE">Échelonné</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="gp-conversion-amount">Montant (F CFA)</Label>
+                <Input
+                  id="gp-conversion-amount"
+                  type="number"
+                  min="0"
+                  value={amountXof}
+                  onChange={(event) => setAmountXof(event.target.value)}
+                />
+              </div>
+              {paymentMode === 'ECHELONNE' ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="gp-conversion-duration">Durée (mois)</Label>
+                  <Input
+                    id="gp-conversion-duration"
+                    type="number"
+                    min="1"
+                    max="300"
+                    value={durationMonths}
+                    onChange={(event) => setDurationMonths(event.target.value)}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConversionOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => conversion.mutate()}
+              disabled={offerId === null || conversion.isPending}
+            >
+              Confirmer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

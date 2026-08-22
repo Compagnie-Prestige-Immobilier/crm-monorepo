@@ -3,11 +3,13 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/payment_mode.dart';
 import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/call_outcome.dart';
 import 'package:crm_api_client/src/model/bdd_segment.dart';
 import 'package:crm_api_client/src/model/phase2_status.dart';
+import 'package:crm_api_client/src/model/prospect_journey_dto.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -65,6 +67,18 @@ class ProspectDto {
     required this.type,
 
     required this.profession,
+
+    required this.professionId,
+
+    required this.professionIsTeaching,
+
+    required this.incomeBandId,
+
+    required this.incomeBandLabel,
+
+    required this.paymentMode,
+
+    required this.journeys,
 
     required this.dureeSystemeMois,
 
@@ -180,6 +194,29 @@ class ProspectDto {
   @JsonKey(name: r'profession', required: true, includeIfNull: true)
   final String? profession;
 
+  @JsonKey(name: r'professionId', required: true, includeIfNull: true)
+  final String? professionId;
+
+  @JsonKey(name: r'professionIsTeaching', required: true, includeIfNull: true)
+  final bool? professionIsTeaching;
+
+  @JsonKey(name: r'incomeBandId', required: true, includeIfNull: true)
+  final String? incomeBandId;
+
+  @JsonKey(name: r'incomeBandLabel', required: true, includeIfNull: true)
+  final String? incomeBandLabel;
+
+  @JsonKey(
+    name: r'paymentMode',
+    required: true,
+    includeIfNull: true,
+    unknownEnumValue: PaymentMode.unknownDefaultOpenApi,
+  )
+  final PaymentMode? paymentMode;
+
+  @JsonKey(name: r'journeys', required: true, includeIfNull: false)
+  final List<ProspectJourneyDto> journeys;
+
   /// Durée du système de paiement retenue, en MOIS.
   @JsonKey(name: r'dureeSystemeMois', required: true, includeIfNull: true)
   final num? dureeSystemeMois;
@@ -293,6 +330,12 @@ class ProspectDto {
                 ownedByCommercialName,
                 type,
                 profession,
+                professionId,
+                professionIsTeaching,
+                incomeBandId,
+                incomeBandLabel,
+                paymentMode,
+                journeys,
                 dureeSystemeMois,
                 canalProvenanceId,
                 canalProvenanceLabel,
@@ -333,6 +376,12 @@ class ProspectDto {
                 other.ownedByCommercialName,
                 other.type,
                 other.profession,
+                other.professionId,
+                other.professionIsTeaching,
+                other.incomeBandId,
+                other.incomeBandLabel,
+                other.paymentMode,
+                other.journeys,
                 other.dureeSystemeMois,
                 other.canalProvenanceId,
                 other.canalProvenanceLabel,
@@ -379,6 +428,12 @@ class ProspectDto {
         ownedByCommercialName,
         type,
         profession,
+        professionId,
+        professionIsTeaching,
+        incomeBandId,
+        incomeBandLabel,
+        paymentMode,
+        journeys,
         dureeSystemeMois,
         canalProvenanceId,
         canalProvenanceLabel,

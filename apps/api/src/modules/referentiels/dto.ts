@@ -74,6 +74,144 @@ export class CanalProvenanceDto {
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
 
+export class ProfessionDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() code!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty({ type: Boolean }) isTeaching!: boolean;
+  @ApiProperty({ type: Number }) position!: number;
+  @ApiProperty({ type: Boolean }) isActive!: boolean;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
+export class CreateProfessionDto {
+  @ApiProperty({ maxLength: 40 })
+  @IsString()
+  @Matches(/^[A-Z][A-Z0-9_]*$/u)
+  @MaxLength(40)
+  code!: string;
+
+  @ApiProperty({ maxLength: 120 })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  label!: string;
+
+  @ApiPropertyOptional({ type: Boolean, default: false })
+  @IsOptional()
+  @IsBoolean()
+  isTeaching?: boolean;
+
+  @ApiPropertyOptional({ type: Number, minimum: 0, maximum: 9999 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  position?: number;
+
+  @ApiPropertyOptional({ type: Boolean, default: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class UpdateProfessionDto extends PartialType(CreateProfessionDto) {}
+
+export class IncomeBandDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() code!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty({ type: Number, nullable: true }) minXof!: number | null;
+  @ApiProperty({ type: Number, nullable: true }) maxXof!: number | null;
+  @ApiProperty({ type: Number }) position!: number;
+  @ApiProperty({ type: Boolean }) isActive!: boolean;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
+export class CreateIncomeBandDto {
+  @ApiProperty({ maxLength: 40 })
+  @IsString()
+  @Matches(/^[A-Z][A-Z0-9_]*$/u)
+  @MaxLength(40)
+  code!: string;
+
+  @ApiProperty({ maxLength: 80 })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  label!: string;
+
+  @ApiPropertyOptional({ type: Number, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minXof?: number;
+
+  @ApiPropertyOptional({ type: Number, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxXof?: number;
+
+  @ApiPropertyOptional({ type: Number, minimum: 0, maximum: 9999 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  position?: number;
+
+  @ApiPropertyOptional({ type: Boolean, default: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class UpdateIncomeBandDto extends PartialType(CreateIncomeBandDto) {}
+
+export class OfferDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() code!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty({ type: String, nullable: true }) description!: string | null;
+  @ApiProperty({ type: Number }) position!: number;
+  @ApiProperty({ type: Boolean }) isActive!: boolean;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
+export class CreateOfferDto {
+  @ApiProperty({ maxLength: 40 })
+  @IsString()
+  @Matches(/^[A-Z][A-Z0-9_]*$/u)
+  @MaxLength(40)
+  code!: string;
+
+  @ApiProperty({ maxLength: 120 })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  label!: string;
+
+  @ApiPropertyOptional({ maxLength: 500 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @ApiPropertyOptional({ type: Number, minimum: 0, maximum: 9999 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  position?: number;
+
+  @ApiPropertyOptional({ type: Boolean, default: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class UpdateOfferDto extends PartialType(CreateOfferDto) {}
+
 export class CreateCanalProvenanceDto {
   @ApiProperty({ maxLength: 40, description: 'Immuable une fois posé.' })
   @IsString()
@@ -110,7 +248,10 @@ export class UpdateCanalProvenanceDto {
   @Max(9999)
   position?: number;
 
-  @ApiPropertyOptional({ type: Boolean, description: 'Le retirer des listes, jamais le supprimer.' })
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Le retirer des listes, jamais le supprimer.',
+  })
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
@@ -126,6 +267,9 @@ export class ReferentielsBundleDto {
   @ApiProperty({ type: () => [SyndicatDto] }) syndicats!: SyndicatDto[];
   @ApiProperty({ type: () => [DepartementDto] }) departements!: DepartementDto[];
   @ApiProperty({ type: () => [RegionDto] }) regions!: RegionDto[];
+  @ApiProperty({ type: () => [ProfessionDto] }) professions!: ProfessionDto[];
+  @ApiProperty({ type: () => [IncomeBandDto] }) incomeBands!: IncomeBandDto[];
+  @ApiProperty({ type: () => [OfferDto] }) offers!: OfferDto[];
 }
 
 export class ReferentielQueryDto {
