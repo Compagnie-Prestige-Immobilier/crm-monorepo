@@ -14,6 +14,14 @@ enum CampaignScope {
   BDD3(r'BDD3'),
   @JsonValue(r'BDD4')
   BDD4(r'BDD4'),
+  @JsonValue(r'GP1')
+  GP1(r'GP1'),
+  @JsonValue(r'GP2')
+  GP2(r'GP2'),
+  @JsonValue(r'GP3')
+  GP3(r'GP3'),
+  @JsonValue(r'GP4')
+  GP4(r'GP4'),
   @JsonValue(r'ALL')
   ALL(r'ALL'),
   @JsonValue(r'unknown_default_open_api')

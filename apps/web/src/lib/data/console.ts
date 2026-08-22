@@ -42,12 +42,14 @@ export interface ConsolePage {
 export async function fetchConsoleQueue(
   campaignId: string | null,
   client: ApiClient = getApiClient(),
+  projet?: 'CHUES' | 'GRAND_PUBLIC',
 ): Promise<ConsolePage> {
   const page = unwrap(
     await client.GET('/api/v1/prospects', {
       params: {
         query: {
           ...(campaignId === null ? {} : { campaignId }),
+          ...(projet ? { projet } : {}),
           // Une file d'appel ne porte QUE des fiches a appeler. Une fiche close
           // y ferait perdre un tour a l'operatrice: les touches d'issue y sont
           // inertes, et rien ne se consigne. Le bandeau lecture seule reste
@@ -66,10 +68,11 @@ export async function fetchConsoleQueue(
 /** Un téléconseiller ne reçoit que ses campagnes, et `progress` compte SES tâches. */
 export async function fetchConsoleCampaigns(
   client: ApiClient = getApiClient(),
+  projet?: 'CHUES' | 'GRAND_PUBLIC',
 ): Promise<FilterOption[]> {
   const page = unwrap(
     await client.GET('/api/v1/phase2/campaigns', {
-      params: { query: { status: 'ACTIVE', pageSize: 100 } },
+      params: { query: { status: 'ACTIVE', pageSize: 100, ...(projet ? { projet } : {}) } },
     }),
   );
   return page.items.map((campaign) => ({
@@ -113,10 +116,17 @@ export async function fetchCallbacks(
   scope: CallbackScope,
   assignedToId: string | null = null,
   client: ApiClient = getApiClient(),
+  projet?: 'CHUES' | 'GRAND_PUBLIC',
 ): Promise<CallbackList> {
   const list = unwrap(
     await client.GET('/api/v1/phase2/callbacks', {
-      params: { query: { scope, ...(assignedToId === null ? {} : { assignedToId }) } },
+      params: {
+        query: {
+          scope,
+          ...(assignedToId === null ? {} : { assignedToId }),
+          ...(projet ? { projet } : {}),
+        },
+      },
     }),
   );
   return { items: sortCallbacks(list.items), serverTime: list.serverTime };

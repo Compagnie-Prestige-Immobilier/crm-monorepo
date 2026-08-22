@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClockIcon, PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -59,18 +60,20 @@ const EMPTY_TEXT: Record<CallbackScope, { title: string; description: string }> 
 };
 
 export function RappelsView({ canFilter }: { canFilter: boolean }) {
+  const pathname = usePathname();
+  const projet = pathname.startsWith('/grand-public') ? 'GRAND_PUBLIC' : 'CHUES';
   const queryClient = useQueryClient();
   const [scope, setScope] = useState<CallbackScope>('overdue');
   const [assignedToId, setAssignedToId] = useState<string | null>(null);
 
   const overdue = useQuery({
-    queryKey: callbackKeys.list('overdue', assignedToId),
-    queryFn: () => fetchCallbacks('overdue', assignedToId),
+    queryKey: [...callbackKeys.list('overdue', assignedToId), projet],
+    queryFn: () => fetchCallbacks('overdue', assignedToId, undefined, projet),
   });
 
   const list = useQuery({
-    queryKey: callbackKeys.list(scope, assignedToId),
-    queryFn: () => fetchCallbacks(scope, assignedToId),
+    queryKey: [...callbackKeys.list(scope, assignedToId), projet],
+    queryFn: () => fetchCallbacks(scope, assignedToId, undefined, projet),
   });
 
   const teleconseillers = useQuery({

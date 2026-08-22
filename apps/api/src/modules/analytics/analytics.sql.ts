@@ -36,14 +36,24 @@ export function prospectConditions(
     conditions.push(Prisma.sql`p."representantId" = ${filter.representantId}`);
   if (filter.banqueId) conditions.push(Prisma.sql`p."banqueId" = ${filter.banqueId}`);
   if (filter.syndicatId) conditions.push(Prisma.sql`p."syndicatId" = ${filter.syndicatId}`);
-  // Meme population que `buildProspectWhere` : un filtre qui n'agirait que sur
-  // la liste ferait diverger le total du graphique du total du tableau.
-  if (filter.projet) conditions.push(Prisma.sql`p."projet" = ${filter.projet}::"Projet"`);
+  if (filter.projet) {
+    const statut = filter.statut
+      ? Prisma.sql`AND pj."statut" = ${filter.statut}::"ProspectStatut"`
+      : Prisma.empty;
+    conditions.push(
+      Prisma.sql`EXISTS (
+        SELECT 1 FROM "prospect_journeys" pj
+        WHERE pj."prospectId" = p."id"
+          AND pj."projet" = ${filter.projet}::"Projet"
+          ${statut}
+      )`,
+    );
+  }
   if (filter.type) conditions.push(Prisma.sql`p."type" = ${filter.type}::"ProspectType"`);
   if (filter.canalProvenanceId) {
     conditions.push(Prisma.sql`p."canalProvenanceId" = ${filter.canalProvenanceId}`);
   }
-  if (filter.statut) {
+  if (filter.statut && !filter.projet) {
     conditions.push(Prisma.sql`p."statut" = ${filter.statut}::"ProspectStatut"`);
   }
   if (filter.origin) conditions.push(Prisma.sql`p."origin" = ${filter.origin}`);

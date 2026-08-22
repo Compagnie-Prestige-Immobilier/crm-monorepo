@@ -50,6 +50,8 @@ const MATRICE: { method: string; roles: Role[] }[] = [
   { method: 'createCampaign', roles: [Role.ADMIN] },
   { method: 'getCampaign', roles: [Role.ADMIN, Role.SUPERVISEUR] },
   { method: 'closeCampaign', roles: [Role.ADMIN] },
+  { method: 'pauseCampaign', roles: [Role.ADMIN] },
+  { method: 'resumeCampaign', roles: [Role.ADMIN] },
   { method: 'downloadProgramme', roles: [Role.ADMIN, Role.SUPERVISEUR] },
   {
     method: 'downloadRecording',

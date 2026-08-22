@@ -21,6 +21,15 @@ import {
   CreateSyndicatDto,
   DepartementDto,
   IefDto,
+  IncomeBandDto,
+  CreateIncomeBandDto,
+  UpdateIncomeBandDto,
+  ProfessionDto,
+  CreateProfessionDto,
+  UpdateProfessionDto,
+  OfferDto,
+  CreateOfferDto,
+  UpdateOfferDto,
   ReferentielQueryDto,
   ReferentielsBundleDto,
   RegionDto,
@@ -75,6 +84,87 @@ export class ReferentielsController {
   @ApiResponse({ status: 200, type: [CanalProvenanceDto] })
   listCanauxProvenance(@Query() query: ReferentielQueryDto): Promise<CanalProvenanceDto[]> {
     return this.referentiels.listCanauxProvenance(query);
+  }
+
+  @Get('professions')
+  @Roles(...ANY_AUTHENTICATED)
+  @ApiOperation({ operationId: 'listProfessions', summary: 'Liste fermée des professions.' })
+  @ApiResponse({ status: 200, type: [ProfessionDto] })
+  listProfessions(@Query() query: ReferentielQueryDto): Promise<ProfessionDto[]> {
+    return this.referentiels.listProfessions(query);
+  }
+
+  @Post('professions')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ operationId: 'createProfession', summary: 'Ajoute une profession.' })
+  @ApiResponse({ status: 201, type: ProfessionDto })
+  createProfession(@Body() body: CreateProfessionDto): Promise<ProfessionDto> {
+    return this.referentiels.createProfession(body);
+  }
+
+  @Patch('professions/:id')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ operationId: 'updateProfession', summary: 'Modifie une profession.' })
+  @ApiResponse({ status: 200, type: ProfessionDto })
+  updateProfession(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateProfessionDto,
+  ): Promise<ProfessionDto> {
+    return this.referentiels.updateProfession(id, body);
+  }
+
+  @Get('tranches-revenu')
+  @Roles(...ANY_AUTHENTICATED)
+  @ApiOperation({ operationId: 'listIncomeBands', summary: 'Tranches de revenu mensuel.' })
+  @ApiResponse({ status: 200, type: [IncomeBandDto] })
+  listIncomeBands(@Query() query: ReferentielQueryDto): Promise<IncomeBandDto[]> {
+    return this.referentiels.listIncomeBands(query);
+  }
+
+  @Post('tranches-revenu')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ operationId: 'createIncomeBand', summary: 'Ajoute une tranche de revenu.' })
+  @ApiResponse({ status: 201, type: IncomeBandDto })
+  createIncomeBand(@Body() body: CreateIncomeBandDto): Promise<IncomeBandDto> {
+    return this.referentiels.createIncomeBand(body);
+  }
+
+  @Patch('tranches-revenu/:id')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ operationId: 'updateIncomeBand', summary: 'Modifie une tranche de revenu.' })
+  @ApiResponse({ status: 200, type: IncomeBandDto })
+  updateIncomeBand(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateIncomeBandDto,
+  ): Promise<IncomeBandDto> {
+    return this.referentiels.updateIncomeBand(id, body);
+  }
+
+  @Get('offres')
+  @Roles(...ANY_AUTHENTICATED)
+  @ApiOperation({ operationId: 'listOffers', summary: 'Offres proposées au Grand Public.' })
+  @ApiResponse({ status: 200, type: [OfferDto] })
+  listOffers(@Query() query: ReferentielQueryDto): Promise<OfferDto[]> {
+    return this.referentiels.listOffers(query);
+  }
+
+  @Post('offres')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ operationId: 'createOffer', summary: 'Ajoute une offre.' })
+  @ApiResponse({ status: 201, type: OfferDto })
+  createOffer(@Body() body: CreateOfferDto): Promise<OfferDto> {
+    return this.referentiels.createOffer(body);
+  }
+
+  @Patch('offres/:id')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ operationId: 'updateOffer', summary: 'Modifie une offre.' })
+  @ApiResponse({ status: 200, type: OfferDto })
+  updateOffer(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateOfferDto,
+  ): Promise<OfferDto> {
+    return this.referentiels.updateOffer(id, body);
   }
 
   @Roles(Role.ADMIN)

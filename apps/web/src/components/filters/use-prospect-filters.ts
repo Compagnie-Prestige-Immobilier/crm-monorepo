@@ -16,10 +16,12 @@ export function useProspectFilters(): {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const filters = useMemo(
-    () => parseProspectFilters(new URLSearchParams(searchParams.toString())),
-    [searchParams],
-  );
+  const filters = useMemo(() => {
+    const parsed = parseProspectFilters(new URLSearchParams(searchParams.toString()));
+    if (pathname.startsWith('/grand-public')) parsed.projet = 'GRAND_PUBLIC';
+    else if (pathname.startsWith('/chues')) parsed.projet = 'CHUES';
+    return parsed;
+  }, [pathname, searchParams]);
 
   const setFilters = useCallback(
     (patch: Partial<ProspectFilters>) => {

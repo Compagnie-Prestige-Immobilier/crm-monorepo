@@ -4,7 +4,10 @@
 
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/departement_dto.dart';
+import 'package:crm_api_client/src/model/profession_dto.dart';
+import 'package:crm_api_client/src/model/income_band_dto.dart';
 import 'package:crm_api_client/src/model/syndicat_dto.dart';
+import 'package:crm_api_client/src/model/offer_dto.dart';
 import 'package:crm_api_client/src/model/region_dto.dart';
 import 'package:crm_api_client/src/model/banque_dto.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -30,6 +33,12 @@ class ReferentielsBundleDto {
     required this.departements,
 
     required this.regions,
+
+    required this.professions,
+
+    required this.incomeBands,
+
+    required this.offers,
   });
 
   @JsonKey(name: r'banques', required: true, includeIfNull: false)
@@ -44,17 +53,37 @@ class ReferentielsBundleDto {
   @JsonKey(name: r'regions', required: true, includeIfNull: false)
   final List<RegionDto> regions;
 
+  @JsonKey(name: r'professions', required: true, includeIfNull: false)
+  final List<ProfessionDto> professions;
+
+  @JsonKey(name: r'incomeBands', required: true, includeIfNull: false)
+  final List<IncomeBandDto> incomeBands;
+
+  @JsonKey(name: r'offers', required: true, includeIfNull: false)
+  final List<OfferDto> offers;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is ReferentielsBundleDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [banques, syndicats, departements, regions],
+              [
+                banques,
+                syndicats,
+                departements,
+                regions,
+                professions,
+                incomeBands,
+                offers,
+              ],
               [
                 other.banques,
                 other.syndicats,
                 other.departements,
                 other.regions,
+                other.professions,
+                other.incomeBands,
+                other.offers,
               ],
             );
   }
@@ -62,7 +91,15 @@ class ReferentielsBundleDto {
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([banques, syndicats, departements, regions]);
+      mapPropsToHashCode([
+        banques,
+        syndicats,
+        departements,
+        regions,
+        professions,
+        incomeBands,
+        offers,
+      ]);
 
   factory ReferentielsBundleDto.fromJson(Map<String, dynamic> json) =>
       _$ReferentielsBundleDtoFromJson(json);

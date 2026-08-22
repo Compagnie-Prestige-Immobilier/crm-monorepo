@@ -77,9 +77,11 @@ function prismaStub(): MockDb {
 }
 
 describe('scopeLabel', () => {
-  it('garde un libellé distinct pour ALL et les quatre segments', () => {
+  it('garde un libellé distinct pour tous les périmètres', () => {
     expect(scopeLabel(CampaignScope.ALL)).toContain('BDD1');
-    expect(new Set(Object.values(CampaignScope).map(scopeLabel)).size).toBe(5);
+    expect(new Set(Object.values(CampaignScope).map(scopeLabel)).size).toBe(
+      Object.values(CampaignScope).length,
+    );
   });
 });
 

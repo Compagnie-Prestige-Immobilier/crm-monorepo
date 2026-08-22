@@ -10,6 +10,7 @@ import {
   CampaignScope,
   CampaignStatus,
   Prisma,
+  Projet,
   Role,
   SEGMENT_LABELS,
   ScheduledCallbackStatus,
@@ -51,9 +52,25 @@ const RECENT_ATTEMPTS = 20;
 
 /** Libellé lisible du périmètre de campagne. */
 export function scopeLabel(scope: CampaignScope): string {
+  const gpLabels: Partial<Record<CampaignScope, string>> = {
+    GP1: 'GP1 : Fonctionnaire',
+    GP2: 'GP2 : Secteur privé',
+    GP3: 'GP3 : Informel',
+    GP4: 'GP4 : Diaspora',
+  };
+  if (gpLabels[scope]) return gpLabels[scope] as string;
   // ALL n'a pas de libellé de segment : les quatre segments réunis FORMENT la
   // base, sans recouvrement ni trou (voir `segment.ts`).
-  return scope === CampaignScope.ALL ? 'Toutes bases, BDD1 à BDD4' : SEGMENT_LABELS[scope];
+  return scope === CampaignScope.ALL
+    ? 'Toutes bases, BDD1 à BDD4'
+    : SEGMENT_LABELS[scope as keyof typeof SEGMENT_LABELS];
+}
+
+function projectScopeLabel(scope: CampaignScope, projet: Projet): string {
+  if (scope === CampaignScope.ALL && projet === Projet.GRAND_PUBLIC) {
+    return 'Tous les groupes Grand Public';
+  }
+  return scopeLabel(scope);
 }
 
 const emptyProgress = (): CampaignProgressDto => ({ total: 0, open: 0, done: 0, cancelled: 0 });
@@ -93,6 +110,8 @@ export class Phase2CampaignsService {
    * une deuxième campagne qui les distribuerait à quelqu'un d'autre.
    */
   async create(user: AuthenticatedUser, body: CreateCampaignDto): Promise<CampaignDetailDto> {
+    const projet = body.projet ?? Projet.CHUES;
+    this.assertScope(projet, body.scope);
     const commerciaux = await this.resolveCommerciaux(body.commercialIds);
     const seed = newCampaignSeed();
     const spreadDays = body.spreadDays ?? MIN_SPREAD_DAYS;
@@ -102,7 +121,14 @@ export class Phase2CampaignsService {
           const campaign = await tx.callCampaign.create({
             data: {
               name: body.name.trim(),
+              projet,
               scope: body.scope,
+              ...(body.offerId ? { offerId: body.offerId } : {}),
+              audienceFilters: {
+                ...(body.canalProvenanceId ? { canalProvenanceId: body.canalProvenanceId } : {}),
+                ...(body.professionId ? { professionId: body.professionId } : {}),
+                ...(body.incomeBandId ? { incomeBandId: body.incomeBandId } : {}),
+              },
               seed,
               spreadDays,
               createdById: user.id,
@@ -124,7 +150,16 @@ export class Phase2CampaignsService {
           // SQL ici ferait exister une seconde définition de BDD1 : un PDF
           // « BDD1 » cesserait de correspondre au graphique « BDD1 ».
           const eligible = await tx.prospect.findMany({
-            where: eligibleForCampaignWhere(body.scope),
+            where: {
+              AND: [
+                eligibleForCampaignWhere(body.scope, projet),
+                {
+                  ...(body.canalProvenanceId ? { canalProvenanceId: body.canalProvenanceId } : {}),
+                  ...(body.professionId ? { professionId: body.professionId } : {}),
+                  ...(body.incomeBandId ? { incomeBandId: body.incomeBandId } : {}),
+                },
+              ],
+            },
             select: { id: true },
             // Ordre d'entrée déterministe : sans lui, le mélange partirait d'une
             // permutation arbitraire et la graine ne rejouerait plus rien.
@@ -253,6 +288,19 @@ export class Phase2CampaignsService {
     });
   }
 
+  private assertScope(projet: Projet, scope: CampaignScope): void {
+    const grandPublicScope = scope.startsWith('GP');
+    if (
+      (projet === Projet.GRAND_PUBLIC && scope !== CampaignScope.ALL && !grandPublicScope) ||
+      (projet === Projet.CHUES && grandPublicScope)
+    ) {
+      throw new UnprocessableEntityException({
+        code: 'CAMPAIGN_SCOPE_PROJECT_MISMATCH',
+        message: 'Le groupe choisi ne correspond pas au projet de la campagne.',
+      });
+    }
+  }
+
   // Lecture
 
   /**
@@ -271,6 +319,7 @@ export class Phase2CampaignsService {
     const where: Prisma.CallCampaignWhereInput = {
       ...(assignedToId === undefined ? {} : { tasks: { some: { assignedToId } } }),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.projet ? { projet: query.projet } : {}),
       ...(query.scope ? { scope: query.scope } : {}),
       ...(query.createdById ? { createdById: query.createdById } : {}),
       ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
@@ -290,6 +339,7 @@ export class Phase2CampaignsService {
         where,
         include: {
           createdBy: { select: { fullName: true } },
+          offer: { select: { label: true } },
           _count: { select: { commerciaux: true } },
         },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -307,9 +357,11 @@ export class Phase2CampaignsService {
       items: campaigns.map((row): CampaignSummaryDto => ({
         id: row.id,
         name: row.name,
+        projet: row.projet ?? Projet.CHUES,
         scope: row.scope,
-        scopeLabel: scopeLabel(row.scope),
+        scopeLabel: projectScopeLabel(row.scope, row.projet ?? Projet.CHUES),
         status: row.status,
+        offerLabel: row.offer?.label ?? null,
         seed: row.seed,
         createdById: row.createdById,
         createdByName: row.createdBy.fullName,
@@ -332,6 +384,7 @@ export class Phase2CampaignsService {
       where: { id },
       include: {
         createdBy: { select: { fullName: true } },
+        offer: { select: { label: true } },
         commerciaux: {
           orderBy: { position: 'asc' },
           include: { user: { select: { id: true, fullName: true, username: true } } },
@@ -384,9 +437,11 @@ export class Phase2CampaignsService {
     return {
       id: campaign.id,
       name: campaign.name,
+      projet: campaign.projet ?? Projet.CHUES,
       scope: campaign.scope,
-      scopeLabel: scopeLabel(campaign.scope),
+      scopeLabel: projectScopeLabel(campaign.scope, campaign.projet ?? Projet.CHUES),
       status: campaign.status,
+      offerLabel: campaign.offer?.label ?? null,
       seed: campaign.seed,
       createdById: campaign.createdById,
       createdByName: campaign.createdBy.fullName,
@@ -534,6 +589,37 @@ export class Phase2CampaignsService {
     return this.get(id);
   }
 
+  async pause(id: string): Promise<CampaignDetailDto> {
+    const changed = await this.prisma.callCampaign.updateMany({
+      where: { id, status: CampaignStatus.ACTIVE },
+      data: { status: CampaignStatus.PAUSED },
+    });
+    if (changed.count === 0) await this.requireCampaign(id);
+    return this.get(id);
+  }
+
+  async resume(id: string): Promise<CampaignDetailDto> {
+    const changed = await this.prisma.callCampaign.updateMany({
+      where: { id, status: CampaignStatus.PAUSED },
+      data: { status: CampaignStatus.ACTIVE },
+    });
+    if (changed.count === 0) await this.requireCampaign(id);
+    return this.get(id);
+  }
+
+  private async requireCampaign(id: string): Promise<void> {
+    const found = await this.prisma.callCampaign.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!found) {
+      throw new NotFoundException({
+        code: 'PHASE2_CAMPAIGN_NOT_FOUND',
+        message: 'Campagne introuvable.',
+      });
+    }
+  }
+
   // Programme d'un commercial
 
   /**
@@ -558,7 +644,7 @@ export class Phase2CampaignsService {
     const membership = await this.prisma.callCampaignCommercial.findUnique({
       where: { campaignId_userId: { campaignId, userId } },
       include: {
-        campaign: { select: { name: true, scope: true, spreadDays: true } },
+        campaign: { select: { name: true, projet: true, scope: true, spreadDays: true } },
         user: { select: { fullName: true } },
       },
     });
@@ -610,7 +696,10 @@ export class Phase2CampaignsService {
     return {
       campaignName: membership.campaign.name,
       commercialName: membership.user.fullName,
-      segmentLabel: scopeLabel(membership.campaign.scope),
+      segmentLabel: projectScopeLabel(
+        membership.campaign.scope,
+        membership.campaign.projet ?? Projet.CHUES,
+      ),
       rows: tasks.map((task) => ({
         position: task.position,
         shortCode: shortCode(task.prospect.id),

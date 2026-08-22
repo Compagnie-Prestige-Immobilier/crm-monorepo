@@ -24,6 +24,7 @@ import { ProspectsService } from './prospects.service.js';
 import { SegmentChangeService } from './segment-change.service.js';
 import {
   ChangeProspectSegmentDto,
+  ConfirmGrandPublicConversionDto,
   CreateProspectDto,
   MergeProspectsDto,
   ProspectConflictDto,
@@ -33,6 +34,7 @@ import {
   ReassignResultDto,
   SegmentChangeListDto,
   UpdateProspectDto,
+  UpdateGrandPublicConsentDto,
 } from './dto.js';
 
 @ApiTags('prospects')
@@ -100,6 +102,34 @@ export class ProspectsController {
     @Body() body: UpdateProspectDto,
   ): Promise<ProspectDto> {
     return this.prospects.update(user, id, body);
+  }
+
+  @Patch(':id/parcours/grand-public/consentement')
+  @ApiOperation({
+    operationId: 'updateGrandPublicConsent',
+    summary: 'Trace l’accord ou le refus de poursuivre en Grand Public.',
+  })
+  @ApiResponse({ status: 200, type: ProspectDto })
+  updateGrandPublicConsent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateGrandPublicConsentDto,
+  ): Promise<ProspectDto> {
+    return this.prospects.setGrandPublicConsent(user, id, body.consent);
+  }
+
+  @Post(':id/parcours/grand-public/conversion')
+  @ApiOperation({
+    operationId: 'confirmGrandPublicConversion',
+    summary: 'Confirme une vente ou adhésion Grand Public.',
+  })
+  @ApiResponse({ status: 200, type: ProspectDto })
+  confirmGrandPublicConversion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ConfirmGrandPublicConversionDto,
+  ): Promise<ProspectDto> {
+    return this.prospects.confirmGrandPublicConversion(user, id, body);
   }
 
   @Delete(':id')

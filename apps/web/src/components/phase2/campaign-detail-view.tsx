@@ -1,7 +1,16 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { DownloadIcon, LoaderIcon, LockIcon, PhoneIcon, UsersIcon } from 'lucide-react';
+import {
+  DownloadIcon,
+  LoaderIcon,
+  LockIcon,
+  PauseIcon,
+  PhoneIcon,
+  PlayIcon,
+  UsersIcon,
+} from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -25,8 +34,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   closeCampaign,
   fetchCampaign,
+  pauseCampaign,
   programmePdfFileName,
   programmePdfUrl,
+  resumeCampaign,
 } from '@/lib/data/phase2';
 import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -58,6 +69,10 @@ export function CampaignDetailView({
   canManage: boolean;
 }) {
   const queryClient = useQueryClient();
+  const pathname = usePathname();
+  const campaignsHref = pathname.startsWith('/grand-public')
+    ? '/grand-public/campagnes'
+    : '/chues/campagnes';
   const [closing, setClosing] = useState(false);
 
   const { data, isPending, isError, error, refetch } = useQuery({
@@ -82,12 +97,23 @@ export function CampaignDetailView({
     },
   });
 
+  const togglePause = useMutation({
+    mutationFn: (status: 'ACTIVE' | 'PAUSED') =>
+      status === 'ACTIVE' ? pauseCampaign(campaignId) : resumeCampaign(campaignId),
+    onSuccess: (campaign) => {
+      queryClient.setQueryData(queryKeys.campaign(campaignId), campaign);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.campaignsRoot });
+      toast.success(campaign.status === 'PAUSED' ? 'Campagne mise en pause.' : 'Campagne reprise.');
+    },
+    onError: (error) => toastApiError(error, 'Le statut de la campagne n’a pas pu être modifié.'),
+  });
+
   if (isPending) return <CampaignDetailSkeleton />;
 
   if (isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/chues/campagnes">Toutes les campagnes</DetailBackLink>
+        <DetailBackLink href={campaignsHref}>Toutes les campagnes</DetailBackLink>
         <QueryErrorState
           error={error}
           onRetry={() => {
@@ -100,10 +126,11 @@ export function CampaignDetailView({
   }
 
   const isActive = data.status === 'ACTIVE';
+  const isPaused = data.status === 'PAUSED';
 
   return (
     <div className="flex flex-col gap-6">
-      <DetailBackLink href="/chues/campagnes">Toutes les campagnes</DetailBackLink>
+      <DetailBackLink href={campaignsHref}>Toutes les campagnes</DetailBackLink>
 
       <Card className="animate-rise">
         <CardHeader>
@@ -116,6 +143,17 @@ export function CampaignDetailView({
               <Badge variant={isActive ? 'info' : 'secondary'}>
                 {CAMPAIGN_STATUS_LABELS[data.status]}
               </Badge>
+              {(isActive || isPaused) && canManage ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={togglePause.isPending}
+                  onClick={() => togglePause.mutate(data.status as 'ACTIVE' | 'PAUSED')}
+                >
+                  {isActive ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}
+                  {isActive ? 'Mettre en pause' : 'Reprendre'}
+                </Button>
+              ) : null}
               {isActive && canManage ? (
                 <Button
                   type="button"

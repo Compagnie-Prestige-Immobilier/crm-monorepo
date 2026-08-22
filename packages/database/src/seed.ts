@@ -10,6 +10,9 @@ import {
   PrismaClient,
   PrismaPg,
   IEFS,
+  INCOME_BANDS,
+  OFFERS,
+  PROFESSIONS_SENEGAL,
   REGIONS_SENEGAL,
   Role,
   SYNDICATS_SENEGAL,
@@ -118,6 +121,46 @@ async function seedCanauxProvenance(): Promise<void> {
     });
   }
   console.info(`  canaux de provenance : ${String(CANAUX_PROVENANCE.length)}`);
+}
+
+async function seedProspectReferentiels(): Promise<void> {
+  for (const profession of PROFESSIONS_SENEGAL) {
+    await prisma.profession.upsert({
+      where: { code: profession.code },
+      create: profession,
+      update: {
+        label: profession.label,
+        isTeaching: profession.isTeaching,
+        position: profession.position,
+      },
+    });
+  }
+  for (const band of INCOME_BANDS) {
+    await prisma.incomeBand.upsert({
+      where: { code: band.code },
+      create: band,
+      update: {
+        label: band.label,
+        minXof: band.minXof,
+        maxXof: band.maxXof,
+        position: band.position,
+      },
+    });
+  }
+  for (const offer of OFFERS) {
+    await prisma.offer.upsert({
+      where: { code: offer.code },
+      create: offer,
+      update: {
+        label: offer.label,
+        description: offer.description,
+        position: offer.position,
+      },
+    });
+  }
+  console.info(
+    `  professions : ${String(PROFESSIONS_SENEGAL.length)} · revenus : ${String(INCOME_BANDS.length)} · offres : ${String(OFFERS.length)}`,
+  );
 }
 
 async function seedBankWorkflow(): Promise<void> {
@@ -255,6 +298,7 @@ async function main(): Promise<void> {
   await seedBanques();
   await seedSyndicats();
   await seedCanauxProvenance();
+  await seedProspectReferentiels();
   await seedBankWorkflow();
   await seedCallOutcomes();
   await seedVisiteReferentiels();

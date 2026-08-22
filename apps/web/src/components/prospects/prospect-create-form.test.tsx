@@ -6,12 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProspectCreateForm } from '@/components/prospects/prospect-create-form';
 import type * as ProspectsModule from '@/lib/data/prospects';
 import type * as ReferenceModule from '@/lib/data/reference';
+import type * as RepresentantsModule from '@/lib/data/representants';
 import { renderWithQuery } from '@/test/render-query';
 import { routerMock } from '@/test/router-mock';
 import type { ProspectRow } from '@/lib/types';
 
 const create = vi.hoisted(() => vi.fn());
 const reference = vi.hoisted(() => vi.fn());
+const searchRepresentants = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/data/prospects', async () => {
   const actual = await vi.importActual<typeof ProspectsModule>('@/lib/data/prospects');
@@ -23,11 +25,21 @@ vi.mock('@/lib/data/reference', async () => {
   return { ...actual, fetchReferenceData: reference };
 });
 
+vi.mock('@/lib/data/representants', async () => {
+  const actual = await vi.importActual<typeof RepresentantsModule>('@/lib/data/representants');
+  return { ...actual, fetchRepresentants: searchRepresentants };
+});
+
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 beforeEach(() => {
   create.mockReset();
   reference.mockReset();
+  searchRepresentants.mockReset();
+  searchRepresentants.mockResolvedValue({
+    items: [],
+    meta: { total: 0, page: 1, pageSize: 20, pageCount: 1 },
+  });
 });
 
 const created = (over: Partial<ProspectRow> = {}): ProspectRow =>
@@ -87,8 +99,8 @@ describe('les champs obligatoires', () => {
     expect(await screen.findByText('Le prénom est obligatoire.')).toBeTruthy();
     expect(screen.getByText('Le nom est obligatoire.')).toBeTruthy();
     expect(screen.getByText('Le numéro est obligatoire.')).toBeTruthy();
-    expect(screen.getByText('Choisissez une banque.')).toBeTruthy();
-    expect(screen.getByText('Choisissez un syndicat.')).toBeTruthy();
+    expect(screen.queryByText('Choisissez une banque.')).toBeNull();
+    expect(screen.queryByText('Choisissez un syndicat.')).toBeNull();
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -102,7 +114,7 @@ describe('les champs obligatoires', () => {
     await choose('Syndicat', 'SAES');
     await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
 
-    expect(await screen.findByText('Numéro invalide : 9 chiffres attendus.')).toBeTruthy();
+    expect(await screen.findByText('Numéro invalide pour le pays choisi.')).toBeTruthy();
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -130,6 +142,59 @@ describe('les champs obligatoires', () => {
 });
 
 describe('la saisie en rafale', () => {
+  it('enregistre sans banque ni syndicat', async () => {
+    const user = userEvent.setup();
+    create.mockResolvedValue(created());
+    mount();
+    await screen.findByRole('combobox', { name: /Banque/u });
+
+    await fillIdentity('Moussa', 'Fall', '77 123 45 67');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith({
+        prenom: 'Moussa',
+        nom: 'Fall',
+        phone: '+221771234567',
+        representantId: 'rep-1',
+      });
+    });
+  });
+
+  it('cherche un représentant par nom ou numéro et affiche les deux', async () => {
+    const user = userEvent.setup();
+    searchRepresentants.mockResolvedValue({
+      items: [
+        {
+          id: 'rep-2',
+          fullName: 'Aïssatou Ndiaye',
+          phoneE164: '+221781234567',
+          departementName: 'Dakar',
+        },
+      ],
+      meta: { total: 1, page: 1, pageSize: 20, pageCount: 1 },
+    });
+    mount(null);
+    await user.click(await screen.findByRole('combobox', { name: /Représentant/u }));
+    await user.type(screen.getByPlaceholderText('Chercher…'), '781234567');
+
+    expect(await screen.findByText(/Aïssatou Ndiaye - \+221 78 123 45 67/u)).toBeTruthy();
+    expect(searchRepresentants).toHaveBeenLastCalledWith(
+      expect.objectContaining({ search: '781234567' }),
+    );
+  });
+
+  it('propose de créer un représentant absent', async () => {
+    const user = userEvent.setup();
+    mount(null);
+    await user.click(await screen.findByRole('combobox', { name: /Représentant/u }));
+    await user.type(screen.getByPlaceholderText('Chercher…'), 'Awa Fall');
+    await user.click(await screen.findByRole('option', { name: 'Créer « Awa Fall »' }));
+
+    expect(await screen.findByRole('heading', { name: 'Nouveau représentant' })).toBeTruthy();
+    expect(screen.getByLabelText(/Nom complet/u).getAttribute('value')).toBe('Awa Fall');
+  });
+
   it('normalise le numéro et envoie le représentant de l’URL', async () => {
     const user = userEvent.setup();
     create.mockResolvedValue(created());

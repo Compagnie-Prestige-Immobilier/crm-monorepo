@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 
 import { SearchField } from '@/components/filters/search-field';
 import { DeactivateReferentielDialog } from '@/components/referentiels/deactivate-dialog';
+import { OpenReferentialTab } from '@/components/referentiels/open-referential-tab';
 import {
   BanqueFormDialog,
   DepartementFormDialog,
@@ -49,7 +50,14 @@ import { queryKeys } from '@/lib/query-keys';
 import type { Banque, Departement, Syndicat } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-const TABS = ['banques', 'syndicats', 'departements'] as const;
+const TABS = [
+  'banques',
+  'syndicats',
+  'departements',
+  'professions',
+  'incomeBands',
+  'offers',
+] as const;
 
 type ReferentielTab = (typeof TABS)[number];
 
@@ -95,6 +103,9 @@ export function ReferentielsView() {
           <TabsTrigger value="banques">Banques</TabsTrigger>
           <TabsTrigger value="syndicats">Syndicats</TabsTrigger>
           <TabsTrigger value="departements">Départements</TabsTrigger>
+          <TabsTrigger value="professions">Professions</TabsTrigger>
+          <TabsTrigger value="incomeBands">Revenus</TabsTrigger>
+          <TabsTrigger value="offers">Offres</TabsTrigger>
         </TabsList>
 
         <TabsContent value="banques">
@@ -120,6 +131,15 @@ export function ReferentielsView() {
               write('departements', value);
             }}
           />
+        </TabsContent>
+        <TabsContent value="professions">
+          <OpenReferentialTab kind="professions" />
+        </TabsContent>
+        <TabsContent value="incomeBands">
+          <OpenReferentialTab kind="incomeBands" />
+        </TabsContent>
+        <TabsContent value="offers">
+          <OpenReferentialTab kind="offers" />
         </TabsContent>
       </Tabs>
     </div>

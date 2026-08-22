@@ -59,7 +59,7 @@ export function Topbar({ user }: { user: SessionUser }) {
           demandes, dossiers sans mouvement). Celles d'un téléconseiller visent
           l'application mobile, et sa console n'en affiche aucune. */}
       <Link
-        href={HUB_PATH}
+        href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
         className={buttonVariants({ variant: 'ghost', className: 'h-11 gap-2 px-3' })}
       >
         <LayoutGridIcon className="size-5" aria-hidden="true" />

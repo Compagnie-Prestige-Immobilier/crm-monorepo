@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckIcon, ChevronsUpDownIcon, XIcon } from 'lucide-react';
+import { CheckIcon, ChevronsUpDownIcon, PlusIcon, XIcon } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,9 @@ export function FilterCombobox({
   onChange,
   className,
   required = false,
+  onSearchChange,
+  onCreate,
+  filterOptions = true,
 }: {
   label: string;
   placeholder: string;
@@ -34,6 +37,9 @@ export function FilterCombobox({
   onChange: (value: string | null) => void;
   className?: string | undefined;
   required?: boolean;
+  onSearchChange?: ((search: string) => void) | undefined;
+  onCreate?: ((search: string) => void) | undefined;
+  filterOptions?: boolean | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -42,7 +48,10 @@ export function FilterCombobox({
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (open) setSearch('');
+    if (open) {
+      setSearch('');
+      onSearchChange?.('');
+    }
   }, [open]);
 
   const selected = options.find((option) => option.value === value);
@@ -89,7 +98,14 @@ export function FilterCombobox({
               intégralement présente tant que rien n'est tapé.
             */}
             <Command shouldFilter={false}>
-              <CommandInput placeholder="Chercher…" value={search} onValueChange={setSearch} />
+              <CommandInput
+                placeholder="Chercher…"
+                value={search}
+                onValueChange={(next) => {
+                  setSearch(next);
+                  onSearchChange?.(next);
+                }}
+              />
               <CommandList>
                 <CommandEmpty>Aucun résultat.</CommandEmpty>
                 <CommandGroup>
@@ -109,7 +125,9 @@ export function FilterCombobox({
 
                   {options
                     .filter((option) =>
-                      matchesSearch(`${option.label} ${option.hint ?? ''}`, search),
+                      filterOptions
+                        ? matchesSearch(`${option.label} ${option.hint ?? ''}`, search)
+                        : true,
                     )
                     .map((option) => (
                       <CommandItem
@@ -135,6 +153,19 @@ export function FilterCombobox({
                         ) : null}
                       </CommandItem>
                     ))}
+
+                  {onCreate !== undefined && search.trim() !== '' ? (
+                    <CommandItem
+                      value={`__creer__ ${search}`}
+                      onSelect={() => {
+                        onCreate(search.trim());
+                        setOpen(false);
+                      }}
+                    >
+                      <PlusIcon className="size-4 shrink-0" aria-hidden="true" />
+                      Créer « {search.trim()} »
+                    </CommandItem>
+                  ) : null}
                 </CommandGroup>
               </CommandList>
             </Command>

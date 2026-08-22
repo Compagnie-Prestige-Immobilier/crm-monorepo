@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/payment_mode.dart';
 import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
@@ -41,6 +42,12 @@ class CreateProspectDto {
     this.type,
 
     this.profession,
+
+    this.professionId,
+
+    this.incomeBandId,
+
+    this.paymentMode,
 
     this.dureeSystemeMois,
 
@@ -95,9 +102,25 @@ class CreateProspectDto {
   @JsonKey(name: r'profession', required: false, includeIfNull: false)
   final String? profession;
 
+  /// Profession choisie dans le référentiel.
+  @JsonKey(name: r'professionId', required: false, includeIfNull: false)
+  final String? professionId;
+
+  /// Tranche de revenu mensuel déclaré.
+  @JsonKey(name: r'incomeBandId', required: false, includeIfNull: false)
+  final String? incomeBandId;
+
+  @JsonKey(
+    name: r'paymentMode',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: PaymentMode.unknownDefaultOpenApi,
+  )
+  final PaymentMode? paymentMode;
+
   /// Durée du système de paiement, en MOIS.
   // minimum: 1
-  // maximum: 600
+  // maximum: 300
   @JsonKey(name: r'dureeSystemeMois', required: false, includeIfNull: false)
   final num? dureeSystemeMois;
 
@@ -133,6 +156,9 @@ class CreateProspectDto {
                 projet,
                 type,
                 profession,
+                professionId,
+                incomeBandId,
+                paymentMode,
                 dureeSystemeMois,
                 canalProvenanceId,
                 statut,
@@ -149,6 +175,9 @@ class CreateProspectDto {
                 other.projet,
                 other.type,
                 other.profession,
+                other.professionId,
+                other.incomeBandId,
+                other.paymentMode,
                 other.dureeSystemeMois,
                 other.canalProvenanceId,
                 other.statut,
@@ -171,6 +200,9 @@ class CreateProspectDto {
         projet,
         type,
         profession,
+        professionId,
+        incomeBandId,
+        paymentMode,
         dureeSystemeMois,
         canalProvenanceId,
         statut,

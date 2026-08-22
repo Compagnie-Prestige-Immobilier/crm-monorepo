@@ -5,6 +5,9 @@ import { EMPTY_FILTERS } from '@/lib/filters';
 import { RETIRED_SUFFIX, type ProspectFilters, type ReferenceData } from '@/lib/types';
 
 const REFERENCE: ReferenceData = {
+  professions: [],
+  incomeBands: [],
+  offers: [],
   regions: [],
   iefs: [],
   departements: [

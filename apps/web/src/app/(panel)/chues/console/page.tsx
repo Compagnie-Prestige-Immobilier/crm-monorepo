@@ -20,8 +20,8 @@ export default async function ConsolePage() {
 
   const queryClient = getQueryClient();
   await queryClient.prefetchQuery({
-    queryKey: consoleKeys.queue(null),
-    queryFn: () => fetchConsoleQueue(null, getServerApiClient()),
+    queryKey: [...consoleKeys.queue(null), 'CHUES'],
+    queryFn: () => fetchConsoleQueue(null, getServerApiClient(), 'CHUES'),
   });
 
   return (
