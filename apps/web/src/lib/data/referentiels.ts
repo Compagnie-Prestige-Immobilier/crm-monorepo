@@ -4,7 +4,7 @@ import { unwrap } from '@crm/api-client/query';
 import { getApiClient } from '@/lib/api/browser';
 import { toFilterQuery } from '@/lib/api/query-params';
 import { EMPTY_FILTERS } from '@/lib/filters';
-import type { Banque, Departement, Syndicat } from '@/lib/types';
+import type { Banque, Departement, IncomeBand, Offer, Profession, Syndicat } from '@/lib/types';
 
 export type CreateBanqueInput = components['schemas']['CreateBanqueDto'];
 export type UpdateBanqueInput = components['schemas']['UpdateBanqueDto'];
@@ -12,6 +12,54 @@ export type CreateSyndicatInput = components['schemas']['CreateSyndicatDto'];
 export type UpdateSyndicatInput = components['schemas']['UpdateSyndicatDto'];
 export type CreateDepartementInput = components['schemas']['CreateDepartementDto'];
 export type UpdateDepartementInput = components['schemas']['UpdateDepartementDto'];
+
+export async function saveProfession(
+  input: components['schemas']['CreateProfessionDto'] & { id?: string },
+  client: ApiClient = getApiClient(),
+): Promise<Profession> {
+  const { id, ...body } = input;
+  if (id) {
+    return unwrap(
+      await client.PATCH('/api/v1/referentiels/professions/{id}', {
+        params: { path: { id } },
+        body,
+      }),
+    );
+  }
+  return unwrap(await client.POST('/api/v1/referentiels/professions', { body }));
+}
+
+export async function saveIncomeBand(
+  input: components['schemas']['CreateIncomeBandDto'] & { id?: string },
+  client: ApiClient = getApiClient(),
+): Promise<IncomeBand> {
+  const { id, ...body } = input;
+  if (id) {
+    return unwrap(
+      await client.PATCH('/api/v1/referentiels/tranches-revenu/{id}', {
+        params: { path: { id } },
+        body,
+      }),
+    );
+  }
+  return unwrap(await client.POST('/api/v1/referentiels/tranches-revenu', { body }));
+}
+
+export async function saveOffer(
+  input: components['schemas']['CreateOfferDto'] & { id?: string },
+  client: ApiClient = getApiClient(),
+): Promise<Offer> {
+  const { id, ...body } = input;
+  if (id) {
+    return unwrap(
+      await client.PATCH('/api/v1/referentiels/offres/{id}', {
+        params: { path: { id } },
+        body,
+      }),
+    );
+  }
+  return unwrap(await client.POST('/api/v1/referentiels/offres', { body }));
+}
 
 export async function createBanque(
   input: CreateBanqueInput,

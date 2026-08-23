@@ -136,16 +136,33 @@ enum ProspectType {
   DIASPORA
 }
 
+enum GrandPublicConsent {
+  NON_DEMANDE
+  INTERESSE
+  REFUSE
+}
+
+enum PaymentMode {
+  COMPTANT
+  ECHELONNE
+}
+
 enum CampaignScope {
   BDD1
   BDD2
   BDD3
   BDD4
+  GP1
+  GP2
+  GP3
+  GP4
   ALL
 }
 
 enum CampaignStatus {
+  DRAFT
   ACTIVE
+  PAUSED
   CLOSED
 }
 
@@ -231,11 +248,16 @@ model User {
   auditLogs     AuditLog[]
 
   // Phase 2
-  enrollmentsCaptured Prospect[]               @relation("ProspectEnrollmentCapturedBy")
-  campaignsCreated    CallCampaign[]           @relation("CallCampaignCreatedBy")
-  campaignMemberships CallCampaignCommercial[] @relation("CallCampaignCommercial")
-  callTasksAssigned   CallTask[]               @relation("CallTaskAssignedTo")
-  callAttempts        CallAttempt[]            @relation("CallAttemptPerformedBy")
+  enrollmentsCaptured  Prospect[]               @relation("ProspectEnrollmentCapturedBy")
+  campaignsCreated     CallCampaign[]           @relation("CallCampaignCreatedBy")
+  campaignMemberships  CallCampaignCommercial[] @relation("CallCampaignCommercial")
+  callTasksAssigned    CallTask[]               @relation("CallTaskAssignedTo")
+  callAttempts         CallAttempt[]            @relation("CallAttemptPerformedBy")
+  journeysConsented    ProspectJourney[]        @relation("ProspectJourneyConsentBy")
+  journeysConverted    ProspectJourney[]        @relation("ProspectJourneyConvertedBy")
+  journeysEnrolled     ProspectJourney[]        @relation("ProspectJourneyEnrollmentCapturedBy")
+  journeysClosed       ProspectJourney[]        @relation("ProspectJourneyClosedBy")
+  conversionsConfirmed ProspectConversion[]     @relation("ProspectConversionConfirmedBy")
 
   // Campagnes d'appels aux représentants : module séparé, voir plus bas
   repCampaignsCreated    RepCallCampaign[]           @relation("RepCallCampaignCreatedBy")
@@ -406,20 +428,20 @@ model Syndicat {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Representant {
-  id        String  @id // UUID v7 généré par le client, jamais par la base
-  fullName  String
+  id            String  @id // UUID v7 généré par le client, jamais par la base
+  fullName      String
   /// Le prenom, quand il a ete recueilli separement.
   ///
   /// `fullName` reste la verite affichee : les fiches importees ne portent
   /// qu'un nom complet, et le decouper apres coup se trompe sur les noms
   /// composes. Ce champ ne fait que garder ce que le terrain a precise.
-  prenom    String?
+  prenom        String?
   /// L'etablissement ou il exerce. Ni l'IEF, qui est une circonscription
   /// administrative, ni le departement.
   etablissement String?
   // Unicité posée en index partiel dans la migration, pas ici. Voir l'en-tête.
-  phoneE164 String
-  notes     String?
+  phoneE164     String
+  notes         String?
 
   // Incrémenté à chaque écriture serveur. Sert au client à ignorer une page de
   // pull plus ancienne que ce qu'il a déjà (`WHERE excluded.rev > rev`).
@@ -505,7 +527,63 @@ model CanalProvenance {
   prospects Prospect[]
 
   @@index([isActive, position])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("canaux_provenance")
+}
+
+model Profession {
+  id         String  @id @default(uuid(7))
+  code       String  @unique
+  label      String  @unique
+  isTeaching Boolean @default(false)
+  position   Int     @default(0)
+  isActive   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prospects Prospect[]
+
+  @@index([isActive, position])
+  @@map("professions")
+}
+
+model IncomeBand {
+  id       String  @id @default(uuid(7))
+  code     String  @unique
+  label    String  @unique
+  minXof   Int?
+  maxXof   Int?
+  position Int     @default(0)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prospects Prospect[]
+
+  @@index([isActive, position])
+  @@map("income_bands")
+}
+
+model Offer {
+  id          String  @id @default(uuid(7))
+  code        String  @unique
+  label       String  @unique
+  description String?
+  position    Int     @default(0)
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaigns   CallCampaign[]
+  conversions ProspectConversion[]
+
+  @@index([isActive, position])
+  @@map("offers")
 }
 
 model Prospect {
@@ -540,7 +618,14 @@ model Prospect {
   /// Le metier declare, en clair. Pas un referentiel : la variete du secteur
   /// informel n'en supporterait pas un, et une liste fermee ferait saisir
   /// « autre » partout.
-  profession String?
+  profession    String?
+  professionId  String?
+  professionRef Profession? @relation(fields: [professionId], references: [id], onDelete: Restrict)
+
+  incomeBandId String?
+  incomeBand   IncomeBand? @relation(fields: [incomeBandId], references: [id], onDelete: Restrict)
+
+  paymentMode PaymentMode?
 
   /// Duree du systeme de paiement retenue, en mois.
   ///
@@ -608,6 +693,7 @@ model Prospect {
   clientRequests     ClientCreationRequest[]
 
   segmentChanges SegmentChange[]
+  journeys       ProspectJourney[]
 
   @@index([phoneE164])
   @@index([representantId])
@@ -622,7 +708,10 @@ model Prospect {
   @@index([syndicatId])
   @@index([statut])
   @@index([clientCreatedAt])
-  @@index([updatedAt, id])
+  // Cet index existe en base sous ce nom, et PARTIEL (`WHERE "deletedAt" IS
+  // NULL`) : sans le `map`, un `migrate dev` le remplacerait par un index plein
+  // sur 500 000 lignes.
+  @@index([updatedAt, id], map: "prospects_phase2_directory")
   @@index([deletedAt])
   // Le segment BDD est calculé par croisement (syndicatId, banqueId) : cet
   // index composite sert le filtrage par segment sur 500 000 lignes sans
@@ -630,7 +719,83 @@ model Prospect {
   @@index([syndicatId, banqueId])
   @@index([phase2Status])
   @@index([enrollmentMethod])
+  @@index([professionId])
+  @@index([incomeBandId])
+  // Créés par la migration `20260820160000` et absents d'ici : le prochain
+  // `db:migrate` les aurait SUPPRIMÉS, dont celui du filtre par projet que les
+  // écrans CHUES appliquent systématiquement.
+  @@index([projet])
+  @@index([canalProvenanceId])
   @@map("prospects")
+}
+
+model ProspectJourney {
+  id         String   @id @default(uuid(7))
+  prospectId String
+  prospect   Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  projet     Projet
+
+  statut      ProspectStatut     @default(NOUVEAU)
+  consent     GrandPublicConsent @default(NON_DEMANDE)
+  consentAt   DateTime?
+  consentById String?
+  consentBy   User?              @relation("ProspectJourneyConsentBy", fields: [consentById], references: [id], onDelete: SetNull)
+
+  /// Phase 2 par PARCOURS, et non par fiche.
+  ///
+  /// Portée par `Prospect`, elle rendait un prospect définitivement inappelable
+  /// dans le second projet : refusé en CHUES, la campagne Grand Public le tirait
+  /// quand même et chaque tentative revenait en 409, bloquant sur le téléphone
+  /// toute la partition de file de ce prospect.
+  phase2Status           Phase2Status      @default(PENDING)
+  enrollmentMethod       EnrollmentMethod?
+  enrollmentCapturedAt   DateTime?
+  enrollmentCapturedById String?
+  enrollmentCapturedBy   User?             @relation("ProspectJourneyEnrollmentCapturedBy", fields: [enrollmentCapturedById], references: [id], onDelete: SetNull)
+
+  /// Un parcours ne se SUPPRIME pas — ce serait effacer l'historique d'un projet
+  /// réellement suivi. Fermé, il sort des listes, des campagnes et des
+  /// statistiques, et reste lisible sur la fiche.
+  closedAt     DateTime?
+  closedReason String?
+  closedById   String?
+  closedBy     User?     @relation("ProspectJourneyClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+
+  convertedAt   DateTime?
+  convertedById String?
+  convertedBy   User?     @relation("ProspectJourneyConvertedBy", fields: [convertedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversion ProspectConversion?
+
+  @@unique([prospectId, projet])
+  @@index([projet, statut])
+  @@index([projet, consent])
+  // Le tirage des campagnes croise projet, phase 2 et fermeture : sans cet
+  // index il balaie la table entière à chaque aperçu de périmètre.
+  @@index([projet, phase2Status, closedAt])
+  @@map("prospect_journeys")
+}
+
+model ProspectConversion {
+  id        String          @id @default(uuid(7))
+  journeyId String          @unique
+  journey   ProspectJourney @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  offerId   String?
+  offer     Offer?          @relation(fields: [offerId], references: [id], onDelete: Restrict)
+
+  paymentMode    PaymentMode?
+  amountXof      Int?
+  durationMonths Int?
+
+  confirmedById String
+  confirmedBy   User     @relation("ProspectConversionConfirmedBy", fields: [confirmedById], references: [id], onDelete: Restrict)
+  confirmedAt   DateTime @default(now())
+
+  @@index([offerId, confirmedAt])
+  @@map("prospect_conversions")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -759,9 +924,14 @@ model AuditLog {
 model CallCampaign {
   id     String         @id @default(uuid(7))
   name   String
+  projet Projet         @default(CHUES)
   scope  CampaignScope
   seed   String
   status CampaignStatus @default(ACTIVE)
+
+  offerId         String?
+  offer           Offer?  @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  audienceFilters Json?
 
   /// Nombre de journées sur lesquelles la file de chaque commercial est étalée.
   ///
@@ -785,6 +955,7 @@ model CallCampaign {
   callbacks   ScheduledCallback[]
 
   @@index([status, createdAt])
+  @@index([projet, status, createdAt])
   @@map("call_campaigns")
 }
 
@@ -847,6 +1018,9 @@ model CallTask {
   @@index([prospectId])
   // Le PDF « jour N » d'un commercial lit exactement cette clé.
   @@index([campaignId, assignedToId, dayIndex])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("call_tasks")
 }
 
@@ -993,7 +1167,6 @@ model RepCallCampaign {
   tasks       RepCallTask[]
   attempts    RepCallAttempt[]
 
-
   @@index([status, createdAt])
   @@map("rep_call_campaigns")
 }
@@ -1041,7 +1214,6 @@ model RepCallTask {
 
   attempts RepCallAttempt[]
 
-
   @@unique([campaignId, representantId])
   @@unique([campaignId, assignedToId, position])
   @@index([assignedToId, status])
@@ -1072,7 +1244,6 @@ model RepCallAttempt {
 
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())
-
 
   suggestion RepresentantSuggestion?
 
@@ -1138,7 +1309,6 @@ model ClientCreationRequest {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
 
   // Unicité de la FILE D'ATTENTE (un seul PENDING par numéro) posée en index
   // partiel dans la migration : Prisma ne sait pas exprimer la clause `WHERE`.
@@ -1377,7 +1547,6 @@ model DeviceToken {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-
   @@index([userId, revokedAt])
   @@index([revokedAt])
   @@map("device_tokens")
@@ -1432,7 +1601,6 @@ model NotificationTemplate {
   updatedAt DateTime @updatedAt
 
   notifications Notification[]
-
 
   @@index([category])
   @@map("notification_templates")
@@ -1511,7 +1679,6 @@ model Notification {
 
   deliveries NotificationDelivery[]
 
-
   @@unique([reminderKey, period])
   @@index([status, scheduledFor])
   @@index([createdAt])
@@ -1557,7 +1724,6 @@ model NotificationDelivery {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
 
   @@unique([notificationId, userId])
   @@unique([reminderKey, userId, period])
@@ -1777,7 +1943,6 @@ model RepresentantComment {
   /// Suppression douce, reservee a l'administration.
   deletedAt       DateTime?
 
-
   @@index([representantId, clientCreatedAt])
   @@index([authorId, createdAt])
   @@map("representant_comments")
@@ -1826,7 +1991,6 @@ model RepresentantSuggestion {
   clientCreatedAt DateTime
   createdAt       DateTime  @default(now())
   deletedAt       DateTime?
-
 
   @@index([suggestedPhoneE164])
   @@index([sourceRepresentantId, createdAt])
@@ -1915,6 +2079,9 @@ model VisiteEntreprise {
   visites Visite[]
 
   @@index([isActive, sortOrder])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("visite_entreprises")
 }
 
@@ -1938,6 +2105,9 @@ model VisiteDirection {
   visites Visite[]
 
   @@index([isActive, sortOrder])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("visite_directions")
 }
 
@@ -1961,6 +2131,9 @@ model VisiteDestinataire {
   visites Visite[]
 
   @@index([isActive, sortOrder])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("visite_destinataires")
 }
 
@@ -1980,6 +2153,9 @@ model VisiteObjet {
   visites Visite[]
 
   @@index([isActive, sortOrder])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("visite_objets")
 }
 
@@ -2033,5 +2209,8 @@ model Visite {
   @@index([destinataireId])
   @@index([objetId])
   @@index([createdById])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("visites")
 }

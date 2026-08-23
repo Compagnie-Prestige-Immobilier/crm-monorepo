@@ -177,7 +177,9 @@ export class ImportsService {
       this.prisma.importJob.count({ where }),
       this.prisma.importJob.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        // `id` en second critère : sans lui, deux lignes de même date peuvent
+        // s'échanger entre deux pages et l'une disparaît de la pagination.
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -209,6 +211,9 @@ export class ImportsService {
    * de l'application les remplace, dans la même forme : garder les deux
    * exigerait une seconde colonne, et laisser les anciens compteurs afficherait
    * une progression qui commence à 100 %.
+   *
+   * Sur un travail APPLY déjà ÉCHOUÉ, la même route reprend le fichier là où il
+   * s'est arrêté : voir `resumeFailedApply`.
    */
   async apply(id: string, now = new Date()): Promise<ImportJobDto> {
     const requeued = await this.prisma.importJob.updateMany({
@@ -235,6 +240,13 @@ export class ImportsService {
         failureMsg: null,
       },
     });
+
+    if (requeued.count !== 1 && (await this.resumeFailedApply(id, now)) === 1) {
+      void this.runner.run(id).catch((error: unknown) => {
+        this.logger.error(`Import ${id} : reprise immédiate impossible. ${String(error)}`);
+      });
+      return this.get(id);
+    }
 
     if (requeued.count !== 1) {
       // La lecture n'a lieu QU'APRÈS l'échec de la transition : elle ne sert
@@ -263,6 +275,47 @@ export class ImportsService {
   }
 
   /**
+   * Repart d'une application interrompue, SANS REJOUER CE QUI EST DÉJÀ ÉCRIT.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * UN ÉCHEC À MI-FICHIER LAISSE DES FICHES, PAS UN TRAVAIL PROPRE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Chaque tranche est écrite dans SA transaction, et `processedRows` y est
+   * inscrit avec elle : le compteur ne peut donc ni devancer ni retarder les
+   * fiches créées. Mais un travail `failed` n'était repris par personne — ni le
+   * balayage, qui ne connaît que `queued`/`running`, ni « Appliquer », qui
+   * n'accepte qu'une simulation. Trente mille fiches sur cinquante mille
+   * restaient en base sans aucun chemin pour finir, et redéposer le fichier
+   * butait sur ces trente mille doublons.
+   *
+   * Les compteurs sont donc CONSERVÉS — c'est eux qui portent la position de
+   * reprise — et seul l'échec est effacé. Le moteur reprend à `processedRows`.
+   *
+   * Réservé au mode APPLY : une simulation échouée n'a rien écrit, la redéposer
+   * ne coûte rien et évite de reprendre un rapport partiel.
+   */
+  private async resumeFailedApply(id: string, now: Date): Promise<number> {
+    const resumed = await this.prisma.importJob.updateMany({
+      where: {
+        id,
+        status: ImportStatus.failed,
+        mode: ImportMode.APPLY,
+        expiresAt: { gt: now },
+      },
+      data: {
+        status: ImportStatus.queued,
+        claimToken: null,
+        claimedAt: null,
+        finishedAt: null,
+        failureCode: null,
+        failureMsg: null,
+      },
+    });
+    return resumed.count;
+  }
+
+  /**
    * Détruit les fichiers échus et clôt leur travail.
    *
    * `claimToken` est REMIS À NUL en même temps, et c'est ce qui rend l'échéance
@@ -281,7 +334,10 @@ export class ImportsService {
 
     let closed = 0;
     for (const job of due) {
-      await this.files.remove(job.storagePath);
+      // LA LIGNE D'ABORD, LE FICHIER ENSUITE. Une coupure entre les deux laisse
+      // au pire un fichier orphelin ; dans l'autre ordre elle laisse un travail
+      // qui se dit vivant sans classeur, et le balayage suivant diagnostique un
+      // « fichier illisible » là où la cause est l'échéance.
       const updated = await this.prisma.importJob.updateMany({
         where: { id: job.id, status: { not: ImportStatus.expired } },
         data: {
@@ -292,6 +348,7 @@ export class ImportsService {
         },
       });
       closed += updated.count;
+      await this.files.remove(job.storagePath);
     }
 
     return closed;

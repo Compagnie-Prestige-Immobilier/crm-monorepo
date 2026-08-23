@@ -93,6 +93,7 @@ export function ProspectsTable({
   const columns = useMemo(
     () =>
       prospectColumns({
+        projet: filters.projet,
         canAdminister: canAdminister && !readOnly,
         readOnly,
         onEdit: setEditing,
@@ -100,7 +101,7 @@ export function ProspectsTable({
         onReassign: setReassigning,
         onDelete: setDeleting,
       }),
-    [canAdminister, readOnly],
+    [canAdminister, filters.projet, readOnly],
   );
 
   const table = useReactTable({

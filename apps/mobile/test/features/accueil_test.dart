@@ -5,7 +5,6 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/providers/connectivity.dart';
 import 'package:cpi_go/core/providers/sync_coordinator.dart';
-import 'package:cpi_go/core/sync/api_port.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/data/local/database.dart';
@@ -15,7 +14,6 @@ import 'package:cpi_go/features/accueil/presentation/visite_form_screen.dart';
 import 'package:cpi_go/features/accueil/visites_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
-import 'package:crm_api_client/crm_api_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,29 +44,31 @@ void main() {
 
   tearDown(() async => db.close());
 
-  VisiteReferentielDto liste(String id, String label) => VisiteReferentielDto(
-    id: id,
-    code: label.toUpperCase().replaceAll(' ', '_'),
-    label: label,
-    isActive: true,
-    isSystem: true,
-    sortOrder: 1,
-    updatedAt: midi,
-  );
+  /// Les listes vivent en base, comme en production : c'est le pull qui les
+  /// dépose, plus aucun appel réseau ne les sert.
+  Future<void> seedListes() async {
+    Future<void> poser(String id, String kind, String label) => db
+        .into(db.visiteReferentiels)
+        .insert(
+          VisiteReferentielsCompanion.insert(
+            id: id,
+            kind: kind,
+            code: label.toUpperCase().replaceAll(' ', '_'),
+            label: label,
+            localUpdatedAt: midi,
+          ),
+        );
 
-  final VisiteReferentielsBundleDto listes = VisiteReferentielsBundleDto(
-    entreprises: <VisiteReferentielDto>[liste('e1', 'CPI'), liste('e2', 'SANTARGILE')],
-    directions: <VisiteReferentielDto>[liste('d1', 'COMMERCIALE')],
-    destinataires: <VisiteReferentielDto>[liste('t1', 'MME. NDOYE')],
-    objets: <VisiteReferentielDto>[
-      liste('o1', 'ACHAT TERRAIN'),
-      liste('o2', 'SUIVI DE DOSSIER'),
-    ],
-  );
+    await poser('e1', 'entreprises', 'CPI');
+    await poser('e2', 'entreprises', 'SANTARGILE');
+    await poser('d1', 'directions', 'COMMERCIALE');
+    await poser('t1', 'destinataires', 'MME. NDOYE');
+    await poser('o1', 'objets', 'ACHAT TERRAIN');
+    await poser('o2', 'objets', 'SUIVI DE DOSSIER');
+  }
 
   Widget host(
     Widget screen, {
-    VisitesPort? port,
     WriteRepository? writes,
     bool horsLigne = false,
     String role = 'ACCUEIL',
@@ -77,7 +77,6 @@ void main() {
       overrides: [
         appDatabaseProvider.overrideWithValue(db),
         apiPortProvider.overrideWithValue(api),
-        if (port != null) visitesPortProvider.overrideWithValue(port),
         if (writes != null) writeRepositoryProvider.overrideWithValue(writes),
         clockProvider.overrideWithValue(FakeClock(midi)),
         connectivitySourceProvider.overrideWithValue(
@@ -85,7 +84,9 @@ void main() {
             horsLigne ? ConnectivityResult.none : ConnectivityResult.wifi,
           ),
         ),
-        networkValidationProvider.overrideWithValue(const _FakeValidation(true)),
+        networkValidationProvider.overrideWithValue(
+          const _FakeValidation(true),
+        ),
         syncCoordinatorProvider.overrideWith(_IdleSyncCoordinator.new),
         authControllerProvider.overrideWith(() => _SignedIn(role)),
       ],
@@ -115,7 +116,7 @@ void main() {
         time: '09:12',
         visitorName: 'Awa Ndiaye',
       );
-      await tester.pumpWidget(host(const RegistreScreen(), port: _FakePort(listes)));
+      await tester.pumpWidget(host(const RegistreScreen()));
       await tester.pumpAndSettle();
 
       expect(find.text('Awa Ndiaye'), findsOneWidget);
@@ -126,8 +127,10 @@ void main() {
       await teardownTree(tester);
     });
 
-    testWidgets('un registre vide dit quoi faire ensuite', (WidgetTester tester) async {
-      await tester.pumpWidget(host(const RegistreScreen(), port: _FakePort(listes)));
+    testWidgets('un registre vide dit quoi faire ensuite', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(host(const RegistreScreen()));
       await tester.pumpAndSettle();
 
       expect(find.text('Aucune visite inscrite aujourd\'hui'), findsOneWidget);
@@ -150,7 +153,7 @@ void main() {
         time: '09:12',
         visitorName: 'Awa Ndiaye',
       );
-      await tester.pumpWidget(host(const RegistreScreen(), port: _FakePort(listes)));
+      await tester.pumpWidget(host(const RegistreScreen()));
       await tester.pumpAndSettle();
 
       expect(find.text('Awa Ndiaye'), findsOneWidget);
@@ -169,9 +172,7 @@ void main() {
         time: '09:12',
         visitorName: 'Awa Ndiaye',
       );
-      await tester.pumpWidget(
-        host(const RegistreScreen(), port: _FakePort(listes), horsLigne: true),
-      );
+      await tester.pumpWidget(host(const RegistreScreen(), horsLigne: true));
       // Pas de pumpAndSettle : le pouls de l'indicateur hors ligne tourne en
       // continu et ne se stabilise jamais.
       await tester.pump();
@@ -185,9 +186,7 @@ void main() {
     testWidgets('un compte sans le registre est renvoyé vers la direction', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(
-        host(const RegistreScreen(), port: _FakePort(listes), role: 'COMMERCIAL'),
-      );
+      await tester.pumpWidget(host(const RegistreScreen(), role: 'COMMERCIAL'));
       await tester.pumpAndSettle();
 
       expect(
@@ -200,6 +199,8 @@ void main() {
   });
 
   group('inscription d\'un visiteur', () {
+    setUp(seedListes);
+
     // La colonne du formulaire est plus haute que l'écran de test : un champ
     // jamais amené à l'image n'est pas construit, et `enterText` ne le voit pas.
     Future<void> amener(WidgetTester tester, String champ) async {
@@ -217,7 +218,11 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Future<void> choisir(WidgetTester tester, String champ, String libelle) async {
+    Future<void> choisir(
+      WidgetTester tester,
+      String champ,
+      String libelle,
+    ) async {
       await amener(tester, champ);
       await tester.tap(find.byKey(ValueKey<String>(champ)));
       await tester.pumpAndSettle();
@@ -230,38 +235,41 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('les trois champs obligatoires sont réclamés avant tout envoi', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(host(const VisiteFormScreen(), port: _FakePort(listes)));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'les trois champs obligatoires sont réclamés avant tout envoi',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(host(const VisiteFormScreen()));
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey<String>('visite-enregistrer')));
-      await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey<String>('visite-enregistrer')),
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('À renseigner.'), findsOneWidget);
-      expect(find.text('À choisir dans la liste.'), findsNWidgets(2));
-      expect(await db.select(db.visites).get(), isEmpty);
+        expect(find.text('À renseigner.'), findsOneWidget);
+        expect(find.text('À choisir dans la liste.'), findsNWidgets(2));
+        expect(await db.select(db.visites).get(), isEmpty);
 
-      // Les deux listes renseignées, le nom toujours vide : c'est le seul
-      // moment où l'absence de nom est ce qui retient la visite.
-      await choisir(tester, 'champ-entreprise', 'CPI');
-      await choisir(tester, 'champ-objet', 'ACHAT TERRAIN');
-      await tester.tap(find.byKey(const ValueKey<String>('visite-enregistrer')));
-      await tester.pumpAndSettle();
+        // Les deux listes renseignées, le nom toujours vide : c'est le seul
+        // moment où l'absence de nom est ce qui retient la visite.
+        await choisir(tester, 'champ-entreprise', 'CPI');
+        await choisir(tester, 'champ-objet', 'ACHAT TERRAIN');
+        await tester.tap(
+          find.byKey(const ValueKey<String>('visite-enregistrer')),
+        );
+        await tester.pumpAndSettle();
 
-      expect(await db.select(db.visites).get(), isEmpty);
-      expect(find.text('À renseigner.'), findsOneWidget);
+        expect(await db.select(db.visites).get(), isEmpty);
+        expect(find.text('À renseigner.'), findsOneWidget);
 
-      await teardownTree(tester);
-    });
+        await teardownTree(tester);
+      },
+    );
 
     testWidgets(
       'la visite part hors ligne, avec le jour, l\'heure et le numéro tel quel',
       (WidgetTester tester) async {
-        await tester.pumpWidget(
-          host(const VisiteFormScreen(), port: _FakePort(listes)),
-        );
+        await tester.pumpWidget(host(const VisiteFormScreen()));
         await tester.pumpAndSettle();
 
         await saisir(tester, 'visite-nom', '  Awa Ndiaye  ');
@@ -270,7 +278,9 @@ void main() {
         // Un numéro étranger : la normalisation sénégalaise le refuserait, le
         // registre le garde.
         await saisir(tester, 'visite-telephone', '+33 6 12 34 56 78');
-        await tester.tap(find.byKey(const ValueKey<String>('visite-enregistrer')));
+        await tester.tap(
+          find.byKey(const ValueKey<String>('visite-enregistrer')),
+        );
         await tester.pumpAndSettle();
         await remonter(tester);
 
@@ -306,7 +316,10 @@ void main() {
         expect(find.textContaining('inscrit(e) au registre'), findsOneWidget);
         // Le comptoir enchaîne : le nom repart vide, l'entreprise reste.
         expect(
-          tester.widget<TextField>(find.byKey(const ValueKey<String>('visite-nom')))
+          tester
+              .widget<TextField>(
+                find.byKey(const ValueKey<String>('visite-nom')),
+              )
               .controller
               ?.text,
           '',
@@ -320,15 +333,15 @@ void main() {
     testWidgets('une inscription hors ligne part quand même en file', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(
-        host(const VisiteFormScreen(), port: _FakePort(listes), horsLigne: true),
-      );
+      await tester.pumpWidget(host(const VisiteFormScreen(), horsLigne: true));
       await tester.pumpAndSettle();
 
       await saisir(tester, 'visite-nom', 'Awa Ndiaye');
       await choisir(tester, 'champ-entreprise', 'CPI');
       await choisir(tester, 'champ-objet', 'ACHAT TERRAIN');
-      await tester.tap(find.byKey(const ValueKey<String>('visite-enregistrer')));
+      await tester.tap(
+        find.byKey(const ValueKey<String>('visite-enregistrer')),
+      );
       await tester.pumpAndSettle();
 
       expect(await db.select(db.visites).get(), hasLength(1));
@@ -341,7 +354,7 @@ void main() {
     testWidgets('une direction choisie puis retirée ne part pas en file', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(host(const VisiteFormScreen(), port: _FakePort(listes)));
+      await tester.pumpWidget(host(const VisiteFormScreen()));
       await tester.pumpAndSettle();
 
       await saisir(tester, 'visite-nom', 'Awa Ndiaye');
@@ -349,7 +362,9 @@ void main() {
       await choisir(tester, 'champ-objet', 'ACHAT TERRAIN');
       await choisir(tester, 'champ-direction', 'COMMERCIALE');
       await choisir(tester, 'champ-direction', 'Aucun');
-      await tester.tap(find.byKey(const ValueKey<String>('visite-enregistrer')));
+      await tester.tap(
+        find.byKey(const ValueKey<String>('visite-enregistrer')),
+      );
       await tester.pumpAndSettle();
 
       expect((await db.select(db.visites).get()).single.directionId, isNull);
@@ -357,46 +372,47 @@ void main() {
       await teardownTree(tester);
     });
 
-    testWidgets('le choix de l\'heure s\'ouvre et laisse l\'heure intacte s\'il est annulé', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(host(const VisiteFormScreen(), port: _FakePort(listes)));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'le choix de l\'heure s\'ouvre et laisse l\'heure intacte s\'il est annulé',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(host(const VisiteFormScreen()));
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(TextButton, 'Changer'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Annuler'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(TextButton, 'Changer'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Annuler'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Aujourd\'hui, 09:12'), findsOneWidget);
+        expect(find.text('Aujourd\'hui, 09:12'), findsOneWidget);
 
-      await saisir(tester, 'visite-nom', 'Awa Ndiaye');
-      await choisir(tester, 'champ-entreprise', 'CPI');
-      await choisir(tester, 'champ-objet', 'ACHAT TERRAIN');
-      await tester.tap(find.byKey(const ValueKey<String>('visite-enregistrer')));
-      await tester.pumpAndSettle();
+        await saisir(tester, 'visite-nom', 'Awa Ndiaye');
+        await choisir(tester, 'champ-entreprise', 'CPI');
+        await choisir(tester, 'champ-objet', 'ACHAT TERRAIN');
+        await tester.tap(
+          find.byKey(const ValueKey<String>('visite-enregistrer')),
+        );
+        await tester.pumpAndSettle();
 
-      expect((await db.select(db.visites).get()).single.time, '09:12');
+        expect((await db.select(db.visites).get()).single.time, '09:12');
 
-      await teardownTree(tester);
-    });
+        await teardownTree(tester);
+      },
+    );
 
     testWidgets('un échec d\'écriture s\'affiche et rend le bouton', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        host(
-          const VisiteFormScreen(),
-          port: _FakePort(listes),
-          writes: _BrokenWrites(db),
-        ),
+        host(const VisiteFormScreen(), writes: _BrokenWrites(db)),
       );
       await tester.pumpAndSettle();
 
       await saisir(tester, 'visite-nom', 'Awa Ndiaye');
       await choisir(tester, 'champ-entreprise', 'CPI');
       await choisir(tester, 'champ-objet', 'ACHAT TERRAIN');
-      await tester.tap(find.byKey(const ValueKey<String>('visite-enregistrer')));
+      await tester.tap(
+        find.byKey(const ValueKey<String>('visite-enregistrer')),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -416,53 +432,56 @@ void main() {
       await teardownTree(tester);
     });
 
-    testWidgets('deux appuis sur une écriture lente n\'inscrivent qu\'une visite', (
+    testWidgets(
+      'deux appuis sur une écriture lente n\'inscrivent qu\'une visite',
+      (WidgetTester tester) async {
+        final Completer<String> lent = Completer<String>();
+        await tester.pumpWidget(
+          host(const VisiteFormScreen(), writes: _LenteEcriture(db, lent)),
+        );
+        await tester.pumpAndSettle();
+
+        await saisir(tester, 'visite-nom', 'Awa Ndiaye');
+        await choisir(tester, 'champ-entreprise', 'CPI');
+        await choisir(tester, 'champ-objet', 'ACHAT TERRAIN');
+
+        // Deux appuis dans la MÊME image : l'arbre n'a pas encore été reconstruit,
+        // le bouton est donc toujours actif au second. Sans la garde d'entrée,
+        // deux visites partent.
+        await tester.tap(
+          find.byKey(const ValueKey<String>('visite-enregistrer')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey<String>('visite-enregistrer')),
+        );
+        await tester.pump();
+
+        lent.complete('v-neuve');
+        await tester.pumpAndSettle();
+
+        expect(await db.select(db.visites).get(), hasLength(1));
+
+        await teardownTree(tester);
+      },
+    );
+
+    // Les listes descendent par le pull. Tant qu'elles ne sont pas là,
+    // l'entreprise et l'objet ne peuvent pas être choisis : le formulaire le
+    // dit et bloque, au lieu de laisser enregistrer une fiche incomplète.
+    testWidgets('des listes pas encore descendues bloquent l\'envoi', (
       WidgetTester tester,
     ) async {
-      final Completer<String> lent = Completer<String>();
-      await tester.pumpWidget(
-        host(
-          const VisiteFormScreen(),
-          port: _FakePort(listes),
-          writes: _LenteEcriture(db, lent),
+      await db.delete(db.visiteReferentiels).go();
+
+      await tester.pumpWidget(host(const VisiteFormScreen()));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          'Les listes de l\'accueil ne sont pas encore descendues.',
         ),
+        findsOneWidget,
       );
-      await tester.pumpAndSettle();
-
-      await saisir(tester, 'visite-nom', 'Awa Ndiaye');
-      await choisir(tester, 'champ-entreprise', 'CPI');
-      await choisir(tester, 'champ-objet', 'ACHAT TERRAIN');
-
-      // Deux appuis dans la MÊME image : l'arbre n'a pas encore été reconstruit,
-      // le bouton est donc toujours actif au second. Sans la garde d'entrée,
-      // deux visites partent.
-      await tester.tap(find.byKey(const ValueKey<String>('visite-enregistrer')));
-      await tester.tap(find.byKey(const ValueKey<String>('visite-enregistrer')));
-      await tester.pump();
-
-      lent.complete('v-neuve');
-      await tester.pumpAndSettle();
-
-      expect(await db.select(db.visites).get(), hasLength(1));
-
-      await teardownTree(tester);
-    });
-
-    testWidgets('des listes illisibles bloquent l\'envoi en le disant', (
-      WidgetTester tester,
-    ) async {
-      final _FakePort port = _FakePort(
-        listes,
-        echecListes: const ApiException(
-          'NETWORK',
-          message: 'Réseau indisponible.',
-          kind: FailureKind.unreachable,
-        ),
-      );
-      await tester.pumpWidget(host(const VisiteFormScreen(), port: port));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('Les listes de l\'accueil manquent.'), findsOneWidget);
       expect(
         tester
             .widget<FilledButton>(
@@ -472,10 +491,37 @@ void main() {
         isNull,
       );
 
-      port.echecListes = null;
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Réessayer'));
+      // Le pull les dépose : l'écran suit la base, sans qu'on le relance.
+      await seedListes();
       await tester.pumpAndSettle();
 
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const ValueKey<String>('visite-enregistrer')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+
+      await teardownTree(tester);
+    });
+
+    // Le point de tout ce dispositif : sans réseau, l'accueil doit pouvoir
+    // inscrire. Les listes viennent de la base, pas d'un appel.
+    testWidgets('hors ligne, le formulaire propose quand même ses listes', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(host(const VisiteFormScreen(), horsLigne: true));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(
+        find.textContaining(
+          'Les listes de l\'accueil ne sont pas encore descendues.',
+        ),
+        findsNothing,
+      );
       expect(
         tester
             .widget<FilledButton>(
@@ -490,29 +536,18 @@ void main() {
   });
 
   group('accès au registre', () {
-    test('les trois rôles du registre, et personne d\'autre', () {
+    /// La DIRECTION relit le registre au PANNEAU. `/sync` lui est fermé côté
+    /// serveur, en toutes lettres (`role-routes.test.ts`) : lui ouvrir la
+    /// tuile ici lui promettrait une saisie qui ne remonterait jamais.
+    test('le comptoir et l\'administration, personne d\'autre', () {
       expect(peutTenirLeRegistre('ACCUEIL'), isTrue);
-      expect(peutTenirLeRegistre('DIRECTION'), isTrue);
       expect(peutTenirLeRegistre('ADMIN'), isTrue);
+      expect(peutTenirLeRegistre('DIRECTION'), isFalse);
       expect(peutTenirLeRegistre('SUPERVISEUR'), isFalse);
       expect(peutTenirLeRegistre('COMMERCIAL'), isFalse);
       expect(peutTenirLeRegistre(null), isFalse);
     });
   });
-}
-
-class _FakePort implements VisitesPort {
-  _FakePort(this.listes, {this.echecListes});
-
-  final VisiteReferentielsBundleDto listes;
-  Object? echecListes;
-
-  @override
-  Future<VisiteReferentielsBundleDto> referentiels() async {
-    final Object? echec = echecListes;
-    if (echec != null) throw echec;
-    return listes;
-  }
 }
 
 /// Une base qui refuse l'inscription.
@@ -590,7 +625,9 @@ class _FakeSource implements ConnectivitySource {
   final ConnectivityResult _result;
 
   @override
-  Future<List<ConnectivityResult>> current() async => <ConnectivityResult>[_result];
+  Future<List<ConnectivityResult>> current() async => <ConnectivityResult>[
+    _result,
+  ];
 
   @override
   Stream<List<ConnectivityResult>> changes() =>

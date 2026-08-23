@@ -188,7 +188,10 @@ void main() {
     testWidgets('rien ne s\'affiche quand le dernier cycle est passé', (
       WidgetTester tester,
     ) async {
-      await paint(tester, await host(const CorrectionsScreen(), const SyncUiState()));
+      await paint(
+        tester,
+        await host(const CorrectionsScreen(), const SyncUiState()),
+      );
 
       expect(find.textContaining('portail Wi-Fi'), findsNothing);
       await unmount(tester);

@@ -16,7 +16,9 @@ import '../../../ui/widgets/sync_badge.dart';
 import '../campagnes.dart';
 
 class CampagnesScreen extends ConsumerWidget {
-  const CampagnesScreen({super.key});
+  const CampagnesScreen({super.key, this.grandPublic = false});
+
+  final bool grandPublic;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,7 +33,12 @@ class CampagnesScreen extends ConsumerWidget {
             SizedBox(width: CpiSpacing.xs),
           ],
         ),
-        body: _corps(ref.watch(campagnesProvider)),
+        body: _corps(
+          ref.watch(
+            grandPublic ? grandPublicCampagnesProvider : campagnesProvider,
+          ),
+          grandPublic: grandPublic,
+        ),
       ),
     );
   }
@@ -39,7 +46,10 @@ class CampagnesScreen extends ConsumerWidget {
   /// L'échec passe AVANT le chargement : Riverpod réessaie indéfiniment une
   /// lecture en défaut, et `when(error:)` laisserait tourner l'indicateur sans
   /// jamais dire au téléconseiller ce qui s'est passé.
-  static Widget _corps(AsyncValue<List<CampaignsWithOpenWorkResult>> campagnes) {
+  static Widget _corps(
+    AsyncValue<List<CampaignsWithOpenWorkResult>> campagnes, {
+    required bool grandPublic,
+  }) {
     final Object? erreur = campagnes.error;
     if (erreur != null) {
       return Padding(
@@ -58,6 +68,7 @@ class CampagnesScreen extends ConsumerWidget {
         child: _CampagneTile(
           key: ValueKey<String>(list[index].id),
           campagne: list[index],
+          grandPublic: grandPublic,
         ),
       ),
     );
@@ -65,21 +76,36 @@ class CampagnesScreen extends ConsumerWidget {
 }
 
 class _CampagneTile extends StatelessWidget {
-  const _CampagneTile({super.key, required this.campagne});
+  const _CampagneTile({
+    super.key,
+    required this.campagne,
+    required this.grandPublic,
+  });
 
   final CampaignsWithOpenWorkResult campagne;
+  final bool grandPublic;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     return ListTile(
-      leading: const Icon(PhosphorIconsDuotone.phoneList, size: 28),
+      leading: const Icon(
+        PhosphorIconsDuotone.phoneList,
+        size: CpiIconSize.xxl,
+      ),
       title: Text(campagne.name, style: theme.textTheme.titleSmall),
       subtitle: Text(resteALire(campagne.ouvertes, campagne.spreadDays)),
-      trailing: const Icon(PhosphorIconsRegular.caretRight, size: 20),
+      trailing: const Icon(
+        PhosphorIconsRegular.caretRight,
+        size: CpiIconSize.md,
+      ),
       onTap: () {
         unawaited(HapticFeedback.selectionClick());
-        context.pushOnce(CampagnesRoutes.fileFor(campagne.id));
+        context.pushOnce(
+          grandPublic
+              ? CampagnesRoutes.grandPublicFileFor(campagne.id)
+              : CampagnesRoutes.fileFor(campagne.id),
+        );
       },
     );
   }
@@ -104,7 +130,7 @@ class _AucuneCampagne extends ConsumerWidget {
         children: <Widget>[
           Icon(
             PhosphorIconsDuotone.phoneList,
-            size: 56,
+            size: CpiIconSize.display,
             color: theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: CpiSpacing.md),
@@ -121,7 +147,10 @@ class _AucuneCampagne extends ConsumerWidget {
           FilledButton.icon(
             onPressed: () =>
                 unawaited(ref.read(syncCoordinatorProvider.notifier).run()),
-            icon: const Icon(PhosphorIconsRegular.arrowsClockwise, size: 20),
+            icon: const Icon(
+              PhosphorIconsRegular.arrowsClockwise,
+              size: CpiIconSize.md,
+            ),
             label: const Text('Synchroniser'),
           ),
         ],

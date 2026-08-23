@@ -3,6 +3,7 @@ import type { Writable } from 'node:stream';
 import PDFDocument from 'pdfkit';
 
 import { CPI_BURGUNDY, CPI_RULE_GREY, CPI_ZEBRA, cpiLogo } from '../../common/brand.js';
+import { ENROLLMENT_METHOD_LABELS, ENROLLMENT_METHOD_ORDER } from '../prospects/phase2-labels.js';
 import { outcomeEffectRule } from '../referentiels/call-outcome-rules.js';
 
 export interface ProgrammeRow {
@@ -30,7 +31,9 @@ export interface ProgrammeData {
   readonly checkboxGroups: readonly CheckboxGroup[];
 }
 
-const METHOD_LABELS = ['Plateforme', 'Physique', 'Voix ou messagerie électronique'] as const;
+const METHOD_LABELS: readonly string[] = ENROLLMENT_METHOD_ORDER.map(
+  (method) => ENROLLMENT_METHOD_LABELS[method],
+);
 
 /**
  * Les cases « Autre » sortent du référentiel : figées ici, elles mentiraient
@@ -62,6 +65,8 @@ const BOX_LABEL_GAP = 4;
 const CHECKBOX_GAP = 9;
 
 const ROW_HEIGHT = 46;
+const CHECKBOX_LINE_HEIGHT = BOX_SIZE + 7;
+const CHECKBOX_TOP_PAD = 7;
 
 const BAND_HEIGHT = 76;
 
@@ -72,6 +77,10 @@ const COLUMN_HEADER_HEIGHT = 26;
 const FOOTER_SPACE = 22;
 
 const TEXT_PAD = 7;
+
+const META_LINE_STEP = 15;
+const COMMENT_CAPTION = 'Commentaire';
+const COMMENT_RULE_MIN = 40;
 
 interface Column {
   readonly key: 'order' | 'code' | 'phone' | 'result';
@@ -134,6 +143,48 @@ function checkboxRow(doc: Doc, x: number, y: number, labels: readonly string[]):
   return cursor;
 }
 
+interface ResultLine {
+  readonly caption: string;
+  readonly labels: string[];
+}
+
+interface ResultLayout {
+  readonly captionWidth: number;
+  readonly lines: readonly ResultLine[];
+  readonly height: number;
+}
+
+/** Les motifs viennent de la base : la ligne se replie au lieu d'écrire hors page. */
+function layoutResultCell(doc: Doc, groups: readonly CheckboxGroup[], width: number): ResultLayout {
+  doc.font('Helvetica').fontSize(CHECKBOX_SIZE);
+  const captionWidth = Math.max(...groups.map((group) => doc.widthOfString(group.caption)), 0) + 8;
+  const available =
+    width - captionWidth - doc.widthOfString(COMMENT_CAPTION) - 10 - COMMENT_RULE_MIN;
+
+  const lines: ResultLine[] = [];
+  for (const group of groups) {
+    let line: ResultLine = { caption: group.caption, labels: [] };
+    let used = 0;
+    for (const label of group.options) {
+      const cost = BOX_SIZE + BOX_LABEL_GAP + doc.widthOfString(label) + CHECKBOX_GAP;
+      if (line.labels.length > 0 && used + cost > available) {
+        lines.push(line);
+        line = { caption: '', labels: [] };
+        used = 0;
+      }
+      line.labels.push(label);
+      used += cost;
+    }
+    lines.push(line);
+  }
+
+  return {
+    captionWidth,
+    lines,
+    height: CHECKBOX_TOP_PAD + lines.length * CHECKBOX_LINE_HEIGHT + 1,
+  };
+}
+
 function drawBand(doc: Doc, data: ProgrammeData): void {
   const width = doc.page.width;
   doc.rect(0, 0, width, BAND_HEIGHT + MARGIN).fill(CPI_BURGUNDY);
@@ -151,10 +202,13 @@ function drawBand(doc: Doc, data: ProgrammeData): void {
 
   const metaWidth = width - textLeft - MARGIN;
   doc.font('Helvetica').fontSize(11).fillColor('#f3e4e7');
+  // pdfkit ne tronque à l'ellipse que si `height` est fourni : sans lui la ligne
+  // se replie et recouvre la suivante dès qu'un nom de campagne est long.
   for (const [index, line] of metaLines(data).entries()) {
-    doc.text(line, textLeft, 47 + index * 15, {
+    doc.text(line, textLeft, 47 + index * META_LINE_STEP, {
       lineBreak: false,
       width: metaWidth,
+      height: META_LINE_STEP,
       ellipsis: true,
     });
   }
@@ -218,32 +272,33 @@ function drawRow(
   y: number,
   row: ProgrammeRow,
   index: number,
-  groups: readonly CheckboxGroup[],
+  layout: ResultLayout,
+  rowHeight: number,
 ): void {
   const bounds = columnBounds(doc.page.width);
   const left = MARGIN;
   const right = doc.page.width - MARGIN;
 
   if (index % 2 === 1) {
-    doc.rect(left, y, right - left, ROW_HEIGHT).fill(CPI_ZEBRA);
+    doc.rect(left, y, right - left, rowHeight).fill(CPI_ZEBRA);
   }
 
   doc.lineWidth(0.5);
   for (const x of verticals(bounds, right)) {
     doc
       .moveTo(x, y)
-      .lineTo(x, y + ROW_HEIGHT)
+      .lineTo(x, y + rowHeight)
       .stroke(CPI_RULE_GREY);
   }
   doc
-    .moveTo(left, y + ROW_HEIGHT)
-    .lineTo(right, y + ROW_HEIGHT)
+    .moveTo(left, y + rowHeight)
+    .lineTo(right, y + rowHeight)
     .stroke(CPI_RULE_GREY);
 
   const cell = (key: Column['key']): number =>
     bounds.find((bound) => bound.column.key === key)?.left ?? MARGIN;
 
-  const textY = y + (ROW_HEIGHT - BODY_SIZE) / 2 - 1;
+  const textY = y + (rowHeight - BODY_SIZE) / 2 - 1;
   doc.font('Helvetica').fontSize(BODY_SIZE).fillColor('#111111');
   doc.text(String(row.position), cell('order') + TEXT_PAD, textY, { lineBreak: false });
   doc
@@ -255,7 +310,7 @@ function drawRow(
     .fillColor('#111111')
     .text(row.phoneE164, cell('phone') + TEXT_PAD, textY, { lineBreak: false });
 
-  drawResultCell(doc, y, cell('result') + TEXT_PAD, right - TEXT_PAD, groups);
+  drawResultCell(doc, y, cell('result') + TEXT_PAD, right - TEXT_PAD, layout);
 }
 
 function drawResultCell(
@@ -263,24 +318,26 @@ function drawResultCell(
   y: number,
   left: number,
   right: number,
-  groups: readonly CheckboxGroup[],
+  layout: ResultLayout,
 ): void {
   doc.font('Helvetica').fontSize(CHECKBOX_SIZE);
 
-  const captionWidth = Math.max(...groups.map((group) => doc.widthOfString(group.caption)), 0) + 8;
+  let lineY = y + CHECKBOX_TOP_PAD;
+  let afterBoxes = left + layout.captionWidth;
 
-  let lineY = y + 7;
-  let afterBoxes = left + captionWidth;
-
-  for (const group of groups) {
-    doc.fillColor('#7a6b6e').text(group.caption, left, lineY + 2, { lineBreak: false });
-    afterBoxes = checkboxRow(doc, left + captionWidth, lineY, group.options);
-    lineY += BOX_SIZE + 7;
+  for (const line of layout.lines) {
+    if (line.caption !== '') {
+      doc.fillColor('#7a6b6e').text(line.caption, left, lineY + 2, { lineBreak: false });
+    }
+    afterBoxes = checkboxRow(doc, left + layout.captionWidth, lineY, line.labels);
+    lineY += CHECKBOX_LINE_HEIGHT;
   }
 
-  const commentY = lineY - BOX_SIZE - 7;
-  doc.fillColor('#7a6b6e').text('Commentaire', afterBoxes + 4, commentY + 2, { lineBreak: false });
-  const ruleStart = afterBoxes + 4 + doc.widthOfString('Commentaire') + 6;
+  const commentY = lineY - CHECKBOX_LINE_HEIGHT;
+  doc.fillColor('#7a6b6e').text(COMMENT_CAPTION, afterBoxes + 4, commentY + 2, {
+    lineBreak: false,
+  });
+  const ruleStart = afterBoxes + 4 + doc.widthOfString(COMMENT_CAPTION) + 6;
   if (ruleStart < right) {
     doc
       .lineWidth(0.5)
@@ -319,12 +376,21 @@ export function writeProgrammePdf(
       resolve();
     });
 
-    const groups = data.checkboxGroups;
+    const bounds = columnBounds(doc.page.width);
+    const resultLeft =
+      (bounds.find((bound) => bound.column.key === 'result')?.left ?? MARGIN) + TEXT_PAD;
+    const layout = layoutResultCell(
+      doc,
+      data.checkboxGroups,
+      doc.page.width - MARGIN - TEXT_PAD - resultLeft,
+    );
+    const rowHeight = Math.max(ROW_HEIGHT, layout.height);
+
     const bottom = doc.page.height - MARGIN - FOOTER_SPACE;
     const firstTop = MARGIN + BAND_HEIGHT + BAND_GAP;
 
-    const firstCapacity = capacity(bottom, firstTop);
-    const otherCapacity = capacity(bottom, MARGIN);
+    const firstCapacity = capacity(bottom, firstTop, rowHeight);
+    const otherCapacity = capacity(bottom, MARGIN, rowHeight);
     const totalPages =
       data.rows.length <= firstCapacity
         ? 1
@@ -360,8 +426,8 @@ export function writeProgrammePdf(
         capacityHere = otherCapacity;
         footer();
       }
-      drawRow(doc, y, row, index, groups);
-      y += ROW_HEIGHT;
+      drawRow(doc, y, row, index, layout, rowHeight);
+      y += rowHeight;
       placed += 1;
     }
 
@@ -379,5 +445,5 @@ export function writeProgrammePdf(
   });
 }
 
-const capacity = (bottom: number, top: number): number =>
-  Math.max(1, Math.floor((bottom - top - COLUMN_HEADER_HEIGHT) / ROW_HEIGHT));
+const capacity = (bottom: number, top: number, rowHeight: number): number =>
+  Math.max(1, Math.floor((bottom - top - COLUMN_HEADER_HEIGHT) / rowHeight));

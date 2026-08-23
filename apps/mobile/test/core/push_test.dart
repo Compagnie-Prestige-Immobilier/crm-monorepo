@@ -26,7 +26,8 @@ void main() {
         if (entity is! File || !entity.path.endsWith('.dart')) continue;
         for (final String line in entity.readAsLinesSync()) {
           final String trimmed = line.trim();
-          if (!trimmed.startsWith('import ') && !trimmed.startsWith('export ')) {
+          if (!trimmed.startsWith('import ') &&
+              !trimmed.startsWith('export ')) {
             continue;
           }
           if (trimmed.contains('package:flutter/') ||
@@ -49,7 +50,9 @@ void main() {
       // « Notifications indisponibles » et la permission POST_NOTIFICATIONS,
       // sans que rien ne le signale avant le prochain build Android.
       final List<String> offenders = <String>[];
-      for (final FileSystemEntity entity in Directory('lib').listSync(recursive: true)) {
+      for (final FileSystemEntity entity in Directory(
+        'lib',
+      ).listSync(recursive: true)) {
         if (entity is! File || !entity.path.endsWith('.dart')) continue;
         for (final String line in entity.readAsLinesSync()) {
           if (line.trim().startsWith('import ') && line.contains('firebase')) {
@@ -88,23 +91,32 @@ void main() {
     test('ignore un message sans identifiant', () {
       // Sans identifiant il n'y a rien à dédupliquer ni à marquer lu : une
       // ligne fantôme dans la boîte de réception vaut moins que rien.
-      expect(PushMessage.fromData(<String, String>{'route': '/phase2'}), isNull);
-      expect(PushMessage.fromData(<String, String>{'notificationId': ''}), isNull);
+      expect(
+        PushMessage.fromData(<String, String>{'route': '/phase2'}),
+        isNull,
+      );
+      expect(
+        PushMessage.fromData(<String, String>{'notificationId': ''}),
+        isNull,
+      );
     });
 
-    test('ne retombe PAS sur `data` : le serveur n\'y met ni titre ni corps', () {
-      // Ce repli n'a jamais eu de source. `data['title']` et `data['body']`
-      // n'existent dans aucun message émis par le serveur, si bien que le code
-      // décrivait une compatibilité imaginaire : à la lecture, on croyait
-      // qu'un message silencieux (data-only) arriverait tout de même titré.
-      final PushMessage? message = PushMessage.fromData(<String, String>{
-        'notificationId': 'ntf-2',
-        'title': 'Depuis data',
-        'body': 'Corps',
-      });
-      expect(message!.title, isEmpty);
-      expect(message.body, isEmpty);
-    });
+    test(
+      'ne retombe PAS sur `data` : le serveur n\'y met ni titre ni corps',
+      () {
+        // Ce repli n'a jamais eu de source. `data['title']` et `data['body']`
+        // n'existent dans aucun message émis par le serveur, si bien que le code
+        // décrivait une compatibilité imaginaire : à la lecture, on croyait
+        // qu'un message silencieux (data-only) arriverait tout de même titré.
+        final PushMessage? message = PushMessage.fromData(<String, String>{
+          'notificationId': 'ntf-2',
+          'title': 'Depuis data',
+          'body': 'Corps',
+        });
+        expect(message!.title, isEmpty);
+        expect(message.body, isEmpty);
+      },
+    );
   });
 
   group('sûreté des routes', () {
@@ -156,14 +168,15 @@ void main() {
 
     tearDown(() async => db.close());
 
-    PushMessage message(String id, {String? route, DateTime? at}) => PushMessage(
-      id: id,
-      title: 'Titre $id',
-      body: 'Corps $id',
-      category: 'ANNONCE',
-      route: route,
-      sentAt: at ?? t0,
-    );
+    PushMessage message(String id, {String? route, DateTime? at}) =>
+        PushMessage(
+          id: id,
+          title: 'Titre $id',
+          body: 'Corps $id',
+          category: 'ANNONCE',
+          route: route,
+          sentAt: at ?? t0,
+        );
 
     test('enregistre un message et le compte comme non lu', () async {
       await store.upsert(message('ntf-1'));
@@ -216,26 +229,34 @@ void main() {
       // Un téléphone éteint reçoit tout d'un coup au rallumage ; l'ordre
       // d'affichage doit rester celui dans lequel les messages ont été émis.
       await store.upsert(message('vieux', at: t0));
-      await store.upsert(message('recent', at: t0.add(const Duration(days: 2))));
-
-      final List<StoredNotification> rows = await store.watchAll().first;
-      expect(rows.map((StoredNotification r) => r.id), <String>['recent', 'vieux']);
-    });
-
-    test('la fusion serveur garde la lecture LOCALE la plus ancienne', () async {
-      final DateTime localRead = t0;
-      final DateTime serverRead = t0.add(const Duration(hours: 5));
-
-      await store.upsert(message('ntf-1'));
-      await store.markRead('ntf-1', at: localRead);
-
-      await store.upsertAll(
-        <PushMessage>[message('ntf-1')],
-        readStates: <String, DateTime?>{'ntf-1': serverRead},
+      await store.upsert(
+        message('recent', at: t0.add(const Duration(days: 2))),
       );
 
-      expect((await store.byId('ntf-1'))!.readAt, localRead);
+      final List<StoredNotification> rows = await store.watchAll().first;
+      expect(rows.map((StoredNotification r) => r.id), <String>[
+        'recent',
+        'vieux',
+      ]);
     });
+
+    test(
+      'la fusion serveur garde la lecture LOCALE la plus ancienne',
+      () async {
+        final DateTime localRead = t0;
+        final DateTime serverRead = t0.add(const Duration(hours: 5));
+
+        await store.upsert(message('ntf-1'));
+        await store.markRead('ntf-1', at: localRead);
+
+        await store.upsertAll(
+          <PushMessage>[message('ntf-1')],
+          readStates: <String, DateTime?>{'ntf-1': serverRead},
+        );
+
+        expect((await store.byId('ntf-1'))!.readAt, localRead);
+      },
+    );
 
     test('la fusion serveur applique une lecture faite ailleurs', () async {
       await store.upsert(message('ntf-1'));

@@ -163,8 +163,10 @@ void main() {
                   RepresentantFormScreen(
                     draftId: state.uri.queryParameters[Routes.draftParam],
                     representantId: state.uri.queryParameters['id'],
-                    prefillName: state.uri.queryParameters[Routes.prefillNameParam],
-                    prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam],
+                    prefillName:
+                        state.uri.queryParameters[Routes.prefillNameParam],
+                    prefillPhone:
+                        state.uri.queryParameters[Routes.prefillPhoneParam],
                   ),
             ),
             GoRoute(
@@ -211,25 +213,29 @@ void main() {
 
   // ───────────────────────────────────────────────────────────────────────────
   group('reprise d\'une saisie de représentant', () {
-    formTestWidgets('un écran ouvert SANS référence retrouve le dernier brouillon', (
-      WidgetTester tester,
-    ) async {
-      // Le cas normal : le commercial tape « Nouveau représentant » depuis le
-      // sélecteur. Aucun `?draft=` dans l'URL, donc un identifiant neuf, donc
-      // une lecture à vide : le formulaire revenait vierge alors que la saisie
-      // était intacte en base.
-      await seedDraft(
-        draftId: 'brouillon-1',
-        formKey: 'representant.create',
-        values: <String, Object?>{'fullName': 'Ousmane Fall', 'phone': '77 123 45 67'},
-      );
+    formTestWidgets(
+      'un écran ouvert SANS référence retrouve le dernier brouillon',
+      (WidgetTester tester) async {
+        // Le cas normal : le commercial tape « Nouveau représentant » depuis le
+        // sélecteur. Aucun `?draft=` dans l'URL, donc un identifiant neuf, donc
+        // une lecture à vide : le formulaire revenait vierge alors que la saisie
+        // était intacte en base.
+        await seedDraft(
+          draftId: 'brouillon-1',
+          formKey: 'representant.create',
+          values: <String, Object?>{
+            'fullName': 'Ousmane Fall',
+            'phone': '77 123 45 67',
+          },
+        );
 
-      await tester.pumpWidget(host(const RepresentantFormScreen()));
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(host(const RepresentantFormScreen()));
+        await tester.pumpAndSettle();
 
-      expect(find.textContaining('Saisie non terminée'), findsOneWidget);
-      expect(find.textContaining('Ousmane Fall'), findsOneWidget);
-    });
+        expect(find.textContaining('Saisie non terminée'), findsOneWidget);
+        expect(find.textContaining('Ousmane Fall'), findsOneWidget);
+      },
+    );
 
     formTestWidgets('« Reprendre » remplit le formulaire et ADOPTE la ligne', (
       WidgetTester tester,
@@ -300,39 +306,40 @@ void main() {
     /// se remplissait de son nom et de son numéro, l'écran adoptait son
     /// `draftId`, et l'enregistrement supprimait la correction de R tout en
     /// tentant une fiche en doublon.
-    formTestWidgets('une correction inachevée ne remonte PAS dans une création', (
-      WidgetTester tester,
-    ) async {
-      await insertRepresentant(db, id: 'rep-9', phone: '+221770000009');
-      await seedDraft(
-        draftId: 'brouillon-edit',
-        formKey: 'representant.create',
-        entityId: 'rep-9',
-        // Dans la fenêtre de reprise silencieuse : c'est ce qui rendait le
-        // défaut invisible, l'utilisateur n'avait rien à confirmer.
-        age: const Duration(seconds: 5),
-        values: <String, Object?>{
-          'fullName': 'Nom corrigé',
-          'phone': '77 000 00 09',
-          'departementId': 'dep-1',
-          'departementLabel': 'Dakar',
-        },
-      );
+    formTestWidgets(
+      'une correction inachevée ne remonte PAS dans une création',
+      (WidgetTester tester) async {
+        await insertRepresentant(db, id: 'rep-9', phone: '+221770000009');
+        await seedDraft(
+          draftId: 'brouillon-edit',
+          formKey: 'representant.create',
+          entityId: 'rep-9',
+          // Dans la fenêtre de reprise silencieuse : c'est ce qui rendait le
+          // défaut invisible, l'utilisateur n'avait rien à confirmer.
+          age: const Duration(seconds: 5),
+          values: <String, Object?>{
+            'fullName': 'Nom corrigé',
+            'phone': '77 000 00 09',
+            'departementId': 'dep-1',
+            'departementLabel': 'Dakar',
+          },
+        );
 
-      await tester.pumpWidget(host(const RepresentantFormScreen()));
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(host(const RepresentantFormScreen()));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Nom corrigé'), findsNothing);
-      expect(find.text('Dakar'), findsNothing);
-      expect(find.textContaining('Saisie non terminée'), findsNothing);
+        expect(find.text('Nom corrigé'), findsNothing);
+        expect(find.text('Dakar'), findsNothing);
+        expect(find.textContaining('Saisie non terminée'), findsNothing);
 
-      // Et la correction est toujours là, intacte, pour la fiche à qui elle
-      // appartient.
-      final List<FormDraft> rows = await drafts();
-      expect(rows, hasLength(1));
-      expect(rows.single.draftId, 'brouillon-edit');
-      expect(rows.single.entityId, 'rep-9');
-    });
+        // Et la correction est toujours là, intacte, pour la fiche à qui elle
+        // appartient.
+        final List<FormDraft> rows = await drafts();
+        expect(rows, hasLength(1));
+        expect(rows.single.draftId, 'brouillon-edit');
+        expect(rows.single.entityId, 'rep-9');
+      },
+    );
 
     /// Le pendant : un brouillon de CRÉATION abandonné doit, lui, toujours
     /// remonter. Le garde sépare les deux, il n'éteint pas la reprise.
@@ -346,7 +353,10 @@ void main() {
         // d'enregistrement supprime le brouillon au moment où la fiche
         // apparaît, donc les deux ne coexistent jamais.
         entityId: 'rep-jamais-enregistre',
-        values: <String, Object?>{'fullName': 'Ousmane Fall', 'phone': '77 123 45 67'},
+        values: <String, Object?>{
+          'fullName': 'Ousmane Fall',
+          'phone': '77 123 45 67',
+        },
       );
 
       await tester.pumpWidget(host(const RepresentantFormScreen()));
@@ -369,7 +379,10 @@ void main() {
       await seedDraft(
         draftId: 'brouillon-1',
         formKey: 'representant.create',
-        values: <String, Object?>{'fullName': 'Ousmane Fall', 'phone': '77 123 45 67'},
+        values: <String, Object?>{
+          'fullName': 'Ousmane Fall',
+          'phone': '77 123 45 67',
+        },
       );
 
       await tester.pumpWidget(host(const RepresentantFormScreen()));
@@ -433,54 +446,134 @@ void main() {
       expect(departement.controller?.text, isEmpty);
     });
 
-    formTestWidgets('un département choisi seul est un brouillon, pas du vide', (
-      WidgetTester tester,
-    ) async {
-      // Choisir dans une liste est le geste le plus lent d'un formulaire
-      // tactile. Le compter pour rien parce que le nom n'est pas encore tapé
-      // jetait exactement ce qu'on cherche à protéger.
-      await tester.pumpWidget(host(const RepresentantFormScreen()));
-      await tester.pumpAndSettle();
+    formTestWidgets(
+      'un département choisi seul est un brouillon, pas du vide',
+      (WidgetTester tester) async {
+        // Choisir dans une liste est le geste le plus lent d'un formulaire
+        // tactile. Le compter pour rien parce que le nom n'est pas encore tapé
+        // jetait exactement ce qu'on cherche à protéger.
+        await tester.pumpWidget(host(const RepresentantFormScreen()));
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(TextField, 'Département'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Dakar').last);
-      await tester.pumpAndSettle();
-      // La traîne de l'anti-rebond, puis l'écriture.
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(TextField, 'Département'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Dakar').last);
+        await tester.pumpAndSettle();
+        // La traîne de l'anti-rebond, puis l'écriture.
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
 
-      expect(await drafts(), hasLength(1));
-    });
+        expect(await drafts(), hasLength(1));
+      },
+    );
   });
 
   // ───────────────────────────────────────────────────────────────────────────
   group('reprise d\'une saisie de prospect', () {
-    formTestWidgets('banque et syndicat seuls suffisent à écrire un brouillon', (
+    formTestWidgets(
+      'banque et syndicat seuls suffisent à écrire un brouillon',
+      (WidgetTester tester) async {
+        await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
+
+        await tester.pumpWidget(
+          host(const ProspectEntryScreen(representantId: 'rep-1')),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.widgetWithText(TextField, 'Banque'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Banque Test').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(TextField, 'Syndicat'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Syndicat Test').last);
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+
+        final List<FormDraft> rows = await drafts();
+        expect(rows, hasLength(1));
+        final Map<String, Object?> values =
+            jsonDecode(rows.single.payload) as Map<String, Object?>;
+        expect(values['banqueId'], 'bq-1');
+        expect(values['syndicatId'], 'sy-1');
+      },
+    );
+
+    // Le Grand Public n'exige que le nom, le numéro et le secteur. Rendre un
+    // champ de plus obligatoire, c'est une fiche abandonnée sur le terrain.
+    formTestWidgets('le Grand Public attend le secteur, et rien de plus', (
       WidgetTester tester,
     ) async {
-      await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
-
-      await tester.pumpWidget(host(const ProspectEntryScreen(representantId: 'rep-1')));
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(projet: 'GRAND_PUBLIC')),
+      );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(TextField, 'Banque'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Banque Test').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextField, 'Syndicat'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Syndicat Test').last);
-      await tester.pumpAndSettle();
-      await tester.pump(const Duration(seconds: 1));
+      await tester.enterText(find.widgetWithText(TextField, 'Nom'), 'Ndiaye');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Téléphone'),
+        '77 000 00 42',
+      );
       await tester.pumpAndSettle();
 
-      final List<FormDraft> rows = await drafts();
-      expect(rows, hasLength(1));
-      final Map<String, Object?> values =
-          jsonDecode(rows.single.payload) as Map<String, Object?>;
-      expect(values['banqueId'], 'bq-1');
-      expect(values['syndicatId'], 'sy-1');
+      final Finder enregistrer = find.widgetWithText(
+        FilledButton,
+        'Enregistrer et suivant',
+      );
+      expect(tester.widget<FilledButton>(enregistrer).onPressed, isNull);
+
+      await tester.tap(find.text('Informel'));
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<FilledButton>(enregistrer).onPressed, isNotNull);
+    });
+
+    formTestWidgets('la fiche Grand Public emporte ses champs propres', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(projet: 'GRAND_PUBLIC')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.widgetWithText(TextField, 'Nom'), 'Ndiaye');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Téléphone'),
+        '77 000 00 42',
+      );
+      await tester.tap(find.text('Fonctionnaire'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Profession'),
+        'Instituteur',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Durée du système'),
+        '24',
+      );
+      await tester.tap(find.widgetWithText(TextField, 'Canal de provenance'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Parrainage').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Enregistrer et suivant'),
+      );
+      await tester.pumpAndSettle();
+
+      final Prospect fiche = (await db.select(db.prospects).get()).single;
+      expect(fiche.projet, 'GRAND_PUBLIC');
+      expect(fiche.type, 'FONCTIONNAIRE');
+      expect(fiche.profession, 'Instituteur');
+      expect(fiche.dureeSystemeMois, 24);
+      expect(fiche.canalProvenanceId, 'cn-1');
+      // Le parcours s'ouvre à la saisie : sans lui la fiche n'apparaîtrait dans
+      // aucune liste de projet tant que le serveur ne l'a pas rendue.
+      expect(
+        (await db.select(db.prospectJourneys).get()).single.projet,
+        'GRAND_PUBLIC',
+      );
     });
 
     formTestWidgets('un brouillon d\'un AUTRE représentant n\'est pas repris', (
@@ -501,7 +594,9 @@ void main() {
         },
       );
 
-      await tester.pumpWidget(host(const ProspectEntryScreen(representantId: 'rep-1')));
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(representantId: 'rep-1')),
+      );
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Saisie non terminée'), findsNothing);
@@ -522,7 +617,9 @@ void main() {
         },
       );
 
-      await tester.pumpWidget(host(const ProspectEntryScreen(representantId: 'rep-1')));
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(representantId: 'rep-1')),
+      );
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Saisie non terminée'), findsOneWidget);
@@ -546,7 +643,9 @@ void main() {
         },
       );
 
-      await tester.pumpWidget(host(const ProspectEntryScreen(representantId: 'rep-1')));
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(representantId: 'rep-1')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Supprimer'));
       await tester.pumpAndSettle();
@@ -566,13 +665,19 @@ void main() {
     await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
 
     await tester.pumpWidget(
-      host(const ProspectEntryScreen(representantId: 'rep-1'), writes: _SlowWrites(db)),
+      host(
+        const ProspectEntryScreen(representantId: 'rep-1'),
+        writes: _SlowWrites(db),
+      ),
     );
     await tester.pumpAndSettle();
 
     await tester.enterText(find.widgetWithText(TextField, 'Prénom'), 'Awa');
     await tester.enterText(find.widgetWithText(TextField, 'Nom'), 'Sow');
-    await tester.enterText(find.widgetWithText(TextField, 'Téléphone'), '771234567');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Téléphone'),
+      '771234567',
+    );
     await tester.tap(find.widgetWithText(TextField, 'Banque'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Banque Test').last);
@@ -616,7 +721,10 @@ void main() {
       await tester.pumpWidget(host(const RepresentantFormScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Référentiels non téléchargés'), findsOneWidget);
+      expect(
+        find.textContaining('Référentiels non téléchargés'),
+        findsOneWidget,
+      );
       expect(
         find.widgetWithText(TextButton, 'Synchroniser'),
         findsOneWidget,
@@ -678,7 +786,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Dakar').last);
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, 'Téléphone'), '77 123 45 67');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Téléphone'),
+        '77 123 45 67',
+      );
       await tester.pumpAndSettle();
       await tester.enterText(
         find.widgetWithText(TextField, 'Notes (facultatif)'),
@@ -716,12 +827,17 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Dakar').last);
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, 'Téléphone'), '77 123 45 67');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Téléphone'),
+        '77 123 45 67',
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(ChoiceChip, 'Même numéro'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextField, 'Profession (facultatif)'));
+      await tester.tap(
+        find.widgetWithText(TextField, 'Profession (facultatif)'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Instituteur').last);
       await tester.pumpAndSettle();
@@ -758,7 +874,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.widgetWithText(ChoiceChip, 'NUMERO_PROFESSIONNEL'), findsOneWidget);
+      expect(
+        find.widgetWithText(ChoiceChip, 'NUMERO_PROFESSIONNEL'),
+        findsOneWidget,
+      );
 
       await tester.enterText(
         find.widgetWithText(TextField, 'Nom complet'),
@@ -799,7 +918,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Dakar').last);
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, 'Téléphone'), typedPhone);
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Téléphone'),
+        typedPhone,
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Enregistrer et saisir des prospects'));
@@ -826,7 +948,10 @@ void main() {
       // porte aussi le bouton d'enregistrement.
       final Finder saveBarColumn = find
           .ancestor(
-            of: find.widgetWithText(FilledButton, 'Enregistrer et saisir des prospects'),
+            of: find.widgetWithText(
+              FilledButton,
+              'Enregistrer et saisir des prospects',
+            ),
             matching: find.byType(Column),
           )
           .first;
@@ -858,7 +983,8 @@ void main() {
       expect(
         banner.bottom,
         lessThanOrEqualTo(tester.getRect(find.byType(Scaffold)).bottom),
-        reason: 'sous le bas de l\'écran, il n\'est pas plus lisible que dans la liste',
+        reason:
+            'sous le bas de l\'écran, il n\'est pas plus lisible que dans la liste',
       );
     });
 
@@ -871,19 +997,21 @@ void main() {
 
       // `SemanticsService.sendAnnouncement` sort par `flutter/accessibility` ;
       // c'est le seul endroit où l'on peut constater qu'elle a bien été émise.
-      final List<Map<Object?, Object?>> announcements = <Map<Object?, Object?>>[];
-      tester.binding.defaultBinaryMessenger.setMockDecodedMessageHandler<Object?>(
-        SystemChannels.accessibility,
-        (Object? message) async {
-          announcements.add(message! as Map<Object?, Object?>);
-          return null;
-        },
-      );
+      final List<Map<Object?, Object?>> announcements =
+          <Map<Object?, Object?>>[];
+      tester.binding.defaultBinaryMessenger
+          .setMockDecodedMessageHandler<Object?>(SystemChannels.accessibility, (
+            Object? message,
+          ) async {
+            announcements.add(message! as Map<Object?, Object?>);
+            return null;
+          });
       addTearDown(
-        () => tester.binding.defaultBinaryMessenger.setMockDecodedMessageHandler<Object?>(
-          SystemChannels.accessibility,
-          null,
-        ),
+        () => tester.binding.defaultBinaryMessenger
+            .setMockDecodedMessageHandler<Object?>(
+              SystemChannels.accessibility,
+              null,
+            ),
       );
 
       await insertRepresentant(db, id: 'rep-existant', phone: duplicatePhone);
@@ -915,7 +1043,8 @@ void main() {
         (Map<Object?, Object?> event) => event['type'] == 'announce',
       );
       expect(announced, isNotEmpty, reason: 'aucune annonce n\'est partie');
-      final Map<Object?, Object?> data = announced.last['data']! as Map<Object?, Object?>;
+      final Map<Object?, Object?> data =
+          announced.last['data']! as Map<Object?, Object?>;
       expect(data['message'], expected);
       expect(
         data['assertiveness'],
@@ -1016,7 +1145,9 @@ void main() {
 
   // ───────────────────────────────────────────────────────────────────────────
   group('sélecteur de représentant', () {
-    formTestWidgets('la recherche survit à un aller-retour', (WidgetTester tester) async {
+    formTestWidgets('la recherche survit à un aller-retour', (
+      WidgetTester tester,
+    ) async {
       // Le terme vivait dans un `Notifier` de portée racine pendant que le
       // `TextField` repartait vide : on revenait sur une boîte de recherche
       // vide au-dessus d'une liste toujours filtrée, souvent accompagnée d'un
@@ -1060,7 +1191,10 @@ void main() {
       // Chercher « Ousmane », ne pas le trouver, puis retaper « Ousmane » dans
       // l'écran suivant : un geste de plus juste après en avoir fait un pour
       // rien.
-      expect(Routes.newRepresentantPrefilled('Ousmane Fall'), contains('nom=Ousmane'));
+      expect(
+        Routes.newRepresentantPrefilled('Ousmane Fall'),
+        contains('nom=Ousmane'),
+      );
       // Une recherche par numéro atterrit dans le champ téléphone, pas dans le
       // nom.
       expect(Routes.newRepresentantPrefilled('77 123 45 67'), contains('tel='));
@@ -1121,8 +1255,70 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Instituteur'), findsWidgets);
-      // Où en est la relation, sans quitter la fiche.
-      expect(find.text('Relation : Ambassadeur'), findsOneWidget);
+      // Où en est la relation, sans quitter la fiche, et réglable sur place.
+      expect(find.text('Relation'), findsOneWidget);
+      expect(
+        tester
+            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Ambassadeur'))
+            .selected,
+        isTrue,
+      );
+    });
+
+    // Le commercial est celui qui sait qu'un représentant vient d'accepter :
+    // sans chemin d'écriture, l'information restait sur le terrain.
+    formTestWidgets('la bascule de relation part avec son lot', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        serverUpdatedAt: DateTime.utc(2026, 8, 12),
+      );
+
+      await tester.pumpWidget(
+        hostRouted(const RepresentantFormScreen(representantId: 'rep-1')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Ambassadeur'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Enregistrer et saisir des prospects'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final List<OutboxData> file = await allOutbox(db);
+      final Map<String, Object?> envoi =
+          jsonDecode(file.last.payload) as Map<String, Object?>;
+      expect(envoi['relationStatus'], 'AMBASSADEUR');
+    });
+
+    // Un enregistrement qui ne touche pas à la relation ne doit pas la
+    // reposter : le serveur écrirait une ligne d'histoire sans geste derrière.
+    formTestWidgets('sans bascule, le statut n\'est pas renvoyé', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        relationStatus: 'AMBASSADEUR',
+        serverUpdatedAt: DateTime.utc(2026, 8, 12),
+      );
+
+      await tester.pumpWidget(
+        hostRouted(const RepresentantFormScreen(representantId: 'rep-1')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Enregistrer et saisir des prospects'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final List<OutboxData> file = await allOutbox(db);
+      final Map<String, Object?> envoi =
+          jsonDecode(file.last.payload) as Map<String, Object?>;
+      expect(envoi.containsKey('relationStatus'), isFalse);
     });
   });
 
@@ -1143,10 +1339,15 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Dakar').last);
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, 'Téléphone'), '77 123 45 67');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Téléphone'),
+        '77 123 45 67',
+      );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(TextField, 'Profession (facultatif)'));
+      await tester.tap(
+        find.widgetWithText(TextField, 'Profession (facultatif)'),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Instituteur').last);
       await tester.pumpAndSettle();
@@ -1177,7 +1378,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Dakar').last);
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, 'Téléphone'), '77 123 45 67');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Téléphone'),
+        '77 123 45 67',
+      );
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -1211,7 +1415,9 @@ void main() {
 
       expect(
         tester
-            .widget<TextField>(find.widgetWithText(TextField, 'Profession (facultatif)'))
+            .widget<TextField>(
+              find.widgetWithText(TextField, 'Profession (facultatif)'),
+            )
             .controller!
             .text
             .length,

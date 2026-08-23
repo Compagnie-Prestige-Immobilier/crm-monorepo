@@ -1316,3 +1316,56 @@ describe('prise en charge de l’envoi', () => {
     expect(brevo.sent).toHaveLength(0);
   });
 });
+
+describe('pagination des listes', () => {
+  const MEME_INSTANT = new Date('2026-08-13T08:00:00.000Z');
+
+  it('DEUX LIGNES DE MÊME DATE NE S’ÉCHANGENT PAS ENTRE DEUX PAGES', async () => {
+    db.addUser({ id: 'usr-1' });
+    db.clock = () => MEME_INSTANT;
+
+    await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1'],
+    });
+    await service.create(admin, {
+      ...baseBody,
+      title: 'Second envoi',
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-1'],
+    });
+    for (const delivery of db.deliveries) delivery.createdAt = MEME_INSTANT;
+
+    db.unstableTies = true;
+
+    const premiere = await service.list({ page: 1, pageSize: 1 });
+    const seconde = await service.list({ page: 2, pageSize: 1 });
+    expect(premiere.meta.total).toBe(2);
+    expect(new Set([premiere.items[0]?.id, seconde.items[0]?.id]).size).toBe(2);
+
+    const boiteA = await service.inbox(asUser('usr-1'), { page: 1, pageSize: 1 });
+    const boiteB = await service.inbox(asUser('usr-1'), { page: 2, pageSize: 1 });
+    expect(new Set([boiteA.items[0]?.id, boiteB.items[0]?.id]).size).toBe(2);
+  });
+
+  it('les destinataires d’un envoi sont rendus dans un ordre déterministe', async () => {
+    for (const id of ['usr-a', 'usr-b', 'usr-c']) db.addUser({ id });
+    db.clock = () => MEME_INSTANT;
+
+    const created = await service.create(admin, {
+      ...baseBody,
+      audience: NotificationAudience.USERS,
+      audienceUserIds: ['usr-a', 'usr-b', 'usr-c'],
+    });
+    for (const delivery of db.deliveries) delivery.createdAt = MEME_INSTANT;
+
+    db.unstableTies = true;
+
+    const premier = await service.get(created.id);
+    const second = await service.get(created.id);
+    expect(premier.recipients.map((row) => row.userId)).toEqual(
+      second.recipients.map((row) => row.userId),
+    );
+  });
+});

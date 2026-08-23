@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/onboarding/onboarding_controller.dart';
+import '../../../core/theme/cpi_tokens.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -136,7 +137,11 @@ class _OnboardingPage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(icon, size: 88, color: theme.colorScheme.primary),
+            Icon(
+              icon,
+              size: CpiIconSize.hero,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(height: 36),
             Text(
               title,

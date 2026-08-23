@@ -11,6 +11,7 @@ class RetryInterceptor extends Interceptor {
     this.maxRetries = 2,
     this.baseDelay = const Duration(milliseconds: 400),
     this.maxRetryAfter = const Duration(minutes: 2),
+    this.throttleFloor = const Duration(seconds: 1),
     Random? random,
   }) : _dio = dio,
        _random = random ?? Random();
@@ -22,12 +23,18 @@ class RetryInterceptor extends Interceptor {
 
   final Duration maxRetryAfter;
 
+  /// Plancher quand le serveur dit « trop d'appels » sans dire combien de temps.
+  final Duration throttleFloor;
+
   final Random _random;
 
   static const String _attemptKey = 'cpi.getRetryAttempt';
 
   @override
-  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
     final RequestOptions request = err.requestOptions;
 
     if (request.method.toUpperCase() != 'GET' || !_isTransient(err)) {
@@ -60,13 +67,18 @@ class RetryInterceptor extends Interceptor {
     }
   }
 
+  /// `Retry-After` est légal sur TOUT statut, 503 compris : le lire seulement
+  /// sur 429 revient à marteler un serveur qui vient de demander une pause.
   Duration _delayFor(DioException err, int attempt) {
-    if (err.response?.statusCode == 429) {
-      final Duration? asked = retryAfterOf(err.response);
-      if (asked != null) return asked;
-    }
+    final Duration? asked = retryAfterOf(err.response);
+    if (asked != null) return asked;
     final int ceiling = baseDelay.inMilliseconds << attempt;
-    return Duration(milliseconds: _random.nextInt(ceiling + 1));
+    final Duration jittered = Duration(
+      milliseconds: _random.nextInt(ceiling + 1),
+    );
+    final int status = err.response?.statusCode ?? 0;
+    if (status != 429 && status != 503) return jittered;
+    return jittered < throttleFloor ? throttleFloor : jittered;
   }
 
   static bool _isTransient(DioException err) {

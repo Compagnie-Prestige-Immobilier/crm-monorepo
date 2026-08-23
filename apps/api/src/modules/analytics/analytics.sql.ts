@@ -30,20 +30,32 @@ export function prospectConditions(
     conditions.push(Prisma.sql`p."deletedAt" IS NULL`);
   }
   // Sans ce filtre, un total « par département » dépasse le total global.
+  // `IS NULL` couvre les deux cas : le représentant supprimé est écarté, et la
+  // fiche SANS représentant — tout le Grand Public — reste comptée.
   conditions.push(Prisma.sql`r."deletedAt" IS NULL`);
 
   if (filter.representantId)
     conditions.push(Prisma.sql`p."representantId" = ${filter.representantId}`);
   if (filter.banqueId) conditions.push(Prisma.sql`p."banqueId" = ${filter.banqueId}`);
   if (filter.syndicatId) conditions.push(Prisma.sql`p."syndicatId" = ${filter.syndicatId}`);
-  // Meme population que `buildProspectWhere` : un filtre qui n'agirait que sur
-  // la liste ferait diverger le total du graphique du total du tableau.
-  if (filter.projet) conditions.push(Prisma.sql`p."projet" = ${filter.projet}::"Projet"`);
+  if (filter.projet) {
+    const statut = filter.statut
+      ? Prisma.sql`AND pj."statut" = ${filter.statut}::"ProspectStatut"`
+      : Prisma.empty;
+    conditions.push(
+      Prisma.sql`EXISTS (
+        SELECT 1 FROM "prospect_journeys" pj
+        WHERE pj."prospectId" = p."id"
+          AND pj."projet" = ${filter.projet}::"Projet"
+          ${statut}
+      )`,
+    );
+  }
   if (filter.type) conditions.push(Prisma.sql`p."type" = ${filter.type}::"ProspectType"`);
   if (filter.canalProvenanceId) {
     conditions.push(Prisma.sql`p."canalProvenanceId" = ${filter.canalProvenanceId}`);
   }
-  if (filter.statut) {
+  if (filter.statut && !filter.projet) {
     conditions.push(Prisma.sql`p."statut" = ${filter.statut}::"ProspectStatut"`);
   }
   if (filter.origin) conditions.push(Prisma.sql`p."origin" = ${filter.origin}`);
@@ -88,10 +100,19 @@ export function prospectConditions(
 
   const search = filter.search?.trim();
   if (search) {
-    const like = `%${search}%`;
-    const phone = `%${tryNormalizePhone(search) ?? search.replace(/[^\d+]/g, '')}%`;
+    // L'EXPRESSION EST CELLE DE L'INDEX `prospects_nom_prenom_trgm`, au caractère
+    // près : `nom ILIKE … OR prenom ILIKE …` sont deux prédicats que l'index ne
+    // couvre pas, et chaque frappe balayait les 500 000 lignes.
+    const like = `%${search.toLowerCase()}%`;
+    const compact = search.replace(/[^\d+]/gu, '');
+    // Sans ce seuil, une recherche sans chiffre produisait `phoneE164 LIKE '%%'`,
+    // vrai partout : le filtre de recherche ne filtrait plus rien.
+    const phone =
+      compact.replace(/\D/gu, '').length >= 3
+        ? Prisma.sql`OR p."phoneE164" LIKE ${`%${tryNormalizePhone(search) ?? compact}%`}`
+        : Prisma.empty;
     conditions.push(
-      Prisma.sql`(p."nom" ILIKE ${like} OR p."prenom" ILIKE ${like} OR p."phoneE164" LIKE ${phone})`,
+      Prisma.sql`((lower(p."nom") || ' ' || lower(p."prenom")) LIKE ${like} ${phone})`,
     );
   }
 
@@ -131,12 +152,20 @@ export function representantConditions(
   return Prisma.join(conditions, ' AND ');
 }
 
-/** `representants` porte le département, `syndicats`/`banques` le segment ; les trois FK sont obligatoires, la jointure est sans perte. */
+/**
+ * `representants` porte le département, `syndicats`/`banques` le segment.
+ *
+ * LEFT et non INNER : les trois clés sont NULLABLES depuis le Grand Public, qui
+ * ne passe par aucun représentant. En jointure interne, 100 % des fiches Grand
+ * Public — et toute fiche CHUES sans banque — disparaissaient de TOUS les
+ * agrégats. Sans erreur, sans zéro : un total simplement plus petit, à côté
+ * d'une liste qui, elle, les comptait.
+ */
 export const PROSPECT_FROM = Prisma.sql`
   FROM "prospects" p
-  INNER JOIN "representants" r ON r."id" = p."representantId"
-  INNER JOIN "syndicats" sy ON sy."id" = p."syndicatId"
-  INNER JOIN "banques" bq ON bq."id" = p."banqueId"
+  LEFT JOIN "representants" r ON r."id" = p."representantId"
+  LEFT JOIN "syndicats" sy ON sy."id" = p."syndicatId"
+  LEFT JOIN "banques" bq ON bq."id" = p."banqueId"
 `;
 
 export function segmentCondition(segment: BddSegment): Prisma.Sql {

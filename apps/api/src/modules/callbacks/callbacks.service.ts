@@ -68,6 +68,7 @@ export class CallbacksService {
     const where: Prisma.ScheduledCallbackWhereInput = {
       status: ScheduledCallbackStatus.PENDING,
       ...(assignedToId === undefined ? {} : { assignedToId }),
+      ...(query.projet ? { prospect: { journeys: { some: { projet: query.projet } } } } : {}),
       scheduledAt:
         scope === CallbackScope.OVERDUE
           ? { lt: now }

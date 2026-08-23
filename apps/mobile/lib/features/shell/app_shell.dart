@@ -19,7 +19,8 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final CpiColors cpi = context.cpi;
-    final int needsAttention = ref.watch(needsAttentionCountProvider).value ?? 0;
+    final int needsAttention =
+        ref.watch(needsAttentionCountProvider).value ?? 0;
 
     return Scaffold(
       body: shell,
@@ -110,6 +111,7 @@ class _PendingBannerState extends ConsumerState<PendingBanner> {
     });
 
     final int pending = ref.watch(pendingSyncCountProvider).value ?? 0;
+    final int blocked = ref.watch(blockedSyncCountProvider).value ?? 0;
     final SyncUiState sync = ref.watch(syncCoordinatorProvider);
     final bool running = sync.running;
     final CpiConnectivity network = ref.watch(connectivityProvider);
@@ -117,7 +119,14 @@ class _PendingBannerState extends ConsumerState<PendingBanner> {
 
     final CpiColors cpi = context.cpi;
 
-    final ({IconData icon, String label, Color color, Color surface, Color border})? tone;
+    final ({
+      IconData icon,
+      String label,
+      Color color,
+      Color surface,
+      Color border,
+    })?
+    tone;
     if (pending > 0) {
       final String count = '$pending élément${pending > 1 ? 's' : ''}';
       tone = switch ((offline, running)) {
@@ -155,6 +164,18 @@ class _PendingBannerState extends ConsumerState<PendingBanner> {
           border: cpi.accentBorder,
         ),
       };
+    } else if (blocked > 0) {
+      // Rien ne part plus tout seul : le dire, plutôt que d'afficher « Tout est
+      // envoyé » sur une file qui contient des refus.
+      tone = (
+        icon: PhosphorIconsRegular.warningCircle,
+        label:
+            '$blocked saisie${blocked > 1 ? 's' : ''} à corriger : '
+            'aucun envoi ne les débloquera',
+        color: cpi.syncFailed,
+        surface: cpi.accentSurface,
+        border: cpi.syncFailed,
+      );
     } else if (_showSuccess) {
       tone = (
         icon: PhosphorIconsRegular.checkCircle,
@@ -227,7 +248,7 @@ class _BannerBody extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(icon, size: 18, color: color),
+          Icon(icon, size: CpiIconSize.sm, color: color),
           const SizedBox(width: CpiSpacing.xs),
           Expanded(
             child: Text(

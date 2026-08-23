@@ -7,6 +7,7 @@ import '../network/retry_after.dart' as retry_after;
 import '../network/session_expired.dart';
 import '../network/timeout_profile.dart';
 import 'api_port.dart';
+import 'outbox_status.dart';
 
 class ResponseFormatException extends FormatException {
   ResponseFormatException(String message, this.contentType, [Object? source])
@@ -54,7 +55,7 @@ class DioApi implements ApiPort {
         refreshDto: RefreshDto(refreshToken: refreshToken),
         extra: <String, dynamic>{
           AuthInterceptor.noAuthFlag: true,
-          ...TimeoutProfile.read.extra,
+          ...TimeoutProfile.refresh.extra,
         },
       );
       return _toTokens(_body('refresh', response));
@@ -285,6 +286,8 @@ class DioApi implements ApiPort {
   static const String networkCode = 'NETWORK';
   static const String timeoutCode = 'TIMEOUT';
 
+  static const int upgradeRequired = 426;
+
   static ApiException classify(DioException e, String operation) {
     if (e.error is SessionExpired) {
       return ApiException(
@@ -296,8 +299,13 @@ class DioApi implements ApiPort {
     }
 
     switch (e.type) {
-      case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
+        return const ApiException(
+          ClientErrorCodes.sendTimeout,
+          message: 'Le lot n\'a pas fini de partir dans le temps imparti.',
+          kind: FailureKind.unreachable,
+        );
+      case DioExceptionType.connectionTimeout:
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.transformTimeout:
         return const ApiException(
@@ -350,6 +358,20 @@ class DioApi implements ApiPort {
       );
     }
 
+    if (status == upgradeRequired ||
+        code == ServerErrorCodes.appUpdateRequired) {
+      return ApiException(
+        ServerErrorCodes.appUpdateRequired,
+        message:
+            message ??
+            'Cette version de CPI GO ne sait plus lire les données du '
+                'serveur. Vos saisies continuent de partir : installez la mise '
+                'à jour pour recevoir de nouveau les fiches.',
+        statusCode: status,
+        kind: FailureKind.appUpdateRequired,
+      );
+    }
+
     if (status == 429) {
       return ApiException(
         code,
@@ -378,7 +400,7 @@ class DioApi implements ApiPort {
       );
     }
 
-    if (_serverCode(e.response?.data) == null && !_announcesJson(e.response)) {
+    if (_serverCode(e.response?.data) == null && !announcesJson(e.response)) {
       return ApiException(
         nonJsonResponseCode,
         message:
@@ -394,16 +416,34 @@ class DioApi implements ApiPort {
       message: message,
       statusCode: status,
       kind: FailureKind.terminal,
+      rejectedOperations: rejectedOperationsOf(e.response?.data),
     );
   }
 
-  static bool _announcesJson(Response<dynamic>? response) =>
-      (response?.headers.value(Headers.contentTypeHeader) ?? '')
-          .toLowerCase()
-          .contains('json');
+  static bool announcesJson(Response<dynamic>? response) =>
+      retry_after.announcesJson(response);
 
   static Duration? retryAfterOf(Response<dynamic>? response) =>
       retry_after.retryAfterOf(response);
+
+  static final RegExp _operationPath = RegExp(r'^operations\.(\d+)\b');
+
+  /// Rangs des opérations que le refus nomme. La validation du serveur préfixe
+  /// chaque phrase de `details` par le chemin fautif — `operations.7.data.nom` —
+  /// et c'est le seul verdict par opération qu'une réponse d'erreur porte.
+  static List<int> rejectedOperationsOf(Object? data) {
+    if (data is! Map) return const <int>[];
+    final Object? details = data['details'];
+    if (details is! List) return const <int>[];
+    final Set<int> ranks = <int>{};
+    for (final Object? line in details) {
+      final RegExpMatch? match = _operationPath.firstMatch('$line');
+      if (match == null) continue;
+      final int? rank = int.tryParse(match.group(1)!);
+      if (rank != null) ranks.add(rank);
+    }
+    return ranks.toList(growable: false)..sort();
+  }
 
   static String? _serverCode(Object? data) {
     if (data is Map && data['code'] is String) return data['code'] as String;

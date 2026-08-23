@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/campaign_scope.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -22,7 +23,17 @@ class CreateCampaignDto {
   CreateCampaignDto({
     required this.name,
 
+    this.projet = Projet.CHUES,
+
     required this.scope,
+
+    this.offerId,
+
+    this.canalProvenanceId,
+
+    this.professionId,
+
+    this.incomeBandId,
 
     required this.commercialIds,
 
@@ -32,6 +43,15 @@ class CreateCampaignDto {
   @JsonKey(name: r'name', required: true, includeIfNull: false)
   final String name;
 
+  @JsonKey(
+    defaultValue: Projet.CHUES,
+    name: r'projet',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: Projet.unknownDefaultOpenApi,
+  )
+  final Projet? projet;
+
   /// Périmètre du tirage. BDD1..BDD4 sont les segments partagés ; ALL réunit les quatre sans recouvrement.
   @JsonKey(
     name: r'scope',
@@ -40,6 +60,19 @@ class CreateCampaignDto {
     unknownEnumValue: CampaignScope.unknownDefaultOpenApi,
   )
   final CampaignScope scope;
+
+  /// Offre ciblée, pour Grand Public.
+  @JsonKey(name: r'offerId', required: false, includeIfNull: false)
+  final String? offerId;
+
+  @JsonKey(name: r'canalProvenanceId', required: false, includeIfNull: false)
+  final String? canalProvenanceId;
+
+  @JsonKey(name: r'professionId', required: false, includeIfNull: false)
+  final String? professionId;
+
+  @JsonKey(name: r'incomeBandId', required: false, includeIfNull: false)
+  final String? incomeBandId;
 
   /// Commerciaux destinataires, DANS L’ORDRE du tourniquet. Cet ordre est persisté en `position` et fige le contenu de chaque programme.
   @JsonKey(name: r'commercialIds', required: true, includeIfNull: false)
@@ -61,15 +94,45 @@ class CreateCampaignDto {
         other is CreateCampaignDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [name, scope, commercialIds, spreadDays],
-              [other.name, other.scope, other.commercialIds, other.spreadDays],
+              [
+                name,
+                projet,
+                scope,
+                offerId,
+                canalProvenanceId,
+                professionId,
+                incomeBandId,
+                commercialIds,
+                spreadDays,
+              ],
+              [
+                other.name,
+                other.projet,
+                other.scope,
+                other.offerId,
+                other.canalProvenanceId,
+                other.professionId,
+                other.incomeBandId,
+                other.commercialIds,
+                other.spreadDays,
+              ],
             );
   }
 
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([name, scope, commercialIds, spreadDays]);
+      mapPropsToHashCode([
+        name,
+        projet,
+        scope,
+        offerId,
+        canalProvenanceId,
+        professionId,
+        incomeBandId,
+        commercialIds,
+        spreadDays,
+      ]);
 
   factory CreateCampaignDto.fromJson(Map<String, dynamic> json) =>
       _$CreateCampaignDtoFromJson(json);

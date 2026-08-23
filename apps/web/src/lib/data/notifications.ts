@@ -103,6 +103,13 @@ export const notificationKeys = {
   list: (filters: NotificationFilters) => ['notifications', 'list', filters] as const,
   detail: (id: string) => ['notifications', 'detail', id] as const,
   preview: (query: AudienceQuery) => ['notifications', 'preview', query] as const,
-  templates: ['notifications', 'templates'] as const,
+  templatesRoot: ['notifications', 'templates'] as const,
+  /**
+   * Le drapeau EST dans la clé. Sans lui, l'onglet Gabarits (inactifs compris)
+   * et le composeur (actifs seulement) se servaient la réponse l'un de l'autre :
+   * selon l'ordre de visite, le composeur proposait un gabarit désactivé, ou les
+   * désactivés disparaissaient de l'onglet et devenaient irréactivables.
+   */
+  templates: (includeInactive: boolean) => ['notifications', 'templates', includeInactive] as const,
   departements: ['notifications', 'departements'] as const,
 };

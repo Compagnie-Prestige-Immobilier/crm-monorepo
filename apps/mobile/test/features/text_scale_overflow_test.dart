@@ -1,5 +1,4 @@
 import 'package:cpi_go/core/providers/app_providers.dart';
-import 'package:crm_api_client/crm_api_client.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/sync/phase2_directory_sync.dart';
 import 'package:cpi_go/core/settings/display_settings.dart';
@@ -18,7 +17,6 @@ import 'package:cpi_go/features/updates/presentation/app_update_screen.dart';
 import 'package:cpi_go/features/about/presentation/about_screen.dart';
 import 'package:cpi_go/features/accueil/presentation/registre_screen.dart';
 import 'package:cpi_go/features/accueil/presentation/visite_form_screen.dart';
-import 'package:cpi_go/features/accueil/visites_repository.dart';
 import 'package:cpi_go/features/corrections/presentation/corrections_screen.dart';
 import 'package:cpi_go/features/historique/presentation/historique_screen.dart';
 import 'package:cpi_go/features/home/presentation/home_screen.dart';
@@ -135,6 +133,32 @@ void main() {
       dayIndex: 3,
     );
 
+    // Les intitulés les plus longs du classeur : c'est eux qui débordent. Les
+    // listes viennent de la base, le formulaire n'appelle plus rien.
+    for (final (String id, String kind, String label)
+        in <(String, String, String)>[
+          ('e1', 'entreprises', 'MAKE-UP ADDICTION'),
+          ('d1', 'directions', 'MARKETING COMMUNICATION'),
+          (
+            't1',
+            'destinataires',
+            'MME. DIOUM YAMA (Ass Rh et Commerciale Argile)',
+          ),
+          ('o1', 'objets', 'ACHAT PRODUITS SANTARGILE ET/OU MAKE-UP'),
+        ]) {
+      await db
+          .into(db.visiteReferentiels)
+          .insert(
+            VisiteReferentielsCompanion.insert(
+              id: id,
+              kind: kind,
+              code: id.toUpperCase(),
+              label: label,
+              localUpdatedAt: t0,
+            ),
+          );
+    }
+
     // Le registre dans son état le plus large : les intitulés les plus longs
     // du classeur, une référence, un téléphone et les quatre listes remplies.
     await insertVisite(
@@ -174,7 +198,11 @@ void main() {
       await DraftRepository(
         db,
         clock: FakeClock(t0.subtract(const Duration(hours: 1))),
-      ).save(draftId: 'draft-${draft.key}', formKey: draft.key, values: draft.value);
+      ).save(
+        draftId: 'draft-${draft.key}',
+        formKey: draft.key,
+        values: draft.value,
+      );
     }
   });
 
@@ -220,7 +248,6 @@ void main() {
         clockProvider.overrideWithValue(FakeClock(t0)),
         sharedPreferencesProvider.overrideWithValue(prefs),
         authControllerProvider.overrideWith(_SignedInController.new),
-        visitesPortProvider.overrideWithValue(const _VisitesFigees()),
       ],
       child: MaterialApp(
         theme: AppTheme.light,
@@ -342,7 +369,8 @@ void main() {
     // la ligne.
     'Nouveau représentant': RepresentantFormScreen.new,
     'Saisie de prospects sans représentant': ProspectEntryScreen.new,
-    'Saisie de prospects': () => const ProspectEntryScreen(representantId: 'repA'),
+    'Saisie de prospects': () =>
+        const ProspectEntryScreen(representantId: 'repA'),
     // Les quatre que la liste oubliait en se croyant complète. Trois sont
     // atteignables sans session ou juste après, donc jamais vus par un
     // balayage qui partait de l'accueil.
@@ -414,12 +442,19 @@ void main() {
         );
         group('${widthDp.toInt()} dp · système $systemFactor× · « ${scale.label} » '
             '(${applied.toStringAsFixed(2)}×)', () {
-          for (final MapEntry<String, Widget Function()> entry in screens.entries) {
-            testWidgets('${entry.key} ne déborde pas', (WidgetTester tester) async {
+          for (final MapEntry<String, Widget Function()> entry
+              in screens.entries) {
+            testWidgets('${entry.key} ne déborde pas', (
+              WidgetTester tester,
+            ) async {
               useSurface(tester, widthDp: widthDp);
               await paint(
                 tester,
-                await host(entry.value(), scale: scale, systemFactor: systemFactor),
+                await host(
+                  entry.value(),
+                  scale: scale,
+                  systemFactor: systemFactor,
+                ),
               );
 
               // `takeException` rend la première exception collectée, ou null. Un
@@ -522,35 +557,3 @@ const List<CallReason> _reasons = <CallReason>[
     sortOrder: 50,
   ),
 ];
-
-
-/// Les intitulés les plus longs du classeur : c'est eux qui débordent.
-class _VisitesFigees implements VisitesPort {
-  const _VisitesFigees();
-
-  static VisiteReferentielDto _entree(String id, String label) => VisiteReferentielDto(
-    id: id,
-    code: id.toUpperCase(),
-    label: label,
-    isActive: true,
-    isSystem: true,
-    sortOrder: 1,
-    updatedAt: DateTime.utc(2026),
-  );
-
-  @override
-  Future<VisiteReferentielsBundleDto> referentiels() async =>
-      VisiteReferentielsBundleDto(
-        entreprises: <VisiteReferentielDto>[_entree('e1', 'MAKE-UP ADDICTION')],
-        directions: <VisiteReferentielDto>[
-          _entree('d1', 'MARKETING COMMUNICATION'),
-        ],
-        destinataires: <VisiteReferentielDto>[
-          _entree('t1', 'MME. DIOUM YAMA (Ass Rh et Commerciale Argile)'),
-        ],
-        objets: <VisiteReferentielDto>[
-          _entree('o1', 'ACHAT PRODUITS SANTARGILE ET/OU MAKE-UP'),
-        ],
-      );
-
-}

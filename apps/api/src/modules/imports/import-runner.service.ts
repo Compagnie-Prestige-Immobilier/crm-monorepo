@@ -154,7 +154,7 @@ export class ImportRunnerService {
       throw new LostLeaseError();
     }
 
-    await adapter.prepare(this.contextOn(job, this.prisma));
+    const run = await adapter.prepare(this.contextOn(job, this.prisma));
 
     let seen = 0;
     let pendingConsumed = 0;
@@ -162,7 +162,7 @@ export class ImportRunnerService {
 
     const flush = async (): Promise<void> => {
       if (pendingConsumed === 0) return;
-      await this.writeChunk(job, adapter, claim, buffer, pendingConsumed, totals);
+      await this.writeChunk(job, adapter, claim, buffer, pendingConsumed, totals, run);
       buffer = [];
       pendingConsumed = 0;
     };
@@ -181,7 +181,7 @@ export class ImportRunnerService {
 
       if (seen <= skip) continue;
 
-      const parsed = adapter.parseRow(raw.cells, raw.rowNumber);
+      const parsed = adapter.parseRow(raw.cells, raw.rowNumber, run);
       if (parsed.ok) {
         buffer.push(parsed.row);
       } else {
@@ -225,12 +225,13 @@ export class ImportRunnerService {
     rows: readonly unknown[],
     consumed: number,
     totals: Totals,
+    run: unknown,
   ): Promise<void> {
     const processed = totals.processed + consumed;
 
     const outcome = await this.prisma.$transaction(
       async (tx) => {
-        const chunk = await adapter.writeChunk(rows, this.contextOn(job, tx));
+        const chunk = await adapter.writeChunk(rows, this.contextOn(job, tx), run);
 
         const written = await claim.writeIn(
           tx,

@@ -16,11 +16,7 @@ import '../providers/connectivity.dart';
 
 enum AppUpdateStatus { checking, downloading, ready, error, unreachable }
 
-enum AppUpdateBlocker {
-  none,
-
-  meteredLink,
-}
+enum AppUpdateBlocker { none, meteredLink }
 
 class AndroidRelease {
   const AndroidRelease({
@@ -119,18 +115,17 @@ appUpdateControllerProvider =
       AppUpdateController.new,
     );
 
-final Provider<Dio Function()> appUpdateClientProvider = Provider<Dio Function()>((
-  Ref ref,
-) {
-  return () => Dio(
-    BaseOptions(
-      baseUrl: ApiEnvironment.baseUrl,
-      connectTimeout: const Duration(seconds: 8),
-      receiveTimeout: const Duration(seconds: 12),
-      headers: <String, dynamic>{'Accept': 'application/json'},
-    ),
-  );
-});
+final Provider<Dio Function()> appUpdateClientProvider =
+    Provider<Dio Function()>((Ref ref) {
+      return () => Dio(
+        BaseOptions(
+          baseUrl: ApiEnvironment.baseUrl,
+          connectTimeout: const Duration(seconds: 8),
+          receiveTimeout: const Duration(seconds: 12),
+          headers: <String, dynamic>{'Accept': 'application/json'},
+        ),
+      );
+    });
 
 class AppUpdateController extends Notifier<AppUpdateState> {
   static const MethodChannel _installer = MethodChannel('sn.cpi.go/updates');
@@ -143,14 +138,17 @@ class AppUpdateController extends Notifier<AppUpdateState> {
   @override
   AppUpdateState build() {
     ref.onDispose(() => _splashDeadline?.cancel());
-    ref.listen<AsyncValue<List<ConnectivityResult>>>(connectivityTriggerProvider, (
-      AsyncValue<List<ConnectivityResult>>? _,
-      AsyncValue<List<ConnectivityResult>> next,
-    ) {
-      final List<ConnectivityResult>? results = next.value;
-      if (results == null) return;
-      unawaited(check(overMeteredLink: !isUnmeteredLink(results)));
-    });
+    ref.listen<AsyncValue<List<ConnectivityResult>>>(
+      connectivityTriggerProvider,
+      (
+        AsyncValue<List<ConnectivityResult>>? _,
+        AsyncValue<List<ConnectivityResult>> next,
+      ) {
+        final List<ConnectivityResult>? results = next.value;
+        if (results == null) return;
+        unawaited(check(overMeteredLink: !isUnmeteredLink(results)));
+      },
+    );
     _splashDeadline = Timer(splashBudget, _releaseSplash);
     unawaited(Future<void>.microtask(check));
     return const AppUpdateState.checking();
@@ -178,13 +176,16 @@ class AppUpdateController extends Notifier<AppUpdateState> {
         response.data as Map,
       );
       if (json['available'] != true) {
-        if (ref.mounted) state = const AppUpdateState(status: AppUpdateStatus.ready);
+        if (ref.mounted) {
+          state = const AppUpdateState(status: AppUpdateStatus.ready);
+        }
         return;
       }
       final AndroidRelease release = AndroidRelease.fromJson(json);
       await _cacheRelease(release);
 
-      final bool metered = overMeteredLink ?? !isUnmeteredLink(await _interfaces());
+      final bool metered =
+          overMeteredLink ?? !isUnmeteredLink(await _interfaces());
       if (metered) {
         if (!ref.mounted) return;
         state = AppUpdateState(

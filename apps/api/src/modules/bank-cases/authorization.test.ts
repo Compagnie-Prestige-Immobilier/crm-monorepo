@@ -171,9 +171,17 @@ const MATRICE_NOUVEAUX: {
   { controller: ClientRequestsController, method: 'reject', roles: [Role.ADMIN] },
 
   { controller: RepCampaignsController, method: 'preview', roles: [Role.ADMIN] },
-  { controller: RepCampaignsController, method: 'list', roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION] },
+  {
+    controller: RepCampaignsController,
+    method: 'list',
+    roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION],
+  },
   { controller: RepCampaignsController, method: 'create', roles: [Role.ADMIN] },
-  { controller: RepCampaignsController, method: 'get', roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION] },
+  {
+    controller: RepCampaignsController,
+    method: 'get',
+    roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION],
+  },
   { controller: RepCampaignsController, method: 'close', roles: [Role.ADMIN] },
   {
     controller: RepCampaignsController,

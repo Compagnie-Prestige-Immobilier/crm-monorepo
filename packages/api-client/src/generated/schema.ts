@@ -92,6 +92,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/demo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** État du workspace démo. */
+    get: operations['getDemoWorkspaceStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/demo/reset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Réinitialise le workspace démo. */
+    post: operations['resetDemoWorkspace'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/users': {
     parameters: {
       query?: never;
@@ -232,6 +266,111 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/api/v1/referentiels/professions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Liste fermée des professions. */
+    get: operations['listProfessions'];
+    put?: never;
+    /** Ajoute une profession. */
+    post: operations['createProfession'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/referentiels/professions/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Modifie une profession. */
+    patch: operations['updateProfession'];
+    trace?: never;
+  };
+  '/api/v1/referentiels/tranches-revenu': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Tranches de revenu mensuel. */
+    get: operations['listIncomeBands'];
+    put?: never;
+    /** Ajoute une tranche de revenu. */
+    post: operations['createIncomeBand'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/referentiels/tranches-revenu/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Modifie une tranche de revenu. */
+    patch: operations['updateIncomeBand'];
+    trace?: never;
+  };
+  '/api/v1/referentiels/offres': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Offres proposées au Grand Public. */
+    get: operations['listOffers'];
+    put?: never;
+    /** Ajoute une offre. */
+    post: operations['createOffer'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/referentiels/offres/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Modifie une offre. */
+    patch: operations['updateOffer'];
     trace?: never;
   };
   '/api/v1/referentiels/canaux-provenance/{id}': {
@@ -627,6 +766,40 @@ export interface paths {
     patch: operations['updateProspect'];
     trace?: never;
   };
+  '/api/v1/prospects/{id}/parcours/grand-public/consentement': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Trace l’accord ou le refus de poursuivre en Grand Public. */
+    patch: operations['updateGrandPublicConsent'];
+    trace?: never;
+  };
+  '/api/v1/prospects/{id}/parcours/grand-public/conversion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Confirme une vente ou adhésion Grand Public. */
+    post: operations['confirmGrandPublicConversion'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/prospects/merge': {
     parameters: {
       query?: never;
@@ -825,6 +998,40 @@ export interface paths {
      * @description Idempotent. Les tâches annulées redeviennent inactives : sans quoi leurs prospects resteraient inéligibles à toute campagne future.
      */
     post: operations['closeCallCampaign'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/phase2/campaigns/{id}/pause': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Suspend temporairement les appels. */
+    post: operations['pauseCallCampaign'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/phase2/campaigns/{id}/resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reprend une campagne suspendue. */
+    post: operations['resumeCallCampaign'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2117,40 +2324,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/admin/demo': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** État du workspace démo. */
-    get: operations['getDemoWorkspaceStatus'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/demo/reset': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Réinitialise le workspace démo. */
-    post: operations['resetDemoWorkspace'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/admin/purge': {
     parameters: {
       query?: never;
@@ -2607,6 +2780,18 @@ export interface components {
       /** @enum {string} */
       workspace: 'public' | 'demo';
     };
+    DemoWorkspaceCountsDto: {
+      users: number;
+      representants: number;
+      prospects: number;
+      campaigns: number;
+      bankCases: number;
+    };
+    DemoWorkspaceStatusDto: {
+      /** @enum {string} */
+      workspace: 'demo';
+      counts: components['schemas']['DemoWorkspaceCountsDto'];
+    };
     UserDto: {
       /** Format: uuid */
       id: string;
@@ -2672,6 +2857,11 @@ export interface components {
     };
     SetActiveDto: {
       isActive: boolean;
+      /**
+       * Format: uuid
+       * @description Compte qui reprend le portefeuille. Exigé si le compte désactivé en a un.
+       */
+      handoverToId?: string;
     };
     ResetPasswordDto: {
       /** Format: password */
@@ -2719,11 +2909,48 @@ export interface components {
       code: string;
       name: string;
     };
+    ProfessionDto: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      label: string;
+      isTeaching: boolean;
+      position: number;
+      isActive: boolean;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    IncomeBandDto: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      label: string;
+      minXof: number | null;
+      maxXof: number | null;
+      position: number;
+      isActive: boolean;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    OfferDto: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      label: string;
+      description: string | null;
+      position: number;
+      isActive: boolean;
+      /** Format: date-time */
+      updatedAt: string;
+    };
     ReferentielsBundleDto: {
       banques: components['schemas']['BanqueDto'][];
       syndicats: components['schemas']['SyndicatDto'][];
       departements: components['schemas']['DepartementDto'][];
       regions: components['schemas']['RegionDto'][];
+      professions: components['schemas']['ProfessionDto'][];
+      incomeBands: components['schemas']['IncomeBandDto'][];
+      offers: components['schemas']['OfferDto'][];
     };
     CanalProvenanceDto: {
       /** Format: uuid */
@@ -2735,6 +2962,58 @@ export interface components {
       isActive: boolean;
       /** Format: date-time */
       updatedAt: string;
+    };
+    CreateProfessionDto: {
+      code: string;
+      label: string;
+      /** @default false */
+      isTeaching: boolean;
+      position?: number;
+      /** @default true */
+      isActive: boolean;
+    };
+    UpdateProfessionDto: {
+      code?: string;
+      label?: string;
+      /** @default false */
+      isTeaching: boolean;
+      position?: number;
+      /** @default true */
+      isActive: boolean;
+    };
+    CreateIncomeBandDto: {
+      code: string;
+      label: string;
+      minXof?: number;
+      maxXof?: number;
+      position?: number;
+      /** @default true */
+      isActive: boolean;
+    };
+    UpdateIncomeBandDto: {
+      code?: string;
+      label?: string;
+      minXof?: number;
+      maxXof?: number;
+      position?: number;
+      /** @default true */
+      isActive: boolean;
+    };
+    CreateOfferDto: {
+      code: string;
+      label: string;
+      description?: string;
+      position?: number;
+      /** @default true */
+      isActive: boolean;
+    };
+    UpdateOfferDto: {
+      code?: string;
+      label?: string;
+      description?: string;
+      position?: number;
+      /** @default true */
+      isActive: boolean;
     };
     CreateCanalProvenanceDto: {
       /** @description Immuable une fois posé. */
@@ -3101,6 +3380,21 @@ export interface components {
     EnrollmentMethod: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING';
     /** @enum {string} */
     ProspectSortField: 'createdAt' | 'clientCreatedAt' | 'nom' | 'prenom' | 'statut';
+    /** @enum {string} */
+    PaymentMode: 'COMPTANT' | 'ECHELONNE';
+    /** @enum {string} */
+    GrandPublicConsent: 'NON_DEMANDE' | 'INTERESSE' | 'REFUSE';
+    ProspectJourneyDto: {
+      /** Format: uuid */
+      id: string;
+      projet: components['schemas']['Projet'];
+      statut: components['schemas']['ProspectStatut'];
+      consent: components['schemas']['GrandPublicConsent'];
+      /** Format: date-time */
+      consentAt: string | null;
+      /** Format: date-time */
+      convertedAt: string | null;
+    };
     /**
      * @description Résultat de la dernière tentative d’appel enregistrée.
      * @enum {string}
@@ -3136,6 +3430,14 @@ export interface components {
       type: components['schemas']['ProspectType'] | null;
       /** @description Métier déclaré, en clair. */
       profession: string | null;
+      /** Format: uuid */
+      professionId: string | null;
+      professionIsTeaching: boolean | null;
+      /** Format: uuid */
+      incomeBandId: string | null;
+      incomeBandLabel: string | null;
+      paymentMode: components['schemas']['PaymentMode'] | null;
+      journeys: components['schemas']['ProspectJourneyDto'][];
       /** @description Durée du système de paiement retenue, en MOIS. */
       dureeSystemeMois: number | null;
       /** Format: uuid */
@@ -3202,6 +3504,17 @@ export interface components {
       type?: components['schemas']['ProspectType'];
       /** @description Métier déclaré, en clair. */
       profession?: string;
+      /**
+       * Format: uuid
+       * @description Profession choisie dans le référentiel.
+       */
+      professionId?: string;
+      /**
+       * Format: uuid
+       * @description Tranche de revenu mensuel déclaré.
+       */
+      incomeBandId?: string;
+      paymentMode?: components['schemas']['PaymentMode'];
       /** @description Durée du système de paiement, en MOIS. */
       dureeSystemeMois?: number;
       /**
@@ -3282,6 +3595,17 @@ export interface components {
       type?: components['schemas']['ProspectType'];
       /** @description Métier déclaré, en clair. */
       profession?: string;
+      /**
+       * Format: uuid
+       * @description Profession choisie dans le référentiel.
+       */
+      professionId?: string;
+      /**
+       * Format: uuid
+       * @description Tranche de revenu mensuel déclaré.
+       */
+      incomeBandId?: string;
+      paymentMode?: components['schemas']['PaymentMode'];
       /** @description Durée du système de paiement, en MOIS. */
       dureeSystemeMois?: number;
       /**
@@ -3295,6 +3619,16 @@ export interface components {
        * @description Horodatage de la saisie terrain.
        */
       clientCreatedAt?: string;
+    };
+    UpdateGrandPublicConsentDto: {
+      consent: components['schemas']['GrandPublicConsent'];
+    };
+    ConfirmGrandPublicConversionDto: {
+      /** Format: uuid */
+      offerId: string;
+      paymentMode?: components['schemas']['PaymentMode'];
+      amountXof?: number;
+      durationMonths?: number;
     };
     MergeProspectsDto: {
       /**
@@ -3425,6 +3759,10 @@ export interface components {
       whatsappE164?: string;
       /** @description Profession déclarée. Sert au représentant comme au prospect. */
       profession?: string;
+      /** @description Représentant : où en est la relation. Un statut identique à celui déjà en base n’écrit rien. */
+      relationStatus?: components['schemas']['RepresentantRelation'];
+      /** @description Motif de la bascule, repris dans la chronologie. FACULTATIF POUR TOUJOURS. */
+      relationReason?: string;
       /** @description Représentant : l’établissement où il exerce. Ni l’IEF ni le département. */
       etablissement?: string;
       /** @description Prospect : le projet dont il relève. CHUES par défaut côté serveur. */
@@ -3513,7 +3851,7 @@ export interface components {
       /** @description Révision serveur sur laquelle le client s’est basé. Fournie sur update/delete, elle transforme une écriture aveugle en écriture conditionnelle. */
       baseRev?: number;
       data?: components['schemas']['SyncEntityDataDto'];
-      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement. */
+      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement, banqueId, syndicatId, representantId. */
       clearedFields?: string[];
     };
     SyncPushDto: {
@@ -3556,7 +3894,20 @@ export interface components {
       nextCursor: string | null;
     };
     /** @enum {string} */
-    CampaignStatus: 'ACTIVE' | 'CLOSED';
+    VisiteReferentielKind: 'entreprises' | 'directions' | 'destinataires' | 'objets';
+    SyncVisiteReferentielDto: {
+      /** Format: uuid */
+      id: string;
+      kind: components['schemas']['VisiteReferentielKind'];
+      code: string;
+      label: string;
+      isActive: boolean;
+      sortOrder: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    CampaignStatus: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'CLOSED';
     SyncCallCampaignDto: {
       /** Format: uuid */
       id: string;
@@ -3621,6 +3972,9 @@ export interface components {
       iefs: components['schemas']['IefDto'][];
       banques: components['schemas']['BanqueDto'][];
       syndicats: components['schemas']['SyndicatDto'][];
+      canauxProvenance: components['schemas']['CanalProvenanceDto'][];
+      /** @description Les quatre listes du registre des visites, réunies : chaque entrée porte sa nature. */
+      visiteReferentiels: components['schemas']['SyncVisiteReferentielDto'][];
       representants: components['schemas']['RepresentantDto'][];
       prospects: components['schemas']['ProspectDto'][];
       callCampaigns: components['schemas']['SyncCallCampaignDto'][];
@@ -3672,7 +4026,7 @@ export interface components {
       serverTime: string;
     };
     /** @enum {string} */
-    CampaignScope: 'BDD1' | 'BDD2' | 'BDD3' | 'BDD4' | 'ALL';
+    CampaignScope: 'BDD1' | 'BDD2' | 'BDD3' | 'BDD4' | 'GP1' | 'GP2' | 'GP3' | 'GP4' | 'ALL';
     CampaignProgressDto: {
       /** @description Nombre total de tâches affectées. */
       total: number;
@@ -3687,10 +4041,12 @@ export interface components {
       /** Format: uuid */
       id: string;
       name: string;
+      projet: components['schemas']['Projet'];
       scope: components['schemas']['CampaignScope'];
       /** @description Libellé lisible du périmètre, issu de la définition partagée. */
       scopeLabel: string;
       status: components['schemas']['CampaignStatus'];
+      offerLabel: string | null;
       /** @description Graine du tirage, persistée pour pouvoir rejouer et auditer la répartition. Les affectations, elles, sont matérialisées. */
       seed: string;
       /** Format: uuid */
@@ -3712,8 +4068,21 @@ export interface components {
     CreateCampaignDto: {
       /** @example Campagne CHUES, avril */
       name: string;
+      /** @default CHUES */
+      projet: components['schemas']['Projet'];
       /** @description Périmètre du tirage. BDD1..BDD4 sont les segments partagés ; ALL réunit les quatre sans recouvrement. */
       scope: components['schemas']['CampaignScope'];
+      /**
+       * Format: uuid
+       * @description Offre ciblée, pour Grand Public.
+       */
+      offerId?: string;
+      /** Format: uuid */
+      canalProvenanceId?: string;
+      /** Format: uuid */
+      professionId?: string;
+      /** Format: uuid */
+      incomeBandId?: string;
       /** @description Commerciaux destinataires, DANS L’ORDRE du tourniquet. Cet ordre est persisté en `position` et fige le contenu de chaque programme. */
       commercialIds: string[];
       /**
@@ -3763,9 +4132,11 @@ export interface components {
       /** Format: uuid */
       id: string;
       name: string;
+      projet: components['schemas']['Projet'];
       scope: components['schemas']['CampaignScope'];
       scopeLabel: string;
       status: components['schemas']['CampaignStatus'];
+      offerLabel: string | null;
       seed: string;
       /** Format: uuid */
       createdById: string;
@@ -3804,8 +4175,6 @@ export interface components {
       destinataires: components['schemas']['VisiteReferentielDto'][];
       objets: components['schemas']['VisiteReferentielDto'][];
     };
-    /** @enum {string} */
-    VisiteReferentielKind: 'entreprises' | 'directions' | 'destinataires' | 'objets';
     VisiteReferentielListDto: {
       items: components['schemas']['VisiteReferentielDto'][];
     };
@@ -5175,18 +5544,6 @@ export interface components {
       /** @description Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre. */
       teleconseillers: components['schemas']['SupervisionTeleconseillerDto'][];
     };
-    DemoWorkspaceCountsDto: {
-      users: number;
-      representants: number;
-      prospects: number;
-      campaigns: number;
-      bankCases: number;
-    };
-    DemoWorkspaceStatusDto: {
-      /** @enum {string} */
-      workspace: 'demo';
-      counts: components['schemas']['DemoWorkspaceCountsDto'];
-    };
     /** @enum {string} */
     PurgeDomainKey:
       | 'teleconseillers'
@@ -5581,6 +5938,44 @@ export interface operations {
       };
     };
   };
+  getDemoWorkspaceStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DemoWorkspaceStatusDto'];
+        };
+      };
+    };
+  };
+  resetDemoWorkspace: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DemoWorkspaceStatusDto'];
+        };
+      };
+    };
+  };
   listUsers: {
     parameters: {
       query?: {
@@ -5742,7 +6137,10 @@ export interface operations {
   };
   deleteUser: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Compte qui reprend le portefeuille. */
+        handoverToId?: string;
+      };
       header?: never;
       path: {
         id: string;
@@ -6259,6 +6657,459 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['CanalProvenanceDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listProfessions: {
+    parameters: {
+      query?: {
+        /** @description Ne renvoyer que les entrées actives. */
+        activeOnly?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProfessionDto'][];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createProfession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateProfessionDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProfessionDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateProfession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateProfessionDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProfessionDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listIncomeBands: {
+    parameters: {
+      query?: {
+        /** @description Ne renvoyer que les entrées actives. */
+        activeOnly?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IncomeBandDto'][];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createIncomeBand: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateIncomeBandDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IncomeBandDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateIncomeBand: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateIncomeBandDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IncomeBandDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listOffers: {
+    parameters: {
+      query?: {
+        /** @description Ne renvoyer que les entrées actives. */
+        activeOnly?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OfferDto'][];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createOffer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateOfferDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OfferDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateOffer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateOfferDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OfferDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
@@ -7966,6 +8817,110 @@ export interface operations {
       };
     };
   };
+  updateGrandPublicConsent: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateGrandPublicConsentDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProspectDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  confirmGrandPublicConversion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ConfirmGrandPublicConversionDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProspectDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   mergeProspects: {
     parameters: {
       query?: never;
@@ -8499,6 +9454,7 @@ export interface operations {
   listCallCampaigns: {
     parameters: {
       query?: {
+        projet?: components['schemas']['Projet'];
         status?: components['schemas']['CampaignStatus'];
         /** @description Recherche libre sur le nom de la campagne. */
         search?: string;
@@ -8729,6 +9685,102 @@ export interface operations {
       };
       /** @description PHASE2_CAMPAIGN_NOT_FOUND. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  pauseCallCampaign: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CampaignDetailDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  resumeCallCampaign: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CampaignDetailDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
         headers: {
           [name: string]: unknown;
         };
@@ -9405,6 +10457,7 @@ export interface operations {
   listScheduledCallbacks: {
     parameters: {
       query?: {
+        projet?: components['schemas']['Projet'];
         /** @description today : tout ce qui est dû d’ici la fin de la journée, retards compris. overdue : les seuls retards. week : les sept prochaines journées. */
         scope?: components['schemas']['CallbackScope'];
         /** @description File d’un téléconseiller donné. Réservé à l’administration et à la supervision ; ignoré pour les autres, qui ne voient que la leur. */
@@ -13642,44 +14695,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getDemoWorkspaceStatus: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DemoWorkspaceStatusDto'];
-        };
-      };
-    };
-  };
-  resetDemoWorkspace: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DemoWorkspaceStatusDto'];
         };
       };
     };

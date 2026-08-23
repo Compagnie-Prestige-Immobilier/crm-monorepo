@@ -153,7 +153,13 @@ export class VisitesService {
 
     const year = dakarWallClock(visitedAt).year;
 
-    for (let attempt = 0; attempt < REFERENCE_ATTEMPTS; attempt += 1) {
+    // Une seule tentative DANS la transaction d'un lot : PostgreSQL abandonne
+    // la transaction à la première erreur, la 2e tentative lèverait 25P02 et
+    // non P2002. La collision de référence remonte alors telle quelle, le
+    // téléphone renvoie, et la séquence est relue à neuf.
+    const attempts = entityId === undefined ? REFERENCE_ATTEMPTS : 1;
+
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
       const reference = formatVisiteReference(year, await this.nextSequence(year, db));
       try {
         const created = await db.visite.create({

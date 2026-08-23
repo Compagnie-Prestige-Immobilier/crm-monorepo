@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { mkdir, rename, rm, stat } from 'node:fs/promises';
+import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
@@ -116,7 +116,25 @@ export class AppUpdatesService {
       create: { key: SETTING_KEY, value: JSON.stringify(release), updatedById: actor.id },
       update: { value: JSON.stringify(release), updatedById: actor.id },
     });
+    await this.discardOtherApks(fileName);
     return this.toDto(release);
+  }
+
+  /**
+   * Une fois la ligne écrite, elle nomme le SEUL APK à garder : tout le reste
+   * est la release remplacée, ou le reliquat d'un envoi coupé avant sa ligne.
+   */
+  private async discardOtherApks(published: string): Promise<void> {
+    let entries: string[];
+    try {
+      entries = await readdir(this.directory);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry === published || !entry.endsWith('.apk')) continue;
+      await rm(join(this.directory, entry), { force: true });
+    }
   }
 
   async download(reply: FastifyReply): Promise<void> {

@@ -32,7 +32,7 @@ export const NON_TOKENS: readonly string[] = ['non', 'n', 'no', 'faux', 'false',
 /** Ce qu'Excel propose dans la colonne, quand elle est tenue à la souris. */
 export const FONCTIONNAIRE_CHOICES: readonly string[] = ['Oui', 'Non'];
 
-export const DUREE_SYSTEME_MAX_MOIS = 600;
+export const DUREE_SYSTEME_MAX_MOIS = 300;
 
 /**
  * Deux colonnes obligatoires, sept facultatives.

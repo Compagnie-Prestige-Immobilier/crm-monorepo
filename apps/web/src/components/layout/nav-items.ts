@@ -4,7 +4,6 @@ import {
   ChartColumnIcon,
   ClipboardListIcon,
   ClockIcon,
-  CompassIcon,
   FileSpreadsheetIcon,
   FolderOpenIcon,
   HeadsetIcon,
@@ -26,6 +25,33 @@ import type { Role } from '@/lib/types';
 
 /** Écran de choix, seul atterrissage après connexion. */
 export const HUB_PATH = '/espaces';
+
+/**
+ * La boîte de réception, HORS COQUE.
+ *
+ * Elle vit sous `/notifications` et non sous `/admin/*` : la coque Admin
+ * n'ouvre aucune entrée de menu aux autres rôles, et la barre latérale y était
+ * vide pour eux. `/admin/notifications` reste le composeur de l'ADMIN.
+ */
+export const INBOX_PATH = '/notifications';
+
+/**
+ * Les rôles qui reçoivent des notifications LISIBLES DANS LE PANEL. Le
+ * téléconseiller en est absent : les siennes visent l'application mobile.
+ */
+export const INBOX_ROLES: readonly Role[] = [
+  'ADMIN',
+  'DIRECTION',
+  'SUPERVISEUR',
+  'BANQUE_FINANCE',
+  'ACCUEIL',
+];
+
+export const hasInbox = (role: Role): boolean => INBOX_ROLES.includes(role);
+
+/** L'ADMIN lit la sienne dans le composeur, qui porte le même onglet. */
+export const inboxPathFor = (role: Role): string =>
+  role === 'ADMIN' ? '/admin/notifications?onglet=reception' : INBOX_PATH;
 
 export type Coque = 'accueil' | 'chues' | 'grand-public' | 'admin';
 
@@ -269,11 +295,65 @@ const SECTIONS: readonly NavSection[] = [
     title: null,
     items: [
       {
+        href: '/grand-public/tableau-de-bord',
+        label: 'Tableau de bord',
+        icon: LayoutDashboardIcon,
+        description: 'Indicateurs et graphiques',
+        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
+      },
+      {
         href: '/grand-public',
-        label: 'Projet Grand Public',
-        icon: CompassIcon,
-        description: 'Ce qui est en préparation',
+        label: 'Prospects',
+        icon: UsersIcon,
+        description: 'Liste filtrable des prospects',
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL'],
+      },
+      {
+        href: '/grand-public/statistiques',
+        label: 'Statistiques',
+        icon: ChartColumnIcon,
+        description: 'Activité et conversion',
+        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
+      },
+      {
+        href: '/grand-public/campagnes',
+        label: 'Campagnes',
+        icon: MegaphoneIcon,
+        description: 'Campagnes d’appels prospects',
+        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
+      },
+    ],
+  },
+  {
+    coque: 'grand-public',
+    title: 'Terrain',
+    items: [
+      {
+        href: '/grand-public/console',
+        label: 'Console d’appel',
+        icon: HeadsetIcon,
+        description: 'File d’appels et qualification',
+        roles: ['ADMIN', 'COMMERCIAL'],
+      },
+      {
+        href: '/grand-public/rappels',
+        label: 'Rappels',
+        icon: ClockIcon,
+        description: 'Échéances promises et retards',
+        roles: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
+      },
+      /*
+       * PAS de « Numéros suggérés » ici. Une suggestion est le numéro d'un
+       * tiers nommé par un REPRÉSENTANT syndical : `GET /api/v1/suggestions`
+       * n'accepte aucun filtre de projet et la notion n'existe pas hors CHUES.
+       * L'entrée servait la file CHUES sous une étiquette Grand Public.
+       */
+      {
+        href: '/grand-public/nouveau',
+        label: 'Nouveau prospect',
+        icon: PlusCircleIcon,
+        description: 'Saisie d’un prospect',
+        roles: ['ADMIN', 'COMMERCIAL'],
       },
     ],
   },
@@ -389,7 +469,17 @@ export function homePathForRole(role: Role): string {
  * décroissante règle les deux cas d'un coup.
  */
 export function navTitle(role: Role, pathname: string): string {
+  if (pathname === INBOX_PATH) return 'Notifications';
   return matchNavItem(role, pathname)?.label ?? 'CPI GO';
+}
+
+/**
+ * Coque à afficher dans la barre latérale d'un écran hors coque : la première
+ * ouverte au rôle. Sans elle, la boîte de réception n'offrirait aucun chemin
+ * de retour.
+ */
+export function fallbackCoque(role: Role): Coque | null {
+  return COQUES.find((entry) => entry.roles.includes(role))?.id ?? null;
 }
 
 /** L'entrée est-elle celle de la page courante ? Même règle que `navTitle`. */

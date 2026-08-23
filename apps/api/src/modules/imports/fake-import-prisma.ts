@@ -55,6 +55,7 @@ export const IEF_ALMADIES: FakeIef = {
 
 export interface FakeJobSeed {
   id?: string;
+  createdAt?: Date;
   kind?: ImportKind;
   status?: ImportStatus;
   mode?: ImportMode;
@@ -64,6 +65,7 @@ export interface FakeJobSeed {
   errorRows?: number;
   claimToken?: string | null;
   claimedAt?: Date | null;
+  failureCode?: string | null;
   startedAt?: Date | null;
   report?: Prisma.JsonValue | null;
 }
@@ -83,14 +85,14 @@ export const fakeJob = (seed: FakeJobSeed = {}): ImportJob => ({
   skippedRows: seed.skippedRows ?? 0,
   errorRows: seed.errorRows ?? 0,
   report: seed.report ?? null,
-  failureCode: null,
+  failureCode: seed.failureCode ?? null,
   failureMsg: null,
   claimToken: seed.claimToken ?? null,
   claimedAt: seed.claimedAt ?? null,
   startedAt: seed.startedAt ?? null,
   finishedAt: null,
   expiresAt: new Date(BASE.getTime() + 24 * 3_600_000),
-  createdAt: BASE,
+  createdAt: seed.createdAt ?? BASE,
   updatedAt: BASE,
 });
 
@@ -139,23 +141,48 @@ function matches(row: object, where: Where | undefined): boolean {
   });
 }
 
+type OrderBy = Record<string, 'asc' | 'desc'>;
+
+function compareOn(left: object, right: object, criterion: OrderBy): number {
+  const entry = Object.entries(criterion)[0];
+  if (!entry) return 0;
+  const [field, direction] = entry;
+  const a = (left as Record<string, unknown>)[field];
+  const b = (right as Record<string, unknown>)[field];
+
+  let delta = 0;
+  if (a instanceof Date && b instanceof Date) delta = a.getTime() - b.getTime();
+  else if (typeof a === 'string' && typeof b === 'string') delta = a < b ? -1 : a > b ? 1 : 0;
+  else if (typeof a === 'number' && typeof b === 'number') delta = a - b;
+
+  return direction === 'desc' ? -delta : delta;
+}
+
+/**
+ * Trie comme PostgreSQL, C'EST-À-DIRE SANS PROMESSE SUR LES EX ÆQUO.
+ *
+ * Deux lignes que le tri ne départage pas sont rendues dans un ordre qui change
+ * d'un appel à l'autre : c'est ce que fait un moteur réel, et c'est ce qui rend
+ * visible une pagination sans second critère unique.
+ */
 function sortBy<T extends object>(
   rows: readonly T[],
-  orderBy: Record<string, 'asc' | 'desc'> | undefined,
+  orderBy: OrderBy | readonly OrderBy[] | undefined,
+  call: number,
 ): T[] {
-  const copy = [...rows];
-  if (!orderBy) return copy;
+  if (!orderBy) return [...rows];
+  const criteria: readonly OrderBy[] = Array.isArray(orderBy) ? orderBy : [orderBy as OrderBy];
 
-  const entry = Object.entries(orderBy)[0];
-  if (!entry) return copy;
-  const [field, direction] = entry;
-
-  return copy.sort((left, right) => {
-    const a = (left as Record<string, unknown>)[field];
-    const b = (right as Record<string, unknown>)[field];
-    const delta = a instanceof Date && b instanceof Date ? a.getTime() - b.getTime() : 0;
-    return direction === 'desc' ? -delta : delta;
-  });
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((left, right) => {
+      for (const criterion of criteria) {
+        const delta = compareOn(left.row, right.row, criterion);
+        if (delta !== 0) return delta;
+      }
+      return call % 2 === 0 ? left.index - right.index : right.index - left.index;
+    })
+    .map((entry) => entry.row);
 }
 
 export class FakeImportPrisma {
@@ -165,6 +192,8 @@ export class FakeImportPrisma {
   iefs: FakeIef[] = [IEF_ALMADIES];
 
   onBeforeCreateMany?: () => void;
+
+  findManyCalls = 0;
 
   committedChunks = 0;
 
@@ -181,14 +210,15 @@ export class FakeImportPrisma {
 
       findMany: (args: {
         where?: Where;
-        orderBy?: Record<string, 'asc' | 'desc'>;
+        orderBy?: OrderBy | readonly OrderBy[];
         skip?: number;
         take?: number;
         select?: unknown;
       }): Promise<ImportJob[]> => {
+        this.findManyCalls += 1;
         const found = this.jobs.filter((job) => matches(job, args.where));
 
-        const sorted = sortBy(found, args.orderBy);
+        const sorted = sortBy(found, args.orderBy, this.findManyCalls);
 
         const from = args.skip ?? 0;
         const page = sorted.slice(from, args.take === undefined ? undefined : from + args.take);

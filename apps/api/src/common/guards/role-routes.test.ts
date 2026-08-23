@@ -127,6 +127,9 @@ const ADMISES: readonly string[] = [
   'ReferentielsController.listCanauxProvenance',
   'ReferentielsController.listDepartements',
   'ReferentielsController.listIefs',
+  'ReferentielsController.listIncomeBands',
+  'ReferentielsController.listOffers',
+  'ReferentielsController.listProfessions',
   'ReferentielsController.listRegions',
   'ReferentielsController.listRegionsWithDepartements',
   'ReferentielsController.listSyndicats',
@@ -170,6 +173,9 @@ const SOCLE: readonly string[] = [
   'ReferentielsController.listCanauxProvenance',
   'ReferentielsController.listDepartements',
   'ReferentielsController.listIefs',
+  'ReferentielsController.listIncomeBands',
+  'ReferentielsController.listOffers',
+  'ReferentielsController.listProfessions',
   'ReferentielsController.listRegions',
   'ReferentielsController.listRegionsWithDepartements',
   'ReferentielsController.listSyndicats',
@@ -188,8 +194,17 @@ const REGISTRE: readonly string[] = [
 /**
  * L'ACCUEIL, c'est le comptoir : le registre, et rien d'autre. Ni prospect, ni
  * représentant, ni statistique d'appel.
+ *
+ * La synchronisation en fait partie : le comptoir saisit sur un téléphone, et
+ * `VISITE_REGISTRE_ROLES` ne servait à rien tant que `/sync` lui répondait 403.
+ * Sa portée reste `mineOrAssigned*` — il ne tire aucun portefeuille.
  */
-const ADMISES_ACCUEIL: readonly string[] = [...SOCLE, ...REGISTRE];
+const ADMISES_ACCUEIL: readonly string[] = [
+  ...SOCLE,
+  ...REGISTRE,
+  'SyncController.pull',
+  'SyncController.push',
+];
 
 /**
  * La DIRECTION lit ce que lit la supervision, tient le registre avec l'accueil,
@@ -322,7 +337,6 @@ describe('ce qu’un compte d’ACCUEIL atteint, route par route', () => {
       SupervisionController,
       SuggestionsController,
       CallbacksController,
-      SyncController,
       UsersController,
     ]) {
       for (const method of routesOf(controller)) {
@@ -330,6 +344,12 @@ describe('ce qu’un compte d’ACCUEIL atteint, route par route', () => {
           false,
         );
       }
+    }
+  });
+
+  it('synchronise, parce que le registre se saisit au téléphone', () => {
+    for (const method of routesOf(SyncController)) {
+      expect(allowsAs(Role.ACCUEIL, SyncController, method), `sync.${method}`).toBe(true);
     }
   });
 

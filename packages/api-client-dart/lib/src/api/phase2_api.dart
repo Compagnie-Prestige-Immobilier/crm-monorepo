@@ -21,6 +21,7 @@ import 'package:crm_api_client/src/model/campaign_scope.dart';
 import 'package:crm_api_client/src/model/campaign_status.dart';
 import 'package:crm_api_client/src/model/create_campaign_dto.dart';
 import 'package:crm_api_client/src/model/directory_page_dto.dart';
+import 'package:crm_api_client/src/model/projet.dart';
 
 class Phase2Api {
   final Dio _dio;
@@ -538,6 +539,7 @@ class Phase2Api {
   ///
   ///
   /// Parameters:
+  /// * [projet]
   /// * [status]
   /// * [search] - Recherche libre sur le nom de la campagne.
   /// * [scope] - Périmètre du tirage.
@@ -556,6 +558,7 @@ class Phase2Api {
   /// Returns a [Future] containing a [Response] with a [CampaignListDto] as data
   /// Throws [DioException] if API call or serialization fails
   Future<Response<CampaignListDto>> listCallCampaigns({
+    Projet? projet,
     CampaignStatus? status,
     String? search,
     CampaignScope? scope,
@@ -585,6 +588,7 @@ class Phase2Api {
     );
 
     final _queryParameters = <String, dynamic>{
+      if (projet != null) r'projet': projet,
       if (status != null) r'status': status,
       if (search != null) r'search': search,
       if (scope != null) r'scope': scope,
@@ -641,6 +645,7 @@ class Phase2Api {
   /// Un téléconseiller ne voit que les rappels qu’il a promis. Les rappels en retard remontent dans la journée courante : le retard se déduit de la date, il n’est jamais écrit.
   ///
   /// Parameters:
+  /// * [projet]
   /// * [scope] - today : tout ce qui est dû d’ici la fin de la journée, retards compris. overdue : les seuls retards. week : les sept prochaines journées.
   /// * [assignedToId] - File d’un téléconseiller donné. Réservé à l’administration et à la supervision ; ignoré pour les autres, qui ne voient que la leur.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -653,6 +658,7 @@ class Phase2Api {
   /// Returns a [Future] containing a [Response] with a [CallbackListDto] as data
   /// Throws [DioException] if API call or serialization fails
   Future<Response<CallbackListDto>> listScheduledCallbacks({
+    Projet? projet,
     CallbackScope? scope,
     String? assignedToId,
     CancelToken? cancelToken,
@@ -676,6 +682,7 @@ class Phase2Api {
     );
 
     final _queryParameters = <String, dynamic>{
+      if (projet != null) r'projet': projet,
       if (scope != null) r'scope': scope,
       if (assignedToId != null) r'assignedToId': assignedToId,
     };
@@ -711,6 +718,88 @@ class Phase2Api {
     }
 
     return Response<CallbackListDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Suspend temporairement les appels.
+  ///
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [CampaignDetailDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<CampaignDetailDto>> pauseCallCampaign({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/phase2/campaigns/{id}/pause'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    CampaignDetailDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<CampaignDetailDto, CampaignDetailDto>(
+              rawData,
+              'CampaignDetailDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<CampaignDetailDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -796,6 +885,88 @@ class Phase2Api {
     }
 
     return Response<DirectoryPageDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Reprend une campagne suspendue.
+  ///
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [CampaignDetailDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<CampaignDetailDto>> resumeCallCampaign({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/phase2/campaigns/{id}/resume'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    CampaignDetailDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<CampaignDetailDto, CampaignDetailDto>(
+              rawData,
+              'CampaignDetailDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<CampaignDetailDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

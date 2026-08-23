@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
-import { HUB_PATH, navTitle } from '@/components/layout/nav-items';
+import { hasInbox, HUB_PATH, inboxPathFor, navTitle } from '@/components/layout/nav-items';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { UserMenu } from '@/components/layout/user-menu';
@@ -53,20 +53,18 @@ export function Topbar({ user }: { user: SessionUser }) {
         {title}
       </h1>
 
-      {/* La cloche n'est montée que pour les rôles dont les notifications
-          pointent vers un écran du panel : l'ADMIN (demandes de création de
-          client, rappels système) et l'agent BANQUE_FINANCE (réponse à ses
-          demandes, dossiers sans mouvement). Celles d'un téléconseiller visent
-          l'application mobile, et sa console n'en affiche aucune. */}
       <Link
-        href={HUB_PATH}
+        href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
         className={buttonVariants({ variant: 'ghost', className: 'h-11 gap-2 px-3' })}
       >
         <LayoutGridIcon className="size-5" aria-hidden="true" />
         <span className="hidden sm:block">Espaces</span>
       </Link>
 
-      {user.role === 'COMMERCIAL' ? null : <NotificationBell />}
+      {/* La cloche ne se montre qu'aux rôles qui ont une boîte de réception à
+          ouvrir : `INBOX_ROLES`. La montrer plus largement menait « Tout voir »
+          droit sur un refus de permission. */}
+      {hasInbox(user.role) ? <NotificationBell href={inboxPathFor(user.role)} /> : null}
       <ThemeToggle />
       <UserMenu user={user} />
     </header>

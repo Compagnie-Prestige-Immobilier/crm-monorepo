@@ -47,6 +47,19 @@ beforeEach(() => {
     commerciaux: [],
     campagnes: [],
     representants: [],
+    professions: [
+      {
+        id: 'pro-chauffeur',
+        code: 'CHAUFFEUR',
+        label: 'Chauffeur',
+        isTeaching: false,
+        position: 1,
+        isActive: true,
+        updatedAt: '',
+      },
+    ],
+    incomeBands: [],
+    offers: [],
     banques: [
       { id: 'bnq-cbao', name: 'CBAO Sénégal', shortName: 'CBAO', isActive: true, sortOrder: 1 },
     ],
@@ -55,7 +68,13 @@ beforeEach(() => {
 });
 
 const created = (over: Partial<ProspectRow> = {}): ProspectRow =>
-  ({ id: 'p-9', nom: 'Fall', prenom: 'Moussa', phoneE164: '+221771234567', ...over }) as ProspectRow;
+  ({
+    id: 'p-9',
+    nom: 'Fall',
+    prenom: 'Moussa',
+    phoneE164: '+221771234567',
+    ...over,
+  }) as ProspectRow;
 
 function mount() {
   return renderWithQuery(<GrandPublicProspectForm />);
@@ -118,7 +137,7 @@ describe('ce que la saisie exige', () => {
     await user.type(screen.getByLabelText(/Téléphone/u), '77 123');
     await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
 
-    expect(await screen.findByText('Numéro invalide : 9 chiffres attendus.')).toBeTruthy();
+    expect(await screen.findByText('Numéro invalide pour le pays choisi.')).toBeTruthy();
     expect(create).not.toHaveBeenCalled();
   });
 });
@@ -131,7 +150,7 @@ describe('les champs facultatifs', () => {
     await screen.findByRole('combobox', { name: /Banque de domiciliation/u });
 
     await fillIdentity();
-    await user.type(screen.getByLabelText(/Profession/u), 'Chauffeur');
+    await choose('Profession', 'Chauffeur');
     await user.click(screen.getByRole('button', { name: 'Diaspora' }));
     await choose('Banque de domiciliation', 'CBAO');
     await choose('Canal de provenance', 'TikTok');
@@ -142,7 +161,7 @@ describe('les champs facultatifs', () => {
         prenom: 'Moussa',
         nom: 'Fall',
         phone: '+221771234567',
-        profession: 'Chauffeur',
+        professionId: 'pro-chauffeur',
         type: 'DIASPORA',
         banqueId: 'bnq-cbao',
         canalProvenanceId: 'c-tiktok',
@@ -177,9 +196,9 @@ describe('la rafale', () => {
       expect(screen.getByLabelText<HTMLInputElement>(/Prénom/u).value).toBe('');
     });
     expect(screen.getByLabelText<HTMLInputElement>(/Téléphone/u).value).toBe('');
-    expect(
-      screen.getByRole('combobox', { name: /Canal de provenance/u }).textContent,
-    ).toContain('TikTok');
+    expect(screen.getByRole('combobox', { name: /Canal de provenance/u }).textContent).toContain(
+      'TikTok',
+    );
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 

@@ -33,7 +33,7 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 
-export function NotificationBell() {
+export function NotificationBell({ href }: { href: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const live = useLive();
@@ -190,7 +190,7 @@ export function NotificationBell() {
           {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
               poserait `role="button"` sur le `<a>`. */}
           <Link
-            href="/admin/notifications?onglet=reception"
+            href={href}
             className={buttonVariants({ variant: 'ghost', size: 'sm' })}
             onClick={() => {
               setOpen(false);

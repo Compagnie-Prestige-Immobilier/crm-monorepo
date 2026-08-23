@@ -224,6 +224,8 @@ class WriteRepository {
     String whatsappStatus = 'NON_DEMANDE',
     String? whatsappE164,
     String? profession,
+    String? relationStatus,
+    String? relationReason,
     String? draftId,
   }) async {
     final DateTime now = _clock.now();
@@ -244,6 +246,9 @@ class WriteRepository {
           whatsappStatus: Value<String>(whatsappStatus),
           whatsappE164: Value<String?>(whatsapp),
           profession: Value<String?>(profession),
+          relationStatus: relationStatus == null
+              ? const Value<String>.absent()
+              : Value<String>(relationStatus),
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
@@ -263,6 +268,11 @@ class WriteRepository {
           'whatsappStatus': whatsappStatus,
           'whatsappE164': whatsapp,
           'profession': profession,
+          // Absent tant que rien n'a bougé : le serveur ne rejoue une bascule
+          // que sur une demande explicite, un renvoi systematique remplirait la
+          // chronologie de la relation de lignes sans geste derriere.
+          'relationStatus': ?relationStatus,
+          'relationReason': ?relationReason,
         },
         now: now,
       );
@@ -374,7 +384,61 @@ class WriteRepository {
     final String entityId = id ?? Ids.newId();
     final DateTime now = _clock.now();
 
-    await _db.transaction(() async {
+    return _db.transaction<String>(() async {
+      final Prospect? existing =
+          await (_db.select(_db.prospects)
+                ..where(
+                  (Prospects row) =>
+                      row.phoneE164.equals(phoneE164) & row.deletedAt.isNull(),
+                )
+                ..limit(1))
+              .getSingleOrNull();
+      // Le meme numero rejoint un second projet : on lui OUVRE un parcours, on
+      // ne deplace pas la fiche. Reecrire `projet` la retirerait du projet
+      // d'origine, ou elle a deja son historique et ses appels.
+      final bool dejaDansLeProjet =
+          existing != null &&
+          await _hasJourney(existing.id, projet ?? existing.projet);
+      if (existing != null && projet != null && !dejaDansLeProjet) {
+        await _openJourney(existing.id, projet);
+        await (_db.update(
+          _db.prospects,
+        )..where((Prospects row) => row.id.equals(existing.id))).write(
+          ProspectsCompanion(
+            type: Value<String?>(type ?? existing.type),
+            profession: Value<String?>(profession ?? existing.profession),
+            dureeSystemeMois: Value<int?>(
+              dureeSystemeMois ?? existing.dureeSystemeMois,
+            ),
+            canalProvenanceId: Value<String?>(
+              canalProvenanceId ?? existing.canalProvenanceId,
+            ),
+            localUpdatedAt: Value<DateTime>(now),
+          ),
+        );
+        await _enqueue(
+          dependencyKey: existing.id,
+          entityType: 'prospect',
+          entityId: existing.id,
+          op: 'update',
+          baseRev: existing.serverUpdatedAt == null ? null : existing.rev,
+          payload: <String, Object?>{
+            // `phone` est exige sur TOUTE operation de prospect, mise a jour
+            // comprise : sans lui le lot repart en `invalid` et le second
+            // parcours n'atteint jamais le serveur.
+            'phone': phoneE164,
+            'projet': projet,
+            'type': ?type,
+            if (profession != null && profession.isNotEmpty)
+              'profession': profession,
+            'dureeSystemeMois': ?dureeSystemeMois,
+            'canalProvenanceId': ?canalProvenanceId,
+          },
+          now: now,
+        );
+        await _dropDraft(draftId);
+        return existing.id;
+      }
       await _db
           .into(_db.prospects)
           .insert(
@@ -391,11 +455,14 @@ class WriteRepository {
                   : Value<String>(projet),
               type: Value<String?>(type),
               profession: Value<String?>(profession),
+              dureeSystemeMois: Value<int?>(dureeSystemeMois),
+              canalProvenanceId: Value<String?>(canalProvenanceId),
               createdById: createdById,
               clientCreatedAt: now,
               localUpdatedAt: now,
             ),
           );
+      await _openJourney(entityId, projet ?? 'CHUES');
       await _enqueue(
         // Sans representant, la fiche ne depend de personne : elle se chaine sur
         // elle-meme plutot que de bloquer derriere une cle vide.
@@ -424,8 +491,32 @@ class WriteRepository {
         now: now,
       );
       await _dropDraft(draftId);
+      return entityId;
     });
-    return entityId;
+  }
+
+  /// Le parcours s'ecrit des la saisie, sans attendre le serveur : hors ligne,
+  /// la fiche doit apparaitre tout de suite dans la liste de son projet.
+  Future<void> _openJourney(String prospectId, String projet) {
+    return _db
+        .into(_db.prospectJourneys)
+        .insert(
+          ProspectJourneysCompanion.insert(
+            prospectId: prospectId,
+            projet: projet,
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+  }
+
+  Future<bool> _hasJourney(String prospectId, String projet) async {
+    final ProspectJourney? row =
+        await (_db.select(_db.prospectJourneys)..where(
+              (ProspectJourneys j) =>
+                  j.prospectId.equals(prospectId) & j.projet.equals(projet),
+            ))
+            .getSingleOrNull();
+    return row != null;
   }
 
   Future<void> updateProspect({
@@ -834,6 +925,13 @@ class WriteRepository {
             await (_db.delete(
               _db.representants,
             )..where((Representants t) => t.id.equals(victim.entityId))).go();
+          }
+        }
+        for (final OutboxData victim in victims) {
+          if (victim.op == 'create' && victim.entityType == 'visite') {
+            await (_db.delete(
+              _db.visites,
+            )..where((Visites t) => t.id.equals(victim.entityId))).go();
           }
         }
         for (final OutboxData victim in victims) {

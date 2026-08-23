@@ -1,9 +1,8 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { VisitesTabs } from '@/components/accueil/visites-tabs';
 import { PermissionDenied } from '@/components/permission-denied';
-import { buttonVariants } from '@/components/ui/button';
 import { guardRoles } from '@/lib/session';
 
 export default async function AccueilLayout({ children }: { children: ReactNode }) {
@@ -15,14 +14,7 @@ export default async function AccueilLayout({ children }: { children: ReactNode 
 
   return (
     <div className="flex flex-col gap-6">
-      <nav aria-label="Visites" className="flex flex-wrap gap-2 print:hidden">
-        <Link href="/accueil" className={buttonVariants({ variant: 'outline' })}>
-          Registre
-        </Link>
-        <Link href="/accueil/tableau-de-bord" className={buttonVariants({ variant: 'outline' })}>
-          Tableau de bord
-        </Link>
-      </nav>
+      <VisitesTabs />
       {children}
     </div>
   );

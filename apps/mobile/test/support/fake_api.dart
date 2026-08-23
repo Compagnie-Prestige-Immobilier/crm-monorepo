@@ -89,7 +89,11 @@ class FakeApi implements ApiPort {
   Future<void> logout({required String refreshToken}) async {}
 
   @override
-  Future<PullPage> pull({String? cursor, int limit = 200, required int payloadVersion}) async {
+  Future<PullPage> pull({
+    String? cursor,
+    int limit = 200,
+    required int payloadVersion,
+  }) async {
     if (pullPages.isEmpty) return emptyPullPage(cursor: cursor);
     return pullPages.removeAt(0);
   }
@@ -303,12 +307,80 @@ class PushCall {
       .toList(growable: false);
 }
 
+/// Une fiche telle que le serveur la rend. Seuls le projet d'entrée et les
+/// parcours varient d'un test à l'autre : tout le reste est du remplissage.
+ProspectDto prospectDto({
+  required String id,
+  Projet projet = Projet.CHUES,
+  List<Projet> parcours = const <Projet>[Projet.CHUES],
+  String phoneE164 = '+221770000001',
+  int rev = 1,
+}) => ProspectDto(
+  id: id,
+  nom: 'Diop',
+  prenom: 'Awa',
+  phoneE164: phoneE164,
+  rev: rev,
+  statut: ProspectStatut.NOUVEAU,
+  projet: projet,
+  banqueId: null,
+  banqueName: null,
+  syndicatId: null,
+  syndicatSigle: null,
+  representantId: null,
+  representantName: null,
+  representantPhoneE164: null,
+  departementId: null,
+  departementName: null,
+  ownedByCommercialId: 'me',
+  ownedByCommercialName: 'Moi',
+  type: null,
+  profession: null,
+  professionId: null,
+  professionIsTeaching: null,
+  incomeBandId: null,
+  incomeBandLabel: null,
+  paymentMode: null,
+  journeys: parcours
+      .map(
+        (Projet p) => ProspectJourneyDto(
+          id: '$id:${p.value}',
+          projet: p,
+          statut: ProspectStatut.NOUVEAU,
+          consent: GrandPublicConsent.NON_DEMANDE,
+          consentAt: null,
+          convertedAt: null,
+        ),
+      )
+      .toList(growable: false),
+  dureeSystemeMois: null,
+  canalProvenanceId: null,
+  canalProvenanceLabel: null,
+  segment: null,
+  phase2Status: Phase2Status.PENDING,
+  enrollmentMethod: null,
+  enrollmentCapturedById: null,
+  enrollmentCapturedByName: null,
+  enrollmentCapturedAt: null,
+  lastOutcome: null,
+  lastComment: null,
+  lastAttemptAt: null,
+  origin: null,
+  originLabel: null,
+  clientCreatedAt: DateTime.utc(2026, 8, 12, 10),
+  createdAt: DateTime.utc(2026, 8, 12, 10),
+  updatedAt: DateTime.utc(2026, 8, 12, 11),
+  deletedAt: null,
+);
+
 PullPage emptyPullPage({String? cursor}) => PullPage(
   changes: SyncChangesDto(
     departements: const <DepartementDto>[],
     iefs: const <IefDto>[],
     banques: const <BanqueDto>[],
     syndicats: const <SyndicatDto>[],
+    canauxProvenance: const <CanalProvenanceDto>[],
+    visiteReferentiels: const <SyncVisiteReferentielDto>[],
     representants: const <RepresentantDto>[],
     prospects: const <ProspectDto>[],
     callCampaigns: const <SyncCallCampaignDto>[],
@@ -414,7 +486,11 @@ class ExplodingApi implements ApiPort {
   Future<void> logout({required String refreshToken}) => _boom();
 
   @override
-  Future<PullPage> pull({String? cursor, int limit = 200, required int payloadVersion}) => _boom();
+  Future<PullPage> pull({
+    String? cursor,
+    int limit = 200,
+    required int payloadVersion,
+  }) => _boom();
 
   @override
   Future<PushResult> push({

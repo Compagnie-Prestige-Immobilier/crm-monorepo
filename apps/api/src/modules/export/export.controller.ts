@@ -33,8 +33,8 @@ export class ExportController {
     private readonly demo: WorkspaceContext,
   ) {}
 
-  // ADMIN et COMMERCIAL, les mêmes qu'`AnalyticsController` : la feuille Synthèse porte
-  // exactement ses agrégats. Le cloisonnement par commercial reste dans `buildProspectWhere`.
+  // ADMIN, COMMERCIAL, DIRECTION : la feuille Synthèse porte les agrégats d'`AnalyticsController`,
+  // moins le SUPERVISEUR, écarté ici à dessein — voir `representantsExport` plus bas.
   @Get('prospects.xlsx')
   @Roles(Role.ADMIN, Role.COMMERCIAL, Role.DIRECTION)
   @ApiProduces(XLSX_MIME)

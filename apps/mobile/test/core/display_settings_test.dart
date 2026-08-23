@@ -26,7 +26,10 @@ void main() {
 
   group('échelle de texte', () {
     test('le défaut est Normal', () {
-      expect(container().read(displaySettingsProvider).textScale, CpiTextScale.normal);
+      expect(
+        container().read(displaySettingsProvider).textScale,
+        CpiTextScale.normal,
+      );
     });
 
     test('le choix SURVIT au redémarrage', () async {
@@ -54,7 +57,10 @@ void main() {
         'display.textScale': 'gigantesque',
       });
       prefs = await SharedPreferences.getInstance();
-      expect(container().read(displaySettingsProvider).textScale, CpiTextScale.normal);
+      expect(
+        container().read(displaySettingsProvider).textScale,
+        CpiTextScale.normal,
+      );
     });
   });
 
@@ -96,16 +102,19 @@ void main() {
       );
     });
 
-    test('le plafond laisse passer « Très grand » par-dessus le maximum système', () {
-      // C'est la raison d'être de l'élargissement de 1,3 à 1,8 : sans lui,
-      // choisir « Très grand » sur un téléphone déjà réglé à 1,3 ne changeait
-      // strictement rien.
-      final double f = resolveTextScaleFactor(
-        system: const TextScaler.linear(1.3),
-        choice: CpiTextScale.extraLarge,
-      );
-      expect(f, greaterThan(kCpiMaxSystemTextScale));
-    });
+    test(
+      'le plafond laisse passer « Très grand » par-dessus le maximum système',
+      () {
+        // C'est la raison d'être de l'élargissement de 1,3 à 1,8 : sans lui,
+        // choisir « Très grand » sur un téléphone déjà réglé à 1,3 ne changeait
+        // strictement rien.
+        final double f = resolveTextScaleFactor(
+          system: const TextScaler.linear(1.3),
+          choice: CpiTextScale.extraLarge,
+        );
+        expect(f, greaterThan(kCpiMaxSystemTextScale));
+      },
+    );
   });
 
   group('échelle typographique', () {
@@ -120,7 +129,8 @@ void main() {
         expect(
           style!.fontSize,
           greaterThanOrEqualTo(CpiTypography.minBodySize),
-          reason: 'un corps de texte sous 14 sp est illisible sur un vrai écran',
+          reason:
+              'un corps de texte sous 14 sp est illisible sur un vrai écran',
         );
       }
     });
@@ -131,7 +141,10 @@ void main() {
         text.labelMedium,
         text.labelSmall,
       ]) {
-        expect(style!.fontSize, greaterThanOrEqualTo(CpiTypography.minLabelSize));
+        expect(
+          style!.fontSize,
+          greaterThanOrEqualTo(CpiTypography.minLabelSize),
+        );
       }
     });
 

@@ -11,11 +11,15 @@ abstract class _$CampaignSummaryDtoCWProxy {
 
   CampaignSummaryDto name(String name);
 
+  CampaignSummaryDto projet(Projet projet);
+
   CampaignSummaryDto scope(CampaignScope scope);
 
   CampaignSummaryDto scopeLabel(String scopeLabel);
 
   CampaignSummaryDto status(CampaignStatus status);
+
+  CampaignSummaryDto offerLabel(String? offerLabel);
 
   CampaignSummaryDto seed(String seed);
 
@@ -42,9 +46,11 @@ abstract class _$CampaignSummaryDtoCWProxy {
   CampaignSummaryDto call({
     String id,
     String name,
+    Projet projet,
     CampaignScope scope,
     String scopeLabel,
     CampaignStatus status,
+    String? offerLabel,
     String seed,
     String createdById,
     String createdByName,
@@ -69,6 +75,9 @@ class _$CampaignSummaryDtoCWProxyImpl implements _$CampaignSummaryDtoCWProxy {
   CampaignSummaryDto name(String name) => this(name: name);
 
   @override
+  CampaignSummaryDto projet(Projet projet) => this(projet: projet);
+
+  @override
   CampaignSummaryDto scope(CampaignScope scope) => this(scope: scope);
 
   @override
@@ -77,6 +86,10 @@ class _$CampaignSummaryDtoCWProxyImpl implements _$CampaignSummaryDtoCWProxy {
 
   @override
   CampaignSummaryDto status(CampaignStatus status) => this(status: status);
+
+  @override
+  CampaignSummaryDto offerLabel(String? offerLabel) =>
+      this(offerLabel: offerLabel);
 
   @override
   CampaignSummaryDto seed(String seed) => this(seed: seed);
@@ -117,9 +130,11 @@ class _$CampaignSummaryDtoCWProxyImpl implements _$CampaignSummaryDtoCWProxy {
   CampaignSummaryDto call({
     Object? id = const $CopyWithPlaceholder(),
     Object? name = const $CopyWithPlaceholder(),
+    Object? projet = const $CopyWithPlaceholder(),
     Object? scope = const $CopyWithPlaceholder(),
     Object? scopeLabel = const $CopyWithPlaceholder(),
     Object? status = const $CopyWithPlaceholder(),
+    Object? offerLabel = const $CopyWithPlaceholder(),
     Object? seed = const $CopyWithPlaceholder(),
     Object? createdById = const $CopyWithPlaceholder(),
     Object? createdByName = const $CopyWithPlaceholder(),
@@ -138,6 +153,10 @@ class _$CampaignSummaryDtoCWProxyImpl implements _$CampaignSummaryDtoCWProxy {
           ? _value.name
           // ignore: cast_nullable_to_non_nullable
           : name as String,
+      projet: projet == const $CopyWithPlaceholder()
+          ? _value.projet
+          // ignore: cast_nullable_to_non_nullable
+          : projet as Projet,
       scope: scope == const $CopyWithPlaceholder()
           ? _value.scope
           // ignore: cast_nullable_to_non_nullable
@@ -150,6 +169,10 @@ class _$CampaignSummaryDtoCWProxyImpl implements _$CampaignSummaryDtoCWProxy {
           ? _value.status
           // ignore: cast_nullable_to_non_nullable
           : status as CampaignStatus,
+      offerLabel: offerLabel == const $CopyWithPlaceholder()
+          ? _value.offerLabel
+          // ignore: cast_nullable_to_non_nullable
+          : offerLabel as String?,
       seed: seed == const $CopyWithPlaceholder()
           ? _value.seed
           // ignore: cast_nullable_to_non_nullable
@@ -204,9 +227,11 @@ CampaignSummaryDto _$CampaignSummaryDtoFromJson(Map<String, dynamic> json) =>
         requiredKeys: const [
           'id',
           'name',
+          'projet',
           'scope',
           'scopeLabel',
           'status',
+          'offerLabel',
           'seed',
           'createdById',
           'createdByName',
@@ -220,6 +245,14 @@ CampaignSummaryDto _$CampaignSummaryDtoFromJson(Map<String, dynamic> json) =>
       final val = CampaignSummaryDto(
         id: $checkedConvert('id', (v) => v as String),
         name: $checkedConvert('name', (v) => v as String),
+        projet: $checkedConvert(
+          'projet',
+          (v) => $enumDecode(
+            _$ProjetEnumMap,
+            v,
+            unknownValue: Projet.unknownDefaultOpenApi,
+          ),
+        ),
         scope: $checkedConvert(
           'scope',
           (v) => $enumDecode(
@@ -237,6 +270,7 @@ CampaignSummaryDto _$CampaignSummaryDtoFromJson(Map<String, dynamic> json) =>
             unknownValue: CampaignStatus.unknownDefaultOpenApi,
           ),
         ),
+        offerLabel: $checkedConvert('offerLabel', (v) => v as String?),
         seed: $checkedConvert('seed', (v) => v as String),
         createdById: $checkedConvert('createdById', (v) => v as String),
         createdByName: $checkedConvert('createdByName', (v) => v as String),
@@ -262,9 +296,11 @@ Map<String, dynamic> _$CampaignSummaryDtoToJson(CampaignSummaryDto instance) =>
     <String, dynamic>{
       'id': instance.id,
       'name': instance.name,
+      'projet': _$ProjetEnumMap[instance.projet]!,
       'scope': _$CampaignScopeEnumMap[instance.scope]!,
       'scopeLabel': instance.scopeLabel,
       'status': _$CampaignStatusEnumMap[instance.status]!,
+      'offerLabel': instance.offerLabel,
       'seed': instance.seed,
       'createdById': instance.createdById,
       'createdByName': instance.createdByName,
@@ -275,17 +311,29 @@ Map<String, dynamic> _$CampaignSummaryDtoToJson(CampaignSummaryDto instance) =>
       'closedAt': instance.closedAt?.toIso8601String(),
     };
 
+const _$ProjetEnumMap = {
+  Projet.CHUES: 'CHUES',
+  Projet.GRAND_PUBLIC: 'GRAND_PUBLIC',
+  Projet.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
 const _$CampaignScopeEnumMap = {
   CampaignScope.BDD1: 'BDD1',
   CampaignScope.BDD2: 'BDD2',
   CampaignScope.BDD3: 'BDD3',
   CampaignScope.BDD4: 'BDD4',
+  CampaignScope.GP1: 'GP1',
+  CampaignScope.GP2: 'GP2',
+  CampaignScope.GP3: 'GP3',
+  CampaignScope.GP4: 'GP4',
   CampaignScope.ALL: 'ALL',
   CampaignScope.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$CampaignStatusEnumMap = {
+  CampaignStatus.DRAFT: 'DRAFT',
   CampaignStatus.ACTIVE: 'ACTIVE',
+  CampaignStatus.PAUSED: 'PAUSED',
   CampaignStatus.CLOSED: 'CLOSED',
   CampaignStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

@@ -1,18 +1,34 @@
 'use client';
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { ChevronLeftIcon, ChevronRightIcon, InboxIcon, PlusIcon, RotateCcwIcon } from 'lucide-react';
+import {
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  InboxIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  SlidersHorizontalIcon,
+} from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { SearchField } from '@/components/filters/search-field';
 import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import { Absent } from '@/components/grand-public/absence';
+import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -47,11 +63,12 @@ import { formatDate, formatNumber, formatPhone, withRetired } from '@/lib/format
 import {
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
+  statutForProjet,
   type Paginated,
   type ProspectRow,
   type ProspectStatut,
 } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { cn } from '@/lib/utils';
 
 const STATUT_VARIANT: Record<ProspectStatut, 'secondary' | 'info' | 'success' | 'destructive'> = {
@@ -117,16 +134,12 @@ const STATUT_OPTIONS = PROSPECT_STATUTS.map((statut) => ({
 export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) {
   const { filters, setFilters, resetFilters } = useUrlFilters(FILTERS_ADAPTER);
 
-  const [searchDraft, setSearchDraft] = useState(filters.search);
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === filters.search) return;
-    setFilters({ search: debouncedSearch });
-  }, [debouncedSearch, filters.search, setFilters]);
+  const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
 
   const canaux = useQuery({
     queryKey: grandPublicKeys.canaux,
@@ -146,6 +159,8 @@ export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) 
   }));
 
   const activeCount = countGrandPublicFilters(filters);
+  const [filtersOpen, setFiltersOpen] = useState(activeCount > 0);
+  const [createOpen, setCreateOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-6">
@@ -159,7 +174,7 @@ export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) 
           </p>
         </div>
         {canCreate ? (
-          <Button render={<Link href="/grand-public/nouveau" />} size="lg">
+          <Button size="lg" onClick={() => setCreateOpen(true)}>
             <PlusIcon aria-hidden="true" />
             Nouveau prospect
           </Button>
@@ -168,72 +183,89 @@ export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) 
 
       <section
         aria-label="Filtres"
-        className="flex flex-col gap-5 rounded-lg border border-border bg-card p-5 shadow-elev-sm"
+        className="rounded-lg border border-border bg-card p-4 shadow-elev-sm"
       >
-        <div className="flex flex-wrap items-end gap-4">
+        <div className="flex flex-wrap items-end gap-3">
           <SearchField
             label="Rechercher"
             placeholder="Nom, prénom ou téléphone"
             value={searchDraft}
             onChange={setSearchDraft}
           />
-          <FilterCombobox
-            label="Canal de provenance"
-            placeholder="Tous les canaux"
-            className="min-w-[15rem] flex-1"
-            value={filters.canalProvenanceId}
-            options={canalOptions}
-            onChange={(value) => {
-              setFilters({ canalProvenanceId: value });
+          <Button
+            type="button"
+            variant="outline"
+            aria-expanded={filtersOpen}
+            onClick={() => {
+              setFiltersOpen((open) => !open);
             }}
-          />
+          >
+            <SlidersHorizontalIcon aria-hidden="true" />
+            Filtres{activeCount > 0 ? ` (${String(activeCount)})` : ''}
+            <ChevronDownIcon
+              aria-hidden="true"
+              className={cn('transition-transform', filtersOpen && 'rotate-180')}
+            />
+          </Button>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-2">
-          <ChoiceRow<ProspectType>
-            legend="Situation"
-            options={TYPE_OPTIONS}
-            value={filters.type}
-            onChange={(value) => {
-              setFilters({ type: value });
-            }}
-          />
-          <ChoiceRow<ProspectStatut>
-            legend="Statut"
-            options={STATUT_OPTIONS}
-            value={filters.statut}
-            onChange={(value) => {
-              setFilters({ statut: value });
-            }}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-end gap-4">
-          <DatePicker
-            id="gp-date-from"
-            label="Saisi à partir du"
-            value={filters.dateFrom}
-            max={filters.dateTo}
-            onChange={(value) => {
-              setFilters({ dateFrom: value });
-            }}
-          />
-          <DatePicker
-            id="gp-date-to"
-            label="Saisi jusqu’au"
-            value={filters.dateTo}
-            min={filters.dateFrom}
-            onChange={(value) => {
-              setFilters({ dateTo: value });
-            }}
-          />
-          {activeCount > 0 ? (
-            <Button type="button" variant="ghost" onClick={resetFilters}>
-              <RotateCcwIcon aria-hidden="true" />
-              {activeCount === 1 ? 'Retirer le filtre' : `Retirer les ${String(activeCount)} filtres`}
-            </Button>
-          ) : null}
-        </div>
+        {filtersOpen ? (
+          <div className="mt-5 flex flex-col gap-5 border-t border-border pt-5">
+            <FilterCombobox
+              label="Canal de provenance"
+              placeholder="Tous les canaux"
+              value={filters.canalProvenanceId}
+              options={canalOptions}
+              onChange={(value) => {
+                setFilters({ canalProvenanceId: value });
+              }}
+            />
+            <div className="grid gap-5 lg:grid-cols-2">
+              <ChoiceRow<ProspectType>
+                legend="Situation"
+                options={TYPE_OPTIONS}
+                value={filters.type}
+                onChange={(value) => {
+                  setFilters({ type: value });
+                }}
+              />
+              <ChoiceRow<ProspectStatut>
+                legend="Statut"
+                options={STATUT_OPTIONS}
+                value={filters.statut}
+                onChange={(value) => {
+                  setFilters({ statut: value });
+                }}
+              />
+            </div>
+            <div className="flex flex-wrap items-end gap-4">
+              <DatePicker
+                id="gp-date-from"
+                label="Saisi à partir du"
+                value={filters.dateFrom}
+                max={filters.dateTo}
+                onChange={(value) => {
+                  setFilters({ dateFrom: value });
+                }}
+              />
+              <DatePicker
+                id="gp-date-to"
+                label="Saisi jusqu’au"
+                value={filters.dateTo}
+                min={filters.dateFrom}
+                onChange={(value) => {
+                  setFilters({ dateTo: value });
+                }}
+              />
+              {activeCount > 0 ? (
+                <Button type="button" variant="ghost" onClick={resetFilters}>
+                  <RotateCcwIcon aria-hidden="true" />
+                  Tout effacer
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {canaux.isError ? (
@@ -253,7 +285,18 @@ export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) 
         setFilters={setFilters}
         hasFilters={activeCount > 0}
         canCreate={canCreate}
+        onCreate={() => setCreateOpen(true)}
       />
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Nouveau prospect Grand Public</DialogTitle>
+            <DialogDescription>Le nom, le prénom et le téléphone suffisent.</DialogDescription>
+          </DialogHeader>
+          <GrandPublicProspectForm embedded onSaved={() => setCreateOpen(false)} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -264,12 +307,14 @@ function ProspectsTable({
   setFilters,
   hasFilters,
   canCreate,
+  onCreate,
 }: {
   list: UseQueryResult<Paginated<ProspectRow>>;
   filters: GrandPublicFilters;
   setFilters: (patch: Partial<GrandPublicFilters>) => void;
   hasFilters: boolean;
   canCreate: boolean;
+  onCreate: () => void;
 }) {
   if (list.isPending) return <GrandPublicTableSkeleton />;
 
@@ -315,7 +360,7 @@ function ProspectsTable({
             {items.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={9} className="py-16">
-                  <EmptyState hasFilters={hasFilters} canCreate={canCreate} />
+                  <EmptyState hasFilters={hasFilters} canCreate={canCreate} onCreate={onCreate} />
                 </TableCell>
               </TableRow>
             ) : (
@@ -389,7 +434,15 @@ function ProspectsTable({
   );
 }
 
-function EmptyState({ hasFilters, canCreate }: { hasFilters: boolean; canCreate: boolean }) {
+function EmptyState({
+  hasFilters,
+  canCreate,
+  onCreate,
+}: {
+  hasFilters: boolean;
+  canCreate: boolean;
+  onCreate: () => void;
+}) {
   return (
     <div className="flex flex-col items-center gap-2 text-center">
       <InboxIcon className="size-8 text-muted-foreground" aria-hidden="true" />
@@ -404,7 +457,7 @@ function EmptyState({ hasFilters, canCreate }: { hasFilters: boolean; canCreate:
           : 'La première fiche se crée depuis « Nouveau prospect ».'}
       </p>
       {!hasFilters && canCreate ? (
-        <Button render={<Link href="/grand-public/nouveau" />} className="mt-2">
+        <Button className="mt-2" onClick={onCreate}>
           <PlusIcon aria-hidden="true" />
           Nouveau prospect
         </Button>
@@ -415,6 +468,7 @@ function EmptyState({ hasFilters, canCreate }: { hasFilters: boolean; canCreate:
 
 function Row({ prospect }: { prospect: ProspectRow }) {
   const name = `${prospect.prenom} ${prospect.nom}`.trim();
+  const statut = statutForProjet(prospect, 'GRAND_PUBLIC');
 
   return (
     <TableRow>
@@ -432,9 +486,7 @@ function Row({ prospect }: { prospect: ProspectRow }) {
         </Link>
       </TableCell>
       <TableCell>
-        <Badge variant={STATUT_VARIANT[prospect.statut]}>
-          {PROSPECT_STATUT_LABELS[prospect.statut]}
-        </Badge>
+        <Badge variant={STATUT_VARIANT[statut]}>{PROSPECT_STATUT_LABELS[statut]}</Badge>
       </TableCell>
       <TableCell>
         {prospect.type === null ? <Absent /> : PROSPECT_TYPE_LABELS[prospect.type]}

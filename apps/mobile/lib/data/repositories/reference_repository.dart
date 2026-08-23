@@ -20,10 +20,13 @@ class ReferenceRepository {
           'SELECT DISTINCT region_id AS id, region_name AS name FROM departements '
           'WHERE is_active = 1 AND deleted_at IS NULL AND region_name <> \'\' '
           'ORDER BY name',
-          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{_db.departements},
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.departements,
+          },
         )
         .map(
-          (QueryRow row) => (id: row.read<String>('id'), name: row.read<String>('name')),
+          (QueryRow row) =>
+              (id: row.read<String>('id'), name: row.read<String>('name')),
         )
         .watch();
   }
@@ -31,7 +34,9 @@ class ReferenceRepository {
   Stream<List<Departement>> watchDepartements({String? regionId}) {
     final SimpleSelectStatement<Departements, Departement> query =
         _db.select(_db.departements)
-          ..where((Departements t) => t.isActive.equals(true) & t.deletedAt.isNull())
+          ..where(
+            (Departements t) => t.isActive.equals(true) & t.deletedAt.isNull(),
+          )
           ..orderBy(<OrderClauseGenerator<Departements>>[
             (Departements t) => OrderingTerm.asc(t.name),
           ]);
@@ -55,7 +60,9 @@ class ReferenceRepository {
   }
 
   Future<Ief?> iefById(String id) {
-    return (_db.select(_db.iefs)..where((Iefs t) => t.id.equals(id))).getSingleOrNull();
+    return (_db.select(
+      _db.iefs,
+    )..where((Iefs t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Stream<List<Banque>> watchBanques() {
@@ -70,10 +77,25 @@ class ReferenceRepository {
 
   Stream<List<Syndicat>> watchSyndicats() {
     return (_db.select(_db.syndicats)
-          ..where((Syndicats t) => t.isActive.equals(true) & t.deletedAt.isNull())
+          ..where(
+            (Syndicats t) => t.isActive.equals(true) & t.deletedAt.isNull(),
+          )
           ..orderBy(<OrderClauseGenerator<Syndicats>>[
             (Syndicats t) => OrderingTerm.asc(t.sortOrder),
             (Syndicats t) => OrderingTerm.asc(t.name),
+          ]))
+        .watch();
+  }
+
+  Stream<List<CanauxProvenanceData>> watchCanauxProvenance() {
+    return (_db.select(_db.canauxProvenance)
+          ..where(
+            (CanauxProvenance t) =>
+                t.isActive.equals(true) & t.deletedAt.isNull(),
+          )
+          ..orderBy(<OrderClauseGenerator<CanauxProvenance>>[
+            (CanauxProvenance t) => OrderingTerm.asc(t.sortOrder),
+            (CanauxProvenance t) => OrderingTerm.asc(t.label),
           ]))
         .watch();
   }
@@ -100,7 +122,8 @@ class ReferenceRepository {
   Future<Representant?> findRepresentantByPhone(String phoneE164) {
     return (_db.select(_db.representants)
           ..where(
-            (Representants t) => t.phoneE164.equals(phoneE164) & t.deletedAt.isNull(),
+            (Representants t) =>
+                t.phoneE164.equals(phoneE164) & t.deletedAt.isNull(),
           )
           ..limit(1))
         .getSingleOrNull();
@@ -108,7 +131,10 @@ class ReferenceRepository {
 
   Future<Prospect?> findProspectByPhone(String phoneE164) {
     return (_db.select(_db.prospects)
-          ..where((Prospects t) => t.phoneE164.equals(phoneE164) & t.deletedAt.isNull())
+          ..where(
+            (Prospects t) =>
+                t.phoneE164.equals(phoneE164) & t.deletedAt.isNull(),
+          )
           ..limit(1))
         .getSingleOrNull();
   }
@@ -167,7 +193,10 @@ class ReferenceRepository {
     int maxRows = ficheRowCap,
   }) {
     return _db
-        .prospectsForRepresentant(representantId: representantId, maxRows: maxRows)
+        .prospectsForRepresentant(
+          representantId: representantId,
+          maxRows: maxRows,
+        )
         .watch();
   }
 
@@ -176,27 +205,58 @@ class ReferenceRepository {
     int maxRows = ficheRowCap,
   }) {
     return _db
-        .commentsForRepresentant(representantId: representantId, maxRows: maxRows)
+        .commentsForRepresentant(
+          representantId: representantId,
+          maxRows: maxRows,
+        )
         .watch();
   }
 
-  Stream<List<ProspectSyncViewData>> watchAllProspects({String? search}) {
+  Stream<List<ProspectSyncViewData>> watchAllProspects({
+    String? search,
+    String? projet,
+  }) {
     final String pattern = '%${(search ?? '').trim().toLowerCase()}%';
+    final String project = projet ?? '';
     return _db
         .customSelect(
-          'SELECT * FROM prospect_sync_view '
+          'SELECT * FROM prospect_sync_view AS v '
           'WHERE deleted_at IS NULL '
-          '  AND (?1 = \'%%\' OR lower(nom) LIKE ?1 OR lower(prenom) LIKE ?1 '
-          '       OR phone_e164 LIKE ?1) '
+          '  AND (?1 = \'\' OR EXISTS ('
+          '        SELECT 1 FROM prospect_journeys j '
+          '        WHERE j.prospect_id = v.id AND j.projet = ?1)) '
+          '  AND (?2 = \'%%\' OR lower(nom) LIKE ?2 OR lower(prenom) LIKE ?2 '
+          '       OR phone_e164 LIKE ?2) '
           'ORDER BY client_created_at DESC LIMIT 500',
-          variables: <Variable<Object>>[Variable<String>(pattern)],
+          variables: <Variable<Object>>[
+            Variable<String>(project),
+            Variable<String>(pattern),
+          ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.prospects,
+            _db.prospectJourneys,
             _db.outbox,
           },
         )
         .map((QueryRow row) => _db.prospectSyncView.map(row.data))
         .watch();
+  }
+
+  Stream<int> watchProspectCount({required String projet}) {
+    return _db
+        .customSelect(
+          'SELECT COUNT(*) AS c FROM prospects AS p '
+          'WHERE p.deleted_at IS NULL AND EXISTS ('
+          '  SELECT 1 FROM prospect_journeys j '
+          '  WHERE j.prospect_id = p.id AND j.projet = ?1)',
+          variables: <Variable<Object>>[Variable<String>(projet)],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.prospects,
+            _db.prospectJourneys,
+          },
+        )
+        .map((QueryRow row) => row.read<int>('c'))
+        .watchSingle();
   }
 
   Stream<int> watchProspectCountFor(String representantId) {

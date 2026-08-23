@@ -87,6 +87,9 @@ const prospectRow = (id: string): Record<string, unknown> => ({
   },
   syndicat: { name: 'Syndicat', sigle: 'CHUES' },
   banque: { name: 'Banque', shortName: 'CBAO' },
+  journeys: [{ projet: 'CHUES', statut: 'NOUVEAU' }],
+  canalProvenance: null,
+  professionRef: null,
   departement: { name: 'Dakar', region: { name: 'Dakar' } },
   ief: null,
 });

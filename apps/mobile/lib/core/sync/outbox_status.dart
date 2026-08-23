@@ -18,13 +18,21 @@ abstract final class ClientErrorCodes {
   static const String noResult = 'NO_RESULT';
 
   static const String attemptsExhausted = 'ATTEMPTS_EXHAUSTED';
+
+  /// Le corps du lot n'a pas fini de partir. À la différence d'un réseau
+  /// absent, l'envoi a bien été tenté : cette tentative se compte.
+  static const String sendTimeout = 'SEND_TIMEOUT';
+
+  /// Le lot a été refusé pour une AUTRE opération que celle-ci.
+  static const String batchPeerRejected = 'BATCH_PEER_REJECTED';
 }
 
 abstract final class ServerErrorCodes {
   static const String representantPhoneConflict = 'REPRESENTANT_PHONE_CONFLICT';
   static const String prospectPhoneConflict = 'PROSPECT_PHONE_CONFLICT';
   static const String revConflict = 'REV_CONFLICT';
-  static const String entityIdOwnedByAnotherUser = 'ENTITY_ID_OWNED_BY_ANOTHER_USER';
+  static const String entityIdOwnedByAnotherUser =
+      'ENTITY_ID_OWNED_BY_ANOTHER_USER';
   static const String representantOwnedByAnotherUser =
       'REPRESENTANT_OWNED_BY_ANOTHER_USER';
   static const String representantNotFound = 'REPRESENTANT_NOT_FOUND';
@@ -33,4 +41,6 @@ abstract final class ServerErrorCodes {
   static const String idempotencyInProgress = 'IDEMPOTENCY_IN_PROGRESS';
 
   static const String phase2AlreadyCompleted = 'PHASE2_ALREADY_COMPLETED';
+
+  static const String appUpdateRequired = 'APP_UPDATE_REQUIRED';
 }

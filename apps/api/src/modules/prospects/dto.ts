@@ -20,6 +20,8 @@ import {
   CallOutcome,
   ChangeSource,
   EnrollmentMethod,
+  GrandPublicConsent,
+  PaymentMode,
   Phase2Status,
   Projet,
   ProspectStatut,
@@ -27,6 +29,9 @@ import {
 } from '@crm/database';
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
+
+/** Plafond du type `Int` de PostgreSQL, en FCFA. */
+const MONTANT_MAX_XOF = 2_147_483_647;
 
 export class CreateProspectDto {
   @ApiPropertyOptional({
@@ -110,19 +115,37 @@ export class CreateProspectDto {
   @MaxLength(120)
   profession?: string;
 
+  @ApiPropertyOptional({ format: 'uuid', description: 'Profession choisie dans le référentiel.' })
+  @IsOptional()
+  @IsUUID()
+  professionId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Tranche de revenu mensuel déclaré.' })
+  @IsOptional()
+  @IsUUID()
+  incomeBandId?: string;
+
+  @ApiPropertyOptional({ enum: PaymentMode, enumName: 'PaymentMode' })
+  @IsOptional()
+  @IsEnum(PaymentMode)
+  paymentMode?: PaymentMode;
+
   @ApiPropertyOptional({
     type: Number,
     minimum: 1,
-    maximum: 600,
+    maximum: 300,
     description: 'Durée du système de paiement, en MOIS.',
   })
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(600)
+  @Max(300)
   dureeSystemeMois?: number;
 
-  @ApiPropertyOptional({ format: 'uuid', description: 'Canal de provenance, choisi dans le référentiel.' })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Canal de provenance, choisi dans le référentiel.',
+  })
   @IsOptional()
   @IsUUID()
   canalProvenanceId?: string;
@@ -176,6 +199,15 @@ export class ProspectDto {
 
   @ApiProperty({ type: String, nullable: true, description: 'Métier déclaré, en clair.' })
   profession!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) professionId!: string | null;
+  @ApiProperty({ type: Boolean, nullable: true }) professionIsTeaching!: boolean | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) incomeBandId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) incomeBandLabel!: string | null;
+  @ApiProperty({ enum: PaymentMode, enumName: 'PaymentMode', nullable: true })
+  paymentMode!: PaymentMode | null;
+
+  @ApiProperty({ type: () => [ProspectJourneyDto] })
+  journeys!: ProspectJourneyDto[];
 
   @ApiProperty({
     type: Number,
@@ -259,6 +291,53 @@ export class ProspectDto {
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) deletedAt!: string | null;
+}
+
+export class ProspectJourneyDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ enum: Projet, enumName: 'Projet' }) projet!: Projet;
+  @ApiProperty({ enum: ProspectStatut, enumName: 'ProspectStatut' }) statut!: ProspectStatut;
+  @ApiProperty({ enum: GrandPublicConsent, enumName: 'GrandPublicConsent' })
+  consent!: GrandPublicConsent;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) consentAt!: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) convertedAt!: string | null;
+}
+
+export class UpdateGrandPublicConsentDto {
+  @ApiProperty({ enum: GrandPublicConsent, enumName: 'GrandPublicConsent' })
+  @IsEnum(GrandPublicConsent)
+  consent!: GrandPublicConsent;
+}
+
+export class ConfirmGrandPublicConversionDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  offerId!: string;
+
+  @ApiPropertyOptional({ enum: PaymentMode, enumName: 'PaymentMode' })
+  @IsOptional()
+  @IsEnum(PaymentMode)
+  paymentMode?: PaymentMode;
+
+  /**
+   * La colonne est un `Int` PostgreSQL : au-delà de 2 147 483 647 FCFA, la base
+   * répond « integer out of range » et l'appelant reçoit un 500 non qualifié
+   * sur une valeur que la validation venait d'accepter. La borne dit la vraie
+   * limite plutôt que de la laisser découvrir par un plantage.
+   */
+  @ApiPropertyOptional({ type: Number, minimum: 0, maximum: MONTANT_MAX_XOF })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(MONTANT_MAX_XOF)
+  amountXof?: number;
+
+  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 300 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(300)
+  durationMonths?: number;
 }
 
 export class ProspectListDto {

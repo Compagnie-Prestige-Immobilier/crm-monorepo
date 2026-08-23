@@ -73,15 +73,20 @@ class Phase2DirectorySync {
           onConflict: DoUpdate<Phase2Directory, Phase2DirectoryData>(
             (Phase2Directory old) => Phase2DirectoryCompanion.custom(
               phoneE164: const CustomExpression<String>('excluded.phone_e164'),
-              phase2Status: const CustomExpression<String>('excluded.phase2_status'),
+              phase2Status: const CustomExpression<String>(
+                'excluded.phase2_status',
+              ),
               enrollmentMethod: const CustomExpression<String>(
                 'excluded.enrollment_method',
               ),
               rev: const CustomExpression<int>('excluded.rev'),
-              updatedAt: const CustomExpression<DateTime>('excluded.updated_at'),
+              updatedAt: const CustomExpression<DateTime>(
+                'excluded.updated_at',
+              ),
             ),
-            where: (Phase2Directory old) =>
-                const CustomExpression<int>('excluded.rev').isBiggerOrEqual(old.rev),
+            where: (Phase2Directory old) => const CustomExpression<int>(
+              'excluded.rev',
+            ).isBiggerOrEqual(old.rev),
           ),
         );
       }
@@ -127,9 +132,10 @@ class Phase2DirectorySync {
 
   Future<DateTime?> lastPulledAt() async => (await _stateRow())?.lastPulledAt;
 
-  Stream<SyncStateData?> watchState() => (_db.select(
-    _db.syncState,
-  )..where((SyncState t) => t.collection.equals(cursorKey))).watchSingleOrNull();
+  Stream<SyncStateData?> watchState() =>
+      (_db.select(_db.syncState)
+            ..where((SyncState t) => t.collection.equals(cursorKey)))
+          .watchSingleOrNull();
 
   Future<String?> readCursor() async => (await _stateRow())?.cursor;
 
@@ -202,7 +208,9 @@ abstract final class CallEffects {
   static const String scheduleCallback = 'SCHEDULE_CALLBACK';
 
   static final List<String> all = CallOutcomeEffect.values
-      .where((CallOutcomeEffect e) => e != CallOutcomeEffect.unknownDefaultOpenApi)
+      .where(
+        (CallOutcomeEffect e) => e != CallOutcomeEffect.unknownDefaultOpenApi,
+      )
       .map((CallOutcomeEffect e) => e.value)
       .toList(growable: false);
 
@@ -336,7 +344,9 @@ abstract final class SystemCallReasons {
 /// Tous les motifs connus de cet appareil, ACTIFS OU NON : une tentative mise en
 /// file avant qu'un motif ne soit désactivé doit encore pouvoir partir.
 Future<Map<String, CallReason>> loadCallReasons(AppDatabase db) async {
-  final List<CallOutcomeReason> rows = await db.select(db.callOutcomeReasons).get();
+  final List<CallOutcomeReason> rows = await db
+      .select(db.callOutcomeReasons)
+      .get();
   return <String, CallReason>{
     ...SystemCallReasons.byCode,
     for (final CallOutcomeReason row in rows) row.code: CallReason.fromRow(row),
@@ -353,10 +363,13 @@ Future<CallReason?> resolveCallReason(AppDatabase db, String code) async {
 abstract final class EnrollmentMethods {
   static const String platform = 'PLATFORM';
   static const String physical = 'PHYSICAL';
-  static const String voiceOrElectronicMessaging = 'VOICE_OR_ELECTRONIC_MESSAGING';
+  static const String voiceOrElectronicMessaging =
+      'VOICE_OR_ELECTRONIC_MESSAGING';
 
   static final List<String> all = EnrollmentMethod.values
-      .where((EnrollmentMethod m) => m != EnrollmentMethod.unknownDefaultOpenApi)
+      .where(
+        (EnrollmentMethod m) => m != EnrollmentMethod.unknownDefaultOpenApi,
+      )
       .map((EnrollmentMethod m) => m.value)
       .toList(growable: false);
 }

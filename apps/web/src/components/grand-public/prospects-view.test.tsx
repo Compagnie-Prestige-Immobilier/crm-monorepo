@@ -32,6 +32,7 @@ const row = (over: Partial<ProspectRow> = {}): ProspectRow =>
     phoneE164: '+221771234567',
     statut: 'NOUVEAU',
     projet: 'GRAND_PUBLIC',
+    journeys: [{ id: 'j-1', projet: 'GRAND_PUBLIC', statut: 'NOUVEAU' }],
     type: null,
     profession: null,
     dureeSystemeMois: null,
@@ -71,6 +72,30 @@ describe('le segment absent', () => {
     mount();
 
     expect(await screen.findByText('BDD3')).toBeTruthy();
+  });
+});
+
+describe('le statut affiché', () => {
+  // Fiche entrée par CHUES, restée « Nouveau » en premier niveau, mais
+  // convertie dans son parcours Grand Public : c'est ce parcours-là que la
+  // liste filtre, et donc celui qu'elle doit montrer.
+  it('est celui du parcours Grand Public, pas celui du point d’entrée', async () => {
+    list.mockResolvedValue(
+      page([
+        row({
+          statut: 'NOUVEAU',
+          projet: 'CHUES',
+          journeys: [
+            { id: 'j-1', projet: 'CHUES', statut: 'NOUVEAU' },
+            { id: 'j-2', projet: 'GRAND_PUBLIC', statut: 'CONVERTI' },
+          ],
+        } as Partial<ProspectRow>),
+      ]),
+    );
+    mount();
+
+    expect(await screen.findByText('Converti')).toBeTruthy();
+    expect(screen.queryByText('Nouveau')).toBeNull();
   });
 });
 
@@ -151,7 +176,7 @@ describe('la liste', () => {
     setUrl('/grand-public');
     list.mockResolvedValue(page([]));
     mount();
-    await screen.findByRole('button', { name: 'Diaspora' });
+    await user.click(await screen.findByRole('button', { name: 'Filtres' }));
 
     await user.click(screen.getByRole('button', { name: 'Diaspora' }));
 

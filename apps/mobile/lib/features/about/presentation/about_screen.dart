@@ -28,19 +28,22 @@ class AboutScreen extends ConsumerWidget {
     final SyncUiState sync = ref.watch(syncCoordinatorProvider);
     final String build = ref.watch(buildNumberProvider);
 
-    final List<({String label, String value})> rows = <({String label, String value})>[
-      (label: 'Version', value: '1.0.0'),
-      (label: 'Build', value: build),
-      (label: 'Environnement', value: _environmentLabel),
-      (label: 'Serveur', value: ApiEnvironment.baseUrl),
-      (label: 'Format des données', value: 'v${SyncEngine.payloadVersion}'),
-      (
-        label: 'Dernière synchronisation',
-        value: sync.lastRunAt == null ? 'Aucune' : _stamp.format(sync.lastRunAt!),
-      ),
-      (label: 'Compte', value: auth.email ?? auth.fullName ?? 'Inconnu'),
-      (label: 'Identifiant de compte', value: auth.userId ?? 'Inconnu'),
-    ];
+    final List<({String label, String value})> rows =
+        <({String label, String value})>[
+          (label: 'Version', value: '1.0.0'),
+          (label: 'Build', value: build),
+          (label: 'Environnement', value: _environmentLabel),
+          (label: 'Serveur', value: ApiEnvironment.baseUrl),
+          (label: 'Format des données', value: 'v${SyncEngine.payloadVersion}'),
+          (
+            label: 'Dernière synchronisation',
+            value: sync.lastRunAt == null
+                ? 'Aucune'
+                : _stamp.format(sync.lastRunAt!),
+          ),
+          (label: 'Compte', value: auth.email ?? auth.fullName ?? 'Inconnu'),
+          (label: 'Identifiant de compte', value: auth.userId ?? 'Inconnu'),
+        ];
 
     return CpiPopScope(
       fallback: Routes.reglages,
@@ -111,7 +114,7 @@ class AboutScreen extends ConsumerWidget {
             const SizedBox(height: CpiSpacing.sm),
             OutlinedButton.icon(
               onPressed: () => _copy(context, rows),
-              icon: const Icon(PhosphorIconsRegular.copy, size: 20),
+              icon: const Icon(PhosphorIconsRegular.copy, size: CpiIconSize.md),
               label: const Text('Copier pour le support'),
             ),
             const SizedBox(height: CpiSpacing.lg),
@@ -131,7 +134,9 @@ class AboutScreen extends ConsumerWidget {
   static String get _environmentLabel {
     const String url = ApiEnvironment.baseUrl;
     if (ApiEnvironment.isDevelopmentServer) return 'Développement';
-    if (url.contains('demo') || url.contains('staging') || url.contains('recette')) {
+    if (url.contains('demo') ||
+        url.contains('staging') ||
+        url.contains('recette')) {
       return 'Démonstration';
     }
     return 'Production';
