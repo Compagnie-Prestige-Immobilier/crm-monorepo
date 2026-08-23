@@ -8,10 +8,10 @@ import {
   NotificationCategory,
   NotificationDeliveryStatus,
   NotificationStatus,
-  Prisma,
   Role,
   ScheduledCallbackStatus,
 } from '@crm/database';
+import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
@@ -399,6 +399,18 @@ export class RemindersService {
     }));
   }
 
+  /**
+   * Écrit toute la vague, puis l'expédie, en un nombre CONSTANT de requêtes.
+   *
+   * L'IDEMPOTENCE RESTE PORTÉE PAR L'INDEX UNIQUE `(reminderKey, period)`, elle
+   * ne se lit simplement plus dans une violation P2002 attrapée trois cents
+   * fois. Les identifiants sont tirés ici, avant l'écriture ; la relecture qui
+   * suit rend l'identifiant réellement en base pour chaque clé, et il suffit de
+   * le comparer au nôtre pour savoir si cette ligne est de ce passage-ci
+   * (« créée ») ou d'un passage antérieur (« déjà présente »). Une seule
+   * requête, et la réponse reste juste même si un second processus écrit dans
+   * l'intervalle.
+   */
   private async emit(input: {
     key: ReminderKeyValue;
     now: Date;
@@ -409,98 +421,121 @@ export class RemindersService {
     category: NotificationCategory;
   }): Promise<ReminderRunDto> {
     const period = periodFor(input.now, this.config.BUSINESS_TIME_ZONE);
-    let created = 0;
-    let skipped = 0;
+    if (!input.candidates.length) return { created: 0, skipped: 0 };
 
-    for (const candidate of input.candidates) {
+    const wave = input.candidates.map((candidate) => {
       const rendered = renderNotification(
         input.titleTemplate,
         input.bodyTemplate,
         candidate.variables,
       );
+      return {
+        id: uuidv7(),
+        userId: candidate.userId,
+        reminderKey: `${input.key}:${candidate.userId}`,
+        title: rendered.title,
+        body: rendered.body,
+      };
+    });
 
-      try {
-        const notification = await this.prisma.notification.create({
-          data: {
-            title: rendered.title,
-            body: rendered.body,
-            category: input.category,
-            route: input.route,
-            audience: NotificationAudience.USERS,
-            audienceUserIds: [candidate.userId],
-            status: NotificationStatus.SENDING,
-            reminderKey: `${input.key}:${candidate.userId}`,
-            period,
-            deliveries: {
-              create: [
-                {
-                  userId: candidate.userId,
-                  status: NotificationDeliveryStatus.PENDING,
-                  reminderKey: input.key,
-                  period,
-                },
-              ],
-            },
-          },
-          select: { id: true },
-        });
+    await this.prisma.notification.createMany({
+      data: wave.map((row) => ({
+        id: row.id,
+        title: row.title,
+        body: row.body,
+        category: input.category,
+        route: input.route,
+        audience: NotificationAudience.USERS,
+        audienceUserIds: [row.userId],
+        status: NotificationStatus.SENDING,
+        reminderKey: row.reminderKey,
+        period,
+      })),
+      skipDuplicates: true,
+    });
 
-        await this.notifications.dispatch(notification.id, input.now);
-        created += 1;
-      } catch (error) {
-        if (isUniqueViolation(error)) {
-          skipped += 1;
-          await this.retryStalled(input.key, candidate.userId, period, input.now);
-          continue;
-        }
-        throw error;
-      }
-    }
+    const present = await this.prisma.notification.findMany({
+      where: { reminderKey: { in: wave.map((row) => row.reminderKey) }, period },
+      select: { id: true, reminderKey: true },
+    });
+    const idByKey = new Map(present.map((row) => [row.reminderKey, row.id]));
 
-    if (created || skipped) {
-      this.logger.log(
-        `Rappel ${input.key} (${period}) : ${String(created)} émis, ${String(skipped)} déjà présents.`,
+    const created = wave.filter((row) => idByKey.get(row.reminderKey) === row.id);
+    const skipped = wave.filter((row) => idByKey.get(row.reminderKey) !== row.id);
+
+    if (created.length) {
+      await this.prisma.notificationDelivery.createMany({
+        data: created.map((row) => ({
+          notificationId: row.id,
+          userId: row.userId,
+          status: NotificationDeliveryStatus.PENDING,
+          reminderKey: input.key,
+          period,
+        })),
+        skipDuplicates: true,
+      });
+
+      await this.notifications.dispatchMany(
+        created.map((row) => row.id),
+        input.now,
       );
     }
-    return { created, skipped };
+
+    if (skipped.length) {
+      await this.retryStalled(
+        input.key,
+        skipped.map((row) => row.userId),
+        period,
+        input.now,
+      );
+    }
+
+    this.logger.log(
+      `Rappel ${input.key} (${period}) : ${String(created.length)} émis, ` +
+        `${String(skipped.length)} déjà présents.`,
+    );
+    return { created: created.length, skipped: skipped.length };
   }
 
   private async retryStalled(
     key: ReminderKeyValue,
-    userId: string,
+    userIds: readonly string[],
     period: string,
     now: Date,
   ): Promise<void> {
-    const stalled = await this.prisma.notificationDelivery.findFirst({
+    const stalled = await this.prisma.notificationDelivery.findMany({
       where: {
         reminderKey: key,
-        userId,
+        userId: { in: [...userIds] },
         period,
         status: NotificationDeliveryStatus.PENDING,
         error: DELIVERY_RETRY_ERROR,
       },
       select: { notificationId: true },
     });
-    if (!stalled) return;
+    if (!stalled.length) return;
 
     try {
-      const retried = await this.notifications.dispatch(stalled.notificationId, now);
-      if (retried.claimed) {
-        this.logger.log(`Rappel ${key} (${period}) : nouvelle tentative d'envoi pour ${userId}.`);
+      const summaries = await this.notifications.dispatchMany(
+        stalled.map((row) => row.notificationId),
+        now,
+      );
+      const retried = [...summaries.values()].filter((summary) => summary.claimed).length;
+      if (retried) {
+        this.logger.log(
+          `Rappel ${key} (${period}) : ${String(retried)} nouvelle(s) tentative(s) d'envoi.`,
+        );
       } else {
         this.logger.debug(
-          `Rappel ${key} (${period}) : envoi tenu par un autre passage, reprise laissée au bail.`,
+          `Rappel ${key} (${period}) : envois tenus par un autre passage, reprise laissée au bail.`,
         );
       }
     } catch (error) {
       this.logger.warn(
-        `Rappel ${key} (${period}) : réessai impossible pour ${userId} (${error instanceof Error ? error.message : String(error)}).`,
+        `Rappel ${key} (${period}) : réessai impossible (${error instanceof Error ? error.message : String(error)}).`,
       );
     }
   }
 }
-
-const isUniqueViolation = (error: unknown): boolean =>
-  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 
 export const REMINDER_ROLE_DEFAULT = Role.COMMERCIAL;

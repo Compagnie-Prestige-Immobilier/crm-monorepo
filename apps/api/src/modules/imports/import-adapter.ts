@@ -46,15 +46,24 @@ export interface SheetLayout {
   readonly headerRow: number;
 }
 
-export interface ImportAdapter<TRow> {
+/**
+ * Un adaptateur est un SINGLETON Nest, son exécution ne l'est pas.
+ *
+ * `prepare` rend tout ce que l'exécution mémorise — référentiels chargés,
+ * numéros déjà vus — et le moteur le repasse aux deux autres méthodes. Rangé
+ * dans un champ d'instance, cet état serait écrasé par le `prepare` du travail
+ * suivant PENDANT que le premier lit encore, et des lignes valides seraient
+ * refusées.
+ */
+export interface ImportAdapter<TRow, TRun = unknown> {
   readonly kind: ImportKind;
   readonly maxRows: number;
   readonly templateColumns: readonly ImportColumn[];
   /** Absent : première feuille, `FIRST_DATA_ROW`, colonnes par position. */
   readonly layout?: SheetLayout;
-  parseRow(cells: Record<string, string>, rowNumber: number): ParsedRow<TRow>;
-  prepare(ctx: ImportRunContext): Promise<void>;
-  writeChunk(rows: readonly TRow[], ctx: ImportRunContext): Promise<ChunkOutcome>;
+  parseRow(cells: Record<string, string>, rowNumber: number, run: TRun): ParsedRow<TRow>;
+  prepare(ctx: ImportRunContext): Promise<TRun>;
+  writeChunk(rows: readonly TRow[], ctx: ImportRunContext, run: TRun): Promise<ChunkOutcome>;
 }
 
 export const IMPORT_ADAPTERS = Symbol('IMPORT_ADAPTERS');

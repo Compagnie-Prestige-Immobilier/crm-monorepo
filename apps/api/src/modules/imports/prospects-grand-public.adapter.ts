@@ -36,11 +36,9 @@ export const GrandPublicImportError = {
   DUREE_ILLISIBLE: 'PROSPECT_GP_IMPORT_DUREE_ILLISIBLE',
   DOUBLON_DANS_LE_FICHIER: 'PROSPECT_GP_IMPORT_DOUBLON_DANS_LE_FICHIER',
   DEJA_EN_BASE: 'PROSPECT_GP_IMPORT_DEJA_EN_BASE',
-  NON_PREPARE: 'PROSPECT_GP_IMPORT_NON_PREPARE',
 } as const;
 
 const PROFESSION_MAX = 120;
-const MAX_TRACKED_RUNS = 8;
 const EXISTING_LOOKUP_CHUNK = 1_000;
 
 export interface GrandPublicImportRow {
@@ -56,17 +54,15 @@ export interface GrandPublicImportRow {
   readonly canalProvenanceId: string | null;
 }
 
-interface Referentiels {
+/** Référentiels chargés et numéros déjà vus, LE TEMPS D'UNE EXÉCUTION. */
+export interface GrandPublicImportRun {
+  readonly seen: Map<string, number>;
   readonly banques: ReadonlyMap<string, string>;
   readonly banqueLabels: readonly string[];
   readonly syndicats: ReadonlyMap<string, string>;
   readonly syndicatLabels: readonly string[];
   readonly canaux: ReadonlyMap<string, string>;
   readonly canalLabels: readonly string[];
-}
-
-interface RunState {
-  readonly seen: Map<string, number>;
 }
 
 /**
@@ -77,16 +73,16 @@ interface RunState {
  * vide est une information qu'on n'a pas encore, jamais un refus.
  */
 @Injectable()
-export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPublicImportRow> {
+export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
+  GrandPublicImportRow,
+  GrandPublicImportRun
+> {
   readonly kind = ImportKind.PROSPECTS_GRAND_PUBLIC;
   readonly maxRows = GRAND_PUBLIC_MAX_ROWS;
   readonly templateColumns: readonly ImportColumn[] = GRAND_PUBLIC_IMPORT_COLUMNS;
   readonly layout = GRAND_PUBLIC_SHEET_LAYOUT;
 
-  private referentiels: Referentiels | null = null;
-  private readonly runs = new Map<string, RunState>();
-
-  async prepare(ctx: ImportRunContext): Promise<void> {
+  async prepare(ctx: ImportRunContext): Promise<GrandPublicImportRun> {
     const [banques, syndicats, canaux] = await Promise.all([
       ctx.tx.banque.findMany({
         where: { isActive: true },
@@ -116,7 +112,8 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
       }
     }
 
-    this.referentiels = {
+    return {
+      seen: new Map(),
       banques: indexBySigle(
         banques.map((row) => [row.shortName, row.id] as const),
         H.banque,
@@ -130,21 +127,13 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
       canaux: canaux0,
       canalLabels: canaux.map((row) => row.label),
     };
-
-    this.runs.set(ctx.jobId, { seen: new Map() });
-    while (this.runs.size > MAX_TRACKED_RUNS) {
-      const oldest = this.runs.keys().next();
-      if (oldest.done === true) break;
-      this.runs.delete(oldest.value);
-    }
   }
 
-  parseRow(cells: Record<string, string>, rowNumber: number): ParsedRow<GrandPublicImportRow> {
-    const refs = this.referentiels;
-    if (refs === null) {
-      throw new Error(`${GrandPublicImportError.NON_PREPARE}: parseRow appelée avant prepare.`);
-    }
-
+  parseRow(
+    cells: Record<string, string>,
+    rowNumber: number,
+    refs: GrandPublicImportRun,
+  ): ParsedRow<GrandPublicImportRow> {
     const refuse = (
       column: string,
       code: string,
@@ -252,17 +241,15 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
   async writeChunk(
     rows: readonly GrandPublicImportRow[],
     ctx: ImportRunContext,
+    run: GrandPublicImportRun,
   ): Promise<ChunkOutcome> {
     if (rows.length === 0) return { created: 0, skipped: 0, errors: [] };
-
-    const state = this.runs.get(ctx.jobId) ?? { seen: new Map<string, number>() };
-    this.runs.set(ctx.jobId, state);
 
     const errors: ImportRowError[] = [];
     const unique: GrandPublicImportRow[] = [];
 
     for (const row of rows) {
-      const firstSeen = state.seen.get(row.phoneE164);
+      const firstSeen = run.seen.get(row.phoneE164);
       if (firstSeen !== undefined) {
         errors.push({
           rowNumber: row.rowNumber,
@@ -272,7 +259,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
         });
         continue;
       }
-      state.seen.set(row.phoneE164, row.rowNumber);
+      run.seen.set(row.phoneE164, row.rowNumber);
       unique.push(row);
     }
 
@@ -364,10 +351,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<GrandPub
         },
       });
       for (const row of rows) {
-        found.set(
-          row.phoneE164,
-          (row.journeys ?? []).length > 0 || row.projet === Projet.GRAND_PUBLIC,
-        );
+        found.set(row.phoneE164, row.journeys.length > 0 || row.projet === Projet.GRAND_PUBLIC);
       }
     }
 

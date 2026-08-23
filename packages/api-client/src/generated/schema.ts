@@ -2857,6 +2857,11 @@ export interface components {
     };
     SetActiveDto: {
       isActive: boolean;
+      /**
+       * Format: uuid
+       * @description Compte qui reprend le portefeuille. Exigé si le compte désactivé en a un.
+       */
+      handoverToId?: string;
     };
     ResetPasswordDto: {
       /** Format: password */
@@ -3754,6 +3759,10 @@ export interface components {
       whatsappE164?: string;
       /** @description Profession déclarée. Sert au représentant comme au prospect. */
       profession?: string;
+      /** @description Représentant : où en est la relation. Un statut identique à celui déjà en base n’écrit rien. */
+      relationStatus?: components['schemas']['RepresentantRelation'];
+      /** @description Motif de la bascule, repris dans la chronologie. FACULTATIF POUR TOUJOURS. */
+      relationReason?: string;
       /** @description Représentant : l’établissement où il exerce. Ni l’IEF ni le département. */
       etablissement?: string;
       /** @description Prospect : le projet dont il relève. CHUES par défaut côté serveur. */
@@ -3842,7 +3851,7 @@ export interface components {
       /** @description Révision serveur sur laquelle le client s’est basé. Fournie sur update/delete, elle transforme une écriture aveugle en écriture conditionnelle. */
       baseRev?: number;
       data?: components['schemas']['SyncEntityDataDto'];
-      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement. */
+      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement, banqueId, syndicatId, representantId. */
       clearedFields?: string[];
     };
     SyncPushDto: {
@@ -3883,6 +3892,19 @@ export interface components {
       results: components['schemas']['SyncOperationResultDto'][];
       /** @description Toujours null : le serveur ignore la position de pull du client, et en fabriquer une lui ferait sauter les écritures des autres appareils. Le client conserve son propre curseur. */
       nextCursor: string | null;
+    };
+    /** @enum {string} */
+    VisiteReferentielKind: 'entreprises' | 'directions' | 'destinataires' | 'objets';
+    SyncVisiteReferentielDto: {
+      /** Format: uuid */
+      id: string;
+      kind: components['schemas']['VisiteReferentielKind'];
+      code: string;
+      label: string;
+      isActive: boolean;
+      sortOrder: number;
+      /** Format: date-time */
+      updatedAt: string;
     };
     /** @enum {string} */
     CampaignStatus: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'CLOSED';
@@ -3950,6 +3972,9 @@ export interface components {
       iefs: components['schemas']['IefDto'][];
       banques: components['schemas']['BanqueDto'][];
       syndicats: components['schemas']['SyndicatDto'][];
+      canauxProvenance: components['schemas']['CanalProvenanceDto'][];
+      /** @description Les quatre listes du registre des visites, réunies : chaque entrée porte sa nature. */
+      visiteReferentiels: components['schemas']['SyncVisiteReferentielDto'][];
       representants: components['schemas']['RepresentantDto'][];
       prospects: components['schemas']['ProspectDto'][];
       callCampaigns: components['schemas']['SyncCallCampaignDto'][];
@@ -4150,8 +4175,6 @@ export interface components {
       destinataires: components['schemas']['VisiteReferentielDto'][];
       objets: components['schemas']['VisiteReferentielDto'][];
     };
-    /** @enum {string} */
-    VisiteReferentielKind: 'entreprises' | 'directions' | 'destinataires' | 'objets';
     VisiteReferentielListDto: {
       items: components['schemas']['VisiteReferentielDto'][];
     };
@@ -6114,7 +6137,10 @@ export interface operations {
   };
   deleteUser: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Compte qui reprend le portefeuille. */
+        handoverToId?: string;
+      };
       header?: never;
       path: {
         id: string;

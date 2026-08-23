@@ -14,7 +14,7 @@ import {
   periodFor,
   remindersCron,
 } from './reminders.service.js';
-import { FakeActivity, FakeBrevoTransport, FakePrisma } from './fake-prisma.js';
+import { FakeActivity, FakeBrevoTransport, FakePrisma, countingPrisma } from './fake-prisma.js';
 import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
 
 const NOW = new Date('2026-08-13T08:00:00Z');
@@ -484,7 +484,7 @@ describe('expédition des envois programmés', () => {
     const moribond = new RemindersService(
       db.asService(),
       {
-        dispatch: () => new Promise<never>(() => {}),
+        dispatchMany: () => new Promise<never>(() => {}),
       } as unknown as NotificationsService,
       activite.asService(),
     );
@@ -831,5 +831,72 @@ describe('compte rendu de fin de journée', () => {
     expect((await reminders.sendDailyReport(SOIR)).created).toBe(2);
     expect((await reminders.sendDailyReport(SOIR)).created).toBe(0);
     expect(db.notifications).toHaveLength(2);
+  });
+});
+
+describe('coût d’une vague de rappels', () => {
+  const DESTINATAIRES = 300;
+
+  /** Le compteur doit mesurer le service, pas la doublure : on l’enveloppe. */
+  const passageInstrumente = (): { service: RemindersService; requetes: string[] } => {
+    const { prisma, calls } = countingPrisma(db);
+    return {
+      service: new RemindersService(
+        prisma,
+        new NotificationsService(prisma, fakeWorkspace(), brevo),
+        activite.asService(),
+      ),
+      requetes: calls,
+    };
+  };
+
+  beforeEach(() => {
+    db.clock = () => NOW;
+    brevo.configured = true;
+    for (let index = 0; index < DESTINATAIRES; index += 1) {
+      const suffix = String(index);
+      db.addUser({ id: `usr-${suffix}`, role: Role.COMMERCIAL, email: `${suffix}@cpi.sn` });
+      db.addCallTask({ assignedToId: `usr-${suffix}` });
+      db.addCallTask({ assignedToId: `usr-${suffix}` });
+    }
+  });
+
+  it('TROIS CENTS DESTINATAIRES NE COÛTENT PAS TROIS CENTS ALLERS-RETOURS', async () => {
+    const { service, requetes } = passageInstrumente();
+
+    const run = await service.remindOpenCallTasks(NOW);
+
+    expect(run.created).toBe(DESTINATAIRES);
+    expect(db.deliveries).toHaveLength(DESTINATAIRES);
+    expect(db.deliveries.every((row) => row.status === NotificationDeliveryStatus.SENT)).toBe(true);
+
+    expect(requetes.length).toBeLessThan(20);
+    expect(brevo.calls).toBe(1);
+  });
+
+  it('un second passage ne réécrit rien et ne renvoie rien', async () => {
+    await passageInstrumente().service.remindOpenCallTasks(NOW);
+    brevo.calls = 0;
+
+    const { service, requetes } = passageInstrumente();
+    const run = await service.remindOpenCallTasks(NOW);
+
+    expect(run).toEqual({ created: 0, skipped: DESTINATAIRES });
+    expect(requetes.length).toBeLessThan(20);
+    expect(brevo.calls).toBe(0);
+  });
+
+  it('DES CHIFFRES DIFFÉRENTS NE PARTAGENT PAS UN ENVOI', async () => {
+    db.addCallTask({ assignedToId: 'usr-0' });
+
+    await passageInstrumente().service.remindOpenCallTasks(NOW);
+
+    expect(brevo.calls).toBe(1);
+    expect(brevo.sent).toHaveLength(2);
+    const seul = brevo.sent.find((message) => message.textContent.includes('3 fiche(s)'));
+    expect(seul?.recipients.map((recipient) => recipient.email)).toEqual(['0@cpi.sn']);
+    expect(
+      brevo.sent.find((message) => message.textContent.includes('2 fiche(s)'))?.recipients,
+    ).toHaveLength(DESTINATAIRES - 1);
   });
 });

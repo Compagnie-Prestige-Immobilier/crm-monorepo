@@ -9,7 +9,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { BankCasesService } from './bank-cases.service.js';
+import { BankCasesService, sansAccents } from './bank-cases.service.js';
 import { BankCaseAnalyticsService } from './bank-cases-analytics.service.js';
 import { BankCaseStagesService } from './bank-case-stages.service.js';
 import { BankCaseError } from './errors.js';
@@ -660,5 +660,36 @@ describe('sûreté du workflow, en base', () => {
     expect(suivante.id).toBe(nouvelle.id);
 
     await stages.reorder({ stageIds: [initiale?.id ?? '', ...autres] });
+  });
+});
+
+describe('le désaccentuage de l’application suit celui de PostgreSQL', () => {
+  /// Le motif est désaccentué en JavaScript pour que le tableau reste une
+  /// CONSTANTE : passé par une sous-requête SQL, le planificateur perd l'index
+  /// et retombe en balayage séquentiel. Les deux dictionnaires doivent donc
+  /// s'accorder sur les accents que portent réellement les noms d'ici.
+  it('rend le même résultat que `immutable_unaccent` sur les accents du terrain', async () => {
+    const echantillon = [
+      'Aïssatou',
+      'Ndèye',
+      'Fatoumata Binta Diallo',
+      'Émile',
+      'Gaëlle',
+      'Cheikhoù',
+      'François',
+      'Maïmouna',
+      'Sénégal',
+      'Thiès',
+      'Kaolack',
+      'Ôsmane',
+      'Ûmar',
+    ];
+
+    for (const mot of echantillon) {
+      const lignes = await prisma.$queryRaw<{ attendu: string }[]>`
+        SELECT immutable_unaccent(lower(${mot})) AS attendu
+      `;
+      expect(sansAccents(mot.toLowerCase())).toBe(lignes[0]?.attendu);
+    }
   });
 });

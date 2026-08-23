@@ -17,6 +17,7 @@ import {
   readSheetDate,
   readSheetTime,
   type VisiteImportRow,
+  type VisiteImportRun,
 } from './visites.adapter.js';
 import { SHEET_CELL } from './xlsx-rows.js';
 
@@ -131,11 +132,12 @@ function accepted(result: ParsedRow<VisiteImportRow>): VisiteImportRow {
 
 let store: Store;
 let adapter: VisitesImportAdapter;
+let run: VisiteImportRun;
 
 beforeEach(async () => {
   store = { visites: [], referentielsEcrits: [] };
   adapter = new VisitesImportAdapter();
-  await adapter.prepare(fakeContext(store));
+  run = await adapter.prepare(fakeContext(store));
 });
 
 describe('contrat de l’adaptateur', () => {
@@ -184,7 +186,7 @@ describe('lecture d’une date et d’une heure', () => {
 
 describe('analyse d’une ligne', () => {
   it('accepte une ligne complète et résout les quatre référentiels', () => {
-    const row = accepted(adapter.parseRow(cells(), 12));
+    const row = accepted(adapter.parseRow(cells(), 12, run));
 
     expect(row.date).toBe('2026-01-06');
     expect(row.time).toBe('11:08');
@@ -197,21 +199,23 @@ describe('analyse d’une ligne', () => {
   });
 
   it('laisse vides la direction et le destinataire, facultatifs au registre', () => {
-    const row = accepted(adapter.parseRow(cells({ [H.direction]: '', [H.destinataire]: '' }), 12));
+    const row = accepted(
+      adapter.parseRow(cells({ [H.direction]: '', [H.destinataire]: '' }), 12, run),
+    );
 
     expect(row.directionId).toBeNull();
     expect(row.destinataireId).toBeNull();
   });
 
   it('garde le numéro tel quel quand il n’est pas normalisable', () => {
-    const row = accepted(adapter.parseRow(cells({ [H.telephone]: '7723663' }), 12));
+    const row = accepted(adapter.parseRow(cells({ [H.telephone]: '7723663' }), 12, run));
 
     expect(row.phone).toBe('7723663');
     expect(row.phoneE164).toBeNull();
   });
 
   it('nomme l’onglet dans le refus, car douze onglets ont une ligne 27', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.date]: '' }), 27));
+    const error = refusal(adapter.parseRow(cells({ [H.date]: '' }), 27, run));
 
     expect(error.rowNumber).toBe(27);
     expect(error.code).toBe(VisiteImportError.DATE_ABSENTE);
@@ -219,26 +223,26 @@ describe('analyse d’une ligne', () => {
   });
 
   it('refuse une ligne sans nom de visiteur', () => {
-    expect(refusal(adapter.parseRow(cells({ [H.nom]: '' }), 12)).code).toBe(
+    expect(refusal(adapter.parseRow(cells({ [H.nom]: '' }), 12, run)).code).toBe(
       VisiteImportError.NOM_ABSENT,
     );
   });
 
   it('refuse une heure illisible plutôt que de poser minuit', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.heure]: '17H5' }), 12));
+    const error = refusal(adapter.parseRow(cells({ [H.heure]: '17H5' }), 12, run));
 
     expect(error.code).toBe(VisiteImportError.HEURE_ILLISIBLE);
     expect(error.message).toContain('17H5');
   });
 
   it('accepte une visite dont l’heure n’a pas été relevée', () => {
-    expect(accepted(adapter.parseRow(cells({ [H.heure]: '' }), 12)).time).toBeNull();
+    expect(accepted(adapter.parseRow(cells({ [H.heure]: '' }), 12, run)).time).toBeNull();
   });
 });
 
 describe('valeur absente d’un référentiel', () => {
   it('refuse la ligne avec la valeur exacte, sans créer d’entrée', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.entreprise]: 'BOULANGERIE JAMM' }), 12));
+    const error = refusal(adapter.parseRow(cells({ [H.entreprise]: 'BOULANGERIE JAMM' }), 12, run));
 
     expect(error.code).toBe(VisiteImportError.ENTREPRISE_INCONNUE);
     expect(error.message).toContain('BOULANGERIE JAMM');
@@ -246,27 +250,29 @@ describe('valeur absente d’un référentiel', () => {
   });
 
   it('refuse une entreprise vide, obligatoire au registre', () => {
-    expect(refusal(adapter.parseRow(cells({ [H.entreprise]: '' }), 12)).code).toBe(
+    expect(refusal(adapter.parseRow(cells({ [H.entreprise]: '' }), 12, run)).code).toBe(
       VisiteImportError.ENTREPRISE_INCONNUE,
     );
   });
 
   it('refuse un objet de visite vide, obligatoire au registre', () => {
-    expect(refusal(adapter.parseRow(cells({ [H.objet]: '' }), 12)).code).toBe(
+    expect(refusal(adapter.parseRow(cells({ [H.objet]: '' }), 12, run)).code).toBe(
       VisiteImportError.OBJET_INCONNU,
     );
   });
 
   it('reconnaît le libellé tronqué que porte la liste déroulante du classeur', () => {
     const row = accepted(
-      adapter.parseRow(cells({ [H.objet]: 'ACHAT PRODUITS SANTARGILE ET/OU MAK' }), 12),
+      adapter.parseRow(cells({ [H.objet]: 'ACHAT PRODUITS SANTARGILE ET/OU MAK' }), 12, run),
     );
 
     expect(row.objetId).toBe(idOf('obj', 'ACHAT_PRODUITS'));
   });
 
   it('tolère la casse et les espaces en trop', () => {
-    const row = accepted(adapter.parseRow(cells({ [H.entreprise]: '  make-up   addiction ' }), 12));
+    const row = accepted(
+      adapter.parseRow(cells({ [H.entreprise]: '  make-up   addiction ' }), 12, run),
+    );
 
     expect(row.entrepriseId).toBe(idOf('ent', 'MAKE_UP_ADDICTION'));
   });
@@ -274,21 +280,21 @@ describe('valeur absente d’un référentiel', () => {
 
 describe('décalage de colonnes', () => {
   it('nomme un numéro de téléphone trouvé sous ENTREPRISE', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.entreprise]: '77 505 62 69' }), 12));
+    const error = refusal(adapter.parseRow(cells({ [H.entreprise]: '77 505 62 69' }), 12, run));
 
     expect(error.code).toBe(VisiteImportError.COLONNES_DECALEES);
     expect(error.message).toContain('téléphone');
   });
 
   it('nomme la liste à laquelle la valeur appartient vraiment', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.entreprise]: 'GENERALE' }), 12));
+    const error = refusal(adapter.parseRow(cells({ [H.entreprise]: 'GENERALE' }), 12, run));
 
     expect(error.code).toBe(VisiteImportError.COLONNES_DECALEES);
     expect(error.message).toContain('directions');
   });
 
   it('nomme un destinataire trouvé sous OBJECT VISITE', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.objet]: 'MME. SY (AG)' }), 12));
+    const error = refusal(adapter.parseRow(cells({ [H.objet]: 'MME. SY (AG)' }), 12, run));
 
     expect(error.code).toBe(VisiteImportError.COLONNES_DECALEES);
     expect(error.message).toContain('destinataires');
@@ -297,10 +303,14 @@ describe('décalage de colonnes', () => {
 
 describe('déduplication', () => {
   const ligne = (over: Partial<Record<string, string>>, rowNumber: number): VisiteImportRow =>
-    accepted(adapter.parseRow(cells(over), rowNumber));
+    accepted(adapter.parseRow(cells(over), rowNumber, run));
 
   it('écarte la même visite vue deux fois dans le même lot', async () => {
-    const outcome = await adapter.writeChunk([ligne({}, 12), ligne({}, 13)], fakeContext(store));
+    const outcome = await adapter.writeChunk(
+      [ligne({}, 12), ligne({}, 13)],
+      fakeContext(store),
+      run,
+    );
 
     expect(outcome.created).toBe(1);
     expect(outcome.skipped).toBe(1);
@@ -310,10 +320,10 @@ describe('déduplication', () => {
 
   it('écarte un doublon vu dans un lot ultérieur, et depuis un autre onglet', async () => {
     const ctx = fakeContext(store);
-    await adapter.writeChunk([ligne({}, 63)], ctx);
+    await adapter.writeChunk([ligne({}, 63)], ctx, run);
 
     const decembre = ligne({ [SHEET_CELL]: '12. BDD VISITES . DECEMBRE 25' }, 8);
-    const outcome = await adapter.writeChunk([decembre], ctx);
+    const outcome = await adapter.writeChunk([decembre], ctx, run);
 
     expect(outcome.created).toBe(0);
     expect(outcome.skipped).toBe(1);
@@ -324,6 +334,7 @@ describe('déduplication', () => {
     const outcome = await adapter.writeChunk(
       [ligne({}, 12), ligne({ [H.nom]: 'AMADOU LO' }, 13)],
       fakeContext(store),
+      run,
     );
 
     expect(outcome.created).toBe(2);
@@ -334,6 +345,7 @@ describe('déduplication', () => {
     const outcome = await adapter.writeChunk(
       [ligne({}, 12), ligne({ [H.heure]: '16H15' }, 13)],
       fakeContext(store),
+      run,
     );
 
     expect(outcome.created).toBe(2);
@@ -341,13 +353,14 @@ describe('déduplication', () => {
 
   it('écarte une visite déjà portée au registre', async () => {
     const ctx = fakeContext(store, ImportMode.APPLY);
-    await adapter.writeChunk([ligne({}, 12)], ctx);
+    await adapter.writeChunk([ligne({}, 12)], ctx, run);
 
     const rejoue = new VisitesImportAdapter();
-    await rejoue.prepare(ctx);
+    const runRejoue = await rejoue.prepare(ctx);
     const outcome = await rejoue.writeChunk(
-      [accepted(rejoue.parseRow(cells(), 12))],
+      [accepted(rejoue.parseRow(cells(), 12, runRejoue))],
       fakeContext(store, ImportMode.APPLY),
+      runRejoue,
     );
 
     expect(outcome.created).toBe(0);
@@ -360,8 +373,9 @@ describe('déduplication', () => {
 describe('écriture', () => {
   it('ne touche à rien en simulation', async () => {
     const outcome = await adapter.writeChunk(
-      [accepted(adapter.parseRow(cells(), 12))],
+      [accepted(adapter.parseRow(cells(), 12, run))],
       fakeContext(store, ImportMode.DRY_RUN),
+      run,
     );
 
     expect(outcome.created).toBe(1);
@@ -378,8 +392,9 @@ describe('écriture', () => {
     });
 
     await adapter.writeChunk(
-      [accepted(adapter.parseRow(cells(), 12))],
+      [accepted(adapter.parseRow(cells(), 12, run))],
       fakeContext(store, ImportMode.APPLY),
+      run,
     );
 
     expect(store.visites.at(-1)?.reference).toBe('V-2026-000412');
@@ -387,8 +402,9 @@ describe('écriture', () => {
 
   it('pose l’instant de la visite, et retient que l’heure était connue', async () => {
     await adapter.writeChunk(
-      [accepted(adapter.parseRow(cells(), 12))],
+      [accepted(adapter.parseRow(cells(), 12, run))],
       fakeContext(store, ImportMode.APPLY),
+      run,
     );
 
     expect(store.visites[0]?.visitedAt).toEqual(visiteInstant('2026-01-06', '11:08'));

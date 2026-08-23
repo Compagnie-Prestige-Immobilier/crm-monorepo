@@ -14,6 +14,7 @@ import {
   Phase2Status,
   PrismaClient,
   PrismaPg,
+  Projet,
   Role,
   type Prisma,
 } from '@crm/database';
@@ -43,6 +44,9 @@ interface Decor {
   campaignId: string;
   departementId: string;
   representantIds: [string, string];
+  /** Pour semer une fiche de plus dans la MÊME transaction annulée. */
+  tx: Prisma.TransactionClient;
+  commercialId: string;
 }
 
 let admin: AuthenticatedUser;
@@ -229,6 +233,8 @@ async function semer(tx: Prisma.TransactionClient): Promise<Decor> {
     campaignId: campagne.id,
     departementId: departement.id,
     representantIds: [rep1, rep2],
+    tx,
+    commercialId: commercial.id,
   };
 }
 
@@ -376,5 +382,33 @@ describe('les huit agrégats rendent LE BON CHIFFRE', () => {
     expect(parOrigine.get(null)).toBe(4);
 
     expect(resultat.byLabel.reduce((somme, ligne) => somme + ligne.prospects, 0)).toBe(5);
+  });
+});
+
+describe('une fiche Grand Public compte dans les agrégats', () => {
+  /// Elle n'a NI représentant, NI syndicat, NI banque : c'est la forme normale
+  /// du Grand Public. En jointure interne, elle disparaissait de tous les
+  /// totaux pendant que la liste, elle, la comptait.
+  it('sans représentant ni banque ni syndicat, elle est comptée quand même', async () => {
+    const resultat = await surLeJeu(async ({ quality, tx, commercialId }) => {
+      await tx.prospect.create({
+        data: {
+          id: uuidv7(),
+          nom: 'Chiffres-GP',
+          prenom: 'Test',
+          phoneE164: '+221770993199',
+          projet: Projet.GRAND_PUBLIC,
+          banqueId: null,
+          syndicatId: null,
+          representantId: null,
+          createdById: commercialId,
+          clientCreatedAt: jour(3),
+        },
+      });
+      return quality.originBreakdown(admin, {});
+    });
+
+    expect(resultat.total).toBe(6);
+    expect(resultat.byLabel.reduce((somme, ligne) => somme + ligne.prospects, 0)).toBe(6);
   });
 });
