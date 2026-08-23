@@ -49,6 +49,20 @@ import type {
 const DEFAULT_PAGE_SIZE = 25;
 const DEFAULT_SEARCH_PAGE_SIZE = 20;
 
+/**
+ * Le motif de recherche est désaccentué ICI, et non en SQL.
+ *
+ * `LIKE ANY (SELECT immutable_unaccent(m) FROM unnest(...))` marche, mais le
+ * planificateur y perd l'index et retombe en balayage séquentiel : vérifié à
+ * l'EXPLAIN. Le tableau doit rester une CONSTANTE pour que le
+ * `Bitmap Index Scan` tienne.
+ *
+ * L'accord avec le dictionnaire de PostgreSQL est vérifié par un test
+ * d'intégration, sur les accents que portent réellement les noms d'ici.
+ */
+export const sansAccents = (valeur: string): string =>
+  valeur.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
 /** Sentinelle interne : la transaction n'a rien mis à jour, la révision a bougé. */
 const REV_MISMATCH = Symbol('rev-mismatch');
 
@@ -336,7 +350,17 @@ export class BankCasesService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? DEFAULT_SEARCH_PAGE_SIZE;
     const term = query.search.trim();
-    const like = `%${term.toLowerCase()}%`;
+
+    // « Fall Moussa » et « Moussa Fall » désignent la même personne. La
+    // permutation se fait sur le TERME : inverser les COLONNES demanderait une
+    // seconde expression, que l'index ne couvre pas, et ramènerait le balayage
+    // séquentiel que cet index existe pour éviter.
+    const jetons = sansAccents(term.toLowerCase()).split(/\s+/u).filter(Boolean);
+    const [premier, second] = jetons;
+    const formesRecherchees =
+      jetons.length === 2 && premier !== undefined && second !== undefined
+        ? [`%${premier} ${second}%`, `%${second} ${premier}%`]
+        : [`%${sansAccents(term.toLowerCase())}%`];
 
     // Téléphone cherché sous sa forme NORMALISÉE : les quatre écritures d'un même
     // abonné doivent répondre. Une saisie partielle retombe sur les chiffres bruts.
@@ -354,9 +378,16 @@ export class BankCasesService {
       AND ${Prisma.sql`TRUE`}
       AND p."phase2Status" = 'METHOD_OBTAINED'::"Phase2Status"
       AND (
-        (lower(p."nom") || ' ' || lower(p."prenom")) LIKE ${like}
-        OR unaccent(lower(p."nom") || ' ' || lower(p."prenom")) LIKE unaccent(${like})
-        OR unaccent(lower(p."prenom") || ' ' || lower(p."nom")) LIKE unaccent(${like})
+        -- UNE seule forme, celle que prospects_nom_prenom_unaccent_trgm indexe
+        -- au caractère près. Les trois branches d'avant se subsumaient : sans
+        -- accent, unaccent étant une substitution caractère à caractère, la
+        -- forme accentuée trouvait tout ce que trouvait la forme brute. Aucun
+        -- plan ne pouvait donc emprunter l'index, payé à chaque INSERT.
+        --
+        -- L'ordre inversé « prénom nom » se traite en permutant les jetons du
+        -- TERME, pas les colonnes : une seconde expression rouvrirait le même
+        -- balayage séquentiel.
+        immutable_unaccent(lower(p."nom") || ' ' || lower(p."prenom")) LIKE ANY (${formesRecherchees}::text[])
         ${phone}
       )
     `;

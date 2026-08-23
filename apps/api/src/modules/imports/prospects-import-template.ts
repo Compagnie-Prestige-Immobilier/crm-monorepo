@@ -1,5 +1,4 @@
-import { EnrollmentMethod } from '@crm/database';
-
+import { ENROLLMENT_METHOD_LABELS, ENROLLMENT_METHOD_ORDER } from '../prospects/phase2-labels.js';
 import type { ImportColumn } from './import-adapter.js';
 
 export const PROSPECT_IMPORT_HEADERS = {
@@ -12,11 +11,15 @@ export const PROSPECT_IMPORT_HEADERS = {
   enrollmentMethod: 'Méthode d’enrôlement',
 } as const;
 
-export const ENROLLMENT_METHOD_TOKENS: readonly EnrollmentMethod[] = [
-  EnrollmentMethod.PLATFORM,
-  EnrollmentMethod.PHYSICAL,
-  EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING,
-];
+/**
+ * Ce que la liste déroulante propose : les LIBELLÉS français, les mêmes que
+ * ceux écrits par l'export, sans quoi un aller-retour export → import échoue
+ * sur cette colonne. Le nom du symbole ne change pas, `src/modules/export/**`
+ * l'importe pour bâtir le modèle.
+ */
+export const ENROLLMENT_METHOD_TOKENS: readonly string[] = ENROLLMENT_METHOD_ORDER.map(
+  (method) => ENROLLMENT_METHOD_LABELS[method],
+);
 
 export const PROSPECTS_IMPORT_COLUMNS: readonly ImportColumn[] = [
   {
@@ -65,8 +68,8 @@ export const PROSPECTS_IMPORT_COLUMNS: readonly ImportColumn[] = [
     header: PROSPECT_IMPORT_HEADERS.enrollmentMethod,
     width: 32,
     required: false,
-    help: 'Facultative. À remplir uniquement si l’enrôlement a DÉJÀ eu lieu : PLATFORM, PHYSICAL ou VOICE_OR_ELECTRONIC_MESSAGING. Laissée vide, la fiche part en attente d’appel.',
-    sample: 'PLATFORM',
+    help: 'Facultative. À remplir uniquement si l’enrôlement a DÉJÀ eu lieu : choisir dans la liste déroulante. Laissée vide, la fiche part en attente d’appel.',
+    sample: ENROLLMENT_METHOD_LABELS.PLATFORM,
   },
 ];
 

@@ -5,12 +5,22 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { GrandPublicConsent, Prisma, Projet, classifySegment } from '@crm/database';
+import {
+  CallTaskStatus,
+  GrandPublicConsent,
+  Prisma,
+  Projet,
+  type ProspectStatut,
+  ScheduledCallbackStatus,
+  classifySegment,
+} from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { lastAttemptsByProspect, type LastAttempt } from './last-attempt.js';
 import { normalizePhone } from '../../common/phone.js';
+import { AuditAction, audit } from '../../common/audit.js';
+import { PROSPECT_STATUT_TRANSITIONS, assertTransition } from '../../common/transitions.js';
 import { assertOwnership, assertReadable, isAdmin, ownerScope } from '../../common/scope.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
 import { ProspectSortField, SortOrder } from '../../common/dto/prospect-filter.dto.js';
@@ -61,6 +71,109 @@ export const PROSPECT_INCLUDE = {
 
 type ProspectRow = Prisma.ProspectGetPayload<{ include: typeof PROSPECT_INCLUDE }>;
 
+/**
+ * Ce qu'une fiche qui sort du jeu laisse derrière elle.
+ *
+ * `deletedAt` seul ne suffisait pas : la tâche d'appel restait ACTIVE et le
+ * rappel restait DÛ, pour toujours. Le téléconseiller voyait un numéro dans sa
+ * journée que toute tentative renvoyait en « prospect introuvable », donc en
+ * échec définitif côté téléphone ; et l'index d'unicité de tâche active
+ * interdisait qu'une campagne ultérieure reprenne ce numéro, même ressaisi.
+ */
+export async function closeProspectWork(
+  tx: Prisma.TransactionClient,
+  prospectId: string,
+): Promise<void> {
+  await tx.callTask.updateMany({
+    where: { prospectId, isActive: true },
+    data: { status: CallTaskStatus.CANCELLED, isActive: false, completedAt: new Date() },
+  });
+  await tx.scheduledCallback.updateMany({
+    where: { prospectId, status: ScheduledCallbackStatus.PENDING },
+    data: { status: ScheduledCallbackStatus.CANCELLED },
+  });
+}
+
+/** Avancement d'un parcours : la fusion garde toujours le plus avancé des deux. */
+const STATUT_RANK: Record<ProspectStatut, number> = {
+  NOUVEAU: 0,
+  PERDU: 1,
+  CONTACTE: 2,
+  CONVERTI: 3,
+};
+
+/**
+ * Déplace les parcours de la source vers la cible.
+ *
+ * `@@unique([prospectId, projet])` interdit le simple `updateMany` : quand les
+ * deux fiches suivent le même projet, il faut choisir. La règle est de ne
+ * JAMAIS perdre une conversion — `ProspectConversion` est en `onDelete:
+ * Cascade` sur le parcours, donc supprimer le mauvais parcours effacerait
+ * silencieusement un engagement signé et daté.
+ */
+async function moveJourneys(
+  tx: Prisma.TransactionClient,
+  sourceId: string,
+  targetId: string,
+): Promise<void> {
+  const select = {
+    id: true,
+    projet: true,
+    statut: true,
+    consent: true,
+    conversion: { select: { id: true } },
+  } as const;
+  const [source, target] = await Promise.all([
+    tx.prospectJourney.findMany({ where: { prospectId: sourceId }, select }),
+    tx.prospectJourney.findMany({ where: { prospectId: targetId }, select }),
+  ]);
+  const parProjet = new Map(target.map((row) => [row.projet, row]));
+
+  for (const depart of source) {
+    const arrivee = parProjet.get(depart.projet);
+    if (!arrivee) {
+      await tx.prospectJourney.update({
+        where: { id: depart.id },
+        data: { prospectId: targetId },
+      });
+      continue;
+    }
+
+    if (depart.conversion && arrivee.conversion) {
+      throw new ConflictException({
+        code: 'MERGE_TWO_CONVERSIONS',
+        message:
+          `Les deux fiches portent une conversion confirmée sur le projet ${depart.projet}. ` +
+          'Corrigez l’une des deux avant de fusionner.',
+      });
+    }
+
+    // C'est le parcours PORTEUR de la conversion qui survit.
+    if (depart.conversion) {
+      await tx.prospectJourney.delete({ where: { id: arrivee.id } });
+      await tx.prospectJourney.update({
+        where: { id: depart.id },
+        data: { prospectId: targetId },
+      });
+      continue;
+    }
+
+    await tx.prospectJourney.update({
+      where: { id: arrivee.id },
+      data: {
+        ...(STATUT_RANK[depart.statut] > STATUT_RANK[arrivee.statut]
+          ? { statut: depart.statut }
+          : {}),
+        ...(arrivee.consent === GrandPublicConsent.NON_DEMANDE &&
+        depart.consent !== GrandPublicConsent.NON_DEMANDE
+          ? { consent: depart.consent }
+          : {}),
+      },
+    });
+    await tx.prospectJourney.delete({ where: { id: depart.id } });
+  }
+}
+
 export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): ProspectDto {
   return {
     id: row.id,
@@ -88,7 +201,7 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     incomeBandId: row.incomeBandId ?? null,
     incomeBandLabel: row.incomeBand?.label ?? null,
     paymentMode: row.paymentMode ?? null,
-    journeys: (row.journeys ?? []).map((journey) => ({
+    journeys: row.journeys.map((journey) => ({
       ...journey,
       consentAt: journey.consentAt?.toISOString() ?? null,
       convertedAt: journey.convertedAt?.toISOString() ?? null,
@@ -183,7 +296,7 @@ export class ProspectsService {
     const projet = input.projet ?? Projet.CHUES;
     const attached = await this.attachProjectByPhone(user, phoneE164, projet, input);
     if (attached) return attached;
-    await this.assertPhoneFree(phoneE164);
+    await this.assertPhoneFree(user, phoneE164);
     this.assertPayment(input.paymentMode, input.dureeSystemeMois);
 
     const created = await this.prisma.prospect.create({
@@ -240,7 +353,8 @@ export class ProspectsService {
     assertOwnership(user, existing);
 
     const phoneE164 = input.phone ? normalizePhone(input.phone) : undefined;
-    if (phoneE164 && phoneE164 !== existing.phoneE164) await this.assertPhoneFree(phoneE164, id);
+    if (phoneE164 && phoneE164 !== existing.phoneE164)
+      await this.assertPhoneFree(user, phoneE164, id);
     if (input.representantId && input.representantId !== existing.representantId) {
       await this.assertRepresentantUsable(user, input.representantId);
     }
@@ -248,6 +362,27 @@ export class ProspectsService {
       input.paymentMode ?? existing.paymentMode,
       input.dureeSystemeMois ?? existing.dureeSystemeMois,
     );
+
+    // `CONVERTI` porte une `ProspectConversion` signée et datée : on n'y entre
+    // que par `confirmGrandPublicConversion`, qui exige le consentement et
+    // écrit l'engagement. Sans cette garde, un simple PATCH y menait, sans
+    // consentement, sans conversion, sans auteur — et depuis n'importe quel
+    // état, `PERDU` compris.
+    if (input.statut && input.statut !== existing.statut) {
+      assertTransition(PROSPECT_STATUT_TRANSITIONS, existing.statut, input.statut, {
+        code: 'PROSPECT_STATUT_TRANSITION_REFUSED',
+        label: 'Statut du prospect',
+        ...(isAdmin(user) ? { bypass: true } : {}),
+      });
+      if (input.statut === 'CONVERTI' && !isAdmin(user)) {
+        throw new ForbiddenException({
+          code: 'PROSPECT_CONVERSION_REQUIRES_CONFIRMATION',
+          message:
+            'Une conversion s’enregistre par la confirmation dédiée, qui recueille ' +
+            'l’offre et le montant.',
+        });
+      }
+    }
 
     if (input.projet) {
       await this.prisma.prospectJourney.upsert({
@@ -321,9 +456,18 @@ export class ProspectsService {
     // Suppression logique : l'index unique sur le téléphone étant PARTIEL
     // (`WHERE deletedAt IS NULL`), le numéro redevient immédiatement
     // ressaisissable. C'est la raison d'être de cet index partiel.
-    await this.prisma.prospect.update({
-      where: { id },
-      data: { deletedAt: new Date(), rev: { increment: 1 } },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.prospect.update({
+        where: { id },
+        data: { deletedAt: new Date(), rev: { increment: 1 } },
+      });
+      await closeProspectWork(tx, id);
+      await audit(tx, user, {
+        action: AuditAction.PROSPECT_DELETE,
+        entity: 'prospect',
+        entityId: id,
+        before: { nom: existing.nom, prenom: existing.prenom, phoneE164: existing.phoneE164 },
+      });
     });
     return { ok: true };
   }
@@ -439,12 +583,47 @@ export class ProspectsService {
     assertOwnership(user, target);
     assertOwnership(user, source);
 
+    // Deux dossiers bancaires ouverts ne se fusionnent pas tout seuls : lequel
+    // survit, avec quel montant et quelle étape, est une décision d'instruction
+    // que le code ne peut pas prendre.
+    const dossiersOuverts = await this.prisma.bankCase.count({
+      where: { prospectId: { in: [source.id, target.id] }, currentStage: { type: 'OPEN' } },
+    });
+    if (dossiersOuverts > 1) {
+      throw new ConflictException({
+        code: 'MERGE_TWO_OPEN_BANK_CASES',
+        message:
+          'Ces deux fiches portent chacune un dossier bancaire en cours. ' +
+          'Clôturez ou corrigez l’un des deux avant de fusionner.',
+      });
+    }
+
     const merged = await this.prisma.$transaction(async (tx) => {
       await tx.prospect.update({
         where: { id: source.id },
         data: { deletedAt: new Date(), rev: { increment: 1 } },
       });
-      return tx.prospect.update({
+
+      // TOUT ce qui pend à la source suit, sinon la fusion perd le classement
+      // par projet, les dossiers et l'historique d'appels : le parcours restait
+      // accroché à une fiche supprimée, donc la personne disparaissait des
+      // listes de ce projet, et le dossier encaissé pointait vers une fiche
+      // qu'aucun écran ne montre plus.
+      await moveJourneys(tx, source.id, target.id);
+      // Déroulé et non bouclé : l'union des délégués Prisma n'est pas appelable.
+      const versLaCible = { where: { prospectId: source.id }, data: { prospectId: target.id } };
+      await tx.bankCase.updateMany(versLaCible);
+      await tx.callAttempt.updateMany(versLaCible);
+      await tx.callTask.updateMany(versLaCible);
+      await tx.scheduledCallback.updateMany(versLaCible);
+      // La demande bancaire nomme sa fiche `createdProspectId`, et un CHECK
+      // exige qu'une demande approuvée en porte une : la laisser sur la fiche
+      // supprimée rendrait la demande orpheline aux yeux de la banque.
+      await tx.clientCreationRequest.updateMany({
+        where: { createdProspectId: source.id },
+        data: { createdProspectId: target.id },
+      });
+      const fusionnee = await tx.prospect.update({
         where: { id: target.id },
         data: {
           ...(input.preferSource
@@ -468,6 +647,15 @@ export class ProspectsService {
         },
         include: PROSPECT_INCLUDE,
       });
+
+      await audit(tx, user, {
+        action: AuditAction.PROSPECT_MERGE,
+        entity: 'prospect',
+        entityId: target.id,
+        before: { sourceId: source.id, sourcePhone: source.phoneE164 },
+        after: { targetId: target.id, preferSource: input.preferSource === true },
+      });
+      return fusionnee;
     });
 
     const attempts = await lastAttemptsByProspect(this.prisma, [merged.id]);
@@ -582,7 +770,11 @@ export class ProspectsService {
    * refuse ensuite, et le mobile recevrait un 409 générique au lieu du message
    * nominatif dont il a besoin pour arrêter de rejouer la même saisie.
    */
-  private async assertPhoneFree(phoneE164: string, exceptId?: string): Promise<void> {
+  private async assertPhoneFree(
+    user: AuthenticatedUser,
+    phoneE164: string,
+    exceptId?: string,
+  ): Promise<void> {
     const clash = await this.prisma.prospect.findFirst({
       where: {
         phoneE164,
@@ -596,19 +788,26 @@ export class ProspectsService {
     });
     if (!clash) return;
 
+    // La recherche est GLOBALE (l'index unique l'est), mais le corps ne l'est
+    // pas : rendre l'identité civile d'une fiche d'autrui ferait de ce 409 un
+    // annuaire interrogeable numéro par numéro. Le nom du propriétaire reste,
+    // c'est lui qui dit à qui s'adresser et qui arrête le rejeu.
+    const visible = isAdmin(user) || clash.createdById === user.id;
     throw new ConflictException({
       code: 'PROSPECT_PHONE_CONFLICT',
       message: `Ce numéro a déjà été enregistré par ${clash.createdBy.fullName}.`,
-      existing: {
-        id: clash.id,
-        nom: clash.nom,
-        prenom: clash.prenom,
-        representantId: clash.representant?.id ?? null,
-        representantName: clash.representant?.fullName ?? null,
-        ownedByCommercialId: clash.createdBy.id,
-        ownedByCommercialName: clash.createdBy.fullName,
-        createdAt: clash.createdAt.toISOString(),
-      },
+      existing: visible
+        ? {
+            id: clash.id,
+            nom: clash.nom,
+            prenom: clash.prenom,
+            representantId: clash.representant?.id ?? null,
+            representantName: clash.representant?.fullName ?? null,
+            ownedByCommercialId: clash.createdBy.id,
+            ownedByCommercialName: clash.createdBy.fullName,
+            createdAt: clash.createdAt.toISOString(),
+          }
+        : { ownedByCommercialName: clash.createdBy.fullName },
     });
   }
 
@@ -626,7 +825,7 @@ export class ProspectsService {
         journeys: { where: { projet }, select: { id: true } },
       },
     });
-    if (!existing || (existing.journeys ?? []).length > 0) return null;
+    if (!existing || existing.journeys.length > 0) return null;
     if (!isAdmin(user) && existing.createdById !== user.id) return null;
 
     await this.prisma.prospectJourney.create({

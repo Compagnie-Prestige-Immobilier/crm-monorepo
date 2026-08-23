@@ -1,8 +1,9 @@
 import { NotFoundException } from '@nestjs/common';
-import { SuggestionStatus } from '@crm/database';
+import { Role, SuggestionStatus } from '@crm/database';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { shortCode } from '../../common/short-code.js';
 import { SuggestionsService } from './suggestions.service.js';
 
@@ -43,11 +44,21 @@ function stub(): MockDb {
 const build = (db: MockDb): SuggestionsService =>
   new SuggestionsService(db as unknown as PrismaService);
 
+const alice: AuthenticatedUser = {
+  id: 'com-1',
+  email: 'alice@cpi.sn',
+  username: 'alice',
+  fullName: 'Awa Sy',
+  role: Role.COMMERCIAL,
+};
+const superviseur: AuthenticatedUser = { ...alice, id: 'sup-1', role: Role.SUPERVISEUR };
+const admin: AuthenticatedUser = { ...alice, id: 'adm-1', role: Role.ADMIN };
+
 describe('SuggestionsService : liste', () => {
   it('désigne le représentant source par son code court, jamais par son nom', async () => {
     const db = stub();
 
-    const result = await build(db).list({});
+    const result = await build(db).list(alice, {});
 
     expect(result.items[0]).toMatchObject({
       sourceRepresentantId: 'rep-1',
@@ -61,7 +72,7 @@ describe('SuggestionsService : liste', () => {
   it('écarte les lignes supprimées et les lignes fictives, mode éteint', async () => {
     const db = stub();
 
-    await build(db).list({ status: SuggestionStatus.A_APPELER });
+    await build(db).list(alice, { status: SuggestionStatus.A_APPELER });
 
     const where = (db.representantSuggestion.findMany.mock.calls[0] as [{ where: unknown }])[0]
       .where;
@@ -75,7 +86,7 @@ describe('SuggestionsService : liste', () => {
     const db = stub();
     db.representantSuggestion.count.mockResolvedValue(53);
 
-    const result = await build(db).list({ page: 3, pageSize: 25 });
+    const result = await build(db).list(alice, { page: 3, pageSize: 25 });
 
     const args = (db.representantSuggestion.findMany.mock.calls[0] as [Record<string, unknown>])[0];
     expect(args).toMatchObject({ skip: 50, take: 25 });
@@ -87,7 +98,7 @@ describe('SuggestionsService : bascule de statut', () => {
   it('marque un numéro appelé', async () => {
     const db = stub();
 
-    const result = await build(db).setStatus('sug-1', SuggestionStatus.APPELE);
+    const result = await build(db).setStatus(alice, 'sug-1', SuggestionStatus.APPELE);
 
     const call = (
       db.representantSuggestion.updateMany.mock.calls[0] as [
@@ -101,10 +112,57 @@ describe('SuggestionsService : bascule de statut', () => {
 
   it('ne distingue pas « inconnue » de « hors du périmètre visible »', async () => {
     const db = stub();
+    // La piste n'est pas visible : la lecture de contrôle ne la trouve pas.
+    db.representantSuggestion.findFirst.mockResolvedValue(null);
     db.representantSuggestion.updateMany.mockResolvedValue({ count: 0 });
 
-    await expect(build(db).setStatus('sug-1', SuggestionStatus.ABANDONNE)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      build(db).setStatus(alice, 'sug-1', SuggestionStatus.ABANDONNE),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('SuggestionsService : à qui appartient une piste', () => {
+  it('un COMMERCIAL ne lit que les pistes qu’il a lui-même remontées', async () => {
+    const db = stub();
+
+    await build(db).list(alice, {});
+
+    const where = (db.representantSuggestion.findMany.mock.calls[0] as [{ where: unknown }])[0]
+      .where;
+    expect(where).toMatchObject({ suggestedById: alice.id });
+  });
+
+  /// Superviser, c'est lire le travail de tous : la clause tomberait à faux.
+  it('la supervision et l’administration lisent tout', async () => {
+    for (const user of [superviseur, admin]) {
+      const db = stub();
+      await build(db).list(user, {});
+      const where = (db.representantSuggestion.findMany.mock.calls[0] as [{ where: unknown }])[0]
+        .where as Record<string, unknown>;
+      expect(where.suggestedById).toBeUndefined();
+    }
+  });
+
+  it('la bascule de statut est bornée au propriétaire de la piste', async () => {
+    const db = stub();
+
+    await build(db).setStatus(alice, 'sug-1', SuggestionStatus.APPELE);
+
+    const call = (
+      db.representantSuggestion.updateMany.mock.calls[0] as [{ where: Record<string, unknown> }]
+    )[0];
+    expect(call.where).toMatchObject({ suggestedById: alice.id });
+  });
+
+  it('un ADMIN bascule sans clause de propriétaire', async () => {
+    const db = stub();
+
+    await build(db).setStatus(admin, 'sug-1', SuggestionStatus.APPELE);
+
+    const call = (
+      db.representantSuggestion.updateMany.mock.calls[0] as [{ where: Record<string, unknown> }]
+    )[0];
+    expect(call.where.suggestedById).toBeUndefined();
   });
 });

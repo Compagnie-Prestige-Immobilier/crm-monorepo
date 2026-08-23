@@ -233,8 +233,44 @@ const matches = (
   return true;
 };
 
+type OrderBy = Record<string, string> | Record<string, string>[] | undefined;
+
+const compare = (left: unknown, right: unknown): number => {
+  if (left instanceof Date && right instanceof Date) return left.getTime() - right.getTime();
+  if (typeof left === 'string' && typeof right === 'string')
+    return left < right ? -1 : +(left > right);
+  return 0;
+};
+
+const sorted = <T extends Record<string, unknown>>(rows: readonly T[], orderBy: OrderBy): T[] => {
+  const clauses = orderBy === undefined ? [] : Array.isArray(orderBy) ? orderBy : [orderBy];
+  return [...rows].sort((left, right) => {
+    for (const clause of clauses) {
+      for (const [field, direction] of Object.entries(clause)) {
+        const delta = compare(left[field], right[field]);
+        if (delta !== 0) return direction === 'desc' ? -delta : delta;
+      }
+    }
+    return 0;
+  });
+};
+
 export class FakePrisma {
   clock: () => Date = () => new Date();
+
+  /**
+   * PostgreSQL ne promet AUCUN ordre à égalité de tri. Levé, ce drapeau rend la
+   * chose visible : un `orderBy` qui ne départage pas rend deux réponses
+   * différentes pour la même question.
+   */
+  unstableTies = false;
+  private tie = 0;
+
+  private order<T extends Record<string, unknown>>(rows: readonly T[], orderBy: OrderBy): T[] {
+    this.tie += 1;
+    const source = this.unstableTies && this.tie % 2 === 0 ? [...rows].reverse() : rows;
+    return sorted(source, orderBy);
+  }
 
   readonly faults = new Map<string, Error>();
 
@@ -331,8 +367,96 @@ export class FakePrisma {
     };
   }
 
+  private buildNotification(data: Record<string, unknown>): NotificationRow {
+    return {
+      id: (data.id as string | undefined) ?? nextId('ntf'),
+      title: String(data.title),
+      body: String(data.body),
+      category: (data.category as NotificationCategory | undefined) ?? NotificationCategory.ANNONCE,
+      route: (data.route as string | null | undefined) ?? null,
+      audience: (data.audience as NotificationAudience | undefined) ?? NotificationAudience.ALL,
+      audienceRole: (data.audienceRole as Role | null | undefined) ?? null,
+      audienceDepartementId: (data.audienceDepartementId as string | null | undefined) ?? null,
+      audienceUserIds: (data.audienceUserIds as string[] | undefined) ?? [],
+      status: (data.status as NotificationStatus | undefined) ?? NotificationStatus.SENT,
+      scheduledFor: (data.scheduledFor as Date | null | undefined) ?? null,
+      sentAt: null,
+      cancelledAt: null,
+      transportStatus: null,
+      templateId: (data.templateId as string | null | undefined) ?? null,
+      createdById: (data.createdById as string | null | undefined) ?? null,
+      reminderKey: (data.reminderKey as string | null | undefined) ?? null,
+      period: (data.period as string | null | undefined) ?? null,
+      createdAt: (data.createdAt as Date | undefined) ?? this.clock(),
+      updatedAt: this.clock(),
+      dispatchClaim: (data.dispatchClaim as string | null | undefined) ?? null,
+    };
+  }
+
+  private buildDelivery(notificationId: string, seed: Record<string, unknown>): DeliveryRow {
+    return {
+      id: (seed.id as string | undefined) ?? nextId('dlv'),
+      notificationId,
+      userId: String(seed.userId),
+      status:
+        (seed.status as NotificationDeliveryStatus | undefined) ??
+        NotificationDeliveryStatus.PENDING,
+      error: null,
+      sentAt: null,
+      deliveredAt: null,
+      readAt: null,
+      failedAt: null,
+      reminderKey: (seed.reminderKey as string | null | undefined) ?? null,
+      period: (seed.period as string | null | undefined) ?? null,
+      createdAt: (seed.createdAt as Date | undefined) ?? new Date(),
+    };
+  }
+
+  private notificationClash(row: NotificationRow): boolean {
+    return (
+      row.reminderKey !== null &&
+      this.notifications.some(
+        (existing) => existing.reminderKey === row.reminderKey && existing.period === row.period,
+      )
+    );
+  }
+
+  private deliveryClash(row: DeliveryRow): boolean {
+    if (
+      this.deliveries.some(
+        (existing) =>
+          existing.notificationId === row.notificationId && existing.userId === row.userId,
+      )
+    ) {
+      return true;
+    }
+    return (
+      row.reminderKey !== null &&
+      this.deliveries.some(
+        (existing) =>
+          existing.reminderKey === row.reminderKey &&
+          existing.userId === row.userId &&
+          existing.period === row.period,
+      )
+    );
+  }
+
   get notification() {
     return {
+      createMany: (args: { data: Record<string, unknown>[]; skipDuplicates?: boolean }) => {
+        let count = 0;
+        for (const data of args.data) {
+          const row = this.buildNotification(data);
+          if (this.notificationClash(row)) {
+            if (args.skipDuplicates) continue;
+            return Promise.reject(uniqueViolation(['reminderKey', 'period']));
+          }
+          this.notifications.push(row);
+          count += 1;
+        }
+        return Promise.resolve({ count });
+      },
+
       create: (args: { data: Record<string, unknown> }) => {
         const data = args.data;
         const reminderKey = (data.reminderKey as string | null | undefined) ?? null;
@@ -428,12 +552,15 @@ export class FakePrisma {
         where?: Record<string, unknown>;
         skip?: number;
         take?: number;
-        orderBy?: Record<string, string>;
+        orderBy?: OrderBy;
       }) => {
-        let rows = this.notifications.filter((row) =>
+        const matching = this.notifications.filter((row) =>
           matches(row as unknown as Record<string, unknown>, args.where, this),
         );
-        rows = [...rows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        const rows = this.order(
+          matching as unknown as Record<string, unknown>[],
+          args.orderBy ?? { createdAt: 'desc' },
+        ) as unknown as NotificationRow[];
         const skip = args.skip ?? 0;
         const take = args.take ?? rows.length;
         return Promise.resolve(rows.slice(skip, skip + take).map((row) => this.decorate(row)));
@@ -465,18 +592,45 @@ export class FakePrisma {
 
   get notificationDelivery() {
     return {
-      findMany: (args: { where?: Record<string, unknown> }) =>
-        Promise.resolve(
-          this.deliveries
-            .filter((row) => matches(row as unknown as Record<string, unknown>, args.where, this))
-            .map((row) => ({
-              ...row,
-              user: this.users.find((user) => user.id === row.userId),
-              notification: this.notifications.find(
-                (notification) => notification.id === row.notificationId,
-              ),
-            })),
-        ),
+      createMany: (args: { data: Record<string, unknown>[]; skipDuplicates?: boolean }) => {
+        let count = 0;
+        for (const seed of args.data) {
+          const row = this.buildDelivery(String(seed.notificationId), seed);
+          if (this.deliveryClash(row)) {
+            if (args.skipDuplicates) continue;
+            return Promise.reject(uniqueViolation(['reminderKey', 'userId', 'period']));
+          }
+          this.deliveries.push(row);
+          count += 1;
+        }
+        return Promise.resolve({ count });
+      },
+
+      findMany: (args: {
+        where?: Record<string, unknown>;
+        skip?: number;
+        take?: number;
+        orderBy?: OrderBy;
+      }) => {
+        const matching = this.deliveries.filter((row) =>
+          matches(row as unknown as Record<string, unknown>, args.where, this),
+        );
+        const rows = this.order(
+          matching as unknown as Record<string, unknown>[],
+          args.orderBy,
+        ) as unknown as DeliveryRow[];
+        const skip = args.skip ?? 0;
+        const take = args.take ?? rows.length;
+        return Promise.resolve(
+          rows.slice(skip, skip + take).map((row) => ({
+            ...row,
+            user: this.users.find((user) => user.id === row.userId),
+            notification: this.notifications.find(
+              (notification) => notification.id === row.notificationId,
+            ),
+          })),
+        );
+      },
 
       findFirst: (args: { where?: Record<string, unknown> }) =>
         Promise.resolve(
@@ -606,6 +760,40 @@ export class FakePrisma {
   }
 }
 
+const DELEGATES = new Set([
+  'user',
+  'notification',
+  'notificationDelivery',
+  'notificationTemplate',
+  'callTask',
+  'repCallTask',
+  'scheduledCallback',
+  'bankCase',
+]);
+
+/** La même doublure, avec la trace de chaque aller-retour qu'on lui demande. */
+export const countingPrisma = (db: FakePrisma): { prisma: PrismaService; calls: string[] } => {
+  const calls: string[] = [];
+  const prisma = new Proxy(db, {
+    get(target, property) {
+      const value: unknown = Reflect.get(target, property);
+      if (typeof property !== 'string' || !DELEGATES.has(property)) return value;
+
+      const delegate = value as Record<string, (args: unknown) => unknown>;
+      const traced: Record<string, unknown> = {};
+      for (const [name, operation] of Object.entries(delegate)) {
+        traced[name] = (args: unknown): unknown => {
+          calls.push(`${property}.${name}`);
+          return operation(args);
+        };
+      }
+      return traced;
+    },
+  }) as unknown as PrismaService;
+
+  return { prisma, calls };
+};
+
 /** Le module analytics rendu par son service réel ; ici on ne fournit que sa réponse. */
 export class FakeActivity {
   readonly items: SupervisionActivityRowDto[] = [];
@@ -658,6 +846,8 @@ export class FakeActivity {
 
 export class FakeBrevoTransport implements BrevoTransport {
   readonly sent: BrevoMessage[] = [];
+  /** Appels HTTP sortants, à distinguer du nombre de messages composés. */
+  calls = 0;
   configured = false;
 
   constructor(
@@ -676,6 +866,7 @@ export class FakeBrevoTransport implements BrevoTransport {
   }
 
   send(messages: readonly BrevoMessage[]): Promise<BrevoDispatchResult> {
+    this.calls += 1;
     if (!this.configured) {
       return Promise.resolve({
         status: 'NOT_CONFIGURED',

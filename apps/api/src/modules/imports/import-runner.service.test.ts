@@ -6,6 +6,7 @@ import { IMPORT_COLUMNS } from '../representants/import-template.js';
 import type { ChunkOutcome, ImportAdapter, ParsedRow } from './import-adapter.js';
 import { ImportRunnerService } from './import-runner.service.js';
 import { DEPARTEMENT_DAKAR, fakeJob, FakeImportPrisma } from './fake-import-prisma.js';
+import { ImportsService } from './imports.service.js';
 import { RepresentantsImportAdapter } from './representants.adapter.js';
 import type { ImportRowReader, SheetRow, SheetSource } from './xlsx-rows.js';
 
@@ -183,6 +184,44 @@ describe('moteur d’import', () => {
       expect(reader.pulled).toBe(0);
       expect(prisma.representants).toHaveLength(0);
       expect(prisma.jobs[0]?.claimToken).toBe('jeton-vivant');
+    });
+  });
+
+  describe('reprise après un échec en cours de fichier', () => {
+    it('repart de la tranche interrompue, sans rejouer les précédentes', async () => {
+      process.env.IMPORTS_CHUNK_SIZE = '1';
+      prisma.jobs.push(fakeJob({ mode: ImportMode.APPLY }));
+      const rows = validRows(5);
+
+      prisma.onBeforeTransaction = (index) => {
+        if (index === 3) throw new Error('la base s’est dérobée');
+      };
+
+      const casse = await runnerOn(prisma, new FakeRowReader(rows), [adapter]).run('job-1', NOW);
+
+      expect(casse).toEqual({ result: 'failed', code: 'IMPORT_FAILED' });
+      expect(prisma.representants).toHaveLength(2);
+      expect(prisma.jobs[0]?.processedRows).toBe(2);
+
+      const service = new ImportsService(
+        prisma as unknown as PrismaService,
+        {
+          run: () => Promise.resolve({ result: 'busy' as const }),
+        } as unknown as ImportRunnerService,
+        { save: () => Promise.reject(new Error('inutile')), remove: () => Promise.resolve() },
+      );
+      await service.apply('job-1', NOW);
+      expect(prisma.jobs[0]?.processedRows).toBe(2);
+
+      prisma.onBeforeTransaction = () => undefined;
+      const reprise = await runnerOn(prisma, new FakeRowReader(rows), [adapter]).run('job-1', NOW);
+
+      expect(reprise).toEqual({ result: 'succeeded', created: 5, processed: 5 });
+      expect(prisma.representants).toHaveLength(5);
+      expect(prisma.jobs[0]?.status).toBe(ImportStatus.succeeded);
+      // Rejouer les deux premières lignes les aurait comptées en doublons.
+      expect(prisma.jobs[0]?.skippedRows).toBe(0);
+      expect(prisma.jobs[0]?.errorRows).toBe(0);
     });
   });
 

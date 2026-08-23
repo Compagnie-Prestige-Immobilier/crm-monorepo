@@ -120,6 +120,9 @@ export class FakeSegmentPrisma {
       enrollmentCapturedBy: null,
       origin: null,
       originLabel: null,
+      // `journeys` fait partie de l'include partagé des prospects : l'omettre
+      // rendrait une ligne que Prisma ne produit jamais.
+      journeys: [],
       banque: { name: banque?.name ?? '?', shortName: banque?.shortName ?? '?' },
       syndicat: { sigle: syndicat?.sigle ?? '?' },
       createdBy: { id: author?.id ?? row.createdById, fullName: author?.fullName ?? '?' },

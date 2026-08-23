@@ -28,4 +28,3 @@ describe('byBank', () => {
     expect(Object.keys(banque ?? {})).not.toContain('bankId');
   });
 });
-

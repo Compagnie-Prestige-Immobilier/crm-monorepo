@@ -27,6 +27,7 @@ export interface RepresentantRow {
   phoneE164: string;
   notes: string | null;
   iefId?: string | null;
+  relationStatus?: string;
   rev: number;
   departementId: string;
   createdById: string;
@@ -117,11 +118,29 @@ export interface ProspectRow {
 
 type Row = Record<string, unknown>;
 
-function matches(row: Row, where: Row | undefined): boolean {
+/**
+ * `relations` traduit un filtre de relation (`callTasks: { some: … }`) que la
+ * doublure ne peut pas lire dans la ligne elle-même. Sans lui, la clé serait
+ * silencieusement ignorée et un test d'autorisation passerait toujours.
+ */
+function matches(
+  row: Row,
+  where: Row | undefined,
+  relations: Record<string, (clause: Row) => boolean> = {},
+): boolean {
   if (!where) return true;
   for (const [key, expected] of Object.entries(where)) {
     if (key === 'AND') {
-      if (!(expected as Row[]).every((clause) => matches(row, clause))) return false;
+      if (!(expected as Row[]).every((clause) => matches(row, clause, relations))) return false;
+      continue;
+    }
+    if (key === 'OR') {
+      if (!(expected as Row[]).some((clause) => matches(row, clause, relations))) return false;
+      continue;
+    }
+    const relation = relations[key];
+    if (relation) {
+      if (!relation(expected as Row)) return false;
       continue;
     }
     const actual = row[key];
@@ -147,6 +166,9 @@ export class FakePrisma {
   operations = new Map<string, OperationRow>();
   representants = new Map<string, RepresentantRow>();
   prospects = new Map<string, ProspectRow>();
+  /** Clé `prospectId|projet`, celle de l'unicité côté base. */
+  prospectJourneys = new Map<string, Row>();
+  relationChanges: Row[] = [];
   callAttempts = new Map<string, CallAttemptRow>();
   representantComments = new Map<string, RepresentantCommentRow>();
   callOutcomeReasons = new Map<string, CallOutcomeReasonRow>();
@@ -342,6 +364,9 @@ export class FakePrisma {
       }
       const created = {
         notes: null,
+        // Défaut du schéma : sans lui, la bascule de relation partait d'un
+        // statut indéfini et la chronologie naissait sans point de départ.
+        relationStatus: 'INCONNU',
         rev: 1,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -356,6 +381,22 @@ export class FakePrisma {
       if (!row) throw Object.assign(new Error('not found'), { code: 'P2025' });
       applyUpdate(row as unknown as Row, args.data);
       return Promise.resolve(row);
+    },
+    updateMany: (args: { where: Row; data: Row }) => {
+      let count = 0;
+      for (const row of this.representants.values()) {
+        if (!matches(row as unknown as Row, args.where)) continue;
+        applyUpdate(row as unknown as Row, args.data);
+        count += 1;
+      }
+      return Promise.resolve({ count });
+    },
+  };
+
+  representantRelationChange = {
+    create: (args: { data: Row }) => {
+      this.relationChanges.push(clone(args.data));
+      return Promise.resolve(args.data);
     },
   };
 
@@ -399,8 +440,16 @@ export class FakePrisma {
   callTasks = new Map<string, Row>();
 
   callTask = {
-    findFirst: (args: { where?: Row }) =>
-      Promise.resolve([...this.callTasks.values()].find((row) => matches(row, args.where)) ?? null),
+    findFirst: (args: { where?: Row }) => {
+      const row = [...this.callTasks.values()].find((item) => matches(item, args.where));
+      if (!row) return Promise.resolve(null);
+      // La campagne porte le PROJET, qui décide de quel parcours relève la
+      // tentative : sans elle, la doublure rendrait une tâche muette.
+      return Promise.resolve({
+        ...row,
+        campaign: { projet: (row.projet as string | undefined) ?? 'CHUES' },
+      });
+    },
     updateMany: () => Promise.resolve({ count: 0 }),
   };
 
@@ -414,7 +463,15 @@ export class FakePrisma {
       Promise.resolve(this.prospects.get(args.where.id) ?? null),
     findFirst: (args: { where?: Row; include?: unknown }) => {
       const row = [...this.prospects.values()].find((item) =>
-        matches(item as unknown as Row, args.where),
+        matches(item as unknown as Row, args.where, {
+          callTasks: (clause) => {
+            const some = (clause as { some?: Row }).some;
+            if (!some) return true;
+            return [...this.callTasks.values()].some(
+              (task) => task.prospectId === item.id && matches(task, some),
+            );
+          },
+        }),
       );
       if (!row) return Promise.resolve(null);
       return Promise.resolve({
@@ -458,6 +515,43 @@ export class FakePrisma {
         count += 1;
       }
       return Promise.resolve({ count });
+    },
+  };
+
+  prospectJourney = {
+    upsert: (args: {
+      where: { prospectId_projet: { prospectId: string; projet: string } };
+      create: Row;
+      update: Row;
+    }) => {
+      const { prospectId, projet } = args.where.prospectId_projet;
+      const key = `${prospectId}|${projet}`;
+      const existing = this.prospectJourneys.get(key);
+      if (existing) {
+        applyUpdate(existing, args.update);
+        return Promise.resolve(existing);
+      }
+      // Les valeurs par défaut du schéma : sans elles, un parcours ouvert à la
+      // volée naîtrait sans état de phase 2 et toute tentative repartirait en
+      // conflit.
+      const created = {
+        id: `journey-${key}`,
+        statut: 'NOUVEAU',
+        phase2Status: 'PENDING',
+        enrollmentMethod: null,
+        enrollmentCapturedAt: null,
+        enrollmentCapturedById: null,
+        closedAt: null,
+        ...args.create,
+      } as Row;
+      this.prospectJourneys.set(key, created);
+      return Promise.resolve(created);
+    },
+
+    updateMany: (args: { where: Row; data: Row }) => {
+      const rows = [...this.prospectJourneys.values()].filter((row) => matches(row, args.where));
+      for (const row of rows) applyUpdate(row, args.data);
+      return Promise.resolve({ count: rows.length });
     },
   };
 

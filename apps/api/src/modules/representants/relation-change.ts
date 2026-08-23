@@ -1,5 +1,6 @@
 import type { ChangeSource, Prisma, RepresentantRelation } from '@crm/database';
 
+import { REPRESENTANT_RELATION_TRANSITIONS, assertTransition } from '../../common/transitions.js';
 import type { RepresentantRelationChangeDto } from './dto.js';
 
 export interface RelationChange {
@@ -10,6 +11,8 @@ export interface RelationChange {
   readonly reason?: string | null;
   readonly changedById: string;
   readonly source: ChangeSource;
+  /** Un ADMIN corrige une saisie, y compris depuis un statut terminal. */
+  readonly bypassTransitionRules?: boolean;
 }
 
 /**
@@ -31,6 +34,15 @@ export async function applyRelationChange(
   change: RelationChange,
 ): Promise<boolean> {
   if (change.toStatus === change.fromStatus) return false;
+
+  // `AMBASSADEUR` et `REFUS` sont terminaux. La règle n'existait que dans le
+  // panneau, qui cessait simplement de proposer les choix : l'API acceptait
+  // `REFUS → AMBASSADEUR`, et le mobile comme un `curl` la faisaient passer.
+  assertTransition(REPRESENTANT_RELATION_TRANSITIONS, change.fromStatus, change.toStatus, {
+    code: 'REPRESENTANT_RELATION_TRANSITION_REFUSED',
+    label: 'Relation du représentant',
+    ...(change.bypassTransitionRules === true ? { bypass: true } : {}),
+  });
 
   const updated = await tx.representant.updateMany({
     where: { id: change.representantId, relationStatus: change.fromStatus, deletedAt: null },

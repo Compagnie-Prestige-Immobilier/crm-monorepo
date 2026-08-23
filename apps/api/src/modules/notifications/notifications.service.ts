@@ -119,13 +119,14 @@ type DeliveryVerdict =
   | { readonly kind: 'retry'; readonly error: string }
   | { readonly kind: 'failed'; readonly error: string };
 
-/** Ce que la branche e-mail a produit. Interne à `dispatch()`. */
+/** Ce que la branche e-mail a produit. Interne à `dispatchMany()`. */
 interface EmailLegResult {
-  readonly emailed: number;
+  /** Livraisons dont le transport a EXPLICITEMENT accepté l'adresse. */
+  readonly accepted: ReadonlySet<string>;
   readonly status: BrevoTransportStatus;
   /**
-   * Verdict par destinataire, pour les seuls comptes réellement servis. Un
-   * identifiant absent de cette table n'a pas reçu de verdict : soit il n'a pas
+   * Verdict par LIVRAISON, pour les seules lignes réellement servies. Une
+   * livraison absente de cette table n'a pas reçu de verdict : soit elle n'a pas
    * d'e-mail à recevoir, soit le transport n'a pas pu être sollicité.
    */
   readonly verdicts: ReadonlyMap<string, DeliveryVerdict>;
@@ -150,6 +151,27 @@ interface EmailLegResult {
 
 interface DeliveryRowSeed {
   readonly userId: string;
+}
+
+/** Une livraison encore en file, avec de quoi la servir puis l'écrire. */
+interface PendingDelivery {
+  readonly id: string;
+  readonly userId: string;
+  readonly notificationId: string;
+  readonly error: string | null;
+}
+
+interface EmailRecipient extends PendingDelivery {
+  readonly email: string;
+  readonly fullName: string;
+}
+
+/** Un appel de transport : un contenu, ses destinataires. */
+interface EmailJob {
+  readonly subject: string;
+  readonly html: string;
+  readonly text: string;
+  readonly rows: readonly EmailRecipient[];
 }
 
 /**
@@ -191,6 +213,14 @@ const NOTIFICATION_SELECT = {
 } satisfies Prisma.NotificationSelect;
 
 type NotificationRow = Prisma.NotificationGetPayload<{ select: typeof NOTIFICATION_SELECT }>;
+
+/** Le détenteur du bail se lit avec l'envoi, sans requête de plus. */
+const DISPATCH_SELECT = {
+  ...NOTIFICATION_SELECT,
+  dispatchClaim: true,
+} satisfies Prisma.NotificationSelect;
+
+type DispatchRow = Prisma.NotificationGetPayload<{ select: typeof DISPATCH_SELECT }>;
 
 @Injectable()
 export class NotificationsService {
@@ -341,70 +371,106 @@ export class NotificationsService {
    * expéditeur vivant.
    */
   async dispatch(notificationId: string, now: Date = new Date()): Promise<DispatchSummary> {
-    const notification = await this.prisma.notification.findUnique({
-      where: { id: notificationId },
-      select: NOTIFICATION_SELECT,
-    });
-    if (!notification) throw notificationNotFound();
+    const summary = (await this.dispatchMany([notificationId], now)).get(notificationId);
+    if (!summary) throw notificationNotFound();
+    return summary;
+  }
 
-    const claim = await DispatchClaim.take(this.prisma, notificationId, now);
-    if (claim === null) {
-      this.logger.debug(
-        `Notification ${notificationId} : envoi non réclamé (état ${notification.status}).`,
-      );
-      return NOT_CLAIMED;
+  /**
+   * Le MÊME chemin, pour une vague entière.
+   *
+   * Une notification par téléconseiller multipliait les allers-retours par le
+   * nombre de personnes : neuf requêtes et un appel Brevo chacun, soit quelques
+   * milliers de requêtes pour un seul tick de rappels. Tout ce qui suit est donc
+   * écrit en nombre CONSTANT de requêtes, quelle que soit la taille de la vague,
+   * et le transport reçoit des destinataires groupés par contenu rendu.
+   *
+   * Rien n'est relâché de ce que `dispatch()` garantissait : le bail est pris en
+   * une écriture pour toute la vague, mais la relecture dit envoi par envoi
+   * lequel porte réellement le jeton, et chaque écriture suivante le reporte
+   * dans son `where`. Un envoi absent de la réponse n'existe pas ; un envoi
+   * présent avec `claimed: false` n'a rien tenté.
+   */
+  async dispatchMany(
+    notificationIds: readonly string[],
+    now: Date = new Date(),
+  ): Promise<Map<string, DispatchSummary>> {
+    const summaries = new Map<string, DispatchSummary>();
+    if (!notificationIds.length) return summaries;
+
+    const attempt = await DispatchClaim.take(this.prisma, notificationIds, now);
+
+    const rows = await this.prisma.notification.findMany({
+      where: { id: { in: [...notificationIds] } },
+      select: DISPATCH_SELECT,
+    });
+
+    const held: DispatchRow[] = [];
+    for (const row of rows) {
+      if (row.status === NotificationStatus.SENDING && row.dispatchClaim === attempt.token) {
+        held.push(row);
+        continue;
+      }
+      summaries.set(row.id, NOT_CLAIMED);
+      this.logger.debug(`Notification ${row.id} : envoi non réclamé (état ${row.status}).`);
     }
+    if (!held.length) return summaries;
 
     // LECTURE GLOBALE délibérée : l'expédition doit servir TOUTES les
-    // livraisons de la notification qu'on lui a désignée. Une livraison écartée
+    // livraisons des notifications qu'on lui a désignées. Une livraison écartée
     // ici resterait `PENDING` pour toujours, sans qu'aucun passage ne la
     // reprenne jamais, et le compteur annoncé au compositeur mentirait. La
     // nature de la ligne est déjà tranchée en amont : les livraisons portent
     // celle de leur notification, posée dans la même transaction que sa
     // création.
     const deliveries = await this.prisma.notificationDelivery.findMany({
-      where: { notificationId, status: NotificationDeliveryStatus.PENDING },
-      select: { id: true, userId: true },
+      where: {
+        notificationId: { in: held.map((row) => row.id) },
+        status: NotificationDeliveryStatus.PENDING,
+      },
+      select: { id: true, userId: true, notificationId: true, error: true },
     });
-
-    if (!deliveries.length) {
-      const idle = await this.sendByEmail(claim, notification, []);
-      await this.settleNotification(claim, idle.status, 0, now);
-      return {
-        claimed: true,
-        sent: 0,
-        failed: 0,
-        pending: 0,
-        emailed: idle.emailed,
-        emailStatus: idle.status,
-      };
-    }
 
     // L'ABANDON SE DÉCIDE AVANT D'ENVOYER, jamais après : passé le délai, il
     // n'y a plus de tentative à faire, et en faire une de plus serait
     // exactement la boucle sans fin qu'on ferme ici.
-    if (this.pastDeadline(notification, now)) {
-      return this.abandon(claim, notification, deliveries, now);
+    const expired = held.filter((row) => this.pastDeadline(row, now));
+    if (expired.length) {
+      const doomed = new Set(expired.map((row) => row.id));
+      await this.abandon(
+        attempt,
+        expired,
+        deliveries.filter((delivery) => doomed.has(delivery.notificationId)),
+        now,
+        summaries,
+      );
     }
 
-    const email = await this.sendByEmail(
-      claim,
-      notification,
-      deliveries.map((delivery) => delivery.userId),
-    );
+    const live = held.filter((row) => !summaries.has(row.id));
+    if (!live.length) return summaries;
 
-    let sent = 0;
-    let failed = 0;
-    let pending = 0;
+    const claim = attempt.holding(live.map((row) => row.id));
+    const byId = new Map(live.map((row) => [row.id, row]));
+    const served = deliveries.filter((delivery) => byId.has(delivery.notificationId));
+
+    const email = await this.sendByEmail(claim, byId, served);
+
+    const counters = new Map(live.map((row) => [row.id, { sent: 0, failed: 0, pending: 0 }]));
+    const emailed = new Map(live.map((row) => [row.id, 0]));
     const inboxOnly: string[] = [];
 
-    for (const delivery of deliveries) {
-      const verdict = email.verdicts.get(delivery.userId);
+    for (const delivery of served) {
+      const bucket = counters.get(delivery.notificationId);
+      if (!bucket) continue;
+      if (email.accepted.has(delivery.id)) {
+        emailed.set(delivery.notificationId, (emailed.get(delivery.notificationId) ?? 0) + 1);
+      }
 
+      const verdict = email.verdicts.get(delivery.id);
       if (verdict === undefined) {
         // Aucun verdict. `PENDING` et non `FAILED` : rien n'a échoué. Reste à
         // dire POURQUOI, et c'est `emailable` qui tranche, pas le transport.
-        pending += 1;
+        bucket.pending += 1;
         if (email.emailable !== null && !email.emailable.has(delivery.userId)) {
           inboxOnly.push(delivery.id);
         }
@@ -412,22 +478,22 @@ export class NotificationsService {
       }
 
       // Le sort des livraisons SERVIES est déjà écrit : `sendByEmail` l'a posé
-      // groupe par groupe, au fur et à mesure des acceptations. Il ne reste ici
+      // vague par vague, au fur et à mesure des acceptations. Il ne reste ici
       // qu'à compter.
       if (verdict.kind === 'sent') {
-        sent += 1;
+        bucket.sent += 1;
         continue;
       }
       if (verdict.kind === 'retry') {
-        pending += 1;
+        bucket.pending += 1;
         continue;
       }
-      failed += 1;
+      bucket.failed += 1;
     }
 
     // LE MARQUEUR DÉCRIT LE DESTINATAIRE, il ne dépend donc plus de l'état du
     // transport : `emailable` vient de la base, pas de la clé Brevo. Il est
-    // écrit AVANT `settleNotification`, qui le relit pour savoir quelles
+    // écrit AVANT `settleNotifications`, qui le relit pour savoir quelles
     // livraisons attendent encore quelque chose.
     if (inboxOnly.length) {
       await this.prisma.notificationDelivery.updateMany({
@@ -436,15 +502,20 @@ export class NotificationsService {
       });
     }
 
-    await this.settleNotification(claim, email.status, pending, now);
-    return {
-      claimed: true,
-      sent,
-      failed,
-      pending,
-      emailed: email.emailed,
-      emailStatus: email.status,
-    };
+    let outstanding = 0;
+    for (const bucket of counters.values()) outstanding += bucket.pending;
+    await this.settleNotifications(claim, email.status, outstanding, now);
+
+    for (const row of live) {
+      const bucket = counters.get(row.id) ?? { sent: 0, failed: 0, pending: 0 };
+      summaries.set(row.id, {
+        claimed: true,
+        ...bucket,
+        emailed: emailed.get(row.id) ?? 0,
+        emailStatus: email.status,
+      });
+    }
+    return summaries;
   }
 
   /** L'envoi a-t-il dépassé le délai que la plateforme s'accorde ? */
@@ -468,82 +539,103 @@ export class NotificationsService {
    * nombre de personnes, et l'état du transport qui l'a causé.
    */
   private async abandon(
-    claim: DispatchClaim,
-    notification: NotificationRow,
-    deliveries: readonly { id: string }[],
+    attempt: DispatchClaim,
+    notifications: readonly DispatchRow[],
+    deliveries: readonly PendingDelivery[],
     now: Date,
-  ): Promise<DispatchSummary> {
-    const abandoned = await this.prisma.notificationDelivery.updateMany({
-      where: {
-        notificationId: claim.notificationId,
-        id: { in: deliveries.map((delivery) => delivery.id) },
-        ...OUTSTANDING_DELIVERY,
-      },
-      data: {
-        status: NotificationDeliveryStatus.FAILED,
-        error: DELIVERY_ABANDONED,
-        failedAt: now,
-      },
-    });
+    summaries: Map<string, DispatchSummary>,
+  ): Promise<void> {
+    // Les lignes marquées `INBOX_ONLY` n'attendent rien : elles ne comptent pas
+    // dans ce qu'on vient de perdre, et le `where` les écarte de toute façon.
+    const doomed = deliveries.filter((delivery) => delivery.error !== DELIVERY_INBOX_ONLY);
 
-    this.logger.error(
-      `Notification ${notification.id} « ${notification.title} » : abandonnée après ` +
-        `${String(Math.round(DISPATCH_DEADLINE_MS / 3_600_000))} h. ` +
-        `${String(abandoned.count)} destinataire(s) n'ont jamais reçu leur e-mail ` +
-        `(transport : ${notification.transportStatus ?? 'inconnu'}).`,
-    );
+    if (doomed.length) {
+      await this.prisma.notificationDelivery.updateMany({
+        where: { id: { in: doomed.map((delivery) => delivery.id) }, ...OUTSTANDING_DELIVERY },
+        data: {
+          status: NotificationDeliveryStatus.FAILED,
+          error: DELIVERY_ABANDONED,
+          failedAt: now,
+        },
+      });
+    }
 
-    await this.settleNotification(claim, notification.transportStatus, 0, now);
-    return {
-      claimed: true,
-      sent: 0,
-      failed: abandoned.count,
-      pending: 0,
-      emailed: 0,
-      emailStatus: null,
-    };
+    const byNotification = new Map<string, number>();
+    for (const delivery of doomed) {
+      byNotification.set(
+        delivery.notificationId,
+        (byNotification.get(delivery.notificationId) ?? 0) + 1,
+      );
+    }
+
+    // Le journal est le SEUL endroit où un exploitant apprend qu'il vient de
+    // perdre des destinataires sans ouvrir la base ; c'est la seule ligne de
+    // niveau ERREUR de tout le module, et elle porte de quoi agir : l'envoi, le
+    // nombre de personnes, et l'état du transport qui l'a causé.
+    const byTransport = new Map<string | null, string[]>();
+    for (const notification of notifications) {
+      const failed = byNotification.get(notification.id) ?? 0;
+      this.logger.error(
+        `Notification ${notification.id} « ${notification.title} » : abandonnée après ` +
+          `${String(Math.round(DISPATCH_DEADLINE_MS / 3_600_000))} h. ` +
+          `${String(failed)} destinataire(s) n'ont jamais reçu leur e-mail ` +
+          `(transport : ${notification.transportStatus ?? 'inconnu'}).`,
+      );
+      summaries.set(notification.id, {
+        claimed: true,
+        sent: 0,
+        failed,
+        pending: 0,
+        emailed: 0,
+        emailStatus: null,
+      });
+      const bucket = byTransport.get(notification.transportStatus);
+      if (bucket) bucket.push(notification.id);
+      else byTransport.set(notification.transportStatus, [notification.id]);
+    }
+
+    for (const [transportStatus, ids] of byTransport) {
+      await this.settleNotifications(attempt.holding(ids), transportStatus, 0, now);
+    }
   }
 
   private async sendByEmail(
     claim: DispatchClaim,
-    notification: NotificationRow,
-    userIds: readonly string[],
+    notifications: ReadonlyMap<string, NotificationRow>,
+    deliveries: readonly PendingDelivery[],
   ): Promise<EmailLegResult> {
     const empty = new Map<string, DeliveryVerdict>();
-    if (!userIds.length)
-      return { emailed: 0, status: 'SENT', verdicts: empty, emailable: new Set<string>() };
+    const nothing = new Set<string>();
+    if (!deliveries.length)
+      return { accepted: nothing, status: 'SENT', verdicts: empty, emailable: new Set<string>() };
     if (this.workspace.current() === 'demo')
-      return { emailed: 0, status: 'SENT', verdicts: empty, emailable: new Set<string>() };
-
-    // Hissé hors du `try` : le rattrapage doit savoir QUI était visé pour
-    // marquer ces lignes-là à réessayer, et elles seules.
-    let targeted: { userId: string; email: string; fullName: string }[] = [];
+      return { accepted: nothing, status: 'SENT', verdicts: empty, emailable: new Set<string>() };
 
     /**
      * Population du rattrapage, VALABLE DÈS LA PREMIÈRE LIGNE DU `try`.
      *
-     * Elle vaut d'abord tout le public visé, faute de savoir qui est
+     * Elle vaut d'abord toutes les livraisons visées, faute de savoir qui est
      * réellement servi par e-mail : cette réponse-là est précisément ce que la
      * lecture des comptes devait apporter. Trop large, donc, et c'est
      * délibéré : une ligne remise en file à tort porte un marqueur de réessai
      * qu'un passage ultérieur corrige de lui-même (le destinataire non servi
      * retombe dans la branche « rien à envoyer »), alors qu'une ligne oubliée
      * ne revient JAMAIS. Une fois les comptes lus, elle se resserre sur les
-     * seuls destinataires réellement visés.
+     * seules livraisons réellement visées.
      */
-    let candidates: readonly { userId: string }[] = userIds.map((userId) => ({ userId }));
+    let candidates: readonly PendingDelivery[] = deliveries;
 
     /**
      * Qui est servi par e-mail. `null` tant que la base n'a pas répondu.
      *
-     * Voir `EmailLegResult.emailable` : tant qu'il vaut `null`, `dispatch()`
+     * Voir `EmailLegResult.emailable` : tant qu'il vaut `null`, `dispatchMany()`
      * n'estampille personne « boîte de réception seule ».
      */
     let emailable: Set<string> | null = null;
 
-    /** Verdicts DÉJÀ ÉCRITS en base, groupe par groupe. */
+    /** Verdicts DÉJÀ ÉCRITS en base, vague par vague. */
     const verdicts = new Map<string, DeliveryVerdict>();
-    let emailed = 0;
+    const accepted = new Set<string>();
     let refused = false;
 
     try {
@@ -560,51 +652,56 @@ export class NotificationsService {
       // et une lecture par identifiants est de toute façon négligeable devant
       // ce qu'elle évite.
       const users = await this.prisma.user.findMany({
-        where: { id: { in: [...userIds] }, role: Role.COMMERCIAL },
+        where: {
+          id: { in: [...new Set(deliveries.map((delivery) => delivery.userId))] },
+          role: Role.COMMERCIAL,
+        },
         select: { id: true, email: true, fullName: true },
       });
 
-      targeted = users
-        .filter((user) => user.email.trim().length > 0)
-        .map((user) => ({ userId: user.id, email: user.email.trim(), fullName: user.fullName }));
+      const addressed = new Map(
+        users
+          .filter((user) => user.email.trim().length > 0)
+          .map((user) => [user.id, { email: user.email.trim(), fullName: user.fullName }]),
+      );
+      emailable = new Set(addressed.keys());
+
+      const targeted: EmailRecipient[] = [];
+      for (const delivery of deliveries) {
+        const account = addressed.get(delivery.userId);
+        if (account) targeted.push({ ...delivery, ...account });
+      }
       // Les comptes sont connus : le rattrapage se resserre sur eux, et la
       // nature de chaque destinataire est désormais établie.
       candidates = targeted;
-      emailable = new Set(targeted.map((row) => row.userId));
 
       // SANS CLÉ, RIEN N'EST JUGÉ, ET RIEN N'EST ENTERRÉ. Les téléconseillers
-      // restent en file sans marqueur, donc `settleNotification` retient la
+      // restent en file sans marqueur, donc `settleNotifications` retient la
       // notification en SENDING et le bail la fera reprendre. Les autres
       // destinataires, eux, sont bel et bien tranchés : `emailable` le dit.
       if (!this.email.isConfigured())
-        return { emailed: 0, status: 'NOT_CONFIGURED', verdicts: empty, emailable };
+        return { accepted, status: 'NOT_CONFIGURED', verdicts: empty, emailable };
 
-      if (!targeted.length) return { emailed: 0, status: 'SENT', verdicts: empty, emailable };
-
-      const content = buildEmailContent(notification.title, notification.body);
+      if (!targeted.length) return { accepted, status: 'SENT', verdicts: empty, emailable };
 
       // UNE VAGUE, PUIS SON ÉCRITURE, PUIS LA SUIVANTE. Voir
       // `EMAIL_PERSIST_GROUP_SIZE` : ce qui a été accepté par Brevo est acquis
       // en base avant qu'on n'expose la suite, faute de quoi une reprise
       // renverrait le message à des gens qui l'ont déjà reçu.
-      for (const group of chunkRecipients(targeted, EMAIL_PERSIST_GROUP_SIZE)) {
-        const recipients: BrevoRecipient[] = group.map((row) => ({
-          email: row.email,
-          name: row.fullName,
-        }));
+      for (const wave of emailWaves(targeted, notifications)) {
+        const result = await this.email.send(
+          wave.map((job) => ({
+            recipients: job.rows.map((row): BrevoRecipient => ({
+              email: row.email,
+              name: row.fullName,
+            })),
+            subject: job.subject,
+            htmlContent: job.html,
+            textContent: job.text,
+          })),
+        );
 
-        const result = await this.email.send([
-          {
-            recipients,
-            subject: notification.title,
-            htmlContent: content.html,
-            textContent: content.text,
-          },
-        ]);
-
-        emailed += result.outcomes.filter((outcome) => outcome.ok).length;
-
-        const groupVerdicts = new Map<string, DeliveryVerdict>();
+        const waveVerdicts = new Map<string, DeliveryVerdict>();
 
         // ═══ `TRANSPORT_ERROR` NE DIT PAS « PASSAGER » ═══
         //
@@ -620,48 +717,51 @@ export class NotificationsService {
         // La nature de l'échec se lit donc sur l'ISSUE, ici comme sur le
         // chemin nominal. L'état global ne décide plus que du sort des
         // adresses dont le transport n'a rien dit.
-        const refusedGroup = result.status === 'TRANSPORT_ERROR';
-        if (refusedGroup) {
+        const refusedWave = result.status === 'TRANSPORT_ERROR';
+        if (refusedWave) {
           refused = true;
           this.logger.warn(
-            `Notification ${notification.id} : e-mail non parti (${result.detail ?? 'sans détail'}). Sort décidé par issue.`,
+            `Expédition : e-mail non parti (${result.detail ?? 'sans détail'}). Sort décidé par issue.`,
           );
         }
 
         const byEmail = new Map(result.outcomes.map((outcome) => [outcome.email, outcome]));
-        for (const row of group) {
-          const outcome = byEmail.get(row.email);
-          if (outcome === undefined) {
-            // ISSUE MUETTE. Sur un envoi qui a abouti, un transport qui ne dit
-            // rien d'une adresse qu'il a reçue l'a prise en charge, et le
-            // doute ne justifie ni un échec ni un réessai. Sur un envoi que le
-            // transport déclare non parti, le même silence dit l'inverse : la
-            // ligne reste en file.
-            groupVerdicts.set(
-              row.userId,
-              refusedGroup ? { kind: 'retry', error: DELIVERY_RETRY_ERROR } : { kind: 'sent' },
+        for (const job of wave) {
+          for (const row of job.rows) {
+            const outcome = byEmail.get(row.email);
+            if (outcome === undefined) {
+              // ISSUE MUETTE. Sur un envoi qui a abouti, un transport qui ne dit
+              // rien d'une adresse qu'il a reçue l'a prise en charge, et le
+              // doute ne justifie ni un échec ni un réessai. Sur un envoi que le
+              // transport déclare non parti, le même silence dit l'inverse : la
+              // ligne reste en file.
+              waveVerdicts.set(
+                row.id,
+                refusedWave ? { kind: 'retry', error: DELIVERY_RETRY_ERROR } : { kind: 'sent' },
+              );
+              continue;
+            }
+            if (outcome.ok) {
+              accepted.add(row.id);
+              waveVerdicts.set(row.id, { kind: 'sent' });
+              continue;
+            }
+            const error = outcome.errorCode ?? 'UNKNOWN';
+            // `permanent` et non `!== 'transient'` : une issue en échec sans
+            // nature annoncée doit repartir en file. Classer un passager en
+            // définitif est la faute coûteuse, elle enterre un envoi que la
+            // seule attente aurait fait passer.
+            waveVerdicts.set(
+              row.id,
+              outcome.kind === 'permanent'
+                ? { kind: 'failed', error }
+                : { kind: 'retry', error: DELIVERY_RETRY_ERROR },
             );
-            continue;
           }
-          if (outcome.ok) {
-            groupVerdicts.set(row.userId, { kind: 'sent' });
-            continue;
-          }
-          const error = outcome.errorCode ?? 'UNKNOWN';
-          // `permanent` et non `!== 'transient'` : une issue en échec sans
-          // nature annoncée doit repartir en file. Classer un passager en
-          // définitif est la faute coûteuse, elle enterre un envoi que la
-          // seule attente aurait fait passer.
-          groupVerdicts.set(
-            row.userId,
-            outcome.kind === 'permanent'
-              ? { kind: 'failed', error }
-              : { kind: 'retry', error: DELIVERY_RETRY_ERROR },
-          );
         }
 
-        await this.persistVerdicts(claim, groupVerdicts);
-        for (const [userId, verdict] of groupVerdicts) verdicts.set(userId, verdict);
+        await this.persistVerdicts(claim, waveVerdicts);
+        for (const [deliveryId, verdict] of waveVerdicts) verdicts.set(deliveryId, verdict);
 
         // ═══ LE BAIL EST RENOUVELÉ ENTRE DEUX VAGUES, ET SA RÉPONSE EST LUE ═══
         //
@@ -676,34 +776,30 @@ export class NotificationsService {
         // et appartiennent désormais au nouveau détenteur.
         if (!(await claim.renew())) {
           this.logger.warn(
-            `Notification ${notification.id} : bail perdu en cours d'expédition, ` +
-              `les vagues restantes sont abandonnées au détenteur suivant.`,
+            `Bail perdu en cours d'expédition, les vagues restantes sont ` +
+              `abandonnées au détenteur suivant.`,
           );
           break;
         }
       }
 
-      if (emailed) {
-        this.logger.log(
-          `Notification ${notification.id} : ${String(emailed)} e-mail(s) remis à Brevo.`,
-        );
+      if (accepted.size) {
+        this.logger.log(`${String(accepted.size)} e-mail(s) remis à Brevo.`);
       }
 
-      // `TRANSPORT_ERROR` ne se dit que si RIEN n'est passé. Un groupe refusé
-      // derrière un groupe accepté décrit une panne partielle : l'annoncer
+      // `TRANSPORT_ERROR` ne se dit que si RIEN n'est passé. Une vague refusée
+      // derrière une vague acceptée décrit une panne partielle : l'annoncer
       // comme une panne de transport ferait croire que la clé est en cause,
       // alors que des e-mails sont bel et bien partis.
       return {
-        emailed,
-        status: refused && emailed === 0 ? 'TRANSPORT_ERROR' : 'SENT',
+        accepted,
+        status: refused && accepted.size === 0 ? 'TRANSPORT_ERROR' : 'SENT',
         verdicts,
         emailable,
       };
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      this.logger.warn(
-        `Notification ${notification.id} : branche e-mail interrompue (${detail}). Les livraisons restent en file.`,
-      );
+      this.logger.warn(`Branche e-mail interrompue (${detail}). Les livraisons restent en file.`);
 
       // SEULS LES DESTINATAIRES PAS ENCORE TRANCHÉS repartent en file. Remettre
       // tout le monde à réessayer réécrirait en `PENDING` des lignes déjà
@@ -713,19 +809,24 @@ export class NotificationsService {
       // `candidates` et non `targeted` : voir sa déclaration. Avant la lecture
       // des comptes, `targeted` est vide, et filtrer une liste vide ne rend
       // rien à réessayer, donc rien qui retienne la notification.
-      const unresolved = retryAll(candidates.filter((row) => !verdicts.has(row.userId)));
+      const unresolved = retryAll(candidates.filter((row) => !verdicts.has(row.id)));
       // L'écriture peut échouer à son tour, c'est même le cas typique quand
       // c'est la base qui a lâché. Sans marqueur, les lignes restent `PENDING`
       // et la notification reste prenable : la reprise est assurée par le bail,
       // pas par ce marqueur.
       await this.persistVerdicts(claim, unresolved).catch(() => undefined);
-      for (const [userId, verdict] of unresolved) verdicts.set(userId, verdict);
+      for (const [deliveryId, verdict] of unresolved) verdicts.set(deliveryId, verdict);
 
       // MÊME RÈGLE QUE LE CHEMIN NOMINAL, et pour la même raison : annoncer
       // une panne de transport alors que des e-mails sont partis ferait
       // chercher du côté de la clé. L'interruption reste visible, dans le
       // journal et dans les lignes laissées en file.
-      return { emailed, status: emailed === 0 ? 'TRANSPORT_ERROR' : 'SENT', verdicts, emailable };
+      return {
+        accepted,
+        status: accepted.size === 0 ? 'TRANSPORT_ERROR' : 'SENT',
+        verdicts,
+        emailable,
+      };
     }
   }
 
@@ -737,34 +838,34 @@ export class NotificationsService {
    * ouvert l'application entre-temps) ne doit pas être ramenée en arrière par
    * une écriture tardive.
    *
-   * LE BAIL EST EXIGÉ EN PARAMÈTRE, alors que le `where` n'en porte pas la
-   * trace, et ce n'est pas une décoration : c'est ce qui rend impossible
-   * d'écrire des verdicts sans avoir réclamé l'envoi. Le prédicat de statut
-   * suffit à rendre une écriture tardive inoffensive (un `SENT` déjà posé n'est
-   * pas défait), mais rien n'empêchait un futur chemin d'écrire des verdicts
-   * pour des e-mails que personne n'avait le droit d'envoyer.
+   * LE BAIL EST EXIGÉ EN PARAMÈTRE, et c'est lui qui borne la population :
+   * c'est ce qui rend impossible d'écrire des verdicts sans avoir réclamé les
+   * envois. Le prédicat de statut suffit à rendre une écriture tardive
+   * inoffensive (un `SENT` déjà posé n'est pas défait), mais rien n'empêchait un
+   * futur chemin d'écrire des verdicts pour des e-mails que personne n'avait le
+   * droit d'envoyer.
    */
   private async persistVerdicts(
     claim: DispatchClaim,
     verdicts: ReadonlyMap<string, DeliveryVerdict>,
   ): Promise<void> {
     if (!verdicts.size) return;
-    const notificationId = claim.notificationId;
+    const notificationId = { in: [...claim.notificationIds] };
 
     const now = new Date();
     const sent: string[] = [];
     const retry = new Map<string, string[]>();
     const failed = new Map<string, string[]>();
 
-    for (const [userId, verdict] of verdicts) {
+    for (const [deliveryId, verdict] of verdicts) {
       if (verdict.kind === 'sent') {
-        sent.push(userId);
+        sent.push(deliveryId);
         continue;
       }
       const bucket = verdict.kind === 'retry' ? retry : failed;
       const ids = bucket.get(verdict.error);
-      if (ids) ids.push(userId);
-      else bucket.set(verdict.error, [userId]);
+      if (ids) ids.push(deliveryId);
+      else bucket.set(verdict.error, [deliveryId]);
     }
 
     // L'ACCEPTATION D'ABORD, avant les réessais et les échecs : c'est la seule
@@ -774,32 +875,32 @@ export class NotificationsService {
       await this.prisma.notificationDelivery.updateMany({
         where: {
           notificationId,
-          userId: { in: sent },
+          id: { in: sent },
           status: NotificationDeliveryStatus.PENDING,
         },
         data: { status: NotificationDeliveryStatus.SENT, error: null, sentAt: now },
       });
     }
 
-    for (const [error, userIds] of retry) {
+    for (const [error, deliveryIds] of retry) {
       // Le statut RESTE `PENDING` : c'est ce qui rend la ligne éligible au
       // prochain passage. Seul le marqueur d'erreur change, pour distinguer
       // « à réessayer » de « rien à envoyer ».
       await this.prisma.notificationDelivery.updateMany({
         where: {
           notificationId,
-          userId: { in: userIds },
+          id: { in: deliveryIds },
           status: NotificationDeliveryStatus.PENDING,
         },
         data: { error },
       });
     }
 
-    for (const [error, userIds] of failed) {
+    for (const [error, deliveryIds] of failed) {
       await this.prisma.notificationDelivery.updateMany({
         where: {
           notificationId,
-          userId: { in: userIds },
+          id: { in: deliveryIds },
           status: NotificationDeliveryStatus.PENDING,
         },
         data: { status: NotificationDeliveryStatus.FAILED, error, failedAt: now },
@@ -902,12 +1003,16 @@ export class NotificationsService {
    * LE JETON DU BAIL FIGURE DANS LES DEUX `where`. Un expéditeur qui a perdu la
    * main n'écrit donc plus rien du tout, ni la clôture ni le maintien.
    */
-  private async settleNotification(
+  private async settleNotifications(
     claim: DispatchClaim,
     transportStatus: string | null,
     outstanding: number,
     now: Date,
   ): Promise<void> {
+    if (!claim.notificationIds.length) return;
+
+    // Le sous-select est évalué LIGNE PAR LIGNE : grouper la clôture ne referme
+    // que les envois dont il ne reste rien à servir, chacun pour son compte.
     const closed = await this.prisma.notification.updateMany({
       where: { ...claim.fence, deliveries: { none: OUTSTANDING_DELIVERY } },
       data: {
@@ -920,7 +1025,7 @@ export class NotificationsService {
         dispatchClaim: null,
       },
     });
-    if (closed.count === 1) return;
+    if (closed.count === claim.notificationIds.length) return;
 
     // Il reste des livraisons à servir. LE BAIL EST CONSERVÉ, et c'est ce qui
     // fixe la cadence de reprise à une par bail : le relâcher ferait reprendre
@@ -938,7 +1043,7 @@ export class NotificationsService {
     // CE QUE L'EXPLOITANT DOIT POUVOIR LIRE SANS OUVRIR LA BASE : combien de
     // personnes attendent encore, et combien de temps on va continuer d'essayer.
     this.logger.warn(
-      `Notification ${claim.notificationId} : reste en cours, ` +
+      `${String(held.count)} envoi(s) restent en cours, ` +
         `${String(outstanding)} livraison(s) en attente (transport : ${transportStatus ?? 'inconnu'}). ` +
         `Nouvelle tentative dans ${String(Math.round(SENDING_LEASE_MS / 60_000))} min, ` +
         `abandon au-delà de ${String(Math.round(DISPATCH_DEADLINE_MS / 3_600_000))} h.`,
@@ -963,7 +1068,9 @@ export class NotificationsService {
       this.prisma.notification.findMany({
         where,
         select: NOTIFICATION_SELECT,
-        orderBy: { createdAt: 'desc' },
+        // `id` en second critère : sans lui, deux lignes de même date peuvent
+        // s'échanger entre deux pages et l'une disparaît de la pagination.
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -1001,7 +1108,9 @@ export class NotificationsService {
         userId: true,
         user: { select: { fullName: true, role: true } },
       },
-      orderBy: { createdAt: 'asc' },
+      // `createdAt` ne trie rien ici : le `createMany` imbriqué donne le même
+      // instant de transaction à toutes les lignes. L'identifiant tranche.
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
 
     const counts = tally(deliveries.map((delivery) => delivery.status));
@@ -1085,7 +1194,9 @@ export class NotificationsService {
             select: { title: true, body: true, category: true, route: true, sentAt: true },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        // `id` en second critère : sans lui, deux lignes de même date peuvent
+        // s'échanger entre deux pages et l'une disparaît de la pagination.
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -1221,19 +1332,65 @@ export class NotificationsService {
 }
 
 /**
- * Verdict « à réessayer » pour tout un lot de destinataires visés.
+ * Verdict « à réessayer » pour tout un lot de livraisons visées.
  *
  * Servi quand l'échec porte sur le TRANSPORT et non sur une adresse : aucune
  * des lignes concernées ne doit être enterrée.
  */
-const retryAll = (
-  targeted: readonly { userId: string }[],
-): ReadonlyMap<string, DeliveryVerdict> => {
+const retryAll = (targeted: readonly { id: string }[]): ReadonlyMap<string, DeliveryVerdict> => {
   const verdicts = new Map<string, DeliveryVerdict>();
   for (const row of targeted) {
-    verdicts.set(row.userId, { kind: 'retry', error: DELIVERY_RETRY_ERROR });
+    verdicts.set(row.id, { kind: 'retry', error: DELIVERY_RETRY_ERROR });
   }
   return verdicts;
+};
+
+/**
+ * Découpe une vague en appels de transport, puis en tranches d'écriture.
+ *
+ * LE REGROUPEMENT SE FAIT PAR CONTENU RENDU, jamais par notification : deux
+ * rappels qui portent des chiffres différents ne peuvent PAS partager un envoi,
+ * alors que trois cents comptes rendus identiques tiennent dans un seul, ce que
+ * le plafond de Brevo autorisait déjà et qu'un envoi par personne annulait.
+ *
+ * Chaque tranche rendue est écrite en base avant que la suivante ne parte, voir
+ * `EMAIL_PERSIST_GROUP_SIZE`.
+ */
+const emailWaves = (
+  targeted: readonly EmailRecipient[],
+  notifications: ReadonlyMap<string, NotificationRow>,
+): EmailJob[][] => {
+  const byContent = new Map<string, { title: string; body: string; rows: EmailRecipient[] }>();
+  for (const row of targeted) {
+    const notification = notifications.get(row.notificationId);
+    if (!notification) continue;
+    const key = JSON.stringify([notification.title, notification.body]);
+    const bucket = byContent.get(key);
+    if (bucket) bucket.rows.push(row);
+    else byContent.set(key, { title: notification.title, body: notification.body, rows: [row] });
+  }
+
+  const jobs: EmailJob[] = [];
+  for (const group of byContent.values()) {
+    const content = buildEmailContent(group.title, group.body);
+    for (const chunk of chunkRecipients(group.rows, EMAIL_PERSIST_GROUP_SIZE)) {
+      jobs.push({ subject: group.title, html: content.html, text: content.text, rows: chunk });
+    }
+  }
+
+  const waves: EmailJob[][] = [];
+  let current: EmailJob[] = [];
+  let size = 0;
+  for (const job of jobs) {
+    current.push(job);
+    size += job.rows.length;
+    if (size < EMAIL_PERSIST_GROUP_SIZE) continue;
+    waves.push(current);
+    current = [];
+    size = 0;
+  }
+  if (current.length) waves.push(current);
+  return waves;
 };
 
 /**

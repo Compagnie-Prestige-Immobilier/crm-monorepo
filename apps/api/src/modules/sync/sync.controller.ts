@@ -22,7 +22,7 @@ import {
 } from '../../common/decorators/current-user.decorator.js';
 import { SyncService } from './sync.service.js';
 import { SyncPullQueryDto, SyncPullResponseDto, SyncPushDto, SyncPushResponseDto } from './dto.js';
-import { MOBILE_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
+import { Roles, SYNC_ROLES } from '../../common/decorators/roles.decorator.js';
 import { HeartbeatService } from '../heartbeat/heartbeat.service.js';
 
 /** Palier où les liens banque, syndicat et représentant d’un prospect sont devenus nuls. */
@@ -41,7 +41,7 @@ export class SyncController {
   ) {}
 
   @Post('push')
-  @Roles(...MOBILE_ROLES)
+  @Roles(...SYNC_ROLES)
   @HttpCode(HttpStatus.OK)
   @ApiHeader({
     name: 'Idempotency-Key',
@@ -117,7 +117,7 @@ export class SyncController {
   }
 
   @Get('pull')
-  @Roles(...MOBILE_ROLES)
+  @Roles(...SYNC_ROLES)
   @ApiHeader({
     name: 'X-CPI-Payload-Version',
     required: true,

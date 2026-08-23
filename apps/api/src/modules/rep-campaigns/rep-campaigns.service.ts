@@ -10,6 +10,7 @@ import {
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { shortCode } from '../../common/short-code.js';
+import { isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import {
   MIN_SPREAD_DAYS,
@@ -545,8 +546,20 @@ export class RepCampaignsService {
       };
     }
 
+    // Sans cette clause, poster le `representantId` d'un collègue suffisait à
+    // écrire sa relation, son WhatsApp, et à clore SA tâche de campagne. La
+    // tâche confiée est cherchée sans `isActive` : une tentative peut arriver
+    // après que la file a été soldée, et elle reste légitime.
     const representant = await this.prisma.representant.findFirst({
-      where: { id: body.representantId, deletedAt: null },
+      where: {
+        id: body.representantId,
+        deletedAt: null,
+        ...(isAdmin(user)
+          ? {}
+          : {
+              OR: [{ createdById: user.id }, { repCallTasks: { some: { assignedToId: user.id } } }],
+            }),
+      },
       select: {
         id: true,
         relationStatus: true,

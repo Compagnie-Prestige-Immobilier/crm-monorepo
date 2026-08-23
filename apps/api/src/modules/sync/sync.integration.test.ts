@@ -123,9 +123,19 @@ const push = (operations: SyncOperationDto[], clientBatchId = randomUUID()): Syn
 const statuses = (results: { status: SyncOpStatus }[]): SyncOpStatus[] =>
   results.map((result) => result.status);
 
+/**
+ * Recule TOUT ce que le pull sert, campagnes et files comprises.
+ *
+ * Le tirage ne sert que les lignes plus vieilles que `PULL_SAFETY_LAG_MS`.
+ * Laisser `call_campaigns` et `call_tasks` à `now()` rendait le test dépendant
+ * de la lenteur de la machine : il ne passait que si deux secondes s'écoulaient
+ * entre la création et le tirage.
+ */
 async function backdate(): Promise<void> {
   await prisma.$executeRaw`UPDATE "representants" SET "updatedAt" = now() - interval '10 seconds'`;
   await prisma.$executeRaw`UPDATE "prospects" SET "updatedAt" = now() - interval '10 seconds'`;
+  await prisma.$executeRaw`UPDATE "call_campaigns" SET "updatedAt" = now() - interval '10 seconds'`;
+  await prisma.$executeRaw`UPDATE "call_tasks" SET "updatedAt" = now() - interval '10 seconds'`;
 }
 
 describe('idempotence contre PostgreSQL', () => {

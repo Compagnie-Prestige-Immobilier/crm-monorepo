@@ -1,4 +1,30 @@
-import { CallOutcome, EnrollmentMethod, Phase2Status } from '@crm/database';
+import {
+  CallOutcome,
+  EnrollmentMethod,
+  Phase2Status,
+  Projet,
+  ProspectStatut,
+  ProspectType,
+} from '@crm/database';
+
+export const PROJET_LABELS: Readonly<Record<Projet, string>> = {
+  [Projet.CHUES]: 'CHUES',
+  [Projet.GRAND_PUBLIC]: 'Grand Public',
+};
+
+export const PROSPECT_STATUT_LABELS: Readonly<Record<ProspectStatut, string>> = {
+  [ProspectStatut.NOUVEAU]: 'Nouveau',
+  [ProspectStatut.CONTACTE]: 'Contacté',
+  [ProspectStatut.CONVERTI]: 'Converti',
+  [ProspectStatut.PERDU]: 'Perdu',
+};
+
+export const PROSPECT_TYPE_LABELS: Readonly<Record<ProspectType, string>> = {
+  [ProspectType.FONCTIONNAIRE]: 'Fonctionnaire',
+  [ProspectType.SECTEUR_PRIVE]: 'Secteur privé',
+  [ProspectType.INFORMEL]: 'Informel',
+  [ProspectType.DIASPORA]: 'Diaspora',
+};
 
 export const PHASE2_STATUS_LABELS: Readonly<Record<Phase2Status, string>> = {
   [Phase2Status.PENDING]: 'En attente',

@@ -29,15 +29,24 @@ import {
   Projet,
   ProspectStatut,
   ProspectType,
+  RepresentantRelation,
   WhatsappStatus,
 } from '@crm/database';
 
-import { BanqueDto, DepartementDto, IefDto, SyndicatDto } from '../referentiels/dto.js';
+import {
+  BanqueDto,
+  CanalProvenanceDto,
+  DepartementDto,
+  IefDto,
+  SyndicatDto,
+} from '../referentiels/dto.js';
 import { ProspectDto } from '../prospects/dto.js';
 import { RepresentantDto } from '../representants/dto.js';
 import {
   DATE_PATTERN as VISITE_DATE_PATTERN,
   TIME_PATTERN as VISITE_TIME_PATTERN,
+  VISITE_REFERENTIEL_KINDS,
+  type VisiteReferentielKind,
   VisiteReferentielRefDto,
 } from '../visites/dto.js';
 
@@ -74,6 +83,13 @@ export const CLEARABLE_FIELDS = [
   'profession',
   'prenom',
   'etablissement',
+  // Les trois liens d'un prospect sont NULLABLES depuis le Grand Public. Sans
+  // eux ici, retirer une banque saisie par erreur disparaissait à l'envoi
+  // (`includeIfNull: false` supprime le `null`) et le tirage suivant réécrivait
+  // l'ancienne valeur : la correction était annulée sans un mot.
+  'banqueId',
+  'syndicatId',
+  'representantId',
 ] as const;
 
 export type ClearableField = (typeof CLEARABLE_FIELDS)[number];
@@ -185,6 +201,25 @@ export class SyncEntityDataDto {
   @IsString()
   @MaxLength(120)
   profession?: string;
+
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    description:
+      'Représentant : où en est la relation. Un statut identique à celui déjà en base n’écrit rien.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation)
+  relationStatus?: RepresentantRelation;
+
+  @ApiPropertyOptional({
+    maxLength: 500,
+    description: 'Motif de la bascule, repris dans la chronologie. FACULTATIF POUR TOUJOURS.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  relationReason?: string;
 
   @ApiPropertyOptional({
     maxLength: 160,
@@ -629,11 +664,35 @@ export class SyncVisiteDto {
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
 
+/**
+ * Une entrée de l'une des quatre listes du registre. `kind` la range : les
+ * quatre tables ont la même forme, et un flux par nature côté cursor suffit à
+ * les faire descendre sans les confondre.
+ */
+export class SyncVisiteReferentielDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ enum: VISITE_REFERENTIEL_KINDS, enumName: 'VisiteReferentielKind' })
+  kind!: VisiteReferentielKind;
+  @ApiProperty() code!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty({ type: Boolean }) isActive!: boolean;
+  @ApiProperty({ type: Number }) sortOrder!: number;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
 export class SyncChangesDto {
   @ApiProperty({ type: () => [DepartementDto] }) departements!: DepartementDto[];
   @ApiProperty({ type: () => [IefDto] }) iefs!: IefDto[];
   @ApiProperty({ type: () => [BanqueDto] }) banques!: BanqueDto[];
   @ApiProperty({ type: () => [SyndicatDto] }) syndicats!: SyndicatDto[];
+  @ApiProperty({ type: () => [CanalProvenanceDto] }) canauxProvenance!: CanalProvenanceDto[];
+
+  @ApiProperty({
+    type: () => [SyncVisiteReferentielDto],
+    description:
+      'Les quatre listes du registre des visites, réunies : chaque entrée porte sa nature.',
+  })
+  visiteReferentiels!: SyncVisiteReferentielDto[];
   @ApiProperty({ type: () => [RepresentantDto] }) representants!: RepresentantDto[];
   @ApiProperty({ type: () => [ProspectDto] }) prospects!: ProspectDto[];
   @ApiProperty({ type: () => [SyncCallCampaignDto] }) callCampaigns!: SyncCallCampaignDto[];

@@ -76,8 +76,7 @@ export class CreateUserDto {
   phone?: string;
 }
 
-export class UpdateUserDto extends PartialType(OmitType(CreateUserDto, ['password'] as const)) {
-}
+export class UpdateUserDto extends PartialType(OmitType(CreateUserDto, ['password'] as const)) {}
 
 export class ResetPasswordDto {
   @ApiProperty({ minLength: 12, maxLength: 200, format: 'password' })
@@ -91,6 +90,28 @@ export class SetActiveDto {
   @ApiProperty({ type: Boolean })
   @IsBoolean()
   isActive!: boolean;
+
+  /**
+   * Obligatoire pour DÉSACTIVER un compte qui possède encore des fiches.
+   *
+   * Sans reprise, son portefeuille gelait : `createdById` restait sur le compte
+   * parti, plus aucun commercial actif ne pouvait lire ni corriger ces fiches,
+   * et ses tâches de campagne les bloquaient hors de tout tirage futur.
+   */
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Compte qui reprend le portefeuille. Exigé si le compte désactivé en a un.',
+  })
+  @IsOptional()
+  @IsUUID()
+  handoverToId?: string;
+}
+
+export class DeleteUserQueryDto {
+  @ApiPropertyOptional({ format: 'uuid', description: 'Compte qui reprend le portefeuille.' })
+  @IsOptional()
+  @IsUUID()
+  handoverToId?: string;
 }
 
 export class UserDto {

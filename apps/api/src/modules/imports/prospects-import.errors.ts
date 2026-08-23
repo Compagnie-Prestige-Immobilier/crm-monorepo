@@ -15,7 +15,6 @@ export const ProspectImportError = {
   DUPLICATE_IN_DATABASE: 'PROSPECT_IMPORT_DUPLICATE_IN_DATABASE',
   ATTACHED_TO_OTHER_REPRESENTANT: 'PROSPECT_IMPORT_ATTACHED_TO_OTHER_REPRESENTANT',
   REFERENTIAL_AMBIGUOUS: 'PROSPECT_IMPORT_REFERENTIAL_AMBIGUOUS',
-  NOT_PREPARED: 'PROSPECT_IMPORT_NOT_PREPARED',
 } as const;
 
 export type ProspectImportErrorCode =
@@ -43,10 +42,4 @@ export function referentialAmbiguous(column: string, key: string): ConflictExcep
     message: `Le référentiel « ${column} » contient deux entrées qui se confondent sur « ${key} ». Corrigez le référentiel avant de relancer l’import.`,
     column,
   });
-}
-
-export function notPrepared(): Error {
-  return new Error(
-    `${ProspectImportError.NOT_PREPARED}: parseRow appelée avant prepare, les référentiels ne sont pas chargés.`,
-  );
 }
