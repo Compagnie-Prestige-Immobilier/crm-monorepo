@@ -52,12 +52,18 @@ const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DO
 
 const CATEGORY_ITEMS = CATEGORIES.map((item) => ({ value: item, label: CATEGORY_LABELS[item] }));
 
+/** Bornes de `CreateNotificationTemplateDto` : dépassées, l'API rend un 400 muet. */
+const NAME_MIN = 2;
+const NAME_MAX = 80;
+const TITLE_MAX = 120;
+const BODY_MAX = 500;
+
 export function TemplateManager() {
   const [editing, setEditing] = useState<NotificationTemplate | null>(null);
   const [formOpen, setFormOpen] = useState(false);
 
   const templates = useQuery({
-    queryKey: notificationKeys.templates,
+    queryKey: notificationKeys.templates(true),
     queryFn: () => fetchTemplates(true),
   });
 
@@ -189,12 +195,29 @@ function TemplateFormDialog({
   const preview = renderNotification(titleTemplate, bodyTemplate, sample);
 
   const routeIssue = routeProblem(route);
-  const blocking =
-    name.trim().length < 2
+
+  const nameIssue =
+    name.trim().length < NAME_MIN
       ? 'Le nom doit faire au moins deux caractères.'
-      : titleTemplate.trim() === '' || bodyTemplate.trim() === ''
-        ? 'Le titre et le corps sont obligatoires.'
-        : routeIssue;
+      : name.trim().length > NAME_MAX
+        ? `Le nom fait ${String(name.trim().length)} caractères, ${String(NAME_MAX)} au maximum.`
+        : null;
+
+  const titleIssue =
+    titleTemplate.trim() === ''
+      ? 'Le titre est obligatoire.'
+      : titleTemplate.length > TITLE_MAX
+        ? `Le titre fait ${String(titleTemplate.length)} caractères, ${String(TITLE_MAX)} au maximum.`
+        : null;
+
+  const bodyIssue =
+    bodyTemplate.trim() === ''
+      ? 'Le message est obligatoire.'
+      : bodyTemplate.length > BODY_MAX
+        ? `Le message fait ${String(bodyTemplate.length)} caractères, ${String(BODY_MAX)} au maximum.`
+        : null;
+
+  const blocking = nameIssue ?? titleIssue ?? bodyIssue ?? routeIssue;
 
   const save = useMutation({
     mutationFn: () => {
@@ -212,7 +235,7 @@ function TemplateFormDialog({
         : createTemplate(route.trim() === '' ? payload : { ...payload, route: route.trim() });
     },
     onSuccess: (saved) => {
-      void queryClient.invalidateQueries({ queryKey: notificationKeys.templates });
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.templatesRoot });
       toast.success(isEdit ? `« ${saved.name} » enregistré.` : `« ${saved.name} » ajouté.`);
       onOpenChange(false);
     },
@@ -233,7 +256,12 @@ function TemplateFormDialog({
 
         <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="flex min-w-0 flex-col gap-4">
-            <Field label="Nom du gabarit" required>
+            <Field
+              label="Nom du gabarit"
+              required
+              description={`${String(name.length)} / ${String(NAME_MAX)} caractères`}
+              error={name.trim() === '' ? undefined : (nameIssue ?? undefined)}
+            >
               {(props) => (
                 <Input
                   {...props}
@@ -269,7 +297,12 @@ function TemplateFormDialog({
               )}
             </Field>
 
-            <Field label="Titre" required>
+            <Field
+              label="Titre"
+              required
+              description={`${String(titleTemplate.length)} / ${String(TITLE_MAX)} caractères`}
+              error={titleTemplate.trim() === '' ? undefined : (titleIssue ?? undefined)}
+            >
               {(props) => (
                 <Input
                   {...props}
@@ -282,7 +315,12 @@ function TemplateFormDialog({
               )}
             </Field>
 
-            <Field label="Message" required>
+            <Field
+              label="Message"
+              required
+              description={`${String(bodyTemplate.length)} / ${String(BODY_MAX)} caractères`}
+              error={bodyTemplate.trim() === '' ? undefined : (bodyIssue ?? undefined)}
+            >
               {(props) => (
                 <Textarea
                   {...props}

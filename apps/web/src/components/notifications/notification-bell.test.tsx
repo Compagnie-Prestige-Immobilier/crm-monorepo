@@ -61,7 +61,7 @@ describe('NotificationBell', () => {
   });
 
   it('annonce le nombre de non-lues dans l’intitulé du bouton', async () => {
-    renderWithQuery(<NotificationBell />);
+    renderWithQuery(<NotificationBell href="/notifications" />);
 
     expect(await screen.findByRole('button', { name: 'Notifications, 3 non lues' })).toBeTruthy();
   });
@@ -74,24 +74,24 @@ describe('NotificationBell', () => {
         meta: { total: 0, page: 1, pageSize: 20, pageCount: 0 },
       }),
     );
-    renderWithQuery(<NotificationBell />);
+    renderWithQuery(<NotificationBell href="/notifications" />);
 
     expect(
       await screen.findByRole('button', { name: 'Notifications, aucune non lue' }),
     ).toBeTruthy();
   });
 
-  it('mène à la boîte de réception, onglet réception, et non au composeur', async () => {
-    renderWithQuery(<NotificationBell />);
+  it('mène à la boîte de réception fournie, et non au composeur', async () => {
+    renderWithQuery(<NotificationBell href="/notifications" />);
 
     await userEvent.click(await screen.findByRole('button', { name: /Notifications/ }));
 
     const all = await screen.findByRole('link', { name: 'Tout voir' });
-    expect(all.getAttribute('href')).toBe('/admin/notifications?onglet=reception');
+    expect(all.getAttribute('href')).toBe('/notifications');
   });
 
   it('marque une ligne non lue à l’ouverture', async () => {
-    renderWithQuery(<NotificationBell />);
+    renderWithQuery(<NotificationBell href="/notifications" />);
 
     await userEvent.click(await screen.findByRole('button', { name: /Notifications/ }));
     await userEvent.click(await rowButton());
@@ -109,7 +109,7 @@ describe('NotificationBell', () => {
         meta: { total: 1, page: 1, pageSize: 20, pageCount: 1 },
       }),
     );
-    renderWithQuery(<NotificationBell />);
+    renderWithQuery(<NotificationBell href="/notifications" />);
 
     await userEvent.click(await screen.findByRole('button', { name: /Notifications/ }));
     await userEvent.click(await rowButton());

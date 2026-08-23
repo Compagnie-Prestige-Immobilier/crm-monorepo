@@ -9,7 +9,7 @@ import {
   RotateCcwIcon,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { ClientRequestReviewDialogs } from '@/components/client-requests/client-request-review-dialogs';
 import { useClientRequestFilters } from '@/components/client-requests/use-client-request-filters';
@@ -36,7 +36,7 @@ import { fetchReferenceData } from '@/lib/data/reference';
 import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import type { BadgeVariant, Role } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 
 const STATUS_VARIANT: Record<ClientRequestStatus, BadgeVariant> = {
   PENDING: 'warning',
@@ -72,15 +72,12 @@ export function ClientRequestsView({ role }: { role: Role }) {
     enabled: canReview,
   });
 
-  const [searchDraft, setSearchDraft] = useState(filters.search);
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === filters.search) return;
-    setFilters({ search: debouncedSearch });
-  }, [debouncedSearch, filters.search, setFilters]);
+  const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
 
   const activeFilterCount = countActiveClientRequestFilters(filters);
   const currentTab = filters.status ?? ALL_STATUSES;

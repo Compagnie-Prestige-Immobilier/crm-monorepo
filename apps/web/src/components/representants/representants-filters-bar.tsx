@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { RotateCcwIcon } from 'lucide-react';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 
 import { AdvancedPanel, type AdvancedChipItem } from '@/components/filters/advanced-panel';
 import { DatePicker } from '@/components/filters/date-picker';
@@ -34,7 +34,7 @@ import {
   type RepresentantSortField,
 } from '@/lib/representant-filters';
 import type { SortDirection } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 
 const PRESENCE_ITEMS = [
   { value: 'tous', label: 'Tous' },
@@ -78,15 +78,12 @@ export function RepresentantsFiltersBar() {
     departements.find((departement) => departement.id === filters.departementId)?.regionId ??
     regionDraft;
 
-  const [searchDraft, setSearchDraft] = useState(filters.search);
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === filters.search) return;
-    setFilters({ search: debouncedSearch });
-  }, [debouncedSearch, filters.search, setFilters]);
+  const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
 
   const removeAdvanced = useCallback(
     (key: RepresentantAdvancedFilterKey) => {

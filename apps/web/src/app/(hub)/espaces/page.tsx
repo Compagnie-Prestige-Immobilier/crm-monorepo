@@ -20,8 +20,12 @@ export default async function EspacesPage({
 
   const tuiles = coquesForRole(user.role);
   const requestedReturn = (await searchParams).retour;
+  // `//evil.com` commence par « / » et est pourtant une URL absolue : le même
+  // motif qu'à la connexion refuse la double barre et l'antislash.
   const returnPath =
-    requestedReturn?.startsWith('/') === true && !requestedReturn.startsWith('/espaces')
+    typeof requestedReturn === 'string' &&
+    /^\/(?!\/)[^\\]*$/.test(requestedReturn) &&
+    !requestedReturn.startsWith('/espaces')
       ? requestedReturn
       : null;
 

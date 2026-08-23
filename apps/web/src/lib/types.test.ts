@@ -37,8 +37,12 @@ describe('exhaustivité des listes de filtre', () => {
     sameMembers(ENROLLMENT_METHODS, ENROLLMENT_METHOD_LABELS);
   });
 
-  it('CAMPAIGN_SCOPES ajoute « toutes bases » aux quatre segments, et rien d’autre', () => {
-    expect([...CAMPAIGN_SCOPES].sort()).toEqual(['ALL', ...BDD_SEGMENTS].sort());
+  /// Les périmètres CHUES et Grand Public sont disjoints ; « ALL » est le seul
+  /// à valoir dans les deux projets.
+  it('CAMPAIGN_SCOPES ajoute « toutes bases » aux segments des DEUX projets', () => {
+    expect([...CAMPAIGN_SCOPES].sort()).toEqual(
+      ['ALL', ...BDD_SEGMENTS, 'GP1', 'GP2', 'GP3', 'GP4'].sort(),
+    );
     for (const scope of CAMPAIGN_SCOPES) {
       expect(campaignScopeLabel(scope).length).toBeGreaterThan(0);
     }

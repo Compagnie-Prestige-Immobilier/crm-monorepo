@@ -257,4 +257,26 @@ describe('correction d’une ligne du registre', () => {
     expect(createVisite).not.toHaveBeenCalled();
     expect(onSaved).toHaveBeenCalled();
   });
+
+  // L'API exige deux caractères ; le formulaire ne testait que « non vide ».
+  // Un nom d'une lettre partait, revenait en 400, et rien ne disait lequel.
+  it('refuse un nom d’une seule lettre, EN NOMMANT le champ', async () => {
+    renderWithQuery(<VisiteForm referentiels={referentiels} onSaved={vi.fn()} />);
+
+    await fillMinimum('A');
+    await userEvent.setup().click(screen.getByRole('button', { name: /Enregistrer la visite/u }));
+
+    expect(await screen.findByText('Au moins deux caractères.')).toBeTruthy();
+    expect(createVisite).not.toHaveBeenCalled();
+  });
+
+  it('borne le téléphone et le commentaire comme l’API', () => {
+    renderWithQuery(<VisiteForm referentiels={referentiels} onSaved={vi.fn()} />);
+
+    expect(screen.getByLabelText(/TELEPHONES/u).getAttribute('maxlength')).toBe('40');
+    expect(screen.getByLabelText(/COMMENTAIRES/u).getAttribute('maxlength')).toBe('2000');
+    expect(screen.getByRole('textbox', { name: /PRENOM ET NOMS/u }).getAttribute('maxlength')).toBe(
+      '160',
+    );
+  });
 });

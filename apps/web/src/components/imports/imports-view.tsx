@@ -90,16 +90,17 @@ const IMPORT_HINTS: Readonly<Record<ImportKind, string>> = {
 };
 
 /** « Grand Public » ne prend pas la marque du pluriel : elle ne peut pas être ajoutée au vol. */
-const IMPORT_NOUNS: Readonly<Record<ImportKind, { readonly un: string; readonly plusieurs: string }>> =
-  {
-    PROSPECTS: { un: 'prospect', plusieurs: 'prospects' },
-    PROSPECTS_GRAND_PUBLIC: {
-      un: 'prospect Grand Public',
-      plusieurs: 'prospects Grand Public',
-    },
-    REPRESENTANTS: { un: 'représentant', plusieurs: 'représentants' },
-    VISITES: { un: 'visite', plusieurs: 'visites' },
-  };
+const IMPORT_NOUNS: Readonly<
+  Record<ImportKind, { readonly un: string; readonly plusieurs: string }>
+> = {
+  PROSPECTS: { un: 'prospect', plusieurs: 'prospects' },
+  PROSPECTS_GRAND_PUBLIC: {
+    un: 'prospect Grand Public',
+    plusieurs: 'prospects Grand Public',
+  },
+  REPRESENTANTS: { un: 'représentant', plusieurs: 'représentants' },
+  VISITES: { un: 'visite', plusieurs: 'visites' },
+};
 
 const nounFor = (job: ImportJob): string =>
   job.createdRows > 1 ? IMPORT_NOUNS[job.kind].plusieurs : IMPORT_NOUNS[job.kind].un;
