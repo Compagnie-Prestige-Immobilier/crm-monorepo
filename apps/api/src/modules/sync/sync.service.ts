@@ -6,7 +6,16 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { OperationResult, Prisma, type Role, WhatsappStatus } from '@crm/database';
+import {
+  ChangeSource,
+  GrandPublicConsent,
+  OperationResult,
+  Prisma,
+  Projet,
+  type ProspectStatut,
+  type Role,
+  WhatsappStatus,
+} from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readEnv } from '../../env.js';
@@ -17,9 +26,11 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import { PROSPECT_INCLUDE, toProspectDto } from '../prospects/prospects.service.js';
 import { REPRESENTANT_INCLUDE, toRepresentantDto } from '../representants/representants.service.js';
 import { resolveWhatsappPatch } from '../representants/whatsapp.js';
+import { applyRelationChange } from '../representants/relation-change.js';
 import { CallAttemptApplyStatus } from '../phase2/dto.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
 import { VISITE_REGISTRE_ROLES, VisitesService, dakarDate } from '../visites/visites.service.js';
+import type { VisiteReferentielKind } from '../visites/dto.js';
 import { SyncBatchStore } from './batch-store.js';
 import { requestHash } from './request-hash.js';
 import {
@@ -45,6 +56,7 @@ import {
   type SyncPushDto,
   type SyncPushResponseDto,
   type SyncVisiteDto,
+  type SyncVisiteReferentielDto,
 } from './dto.js';
 
 /**
@@ -560,11 +572,15 @@ export class SyncService {
       // Une campagne confie des fiches que le teleconseiller n'a pas saisies.
       // Sans cette porte, il tirait la file sur son telephone et chaque
       // qualification repartait en CONFLIT, sans qu'il puisse rien y faire.
+      //
+      // `existing` est un REPRÉSENTANT : la tâche se cherche par le prospect
+      // qui lui est rattaché. Comparée à `prospectId`, la condition ne pouvait
+      // jamais être vraie et la porte restait murée.
       const assigned = await tx.callTask.findFirst({
         where: {
-          prospectId: existing.id,
           assignedToId: user.id,
           isActive: true,
+          prospect: { representantId: existing.id },
         },
         select: { id: true },
       });
@@ -674,6 +690,19 @@ export class SyncService {
         rev: { increment: 1 },
       },
     });
+    // Après la mise à jour : la bascule pose sa propre garde sur le statut de
+    // départ et incrémente `rev` elle-même. Un statut identique n'écrit rien,
+    // sinon une relation stable ressortirait agitée dans sa chronologie.
+    if (data.relationStatus) {
+      await applyRelationChange(tx, {
+        representantId: row.id,
+        fromStatus: existing.relationStatus,
+        toStatus: data.relationStatus,
+        reason: data.relationReason ?? null,
+        changedById: user.id,
+        source: ChangeSource.MOBILE,
+      });
+    }
     return applied(row.id, row.rev, row.updatedAt);
   }
 
@@ -742,6 +771,29 @@ export class SyncService {
         'CALL_ATTEMPT_INCOMPLETE',
         'Une tentative d’appel exige prospectId, outcome et clientCreatedAt.',
       );
+    }
+
+    // La tentative n'hérite d'aucune garde : `phase2-sync` LIT le prospect, il
+    // ne l'autorise pas. Sans ce contrôle, poster le `prospectId` d'un collègue
+    // suffisait à s'attribuer son adhésion et à éteindre sa file.
+    //
+    // La tâche est cherchée sans `isActive` : une tentative saisie hors ligne
+    // arrive souvent après que la file a été soldée, et elle reste légitime.
+    if (!isAdmin(user)) {
+      const permis = await tx.prospect.findFirst({
+        where: {
+          id: data.prospectId,
+          OR: [{ createdById: user.id }, { callTasks: { some: { assignedToId: user.id } } }],
+        },
+        select: { id: true },
+      });
+      if (!permis) {
+        throw new OperationError(
+          SyncOpStatus.CONFLICT,
+          'ENTITY_ID_OWNED_BY_ANOTHER_USER',
+          'Cette fiche appartient à un autre téléconseiller.',
+        );
+      }
     }
 
     try {
@@ -894,6 +946,7 @@ export class SyncService {
           rev: { increment: 1 },
         },
       });
+      await openJourney(tx, row.id, data.projet ?? Projet.CHUES, data.statut);
       return applied(row.id, row.rev, row.updatedAt);
     }
 
@@ -905,16 +958,26 @@ export class SyncService {
       await assertRepresentantUsable(tx, user, data.representantId);
     }
 
+    // Un lien VIDÉ se déclare, il ne se devine pas : `includeIfNull: false`
+    // supprime le `null` avant l'envoi, donc un effacement arrivait ici
+    // identique au silence d'une application ancienne.
+    const videe = new Set(operation.clearedFields ?? []);
+    const lien = (champ: 'banqueId' | 'syndicatId' | 'representantId'): object =>
+      videe.has(champ) ? { [champ]: null } : data[champ] ? { [champ]: data[champ] } : {};
+
     const row = await tx.prospect.update({
       where: { id: existing.id },
       data: {
         ...(data.nom ? { nom: data.nom.trim() } : {}),
         ...(data.prenom ? { prenom: data.prenom.trim() } : {}),
         phoneE164,
-        ...(data.banqueId ? { banqueId: data.banqueId } : {}),
-        ...(data.syndicatId ? { syndicatId: data.syndicatId } : {}),
-        ...(data.representantId ? { representantId: data.representantId } : {}),
-        ...(data.projet ? { projet: data.projet } : {}),
+        ...lien('banqueId'),
+        ...lien('syndicatId'),
+        ...lien('representantId'),
+        // `projet` ABSENT volontairement : sur une fiche qui existe déjà, il dit
+        // par où elle est ENTRÉE, et ça ne se réécrit pas. Rejoindre un second
+        // projet lui ouvre un parcours, plus bas. Le réécrire ici la retirait du
+        // projet d'origine, avec son historique et ses appels.
         ...(data.type ? { type: data.type } : {}),
         ...(data.profession === undefined ? {} : { profession: data.profession }),
         ...(data.dureeSystemeMois === undefined ? {} : { dureeSystemeMois: data.dureeSystemeMois }),
@@ -925,6 +988,7 @@ export class SyncService {
         rev: { increment: 1 },
       },
     });
+    if (data.projet) await openJourney(tx, row.id, data.projet, data.statut);
     return applied(row.id, row.rev, row.updatedAt);
   }
 
@@ -967,6 +1031,55 @@ export class SyncService {
     });
     cursor = advance(cursor, 'banques', lastPosition(banques));
     hasMore ||= banques.length === limit;
+
+    // Le canal de provenance descend comme les autres référentiels : sans lui
+    // en local, une fiche Grand Public saisie hors réseau n'a rien à choisir.
+    const canauxProvenance = await this.prisma.canalProvenance.findMany({
+      where: keyset(cursor.streams.canauxProvenance, safeNow),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'canauxProvenance', lastPosition(canauxProvenance));
+    hasMore ||= canauxProvenance.length === limit;
+
+    // Les quatre listes du registre. Sans elles en local, l'accueil ne pouvait
+    // pas inscrire un visiteur hors réseau : la lecture du registre tenait, sa
+    // saisie non.
+    const entreprises = await this.prisma.visiteEntreprise.findMany({
+      where: keyset(cursor.streams.visiteEntreprises, safeNow),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    const objets = await this.prisma.visiteObjet.findMany({
+      where: keyset(cursor.streams.visiteObjets, safeNow),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    const directions = await this.prisma.visiteDirection.findMany({
+      where: keyset(cursor.streams.visiteDirections, safeNow),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    const destinataires = await this.prisma.visiteDestinataire.findMany({
+      where: keyset(cursor.streams.visiteDestinataires, safeNow),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'visiteEntreprises', lastPosition(entreprises));
+    cursor = advance(cursor, 'visiteObjets', lastPosition(objets));
+    cursor = advance(cursor, 'visiteDirections', lastPosition(directions));
+    cursor = advance(cursor, 'visiteDestinataires', lastPosition(destinataires));
+    hasMore ||=
+      entreprises.length === limit ||
+      objets.length === limit ||
+      directions.length === limit ||
+      destinataires.length === limit;
+    const listesDuRegistre: SyncVisiteReferentielDto[] = [
+      ...entreprises.map(toRegistreDto('entreprises')),
+      ...objets.map(toRegistreDto('objets')),
+      ...directions.map(toRegistreDto('directions')),
+      ...destinataires.map(toRegistreDto('destinataires')),
+    ];
 
     const syndicats = await this.prisma.syndicat.findMany({
       where: keyset(cursor.streams.syndicats, safeNow),
@@ -1095,6 +1208,15 @@ export class SyncService {
           sortOrder: row.sortOrder,
           updatedAt: row.updatedAt.toISOString(),
         })),
+        visiteReferentiels: listesDuRegistre,
+        canauxProvenance: canauxProvenance.map((row) => ({
+          id: row.id,
+          code: row.code,
+          label: row.label,
+          position: row.position,
+          isActive: row.isActive,
+          updatedAt: row.updatedAt.toISOString(),
+        })),
         syndicats: syndicats.map((row) => ({
           id: row.id,
           name: row.name,
@@ -1125,25 +1247,23 @@ export class SyncService {
           status: row.status,
           updatedAt: row.updatedAt.toISOString(),
         })),
-        visites: visites.map(
-          (row): SyncVisiteDto => ({
-            id: row.id,
-            reference: row.reference,
-            date: dakarDate(row.visitedAt),
-            time: row.timeKnown ? hourMinuteDakar(row.visitedAt) : null,
-            visitorName: row.visitorName,
-            phone: row.phone,
-            phoneE164: row.phoneE164,
-            entreprise: row.entreprise,
-            objet: row.objet,
-            direction: row.direction,
-            destinataire: row.destinataire,
-            comment: row.comment,
-            createdById: row.createdById,
-            createdAt: row.createdAt.toISOString(),
-            updatedAt: row.updatedAt.toISOString(),
-          }),
-        ),
+        visites: visites.map((row): SyncVisiteDto => ({
+          id: row.id,
+          reference: row.reference,
+          date: dakarDate(row.visitedAt),
+          time: row.timeKnown ? hourMinuteDakar(row.visitedAt) : null,
+          visitorName: row.visitorName,
+          phone: row.phone,
+          phoneE164: row.phoneE164,
+          entreprise: row.entreprise,
+          objet: row.objet,
+          direction: row.direction,
+          destinataire: row.destinataire,
+          comment: row.comment,
+          createdById: row.createdById,
+          createdAt: row.createdAt.toISOString(),
+          updatedAt: row.updatedAt.toISOString(),
+        })),
       },
       deletions,
       nextCursor: encodeCursor(cursor),
@@ -1397,6 +1517,58 @@ async function assertProspectPhoneFree(
     'PROSPECT_PHONE_CONFLICT',
     `Ce numéro a déjà été enregistré par ${clash.createdBy.fullName}.`,
   );
+}
+
+interface RegistreRow {
+  id: string;
+  code: string;
+  label: string;
+  isActive: boolean;
+  sortOrder: number;
+  updatedAt: Date;
+}
+
+const toRegistreDto =
+  (kind: VisiteReferentielKind) =>
+  (row: RegistreRow): SyncVisiteReferentielDto => ({
+    id: row.id,
+    kind,
+    code: row.code,
+    label: row.label,
+    isActive: row.isActive,
+    sortOrder: row.sortOrder,
+    updatedAt: row.updatedAt.toISOString(),
+  });
+
+/**
+ * Ouvre le parcours du projet, ou le laisse tel quel s'il existe déjà.
+ *
+ * C'est `prospect_journeys` que filtrent les listes par projet, les statistiques
+ * et les rappels, JAMAIS la colonne `projet`. Sans cette ligne, une fiche saisie
+ * sur le terrain n'apparaissait dans aucun des deux projets côté web : elle
+ * existait, elle était introuvable.
+ *
+ * Le même numéro rejoint donc un second projet en s'ajoutant un parcours, il ne
+ * quitte pas le premier.
+ */
+async function openJourney(
+  tx: Prisma.TransactionClient,
+  prospectId: string,
+  projet: Projet,
+  statut: ProspectStatut | undefined,
+): Promise<void> {
+  const grandPublic = projet === Projet.GRAND_PUBLIC;
+  await tx.prospectJourney.upsert({
+    where: { prospectId_projet: { prospectId, projet } },
+    create: {
+      prospectId,
+      projet,
+      ...(statut ? { statut } : {}),
+      consent: grandPublic ? GrandPublicConsent.INTERESSE : GrandPublicConsent.NON_DEMANDE,
+      consentAt: grandPublic ? new Date() : null,
+    },
+    update: statut === undefined ? {} : { statut },
+  });
 }
 
 async function assertRepresentantPhoneFree(

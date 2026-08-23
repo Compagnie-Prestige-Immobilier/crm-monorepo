@@ -10,6 +10,7 @@ import {
   Prisma,
   ScheduledCallbackStatus,
   type EnrollmentMethod,
+  type Projet,
 } from '@crm/database';
 
 import { normalizeAttempt, systemReasonFor, type AttemptReason } from './attempt-rules.js';
@@ -24,32 +25,43 @@ export type Phase2TransactionClient = Prisma.TransactionClient;
 
 interface ProspectState {
   id: string;
-  phase2Status: Phase2Status;
-  enrollmentMethod: EnrollmentMethod | null;
+  projet: Projet;
   rev: number;
   updatedAt: Date;
+}
+
+/** L'état de phase 2 vit sur le PARCOURS ; la fiche ne porte plus que sa révision. */
+interface JourneyState {
+  id: string;
+  phase2Status: Phase2Status;
+  enrollmentMethod: EnrollmentMethod | null;
   enrollmentCapturedById: string | null;
   enrollmentCapturedAt: Date | null;
 }
 
 const PROSPECT_STATE_SELECT = {
   id: true,
-  phase2Status: true,
-  enrollmentMethod: true,
+  projet: true,
   rev: true,
   updatedAt: true,
-  enrollmentCapturedById: true,
-  enrollmentCapturedAt: true,
 } satisfies Prisma.ProspectSelect;
 
-const toState = (row: ProspectState): ProspectPhase2StateDto => ({
+const JOURNEY_STATE_SELECT = {
+  id: true,
+  phase2Status: true,
+  enrollmentMethod: true,
+  enrollmentCapturedById: true,
+  enrollmentCapturedAt: true,
+} satisfies Prisma.ProspectJourneySelect;
+
+const toState = (row: ProspectState, journey: JourneyState): ProspectPhase2StateDto => ({
   prospectId: row.id,
-  phase2Status: row.phase2Status,
-  enrollmentMethod: row.enrollmentMethod,
+  phase2Status: journey.phase2Status,
+  enrollmentMethod: journey.enrollmentMethod,
   rev: row.rev,
   updatedAt: row.updatedAt.toISOString(),
-  capturedById: row.enrollmentCapturedById,
-  capturedAt: row.enrollmentCapturedAt?.toISOString() ?? null,
+  capturedById: journey.enrollmentCapturedById,
+  capturedAt: journey.enrollmentCapturedAt?.toISOString() ?? null,
 });
 
 const REASON_SELECT = {
@@ -95,20 +107,30 @@ export class Phase2SyncService {
         attemptId: known.id,
         taskId: known.taskId,
         taskStatus: known.task?.status ?? null,
-        state: toState(current),
+        state: toState(current, await this.loadJourney(tx, op.prospectId, current.projet)),
       };
     }
 
     const prospect = await this.loadProspect(tx, op.prospectId);
-    if (prospect.phase2Status !== Phase2Status.PENDING) {
-      throw alreadyCompleted(toState(prospect));
-    }
 
     const activeTask = await tx.callTask.findFirst({
       where: { prospectId: op.prospectId, isActive: true },
-      select: { id: true, campaignId: true },
+      select: { id: true, campaignId: true, campaign: { select: { projet: true } } },
       orderBy: { createdAt: 'asc' },
     });
+
+    // La phase 2 est un état du PARCOURS. Portée par la fiche, elle rendait un
+    // prospect refusé en CHUES définitivement inappelable en Grand Public : la
+    // campagne le tirait quand même et chaque tentative revenait en 409, ce qui
+    // bloquait sur le téléphone toute la partition de file de ce prospect.
+    //
+    // Le projet vient de la CAMPAGNE qui a confié la tâche ; sans tâche, c'est
+    // le projet d'entrée de la fiche.
+    const projet = activeTask?.campaign.projet ?? prospect.projet;
+    const journey = await this.loadJourney(tx, op.prospectId, projet);
+    if (journey.phase2Status !== Phase2Status.PENDING) {
+      throw alreadyCompleted(toState(prospect, journey));
+    }
 
     const inserted = await tx.callAttempt.createMany({
       data: [
@@ -135,7 +157,7 @@ export class Phase2SyncService {
         attemptId: op.id,
         taskId: activeTask?.id ?? null,
         taskStatus: null,
-        state: toState(current),
+        state: toState(current, await this.loadJourney(tx, op.prospectId, projet)),
       };
     }
 
@@ -168,26 +190,44 @@ export class Phase2SyncService {
         attemptId: op.id,
         taskId: activeTask?.id ?? null,
         taskStatus: activeTask ? CallTaskStatus.OPEN : null,
-        state: toState(prospect),
+        state: toState(prospect, journey),
       };
     }
 
     const completedAt = new Date();
     const nextStatus = attempt.phase2Status;
 
-    const applied = await tx.prospect.updateMany({
-      where: { id: op.prospectId, phase2Status: Phase2Status.PENDING },
+    // Compare-and-swap sur le PARCOURS : c'est lui qui arbitre désormais « la
+    // première transition terminale validée gagne ».
+    const applied = await tx.prospectJourney.updateMany({
+      where: { id: journey.id, phase2Status: Phase2Status.PENDING },
       data: {
         phase2Status: nextStatus,
         enrollmentMethod: attempt.method,
         enrollmentCapturedAt: completedAt,
         enrollmentCapturedById: userId,
-        rev: { increment: 1 },
       },
     });
 
     if (applied.count === 0) {
-      throw alreadyCompleted(toState(await this.loadProspect(tx, op.prospectId)));
+      const relu = await this.loadProspect(tx, op.prospectId);
+      throw alreadyCompleted(toState(relu, await this.loadJourney(tx, op.prospectId, projet)));
+    }
+
+    // La fiche reste le REFLET du parcours d'entrée : le contrat de
+    // synchronisation l'expose encore et un APK déployé le lit. Elle n'est plus
+    // l'autorité.
+    if (projet === prospect.projet) {
+      await tx.prospect.updateMany({
+        where: { id: op.prospectId },
+        data: {
+          phase2Status: nextStatus,
+          enrollmentMethod: attempt.method,
+          enrollmentCapturedAt: completedAt,
+          enrollmentCapturedById: userId,
+          rev: { increment: 1 },
+        },
+      });
     }
 
     await tx.callTask.updateMany({
@@ -205,7 +245,10 @@ export class Phase2SyncService {
       attemptId: op.id,
       taskId: activeTask?.id ?? null,
       taskStatus: activeTask ? CallTaskStatus.DONE : null,
-      state: toState(await this.loadProspect(tx, op.prospectId)),
+      state: toState(
+        await this.loadProspect(tx, op.prospectId),
+        await this.loadJourney(tx, op.prospectId, projet),
+      ),
     };
   }
 
@@ -272,5 +315,23 @@ export class Phase2SyncService {
       });
     }
     return row;
+  }
+
+  /**
+   * Le parcours est ouvert à la volée s'il n'existe pas : une fiche importée
+   * sans parcours doit rester appelable, et refuser ici transformerait une
+   * lacune de données en échec définitif sur le téléphone.
+   */
+  private async loadJourney(
+    tx: Phase2TransactionClient,
+    prospectId: string,
+    projet: Projet,
+  ): Promise<JourneyState> {
+    return tx.prospectJourney.upsert({
+      where: { prospectId_projet: { prospectId, projet } },
+      create: { prospectId, projet },
+      update: {},
+      select: JOURNEY_STATE_SELECT,
+    });
   }
 }

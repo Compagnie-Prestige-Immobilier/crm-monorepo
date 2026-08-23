@@ -15,7 +15,8 @@ class PushDeepLinkListener extends ConsumerStatefulWidget {
   final Widget child;
 
   @override
-  ConsumerState<PushDeepLinkListener> createState() => _PushDeepLinkListenerState();
+  ConsumerState<PushDeepLinkListener> createState() =>
+      _PushDeepLinkListenerState();
 }
 
 class _PushDeepLinkListenerState extends ConsumerState<PushDeepLinkListener> {
@@ -30,7 +31,10 @@ class _PushDeepLinkListenerState extends ConsumerState<PushDeepLinkListener> {
       if (next != null) _drain();
     });
 
-    ref.listen<AuthState>(authControllerProvider, (AuthState? previous, AuthState next) {
+    ref.listen<AuthState>(authControllerProvider, (
+      AuthState? previous,
+      AuthState next,
+    ) {
       if (next.isAuthenticated) _drain();
     });
 
@@ -52,7 +56,9 @@ class _PushDeepLinkListenerState extends ConsumerState<PushDeepLinkListener> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _navigating = false;
       if (!mounted) return;
-      final PendingPushRoute? route = ref.read(pendingPushRouteProvider.notifier).take();
+      final PendingPushRoute? route = ref
+          .read(pendingPushRouteProvider.notifier)
+          .take();
       if (route == null) return;
 
       final GoRouter router = ref.read(routerProvider);

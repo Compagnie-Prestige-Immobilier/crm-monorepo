@@ -7,6 +7,7 @@ import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/call_outcome.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
+import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
 import 'package:crm_api_client/src/model/whatsapp_status.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -54,6 +55,10 @@ class SyncEntityDataDto {
     this.whatsappE164,
 
     this.profession,
+
+    this.relationStatus,
+
+    this.relationReason,
 
     this.etablissement,
 
@@ -162,6 +167,19 @@ class SyncEntityDataDto {
   /// Profession déclarée. Sert au représentant comme au prospect.
   @JsonKey(name: r'profession', required: false, includeIfNull: false)
   final String? profession;
+
+  /// Représentant : où en est la relation. Un statut identique à celui déjà en base n’écrit rien.
+  @JsonKey(
+    name: r'relationStatus',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
+  )
+  final RepresentantRelation? relationStatus;
+
+  /// Motif de la bascule, repris dans la chronologie. FACULTATIF POUR TOUJOURS.
+  @JsonKey(name: r'relationReason', required: false, includeIfNull: false)
+  final String? relationReason;
 
   /// Représentant : l’établissement où il exerce. Ni l’IEF ni le département.
   @JsonKey(name: r'etablissement', required: false, includeIfNull: false)
@@ -281,6 +299,8 @@ class SyncEntityDataDto {
                 whatsappStatus,
                 whatsappE164,
                 profession,
+                relationStatus,
+                relationReason,
                 etablissement,
                 projet,
                 type,
@@ -317,6 +337,8 @@ class SyncEntityDataDto {
                 other.whatsappStatus,
                 other.whatsappE164,
                 other.profession,
+                other.relationStatus,
+                other.relationReason,
                 other.etablissement,
                 other.projet,
                 other.type,
@@ -359,6 +381,8 @@ class SyncEntityDataDto {
         whatsappStatus,
         whatsappE164,
         profession,
+        relationStatus,
+        relationReason,
         etablissement,
         projet,
         type,

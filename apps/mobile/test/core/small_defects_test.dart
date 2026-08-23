@@ -26,9 +26,18 @@ void main() {
     });
 
     test('les paliers normaux sont inchangés', () {
-      expect(relativeTime(now.subtract(const Duration(seconds: 20)), now: now), 'à l\'instant');
-      expect(relativeTime(now.subtract(const Duration(minutes: 5)), now: now), 'il y a 5 min');
-      expect(relativeTime(now.subtract(const Duration(hours: 3)), now: now), 'il y a 3 h');
+      expect(
+        relativeTime(now.subtract(const Duration(seconds: 20)), now: now),
+        'à l\'instant',
+      );
+      expect(
+        relativeTime(now.subtract(const Duration(minutes: 5)), now: now),
+        'il y a 5 min',
+      );
+      expect(
+        relativeTime(now.subtract(const Duration(hours: 3)), now: now),
+        'il y a 3 h',
+      );
       expect(
         relativeTime(now.subtract(const Duration(days: 4)), now: now),
         startsWith('le '),
@@ -88,23 +97,26 @@ void main() {
     });
     tearDown(() => db.close());
 
-    test('le flux est plafonné : l\'outbox le rejoue à chaque écriture', () async {
-      for (int i = 0; i < 12; i++) {
-        await insertRepresentant(db, id: 'r$i', phone: '+2217700${1000 + i}');
-      }
+    test(
+      'le flux est plafonné : l\'outbox le rejoue à chaque écriture',
+      () async {
+        for (int i = 0; i < 12; i++) {
+          await insertRepresentant(db, id: 'r$i', phone: '+2217700${1000 + i}');
+        }
 
-      final List<RepresentantSyncViewData> page = await repo
-          .watchRepresentants(limit: 5)
-          .first;
+        final List<RepresentantSyncViewData> page = await repo
+            .watchRepresentants(limit: 5)
+            .first;
 
-      expect(
-        page,
-        hasLength(5),
-        reason:
-            'sans LIMIT, chaque changement d\'outbox rematérialisait la table '
-            'entière, jointure comprise',
-      );
-    });
+        expect(
+          page,
+          hasLength(5),
+          reason:
+              'sans LIMIT, chaque changement d\'outbox rematérialisait la table '
+              'entière, jointure comprise',
+        );
+      },
+    );
 
     test('la recherche atteint ce qui est au-delà de la borne', () async {
       for (int i = 0; i < 12; i++) {

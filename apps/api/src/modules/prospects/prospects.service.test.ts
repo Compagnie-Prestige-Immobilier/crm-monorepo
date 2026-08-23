@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { Role } from '@crm/database';
+import { GrandPublicConsent, Role } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -28,6 +28,13 @@ interface PrismaMock {
   };
   representant: { findFirst: ReturnType<typeof vi.fn> };
   user: { findFirst: ReturnType<typeof vi.fn> };
+  prospectJourney: {
+    findUnique: ReturnType<typeof vi.fn>;
+    upsert: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
+  prospectConversion: { upsert: ReturnType<typeof vi.fn> };
+  $transaction: ReturnType<typeof vi.fn>;
   $queryRaw: ReturnType<typeof vi.fn>;
 }
 
@@ -44,6 +51,13 @@ function makePrisma(): PrismaMock {
     },
     representant: { findFirst: vi.fn().mockResolvedValue(null) },
     user: { findFirst: vi.fn().mockResolvedValue(null) },
+    prospectJourney: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn(),
+      update: vi.fn(),
+    },
+    prospectConversion: { upsert: vi.fn() },
+    $transaction: vi.fn(),
     $queryRaw: vi.fn().mockResolvedValue([]),
   };
 }
@@ -51,6 +65,7 @@ function makePrisma(): PrismaMock {
 interface PrismaCallArgs {
   where?: Record<string, unknown>;
   data?: Record<string, unknown>;
+  update?: Record<string, unknown>;
 }
 
 function firstArg(fn: ReturnType<typeof vi.fn>): PrismaCallArgs {
@@ -186,17 +201,21 @@ describe('conflit de téléphone', () => {
     prisma.representant.findFirst.mockResolvedValue({ id: 'r-1', createdById: alice.id });
   });
 
-  it('renvoie un 409 nommant la fiche existante ET son commercial', async () => {
-    prisma.prospect.findFirst.mockResolvedValue({
-      id: 'p-existant',
-      nom: 'Fall',
-      prenom: 'Moussa',
-      createdAt: new Date('2026-08-01T09:30:00.000Z'),
-      createdBy: { id: 'com-bob', fullName: 'Bob Sarr' },
-      representant: { id: 'r-9', fullName: 'Cheikh Ba' },
-    });
+  const clashDe = (createdById: string): Record<string, unknown> => ({
+    id: 'p-existant',
+    nom: 'Fall',
+    prenom: 'Moussa',
+    createdById,
+    createdAt: new Date('2026-08-01T09:30:00.000Z'),
+    createdBy: { id: createdById, fullName: createdById === alice.id ? 'Alice Diop' : 'Bob Sarr' },
+    representant: { id: 'r-9', fullName: 'Cheikh Ba' },
+    // Un parcours déjà ouvert sur ce projet : sinon `attachProjectByPhone`
+    // rattache la fiche et il n'y a pas de conflit à observer.
+    journeys: [{ id: 'j-1' }],
+  });
 
-    const promise = service(prisma).create(alice, {
+  const creation = (user: AuthenticatedUser): Promise<unknown> =>
+    service(prisma).create(user, {
       nom: 'Fall',
       prenom: 'Moussa',
       phone: '77 123 45 67',
@@ -205,25 +224,52 @@ describe('conflit de téléphone', () => {
       representantId: 'r-1',
     });
 
-    await expect(promise).rejects.toThrow(ConflictException);
+  const bodyOf = async (promise: Promise<unknown>): Promise<unknown> => {
     try {
       await promise;
     } catch (error) {
-      expect((error as ConflictException).getResponse()).toEqual({
-        code: 'PROSPECT_PHONE_CONFLICT',
-        message: 'Ce numéro a déjà été enregistré par Bob Sarr.',
-        existing: {
-          id: 'p-existant',
-          nom: 'Fall',
-          prenom: 'Moussa',
-          representantId: 'r-9',
-          representantName: 'Cheikh Ba',
-          ownedByCommercialId: 'com-bob',
-          ownedByCommercialName: 'Bob Sarr',
-          createdAt: '2026-08-01T09:30:00.000Z',
-        },
-      });
+      return (error as ConflictException).getResponse();
     }
+    throw new Error('aucun conflit levé');
+  };
+
+  it('renvoie un 409 nommant la fiche existante ET son commercial, à son propriétaire', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(clashDe(alice.id));
+
+    expect(await bodyOf(creation(alice))).toEqual({
+      code: 'PROSPECT_PHONE_CONFLICT',
+      message: 'Ce numéro a déjà été enregistré par Alice Diop.',
+      existing: {
+        id: 'p-existant',
+        nom: 'Fall',
+        prenom: 'Moussa',
+        representantId: 'r-9',
+        representantName: 'Cheikh Ba',
+        ownedByCommercialId: alice.id,
+        ownedByCommercialName: 'Alice Diop',
+        createdAt: '2026-08-01T09:30:00.000Z',
+      },
+    });
+  });
+
+  /// Le contrôle est GLOBAL (l'index unique l'est) : sans cette réserve, boucler
+  /// sur les numéros sénégalais rendait l'identité civile de tout le fichier.
+  it('sur la fiche d’un collègue, ne rend que le nom du propriétaire', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(clashDe('com-bob'));
+
+    expect(await bodyOf(creation(alice))).toEqual({
+      code: 'PROSPECT_PHONE_CONFLICT',
+      message: 'Ce numéro a déjà été enregistré par Bob Sarr.',
+      existing: { ownedByCommercialName: 'Bob Sarr' },
+    });
+  });
+
+  it('un ADMIN garde la fiche entière', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(clashDe('com-bob'));
+
+    expect(await bodyOf(creation(admin))).toMatchObject({
+      existing: { id: 'p-existant', nom: 'Fall' },
+    });
   });
 
   it('cherche le doublon sur le numéro NORMALISÉ, pas sur la saisie brute', async () => {
@@ -477,6 +523,9 @@ function prospectRow(overrides: Record<string, unknown>): Record<string, unknown
     enrollmentCapturedAt: null,
     enrollmentCapturedById: null,
     enrollmentCapturedBy: null,
+    // `journeys` est dans l'include partagé : une doublure qui l'omet ne
+    // ressemble à aucune ligne que Prisma rend vraiment.
+    journeys: [],
     banque: { name: 'CBAO Sénégal', shortName: 'CBAO' },
     syndicat: { sigle: 'SUDES' },
     createdBy: { id: alice.id, fullName: alice.fullName },
@@ -626,5 +675,24 @@ describe('le panneau sait saisir une fiche Grand Public', () => {
     });
 
     expect(firstArg(prisma.prospect.create).data?.projet).toBeUndefined();
+  });
+
+  it('trace le consentement sur le parcours Grand Public', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: alice.id }));
+
+    await service(prisma).setGrandPublicConsent(alice, 'p-1', GrandPublicConsent.INTERESSE);
+
+    expect(firstArg(prisma.prospectJourney.upsert).update).toMatchObject({
+      consent: 'INTERESSE',
+      consentById: alice.id,
+    });
+  });
+
+  it('refuse une conversion avant le consentement', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: alice.id }));
+
+    await expect(
+      service(prisma).confirmGrandPublicConversion(alice, 'p-1', { offerId: 'offer-1' }),
+    ).rejects.toMatchObject({ response: { code: 'GRAND_PUBLIC_CONSENT_REQUIRED' } });
   });
 });

@@ -113,6 +113,14 @@ const WEB_ROUTES: readonly string[] = [
   '/accueil',
   '/grand-public',
   '/espaces',
+
+  /*
+   * Les trois adresses des rappels quotidiens (`reminders.service.ts`), qui
+   * n'ont jamais porté le nom d'un écran du panel. `moved-routes.ts` les
+   * renvoie sur les campagnes, les campagnes représentants et les rappels.
+   */
+  '/phase2',
+  '/rep-campaigns',
 ];
 
 export function webRouteFor(route: string | null): string | null {

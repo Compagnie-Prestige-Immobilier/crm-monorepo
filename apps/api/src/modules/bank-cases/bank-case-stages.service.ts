@@ -16,6 +16,9 @@ import type {
 
 const MAX_OPEN_POSITION = 99;
 
+/** Clé arbitraire mais stable : seule la file des positions d'étapes s'y sérialise. */
+const STAGE_POSITION_LOCK = 4_271_001;
+
 @Injectable()
 export class BankCaseStagesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -39,16 +42,21 @@ export class BankCaseStagesService {
       });
     }
 
-    const open = await this.prisma.bankCaseStage.findMany({
-      where: { type: BankStageType.OPEN },
-      orderBy: { position: 'asc' },
-      select: { id: true, position: true },
-    });
-    const requested = input.position ?? (open.at(-1)?.position ?? 0) + 1;
-    const position = Math.min(Math.max(requested, 1), MAX_OPEN_POSITION);
-
     try {
       const created = await this.prisma.$transaction(async (tx) => {
+        // `position` ne porte aucune unicité en base et aucune migration n'est
+        // possible : sans ce verrou, deux créations simultanées lisent le même
+        // rang en READ COMMITTED et l'écrivent toutes les deux.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${STAGE_POSITION_LOCK})`;
+
+        const open = await tx.bankCaseStage.findMany({
+          where: { type: BankStageType.OPEN },
+          orderBy: { position: 'asc' },
+          select: { id: true, position: true },
+        });
+        const requested = input.position ?? (open.at(-1)?.position ?? 0) + 1;
+        const position = Math.min(Math.max(requested, 1), MAX_OPEN_POSITION);
+
         const shifted = open.filter((stage) => stage.position >= position);
         for (const stage of shifted) {
           await tx.bankCaseStage.update({

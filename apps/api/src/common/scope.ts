@@ -25,6 +25,34 @@ export const readScope = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
 ): { createdById?: string } => (readsEveryone(user) ? {} : { createdById: user.id });
 
+/**
+ * Qui ENCADRE : peut agir sur le travail d'un autre depuis le PANNEAU.
+ *
+ * Distinct d'`ownerScope`, qui reste la portée du téléphone. Le superviseur
+ * corrige, réattribue et débloque ce que ses commerciaux ont saisi ; il ne
+ * synchronise pas, donc il ne tire aucun portefeuille sur un appareil.
+ * La DIRECTION lit tout mais n'écrit rien : elle n'est pas ici.
+ */
+export const manages = (user: Pick<AuthenticatedUser, 'role'>): boolean =>
+  isAdmin(user) || user.role === Role.SUPERVISEUR;
+
+/** Portée d'écriture des écrans d'encadrement. Ne JAMAIS l'utiliser dans `sync`. */
+export const manageScope = (
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+): { createdById?: string } => (manages(user) ? {} : { createdById: user.id });
+
+/** Pendant d'`assertOwnership` pour un geste d'encadrement. */
+export function assertManageable(
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+  row: { createdById: string },
+  message = 'Cette fiche appartient à un autre commercial.',
+): void {
+  if (manages(user)) return;
+  if (row.createdById !== user.id) {
+    throw new ForbiddenException({ code: 'NOT_OWNER', message });
+  }
+}
+
 export function assertOwnership(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   row: { createdById: string },

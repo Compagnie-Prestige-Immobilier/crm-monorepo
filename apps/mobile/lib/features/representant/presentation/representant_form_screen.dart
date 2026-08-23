@@ -43,7 +43,8 @@ class RepresentantFormScreen extends ConsumerStatefulWidget {
   final String? prefillPhone;
 
   @override
-  ConsumerState<RepresentantFormScreen> createState() => _RepresentantFormScreenState();
+  ConsumerState<RepresentantFormScreen> createState() =>
+      _RepresentantFormScreenState();
 }
 
 class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
@@ -77,6 +78,9 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   String _whatsappStatus = WhatsappStatus.nonDemande.code;
   String? _professionId;
   String? _relationStatus;
+
+  /// Le statut au chargement : c'est l'écart avec lui qui vaut bascule.
+  String? _relationInitial;
   bool _saving = false;
   String? _error;
 
@@ -109,7 +113,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       _iefId == null;
 
   @override
-  String? draftRouteWithId() => widget.draftId == null && widget.representantId == null
+  String? draftRouteWithId() =>
+      widget.draftId == null && widget.representantId == null
       ? Routes.newRepresentantWithDraft(_draftId)
       : null;
 
@@ -208,6 +213,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
           _setProfession(existing.profession ?? '');
           _notes.text = existing.notes ?? '';
           _relationStatus = existing.relationStatus;
+          _relationInitial = existing.relationStatus;
         });
         await _labelDepartement(existing.departementId);
         if (existing.iefId != null) await _labelIef(existing.iefId!);
@@ -258,7 +264,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       _regionId = snapshot.values['regionId'] as String?;
       _region.text = (snapshot.values['regionLabel'] as String?) ?? '';
       _departementId = snapshot.values['departementId'] as String?;
-      _departement.text = (snapshot.values['departementLabel'] as String?) ?? '';
+      _departement.text =
+          (snapshot.values['departementLabel'] as String?) ?? '';
       _iefId = snapshot.values['iefId'] as String?;
       _ief.text = (snapshot.values['iefLabel'] as String?) ?? '';
       _whatsappStatus =
@@ -342,7 +349,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     }
   }
 
-
   /// Un « autre numéro » sans numéro serait un état qui ment : la fiche dirait
   /// qu'il a WhatsApp ailleurs sans dire où.
   bool get _whatsappComplete =>
@@ -392,6 +398,11 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
               whatsappStatus: _whatsappStatus,
               whatsappE164: Phone.toE164(_whatsapp.text),
               profession: profession.isEmpty ? null : profession,
+              // Seulement si le geste a eu lieu : le serveur n'écrit une ligne
+              // d'histoire que sur une bascule réelle.
+              relationStatus: _relationStatus == _relationInitial
+                  ? null
+                  : _relationStatus,
               draftId: _draftId,
             );
       } else {
@@ -437,7 +448,9 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
         assertiveness: Assertiveness.assertive,
       ),
     );
-    final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(context);
+    final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(
+      context,
+    );
     messenger
       ?..hideCurrentSnackBar()
       ..showSnackBar(
@@ -459,13 +472,15 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     return 'Enregistrement impossible. $raw';
   }
 
-
   @override
   Widget build(BuildContext context) {
-    final List<Region> regions = ref.watch(regionsProvider).value ?? const <Region>[];
+    final List<Region> regions =
+        ref.watch(regionsProvider).value ?? const <Region>[];
     final List<Departement> departements =
-        ref.watch(departementsProvider(_regionId)).value ?? const <Departement>[];
-    final List<Ief> iefs = ref.watch(iefsProvider(_departementId)).value ?? const <Ief>[];
+        ref.watch(departementsProvider(_regionId)).value ??
+        const <Departement>[];
+    final List<Ief> iefs =
+        ref.watch(iefsProvider(_departementId)).value ?? const <Ief>[];
 
     return CpiPopScope(
       child: Scaffold(
@@ -487,7 +502,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
               ReferentialsBanner(missing: departements.isEmpty),
               if (_pendingRestore != null)
                 _ResumeBanner(
-                  label: (_pendingRestore!.values['fullName'] as String?)?.trim(),
+                  label: (_pendingRestore!.values['fullName'] as String?)
+                      ?.trim(),
                   onResume: () => _apply(_pendingRestore!),
                   onDiscard: () async {
                     await ref
@@ -501,7 +517,13 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                   padding: const EdgeInsets.all(CpiSpacing.md),
                   children: <Widget>[
                     if (_relationStatus != null) ...<Widget>[
-                      _RelationLine(status: _relationStatus!),
+                      _ChampRelation(
+                        status: _relationStatus!,
+                        onChanged: (String choix) {
+                          setState(() => _relationStatus = choix);
+                          markDraftDirty();
+                        },
+                      ),
                       const SizedBox(height: CpiSpacing.md),
                     ],
                     TextField(
@@ -537,7 +559,9 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                         onAddProspects: _duplicate!.representantId == null
                             ? null
                             : () => context.pushReplacement(
-                                Routes.newProspectFor(_duplicate!.representantId!),
+                                Routes.newProspectFor(
+                                  _duplicate!.representantId!,
+                                ),
                               ),
                       ),
                     ],
@@ -554,10 +578,15 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                         selectedId: _regionId,
                         emptyHint: 'Aucun résultat',
                         options: regions
-                            .map((Region r) => TypeaheadOption(id: r.id, label: r.name))
+                            .map(
+                              (Region r) =>
+                                  TypeaheadOption(id: r.id, label: r.name),
+                            )
                             .toList(growable: false),
                         onChanged: (String _) {
-                          if (_regionId != null) setState(() => _regionId = null);
+                          if (_regionId != null) {
+                            setState(() => _regionId = null);
+                          }
                           markDraftDirty();
                         },
                         onSelected: (TypeaheadOption option) {
@@ -688,7 +717,9 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
                       maxLength: 2000,
                       textCapitalization: TextCapitalization.sentences,
                       onChanged: (String _) => markDraftDirty(),
-                      decoration: const InputDecoration(labelText: 'Notes (facultatif)'),
+                      decoration: const InputDecoration(
+                        labelText: 'Notes (facultatif)',
+                      ),
                     ),
                   ],
                 ),
@@ -711,7 +742,11 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
 
   ({String name, String? owner, String? representantId})? get _duplicate {
     if (_localMatch != null) {
-      return (name: _localMatch!.fullName, owner: null, representantId: _localMatch!.id);
+      return (
+        name: _localMatch!.fullName,
+        owner: null,
+        representantId: _localMatch!.id,
+      );
     }
     final RepresentantLookup? remote = _remoteMatch;
     if (remote == null || remote.representant == null) return null;
@@ -812,31 +847,60 @@ class _WhatsappPicker extends StatelessWidget {
   }
 }
 
-/// Où en est la relation, en LECTURE SEULE : le contrat de synchronisation n'a
-/// pas de chemin d'écriture mobile pour ce statut, seul le serveur l'écrit.
-class _RelationLine extends StatelessWidget {
-  const _RelationLine({required this.status});
+/// Où en est la relation. Le commercial la règle depuis le terrain : c'est lui
+/// qui sait qu'un représentant vient d'accepter de présenter ses collègues, et
+/// il n'a pas le panneau web sous la main.
+class _ChampRelation extends StatelessWidget {
+  const _ChampRelation({required this.status, required this.onChanged});
 
   final String status;
+  final ValueChanged<String> onChanged;
+
+  static const List<String> _choix = <String>[
+    'INCONNU',
+    'CONTACTE',
+    'AMBASSADEUR',
+    'REFUS',
+  ];
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Icon(
-          PhosphorIconsRegular.handshake,
-          size: 18,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(width: CpiSpacing.xs),
-        Expanded(
-          child: Text(
-            'Relation : ${relationLabel(status)}',
-            style: theme.textTheme.bodySmall?.copyWith(
+        Row(
+          children: <Widget>[
+            Icon(
+              PhosphorIconsRegular.handshake,
+              size: CpiIconSize.sm,
               color: theme.colorScheme.onSurfaceVariant,
             ),
-          ),
+            const SizedBox(width: CpiSpacing.xs),
+            Text('Relation', style: theme.textTheme.labelLarge),
+          ],
+        ),
+        const SizedBox(height: CpiSpacing.xs),
+        Wrap(
+          spacing: CpiSpacing.xs,
+          runSpacing: CpiSpacing.xs,
+          children: _choix
+              .map(
+                (String valeur) => ChoiceChip(
+                  label: Text(relationLabel(valeur)),
+                  selected: status == valeur,
+                  // Se corrige en touchant un autre choix : la relation a
+                  // toujours un état, elle ne se vide pas.
+                  onSelected: (bool choisi) {
+                    if (choisi) onChanged(valeur);
+                  },
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: CpiSpacing.sm,
+                    vertical: CpiSpacing.xs,
+                  ),
+                ),
+              )
+              .toList(growable: false),
         ),
       ],
     );
@@ -869,7 +933,7 @@ class _DuplicateBanner extends StatelessWidget {
             children: <Widget>[
               Icon(
                 PhosphorIconsRegular.warningCircle,
-                size: 20,
+                size: CpiIconSize.md,
                 color: cpi.accentText,
               ),
               const SizedBox(width: CpiSpacing.xs),
@@ -879,7 +943,9 @@ class _DuplicateBanner extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       'Ce représentant existe déjà',
-                      style: theme.textTheme.titleSmall?.copyWith(color: cpi.accentText),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: cpi.accentText,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -897,7 +963,10 @@ class _DuplicateBanner extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: TextButton.icon(
                 onPressed: onAddProspects,
-                icon: const Icon(PhosphorIconsRegular.userPlus, size: 18),
+                icon: const Icon(
+                  PhosphorIconsRegular.userPlus,
+                  size: CpiIconSize.sm,
+                ),
                 label: const Text('Ajouter des prospects'),
               ),
             ),
@@ -909,7 +978,11 @@ class _DuplicateBanner extends StatelessWidget {
 }
 
 class _ResumeBanner extends StatelessWidget {
-  const _ResumeBanner({required this.onResume, required this.onDiscard, this.label});
+  const _ResumeBanner({
+    required this.onResume,
+    required this.onDiscard,
+    this.label,
+  });
 
   final String? label;
   final VoidCallback onResume;
@@ -934,7 +1007,11 @@ class _ResumeBanner extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Icon(PhosphorIconsRegular.arrowCounterClockwise, size: 18, color: cpi.info),
+              Icon(
+                PhosphorIconsRegular.arrowCounterClockwise,
+                size: CpiIconSize.sm,
+                color: cpi.info,
+              ),
               const SizedBox(width: CpiSpacing.xs),
               Expanded(
                 child: Text(
@@ -1000,7 +1077,7 @@ class _SaveBar extends StatelessWidget {
                 children: <Widget>[
                   Icon(
                     PhosphorIconsRegular.warningCircle,
-                    size: 18,
+                    size: CpiIconSize.sm,
                     color: theme.colorScheme.error,
                   ),
                   const SizedBox(width: CpiSpacing.xs),
@@ -1025,7 +1102,7 @@ class _SaveBar extends StatelessWidget {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(PhosphorIconsRegular.check, size: 20),
+                : const Icon(PhosphorIconsRegular.check, size: CpiIconSize.md),
             label: Text(label),
           ),
         ],

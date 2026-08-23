@@ -31,9 +31,7 @@ class PhoneValid extends PhoneResult {
   };
 }
 
-enum PhoneWarning {
-  unknownPrefix,
-}
+enum PhoneWarning { unknownPrefix }
 
 class PhoneInvalid extends PhoneResult {
   const PhoneInvalid(this.reason);

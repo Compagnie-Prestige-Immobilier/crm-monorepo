@@ -136,6 +136,8 @@ export class CallRecordingsService {
     let expired = 0;
     let orphaned = 0;
 
+    const survivors: string[] = [];
+
     for (const name of recordings) {
       const file = join(env.CALL_RECORDING_DIR, name);
       let age: number;
@@ -149,15 +151,23 @@ export class CallRecordingsService {
         if (await this.remove(file)) expired += 1;
         continue;
       }
+      survivors.push(name.slice(0, -'.m4a'.length));
+    }
 
-      // LECTURE GLOBALE : le fichier survit a la ligne, donc la question n'est
-      // pas « cette tentative m'est-elle visible » mais « existe-t-elle encore ».
-      const attemptId = name.slice(0, -'.m4a'.length);
-      const attempt = await this.prisma.callAttempt.findUnique({
-        where: { id: attemptId },
-        select: { id: true },
-      });
-      if (attempt === null && (await this.remove(file))) orphaned += 1;
+    if (survivors.length === 0) return { expired, orphaned };
+
+    // LECTURE GLOBALE : le fichier survit a la ligne, donc la question n'est
+    // pas « cette tentative m'est-elle visible » mais « existe-t-elle encore ».
+    // Une seule requete pour tout le repertoire: le balayage passe chaque heure.
+    const rows = await this.prisma.callAttempt.findMany({
+      where: { id: { in: survivors } },
+      select: { id: true },
+    });
+    const alive = new Set(rows.map((row) => row.id));
+
+    for (const attemptId of survivors) {
+      if (alive.has(attemptId)) continue;
+      if (await this.remove(join(env.CALL_RECORDING_DIR, `${attemptId}.m4a`))) orphaned += 1;
     }
 
     return { expired, orphaned };

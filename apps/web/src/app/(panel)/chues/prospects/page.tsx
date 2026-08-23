@@ -27,6 +27,7 @@ export default async function ProspectsPage({
   }
 
   const filters = parseProspectFilters(await searchParams);
+  filters.projet = 'CHUES';
   const session = await getSession();
   const client = getServerApiClient();
 

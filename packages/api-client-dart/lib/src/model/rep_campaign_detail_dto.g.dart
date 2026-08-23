@@ -366,7 +366,9 @@ Map<String, dynamic> _$RepCampaignDetailDtoToJson(
 };
 
 const _$CampaignStatusEnumMap = {
+  CampaignStatus.DRAFT: 'DRAFT',
   CampaignStatus.ACTIVE: 'ACTIVE',
+  CampaignStatus.PAUSED: 'PAUSED',
   CampaignStatus.CLOSED: 'CLOSED',
   CampaignStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

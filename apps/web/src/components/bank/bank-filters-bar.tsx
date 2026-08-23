@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { RotateCcwIcon } from 'lucide-react';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useId } from 'react';
 
 import { buildBankAdvancedChips } from '@/components/bank/bank-advanced-chips';
 import { useBankFilters } from '@/components/bank/use-bank-filters';
@@ -31,7 +31,7 @@ import { withRetired } from '@/lib/format';
 import { parseMoneyInput } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
 import type { FilterOption } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { cn } from '@/lib/utils';
 
 export function BankFiltersBar({
@@ -59,15 +59,12 @@ export function BankFiltersBar({
     staleTime: 5 * 60_000,
   });
 
-  const [searchDraft, setSearchDraft] = useState(filters.search);
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === filters.search) return;
-    setFilters({ search: debouncedSearch });
-  }, [debouncedSearch, filters.search, setFilters]);
+  const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
 
   const removeAdvanced = useCallback(
     (key: BankAdvancedFilterKey) => {

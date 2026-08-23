@@ -69,37 +69,40 @@ void main() {
     );
   });
 
-  test('réseau coupé + release obligatoire en cache : la saisie reste possible', () async {
-    // C'était l'impasse : `AppUpdateScreen` s'affichait sans aucune issue, et
-    // le commercial derrière un portail captif ne pouvait plus enregistrer un
-    // seul prospect.
-    await prefs.setString(
-      'cpi.android.release',
-      jsonEncode(<String, Object?>{
-        'forceUpdate': true,
-        'versionName': '9.9.9',
-        'versionCode': 999,
-        'fileSize': 12000000,
-        'sha256': 'abc',
-        'downloadUrl': 'https://exemple.test/cpi.apk',
-        'notes': null,
-      }),
-    );
+  test(
+    'réseau coupé + release obligatoire en cache : la saisie reste possible',
+    () async {
+      // C'était l'impasse : `AppUpdateScreen` s'affichait sans aucune issue, et
+      // le commercial derrière un portail captif ne pouvait plus enregistrer un
+      // seul prospect.
+      await prefs.setString(
+        'cpi.android.release',
+        jsonEncode(<String, Object?>{
+          'forceUpdate': true,
+          'versionName': '9.9.9',
+          'versionCode': 999,
+          'fileSize': 12000000,
+          'sha256': 'abc',
+          'downloadUrl': 'https://exemple.test/cpi.apk',
+          'notes': null,
+        }),
+      );
 
-    final ProviderContainer container = build(adapter: _FailingAdapter());
-    container.read(appUpdateControllerProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+      final ProviderContainer container = build(adapter: _FailingAdapter());
+      container.read(appUpdateControllerProvider);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    final AppUpdateState state = container.read(appUpdateControllerProvider);
-    expect(state.status, AppUpdateStatus.unreachable);
-    expect(
-      state.requiresPrompt,
-      isFalse,
-      reason:
-          '« je dois mettre à jour » et « je n\'ai pas pu demander » ne sont '
-          'pas la même chose',
-    );
-  });
+      final AppUpdateState state = container.read(appUpdateControllerProvider);
+      expect(state.status, AppUpdateStatus.unreachable);
+      expect(
+        state.requiresPrompt,
+        isFalse,
+        reason:
+            '« je dois mettre à jour » et « je n\'ai pas pu demander » ne sont '
+            'pas la même chose',
+      );
+    },
+  );
 
   test('sur données mobiles, l\'APK attend un accord explicite', () async {
     // L'écouteur de connectivité jetait son `ConnectivityResult` : plusieurs

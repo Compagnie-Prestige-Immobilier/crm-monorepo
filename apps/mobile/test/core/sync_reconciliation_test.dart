@@ -967,6 +967,8 @@ PullPage pullPageWithRepresentant(RepresentantDto dto) {
       iefs: const <IefDto>[],
       banques: const <BanqueDto>[],
       syndicats: const <SyndicatDto>[],
+      canauxProvenance: const <CanalProvenanceDto>[],
+      visiteReferentiels: const <SyncVisiteReferentielDto>[],
       representants: <RepresentantDto>[dto],
       prospects: const <ProspectDto>[],
       callCampaigns: const <SyncCallCampaignDto>[],

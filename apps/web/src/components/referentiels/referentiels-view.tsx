@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 
 import { SearchField } from '@/components/filters/search-field';
 import { DeactivateReferentielDialog } from '@/components/referentiels/deactivate-dialog';
+import { OpenReferentialTab } from '@/components/referentiels/open-referential-tab';
 import {
   BanqueFormDialog,
   DepartementFormDialog,
@@ -49,7 +50,14 @@ import { queryKeys } from '@/lib/query-keys';
 import type { Banque, Departement, Syndicat } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-const TABS = ['banques', 'syndicats', 'departements'] as const;
+const TABS = [
+  'banques',
+  'syndicats',
+  'departements',
+  'professions',
+  'incomeBands',
+  'offers',
+] as const;
 
 type ReferentielTab = (typeof TABS)[number];
 
@@ -95,6 +103,9 @@ export function ReferentielsView() {
           <TabsTrigger value="banques">Banques</TabsTrigger>
           <TabsTrigger value="syndicats">Syndicats</TabsTrigger>
           <TabsTrigger value="departements">Départements</TabsTrigger>
+          <TabsTrigger value="professions">Professions</TabsTrigger>
+          <TabsTrigger value="incomeBands">Revenus</TabsTrigger>
+          <TabsTrigger value="offers">Offres</TabsTrigger>
         </TabsList>
 
         <TabsContent value="banques">
@@ -121,6 +132,15 @@ export function ReferentielsView() {
             }}
           />
         </TabsContent>
+        <TabsContent value="professions">
+          <OpenReferentialTab kind="professions" />
+        </TabsContent>
+        <TabsContent value="incomeBands">
+          <OpenReferentialTab kind="incomeBands" />
+        </TabsContent>
+        <TabsContent value="offers">
+          <OpenReferentialTab kind="offers" />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -139,14 +159,38 @@ function matches(search: string, ...fields: readonly (string | null)[]): boolean
   return fields.some((field) => field !== null && normalize(field).includes(needle));
 }
 
-function useUsage(): { banques: UsageCounts; syndicats: UsageCounts; departements: UsageCounts } {
-  const { data } = useQuery({
+type UsageKind = 'banques' | 'syndicats' | 'departements';
+
+interface Usage extends Record<UsageKind, UsageCounts> {
+  /** Faux tant que le décompte n'est pas revenu. Il ne vaut alors PAS zéro. */
+  known: boolean;
+  retry: () => void;
+}
+
+function useUsage(): Usage {
+  const { data, refetch } = useQuery({
     queryKey: queryKeys.referentielUsage,
     queryFn: () => fetchReferentielUsage(),
     staleTime: 60_000,
   });
-  return data ?? { banques: {}, syndicats: {}, departements: {} };
+
+  return {
+    ...(data ?? { banques: {}, syndicats: {}, departements: {} }),
+    known: data !== undefined,
+    retry: () => {
+      void refetch();
+    },
+  };
 }
+
+/**
+ * `null` tant que le décompte n'est pas connu.
+ *
+ * Le rendre à zéro faisait lire « 0 prospect référence cette banque » dans la
+ * boîte de confirmation d'une désactivation, alors que l'appel avait échoué.
+ */
+const usageOf = (usage: Usage, kind: UsageKind, id: string): number | null =>
+  usage.known ? (usage[kind][id] ?? 0) : null;
 
 function TabShell({
   title,
@@ -213,7 +257,14 @@ function TableSkeleton() {
 const inactiveRowClass =
   'bg-muted/50 [&>td:first-child]:border-l-2 [&>td:first-child]:border-l-muted-foreground';
 
-function UsageCell({ count }: { count: number }) {
+function UsageCell({ count }: { count: number | null }) {
+  if (count === null) {
+    return (
+      <span className="text-muted-foreground" title="Décompte indisponible">
+        –
+      </span>
+    );
+  }
   return (
     <span className={cn('tabular-nums', count === 0 && 'text-muted-foreground')}>
       {formatNumber(count)}
@@ -346,7 +397,7 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
                     </TableCell>
                     <TableCell className="text-muted-foreground">{banque.name}</TableCell>
                     <TableCell className="text-right">
-                      <UsageCell count={usage.banques[banque.id] ?? 0} />
+                      <UsageCell count={usageOf(usage, 'banques', banque.id)} />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{banque.sortOrder}</TableCell>
                     <TableCell>
@@ -427,7 +478,8 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
         }}
         label={deactivating?.shortName ?? ''}
         kind="banque"
-        usageCount={deactivating === null ? 0 : (usage.banques[deactivating.id] ?? 0)}
+        usageCount={deactivating === null ? null : usageOf(usage, 'banques', deactivating.id)}
+        onRetryUsage={usage.retry}
         pending={setActive.isPending}
         onConfirm={() => {
           if (deactivating !== null) setActive.mutate({ banque: deactivating, isActive: false });
@@ -565,7 +617,7 @@ function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: 
                       {syndicat.secteur ?? '–'}
                     </TableCell>
                     <TableCell className="text-right">
-                      <UsageCell count={usage.syndicats[syndicat.id] ?? 0} />
+                      <UsageCell count={usageOf(usage, 'syndicats', syndicat.id)} />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{syndicat.sortOrder}</TableCell>
                     <TableCell>
@@ -646,7 +698,8 @@ function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: 
         }}
         label={deactivating?.sigle ?? ''}
         kind="syndicat"
-        usageCount={deactivating === null ? 0 : (usage.syndicats[deactivating.id] ?? 0)}
+        usageCount={deactivating === null ? null : usageOf(usage, 'syndicats', deactivating.id)}
+        onRetryUsage={usage.retry}
         pending={setActive.isPending}
         onConfirm={() => {
           if (deactivating !== null) setActive.mutate({ syndicat: deactivating, isActive: false });
@@ -771,7 +824,7 @@ function DepartementsTab({
                   </TableCell>
                   <TableCell className="text-muted-foreground">{departement.regionName}</TableCell>
                   <TableCell className="text-right">
-                    <UsageCell count={usage.departements[departement.id] ?? 0} />
+                    <UsageCell count={usageOf(usage, 'departements', departement.id)} />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
@@ -826,7 +879,8 @@ function DepartementsTab({
         }}
         label={deactivating?.name ?? ''}
         kind="département"
-        usageCount={deactivating === null ? 0 : (usage.departements[deactivating.id] ?? 0)}
+        usageCount={deactivating === null ? null : usageOf(usage, 'departements', deactivating.id)}
+        onRetryUsage={usage.retry}
         pending={setActive.isPending}
         onConfirm={() => {
           if (deactivating !== null) {

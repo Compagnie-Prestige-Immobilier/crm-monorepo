@@ -11,9 +11,14 @@ import {
   type FakeProspectsImportStore,
 } from './fake-prospects-import.js';
 import { ProspectsImportAdapter, referentialKey } from './prospects-import.adapter.js';
-import type { ProspectImportRow } from './prospects-import.adapter.js';
+import type { ProspectImportRow, ProspectImportRun } from './prospects-import.adapter.js';
 import { ProspectImportError } from './prospects-import.errors.js';
-import { PROSPECTS_IMPORT_COLUMNS, PROSPECT_IMPORT_HEADERS } from './prospects-import-template.js';
+import { ENROLLMENT_METHOD_LABELS } from '../prospects/phase2-labels.js';
+import {
+  ENROLLMENT_METHOD_TOKENS,
+  PROSPECTS_IMPORT_COLUMNS,
+  PROSPECT_IMPORT_HEADERS,
+} from './prospects-import-template.js';
 
 const H = PROSPECT_IMPORT_HEADERS;
 
@@ -42,11 +47,12 @@ function accepted(result: ParsedRow<ProspectImportRow>): ProspectImportRow {
 
 let store: FakeProspectsImportStore;
 let adapter: ProspectsImportAdapter;
+let run: ProspectImportRun;
 
 beforeEach(async () => {
   store = createFakeImportStore();
   adapter = new ProspectsImportAdapter();
-  await adapter.prepare(fakeImportContext(store));
+  run = await adapter.prepare(fakeImportContext(store));
 });
 
 describe('contrat de l’adaptateur', () => {
@@ -77,7 +83,7 @@ describe('contrat de l’adaptateur', () => {
 
 describe('analyse d’une ligne', () => {
   it('accepte une ligne complète et résout les trois clés étrangères', () => {
-    const row = accepted(adapter.parseRow(cells(), 3));
+    const row = accepted(adapter.parseRow(cells(), 3, run));
 
     expect(row).toMatchObject({
       rowNumber: 3,
@@ -92,17 +98,17 @@ describe('analyse d’une ligne', () => {
   });
 
   it('exige le nom et le prénom, chacun dans sa colonne', () => {
-    const sansNom = refusal(adapter.parseRow(cells({ [H.nom]: '   ' }), 3));
+    const sansNom = refusal(adapter.parseRow(cells({ [H.nom]: '   ' }), 3, run));
     expect(sansNom.code).toBe(ProspectImportError.NOM_REQUIRED);
     expect(sansNom.column).toBe(H.nom);
 
-    const sansPrenom = refusal(adapter.parseRow(cells({ [H.prenom]: '' }), 4));
+    const sansPrenom = refusal(adapter.parseRow(cells({ [H.prenom]: '' }), 4, run));
     expect(sansPrenom.code).toBe(ProspectImportError.PRENOM_REQUIRED);
     expect(sansPrenom.column).toBe(H.prenom);
   });
 
   it('refuse un téléphone inexploitable', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.phone]: 'à demander' }), 3));
+    const error = refusal(adapter.parseRow(cells({ [H.phone]: 'à demander' }), 3, run));
 
     expect(error.code).toBe(ProspectImportError.PHONE_INVALID);
     expect(error.column).toBe(H.phone);
@@ -110,16 +116,20 @@ describe('analyse d’une ligne', () => {
   });
 
   it('accepte toutes les présentations du même abonné', async () => {
-    const local = accepted(adapter.parseRow(cells({ [H.phone]: '77 123 45 67' }), 3));
+    const local = accepted(adapter.parseRow(cells({ [H.phone]: '77 123 45 67' }), 3, run));
     const other = new ProspectsImportAdapter();
-    await other.prepare(fakeImportContext(store));
+    const runOther = await other.prepare(fakeImportContext(store));
 
-    const international = accepted(other.parseRow(cells({ [H.phone]: '00221771234567' }), 3));
+    const international = accepted(
+      other.parseRow(cells({ [H.phone]: '00221771234567' }), 3, runOther),
+    );
     expect(international.phoneE164).toBe(local.phoneE164);
   });
 
   it('refuse un représentant qui n’existe pas, et dit qu’il faut le créer d’abord', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.representantPhone]: '+221700000000' }), 3));
+    const error = refusal(
+      adapter.parseRow(cells({ [H.representantPhone]: '+221700000000' }), 3, run),
+    );
 
     expect(error.code).toBe(ProspectImportError.REPRESENTANT_UNKNOWN);
     expect(error.column).toBe(H.representantPhone);
@@ -127,7 +137,7 @@ describe('analyse d’une ligne', () => {
   });
 
   it('refuse un syndicat inconnu en nommant la colonne et les valeurs admises', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.syndicat]: 'CHUE' }), 3));
+    const error = refusal(adapter.parseRow(cells({ [H.syndicat]: 'CHUE' }), 3, run));
 
     expect(error.code).toBe(ProspectImportError.SYNDICAT_UNKNOWN);
     expect(error.column).toBe(H.syndicat);
@@ -138,8 +148,8 @@ describe('analyse d’une ligne', () => {
   it('ne rapproche PAS un libellé voisin, parce que le segment BDD en dépend', async () => {
     for (const proche of ['CBAO Attijari', 'CBA', 'CBAOO', 'C.B.A.O.']) {
       const parser = new ProspectsImportAdapter();
-      await parser.prepare(fakeImportContext(store));
-      expect(refusal(parser.parseRow(cells({ [H.banque]: proche }), 3)).code).toBe(
+      const runParser = await parser.prepare(fakeImportContext(store));
+      expect(refusal(parser.parseRow(cells({ [H.banque]: proche }), 3, runParser)).code).toBe(
         ProspectImportError.BANQUE_UNKNOWN,
       );
     }
@@ -147,7 +157,7 @@ describe('analyse d’une ligne', () => {
 
   it('tolère la casse et les espaces, qui sont invisibles à l’écran', () => {
     const row = accepted(
-      adapter.parseRow(cells({ [H.banque]: '  cbao ', [H.syndicat]: 'Chues  ' }), 3),
+      adapter.parseRow(cells({ [H.banque]: '  cbao ', [H.syndicat]: 'Chues  ' }), 3, run),
     );
 
     expect(row.banqueId).toBe('ban-cbao');
@@ -164,7 +174,7 @@ describe('analyse d’une ligne', () => {
 
 describe('méthode d’enrôlement', () => {
   it('laisse la fiche en attente quand la colonne est vide', () => {
-    expect(accepted(adapter.parseRow(cells(), 3)).enrollmentMethod).toBeNull();
+    expect(accepted(adapter.parseRow(cells(), 3, run)).enrollmentMethod).toBeNull();
   });
 
   it('accepte les trois jetons admis', async () => {
@@ -174,29 +184,69 @@ describe('méthode d’enrôlement', () => {
       EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING,
     ]) {
       const parser = new ProspectsImportAdapter();
-      await parser.prepare(fakeImportContext(store));
-      const row = accepted(parser.parseRow(cells({ [H.enrollmentMethod]: token }), 3));
+      const runParser = await parser.prepare(fakeImportContext(store));
+      const row = accepted(parser.parseRow(cells({ [H.enrollmentMethod]: token }), 3, runParser));
       expect(row.enrollmentMethod).toBe(token);
     }
   });
 
   it('refuse un jeton inconnu en listant les valeurs admises', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.enrollmentMethod]: 'TÉLÉPHONE' }), 3));
+    const error = refusal(adapter.parseRow(cells({ [H.enrollmentMethod]: 'TÉLÉPHONE' }), 3, run));
 
     expect(error.code).toBe(ProspectImportError.ENROLLMENT_METHOD_UNKNOWN);
     expect(error.column).toBe(H.enrollmentMethod);
-    expect(error.message).toContain('PLATFORM');
-    expect(error.message).toContain('VOICE_OR_ELECTRONIC_MESSAGING');
+    expect(error.message).toContain('Plateforme');
+    expect(error.message).toContain('Vocal ou messagerie électronique');
+  });
+
+  it('accepte le LIBELLÉ français, celui du modèle et celui de l’export', () => {
+    const row = accepted(
+      adapter.parseRow(cells({ [H.enrollmentMethod]: 'Vocal ou messagerie électronique' }), 3, run),
+    );
+
+    expect(row.enrollmentMethod).toBe(EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING);
+  });
+
+  it('tolère la casse et les accents sur le libellé', () => {
+    const row = accepted(
+      adapter.parseRow(cells({ [H.enrollmentMethod]: 'vocal ou messagerie electronique' }), 3, run),
+    );
+
+    expect(row.enrollmentMethod).toBe(EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING);
+  });
+
+  // Le modèle propose le libellé, l'export l'écrit : les deux doivent tomber
+  // sur la même valeur, sans quoi l'aller-retour échoue sur cette colonne.
+  it('reprend telle quelle la valeur proposée par le modèle', () => {
+    for (const proposee of ENROLLMENT_METHOD_TOKENS) {
+      const row = accepted(adapter.parseRow(cells({ [H.enrollmentMethod]: proposee }), 3, run));
+      expect(row.enrollmentMethod).not.toBeNull();
+      expect(ENROLLMENT_METHOD_LABELS[row.enrollmentMethod as EnrollmentMethod]).toBe(proposee);
+    }
+  });
+});
+
+describe('modèle de la colonne « Méthode d’enrôlement »', () => {
+  it('propose les libellés français, jamais les jetons techniques', () => {
+    expect(ENROLLMENT_METHOD_TOKENS).toEqual([
+      'Plateforme',
+      'Physique',
+      'Vocal ou messagerie électronique',
+    ]);
+
+    const colonne = PROSPECTS_IMPORT_COLUMNS.find((column) => column.header === H.enrollmentMethod);
+    expect(colonne?.sample).toBe('Plateforme');
+    expect(colonne?.help).not.toContain('VOICE_OR_ELECTRONIC_MESSAGING');
   });
 });
 
 describe('doublon interne au fichier', () => {
   it('garde la première occurrence et refuse la seconde en la renvoyant à sa ligne', async () => {
     const ctx = fakeImportContext(store);
-    const premiere = accepted(adapter.parseRow(cells({ [H.phone]: '77 123 45 67' }), 3));
-    const seconde = accepted(adapter.parseRow(cells({ [H.phone]: '+221 77 123 45 67' }), 41));
+    const premiere = accepted(adapter.parseRow(cells({ [H.phone]: '77 123 45 67' }), 3, run));
+    const seconde = accepted(adapter.parseRow(cells({ [H.phone]: '+221 77 123 45 67' }), 41, run));
 
-    const outcome = await adapter.writeChunk([premiere, seconde], ctx);
+    const outcome = await adapter.writeChunk([premiere, seconde], ctx, run);
 
     expect(outcome.created).toBe(1);
     const error = outcome.errors[0];
@@ -208,9 +258,13 @@ describe('doublon interne au fichier', () => {
 
   it('se souvient d’une tranche à l’autre du même travail', async () => {
     const ctx = fakeImportContext(store);
-    await adapter.writeChunk([accepted(adapter.parseRow(cells(), 3))], ctx);
+    await adapter.writeChunk([accepted(adapter.parseRow(cells(), 3, run))], ctx, run);
 
-    const outcome = await adapter.writeChunk([accepted(adapter.parseRow(cells(), 900))], ctx);
+    const outcome = await adapter.writeChunk(
+      [accepted(adapter.parseRow(cells(), 900, run))],
+      ctx,
+      run,
+    );
 
     expect(outcome.errors[0]?.code).toBe(ProspectImportError.DUPLICATE_IN_FILE);
     expect(outcome.errors[0]?.message).toContain('3');
@@ -219,30 +273,51 @@ describe('doublon interne au fichier', () => {
   it('ne confond PAS deux imports concurrents servis par la même instance', async () => {
     const autreStore = createFakeImportStore();
     const autre = fakeImportContext(autreStore, { jobId: 'job-2' });
-    await adapter.prepare(autre);
+    const runAutre = await adapter.prepare(autre);
 
-    await adapter.writeChunk([accepted(adapter.parseRow(cells(), 3))], fakeImportContext(store));
-    const outcome = await adapter.writeChunk([accepted(adapter.parseRow(cells(), 3))], autre);
+    await adapter.writeChunk(
+      [accepted(adapter.parseRow(cells(), 3, run))],
+      fakeImportContext(store),
+      run,
+    );
+    const outcome = await adapter.writeChunk(
+      [accepted(adapter.parseRow(cells(), 3, runAutre))],
+      autre,
+      runAutre,
+    );
 
     expect(outcome.created).toBe(1);
     expect(outcome.errors).toHaveLength(0);
   });
 
-  it('signale d’abord la vraie faute d’une ligne, pas le doublon', () => {
-    expect(adapter.parseRow(cells(), 3).ok).toBe(true);
+  it('juge une ligne du lot A avec les référentiels de A, même si B a préparé entre-temps', async () => {
+    const autreStore = createFakeImportStore({
+      banques: [{ id: 'ban-eco', shortName: 'ECOBANK', isActive: true, sortOrder: 10 }],
+    });
+    await adapter.prepare(fakeImportContext(autreStore, { jobId: 'job-2' }));
 
-    const error = refusal(adapter.parseRow(cells({ [H.banque]: 'INCONNUE' }), 4));
+    expect(accepted(adapter.parseRow(cells(), 3, run)).banqueId).toBe('ban-cbao');
+  });
+
+  it('signale d’abord la vraie faute d’une ligne, pas le doublon', () => {
+    expect(adapter.parseRow(cells(), 3, run).ok).toBe(true);
+
+    const error = refusal(adapter.parseRow(cells({ [H.banque]: 'INCONNUE' }), 4, run));
     expect(error.code).toBe(ProspectImportError.BANQUE_UNKNOWN);
   });
 
   it('oublie le fichier précédent quand le même travail est repris', async () => {
     const ctx = fakeImportContext(store);
-    await adapter.writeChunk([accepted(adapter.parseRow(cells(), 3))], ctx);
+    await adapter.writeChunk([accepted(adapter.parseRow(cells(), 3, run))], ctx, run);
 
-    await adapter.prepare(ctx);
+    const reprise = await adapter.prepare(ctx);
     store.prospects.length = 0;
 
-    const outcome = await adapter.writeChunk([accepted(adapter.parseRow(cells(), 3))], ctx);
+    const outcome = await adapter.writeChunk(
+      [accepted(adapter.parseRow(cells(), 3, reprise))],
+      ctx,
+      reprise,
+    );
     expect(outcome.created).toBe(1);
     expect(outcome.errors).toHaveLength(0);
   });
@@ -251,9 +326,9 @@ describe('doublon interne au fichier', () => {
 describe('écriture d’une tranche', () => {
   it('crée une fiche identique à celle de la saisie ordinaire', async () => {
     const ctx = fakeImportContext(store);
-    const row = accepted(adapter.parseRow(cells(), 3));
+    const row = accepted(adapter.parseRow(cells(), 3, run));
 
-    const outcome = await adapter.writeChunk([row], ctx);
+    const outcome = await adapter.writeChunk([row], ctx, run);
 
     expect(outcome).toMatchObject({ created: 1, skipped: 0 });
     expect(outcome.errors).toHaveLength(0);
@@ -278,10 +353,10 @@ describe('écriture d’une tranche', () => {
   it('satisfait le CHECK de phase 2 quand la méthode est fournie', async () => {
     const ctx = fakeImportContext(store);
     const row = accepted(
-      adapter.parseRow(cells({ [H.enrollmentMethod]: EnrollmentMethod.PHYSICAL }), 3),
+      adapter.parseRow(cells({ [H.enrollmentMethod]: EnrollmentMethod.PHYSICAL }), 3, run),
     );
 
-    await adapter.writeChunk([row], ctx);
+    await adapter.writeChunk([row], ctx, run);
 
     expect(store.prospects[0]).toMatchObject({
       phase2Status: Phase2Status.METHOD_OBTAINED,
@@ -300,9 +375,9 @@ describe('écriture d’une tranche', () => {
       }),
     );
     const ctx = fakeImportContext(store);
-    const row = accepted(adapter.parseRow(cells(), 3));
+    const row = accepted(adapter.parseRow(cells(), 3, run));
 
-    const outcome = await adapter.writeChunk([row], ctx);
+    const outcome = await adapter.writeChunk([row], ctx, run);
 
     expect(outcome.created).toBe(0);
     expect(outcome.errors[0]?.code).toBe(ProspectImportError.DUPLICATE_IN_DATABASE);
@@ -318,9 +393,9 @@ describe('écriture d’une tranche', () => {
       }),
     );
     const ctx = fakeImportContext(store);
-    const row = accepted(adapter.parseRow(cells(), 3));
+    const row = accepted(adapter.parseRow(cells(), 3, run));
 
-    const outcome = await adapter.writeChunk([row], ctx);
+    const outcome = await adapter.writeChunk([row], ctx, run);
 
     expect(outcome.created).toBe(0);
     const error = outcome.errors[0];
@@ -334,9 +409,9 @@ describe('écriture d’une tranche', () => {
   it('compte en `skipped`, et non en erreur, ce que l’index unique écarte', async () => {
     store.racingPhones.push('+221771234567');
     const ctx = fakeImportContext(store);
-    const row = accepted(adapter.parseRow(cells(), 3));
+    const row = accepted(adapter.parseRow(cells(), 3, run));
 
-    const outcome = await adapter.writeChunk([row], ctx);
+    const outcome = await adapter.writeChunk([row], ctx, run);
 
     expect(outcome).toMatchObject({ created: 0, skipped: 1 });
     expect(outcome.errors).toHaveLength(0);
@@ -344,28 +419,22 @@ describe('écriture d’une tranche', () => {
 
   it('n’écrit RIEN en simulation, et annonce ce qui serait écrit', async () => {
     const ctx = fakeImportContext(store, { mode: ImportMode.DRY_RUN });
-    const row = accepted(adapter.parseRow(cells(), 3));
+    const row = accepted(adapter.parseRow(cells(), 3, run));
 
-    const outcome = await adapter.writeChunk([row], ctx);
+    const outcome = await adapter.writeChunk([row], ctx, run);
 
     expect(outcome).toMatchObject({ created: 1, skipped: 0 });
     expect(store.prospects).toHaveLength(0);
   });
 
   it('ne touche pas à la base sur une tranche vide', async () => {
-    const outcome = await adapter.writeChunk([], fakeImportContext(store));
+    const outcome = await adapter.writeChunk([], fakeImportContext(store), run);
 
     expect(outcome).toEqual({ created: 0, skipped: 0, errors: [] });
   });
 });
 
 describe('enchaînement', () => {
-  it('lève si l’on analyse une ligne avant d’avoir chargé les référentiels', () => {
-    const vierge = new ProspectsImportAdapter();
-
-    expect(() => vierge.parseRow(cells(), 3)).toThrow(ProspectImportError.NOT_PREPARED);
-  });
-
   it('refuse un référentiel dont deux entrées se confondent', async () => {
     const ambigu = createFakeImportStore({
       banques: [
@@ -387,17 +456,18 @@ describe('déduplication contre le représentant, plusieurs lignes', () => {
     const ctx = fakeImportContext(store);
 
     const rows = [
-      accepted(adapter.parseRow(cells({ [H.phone]: '+221773333333' }), 3)),
-      accepted(adapter.parseRow(cells({ [H.phone]: '+221771111111' }), 4)),
+      accepted(adapter.parseRow(cells({ [H.phone]: '+221773333333' }), 3, run)),
+      accepted(adapter.parseRow(cells({ [H.phone]: '+221771111111' }), 4, run)),
       accepted(
         adapter.parseRow(
           cells({ [H.phone]: '+221772222222', [H.representantPhone]: FAKE_REPRESENTANT_PHONE }),
           5,
+          run,
         ),
       ),
     ];
 
-    const outcome = await adapter.writeChunk(rows, ctx);
+    const outcome = await adapter.writeChunk(rows, ctx, run);
 
     expect(outcome.created).toBe(1);
     expect(outcome.errors.map((error) => error.code)).toEqual([

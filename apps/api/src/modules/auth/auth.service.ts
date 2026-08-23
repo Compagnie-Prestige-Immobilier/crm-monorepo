@@ -7,6 +7,7 @@ import type { User } from '@crm/database';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readEnv } from '../../env.js';
 import { WorkspaceContext, type Workspace } from '../../workspaces/workspace.js';
+import { DemoService } from '../demo/demo.service.js';
 import { hashPassword, verifyPassword } from './password.js';
 import type { AuthTokensDto, AuthUserDto } from './dto.js';
 
@@ -39,6 +40,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly workspace: WorkspaceContext,
+    private readonly demo: DemoService,
   ) {}
 
   async login(identifier: string, password: string, userAgent?: string): Promise<AuthTokensDto> {
@@ -161,6 +163,7 @@ export class AuthService {
         message: 'Ce compte est désactivé. Contactez un administrateur.',
       });
     }
+    if (workspace === 'demo') await this.demo.ensureSeeded();
     return this.issue(user, randomUUID(), userAgent, workspace);
   }
 

@@ -27,12 +27,13 @@ class SyncEngine {
     required TokenStore tokens,
     required Clock clock,
     this.maxBatchOps = 200,
-    this.maxBatchBytes = 512 * 1024,
+    this.maxBatchBytes = defaultMaxBatchBytes,
     this.maxBatchGroups = 25,
     this.maxAttempts = 8,
     this.maxBlockedAttempts = 12,
     this.blockedFloor = const Duration(seconds: 30),
     this.leaseDuration = const Duration(minutes: 2),
+    this.doneRetention = const Duration(days: 7),
     Random? random,
   }) : _db = database,
        _api = api,
@@ -54,6 +55,10 @@ class SyncEngine {
   /// être nuls ; le tirage exige ce numéro en en-tête et refuse en dessous.
   static const int payloadVersion = 4;
 
+  /// Poids qu'un lot peut atteindre sur le fil ; c'est lui que le `sendTimeout`
+  /// du profil `push` doit pouvoir émettre sur un lien montant EDGE.
+  static const int defaultMaxBatchBytes = 512 * 1024;
+
   final int maxBatchOps;
 
   final int maxBatchBytes;
@@ -67,6 +72,10 @@ class SyncEngine {
   final Duration blockedFloor;
 
   final Duration leaseDuration;
+
+  /// Délai avant qu'une ligne acquittée ne quitte la file. Assez long pour
+  /// qu'un envoi contesté quelques jours plus tard reste diagnosticable.
+  final Duration doneRetention;
 
   AppDatabase get database => _db;
   ApiPort get api => _api;
@@ -127,6 +136,7 @@ class SyncEngine {
     _draining = true;
     _lastPushFailure = null;
     try {
+      await purgeAcknowledged();
       int acknowledged = 0;
       for (int round = 0; round < 50; round++) {
         await repairClockDrift();
@@ -156,6 +166,18 @@ class SyncEngine {
     final String? token = row.claimToken;
     return o.seq.equals(row.seq) &
         (token == null ? o.claimToken.isNull() : o.claimToken.equals(token));
+  }
+
+  /// `seq` étant AUTOINCREMENT, l'ordre d'émission survit à la purge : rien de
+  /// ce qui reste ouvert ne se réordonne parce qu'une ligne acquittée a disparu.
+  Future<int> purgeAcknowledged() async {
+    final DateTime floor = _clock.now().subtract(doneRetention);
+    return (_db.delete(_db.outbox)..where(
+          (Outbox o) =>
+              o.status.equals(OutboxStatus.done) &
+              o.createdAt.isSmallerThanValue(floor),
+        ))
+        .go();
   }
 
   Future<int> reclaimExpiredLeases() async {
@@ -393,6 +415,7 @@ class SyncEngine {
     'representant_comment' => SyncEntity.representantComment,
     'prospect' => SyncEntity.prospect,
     callAttemptEntity => SyncEntity.callAttempt,
+    'visite' => SyncEntity.visite,
     _ => throw FormatException('entité inconnue', entityType),
   };
 
@@ -470,11 +493,15 @@ class SyncEngine {
   }
 
   /// Champs que le serveur accepte de mettre à NULL sur demande explicite.
+  /// Copie exacte de `CLEARABLE_FIELDS` (`apps/api/src/modules/sync/dto.ts`) :
+  /// un nom absent de sa liste fait refuser le LOT ENTIER.
   static const List<String> _clearableFields = <String>[
     'iefId',
     'notes',
     'whatsappE164',
     'profession',
+    'prenom',
+    'etablissement',
   ];
 
   /// Un champ ABSENT du payload reste inchangé côté serveur ; seul un champ
@@ -977,7 +1004,9 @@ class SyncEngine {
             message: error.message,
           );
         }
-      case FailureKind.unreachable:
+      case FailureKind.appUpdateRequired:
+        // La remontée reste ouverte côté serveur : la file attend la mise à
+        // jour, elle ne s'use pas.
         for (final OutboxData row in rows) {
           await _requeue(
             row,
@@ -987,11 +1016,26 @@ class SyncEngine {
             message: error.message,
           );
         }
+      case FailureKind.unreachable:
+        // Un envoi qui expire a bien été TENTÉ : le compter est ce qui le rend
+        // un jour visible dans « À corriger », là où un réseau absent ne doit
+        // rien user.
+        final bool sent = error.code == ClientErrorCodes.sendTimeout;
+        for (final OutboxData row in rows) {
+          await _requeue(
+            row,
+            incrementAttempt: sent,
+            delay: sent ? null : Duration.zero,
+            code: error.code,
+            message: error.message,
+          );
+        }
       case FailureKind.throttled:
         for (final OutboxData row in rows) {
           await _requeue(
             row,
             incrementAttempt: true,
+            exhaustible: false,
             delay: error.retryAfter ?? _backoff.nextDelay(row.attempts + 1),
             code: error.code,
             message: error.message,
@@ -1002,26 +1046,63 @@ class SyncEngine {
           await _requeue(
             row,
             incrementAttempt: true,
+            exhaustible: false,
             code: error.code,
             message: error.message,
           );
         }
       case FailureKind.terminal:
-        for (final OutboxData row in rows) {
-          await _markFailed(row, error.code, error.message);
-        }
+        await _applyTerminalRefusal(rows, error);
     }
   }
 
+  /// Un refus qui NOMME les opérations fautives ne condamne qu'elles : sur un
+  /// lot de deux cents saisies, tout marquer en échec pour une seule malformée
+  /// renvoie une journée entière de prospection dans « À corriger ».
+  Future<void> _applyTerminalRefusal(
+    List<OutboxData> rows,
+    ApiException error,
+  ) async {
+    final Set<int> named = error.rejectedOperations
+        .where((int rank) => rank >= 0 && rank < rows.length)
+        .toSet();
+    if (named.isEmpty) {
+      for (final OutboxData row in rows) {
+        await _markFailed(row, error.code, error.message);
+      }
+      return;
+    }
+    for (int rank = 0; rank < rows.length; rank++) {
+      if (named.contains(rank)) {
+        await _markFailed(rows[rank], error.code, error.message);
+        continue;
+      }
+      await _requeue(
+        rows[rank],
+        incrementAttempt: false,
+        delay: Duration.zero,
+        code: ClientErrorCodes.batchPeerRejected,
+        message:
+            'Renvoyée seule : le lot avait été refusé pour une autre saisie.',
+      );
+    }
+  }
+
+  /// [exhaustible] : un refus du SERVEUR (429, 5xx) n'est pas une faute de la
+  /// saisie. Il fait croître le délai d'attente mais ne consomme pas le quota
+  /// qui bascule la ligne dans « À corriger », sans quoi dix minutes de
+  /// déploiement condamnent la file entière.
   Future<void> _requeue(
     OutboxData row, {
     required bool incrementAttempt,
+    bool exhaustible = true,
     Duration? delay,
     String? code,
     String? message,
   }) async {
-    final int attempts = incrementAttempt ? row.attempts + 1 : row.attempts;
-    if (incrementAttempt && attempts >= maxAttempts) {
+    final int counted = incrementAttempt ? row.attempts + 1 : row.attempts;
+    final int attempts = exhaustible ? counted : min(counted, maxAttempts - 1);
+    if (exhaustible && incrementAttempt && attempts >= maxAttempts) {
       await _markFailed(
         row,
         code ?? ClientErrorCodes.attemptsExhausted,
@@ -1156,11 +1237,23 @@ class SyncEngine {
     }
     if (items.isEmpty) return 0;
     await _db.transaction(() async {
-      await _db.delete(_db.callOutcomeReasons).go();
+      // Un motif retiré du web reste indispensable tant qu'une tentative déjà
+      // en file le cite : sans lui, `_resolveCallAttempt` la juge illisible et
+      // elle passe en échec définitif.
+      final Set<String> stillCited = await _citedCallReasonCodes();
+      final DeleteStatement<CallOutcomeReasons, CallOutcomeReason> stale = _db
+          .delete(_db.callOutcomeReasons);
+      if (stillCited.isNotEmpty) {
+        stale.where(
+          (CallOutcomeReasons t) =>
+              t.code.isNotIn(stillCited.toList(growable: false)),
+        );
+      }
+      await stale.go();
       for (final CallOutcomeReasonDto r in items) {
         await _db
             .into(_db.callOutcomeReasons)
-            .insert(
+            .insertOnConflictUpdate(
               CallOutcomeReasonsCompanion.insert(
                 code: r.code,
                 label: r.label,
@@ -1177,6 +1270,24 @@ class SyncEngine {
       }
     });
     return items.length;
+  }
+
+  Future<Set<String>> _citedCallReasonCodes() async {
+    final List<OutboxData> open =
+        await (_db.select(_db.outbox)..where(
+              (Outbox o) =>
+                  o.entityType.equals(callAttemptEntity) &
+                  o.status.isIn(OutboxStatus.open),
+            ))
+            .get();
+    final Set<String> codes = <String>{};
+    for (final OutboxData row in open) {
+      final Object? decoded = _tryDecode(row.payload);
+      if (decoded is! Map) continue;
+      final Object? code = decoded['reasonCode'] ?? decoded['outcome'];
+      if (code is String && code.isNotEmpty) codes.add(code);
+    }
+    return codes;
   }
 
   Future<Set<String>> _entitiesWithOpenWrites(String entityType) async {
@@ -1306,6 +1417,54 @@ class SyncEngine {
             );
         count++;
       }
+      for (final CanalProvenanceDto c in page.changes.canauxProvenance) {
+        await _db
+            .into(_db.canauxProvenance)
+            .insert(
+              CanauxProvenanceCompanion.insert(
+                id: c.id,
+                code: c.code,
+                label: c.label,
+                isActive: Value<bool>(c.isActive),
+                sortOrder: Value<int>(c.position.toInt()),
+                localUpdatedAt: _clock.now(),
+                serverUpdatedAt: Value<DateTime?>(c.updatedAt),
+              ),
+              onConflict: DoUpdate<CanauxProvenance, CanauxProvenanceData>(
+                (CanauxProvenance old) => CanauxProvenanceCompanion.custom(
+                  code: const CustomExpression<String>('excluded.code'),
+                  label: const CustomExpression<String>('excluded.label'),
+                  isActive: const CustomExpression<bool>('excluded.is_active'),
+                  sortOrder: const CustomExpression<int>('excluded.sort_order'),
+                  serverUpdatedAt: const CustomExpression<DateTime>(
+                    'excluded.server_updated_at',
+                  ),
+                  localUpdatedAt: const CustomExpression<DateTime>(
+                    'excluded.local_updated_at',
+                  ),
+                ),
+              ),
+            );
+        count++;
+      }
+      for (final SyncVisiteReferentielDto r
+          in page.changes.visiteReferentiels) {
+        await _db
+            .into(_db.visiteReferentiels)
+            .insertOnConflictUpdate(
+              VisiteReferentielsCompanion.insert(
+                id: r.id,
+                kind: r.kind.value,
+                code: r.code,
+                label: r.label,
+                isActive: Value<bool>(r.isActive),
+                sortOrder: Value<int>(r.sortOrder.toInt()),
+                localUpdatedAt: _clock.now(),
+                serverUpdatedAt: Value<DateTime?>(r.updatedAt),
+              ),
+            );
+        count++;
+      }
       for (final SyndicatDto s in page.changes.syndicats) {
         await _db
             .into(_db.syndicats)
@@ -1413,6 +1572,11 @@ class SyncEngine {
                 banqueId: Value<String?>(p.banqueId),
                 syndicatId: Value<String?>(p.syndicatId),
                 representantId: Value<String?>(p.representantId),
+                projet: Value<String>(p.projet.value),
+                type: Value<String?>(p.type?.value),
+                profession: Value<String?>(p.profession),
+                dureeSystemeMois: Value<int?>(p.dureeSystemeMois?.toInt()),
+                canalProvenanceId: Value<String?>(p.canalProvenanceId),
                 createdById: p.ownedByCommercialId,
                 statut: Value<String>(p.statut.value),
                 clientCreatedAt: p.clientCreatedAt,
@@ -1437,6 +1601,17 @@ class SyncEngine {
                   representantId: const CustomExpression<String>(
                     'excluded.representant_id',
                   ),
+                  projet: const CustomExpression<String>('excluded.projet'),
+                  type: const CustomExpression<String>('excluded.type'),
+                  profession: const CustomExpression<String>(
+                    'excluded.profession',
+                  ),
+                  dureeSystemeMois: const CustomExpression<int>(
+                    'excluded.duree_systeme_mois',
+                  ),
+                  canalProvenanceId: const CustomExpression<String>(
+                    'excluded.canal_provenance_id',
+                  ),
                   statut: const CustomExpression<String>('excluded.statut'),
                   rev: const CustomExpression<int>('excluded.rev'),
                   serverUpdatedAt: const CustomExpression<DateTime>(
@@ -1454,6 +1629,20 @@ class SyncEngine {
                 ).isBiggerThan(old.rev),
               ),
             );
+        // Les parcours, sans arbitrage : un parcours s'ouvre et ne se ferme
+        // pas, le serveur en est seul auteur. C'est eux, et non la colonne
+        // `projet`, qui rangent la fiche dans CHUES ou dans Grand Public.
+        for (final ProspectJourneyDto j in p.journeys) {
+          await _db
+              .into(_db.prospectJourneys)
+              .insertOnConflictUpdate(
+                ProspectJourneysCompanion.insert(
+                  prospectId: p.id,
+                  projet: j.projet.value,
+                  statut: Value<String>(j.statut.value),
+                ),
+              );
+        }
         count++;
       }
 
@@ -1641,7 +1830,10 @@ class SyncOutcome {
   bool get shouldRetry =>
       status == SyncRunStatus.failed &&
       kind != FailureKind.terminal &&
-      kind != FailureKind.sessionExpired;
+      kind != FailureKind.sessionExpired &&
+      kind != FailureKind.appUpdateRequired;
+
+  bool get requiresAppUpdate => kind == FailureKind.appUpdateRequired;
 }
 
 enum SyncRunStatus { ok, skipped, failed }

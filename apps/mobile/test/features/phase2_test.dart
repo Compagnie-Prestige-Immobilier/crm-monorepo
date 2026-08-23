@@ -782,19 +782,25 @@ void main() {
       expect(sent.data?.outcome, CallOutcome.UNREACHABLE);
     });
 
-    test('la file d\'aujourd\'hui part en version de charge utile courante', () async {
-      await seedDirectory();
-      await writes.recordCallAttempt(
-        prospectId: 'pros-1',
-        outcome: CallOutcomes.unreachable,
-        createdById: 'me',
-      );
+    test(
+      'la file d\'aujourd\'hui part en version de charge utile courante',
+      () async {
+        await seedDirectory();
+        await writes.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.unreachable,
+          createdById: 'me',
+        );
 
-      await engine.drain();
+        await engine.drain();
 
-      expect((await allOutbox(db)).single.payloadVersion, SyncEngine.payloadVersion);
-      expect(api.calls.single.payloadVersion, SyncEngine.payloadVersion);
-    });
+        expect(
+          (await allOutbox(db)).single.payloadVersion,
+          SyncEngine.payloadVersion,
+        );
+        expect(api.calls.single.payloadVersion, SyncEngine.payloadVersion);
+      },
+    );
 
     test('la note vocale reste en file jusqu’à son envoi', () async {
       await seedDirectory();

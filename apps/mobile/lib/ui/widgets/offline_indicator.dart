@@ -51,25 +51,40 @@ class _OfflinePulse extends StatefulWidget {
 
 class _OfflinePulseState extends State<_OfflinePulse>
     with SingleTickerProviderStateMixin {
+  /// WCAG 2.2.2 : un mouvement qui démarre seul doit s'arrêter avant cinq
+  /// secondes. Le réseau, lui, peut manquer toute la journée.
+  static const Duration _fenetre = Duration(seconds: 5);
+
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1600),
   );
+  Timer? _plafond;
+  bool _termine = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final bool reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    if (reduced) {
-      if (_controller.isAnimating) _controller.stop();
-      _controller.value = 0;
+    if (reduced || _termine) {
+      _immobilise();
     } else if (!_controller.isAnimating) {
       unawaited(_controller.repeat(reverse: true));
+      _plafond ??= Timer(_fenetre, () {
+        _termine = true;
+        if (mounted) _immobilise();
+      });
     }
+  }
+
+  void _immobilise() {
+    if (_controller.isAnimating) _controller.stop();
+    _controller.value = 0;
   }
 
   @override
   void dispose() {
+    _plafond?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -77,7 +92,7 @@ class _OfflinePulseState extends State<_OfflinePulse>
   @override
   Widget build(BuildContext context) {
     final Color color = context.cpi.accentOnDark;
-    final Widget icon = Icon(widget.icon, size: 20, color: color);
+    final Widget icon = Icon(widget.icon, size: CpiIconSize.md, color: color);
 
     return Semantics(
       label: widget.label,

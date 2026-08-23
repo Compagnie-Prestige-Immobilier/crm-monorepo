@@ -123,6 +123,10 @@ enum FailureKind {
   terminal,
 
   sessionExpired,
+
+  /// Le serveur ne sert plus ce format de données à cet APK (426). La remontée
+  /// reste ouverte : seule la descente est fermée.
+  appUpdateRequired,
 }
 
 class ApiException implements Exception {
@@ -132,6 +136,7 @@ class ApiException implements Exception {
     this.statusCode,
     this.kind = FailureKind.retryable,
     this.retryAfter,
+    this.rejectedOperations = const <int>[],
   });
 
   final String code;
@@ -140,6 +145,11 @@ class ApiException implements Exception {
   final FailureKind kind;
 
   final Duration? retryAfter;
+
+  /// Rangs, dans le lot envoyé, des opérations que le serveur nomme dans son
+  /// refus. Vide quand le refus ne désigne personne : le lot entier est alors
+  /// en cause.
+  final List<int> rejectedOperations;
 
   bool get retryable =>
       kind == FailureKind.retryable ||
@@ -163,7 +173,11 @@ abstract interface class ApiPort {
 
   Future<void> logout({required String refreshToken});
 
-  Future<PullPage> pull({String? cursor, int limit, required int payloadVersion});
+  Future<PullPage> pull({
+    String? cursor,
+    int limit,
+    required int payloadVersion,
+  });
 
   Future<PushResult> push({
     required String batchId,

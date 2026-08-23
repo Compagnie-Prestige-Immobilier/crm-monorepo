@@ -45,6 +45,15 @@ import {
 
 const MIN_REASON_LENGTH = 5;
 
+/**
+ * Le formulaire porte `''` là où la fiche porte `null`. Comparés tels quels,
+ * toute fiche SANS banque — donc toute fiche Grand Public — s'ouvrait déjà « en
+ * bascule », motif obligatoire à l'appui, et plus aucune correction de nom
+ * n'était enregistrable.
+ */
+const memeChoix = (saisi: string, enregistre: string | null): boolean =>
+  (saisi === '' ? null : saisi) === enregistre;
+
 export function ProspectEditDialog({
   prospect,
   onOpenChange,
@@ -95,8 +104,8 @@ export function ProspectEditDialog({
     mutationFn: async (values: ProspectFormInput) => {
       if (prospect === null) throw new Error('Aucun prospect sélectionné.');
 
-      const banqueChanged = values.banqueId !== prospect.banqueId;
-      const syndicatChanged = values.syndicatId !== prospect.syndicatId;
+      const banqueChanged = !memeChoix(values.banqueId, prospect.banqueId);
+      const syndicatChanged = !memeChoix(values.syndicatId, prospect.syndicatId);
 
       let saved: ProspectRow | undefined;
       if (banqueChanged || syndicatChanged) {
@@ -112,7 +121,7 @@ export function ProspectEditDialog({
         values.nom !== prospect.nom ||
         values.prenom !== prospect.prenom ||
         values.phone !== prospect.phoneE164 ||
-        values.representantId !== prospect.representantId ||
+        !memeChoix(values.representantId, prospect.representantId) ||
         values.statut !== prospect.statut;
 
       if (identityChanged) {
@@ -167,7 +176,8 @@ export function ProspectEditDialog({
         });
 
   const segmentChanged =
-    prospect !== null && (banqueId !== prospect.banqueId || syndicatId !== prospect.syndicatId);
+    prospect !== null &&
+    (!memeChoix(banqueId, prospect.banqueId) || !memeChoix(syndicatId, prospect.syndicatId));
 
   return (
     <Dialog
@@ -312,7 +322,9 @@ export function ProspectEditDialog({
                 */}
                 <div role="alert" className="flex flex-col gap-1.5">
                   <p className="flex flex-wrap items-center gap-1.5 text-[0.8125rem]">
-                    <span>{prospect.segment === null ? 'Aucun' : SEGMENT_LABELS[prospect.segment]}</span>
+                    <span>
+                      {prospect.segment === null ? 'Aucun' : SEGMENT_LABELS[prospect.segment]}
+                    </span>
                     <ArrowRightIcon className="size-3.5" aria-hidden="true" />
                     <span className="font-[600]">
                       {nextSegment === null ? 'segment indéterminé' : SEGMENT_LABELS[nextSegment]}

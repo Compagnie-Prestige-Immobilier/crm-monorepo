@@ -103,32 +103,32 @@ export function RepresentantComments({
   return (
     <div className="flex flex-col gap-5">
       {readOnly ? null : (
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={fieldId}>Ajouter au fil</Label>
-        <Textarea
-          id={fieldId}
-          value={draft}
-          rows={3}
-          maxLength={MAX_LENGTH}
-          placeholder="Ce qui s’est dit, ce qui reste à faire."
-          onChange={(event) => {
-            setDraft(event.target.value);
-          }}
-        />
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[0.75rem] text-muted-foreground">
-            Un commentaire publié ne se modifie plus.
-          </p>
-          <Button type="button" size="sm" disabled={body === ''} onClick={submit}>
-            {publish.isPending ? (
-              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <SendHorizontalIcon aria-hidden="true" />
-            )}
-            Publier
-          </Button>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={fieldId}>Ajouter au fil</Label>
+          <Textarea
+            id={fieldId}
+            value={draft}
+            rows={3}
+            maxLength={MAX_LENGTH}
+            placeholder="Ce qui s’est dit, ce qui reste à faire."
+            onChange={(event) => {
+              setDraft(event.target.value);
+            }}
+          />
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[0.75rem] text-muted-foreground">
+              Un commentaire publié ne se modifie plus.
+            </p>
+            <Button type="button" size="sm" disabled={body === ''} onClick={submit}>
+              {publish.isPending ? (
+                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <SendHorizontalIcon aria-hidden="true" />
+              )}
+              Publier
+            </Button>
+          </div>
         </div>
-      </div>
       )}
 
       {thread.isPending ? (

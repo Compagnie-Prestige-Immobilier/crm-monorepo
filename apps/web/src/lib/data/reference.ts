@@ -1,16 +1,41 @@
 import type { ApiClient } from '@crm/api-client';
-import { unwrap } from '@crm/api-client/query';
+import { ApiError, unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
+import { formatPhone } from '@/lib/format';
 import type {
   Banque,
   Departement,
   FilterOption,
   Ief,
+  IncomeBand,
+  Offer,
+  Profession,
   ReferenceData,
   Region,
   Syndicat,
 } from '@/lib/types';
+
+/**
+ * Trois des cinq appels sont réservés à des rôles que le paquet ne connaît pas.
+ * Passés par `unwrap`, leur 403 faisait rejeter TOUTE la fonction : un
+ * COMMERCIAL n'avait alors ni banque ni syndicat dans ses listes déroulantes, en
+ * permanence et sans un message, et enregistrait des fiches sans segment.
+ *
+ * Un refus de rôle rend donc une liste vide — c'est ce que ce rôle est censé
+ * voir. Toute autre panne continue de remonter.
+ */
+function listeFacultative<TItem>(
+  result: { data?: { items: TItem[] }; error?: unknown; response: Response },
+  map: (item: TItem) => FilterOption,
+): FilterOption[] {
+  try {
+    return unwrap(result).items.map(map);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) return [];
+    throw error;
+  }
+}
 
 export async function fetchReferenceData(
   client: ApiClient = getApiClient(),
@@ -31,17 +56,20 @@ export async function fetchReferenceData(
     iefs: unwrap(iefs),
     banques: referentiels.banques,
     syndicats: referentiels.syndicats,
-    commerciaux: unwrap(users).items.map((user): FilterOption => ({
+    professions: referentiels.professions,
+    incomeBands: referentiels.incomeBands,
+    offers: referentiels.offers,
+    commerciaux: listeFacultative(users, (user) => ({
       value: user.id,
       label: user.fullName,
       hint: user.isActive ? (user.departementName ?? undefined) : 'Compte désactivé',
     })),
-    representants: unwrap(representants).items.map((representant): FilterOption => ({
+    representants: listeFacultative(representants, (representant) => ({
       value: representant.id,
-      label: representant.fullName,
+      label: `${representant.fullName} - ${formatPhone(representant.phoneE164)}`,
       hint: representant.departementName,
     })),
-    campagnes: unwrap(campaigns).items.map((campaign): FilterOption => ({
+    campagnes: listeFacultative(campaigns, (campaign) => ({
       value: campaign.id,
       label: campaign.name,
       hint: `${campaign.scope} · ${campaign.status === 'ACTIVE' ? 'en cours' : 'clôturée'}`,
@@ -88,4 +116,28 @@ export async function fetchSyndicats(client: ApiClient = getApiClient()): Promis
 
 export async function fetchRegions(client: ApiClient = getApiClient()): Promise<Region[]> {
   return unwrap(await client.GET('/api/v1/referentiels/regions'));
+}
+
+export async function fetchProfessions(client: ApiClient = getApiClient()): Promise<Profession[]> {
+  return unwrap(
+    await client.GET('/api/v1/referentiels/professions', {
+      params: { query: { activeOnly: false } },
+    }),
+  );
+}
+
+export async function fetchIncomeBands(client: ApiClient = getApiClient()): Promise<IncomeBand[]> {
+  return unwrap(
+    await client.GET('/api/v1/referentiels/tranches-revenu', {
+      params: { query: { activeOnly: false } },
+    }),
+  );
+}
+
+export async function fetchOffers(client: ApiClient = getApiClient()): Promise<Offer[]> {
+  return unwrap(
+    await client.GET('/api/v1/referentiels/offres', {
+      params: { query: { activeOnly: false } },
+    }),
+  );
 }

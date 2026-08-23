@@ -12,11 +12,13 @@ import {
   ProspectsGrandPublicImportAdapter,
   readDureeMois,
   type GrandPublicImportRow,
+  type GrandPublicImportRun,
 } from './prospects-grand-public.adapter.js';
 
 const H = GRAND_PUBLIC_IMPORT_HEADERS;
 
 interface FakeProspect {
+  id?: string;
   phoneE164: string;
   projet: Projet;
   deletedAt: Date | null;
@@ -40,10 +42,23 @@ interface WrittenProspect {
 interface Store {
   prospects: FakeProspect[];
   written: WrittenProspect[];
+  journeys: Set<string>;
 }
 
 function makeStore(prospects: FakeProspect[] = []): Store {
-  return { prospects, written: [] };
+  const normalized = prospects.map((prospect, index) => ({
+    id: prospect.id ?? `p-${String(index + 1)}`,
+    ...prospect,
+  }));
+  return {
+    prospects: normalized,
+    written: [],
+    journeys: new Set(
+      normalized
+        .filter((prospect) => prospect.projet === Projet.GRAND_PUBLIC)
+        .map((prospect) => prospect.id),
+    ),
+  };
 }
 
 function context(
@@ -85,7 +100,12 @@ function context(
                 args.where.phoneE164.in.includes(row.phoneE164) &&
                 (args.where.projet === undefined || args.where.projet === row.projet),
             )
-            .map((row) => ({ phoneE164: row.phoneE164, projet: row.projet })),
+            .map((row) => ({
+              id: row.id,
+              phoneE164: row.phoneE164,
+              projet: row.projet,
+              journeys: store.journeys.has(row.id ?? '') ? [{ id: 'journey' }] : [],
+            })),
         ),
       createMany: (args: { data: readonly WrittenProspect[]; skipDuplicates?: boolean }) => {
         let count = 0;
@@ -95,11 +115,23 @@ function context(
           );
           if (taken) continue;
           store.prospects.push({
+            id: `p-${String(store.prospects.length + 1)}`,
             phoneE164: row.phoneE164,
             projet: row.projet,
             deletedAt: null,
           });
           store.written.push(row);
+          count += 1;
+        }
+        return Promise.resolve({ count });
+      },
+    },
+    prospectJourney: {
+      createMany: (args: { data: readonly { prospectId: string }[] }) => {
+        let count = 0;
+        for (const row of args.data) {
+          if (store.journeys.has(row.prospectId)) continue;
+          store.journeys.add(row.prospectId);
           count += 1;
         }
         return Promise.resolve({ count });
@@ -142,11 +174,12 @@ function accepted(result: ParsedRow<GrandPublicImportRow>): GrandPublicImportRow
 
 let store: Store;
 let adapter: ProspectsGrandPublicImportAdapter;
+let run: GrandPublicImportRun;
 
 beforeEach(async () => {
   store = makeStore();
   adapter = new ProspectsGrandPublicImportAdapter();
-  await adapter.prepare(context(store));
+  run = await adapter.prepare(context(store));
 });
 
 describe('contrat de l’adaptateur Grand Public', () => {
@@ -194,7 +227,7 @@ describe('contrat de l’adaptateur Grand Public', () => {
 
 describe('une cellule vide n’est pas une erreur', () => {
   it('accepte une ligne qui ne porte QUE le nom et le téléphone', () => {
-    const row = accepted(adapter.parseRow(cells({ [H.prenom]: '' }), 3));
+    const row = accepted(adapter.parseRow(cells({ [H.prenom]: '' }), 3, run));
 
     expect(row).toEqual({
       rowNumber: 3,
@@ -211,7 +244,7 @@ describe('une cellule vide n’est pas une erreur', () => {
   });
 
   it('accepte aussi une ligne dont les colonnes facultatives manquent du fichier', () => {
-    const row = accepted(adapter.parseRow({ [H.nom]: 'Fall', [H.phone]: '781112233' }, 4));
+    const row = accepted(adapter.parseRow({ [H.nom]: 'Fall', [H.phone]: '781112233' }, 4, run));
 
     expect(row.nom).toBe('Fall');
     expect(row.canalProvenanceId).toBeNull();
@@ -230,6 +263,7 @@ describe('une cellule vide n’est pas une erreur', () => {
           [H.canal]: 'tiktok',
         }),
         3,
+        run,
       ),
     );
 
@@ -246,7 +280,7 @@ describe('une cellule vide n’est pas une erreur', () => {
 
 describe('ce qui fait refuser une ligne', () => {
   it('refuse un nom absent', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.nom]: '   ' }), 3));
+    const error = refusal(adapter.parseRow(cells({ [H.nom]: '   ' }), 3, run));
 
     expect(error.code).toBe(GrandPublicImportError.NOM_ABSENT);
     expect(error.column).toBe(H.nom);
@@ -254,8 +288,8 @@ describe('ce qui fait refuser une ligne', () => {
   });
 
   it('refuse un téléphone absent, et le dit autrement qu’un téléphone illisible', () => {
-    const absent = refusal(adapter.parseRow(cells({ [H.phone]: '' }), 3));
-    const illisible = refusal(adapter.parseRow(cells({ [H.phone]: 'à rappeler' }), 4));
+    const absent = refusal(adapter.parseRow(cells({ [H.phone]: '' }), 3, run));
+    const illisible = refusal(adapter.parseRow(cells({ [H.phone]: 'à rappeler' }), 4, run));
 
     expect(absent.code).toBe(GrandPublicImportError.TELEPHONE_ILLISIBLE);
     expect(absent.message).toMatch(/obligatoire/);
@@ -270,7 +304,7 @@ describe('ce qui fait refuser une ligne', () => {
   ])(
     'refuse « %s » rempli hors référentiel, en nommant les valeurs admises',
     (column, valeur, code, admise) => {
-      const error = refusal(adapter.parseRow(cells({ [column]: valeur }), 3));
+      const error = refusal(adapter.parseRow(cells({ [column]: valeur }), 3, run));
 
       expect(error.code).toBe(code);
       expect(error.column).toBe(column);
@@ -282,14 +316,14 @@ describe('ce qui fait refuser une ligne', () => {
 
   it('refuse une durée qui n’est pas un entier de mois', () => {
     for (const raw of ['2 ans', '0', 'douze', '-3', '1000']) {
-      const error = refusal(adapter.parseRow(cells({ [H.dureeSysteme]: raw }), 3));
+      const error = refusal(adapter.parseRow(cells({ [H.dureeSysteme]: raw }), 3, run));
       expect(error.code, raw).toBe(GrandPublicImportError.DUREE_ILLISIBLE);
       expect(error.column, raw).toBe(H.dureeSysteme);
     }
   });
 
   it('refuse une case « Fonctionnaire » qui ne se lit ni oui ni non', () => {
-    const error = refusal(adapter.parseRow(cells({ [H.fonctionnaire]: 'peut-être' }), 3));
+    const error = refusal(adapter.parseRow(cells({ [H.fonctionnaire]: 'peut-être' }), 3, run));
 
     expect(error.code).toBe(GrandPublicImportError.FONCTIONNAIRE_ILLISIBLE);
     expect(error.column).toBe(H.fonctionnaire);
@@ -300,7 +334,7 @@ describe('« Fonctionnaire » et le type se composent sans jamais se deviner', (
   it.each(['oui', 'OUI', 'O', 'x', '1', 'vrai'])(
     '« %s » range la fiche en FONCTIONNAIRE',
     (raw) => {
-      expect(accepted(adapter.parseRow(cells({ [H.fonctionnaire]: raw }), 3)).type).toBe(
+      expect(accepted(adapter.parseRow(cells({ [H.fonctionnaire]: raw }), 3, run)).type).toBe(
         ProspectType.FONCTIONNAIRE,
       );
     },
@@ -309,18 +343,18 @@ describe('« Fonctionnaire » et le type se composent sans jamais se deviner', (
   // « Non » dit ce que la personne n'est pas, pas ce qu'elle est : le fichier ne
   // choisit pas entre secteur privé, informel et diaspora.
   it.each(['non', 'NON', 'n', '0', 'faux'])('« %s » laisse le type VIDE', (raw) => {
-    expect(accepted(adapter.parseRow(cells({ [H.fonctionnaire]: raw }), 3)).type).toBeNull();
+    expect(accepted(adapter.parseRow(cells({ [H.fonctionnaire]: raw }), 3, run)).type).toBeNull();
   });
 
   it('une case vide laisse le type vide, sans refus', () => {
-    expect(accepted(adapter.parseRow(cells({ [H.fonctionnaire]: '' }), 3)).type).toBeNull();
+    expect(accepted(adapter.parseRow(cells({ [H.fonctionnaire]: '' }), 3, run)).type).toBeNull();
   });
 });
 
 describe('lecture du canal et de la durée', () => {
   it('reconnaît un canal par son libellé comme par son code, accents indifférents', () => {
-    const parLibelle = accepted(adapter.parseRow(cells({ [H.canal]: 'Bouche a oreille' }), 3));
-    const parCode = accepted(adapter.parseRow(cells({ [H.canal]: 'BOUCHE_A_OREILLE' }), 4));
+    const parLibelle = accepted(adapter.parseRow(cells({ [H.canal]: 'Bouche a oreille' }), 3, run));
+    const parCode = accepted(adapter.parseRow(cells({ [H.canal]: 'BOUCHE_A_OREILLE' }), 4, run));
 
     expect(parLibelle.canalProvenanceId).toBe('canal-bouche');
     expect(parCode.canalProvenanceId).toBe('canal-bouche');
@@ -329,13 +363,13 @@ describe('lecture du canal et de la durée', () => {
   it('lit une durée avec ou sans le mot « mois »', () => {
     expect(readDureeMois('24')).toBe(24);
     expect(readDureeMois('24 mois')).toBe(24);
-    expect(readDureeMois('600')).toBe(600);
-    expect(readDureeMois('601')).toBeNull();
+    expect(readDureeMois('300')).toBe(300);
+    expect(readDureeMois('301')).toBeNull();
     expect(readDureeMois('2 ans')).toBeNull();
   });
 
   it('borne la profession à 120 caractères plutôt que de refuser la ligne', () => {
-    const row = accepted(adapter.parseRow(cells({ [H.profession]: 'a'.repeat(400) }), 3));
+    const row = accepted(adapter.parseRow(cells({ [H.profession]: 'a'.repeat(400) }), 3, run));
 
     expect(row.profession).toHaveLength(120);
   });
@@ -356,7 +390,7 @@ describe('écriture d’une tranche', () => {
   });
 
   it('écrit une fiche Grand Public sans représentant et hors démonstration', async () => {
-    const outcome = await adapter.writeChunk([rowOf(3, '+221771234567')], context(store));
+    const outcome = await adapter.writeChunk([rowOf(3, '+221771234567')], context(store), run);
 
     expect(outcome).toMatchObject({ created: 1, skipped: 0 });
     expect(outcome.errors).toEqual([]);
@@ -371,6 +405,7 @@ describe('écriture d’une tranche', () => {
     const outcome = await adapter.writeChunk(
       [rowOf(3, '+221771234567'), rowOf(9, '+221771234567')],
       context(store),
+      run,
     );
 
     expect(outcome.created).toBe(1);
@@ -380,34 +415,32 @@ describe('écriture d’une tranche', () => {
     expect(outcome.errors[0]?.message).toContain('3');
   });
 
-  it('distingue un doublon Grand Public d’un numéro déjà tenu par une fiche CHUES', async () => {
+  it('ajoute un parcours à une fiche CHUES et refuse le doublon Grand Public', async () => {
     store = makeStore([
       { phoneE164: '+221771234567', projet: Projet.CHUES, deletedAt: null },
       { phoneE164: '+221781112233', projet: Projet.GRAND_PUBLIC, deletedAt: null },
     ]);
-    await adapter.prepare(context(store));
+    run = await adapter.prepare(context(store));
 
     const outcome = await adapter.writeChunk(
       [rowOf(3, '+221771234567'), rowOf(4, '+221781112233')],
       context(store),
+      run,
     );
 
-    expect(outcome.created).toBe(0);
+    expect(outcome.created).toBe(1);
     expect(outcome.errors.map((error) => error.code)).toEqual([
       GrandPublicImportError.DEJA_EN_BASE,
-      GrandPublicImportError.DEJA_EN_BASE,
     ]);
-    expect(outcome.errors[0]?.message).toContain('CHUES');
-    expect(outcome.errors[1]?.message).not.toContain('CHUES');
   });
 
   it('ne voit pas un numéro porté par une fiche supprimée', async () => {
     store = makeStore([
       { phoneE164: '+221771234567', projet: Projet.CHUES, deletedAt: new Date() },
     ]);
-    await adapter.prepare(context(store));
+    run = await adapter.prepare(context(store));
 
-    const outcome = await adapter.writeChunk([rowOf(3, '+221771234567')], context(store));
+    const outcome = await adapter.writeChunk([rowOf(3, '+221771234567')], context(store), run);
 
     expect(outcome.created).toBe(1);
     expect(outcome.errors).toEqual([]);
@@ -417,6 +450,7 @@ describe('écriture d’une tranche', () => {
     const outcome = await adapter.writeChunk(
       [rowOf(3, '+221771234567'), rowOf(4, '+221781112233')],
       context(store, { mode: ImportMode.DRY_RUN }),
+      run,
     );
 
     expect(outcome).toMatchObject({ created: 2, skipped: 0 });
@@ -424,11 +458,11 @@ describe('écriture d’une tranche', () => {
   });
 
   it('repart d’un fichier vierge à chaque préparation, pour qu’une reprise ne fabrique pas de doublons', async () => {
-    await adapter.writeChunk([rowOf(3, '+221771234567')], context(store));
+    await adapter.writeChunk([rowOf(3, '+221771234567')], context(store), run);
     store = makeStore();
-    await adapter.prepare(context(store));
+    run = await adapter.prepare(context(store));
 
-    const outcome = await adapter.writeChunk([rowOf(3, '+221771234567')], context(store));
+    const outcome = await adapter.writeChunk([rowOf(3, '+221771234567')], context(store), run);
 
     expect(outcome.created).toBe(1);
     expect(outcome.errors).toEqual([]);

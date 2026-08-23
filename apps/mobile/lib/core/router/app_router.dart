@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/about/presentation/about_screen.dart';
 import '../../features/accueil/presentation/registre_screen.dart';
+import '../../features/accueil/presentation/visite_form_screen.dart';
 import '../../features/auth/auth_state.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/corrections/presentation/corrections_screen.dart';
@@ -34,7 +35,10 @@ import 'route_paths.dart';
 
 class _AuthRefreshNotifier extends ChangeNotifier {
   _AuthRefreshNotifier(Ref ref) {
-    ref.listen<AuthState>(authControllerProvider, (AuthState? previous, AuthState next) {
+    ref.listen<AuthState>(authControllerProvider, (
+      AuthState? previous,
+      AuthState next,
+    ) {
       if (previous?.status != next.status) notifyListeners();
     });
   }
@@ -55,7 +59,8 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   ref.onDispose(refresh.dispose);
 
   final bool authenticated = ref.read(authControllerProvider).isAuthenticated;
-  final String initial = memory.read(authenticated: authenticated) ?? Routes.home;
+  final String initial =
+      memory.read(authenticated: authenticated) ?? Routes.home;
 
   final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -88,39 +93,101 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.login,
         name: 'login',
-        builder: (BuildContext context, GoRouterState state) => const LoginScreen(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const LoginScreen(),
       ),
 
       GoRoute(
         path: Routes.home,
         name: 'hub',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => const HubScreen(),
+        builder: (BuildContext context, GoRouterState state) =>
+            const HubScreen(),
       ),
       GoRoute(
         path: Routes.accueil,
         name: 'accueil',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => const ProjectScope(
+        builder: (BuildContext context, GoRouterState state) =>
+            const ProjectScope(
+              project: CpiProject.accueil,
+              child: RegistreScreen(),
+            ),
+      ),
+      GoRoute(
+        path: Routes.accueilVisiteNew,
+        name: 'accueilVisiteNew',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => ProjectScope(
           project: CpiProject.accueil,
-          child: RegistreScreen(),
+          child: VisiteFormScreen(
+            draftId: state.uri.queryParameters[Routes.draftParam],
+          ),
+        ),
+      ),
+      GoRoute(
+        path: Routes.grandPublicNew,
+        name: 'grandPublicNew',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => ProjectScope(
+          project: CpiProject.grandPublic,
+          child: ProspectEntryScreen(
+            projet: 'GRAND_PUBLIC',
+            draftId: state.uri.queryParameters[Routes.draftParam],
+          ),
+        ),
+      ),
+      GoRoute(
+        path: CampagnesRoutes.grandPublicListe,
+        name: 'grandPublicCampagnes',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            const ProjectScope(
+              project: CpiProject.grandPublic,
+              child: CampagnesScreen(grandPublic: true),
+            ),
+      ),
+      GoRoute(
+        path: CampagnesRoutes.grandPublicFile,
+        name: 'grandPublicCampagneFile',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => ProjectScope(
+          project: CpiProject.grandPublic,
+          child: CampagneFileScreen(
+            campaignId: state.pathParameters[CampagnesRoutes.idParam] ?? '',
+            grandPublic: true,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: CampagnesRoutes.grandPublicConsole,
+        name: 'grandPublicConsole',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => ProjectScope(
+          project: CpiProject.grandPublic,
+          child: Phase2Screen(
+            prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam],
+          ),
         ),
       ),
       GoRoute(
         path: Routes.grandPublic,
         name: 'grandPublic',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => const ProjectScope(
-          project: CpiProject.grandPublic,
-          child: GrandPublicScreen(),
-        ),
+        builder: (BuildContext context, GoRouterState state) =>
+            const ProjectScope(
+              project: CpiProject.grandPublic,
+              child: GrandPublicScreen(),
+            ),
       ),
 
       GoRoute(
         path: Routes.representants,
         name: 'representants',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: _chues((GoRouterState state) => const RepresentantPickerScreen()),
+        builder: _chues(
+          (GoRouterState state) => const RepresentantPickerScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.newRepresentant,
@@ -142,8 +209,9 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         name: 'representantDetail',
         parentNavigatorKey: _rootNavigatorKey,
         builder: _chues(
-          (GoRouterState state) =>
-              RepresentantDetailScreen(representantId: state.pathParameters['id'] ?? ''),
+          (GoRouterState state) => RepresentantDetailScreen(
+            representantId: state.pathParameters['id'] ?? '',
+          ),
         ),
       ),
       GoRoute(
@@ -162,8 +230,9 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         name: 'phase2',
         parentNavigatorKey: _rootNavigatorKey,
         builder: _chues(
-          (GoRouterState state) =>
-              Phase2Screen(prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam]),
+          (GoRouterState state) => Phase2Screen(
+            prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam],
+          ),
         ),
       ),
       GoRoute(
@@ -177,8 +246,9 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         name: 'campagneFile',
         parentNavigatorKey: _rootNavigatorKey,
         builder: _chues(
-          (GoRouterState state) =>
-              CampagneFileScreen(campaignId: state.pathParameters[CampagnesRoutes.idParam] ?? ''),
+          (GoRouterState state) => CampagneFileScreen(
+            campaignId: state.pathParameters[CampagnesRoutes.idParam] ?? '',
+          ),
         ),
       ),
       GoRoute(
@@ -202,8 +272,14 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
 
       StatefulShellRoute.indexedStack(
         builder:
-            (BuildContext context, GoRouterState state, StatefulNavigationShell shell) =>
-                ProjectScope(project: CpiProject.chues, child: AppShell(shell: shell)),
+            (
+              BuildContext context,
+              GoRouterState state,
+              StatefulNavigationShell shell,
+            ) => ProjectScope(
+              project: CpiProject.chues,
+              child: AppShell(shell: shell),
+            ),
         branches: <StatefulShellBranch>[
           StatefulShellBranch(
             routes: <RouteBase>[
@@ -282,7 +358,10 @@ class _RouteNotFound extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Text('Cette adresse n\'existe pas.', style: theme.textTheme.titleMedium),
+            Text(
+              'Cette adresse n\'existe pas.',
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: CpiSpacing.xs),
             Text(location, style: theme.textTheme.bodySmall),
             const SizedBox(height: CpiSpacing.xl),

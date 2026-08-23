@@ -108,6 +108,34 @@ describe('listes de l’accueil', () => {
     expect(prisma.entreprises.map((entry) => entry.sortOrder)).toEqual([1, 2, 3]);
   });
 
+  it('valide tout le lot de réordonnancement en une seule lecture', async () => {
+    const ids: string[] = [];
+    prisma.entreprises = [];
+    for (let index = 0; index < 200; index += 1) {
+      const id = `ent-${String(index).padStart(3, '0')}`;
+      ids.push(id);
+      prisma.entreprises.push(fakeRef({ id, code: id.toUpperCase(), sortOrder: index + 1 }));
+    }
+
+    let reads = 0;
+    const delegate = prisma.visiteEntreprise;
+    const findUnique = delegate.findUnique.bind(delegate);
+    const findMany = delegate.findMany.bind(delegate);
+    delegate.findUnique = (args) => {
+      reads += 1;
+      return findUnique(args);
+    };
+    delegate.findMany = (args) => {
+      reads += 1;
+      return findMany(args);
+    };
+
+    await service.reorder('entreprises', { ids });
+
+    expect(reads).toBe(2);
+    expect(prisma.entreprises[0]?.sortOrder).toBe(1);
+  });
+
   it('ne trouve pas dans une liste ce qui appartient à une autre', async () => {
     await expect(service.update('objets', 'ent-cpi', { label: 'X' })).rejects.toThrow(
       NotFoundException,

@@ -61,6 +61,13 @@ describe('discipline du montant', () => {
     expect(moneyToNumber('1200000')).toBe(1200000);
     expect(moneyToNumber(null)).toBeNull();
   });
+
+  it('au-delà de 2^53 le montant reste une chaîne plutôt qu’un nombre faux', () => {
+    const huge = '9007199254740993';
+    expect(String(Number(huge))).not.toBe(huge);
+    expect(moneyToNumber(huge)).toBe(huge);
+    expect(moneyToNumber('9007199254740991')).toBe(9007199254740991);
+  });
 });
 
 describe('normalisation de la référence', () => {

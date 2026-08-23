@@ -1,6 +1,6 @@
 'use client';
 
-import { InfoIcon, LoaderIcon } from 'lucide-react';
+import { AlertTriangleIcon, InfoIcon, LoaderIcon, RotateCwIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,7 @@ export function DeactivateReferentielDialog({
   label,
   kind,
   usageCount,
+  onRetryUsage,
   pending,
   onConfirm,
 }: {
@@ -27,10 +28,14 @@ export function DeactivateReferentielDialog({
   onOpenChange: (open: boolean) => void;
   label: string;
   kind: 'banque' | 'syndicat' | 'département';
-  usageCount: number;
+  /** `null` : le décompte n'est pas revenu. Ce n'est PAS zéro. */
+  usageCount: number | null;
+  onRetryUsage: () => void;
   pending: boolean;
   onConfirm: () => void;
 }) {
+  const unknown = usageCount === null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -42,13 +47,32 @@ export function DeactivateReferentielDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
-          <p className="rounded-md border border-border bg-secondary px-3 py-2.5 text-[0.875rem]">
-            <span className="font-display text-[1.5rem] font-[800] tabular-nums">
-              {formatNumber(usageCount)}
-            </span>{' '}
-            {usageCount === 1 ? 'prospect référence' : 'prospects référencent'}{' '}
-            {kind === 'département' ? 'ce' : 'cette'} {kind}.
-          </p>
+          {/* Sans le décompte, PAS de désactivation : afficher « 0 » quand
+              l'appel a échoué faisait retirer d'un clic une banque portée par
+              des milliers de fiches. */}
+          {unknown ? (
+            <p
+              role="alert"
+              className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.875rem]"
+            >
+              <AlertTriangleIcon
+                className="mt-0.5 size-4 shrink-0 text-destructive"
+                aria-hidden="true"
+              />
+              <span>
+                <strong>Le nombre de fiches concernées n’a pas pu être lu.</strong> Tant qu’il
+                manque, la désactivation n’est pas proposée.
+              </span>
+            </p>
+          ) : (
+            <p className="rounded-md border border-border bg-secondary px-3 py-2.5 text-[0.875rem]">
+              <span className="font-display text-[1.5rem] font-[800] tabular-nums">
+                {formatNumber(usageCount)}
+              </span>{' '}
+              {usageCount === 1 ? 'prospect référence' : 'prospects référencent'}{' '}
+              {kind === 'département' ? 'ce' : 'cette'} {kind}.
+            </p>
+          )}
 
           <p className="flex items-start gap-2 rounded-md border border-accent-border/30 bg-accent-surface px-3 py-2.5 text-[0.8125rem]">
             <InfoIcon className="mt-0.5 size-4 shrink-0 text-accent-text" aria-hidden="true" />
@@ -69,10 +93,17 @@ export function DeactivateReferentielDialog({
           >
             Annuler
           </Button>
-          <Button type="button" variant="destructive" disabled={pending} onClick={onConfirm}>
-            {pending ? <LoaderIcon className="size-4 animate-spin" aria-hidden="true" /> : null}
-            Désactiver
-          </Button>
+          {unknown ? (
+            <Button type="button" variant="outline" onClick={onRetryUsage}>
+              <RotateCwIcon className="size-4" aria-hidden="true" />
+              Réessayer le décompte
+            </Button>
+          ) : (
+            <Button type="button" variant="destructive" disabled={pending} onClick={onConfirm}>
+              {pending ? <LoaderIcon className="size-4 animate-spin" aria-hidden="true" /> : null}
+              Désactiver
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

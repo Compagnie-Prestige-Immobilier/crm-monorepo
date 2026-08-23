@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { RotateCcwIcon } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 
 import { AdvancedPanel, type AdvancedChipItem } from '@/components/filters/advanced-panel';
 import { DatePicker } from '@/components/filters/date-picker';
@@ -26,16 +26,18 @@ import {
   type CampaignStatus,
   type FilterOption,
 } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
 
 const STATUS_TABS: readonly { value: 'TOUTES' | CampaignStatus; label: string }[] = [
   { value: 'TOUTES', label: 'Toutes' },
+  { value: 'DRAFT', label: 'Brouillons' },
   { value: 'ACTIVE', label: 'En cours' },
+  { value: 'PAUSED', label: 'Suspendues' },
   { value: 'CLOSED', label: 'Clôturées' },
 ];
 
-export function CampaignsFiltersBar() {
+export function CampaignsFiltersBar({ projet = 'CHUES' }: { projet?: 'CHUES' | 'GRAND_PUBLIC' }) {
   const { filters, setFilters, resetFilters } = useCampaignFilters();
 
   const { data: creators } = useQuery({
@@ -49,15 +51,12 @@ export function CampaignsFiltersBar() {
     label: user.fullName,
   }));
 
-  const [searchDraft, setSearchDraft] = useState(filters.search);
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === filters.search) return;
-    setFilters({ search: debouncedSearch });
-  }, [debouncedSearch, filters.search, setFilters]);
+  const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
 
   const removeAdvanced = useCallback(
     (key: CampaignAdvancedFilterKey) => {
@@ -73,6 +72,11 @@ export function CampaignsFiltersBar() {
 
   const activeCount = countActiveCampaignFilters(filters);
   const chips = buildChips(filters, creatorOptions);
+  const scopes = CAMPAIGN_SCOPES.filter(
+    (scope) =>
+      scope === 'ALL' ||
+      (projet === 'GRAND_PUBLIC' ? scope.startsWith('GP') : scope.startsWith('BDD')),
+  );
 
   return (
     <section
@@ -125,7 +129,7 @@ export function CampaignsFiltersBar() {
           <FilterCombobox
             label="Périmètre"
             placeholder="Tous les périmètres"
-            options={CAMPAIGN_SCOPES.map((scope) => ({
+            options={scopes.map((scope) => ({
               value: scope,
               label: campaignScopeLabel(scope),
             }))}

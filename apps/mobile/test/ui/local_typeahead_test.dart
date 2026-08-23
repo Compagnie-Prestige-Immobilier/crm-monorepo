@@ -15,8 +15,12 @@ void main() {
     String label, {
     String? secondary,
     List<String> keywords = const <String>[],
-  }) =>
-      TypeaheadOption(id: label, label: label, secondary: secondary, keywords: keywords);
+  }) => TypeaheadOption(
+    id: label,
+    label: label,
+    secondary: secondary,
+    keywords: keywords,
+  );
 
   group('foldSearch', () {
     test('replie les accents des référentiels sénégalais', () {
@@ -63,7 +67,10 @@ void main() {
     });
 
     test('Kédougou se trouve aussi sans accent', () {
-      expect(option('Kédougou', secondary: 'KE-KED').matches('Kedougou'), isTrue);
+      expect(
+        option('Kédougou', secondary: 'KE-KED').matches('Kedougou'),
+        isTrue,
+      );
     });
   });
 
@@ -134,16 +141,15 @@ void main() {
   // ───────────────────────────────────────────────────────────────────────────
   group('message d\'état : il DOIT être à l\'écran', () {
     /// Monte un champ isolé, avec les options qu'on lui donne.
-    Future<
-      ({TextEditingController controller, FocusNode focus})
-    >
-    pumpField(
+    Future<({TextEditingController controller, FocusNode focus})> pumpField(
       WidgetTester tester, {
       required List<TypeaheadOption> options,
       String emptyHint = 'Aucun département. Synchronisez.',
       String text = '',
     }) async {
-      final TextEditingController controller = TextEditingController(text: text);
+      final TextEditingController controller = TextEditingController(
+        text: text,
+      );
       final FocusNode focus = FocusNode();
       addTearDown(controller.dispose);
       addTearDown(focus.dispose);
@@ -186,10 +192,11 @@ void main() {
     testWidgets('une recherche sans résultat le dit, sous le champ', (
       WidgetTester tester,
     ) async {
-      final ({TextEditingController controller, FocusNode focus}) f = await pumpField(
-        tester,
-        options: <TypeaheadOption>[option('Dakar'), option('Thiès')],
-      );
+      final ({TextEditingController controller, FocusNode focus}) f =
+          await pumpField(
+            tester,
+            options: <TypeaheadOption>[option('Dakar'), option('Thiès')],
+          );
 
       f.focus.requestFocus();
       await tester.pumpAndSettle();
@@ -282,11 +289,14 @@ void main() {
       },
     );
 
-    testWidgets('une recherche qui aboutit ne dit rien', (WidgetTester tester) async {
-      final ({TextEditingController controller, FocusNode focus}) f = await pumpField(
-        tester,
-        options: <TypeaheadOption>[option('Dakar'), option('Thiès')],
-      );
+    testWidgets('une recherche qui aboutit ne dit rien', (
+      WidgetTester tester,
+    ) async {
+      final ({TextEditingController controller, FocusNode focus}) f =
+          await pumpField(
+            tester,
+            options: <TypeaheadOption>[option('Dakar'), option('Thiès')],
+          );
 
       f.focus.requestFocus();
       await tester.pumpAndSettle();
@@ -315,24 +325,25 @@ void main() {
           theme: AppTheme.light,
           home: Scaffold(
             body: StatefulBuilder(
-              builder: (BuildContext context, StateSetter setState) => LocalTypeahead(
-                controller: controller,
-                focusNode: focus,
-                options: <TypeaheadOption>[
-                  option('Tambacounda'),
-                  option('Dakar'),
-                  option('Thiès'),
-                ],
-                label: 'Département',
-                selectedId: selectedId,
-                onChanged: (String _) {
-                  if (selectedId != null) setState(() => selectedId = null);
-                },
-                onSelected: (TypeaheadOption o) {
-                  chosen.add(o.id);
-                  setState(() => selectedId = o.id);
-                },
-              ),
+              builder: (BuildContext context, StateSetter setState) =>
+                  LocalTypeahead(
+                    controller: controller,
+                    focusNode: focus,
+                    options: <TypeaheadOption>[
+                      option('Tambacounda'),
+                      option('Dakar'),
+                      option('Thiès'),
+                    ],
+                    label: 'Département',
+                    selectedId: selectedId,
+                    onChanged: (String _) {
+                      if (selectedId != null) setState(() => selectedId = null);
+                    },
+                    onSelected: (TypeaheadOption o) {
+                      chosen.add(o.id);
+                      setState(() => selectedId = o.id);
+                    },
+                  ),
             ),
           ),
         ),
@@ -341,31 +352,36 @@ void main() {
       return (focus: focus, chosen: chosen);
     }
 
-    testWidgets('après un choix, la liste est fermée et le champ rend la main', (
-      WidgetTester tester,
-    ) async {
-      // Plainte terrain : « je tape, je complète avec le combobox, il me
-      // réaffiche toute la liste encore et je dois choisir à nouveau ».
-      final ({FocusNode focus, List<String> chosen}) f = await pumpSelectable(tester);
+    testWidgets(
+      'après un choix, la liste est fermée et le champ rend la main',
+      (WidgetTester tester) async {
+        // Plainte terrain : « je tape, je complète avec le combobox, il me
+        // réaffiche toute la liste encore et je dois choisir à nouveau ».
+        final ({FocusNode focus, List<String> chosen}) f = await pumpSelectable(
+          tester,
+        );
 
-      await tester.tap(find.byType(TextField));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'Tamba');
-      await tester.pumpAndSettle();
-      expect(find.byType(ListTile), findsOneWidget);
+        await tester.tap(find.byType(TextField));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'Tamba');
+        await tester.pumpAndSettle();
+        expect(find.byType(ListTile), findsOneWidget);
 
-      await tester.tap(find.byType(ListTile));
-      await tester.pumpAndSettle();
+        await tester.tap(find.byType(ListTile));
+        await tester.pumpAndSettle();
 
-      expect(f.chosen, <String>['Tambacounda']);
-      expect(find.byType(ListTile), findsNothing);
-      expect(f.focus.hasFocus, isFalse);
-    });
+        expect(f.chosen, <String>['Tambacounda']);
+        expect(find.byType(ListTile), findsNothing);
+        expect(f.focus.hasFocus, isFalse);
+      },
+    );
 
     testWidgets('revenir sur le champ sans le toucher ne rouvre RIEN', (
       WidgetTester tester,
     ) async {
-      final ({FocusNode focus, List<String> chosen}) f = await pumpSelectable(tester);
+      final ({FocusNode focus, List<String> chosen}) f = await pumpSelectable(
+        tester,
+      );
 
       await tester.tap(find.byType(TextField));
       await tester.pumpAndSettle();

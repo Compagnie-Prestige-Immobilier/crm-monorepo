@@ -24,6 +24,7 @@ import { OkDto } from '../../common/dto/ok.dto.js';
 import { UsersService } from './users.service.js';
 import {
   CreateUserDto,
+  DeleteUserQueryDto,
   ResetPasswordDto,
   SetActiveDto,
   UpdateUserDto,
@@ -64,16 +65,20 @@ export class UsersController {
     type: ApiErrorDto,
     description: 'E-mail ou nom d’utilisateur déjà pris.',
   })
-  create(@Body() body: CreateUserDto): Promise<UserDto> {
-    return this.users.create(body);
+  create(@Body() body: CreateUserDto, @CurrentUser() actor: AuthenticatedUser): Promise<UserDto> {
+    return this.users.create(body, actor);
   }
 
   @Patch(':id')
   @ApiOperation({ operationId: 'updateUser', summary: 'Modifie un compte.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: UserDto })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateUserDto): Promise<UserDto> {
-    return this.users.update(id, body);
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateUserDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ): Promise<UserDto> {
+    return this.users.update(id, body, actor);
   }
 
   @Put(':id/active')
@@ -88,7 +93,7 @@ export class UsersController {
     @Body() body: SetActiveDto,
     @CurrentUser() actor: AuthenticatedUser,
   ): Promise<UserDto> {
-    return this.users.setActive(id, body, actor.id);
+    return this.users.setActive(id, body, actor);
   }
 
   @Put(':id/password')
@@ -101,8 +106,9 @@ export class UsersController {
   resetPassword(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: ResetPasswordDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ): Promise<OkDto> {
-    return this.users.resetPassword(id, body);
+    return this.users.resetPassword(id, body, actor);
   }
 
   @Delete(':id')
@@ -111,8 +117,9 @@ export class UsersController {
   @ApiResponse({ status: 200, type: OkDto })
   remove(
     @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: DeleteUserQueryDto,
     @CurrentUser() actor: AuthenticatedUser,
   ): Promise<OkDto> {
-    return this.users.remove(id, actor.id);
+    return this.users.remove(id, actor, query.handoverToId);
   }
 }

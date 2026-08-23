@@ -18,6 +18,7 @@ interface MockTx {
   callTask: Record<'findFirst' | 'updateMany', MockFn>;
   callOutcomeReason: Record<'findUnique', MockFn>;
   prospect: Record<'findFirst' | 'updateMany', MockFn>;
+  prospectJourney: Record<'upsert' | 'updateMany', MockFn>;
   scheduledCallback: Record<'updateMany' | 'createMany', MockFn>;
 }
 
@@ -38,10 +39,16 @@ const seededReason = (code: string): Record<string, unknown> | null => {
 
 const prospectRow = (): Record<string, unknown> => ({
   id: 'p-1',
-  phase2Status: Phase2Status.PENDING,
-  enrollmentMethod: null,
+  projet: 'CHUES',
   rev: 3,
   updatedAt: new Date('2026-08-01T09:00:00.000Z'),
+});
+
+/** L'état de phase 2 vit sur le parcours, plus sur la fiche. */
+const journeyRow = (): Record<string, unknown> => ({
+  id: 'j-1',
+  phase2Status: Phase2Status.PENDING,
+  enrollmentMethod: null,
   enrollmentCapturedById: null,
   enrollmentCapturedAt: null,
 });
@@ -65,6 +72,10 @@ const prepare = (): void => {
     },
     prospect: {
       findFirst: vi.fn().mockResolvedValue(prospectRow()),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    prospectJourney: {
+      upsert: vi.fn().mockResolvedValue(journeyRow()),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     scheduledCallback: {
@@ -123,7 +134,12 @@ describe('rappel planifié', () => {
   });
 
   it('rattache le rappel à la campagne quand l’appel en vient', async () => {
-    tx.callTask.findFirst.mockResolvedValue({ id: 'task-1', campaignId: 'camp-1' });
+    // La campagne porte le PROJET, qui décide de quel parcours relève la tentative.
+    tx.callTask.findFirst.mockResolvedValue({
+      id: 'task-1',
+      campaignId: 'camp-1',
+      campaign: { projet: 'CHUES' },
+    });
     await apply({ outcome: CallOutcome.CALLBACK, callbackAt: RAPPEL });
 
     expect(callbackWritten().taskId).toBe('task-1');
@@ -309,5 +325,58 @@ describe('résolution du motif d’issue', () => {
     const [args] = tx.prospect.updateMany.mock.calls[0] as [{ data: Record<string, unknown> }];
     expect(args.data.phase2Status).toBe(Phase2Status.REFUSED);
     expect(writtenRow().reasonId).toBe('reason-REFUS_SEC');
+  });
+});
+
+describe('la phase 2 est un état du PARCOURS, pas de la fiche', () => {
+  /// Portée par la fiche, elle rendait un prospect refusé en CHUES
+  /// définitivement inappelable en Grand Public : la campagne le tirait quand
+  /// même et chaque tentative revenait en 409, bloquant sur le téléphone toute
+  /// la partition de file de ce prospect.
+  it('un refus CHUES ne ferme pas le parcours Grand Public', async () => {
+    prepare();
+    tx.callTask.findFirst.mockResolvedValue({
+      id: 'task-gp',
+      campaignId: 'camp-gp',
+      campaign: { projet: 'GRAND_PUBLIC' },
+    });
+    // Le parcours Grand Public est neuf, même si la fiche a été soldée par CHUES.
+    tx.prospectJourney.upsert.mockResolvedValue({
+      id: 'j-gp',
+      phase2Status: Phase2Status.PENDING,
+      enrollmentMethod: null,
+      enrollmentCapturedById: null,
+      enrollmentCapturedAt: null,
+    });
+
+    const result = (await apply({ outcome: CallOutcome.REFUSED })) as { status: string };
+
+    expect(result.status).toBe('applied');
+    const upsert = tx.prospectJourney.upsert.mock.calls[0]?.[0] as {
+      where: { prospectId_projet: { projet: string } };
+    };
+    expect(upsert.where.prospectId_projet.projet).toBe('GRAND_PUBLIC');
+  });
+
+  it('c’est le PARCOURS qui arbitre « la première transition terminale gagne »', async () => {
+    prepare();
+    tx.prospectJourney.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(apply({ outcome: CallOutcome.REFUSED })).rejects.toMatchObject({
+      response: { code: 'PHASE2_ALREADY_COMPLETED' },
+    });
+  });
+
+  it('un parcours déjà soldé refuse la tentative', async () => {
+    prepare();
+    tx.prospectJourney.upsert.mockResolvedValue({
+      id: 'j-1',
+      phase2Status: Phase2Status.REFUSED,
+      enrollmentMethod: null,
+      enrollmentCapturedById: null,
+      enrollmentCapturedAt: null,
+    });
+
+    await expect(apply()).rejects.toMatchObject({ response: { code: 'PHASE2_ALREADY_COMPLETED' } });
   });
 });

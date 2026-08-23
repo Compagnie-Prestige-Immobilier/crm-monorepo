@@ -324,7 +324,9 @@ describe('ImportsView', () => {
       expect(createImportJob).toHaveBeenCalledWith('PROSPECTS_GRAND_PUBLIC', expect.any(File));
     });
 
-    await user.click(await screen.findByRole('button', { name: 'Créer 800 prospects Grand Public' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Créer 800 prospects Grand Public' }),
+    );
     const dialog = await screen.findByRole('dialog');
     expect(dialog.textContent).toContain('800 prospects Grand Public seront créés');
     await user.click(

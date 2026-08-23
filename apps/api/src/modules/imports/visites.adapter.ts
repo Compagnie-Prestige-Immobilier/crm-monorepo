@@ -45,7 +45,6 @@ export const VisiteImportError = {
   DOUBLON_DANS_LE_FICHIER: 'VISITE_IMPORT_DOUBLON_DANS_LE_FICHIER',
   DEJA_AU_REGISTRE: 'VISITE_IMPORT_DEJA_AU_REGISTRE',
   REFERENCE_EPUISEE: 'VISITE_IMPORT_REFERENCE_EPUISEE',
-  NON_PREPARE: 'VISITE_IMPORT_NON_PREPARE',
 } as const;
 
 export const VISITE_IMPORT_HEADERS = {
@@ -161,17 +160,15 @@ interface Entry {
   readonly label: string;
 }
 
-interface Referentiels {
+/** Référentiels chargés et visites déjà vues, LE TEMPS D'UNE EXÉCUTION. */
+export interface VisiteImportRun {
+  readonly seen: Map<string, VisiteImportRow>;
   readonly entreprises: ReadonlyMap<string, Entry>;
   readonly directions: ReadonlyMap<string, Entry>;
   readonly destinataires: ReadonlyMap<string, Entry>;
   readonly objets: ReadonlyMap<string, Entry>;
   /** Où une valeur se trouve VRAIMENT, pour nommer un décalage de colonnes. */
   readonly owners: ReadonlyMap<string, string>;
-}
-
-interface RunState {
-  readonly seen: Map<string, VisiteImportRow>;
 }
 
 /**
@@ -182,8 +179,6 @@ interface RunState {
 const LIBELLES_DU_CLASSEUR: ReadonlyMap<string, string> = new Map([
   [normalizeKey('ACHAT PRODUITS SANTARGILE ET/OU MAK'), 'ACHAT_PRODUITS'],
 ]);
-
-const MAX_TRACKED_RUNS = 8;
 
 const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30);
 const FIRST_UNAMBIGUOUS_SERIAL = 61;
@@ -246,16 +241,13 @@ const dedupKeyOf = (row: {
 };
 
 @Injectable()
-export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow> {
+export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow, VisiteImportRun> {
   readonly kind = ImportKind.VISITES;
   readonly maxRows = VISITES_MAX_ROWS;
   readonly templateColumns: readonly ImportColumn[] = VISITES_IMPORT_COLUMNS;
   readonly layout = VISITES_SHEET_LAYOUT;
 
-  private referentiels: Referentiels | null = null;
-  private readonly runs = new Map<string, RunState>();
-
-  async prepare(ctx: ImportRunContext): Promise<void> {
+  async prepare(ctx: ImportRunContext): Promise<VisiteImportRun> {
     const select = { id: true, code: true, label: true } as const;
     const where = { isActive: true } as const;
 
@@ -283,28 +275,21 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow> {
       return map;
     };
 
-    this.referentiels = {
+    return {
+      seen: new Map(),
       entreprises: index(entreprises, 'entreprises'),
       directions: index(directions, 'directions'),
       destinataires: index(destinataires, 'destinataires'),
       objets: index(objets, 'objets de visite'),
       owners,
     };
-
-    this.runs.set(ctx.jobId, { seen: new Map() });
-    while (this.runs.size > MAX_TRACKED_RUNS) {
-      const oldest = this.runs.keys().next();
-      if (oldest.done === true) break;
-      this.runs.delete(oldest.value);
-    }
   }
 
-  parseRow(cells: Record<string, string>, rowNumber: number): ParsedRow<VisiteImportRow> {
-    const refs = this.referentiels;
-    if (refs === null) {
-      throw new Error(`${VisiteImportError.NON_PREPARE}: parseRow appelée avant prepare.`);
-    }
-
+  parseRow(
+    cells: Record<string, string>,
+    rowNumber: number,
+    refs: VisiteImportRun,
+  ): ParsedRow<VisiteImportRow> {
     const sheet = cells[SHEET_CELL] ?? '';
     const refuse = (column: string, code: string, detail: string): ParsedRow<VisiteImportRow> => ({
       ok: false,
@@ -393,11 +378,12 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow> {
     };
   }
 
-  async writeChunk(rows: readonly VisiteImportRow[], ctx: ImportRunContext): Promise<ChunkOutcome> {
+  async writeChunk(
+    rows: readonly VisiteImportRow[],
+    ctx: ImportRunContext,
+    run: VisiteImportRun,
+  ): Promise<ChunkOutcome> {
     if (rows.length === 0) return { created: 0, skipped: 0, errors: [] };
-
-    const state = this.runs.get(ctx.jobId) ?? { seen: new Map<string, VisiteImportRow>() };
-    this.runs.set(ctx.jobId, state);
 
     const errors: ImportRowError[] = [];
     let skipped = 0;
@@ -405,7 +391,7 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow> {
     const unique: VisiteImportRow[] = [];
     for (const row of rows) {
       const key = visiteDedupKey(row);
-      const previous = state.seen.get(key);
+      const previous = run.seen.get(key);
       if (previous !== undefined) {
         skipped += 1;
         errors.push({
@@ -416,7 +402,7 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow> {
         });
         continue;
       }
-      state.seen.set(key, row);
+      run.seen.set(key, row);
       unique.push(row);
     }
 
@@ -528,7 +514,7 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow> {
    * entrée à ajouter, alors que la ligne est décalée d'un cran.
    */
   private missReason(
-    refs: Referentiels,
+    refs: VisiteImportRun,
     raw: string,
     attendu: 'entreprise' | 'direction' | 'destinataire' | 'objet',
   ): [string, string] {

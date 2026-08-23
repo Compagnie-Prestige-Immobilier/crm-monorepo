@@ -9,7 +9,12 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   const SenegalPhoneFormatter formatter = SenegalPhoneFormatter();
 
-  TextEditingValue format(String before, int cursorBefore, String after, int cursor) {
+  TextEditingValue format(
+    String before,
+    int cursorBefore,
+    String after,
+    int cursor,
+  ) {
     return formatter.formatEditUpdate(
       TextEditingValue(
         text: before,
@@ -28,7 +33,10 @@ void main() {
   });
 
   test('au-delà de neuf chiffres, la frappe est ignorée', () {
-    expect(format('77 123 45 67', 12, '77 123 45 678', 13).text, '77 123 45 67');
+    expect(
+      format('77 123 45 67', 12, '77 123 45 678', 13).text,
+      '77 123 45 67',
+    );
   });
 
   test('un retour arrière sur un chiffre le supprime', () {
@@ -39,9 +47,12 @@ void main() {
 
   // Le regroupement replaçait l'espace aussitôt : le premier appui ne supprimait
   // rien et il en fallait deux pour avancer d'un chiffre.
-  test('un retour arrière sur un espace supprime le chiffre qui le précède', () {
-    final TextEditingValue out = format('77 123 45 67', 3, '77123 45 67', 2);
-    expect(out.text, '71 234 56 7');
-    expect(out.selection.baseOffset, 1);
-  });
+  test(
+    'un retour arrière sur un espace supprime le chiffre qui le précède',
+    () {
+      final TextEditingValue out = format('77 123 45 67', 3, '77123 45 67', 2);
+      expect(out.text, '71 234 56 7');
+      expect(out.selection.baseOffset, 1);
+    },
+  );
 }

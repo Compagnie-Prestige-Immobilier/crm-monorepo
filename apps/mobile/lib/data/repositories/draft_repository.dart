@@ -8,13 +8,7 @@ import '../local/database.dart';
 
 const int kDraftSchemaVersion = 1;
 
-enum DraftAge {
-  crash,
-
-  resumable,
-
-  stale,
-}
+enum DraftAge { crash, resumable, stale }
 
 class DraftSnapshot {
   const DraftSnapshot({
@@ -39,7 +33,8 @@ class DraftSnapshot {
 }
 
 class DraftRepository {
-  DraftRepository(this._db, {Clock clock = const SystemClock()}) : _clock = clock;
+  DraftRepository(this._db, {Clock clock = const SystemClock()})
+    : _clock = clock;
 
   static const Duration silentRestoreWindow = Duration(seconds: 60);
   static const Duration keepFor = Duration(days: 7);
@@ -133,7 +128,8 @@ class DraftRepository {
     final List<String> doomed = all
         .where(
           (FormDraft d) =>
-              d.updatedAt.isBefore(cutoff) || d.schemaVersion != kDraftSchemaVersion,
+              d.updatedAt.isBefore(cutoff) ||
+              d.schemaVersion != kDraftSchemaVersion,
         )
         .map((FormDraft d) => d.draftId)
         .toList(growable: false);

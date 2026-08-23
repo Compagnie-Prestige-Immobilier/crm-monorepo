@@ -9,6 +9,10 @@ import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { Field } from '@/components/forms/field';
+import {
+  InternationalPhoneField,
+  toInternationalE164,
+} from '@/components/forms/international-phone-field';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -36,19 +40,17 @@ import { fetchReferenceData } from '@/lib/data/reference';
 import { formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import type { PaymentMode } from '@/lib/types';
 
-const NATIONAL_LENGTH = 9;
+type Errors = Partial<Record<'prenom' | 'nom' | 'phone' | 'banqueId', string>>;
 
-function toE164Senegal(raw: string): string | null {
-  if (/\p{Letter}/u.test(raw)) return null;
-  let digits = raw.replace(/\D/gu, '').replace(/^00/u, '');
-  if (digits.startsWith('221') && digits.length > NATIONAL_LENGTH) digits = digits.slice(3);
-  return digits.length === NATIONAL_LENGTH ? `+221${digits}` : null;
-}
-
-type Errors = Partial<Record<'prenom' | 'nom' | 'phone', string>>;
-
-export function GrandPublicProspectForm() {
+export function GrandPublicProspectForm({
+  embedded = false,
+  onSaved,
+}: {
+  embedded?: boolean;
+  onSaved?: () => void;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const prenomRef = useRef<HTMLInputElement>(null);
@@ -56,7 +58,10 @@ export function GrandPublicProspectForm() {
   const [prenom, setPrenom] = useState('');
   const [nom, setNom] = useState('');
   const [phone, setPhone] = useState('');
-  const [profession, setProfession] = useState('');
+  const [callingCode, setCallingCode] = useState('221');
+  const [professionId, setProfessionId] = useState<string | null>(null);
+  const [incomeBandId, setIncomeBandId] = useState<string | null>(null);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
   const [type, setType] = useState<ProspectType | null>(null);
   const [banqueId, setBanqueId] = useState<string | null>(null);
   const [syndicatId, setSyndicatId] = useState<string | null>(null);
@@ -88,6 +93,10 @@ export function GrandPublicProspectForm() {
       toast.success(`${prospect.prenom} ${prospect.nom} enregistré.`);
 
       if (!variables.andNext) {
+        if (onSaved !== undefined) {
+          onSaved();
+          return;
+        }
         router.push(`/grand-public/${prospect.id}`);
         return;
       }
@@ -97,7 +106,9 @@ export function GrandPublicProspectForm() {
       setPrenom('');
       setNom('');
       setPhone('');
-      setProfession('');
+      setProfessionId(null);
+      setIncomeBandId(null);
+      setPaymentMode(null);
       setType(null);
       setBanqueId(null);
       setSyndicatId(null);
@@ -117,23 +128,28 @@ export function GrandPublicProspectForm() {
   function submit(andNext: boolean): void {
     if (save.isPending) return;
 
-    const e164 = toE164Senegal(phone);
+    const e164 = toInternationalE164(phone, callingCode);
     const found: Errors = {};
     if (prenom.trim() === '') found.prenom = 'Le prénom est obligatoire.';
     if (nom.trim() === '') found.nom = 'Le nom est obligatoire.';
     if (phone.trim() === '') found.phone = 'Le numéro est obligatoire.';
-    else if (e164 === null) found.phone = 'Numéro invalide : 9 chiffres attendus.';
+    else if (e164 === null) found.phone = 'Numéro invalide pour le pays choisi.';
+    if (type === 'FONCTIONNAIRE' && banqueId === null) {
+      found.banqueId = 'Choisissez la banque de domiciliation.';
+    }
 
     setErrors(found);
     if (e164 === null || Object.keys(found).length > 0) return;
 
     setConflict(null);
     const input: GrandPublicProspectInput = { prenom: prenom.trim(), nom: nom.trim(), phone: e164 };
-    if (profession.trim() !== '') input.profession = profession.trim();
+    if (professionId !== null) input.professionId = professionId;
+    if (incomeBandId !== null) input.incomeBandId = incomeBandId;
+    if (paymentMode !== null) input.paymentMode = paymentMode;
     if (type !== null) input.type = type;
     if (banqueId !== null) input.banqueId = banqueId;
     if (syndicatId !== null) input.syndicatId = syndicatId;
-    if (dureeMois !== null) input.dureeSystemeMois = dureeMois;
+    if (paymentMode === 'ECHELONNE' && dureeMois !== null) input.dureeSystemeMois = dureeMois;
     if (canalId !== null) input.canalProvenanceId = canalId;
 
     save.mutate({ input, andNext });
@@ -141,7 +157,10 @@ export function GrandPublicProspectForm() {
 
   const last = saved.at(-1);
   const plural = saved.length > 1 ? 's' : '';
-  const searchHref = `/grand-public?search=${encodeURIComponent(toE164Senegal(phone) ?? phone)}`;
+  const searchHref = `/grand-public?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`;
+  const selectedProfession = reference.data?.professions.find(
+    (profession) => profession.id === professionId,
+  );
 
   return (
     <form
@@ -156,14 +175,16 @@ export function GrandPublicProspectForm() {
         submit(true);
       }}
     >
-      <div>
-        <h1 className="font-display text-h2 font-[700] tracking-[-0.02em]">
-          Nouveau prospect Grand Public
-        </h1>
-        <p className="text-body text-muted-foreground">
-          Le nom, le prénom et le téléphone suffisent. Le reste se complète plus tard.
-        </p>
-      </div>
+      {embedded ? null : (
+        <div>
+          <h1 className="font-display text-h2 font-[700] tracking-[-0.02em]">
+            Nouveau prospect Grand Public
+          </h1>
+          <p className="text-body text-muted-foreground">
+            Le nom, le prénom et le téléphone suffisent. Le reste se complète plus tard.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Prénom" required error={errors.prenom}>
@@ -197,27 +218,16 @@ export function GrandPublicProspectForm() {
         </Field>
       </div>
 
-      <Field
-        label="Téléphone"
-        required
+      <InternationalPhoneField
+        value={phone}
+        callingCode={callingCode}
         error={errors.phone}
-        description="Neuf chiffres, enregistrés au format +221."
-      >
-        {(props) => (
-          <Input
-            {...props}
-            value={phone}
-            maxLength={40}
-            inputMode="tel"
-            autoComplete="off"
-            placeholder="77 123 45 67"
-            onChange={(event) => {
-              setPhone(event.target.value);
-              setConflict(null);
-            }}
-          />
-        )}
-      </Field>
+        onCallingCodeChange={setCallingCode}
+        onChange={(value) => {
+          setPhone(value);
+          setConflict(null);
+        }}
+      />
 
       {conflict !== null ? (
         <Card className="border-destructive/40">
@@ -245,20 +255,15 @@ export function GrandPublicProspectForm() {
         </Card>
       ) : null}
 
-      <Field label="Profession">
-        {(props) => (
-          <Input
-            {...props}
-            value={profession}
-            maxLength={120}
-            autoComplete="off"
-            placeholder="Chauffeur, commerçante, infirmier…"
-            onChange={(event) => {
-              setProfession(event.target.value);
-            }}
-          />
-        )}
-      </Field>
+      <FilterCombobox
+        label="Profession"
+        placeholder="Rechercher une profession"
+        value={professionId}
+        options={(reference.data?.professions ?? [])
+          .filter((profession) => profession.isActive)
+          .map((profession) => ({ value: profession.id, label: profession.label }))}
+        onChange={setProfessionId}
+      />
 
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-2 text-[0.875rem] font-[600] text-foreground">Situation</legend>
@@ -293,42 +298,79 @@ export function GrandPublicProspectForm() {
             .map((banque) => ({ value: banque.id, label: banque.name, hint: banque.shortName }))}
           onChange={setBanqueId}
         />
-        <FilterCombobox
-          label="Syndicat"
-          placeholder="Choisir un syndicat"
-          value={syndicatId}
-          options={(reference.data?.syndicats ?? [])
-            .filter((syndicat) => syndicat.isActive)
-            .map((syndicat) => ({
-              value: syndicat.id,
-              label: syndicat.name,
-              hint: syndicat.sigle,
-            }))}
-          onChange={setSyndicatId}
-        />
+        {errors.banqueId ? (
+          <p role="alert" className="text-[0.75rem] text-destructive">
+            {errors.banqueId}
+          </p>
+        ) : null}
+        {selectedProfession?.isTeaching ? (
+          <FilterCombobox
+            label="Syndicat"
+            placeholder="Choisir un syndicat"
+            value={syndicatId}
+            options={(reference.data?.syndicats ?? [])
+              .filter((syndicat) => syndicat.isActive)
+              .map((syndicat) => ({
+                value: syndicat.id,
+                label: syndicat.name,
+                hint: syndicat.sigle,
+              }))}
+            onChange={setSyndicatId}
+          />
+        ) : null}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
+        <FilterCombobox
+          label="Revenu mensuel"
+          placeholder="Choisir une tranche"
+          value={incomeBandId}
+          options={(reference.data?.incomeBands ?? [])
+            .filter((band) => band.isActive)
+            .map((band) => ({ value: band.id, label: band.label }))}
+          onChange={setIncomeBandId}
+        />
         <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor="gp-duree">Durée du système</Label>
+          <Label htmlFor="gp-paiement">Paiement</Label>
           <Select
-            value={dureeMois === null ? '' : String(dureeMois)}
+            value={paymentMode ?? ''}
             onValueChange={(value) => {
-              setDureeMois(value === null || value === '' ? null : Number(value));
+              const mode = value === '' || value === null ? null : (value as PaymentMode);
+              setPaymentMode(mode);
+              if (mode !== 'ECHELONNE') setDureeMois(null);
             }}
           >
-            <SelectTrigger id="gp-duree">
-              <SelectValue placeholder="Choisir une durée" />
+            <SelectTrigger id="gp-paiement">
+              <SelectValue placeholder="Choisir un mode" />
             </SelectTrigger>
             <SelectContent>
-              {DUREES_MOIS.map((mois) => (
-                <SelectItem key={mois} value={String(mois)}>
-                  {formatDureeMois(mois)}
-                </SelectItem>
-              ))}
+              <SelectItem value="COMPTANT">Comptant</SelectItem>
+              <SelectItem value="ECHELONNE">Échelonné</SelectItem>
             </SelectContent>
           </Select>
         </div>
+        {paymentMode === 'ECHELONNE' ? (
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor="gp-duree">Durée de remboursement</Label>
+            <Select
+              value={dureeMois === null ? '' : String(dureeMois)}
+              onValueChange={(value) => {
+                setDureeMois(value === null || value === '' ? null : Number(value));
+              }}
+            >
+              <SelectTrigger id="gp-duree">
+                <SelectValue placeholder="Choisir une durée" />
+              </SelectTrigger>
+              <SelectContent>
+                {DUREES_MOIS.map((mois) => (
+                  <SelectItem key={mois} value={String(mois)}>
+                    {formatDureeMois(mois)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
 
         <FilterCombobox
           label="Canal de provenance"

@@ -75,7 +75,10 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
   }
 
   Future<void> _start() async {
+    // La boîte de permission Android met l'application en pause : au retour, ce
+    // State peut avoir été détruit et tout `setState` d'ici plante.
     if (!await _recorder.hasPermission()) {
+      if (!mounted) return;
       setState(
         () => _error =
             'Autorisez le microphone pour enregistrer une note vocale.',
@@ -109,6 +112,7 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
             if (_samples.length > 72) _samples.removeAt(0);
           });
         });
+    if (!mounted) return;
     setState(() {
       _path = path;
       _recording = true;
@@ -126,6 +130,7 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
     await _amplitudes?.cancel();
     widget.onRecordingStateChanged(null);
     if (path == null) {
+      if (!mounted) return;
       setState(() {
         _recording = false;
         _error = 'La note vocale n’a pas pu être conservée.';
@@ -133,11 +138,13 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
       return;
     }
     await _player.setFilePath(path);
+    // Le fichier existe : la fiche doit le recevoir même si l'écran est parti.
+    widget.onChanged(path);
+    if (!mounted) return;
     setState(() {
       _path = path;
       _recording = false;
     });
-    widget.onChanged(path);
   }
 
   Future<void> _togglePlayback() async {
@@ -157,6 +164,7 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
     if (previous != null) {
       await File(previous).delete().catchError((_) => File(previous));
     }
+    if (!mounted) return;
     setState(() {
       _path = null;
       _samples.clear();
@@ -218,13 +226,16 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
             if (_recording)
               FilledButton.icon(
                 onPressed: _stop,
-                icon: const Icon(PhosphorIconsFill.stop, size: 18),
+                icon: const Icon(PhosphorIconsFill.stop, size: CpiIconSize.sm),
                 label: const Text('Arrêter l’enregistrement'),
               )
             else if (!ready)
               OutlinedButton.icon(
                 onPressed: widget.enabled ? _start : null,
-                icon: const Icon(PhosphorIconsRegular.microphone, size: 20),
+                icon: const Icon(
+                  PhosphorIconsRegular.microphone,
+                  size: CpiIconSize.md,
+                ),
                 label: const Text('Enregistrer une note vocale'),
               )
             else
@@ -237,7 +248,7 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
                       _playing
                           ? PhosphorIconsFill.pause
                           : PhosphorIconsFill.play,
-                      size: 20,
+                      size: CpiIconSize.md,
                     ),
                   ),
                   const SizedBox(width: CpiSpacing.xs),
@@ -258,6 +269,7 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
                     onChanged: (double? value) async {
                       if (value == null) return;
                       await _player.setSpeed(value);
+                      if (!mounted) return;
                       setState(() => _speed = value);
                     },
                   ),
@@ -266,7 +278,7 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
                     tooltip: 'Recommencer',
                     icon: const Icon(
                       PhosphorIconsRegular.arrowCounterClockwise,
-                      size: 20,
+                      size: CpiIconSize.md,
                     ),
                   ),
                 ],

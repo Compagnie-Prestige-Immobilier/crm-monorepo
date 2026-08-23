@@ -83,6 +83,16 @@ beforeEach(() => {
 });
 
 describe('registre du jour', () => {
+  it('ouvre la saisie depuis la liste au lieu de l’afficher en permanence', async () => {
+    renderWithQuery(<RegistreView />);
+
+    expect(screen.queryByRole('form', { name: 'Enregistrer une visite' })).toBeNull();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Ajouter une visite' }));
+
+    expect(await screen.findByRole('form', { name: 'Enregistrer une visite' })).toBeTruthy();
+  });
+
   it('reprend les intitulés de colonnes du classeur', async () => {
     renderWithQuery(<RegistreView />);
 
@@ -141,6 +151,38 @@ describe('registre du jour', () => {
 
     expect(await screen.findByText(/Aucune visite enregistrée aujourd’hui/u)).toBeTruthy();
   });
+
+  it('ouvre les visites précédentes depuis l’état vide du jour', async () => {
+    fetchVisites.mockResolvedValue(page([]));
+    renderWithQuery(<RegistreView />);
+
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: 'Voir tout le registre' }));
+
+    expect(routerMock.push).toHaveBeenCalledWith('/accueil?periode=tout', { scroll: false });
+  });
+
+  it('prépare une impression en paysage avant d’ouvrir la boîte système', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    renderWithQuery(<RegistreView />);
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Imprimer' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Préparer l’impression' });
+    expect(
+      within(dialog)
+        .getByRole('radio', { name: /Paysage/u })
+        .hasAttribute('checked'),
+    ).toBe(true);
+    expect(print).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Ouvrir l’impression' }));
+
+    expect(print).toHaveBeenCalledOnce();
+    print.mockRestore();
+  });
 });
 
 describe('filtres du registre, dans l’adresse', () => {
@@ -186,6 +228,24 @@ describe('filtres du registre, dans l’adresse', () => {
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Page suivante' }));
 
     expect(routerMock.push).toHaveBeenCalledWith('/accueil?page=2', { scroll: false });
+  });
+
+  // La pagination est masquée à l'impression : rien sur le papier n'indiquait
+  // qu'il manquait les 140 visites suivantes.
+  it('dit SUR LE PAPIER quelles visites la feuille porte, et lesquelles manquent', async () => {
+    fetchVisites.mockResolvedValue(page([visite()], { total: 240, pageCount: 3 }));
+    renderWithQuery(<RegistreView />);
+
+    const mention = await screen.findByText(/Page 1 sur 3/u);
+    expect(mention.className).toContain('print:block');
+    expect(mention.textContent).toContain('240');
+  });
+
+  it('ne l’écrit pas quand tout tient sur une feuille', async () => {
+    renderWithQuery(<RegistreView />);
+
+    await screen.findByRole('table');
+    expect(screen.queryByText(/Page 1 sur/u)).toBeNull();
   });
 
   it('ne propose aucune page à tourner quand le registre tient sur une seule', async () => {

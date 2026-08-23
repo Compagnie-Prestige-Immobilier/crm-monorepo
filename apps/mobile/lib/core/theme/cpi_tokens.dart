@@ -4,6 +4,9 @@ import 'cpi_colors.dart';
 
 abstract final class CpiSpacing {
   static const double xxs = 4;
+
+  /// Comble le saut de 4 à 8 : cinq widgets écrivaient `xxs + 2`.
+  static const double xxsPlus = 6;
   static const double xs = 8;
   static const double sm = 12;
   static const double md = 16;
@@ -14,6 +17,19 @@ abstract final class CpiSpacing {
   static const double huge = 48;
   static const double giant = 64;
   static const double colossal = 80;
+}
+
+abstract final class CpiIconSize {
+  static const double xxs = 12;
+  static const double xs = 16;
+  static const double sm = 18;
+  static const double md = 20;
+  static const double lg = 22;
+  static const double xl = 26;
+  static const double xxl = 28;
+  static const double xxxl = 36;
+  static const double display = 56;
+  static const double hero = 88;
 }
 
 abstract final class CpiRadius {
@@ -74,7 +90,25 @@ abstract final class CpiStateOpacity {
   static const double disabledContainer = 0.12;
 }
 
-const double kCpiMinTouchTarget = 44;
+/// Plancher de cible tactile. 48 dp est le minimum Android (Material 3, WCAG
+/// 2.5.8 AAA) ; 44 laissait `SyncBadge` et `NotificationBell` coder 48 à côté.
+const double kCpiMinTouchTarget = 48;
+
+/// Piste de progression posée sur un aplat de marque : le blanc translucide
+/// doit rester à 3:1 du fond ET de l'indicateur blanc (WCAG 1.4.11).
+Color cpiTrackOn(Color brand) =>
+    Color.alphaBlend(const Color(0x73FFFFFF), brand);
+
+/// Dégradé plein écran d'un aplat de marque : la même teinte éclaircie puis
+/// assombrie, pour qu'une autre coque n'hérite pas du bordeaux CPI.
+List<Color> cpiBrandGradient(Color brand) {
+  final HSLColor base = HSLColor.fromColor(brand);
+  return <Color>[
+    base.withLightness((base.lightness + 0.06).clamp(0.0, 1.0)).toColor(),
+    brand,
+    base.withLightness((base.lightness - 0.05).clamp(0.0, 1.0)).toColor(),
+  ];
+}
 
 @immutable
 class CpiMotion extends ThemeExtension<CpiMotion> {

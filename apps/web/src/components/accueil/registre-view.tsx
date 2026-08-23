@@ -6,10 +6,11 @@ import {
   ChevronRightIcon,
   ClipboardListIcon,
   PencilIcon,
+  PlusIcon,
   PrinterIcon,
   RotateCcwIcon,
 } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 
 import { VisiteForm } from '@/components/accueil/visite-form';
 import { EmptyState } from '@/components/empty-state';
@@ -19,7 +20,14 @@ import { SearchField } from '@/components/filters/search-field';
 import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -47,7 +55,7 @@ import {
 } from '@/lib/data/visites';
 import { formatDate, formatNumber } from '@/lib/format';
 import type { FilterOption } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 
 const ADAPTER: UrlFilterAdapter<VisiteFilters> = {
   parse: parseVisiteFilters,
@@ -78,16 +86,17 @@ export function RegistreView() {
   const auId = useId();
   const [today] = useState(() => dakarNow().date);
   const [corrigeeId, setCorrigeeId] = useState<string | null>(null);
+  const [ajoutOuvert, setAjoutOuvert] = useState(false);
+  const [impressionOuverte, setImpressionOuverte] = useState(false);
+  const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
+  const [commentairesImprimes, setCommentairesImprimes] = useState(true);
 
-  const [searchDraft, setSearchDraft] = useState(filters.search);
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === filters.search) return;
-    setFilters({ search: debouncedSearch });
-  }, [debouncedSearch, filters.search, setFilters]);
+  const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
 
   const referentiels = useQuery({
     queryKey: VISITE_REFERENTIELS_QUERY_KEY,
@@ -115,14 +124,19 @@ export function RegistreView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card className="print:hidden">
-        <CardHeader>
-          <CardTitle>Enregistrer une visite</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <VisiteForm referentiels={referentiels.data} onSaved={rafraichir} />
-        </CardContent>
-      </Card>
+      <style media="print">{`@page { size: ${orientation}; margin: 10mm; }`}</style>
+
+      <div className="flex justify-end print:hidden">
+        <Button
+          type="button"
+          onClick={() => {
+            setAjoutOuvert(true);
+          }}
+        >
+          <PlusIcon aria-hidden="true" />
+          Ajouter une visite
+        </Button>
+      </div>
 
       <section
         aria-label="Rechercher dans le registre"
@@ -230,20 +244,33 @@ export function RegistreView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
           {jourSeul ? 'Visites du jour' : 'Registre des visites'}
-          <span className="ml-2 font-[400] text-muted-foreground">{formatNumber(total)}</span>
+          <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[0.875rem] font-[600] text-muted-foreground">
+            {formatNumber(total)}
+          </span>
         </h2>
         <Button
           type="button"
           variant="outline"
           className="print:hidden"
+          disabled={visites.length === 0}
           onClick={() => {
-            window.print();
+            setImpressionOuverte(true);
           }}
         >
           <PrinterIcon aria-hidden="true" />
           Imprimer
         </Button>
       </div>
+
+      {/* SUR LE PAPIER, dire ce que la feuille contient. La pagination de
+          l'écran est masquée à l'impression, et rien n'indiquait qu'il manquait
+          les visites au-delà de la page en cours. */}
+      {pageCount > 1 ? (
+        <p className="hidden text-[0.75rem] print:block">
+          Page {page} sur {pageCount} — visites {formatNumber(premiere)} à {formatNumber(derniere)}{' '}
+          sur {formatNumber(total)}. Les autres pages s’impriment séparément.
+        </p>
+      ) : null}
 
       {registre.isPending ? (
         <Skeleton className="h-64 w-full" />
@@ -265,18 +292,40 @@ export function RegistreView() {
           }
           description={
             jourSeul
-              ? 'Enregistrez la première depuis le formulaire ci-dessus.'
+              ? 'Enregistrez la première ou consultez les visites précédentes.'
               : 'Élargissez la période ou retirez un filtre.'
+          }
+          action={
+            jourSeul ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
+                }}
+              >
+                Voir tout le registre
+              </Button>
+            ) : undefined
           }
         />
       ) : (
-        <div className="rounded-lg border border-border bg-card shadow-elev-sm">
+        <div className="rounded-lg border border-border bg-card shadow-elev-sm print:text-[10px]">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>N° REGISTRE</TableHead>
                 {COLONNES.map((colonne) => (
-                  <TableHead key={colonne}>{colonne}</TableHead>
+                  <TableHead
+                    key={colonne}
+                    className={
+                      colonne === VISITE_COLONNES.comment && !commentairesImprimes
+                        ? 'print:hidden'
+                        : undefined
+                    }
+                  >
+                    {colonne}
+                  </TableHead>
                 ))}
                 <TableHead className="print:hidden">CORRIGER</TableHead>
               </TableRow>
@@ -303,6 +352,7 @@ export function RegistreView() {
                   <LigneVisite
                     key={visite.id}
                     visite={visite}
+                    commentairesImprimes={commentairesImprimes}
                     onCorriger={() => {
                       setCorrigeeId(visite.id);
                     }}
@@ -350,11 +400,113 @@ export function RegistreView() {
           </div>
         </div>
       ) : null}
+
+      <Dialog open={ajoutOuvert} onOpenChange={setAjoutOuvert}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Enregistrer une visite</DialogTitle>
+          </DialogHeader>
+          {/* Le dialogue RESTE ouvert : le formulaire se remet en file de
+              lui-même, entreprise conservée, focus sur le nom. Trois visiteurs
+              de la même société s'enregistrent d'affilée, ce que la fermeture
+              automatique rendait impossible. L'accueil ferme quand il a fini. */}
+          <VisiteForm referentiels={referentiels.data} onSaved={rafraichir} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={impressionOuverte} onOpenChange={setImpressionOuverte}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Préparer l’impression</DialogTitle>
+            <DialogDescription>
+              Les filtres et la période affichés seront conservés.
+            </DialogDescription>
+          </DialogHeader>
+
+          <fieldset className="flex flex-col gap-2">
+            <legend className="pb-1 text-[0.8125rem] font-[600]">Orientation</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  ['landscape', 'Paysage', 'Recommandé pour toutes les colonnes'],
+                  ['portrait', 'Portrait', 'Pour une liste plus étroite'],
+                ] as const
+              ).map(([value, label, description]) => (
+                <label
+                  key={value}
+                  className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${
+                    orientation === value ? 'border-primary bg-secondary' : 'border-border'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="orientation-impression"
+                    value={value}
+                    checked={orientation === value}
+                    className="mt-0.5 size-4 accent-[var(--primary)]"
+                    onChange={() => {
+                      setOrientation(value);
+                    }}
+                  />
+                  <span>
+                    <span className="block text-[0.875rem] font-[600]">{label}</span>
+                    <span className="block text-[0.75rem] text-muted-foreground">
+                      {description}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-border p-3 text-[0.875rem]">
+            <input
+              type="checkbox"
+              checked={commentairesImprimes}
+              className="size-4 accent-[var(--primary)]"
+              onChange={(event) => {
+                setCommentairesImprimes(event.target.checked);
+              }}
+            />
+            Inclure la colonne commentaires
+          </label>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setImpressionOuverte(false);
+              }}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setImpressionOuverte(false);
+                window.print();
+              }}
+            >
+              <PrinterIcon aria-hidden="true" />
+              Ouvrir l’impression
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function LigneVisite({ visite, onCorriger }: { visite: Visite; onCorriger: () => void }) {
+function LigneVisite({
+  visite,
+  commentairesImprimes,
+  onCorriger,
+}: {
+  visite: Visite;
+  commentairesImprimes: boolean;
+  onCorriger: () => void;
+}) {
   return (
     <TableRow>
       <TableCell className="font-[600] whitespace-nowrap">{visite.reference}</TableCell>
@@ -366,7 +518,9 @@ function LigneVisite({ visite, onCorriger }: { visite: Visite; onCorriger: () =>
       <TableCell>{visite.direction?.label ?? ''}</TableCell>
       <TableCell>{visite.destinataire?.label ?? ''}</TableCell>
       <TableCell>{visite.objet.label}</TableCell>
-      <TableCell className="max-w-[20rem]">{visite.comment ?? ''}</TableCell>
+      <TableCell className={`max-w-[20rem] ${commentairesImprimes ? '' : 'print:hidden'}`}>
+        {visite.comment ?? ''}
+      </TableCell>
       <TableCell className="print:hidden">
         <Button
           type="button"
