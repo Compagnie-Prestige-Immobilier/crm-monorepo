@@ -28,11 +28,11 @@ class DatabaseRefreshMutex implements RefreshMutex {
 
   @override
   Future<T> protect<T>(Future<T> Function() body) async {
-    final DateTime? mine = await _acquire();
+    final DateTime mine = await _acquire() ?? (throw const RefreshLockBusy());
     try {
       return await body();
     } finally {
-      if (mine != null) await _release(mine);
+      await _release(mine);
     }
   }
 
@@ -61,7 +61,8 @@ class DatabaseRefreshMutex implements RefreshMutex {
         await (_db.update(_db.syncState)..where(
               (SyncState t) =>
                   t.collection.equals(lockKey) &
-                  (t.lastPulledAt.isNull() | t.lastPulledAt.isSmallerOrEqualValue(now)),
+                  (t.lastPulledAt.isNull() |
+                      t.lastPulledAt.isSmallerOrEqualValue(now)),
             ))
             .write(SyncStateCompanion(lastPulledAt: Value<DateTime?>(expiry)));
     return changed == 1 ? expiry : null;

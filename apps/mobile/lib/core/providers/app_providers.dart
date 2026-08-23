@@ -26,22 +26,26 @@ import '../sync/sync_engine_factory.dart';
 import '../sync/token_store.dart';
 import 'sync_coordinator.dart';
 
-
-final Provider<AppDatabase> appDatabaseProvider = Provider<AppDatabase>((Ref ref) {
-  throw UnimplementedError('appDatabaseProvider doit être surchargé dans main().');
+final Provider<AppDatabase> appDatabaseProvider = Provider<AppDatabase>((
+  Ref ref,
+) {
+  throw UnimplementedError(
+    'appDatabaseProvider doit être surchargé dans main().',
+  );
 });
 
-final Provider<SharedPreferences> sharedPreferencesProvider = Provider<SharedPreferences>(
-  (Ref ref) {
-    throw UnimplementedError(
-      'sharedPreferencesProvider doit être surchargé dans main().',
-    );
-  },
-);
+final Provider<SharedPreferences> sharedPreferencesProvider =
+    Provider<SharedPreferences>((Ref ref) {
+      throw UnimplementedError(
+        'sharedPreferencesProvider doit être surchargé dans main().',
+      );
+    });
 
 final Provider<String> buildNumberProvider = Provider<String>((Ref ref) => '0');
 
-final Provider<Clock> clockProvider = Provider<Clock>((Ref ref) => const SystemClock());
+final Provider<Clock> clockProvider = Provider<Clock>(
+  (Ref ref) => const SystemClock(),
+);
 
 final Provider<TokenStore> tokenStoreProvider = Provider<TokenStore>((Ref ref) {
   return SecureTokenStore();
@@ -62,7 +66,9 @@ final Provider<ApiPort> apiPortProvider = Provider<ApiPort>((Ref ref) {
   return DioApi(ref.watch(apiClientProvider).client);
 });
 
-final Provider<RouteMemory> routeMemoryProvider = Provider<RouteMemory>((Ref ref) {
+final Provider<RouteMemory> routeMemoryProvider = Provider<RouteMemory>((
+  Ref ref,
+) {
   return RouteMemory(
     ref.watch(sharedPreferencesProvider),
     buildNumber: ref.watch(buildNumberProvider),
@@ -89,17 +95,21 @@ final Provider<Phase2DirectorySync> phase2DirectoryProvider =
       );
     });
 
-final Provider<WriteRepository> writeRepositoryProvider = Provider<WriteRepository>((
-  Ref ref,
-) {
-  return WriteRepository(ref.watch(appDatabaseProvider), clock: ref.watch(clockProvider));
-});
+final Provider<WriteRepository> writeRepositoryProvider =
+    Provider<WriteRepository>((Ref ref) {
+      return WriteRepository(
+        ref.watch(appDatabaseProvider),
+        clock: ref.watch(clockProvider),
+      );
+    });
 
-final Provider<DraftRepository> draftRepositoryProvider = Provider<DraftRepository>((
-  Ref ref,
-) {
-  return DraftRepository(ref.watch(appDatabaseProvider), clock: ref.watch(clockProvider));
-});
+final Provider<DraftRepository> draftRepositoryProvider =
+    Provider<DraftRepository>((Ref ref) {
+      return DraftRepository(
+        ref.watch(appDatabaseProvider),
+        clock: ref.watch(clockProvider),
+      );
+    });
 
 final Provider<ReferenceRepository> referenceRepositoryProvider =
     Provider<ReferenceRepository>((Ref ref) {
@@ -112,16 +122,39 @@ final NotifierProvider<AuthController, AuthState> authControllerProvider =
 final NotifierProvider<SyncCoordinator, SyncUiState> syncCoordinatorProvider =
     NotifierProvider<SyncCoordinator, SyncUiState>(SyncCoordinator.new);
 
-final StreamProvider<int> representantCountProvider = StreamProvider<int>((Ref ref) {
+final StreamProvider<int> representantCountProvider = StreamProvider<int>((
+  Ref ref,
+) {
   return ref.watch(appDatabaseProvider).countRepresentants().watchSingle();
 });
 
-final StreamProvider<int> prospectCountProvider = StreamProvider<int>((Ref ref) {
+final StreamProvider<int> prospectCountProvider = StreamProvider<int>((
+  Ref ref,
+) {
   return ref.watch(appDatabaseProvider).countProspects().watchSingle();
 });
 
-final StreamProvider<int> pendingSyncCountProvider = StreamProvider<int>((Ref ref) {
-  return ref.watch(appDatabaseProvider).countPendingOutbox().watchSingle();
+final StreamProvider<int> grandPublicProspectCountProvider =
+    StreamProvider<int>((Ref ref) {
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchProspectCount(projet: 'GRAND_PUBLIC');
+    });
+
+/// Ce qu'un envoi peut encore faire partir. `countPendingOutbox` comptait aussi
+/// `conflict` et `failed` : le bandeau annonçait « sera envoyé au retour du
+/// réseau » pour des lignes qu'aucun réseau ne débloquera.
+final StreamProvider<int> pendingSyncCountProvider = StreamProvider<int>((
+  Ref ref,
+) {
+  return ref.watch(appDatabaseProvider).countSchedulableOutbox().watchSingle();
+});
+
+/// Ce qui attend une décision humaine, dans « À corriger ».
+final StreamProvider<int> blockedSyncCountProvider = StreamProvider<int>((
+  Ref ref,
+) {
+  return ref.watch(appDatabaseProvider).countBlockedOutbox().watchSingle();
 });
 
 final StreamProvider<List<ActivityDay>> activityLast7DaysProvider =
@@ -180,7 +213,9 @@ String _isoDay(DateTime d) =>
     '${d.month.toString().padLeft(2, '0')}-'
     '${d.day.toString().padLeft(2, '0')}';
 
-final StreamProvider<int> needsAttentionCountProvider = StreamProvider<int>((Ref ref) {
+final StreamProvider<int> needsAttentionCountProvider = StreamProvider<int>((
+  Ref ref,
+) {
   return ref
       .watch(referenceRepositoryProvider)
       .watchNeedsAttention()
@@ -192,39 +227,43 @@ final StreamProvider<List<OutboxData>> needsAttentionProvider =
       return ref.watch(referenceRepositoryProvider).watchNeedsAttention();
     });
 
-
-final StreamProvider<List<Region>> regionsProvider = StreamProvider<List<Region>>((
-  Ref ref,
-) {
-  return ref.watch(referenceRepositoryProvider).watchRegions();
-});
+final StreamProvider<List<Region>> regionsProvider =
+    StreamProvider<List<Region>>((Ref ref) {
+      return ref.watch(referenceRepositoryProvider).watchRegions();
+    });
 
 final departementsProvider = StreamProvider.family<List<Departement>, String?>((
   Ref ref,
   String? regionId,
 ) {
-  return ref.watch(referenceRepositoryProvider).watchDepartements(regionId: regionId);
+  return ref
+      .watch(referenceRepositoryProvider)
+      .watchDepartements(regionId: regionId);
 });
 
 final iefsProvider = StreamProvider.family<List<Ief>, String?>((
   Ref ref,
   String? departementId,
 ) {
-  return ref.watch(referenceRepositoryProvider).watchIefs(departementId: departementId);
+  return ref
+      .watch(referenceRepositoryProvider)
+      .watchIefs(departementId: departementId);
 });
 
-final StreamProvider<List<Banque>> banquesProvider = StreamProvider<List<Banque>>((
-  Ref ref,
-) {
-  return ref.watch(referenceRepositoryProvider).watchBanques();
-});
+final StreamProvider<List<Banque>> banquesProvider =
+    StreamProvider<List<Banque>>((Ref ref) {
+      return ref.watch(referenceRepositoryProvider).watchBanques();
+    });
 
-final StreamProvider<List<Syndicat>> syndicatsProvider = StreamProvider<List<Syndicat>>((
-  Ref ref,
-) {
-  return ref.watch(referenceRepositoryProvider).watchSyndicats();
-});
+final StreamProvider<List<Syndicat>> syndicatsProvider =
+    StreamProvider<List<Syndicat>>((Ref ref) {
+      return ref.watch(referenceRepositoryProvider).watchSyndicats();
+    });
 
+final StreamProvider<List<CanauxProvenanceData>> canauxProvenanceProvider =
+    StreamProvider<List<CanauxProvenanceData>>((Ref ref) {
+      return ref.watch(referenceRepositoryProvider).watchCanauxProvenance();
+    });
 
 final NotifierProvider<HistoriqueSearch, String> historiqueSearchProvider =
     NotifierProvider<HistoriqueSearch, String>(HistoriqueSearch.new);
@@ -243,8 +282,23 @@ final StreamProvider<List<RepresentantSyncViewData>> representantListProvider =
           .watchRepresentants(search: ref.watch(historiqueSearchProvider));
     });
 
-final NotifierProvider<RepresentantPickerSearch, String> representantPickerSearchProvider =
-    NotifierProvider<RepresentantPickerSearch, String>(RepresentantPickerSearch.new);
+final StreamProvider<List<ProspectSyncViewData>>
+grandPublicProspectListProvider = StreamProvider<List<ProspectSyncViewData>>((
+  Ref ref,
+) {
+  return ref
+      .watch(referenceRepositoryProvider)
+      .watchAllProspects(
+        search: ref.watch(historiqueSearchProvider),
+        projet: 'GRAND_PUBLIC',
+      );
+});
+
+final NotifierProvider<RepresentantPickerSearch, String>
+representantPickerSearchProvider =
+    NotifierProvider<RepresentantPickerSearch, String>(
+      RepresentantPickerSearch.new,
+    );
 
 class RepresentantPickerSearch extends Notifier<String> {
   @override
@@ -253,19 +307,25 @@ class RepresentantPickerSearch extends Notifier<String> {
   void set(String value) => state = value;
 }
 
-final StreamProvider<List<RepresentantSyncViewData>> representantPickerListProvider =
-    StreamProvider<List<RepresentantSyncViewData>>((Ref ref) {
-      return ref
-          .watch(referenceRepositoryProvider)
-          .watchRepresentants(search: ref.watch(representantPickerSearchProvider));
-    });
+final StreamProvider<List<RepresentantSyncViewData>>
+representantPickerListProvider = StreamProvider<List<RepresentantSyncViewData>>(
+  (Ref ref) {
+    return ref
+        .watch(referenceRepositoryProvider)
+        .watchRepresentants(
+          search: ref.watch(representantPickerSearchProvider),
+        );
+  },
+);
 
 final representantDetailProvider =
     StreamProvider.family<RepresentantSyncViewData?, String>((
       Ref ref,
       String representantId,
     ) {
-      return ref.watch(referenceRepositoryProvider).watchRepresentant(representantId);
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchRepresentant(representantId);
     });
 
 final prospectsForRepresentantProvider =
@@ -273,7 +333,9 @@ final prospectsForRepresentantProvider =
       Ref ref,
       String representantId,
     ) {
-      return ref.watch(referenceRepositoryProvider).watchProspectsFor(representantId);
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchProspectsFor(representantId);
     });
 
 final representantCommentsProvider =
@@ -281,18 +343,23 @@ final representantCommentsProvider =
       Ref ref,
       String representantId,
     ) {
-      return ref.watch(referenceRepositoryProvider).watchCommentsFor(representantId);
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchCommentsFor(representantId);
     });
 
 final prospectCountForProvider = StreamProvider.family<int, String>((
   Ref ref,
   String representantId,
 ) {
-  return ref.watch(referenceRepositoryProvider).watchProspectCountFor(representantId);
+  return ref
+      .watch(referenceRepositoryProvider)
+      .watchProspectCountFor(representantId);
 });
 
-
-final StreamProvider<int> phase2DirectoryCountProvider = StreamProvider<int>((Ref ref) {
+final StreamProvider<int> phase2DirectoryCountProvider = StreamProvider<int>((
+  Ref ref,
+) {
   return ref.watch(phase2DirectoryProvider).watchCount();
 });
 
@@ -301,7 +368,8 @@ final StreamProvider<SyncStateData?> phase2DirectoryStateProvider =
       return ref.watch(phase2DirectoryProvider).watchState();
     });
 
-final StreamProvider<({int attempts, int methods, int closed})> phase2ProgressProvider =
+final StreamProvider<({int attempts, int methods, int closed})>
+phase2ProgressProvider =
     StreamProvider<({int attempts, int methods, int closed})>((Ref ref) {
       final AppDatabase db = ref.watch(appDatabaseProvider);
       return db.countMyAttempts().watchSingle().asyncMap((int attempts) async {
@@ -313,7 +381,9 @@ final StreamProvider<({int attempts, int methods, int closed})> phase2ProgressPr
       });
     });
 
-final StreamProvider<int> phase2PendingCountProvider = StreamProvider<int>((Ref ref) {
+final StreamProvider<int> phase2PendingCountProvider = StreamProvider<int>((
+  Ref ref,
+) {
   return ref.watch(appDatabaseProvider).countPhase2Pending().watchSingle();
 });
 

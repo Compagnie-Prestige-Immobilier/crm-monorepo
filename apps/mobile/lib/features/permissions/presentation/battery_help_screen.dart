@@ -37,13 +37,19 @@ class BatteryHelpScreen extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Icon(PhosphorIconsRegular.info, size: 20, color: cpi.info),
+                  Icon(
+                    PhosphorIconsRegular.info,
+                    size: CpiIconSize.md,
+                    color: cpi.info,
+                  ),
                   const SizedBox(width: CpiSpacing.xs),
                   Expanded(
                     child: Text(
                       'Ces réglages permettent l\'envoi pendant que l\'app est '
                       'fermée.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: cpi.info),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cpi.info,
+                      ),
                     ),
                   ),
                 ],
@@ -77,13 +83,16 @@ class BatteryHelpScreen extends StatelessWidget {
             const SizedBox(height: CpiSpacing.lg),
             FilledButton.icon(
               onPressed: _openBatterySettings,
-              icon: const Icon(PhosphorIconsRegular.gear, size: 20),
+              icon: const Icon(PhosphorIconsRegular.gear, size: CpiIconSize.md),
               label: const Text('Ouvrir les réglages de batterie'),
             ),
             const SizedBox(height: CpiSpacing.xs),
             OutlinedButton.icon(
               onPressed: _openAppSettings,
-              icon: const Icon(PhosphorIconsRegular.slidersHorizontal, size: 20),
+              icon: const Icon(
+                PhosphorIconsRegular.slidersHorizontal,
+                size: CpiIconSize.md,
+              ),
               label: const Text('Ouvrir la fiche de l\'application'),
             ),
           ],
@@ -99,7 +108,10 @@ class BatteryHelpScreen extends StatelessWidget {
         action: 'android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS',
       ).launch();
     } on Object catch (e) {
-      developer.log('Réglages de batterie inaccessibles : $e', name: 'cpi.perm');
+      developer.log(
+        'Réglages de batterie inaccessibles : $e',
+        name: 'cpi.perm',
+      );
       await _openAppSettings();
     }
   }

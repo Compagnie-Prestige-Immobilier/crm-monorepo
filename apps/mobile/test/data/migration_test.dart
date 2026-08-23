@@ -1,5 +1,5 @@
 import 'package:cpi_go/data/local/database.dart';
-import 'package:drift/drift.dart' show QueryRow;
+import 'package:drift/drift.dart' show GeneratedDatabase, QueryRow;
 import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +17,7 @@ import 'generated_migrations/schema_v9.dart' as v9;
 import 'generated_migrations/schema_v10.dart' as v10;
 import 'generated_migrations/schema_v11.dart' as v11;
 import 'generated_migrations/schema_v13.dart' as v13;
+import 'generated_migrations/schema_v14.dart' as v14;
 
 /// Test doré de migration.
 ///
@@ -1344,45 +1345,48 @@ void main() {
     await db.close();
   });
 
-  test('v2 -> dernier palier : le saut passe aussi par les colonnes ajoutées', () async {
-    final schema = await verifier.schemaAt(2);
-    final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+  test(
+    'v2 -> dernier palier : le saut passe aussi par les colonnes ajoutées',
+    () async {
+      final schema = await verifier.schemaAt(2);
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
-    // Les colonnes ajoutées en chemin (v4, v5, v7 puis v8) doivent être là
-    // toutes : un palier gardé par `from < n` seul, sans `to >= n`, produit un
-    // schéma intermédiaire qui n'est aucune version déclarée.
-    final List<QueryRow> columns = await db
-        .customSelect(
-          'SELECT ief_id, relation_status, whatsapp_status, whatsapp_e164, '
-          'profession FROM representants',
-        )
-        .get();
-    expect(columns, isEmpty);
-    final List<QueryRow> outbox = await db
-        .customSelect('SELECT blocked_attempts, claim_token FROM outbox')
-        .get();
-    expect(outbox, isEmpty);
-    final List<QueryRow> attempts = await db
-        .customSelect(
-          'SELECT callback_at, reason_code, effect, requires_comment '
-          'FROM call_attempts',
-        )
-        .get();
-    expect(attempts, isEmpty);
-    final List<QueryRow> fil = await db
-        .customSelect('SELECT body FROM representant_comments')
-        .get();
-    expect(fil, isEmpty);
-    final List<QueryRow> motifs = await db
-        .customSelect(
-          'SELECT code, effect, min_payload_version FROM call_outcome_reasons',
-        )
-        .get();
-    expect(motifs, isEmpty);
+      // Les colonnes ajoutées en chemin (v4, v5, v7 puis v8) doivent être là
+      // toutes : un palier gardé par `from < n` seul, sans `to >= n`, produit un
+      // schéma intermédiaire qui n'est aucune version déclarée.
+      final List<QueryRow> columns = await db
+          .customSelect(
+            'SELECT ief_id, relation_status, whatsapp_status, whatsapp_e164, '
+            'profession FROM representants',
+          )
+          .get();
+      expect(columns, isEmpty);
+      final List<QueryRow> outbox = await db
+          .customSelect('SELECT blocked_attempts, claim_token FROM outbox')
+          .get();
+      expect(outbox, isEmpty);
+      final List<QueryRow> attempts = await db
+          .customSelect(
+            'SELECT callback_at, reason_code, effect, requires_comment '
+            'FROM call_attempts',
+          )
+          .get();
+      expect(attempts, isEmpty);
+      final List<QueryRow> fil = await db
+          .customSelect('SELECT body FROM representant_comments')
+          .get();
+      expect(fil, isEmpty);
+      final List<QueryRow> motifs = await db
+          .customSelect(
+            'SELECT code, effect, min_payload_version FROM call_outcome_reasons',
+          )
+          .get();
+      expect(motifs, isEmpty);
 
-    await db.close();
-  });
+      await db.close();
+    },
+  );
   // ── v11 → v12 : les campagnes descendent sur l'appareil ────────────────────
   //
   // Deux tables NEUVES, aucune recopie. Ce qui doit être prouvé : la saisie déjà
@@ -1509,6 +1513,190 @@ void main() {
       await db.close();
     },
   );
+
+  // ── v13/v14 → v15 : les parcours ───────────────────────────────────────────
+  //
+  // Le palier le plus exposé depuis le v10. Il fait trois choses à la fois :
+  // deux référentiels neufs, DEUX COLONNES ajoutées conditionnellement à
+  // `prospects` selon le palier d'origine, et une REPRISE qui fabrique une ligne
+  // de parcours par fiche. Aucune n'était exercée avec des données.
+  //
+  // Le `if (from >= 13)` porte tout le risque : `alterTable(_prospectsCopy)`
+  // engendre TOUJOURS la forme COURANTE de la table, donc une base venue d'avant
+  // la v13 a déjà les deux colonnes et un `addColumn` inconditionnel y échouerait
+  // sur « duplicate column name ». Une base de v13 ou v14, elle, ne les a pas.
+
+  Future<void> semerFichesEnV(
+    GeneratedDatabase old, {
+    required String projet,
+  }) async {
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO prospects '
+      '(id, nom, prenom, phone_e164, projet, created_by_id, statut, '
+      ' client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'pro-vivant',
+        'Diop',
+        'Awa',
+        '+221771112201',
+        projet,
+        'me',
+        'CONTACTE',
+        _iso,
+        _iso,
+      ],
+    );
+    // Une fiche SUPPRIMÉE : lui rouvrir un parcours la ferait réapparaître dans
+    // la liste de son projet, effacée le matin et de retour l'après-midi.
+    await old.customStatement(
+      'INSERT INTO prospects '
+      '(id, nom, prenom, phone_e164, projet, created_by_id, statut, '
+      ' client_created_at, local_updated_at, deleted_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'pro-efface',
+        'Sarr',
+        'Ibrahima',
+        '+221771112202',
+        projet,
+        'me',
+        'NOUVEAU',
+        _iso,
+        _iso,
+        _iso,
+      ],
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'op-parcours',
+        'prospect',
+        'pro-vivant',
+        'create',
+        '{"nom":"Diop"}',
+        _iso,
+        _iso,
+      ],
+    );
+  }
+
+  Future<void> verifierLaReprise(
+    AppDatabase db, {
+    required String projet,
+  }) async {
+    // La reprise : sans elle, toutes les fiches déjà sur l'appareil
+    // disparaissent des DEUX listes de projet à la mise à jour.
+    final List<QueryRow> parcours = await db
+        .customSelect(
+          'SELECT prospect_id, projet, statut FROM prospect_journeys '
+          'ORDER BY prospect_id',
+        )
+        .get();
+    expect(
+      parcours.map((QueryRow r) => r.read<String>('prospect_id')),
+      <String>['pro-vivant'],
+      reason: 'une fiche supprimée n\'a pas de parcours à rouvrir',
+    );
+    expect(parcours.single.read<String>('projet'), projet);
+    expect(
+      parcours.single.read<String>('statut'),
+      'CONTACTE',
+      reason: 'le statut de la fiche est repris, pas remis au défaut',
+    );
+
+    // Les deux colonnes ajoutées conditionnellement sont là ET s'écrivent.
+    await db.customStatement(
+      'INSERT INTO canaux_provenance '
+      '(id, code, label, local_updated_at) VALUES (?, ?, ?, ?)',
+      <Object?>['cn-1', 'PARRAINAGE', 'Parrainage', _iso],
+    );
+    await db.customStatement(
+      'UPDATE prospects SET duree_systeme_mois = ?, canal_provenance_id = ? '
+      'WHERE id = ?',
+      <Object?>[36, 'cn-1', 'pro-vivant'],
+    );
+    final List<QueryRow> fiche = await db
+        .customSelect(
+          'SELECT duree_systeme_mois, canal_provenance_id FROM prospects '
+          'WHERE id = \'pro-vivant\'',
+        )
+        .get();
+    expect(fiche.single.read<int?>('duree_systeme_mois'), 36);
+    expect(fiche.single.read<String?>('canal_provenance_id'), 'cn-1');
+
+    // La file n'a rien perdu.
+    final List<QueryRow> enFile = await db
+        .customSelect('SELECT id FROM outbox')
+        .get();
+    expect(enFile.single.read<String>('id'), 'op-parcours');
+
+    final List<QueryRow> violations = await db
+        .customSelect('PRAGMA foreign_key_check')
+        .get();
+    expect(violations, isEmpty);
+  }
+
+  test('v13 -> v15 ouvre un parcours par fiche VIVANTE', () async {
+    final schema = await verifier.schemaAt(13);
+    final v13.DatabaseAtV13 old = v13.DatabaseAtV13(schema.newConnection());
+    await semerFichesEnV(old, projet: 'CHUES');
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+    await verifierLaReprise(db, projet: 'CHUES');
+    await db.close();
+  });
+
+  test('v14 -> v15 ouvre un parcours par fiche VIVANTE', () async {
+    final schema = await verifier.schemaAt(14);
+    final v14.DatabaseAtV14 old = v14.DatabaseAtV14(schema.newConnection());
+    await semerFichesEnV(old, projet: 'GRAND_PUBLIC');
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+    await verifierLaReprise(db, projet: 'GRAND_PUBLIC');
+    await db.close();
+  });
+
+  test('v13 -> v15 crée les index des tables neuves', () async {
+    final schema = await verifier.schemaAt(13);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+    final List<QueryRow> indexes = await db
+        .customSelect(
+          'SELECT name FROM sqlite_master WHERE type = \'index\' '
+          'AND tbl_name IN (\'canaux_provenance\', \'visite_referentiels\', '
+          '\'prospect_journeys\')',
+        )
+        .get();
+    final Set<String> names = indexes
+        .map((QueryRow r) => r.read<String>('name'))
+        .toSet();
+    expect(names, contains('canaux_provenance_active_idx'));
+    expect(names, contains('visite_referentiels_kind_idx'));
+    expect(names, contains('prospect_journeys_projet_idx'));
+
+    await db.close();
+  });
+
+  /// Une fiche venue d'AVANT la v13 passe par `alterTable`, qui engendre la
+  /// forme courante : les deux colonnes y sont déjà, et le `addColumn` du palier
+  /// v15 doit alors se taire.
+  test('v12 -> v15 ne redéclare pas deux fois les mêmes colonnes', () async {
+    final schema = await verifier.schemaAt(12);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+    await db.close();
+  });
 }
 
 /// Instant fixe, en texte ISO-8601 : c'est ainsi que drift stocke les DATETIME

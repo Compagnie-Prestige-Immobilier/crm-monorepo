@@ -1,0 +1,93 @@
+import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+
+import '../../core/sync/api_port.dart';
+import '../../core/theme/cpi_tokens.dart';
+
+String messageErreur(Object error) {
+  if (error is ApiException) {
+    final String? message = error.message;
+    if (message != null && message.trim().isNotEmpty) return message;
+    return 'Erreur ${error.code}.';
+  }
+  return '$error';
+}
+
+class CpiFailureBanner extends StatelessWidget {
+  const CpiFailureBanner({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(CpiSpacing.sm),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer,
+        borderRadius: CpiRadius.brMd,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            PhosphorIconsRegular.warningCircle,
+            size: CpiIconSize.md,
+            color: theme.colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: CpiSpacing.xs),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onErrorContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Un écran en défaut n'est jamais une impasse : il dit ce qui a échoué et
+/// offre le geste qui le rattrape. Trois écrans affichaient l'exception Dart
+/// centrée, sans aucun bouton.
+class CpiErrorState extends StatelessWidget {
+  const CpiErrorState({
+    super.key,
+    required this.message,
+    required this.onRetry,
+    this.retryLabel = 'Réessayer',
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+  final String retryLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(CpiSpacing.md),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          CpiFailureBanner(message: message),
+          const SizedBox(height: CpiSpacing.xs),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(
+              PhosphorIconsRegular.arrowClockwise,
+              size: CpiIconSize.md,
+            ),
+            label: Text(retryLabel),
+          ),
+        ],
+      ),
+    );
+  }
+}

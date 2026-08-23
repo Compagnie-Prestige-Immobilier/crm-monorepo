@@ -25,14 +25,17 @@ class _UnreadableTokenStore implements TokenStore {
   String? get accessToken => null;
 
   @override
-  Future<String?> readRefreshToken() async => throw StateError('trousseau illisible');
+  Future<String?> readRefreshToken() async =>
+      throw StateError('trousseau illisible');
 
   @override
   Future<String?> readUserId() async => null;
 
   @override
-  Future<void> save({required String accessToken, required String refreshToken}) async =>
-      throw StateError('trousseau en panne');
+  Future<void> save({
+    required String accessToken,
+    required String refreshToken,
+  }) async => throw StateError('trousseau en panne');
 
   @override
   void setAccessToken(String accessToken) {}
@@ -60,7 +63,9 @@ void main() {
     // écran d'amorçage sans fin. Aucune console, aucun rapport de plantage sur
     // place : le téléphone a simplement l'air éteint.
     final ProviderContainer container = ProviderContainer(
-      overrides: [tokenStoreProvider.overrideWithValue(_UnreadableTokenStore())],
+      overrides: [
+        tokenStoreProvider.overrideWithValue(_UnreadableTokenStore()),
+      ],
     );
     addTearDown(container.dispose);
 
@@ -112,13 +117,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('CPI GO'), findsOneWidget);
+    expect(find.text('Accédez à vos espaces de travail'), findsOneWidget);
     final Finder toggle = find
         .ancestor(
           of: find.text('Rester connecté sur cet appareil'),
           matching: find.byType(InkWell),
         )
         .first;
-    expect(tester.getSize(toggle).height, greaterThanOrEqualTo(kCpiMinTouchTarget));
+    expect(
+      tester.getSize(toggle).height,
+      greaterThanOrEqualTo(kCpiMinTouchTarget),
+    );
   });
 
   testWidgets('un premier lancement qui ne s\'enregistre pas le DIT', (
@@ -129,7 +139,9 @@ void main() {
     // pourquoi. Le doigt réappuie, indéfiniment.
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [sharedPreferencesProvider.overrideWithValue(_ReadOnlyPreferences())],
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(_ReadOnlyPreferences()),
+        ],
         child: MaterialApp(
           theme: AppTheme.light,
           locale: const Locale('fr'),

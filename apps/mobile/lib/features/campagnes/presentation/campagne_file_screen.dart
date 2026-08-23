@@ -11,6 +11,8 @@ import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
+import '../../../ui/widgets/empty_state.dart';
+import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/sync_badge.dart';
 import '../campagnes.dart';
@@ -19,30 +21,54 @@ import '../campagnes.dart';
 /// `day_index` puis `position`, et un téléconseiller qui suit les deux à la fois
 /// perd sa place dès que l'écran s'en écarte.
 class CampagneFileScreen extends ConsumerWidget {
-  const CampagneFileScreen({super.key, required this.campaignId});
+  const CampagneFileScreen({
+    super.key,
+    required this.campaignId,
+    this.grandPublic = false,
+  });
 
   final String campaignId;
+  final bool grandPublic;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<CampaignQueueResult>> file = ref.watch(
-      fileDeCampagneProvider(campaignId),
+      grandPublic
+          ? grandPublicFileDeCampagneProvider(campaignId)
+          : fileDeCampagneProvider(campaignId),
     );
-    final CallCampaign? campagne = ref.watch(campagneProvider(campaignId)).value;
+    final CallCampaign? campagne = ref
+        .watch(campagneProvider(campaignId))
+        .value;
 
     return CpiPopScope(
-      fallback: CampagnesRoutes.liste,
+      fallback: grandPublic
+          ? CampagnesRoutes.grandPublicListe
+          : CampagnesRoutes.liste,
       child: Scaffold(
         appBar: AppBar(
           title: Text(campagne?.name ?? 'Campagne'),
-          leading: const CpiBackButton(fallback: CampagnesRoutes.liste),
+          leading: CpiBackButton(
+            fallback: grandPublic
+                ? CampagnesRoutes.grandPublicListe
+                : CampagnesRoutes.liste,
+          ),
           actions: const <Widget>[
             OfflineIndicator(),
             SyncBadge(),
             SizedBox(width: CpiSpacing.xs),
           ],
         ),
-        body: _corps(file, campagne?.spreadDays ?? 1),
+        body: _corps(
+          file,
+          campagne?.spreadDays ?? 1,
+          grandPublic: grandPublic,
+          onRetry: () => ref.invalidate(
+            grandPublic
+                ? grandPublicFileDeCampagneProvider(campaignId)
+                : fileDeCampagneProvider(campaignId),
+          ),
+        ),
       ),
     );
   }
@@ -50,26 +76,42 @@ class CampagneFileScreen extends ConsumerWidget {
   /// L'échec passe AVANT le chargement : Riverpod réessaie indéfiniment une
   /// lecture en défaut, et `when(error:)` laisserait tourner l'indicateur sans
   /// jamais dire au téléconseiller ce qui s'est passé.
-  static Widget _corps(AsyncValue<List<CampaignQueueResult>> file, int spreadDays) {
+  static Widget _corps(
+    AsyncValue<List<CampaignQueueResult>> file,
+    int spreadDays, {
+    required bool grandPublic,
+    required VoidCallback onRetry,
+  }) {
     final Object? erreur = file.error;
     if (erreur != null) {
-      return Padding(
-        padding: const EdgeInsets.all(CpiSpacing.xl),
-        child: Center(child: Text('Lecture de la file impossible. $erreur')),
+      return CpiErrorState(
+        message:
+            'La file de cette campagne n\'a pas pu être lue. '
+            '${messageErreur(erreur)}',
+        onRetry: onRetry,
       );
     }
     final List<CampaignQueueResult>? taches = file.value;
     if (taches == null) return const Center(child: CircularProgressIndicator());
     if (taches.isEmpty) return const _FileVide();
-    return _Programme(taches: taches, spreadDays: spreadDays);
+    return _Programme(
+      taches: taches,
+      spreadDays: spreadDays,
+      grandPublic: grandPublic,
+    );
   }
 }
 
 class _Programme extends StatelessWidget {
-  const _Programme({required this.taches, required this.spreadDays});
+  const _Programme({
+    required this.taches,
+    required this.spreadDays,
+    required this.grandPublic,
+  });
 
   final List<CampaignQueueResult> taches;
   final int spreadDays;
+  final bool grandPublic;
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +131,7 @@ class _Programme extends StatelessWidget {
         final Widget ligne = _TacheTile(
           key: ValueKey<String>(tache.id),
           tache: tache,
+          grandPublic: grandPublic,
         );
         if (!ouvreUnJour || jours <= 1) return ligne;
         return Column(
@@ -139,9 +182,10 @@ class _EnTeteDeJour extends StatelessWidget {
 }
 
 class _TacheTile extends StatelessWidget {
-  const _TacheTile({super.key, required this.tache});
+  const _TacheTile({super.key, required this.tache, required this.grandPublic});
 
   final CampaignQueueResult tache;
+  final bool grandPublic;
 
   @override
   Widget build(BuildContext context) {
@@ -157,10 +201,17 @@ class _TacheTile extends StatelessWidget {
           color: theme.colorScheme.onSurfaceVariant,
         ),
       ),
-      trailing: const Icon(PhosphorIconsRegular.phoneCall, size: 20),
+      trailing: const Icon(
+        PhosphorIconsRegular.phoneCall,
+        size: CpiIconSize.md,
+      ),
       onTap: () {
         unawaited(HapticFeedback.selectionClick());
-        context.pushOnce(CampagnesRoutes.appelPour(tache.phoneE164));
+        context.pushOnce(
+          grandPublic
+              ? CampagnesRoutes.appelGrandPublicPour(tache.phoneE164)
+              : CampagnesRoutes.appelPour(tache.phoneE164),
+        );
       },
     );
   }
@@ -170,30 +221,9 @@ class _FileVide extends StatelessWidget {
   const _FileVide();
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(CpiSpacing.xl),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Icon(
-            PhosphorIconsDuotone.checkCircle,
-            size: 56,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: CpiSpacing.md),
-          Text('Rien à appeler ici', style: theme.textTheme.titleSmall),
-          const SizedBox(height: CpiSpacing.xs),
-          Text(
-            'Les fiches restantes descendront à la prochaine synchronisation.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const CpiEmptyState(
+    icon: PhosphorIconsDuotone.checkCircle,
+    title: 'Rien à appeler ici',
+    message: 'Les fiches restantes descendront à la prochaine synchronisation.',
+  );
 }

@@ -30,19 +30,22 @@ void main() {
   group('ColorScheme', () {
     final ColorScheme scheme = AppTheme.colorScheme;
 
-    test('les rôles critiques portent les hex audités, pas ceux de fromSeed', () {
-      // `ColorScheme.fromSeed` dérive un `primary` qui n'est PAS #630210 :
-      // c'est précisément la raison de la surcharge explicite.
-      expect(scheme.primary, const Color(0xFF630210));
-      expect(scheme.onPrimary, const Color(0xFFFFFFFF));
-      expect(scheme.surface, const Color(0xFFFAF7F7));
-      expect(scheme.onSurface, const Color(0xFF1C0810));
-      expect(scheme.surfaceContainerLowest, white);
-      expect(scheme.error, const Color(0xFFB91C1C));
-      expect(scheme.outline, const Color(0xFF6B4A52));
-      expect(scheme.outlineVariant, const Color(0xFFECE1E2));
-      expect(scheme.brightness, Brightness.light);
-    });
+    test(
+      'les rôles critiques portent les hex audités, pas ceux de fromSeed',
+      () {
+        // `ColorScheme.fromSeed` dérive un `primary` qui n'est PAS #630210 :
+        // c'est précisément la raison de la surcharge explicite.
+        expect(scheme.primary, const Color(0xFF630210));
+        expect(scheme.onPrimary, const Color(0xFFFFFFFF));
+        expect(scheme.surface, const Color(0xFFFAF7F7));
+        expect(scheme.onSurface, const Color(0xFF1C0810));
+        expect(scheme.surfaceContainerLowest, white);
+        expect(scheme.error, const Color(0xFFB91C1C));
+        expect(scheme.outline, const Color(0xFF6B4A52));
+        expect(scheme.outlineVariant, const Color(0xFFECE1E2));
+        expect(scheme.brightness, Brightness.light);
+      },
+    );
 
     test('fromSeed seul ne produirait pas ces valeurs', () {
       final ColorScheme raw = ColorScheme.fromSeed(
@@ -86,8 +89,14 @@ void main() {
     });
 
     test('les paires texte/fond annoncées par le document tiennent AA', () {
-      expect(contrast(scheme.onSurface, scheme.surface), greaterThanOrEqualTo(4.5));
-      expect(contrast(scheme.onPrimary, scheme.primary), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(scheme.onSurface, scheme.surface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(scheme.onPrimary, scheme.primary),
+        greaterThanOrEqualTo(4.5),
+      );
       expect(
         contrast(scheme.onSurfaceVariant, scheme.surfaceContainerLowest),
         greaterThanOrEqualTo(4.5),
@@ -98,7 +107,10 @@ void main() {
         greaterThanOrEqualTo(4.5),
       );
       // `outline` sert de bordure de champ : seuil non textuel, 3:1.
-      expect(contrast(scheme.outline, scheme.surface), greaterThanOrEqualTo(3.0));
+      expect(
+        contrast(scheme.outline, scheme.surface),
+        greaterThanOrEqualTo(3.0),
+      );
     });
 
     group('texte posé sur le bordeaux plein', () {
@@ -156,13 +168,19 @@ void main() {
       // Confirmation du chiffre qui motive toute la règle.
       expect(contrast(gold, white), lessThan(3.0));
       // Ce qu'on pose DESSUS passe largement.
-      expect(contrast(cpi.accentForeground, cpi.accent), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(cpi.accentForeground, cpi.accent),
+        greaterThanOrEqualTo(4.5),
+      );
     });
 
     test('accentText est la seule déclinaison or utilisable en texte', () {
       expect(cpi.accentText, const Color(0xFF856011));
       expect(contrast(cpi.accentText, white), greaterThanOrEqualTo(4.5));
-      expect(contrast(cpi.accentText, cpi.accentSurface), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(cpi.accentText, cpi.accentSurface),
+        greaterThanOrEqualTo(4.5),
+      );
     });
 
     test('accentOnDark est lisible sur bordeaux', () {
@@ -174,8 +192,14 @@ void main() {
     });
 
     test('les statuts passent AA sur leur surface', () {
-      expect(contrast(cpi.success, cpi.successSurface), greaterThanOrEqualTo(4.5));
-      expect(contrast(cpi.warning, cpi.warningSurface), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(cpi.success, cpi.successSurface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(cpi.warning, cpi.warningSurface),
+        greaterThanOrEqualTo(4.5),
+      );
       expect(contrast(cpi.info, cpi.infoSurface), greaterThanOrEqualTo(4.5));
     });
 
@@ -218,7 +242,8 @@ void main() {
           seen['failed']!,
         },
         hasLength(5),
-        reason: 'deux familles qui partagent une couleur ne se distinguent plus',
+        reason:
+            'deux familles qui partagent une couleur ne se distinguent plus',
       );
       expect(seen['pending'], seen['draft']);
       expect(seen['blocked'], seen['draft']);
@@ -282,9 +307,8 @@ void main() {
       final ButtonStyle? filled = theme.filledButtonTheme.style;
       final Size? min = filled?.minimumSize?.resolve(<WidgetState>{});
       expect(min!.height, greaterThanOrEqualTo(kCpiMinTouchTarget));
-      final Size? outlined = theme.outlinedButtonTheme.style?.minimumSize?.resolve(
-        <WidgetState>{},
-      );
+      final Size? outlined = theme.outlinedButtonTheme.style?.minimumSize
+          ?.resolve(<WidgetState>{});
       expect(outlined!.height, greaterThanOrEqualTo(kCpiMinTouchTarget));
     });
   });
@@ -307,10 +331,22 @@ void main() {
       for (final (String name, Color fg, Color bg) in <(String, Color, Color)>[
         ('onSurface', scheme.onSurface, scheme.surface),
         ('onPrimary', scheme.onPrimary, scheme.primary),
-        ('onSurfaceVariant sur carte', scheme.onSurfaceVariant, scheme.surfaceContainerLowest),
+        (
+          'onSurfaceVariant sur carte',
+          scheme.onSurfaceVariant,
+          scheme.surfaceContainerLowest,
+        ),
         ('onSurfaceVariant sur fond', scheme.onSurfaceVariant, scheme.surface),
-        ('onSecondaryContainer', scheme.onSecondaryContainer, scheme.secondaryContainer),
-        ('onTertiaryContainer', scheme.onTertiaryContainer, scheme.tertiaryContainer),
+        (
+          'onSecondaryContainer',
+          scheme.onSecondaryContainer,
+          scheme.secondaryContainer,
+        ),
+        (
+          'onTertiaryContainer',
+          scheme.onTertiaryContainer,
+          scheme.tertiaryContainer,
+        ),
         ('onErrorContainer', scheme.onErrorContainer, scheme.errorContainer),
         ('onError', scheme.onError, scheme.error),
         ('navForeground', cpi.navForeground, cpi.navSurface),
@@ -325,7 +361,10 @@ void main() {
           reason: '$name est illisible sur la coque CHUES',
         );
       }
-      expect(contrast(scheme.outline, scheme.surface), greaterThanOrEqualTo(3.0));
+      expect(
+        contrast(scheme.outline, scheme.surface),
+        greaterThanOrEqualTo(3.0),
+      );
     });
 
     test('sur le bleu plein, le rouge d\'erreur cede la place', () {
@@ -336,7 +375,10 @@ void main() {
         contrast(cpi.destructiveOnDark, scheme.primary),
         greaterThanOrEqualTo(4.5),
       );
-      expect(contrast(cpi.accentOnDark, scheme.primary), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(cpi.accentOnDark, scheme.primary),
+        greaterThanOrEqualTo(4.5),
+      );
       expect(
         contrast(cpi.accentOnDark, scheme.primary),
         greaterThan(contrast(cpi.accent, scheme.primary)),
@@ -344,23 +386,26 @@ void main() {
     });
 
     test('les statuts passent AA sur leur surface', () {
-      expect(contrast(cpi.success, cpi.successSurface), greaterThanOrEqualTo(4.5));
-      expect(contrast(cpi.warning, cpi.warningSurface), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(cpi.success, cpi.successSurface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(cpi.warning, cpi.warningSurface),
+        greaterThanOrEqualTo(4.5),
+      );
       expect(contrast(cpi.info, cpi.infoSurface), greaterThanOrEqualTo(4.5));
     });
 
     test('cinq series et cinq familles de synchronisation se distinguent', () {
       expect(cpi.chartSeries.toSet(), hasLength(5));
-      expect(
-        <Color>{
-          cpi.syncDraft,
-          cpi.syncSyncing,
-          cpi.syncSynced,
-          cpi.syncConflict,
-          cpi.syncFailed,
-        },
-        hasLength(5),
-      );
+      expect(<Color>{
+        cpi.syncDraft,
+        cpi.syncSyncing,
+        cpi.syncSynced,
+        cpi.syncConflict,
+        cpi.syncFailed,
+      }, hasLength(5));
     });
 
     test('chaque coque emporte SON extension de couleurs', () {
@@ -370,44 +415,45 @@ void main() {
   });
 
   group('CpiMotion', () {
-    testWidgets('les durées tombent à zéro si les animations sont désactivées', (
-      WidgetTester tester,
-    ) async {
-      late CpiMotion normal;
-      late CpiMotion reduced;
+    testWidgets(
+      'les durées tombent à zéro si les animations sont désactivées',
+      (WidgetTester tester) async {
+        late CpiMotion normal;
+        late CpiMotion reduced;
 
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light,
-          home: Builder(
-            builder: (BuildContext context) {
-              normal = CpiMotion.of(context);
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light,
-          home: MediaQuery(
-            data: const MediaQueryData(disableAnimations: true),
-            child: Builder(
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Builder(
               builder: (BuildContext context) {
-                reduced = CpiMotion.of(context);
+                normal = CpiMotion.of(context);
                 return const SizedBox.shrink();
               },
             ),
           ),
-        ),
-      );
+        );
 
-      expect(normal.screen, const Duration(milliseconds: 300));
-      expect(reduced.screen, Duration.zero);
-      expect(reduced.micro, Duration.zero);
-      // La logique ne change pas : les courbes restent identiques.
-      expect(reduced.easeOut, normal.easeOut);
-    });
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: MediaQuery(
+              data: const MediaQueryData(disableAnimations: true),
+              child: Builder(
+                builder: (BuildContext context) {
+                  reduced = CpiMotion.of(context);
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+        );
+
+        expect(normal.screen, const Duration(milliseconds: 300));
+        expect(reduced.screen, Duration.zero);
+        expect(reduced.micro, Duration.zero);
+        // La logique ne change pas : les courbes restent identiques.
+        expect(reduced.easeOut, normal.easeOut);
+      },
+    );
   });
 }

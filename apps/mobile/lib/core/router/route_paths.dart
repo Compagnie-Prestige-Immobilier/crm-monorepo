@@ -6,8 +6,10 @@ abstract final class Routes {
   static const String home = '/';
 
   static const String accueil = '/accueil';
+  static const String accueilVisiteNew = '/accueil/nouvelle-visite';
   static const String chues = '/chues';
   static const String grandPublic = '/grand-public';
+  static const String grandPublicNew = '/grand-public/nouveau';
 
   static const String representants = '/representants';
   static const String newRepresentant = '/representants/nouveau';
@@ -52,6 +54,16 @@ abstract final class Routes {
 
   static String newRepresentantWithDraft(String draftId) => Uri(
     path: newRepresentant,
+    queryParameters: <String, String>{draftParam: draftId},
+  ).toString();
+
+  static String grandPublicNewWithDraft(String draftId) => Uri(
+    path: grandPublicNew,
+    queryParameters: <String, String>{draftParam: draftId},
+  ).toString();
+
+  static String accueilVisiteNewWithDraft(String draftId) => Uri(
+    path: accueilVisiteNew,
     queryParameters: <String, String>{draftParam: draftId},
   ).toString();
 

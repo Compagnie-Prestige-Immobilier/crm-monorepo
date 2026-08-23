@@ -57,7 +57,9 @@ void main() {
       await d.dispose();
     });
 
-    testWidgets('flush() sans modification n\'écrit rien', (WidgetTester tester) async {
+    testWidgets('flush() sans modification n\'écrit rien', (
+      WidgetTester tester,
+    ) async {
       int writes = 0;
       final DraftDebouncer d = DraftDebouncer(onFlush: () async => writes++);
       await d.flush();
@@ -75,7 +77,9 @@ void main() {
       expect(writes, 1);
     });
 
-    testWidgets('une écriture qui échoue reste à refaire', (WidgetTester tester) async {
+    testWidgets('une écriture qui échoue reste à refaire', (
+      WidgetTester tester,
+    ) async {
       bool fail = true;
       int writes = 0;
       final DraftDebouncer d = DraftDebouncer(
@@ -109,7 +113,9 @@ void main() {
     tearDown(() => db.close());
 
     Future<void> pumpForm(WidgetTester tester) async {
-      await tester.pumpWidget(MaterialApp(home: _DraftForm(repository: drafts)));
+      await tester.pumpWidget(
+        MaterialApp(home: _DraftForm(repository: drafts)),
+      );
       // L'écran démarre au premier plan.
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
@@ -145,20 +151,25 @@ void main() {
       expect(snapshot.age, DraftAge.crash);
     });
 
-    testWidgets('l\'app n\'atteint JAMAIS `paused` et la saisie est déjà sauve', (
+    testWidgets(
+      'l\'app n\'atteint JAMAIS `paused` et la saisie est déjà sauve',
+      (WidgetTester tester) async {
+        await pumpForm(tester);
+        await tester.enterText(find.byType(TextField), 'Fatou');
+        await tester.pump();
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        await tester.pumpAndSettle();
+
+        // Le système tue le processus ici : `paused` ne sera jamais délivré.
+        expect((await drafts.read('d-test'))!.values['fullName'], 'Fatou');
+      },
+    );
+
+    testWidgets('quitter l\'écran vide aussi le brouillon', (
       WidgetTester tester,
     ) async {
-      await pumpForm(tester);
-      await tester.enterText(find.byType(TextField), 'Fatou');
-      await tester.pump();
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      await tester.pumpAndSettle();
-
-      // Le système tue le processus ici : `paused` ne sera jamais délivré.
-      expect((await drafts.read('d-test'))!.values['fullName'], 'Fatou');
-    });
-
-    testWidgets('quitter l\'écran vide aussi le brouillon', (WidgetTester tester) async {
       await pumpForm(tester);
       await tester.enterText(find.byType(TextField), 'Ousmane');
       await tester.pump();
@@ -282,7 +293,8 @@ class _DraftForm extends StatefulWidget {
   State<_DraftForm> createState() => _DraftFormState();
 }
 
-class _DraftFormState extends State<_DraftForm> with DraftFormMixin<_DraftForm> {
+class _DraftFormState extends State<_DraftForm>
+    with DraftFormMixin<_DraftForm> {
   final TextEditingController _controller = TextEditingController();
 
   @override
@@ -319,7 +331,10 @@ class _DraftFormState extends State<_DraftForm> with DraftFormMixin<_DraftForm> 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: TextField(controller: _controller, onChanged: (String _) => markDraftDirty()),
+      body: TextField(
+        controller: _controller,
+        onChanged: (String _) => markDraftDirty(),
+      ),
     );
   }
 }

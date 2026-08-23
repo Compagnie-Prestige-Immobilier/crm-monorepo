@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/sync_coordinator.dart';
 import '../../../data/local/database.dart';
 import '../../campagnes/campagnes.dart';
 import '../../../core/router/route_paths.dart';
@@ -55,8 +56,11 @@ class HomeScreen extends ConsumerWidget {
               child: RefreshIndicator(
                 color: theme.colorScheme.primary,
                 onRefresh: () async {
+                  final SyncCoordinator sync = ref.read(
+                    syncCoordinatorProvider.notifier,
+                  );
                   await HapticFeedback.selectionClick();
-                  await ref.read(syncCoordinatorProvider.notifier).run();
+                  await sync.run();
                 },
                 child: ListView.builder(
                   padding: const EdgeInsets.fromLTRB(
@@ -96,7 +100,9 @@ class HomeScreen extends ConsumerWidget {
                         builder: (BuildContext context) {
                           final int count = pending.value ?? 0;
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
+                            padding: const EdgeInsets.only(
+                              bottom: CpiSpacing.xs,
+                            ),
                             child: SummaryCard(
                               label: 'En attente d\'envoi',
                               value: '$count',
@@ -104,8 +110,12 @@ class HomeScreen extends ConsumerWidget {
                               icon: count == 0
                                   ? PhosphorIconsRegular.checkCircle
                                   : PhosphorIconsRegular.cloudSlash,
-                              accentColor: count == 0 ? cpi.success : cpi.accentText,
-                              surfaceColor: count == 0 ? null : cpi.accentSurface,
+                              accentColor: count == 0
+                                  ? cpi.success
+                                  : cpi.accentText,
+                              surfaceColor: count == 0
+                                  ? null
+                                  : cpi.accentSurface,
                               onTap: () => context.go(Routes.corrections),
                             ),
                           );
@@ -114,23 +124,32 @@ class HomeScreen extends ConsumerWidget {
                       4 => Padding(
                         padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
                         child: Consumer(
-                          builder: (BuildContext context, WidgetRef ref, Widget? _) {
-                            final AsyncValue<List<CampaignsWithOpenWorkResult>> campagnes = ref
-                                .watch(campagnesProvider);
-                            final int reste = (campagnes.value ?? <CampaignsWithOpenWorkResult>[])
-                                .fold<int>(
-                                  0,
-                                  (int total, CampaignsWithOpenWorkResult c) => total + c.ouvertes,
+                          builder:
+                              (BuildContext context, WidgetRef ref, Widget? _) {
+                                final AsyncValue<
+                                  List<CampaignsWithOpenWorkResult>
+                                >
+                                campagnes = ref.watch(campagnesProvider);
+                                final int reste =
+                                    (campagnes.value ??
+                                            <CampaignsWithOpenWorkResult>[])
+                                        .fold<int>(
+                                          0,
+                                          (
+                                            int total,
+                                            CampaignsWithOpenWorkResult c,
+                                          ) => total + c.ouvertes,
+                                        );
+                                return SummaryCard(
+                                  label: 'À appeler',
+                                  value: '$reste',
+                                  isLoading: campagnes.isLoading,
+                                  icon: PhosphorIconsRegular.phoneCall,
+                                  accentColor: cpi.accentText,
+                                  onTap: () =>
+                                      context.go(CampagnesRoutes.liste),
                                 );
-                            return SummaryCard(
-                              label: 'À appeler',
-                              value: '$reste',
-                              isLoading: campagnes.isLoading,
-                              icon: PhosphorIconsRegular.phoneCall,
-                              accentColor: cpi.accentText,
-                              onTap: () => context.go(CampagnesRoutes.liste),
-                            );
-                          },
+                              },
                         ),
                       ),
                       5 => Padding(
@@ -223,7 +242,9 @@ class _Phase2Entry extends ConsumerWidget {
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainerLowest,
               borderRadius: CpiRadius.brLg,
-              border: Border.all(color: cpi.accentBorder.withValues(alpha: 0.5)),
+              border: Border.all(
+                color: cpi.accentBorder.withValues(alpha: 0.5),
+              ),
             ),
             child: Row(
               children: <Widget>[
@@ -236,7 +257,7 @@ class _Phase2Entry extends ConsumerWidget {
                   ),
                   child: Icon(
                     PhosphorIconsRegular.phoneCall,
-                    size: 22,
+                    size: CpiIconSize.lg,
                     color: cpi.accentForeground,
                   ),
                 ),
@@ -268,7 +289,7 @@ class _Phase2Entry extends ConsumerWidget {
                 ),
                 Icon(
                   PhosphorIconsRegular.caretRight,
-                  size: 20,
+                  size: CpiIconSize.md,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ],
@@ -306,7 +327,7 @@ class _PrimaryAction extends StatelessWidget {
               HapticFeedback.selectionClick().ignore();
               context.pushOnce(Routes.representants);
             },
-            icon: const Icon(PhosphorIconsRegular.users, size: 20),
+            icon: const Icon(PhosphorIconsRegular.users, size: CpiIconSize.md),
             label: const Text('Choisir un représentant'),
           ),
           const SizedBox(height: CpiSpacing.xs),
@@ -315,7 +336,10 @@ class _PrimaryAction extends StatelessWidget {
               HapticFeedback.selectionClick().ignore();
               context.pushOnce(Routes.newRepresentant);
             },
-            icon: const Icon(PhosphorIconsRegular.userPlus, size: 20),
+            icon: const Icon(
+              PhosphorIconsRegular.userPlus,
+              size: CpiIconSize.md,
+            ),
             label: const Text('Nouveau représentant'),
           ),
         ],

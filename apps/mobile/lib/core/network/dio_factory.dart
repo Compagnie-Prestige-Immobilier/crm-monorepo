@@ -44,14 +44,15 @@ class ApiClientFactory {
         onSessionExpired: onSessionExpired,
         mutex: mutex,
         refreshCall: (String refreshToken) async {
-          final Response<AuthTokensDto> response = await refreshApi.refreshSession(
-            userAgent: ApiEnvironment.userAgent,
-            refreshDto: RefreshDto(refreshToken: refreshToken),
-            extra: <String, dynamic>{
-              AuthInterceptor.noAuthFlag: true,
-              ...TimeoutProfile.read.extra,
-            },
-          );
+          final Response<AuthTokensDto> response = await refreshApi
+              .refreshSession(
+                userAgent: ApiEnvironment.userAgent,
+                refreshDto: RefreshDto(refreshToken: refreshToken),
+                extra: <String, dynamic>{
+                  AuthInterceptor.noAuthFlag: true,
+                  ...TimeoutProfile.refresh.extra,
+                },
+              );
           final AuthTokensDto body = response.data!;
           return RefreshedTokens(
             accessToken: body.accessToken,

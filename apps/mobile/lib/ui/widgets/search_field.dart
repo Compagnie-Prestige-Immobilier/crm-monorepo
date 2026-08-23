@@ -60,12 +60,18 @@ class _CpiSearchFieldState extends State<CpiSearchField> {
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         hintText: widget.hintText,
-        prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass, size: 20),
+        prefixIcon: const Icon(
+          PhosphorIconsRegular.magnifyingGlass,
+          size: CpiIconSize.md,
+        ),
         suffixIcon: _controller.text.isEmpty
             ? null
             : IconButton(
                 tooltip: 'Effacer la recherche',
-                icon: const Icon(PhosphorIconsRegular.xCircle, size: 20),
+                icon: const Icon(
+                  PhosphorIconsRegular.xCircle,
+                  size: CpiIconSize.md,
+                ),
                 onPressed: _clear,
               ),
         suffixIconConstraints: const BoxConstraints(

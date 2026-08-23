@@ -7,7 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// Chaque valeur émise relance une requête qui balaye la table sans index.
 void main() {
-  Future<List<String>> pumpAndType(WidgetTester tester, List<String> frappes) async {
+  Future<List<String>> pumpAndType(
+    WidgetTester tester,
+    List<String> frappes,
+  ) async {
     final List<String> emitted = <String>[];
     await tester.pumpWidget(
       MaterialApp(
@@ -56,7 +59,9 @@ void main() {
   });
 
   // Effacer est un geste, pas une frappe : rien à attendre.
-  testWidgets('effacer rend la liste entière tout de suite', (WidgetTester tester) async {
+  testWidgets('effacer rend la liste entière tout de suite', (
+    WidgetTester tester,
+  ) async {
     final List<String> emitted = <String>[];
     await tester.pumpWidget(
       MaterialApp(
@@ -71,6 +76,9 @@ void main() {
     await tester.pump();
 
     expect(emitted, <String>['Ousmane', '']);
-    expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller?.text,
+      isEmpty,
+    );
   });
 }

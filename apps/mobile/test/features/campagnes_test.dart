@@ -72,6 +72,27 @@ void main() {
             ),
           ),
         ),
+        GoRoute(
+          path: CampagnesRoutes.grandPublicListe,
+          builder: (BuildContext context, GoRouterState state) =>
+              const CampagnesScreen(grandPublic: true),
+        ),
+        GoRoute(
+          path: CampagnesRoutes.grandPublicFile,
+          builder: (BuildContext context, GoRouterState state) =>
+              CampagneFileScreen(
+                campaignId: state.pathParameters[CampagnesRoutes.idParam] ?? '',
+                grandPublic: true,
+              ),
+        ),
+        GoRoute(
+          path: CampagnesRoutes.grandPublicConsole,
+          builder: (BuildContext context, GoRouterState state) => Scaffold(
+            body: Text(
+              'appel GP ${state.uri.queryParameters[Routes.prefillPhoneParam]}',
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -132,6 +153,7 @@ void main() {
     String prenom = 'Awa',
     bool avecFiche = true,
     bool ficheSupprimee = false,
+    String projet = 'CHUES',
   }) async {
     if (avecFiche) {
       await insertProspect(
@@ -141,6 +163,7 @@ void main() {
         phone: '+22177${suffixe.padLeft(7, '0')}',
         nom: nom,
         prenom: prenom,
+        projet: projet,
         deletedAt: ficheSupprimee ? t0 : null,
       );
     }
@@ -175,7 +198,10 @@ void main() {
     await open(tester, CampagnesRoutes.liste);
 
     expect(find.text('Lot J'), findsOneWidget);
-    expect(find.text('2 fiches à appeler, réparties sur 3 jours'), findsOneWidget);
+    expect(
+      find.text('2 fiches à appeler, réparties sur 3 jours'),
+      findsOneWidget,
+    );
     expect(
       find.text('Lot K'),
       findsNothing,
@@ -185,18 +211,41 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('une file dont la campagne n\'est pas descendue reste invisible', (
+  testWidgets('le Grand Public ne reçoit que sa file et ouvre sa console', (
     WidgetTester tester,
   ) async {
-    await confier('camp-pas-encore-la', suffixe: '01', position: 1);
+    await insertCampagne(db, id: 'camp-a', name: 'Lot multicanal');
+    await confier('camp-a', suffixe: '01', position: 1);
+    await confier('camp-a', suffixe: '02', position: 2, projet: 'GRAND_PUBLIC');
 
-    await open(tester, CampagnesRoutes.liste);
+    await open(tester, CampagnesRoutes.grandPublicListe);
+    expect(find.text('1 fiche à appeler'), findsOneWidget);
 
-    expect(find.text('Aucune file confiée'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Lot multicanal'));
+    await settle(tester);
+    expect(find.text('2 · Awa Diop'), findsOneWidget);
+    expect(find.text('1 · Awa Diop'), findsNothing);
+
+    await tester.tap(find.text('2 · Awa Diop'));
+    await settle(tester);
+    expect(find.text('appel GP +221770000002'), findsOneWidget);
 
     await unmount(tester);
   });
+
+  testWidgets(
+    'une file dont la campagne n\'est pas descendue reste invisible',
+    (WidgetTester tester) async {
+      await confier('camp-pas-encore-la', suffixe: '01', position: 1);
+
+      await open(tester, CampagnesRoutes.liste);
+
+      expect(find.text('Aucune file confiée'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await unmount(tester);
+    },
+  );
 
   testWidgets('une file dont la fiche n\'est pas descendue ne se compte pas', (
     WidgetTester tester,
@@ -262,18 +311,19 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('une campagne d\'un seul jour n\'affiche pas d\'en-tête de jour', (
-    WidgetTester tester,
-  ) async {
-    await insertCampagne(db, id: 'camp-a', name: 'Lot J');
-    await confier('camp-a', suffixe: '01', position: 1);
+  testWidgets(
+    'une campagne d\'un seul jour n\'affiche pas d\'en-tête de jour',
+    (WidgetTester tester) async {
+      await insertCampagne(db, id: 'camp-a', name: 'Lot J');
+      await confier('camp-a', suffixe: '01', position: 1);
 
-    await open(tester, CampagnesRoutes.fileFor('camp-a'));
+      await open(tester, CampagnesRoutes.fileFor('camp-a'));
 
-    expect(find.textContaining('Jour '), findsNothing);
+      expect(find.textContaining('Jour '), findsNothing);
 
-    await unmount(tester);
-  });
+      await unmount(tester);
+    },
+  );
 
   testWidgets('la file d\'une campagne inconnue s\'ouvre sans planter', (
     WidgetTester tester,
@@ -352,7 +402,10 @@ void main() {
 
     // Les 300 lignes existent en base, seule une poignée est construite.
     expect(find.byType(ListTile), findsWidgets);
-    expect(tester.widgetList<ListTile>(find.byType(ListTile)).length, lessThan(40));
+    expect(
+      tester.widgetList<ListTile>(find.byType(ListTile)).length,
+      lessThan(40),
+    );
     expect(find.text('1 · Awa Diop'), findsOneWidget);
 
     await unmount(tester);
@@ -398,8 +451,14 @@ void main() {
       ],
     );
 
-    expect(find.textContaining('Lecture de la file impossible.'), findsOneWidget);
+    expect(
+      find.textContaining('La file de cette campagne n\'a pas pu être lue.'),
+      findsOneWidget,
+    );
     expect(find.textContaining('base illisible'), findsOneWidget);
+    // Un écran en défaut sans bouton est une impasse : le téléconseiller n'a
+    // aucun geste et croit l'application morte.
+    expect(find.text('Réessayer'), findsOneWidget);
 
     await unmount(tester);
   });

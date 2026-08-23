@@ -5,18 +5,14 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum CpiConnectivity {
-  online,
-
-  unreachable,
-
-  offline,
-}
+enum CpiConnectivity { online, unreachable, offline }
 
 const Duration kUnreachableFreshness = Duration(minutes: 3);
 
-final NotifierProvider<UnreachableEvidence, DateTime?> unreachableEvidenceProvider =
-    NotifierProvider<UnreachableEvidence, DateTime?>(UnreachableEvidence.new);
+final NotifierProvider<UnreachableEvidence, DateTime?>
+unreachableEvidenceProvider = NotifierProvider<UnreachableEvidence, DateTime?>(
+  UnreachableEvidence.new,
+);
 
 /// La preuve s'efface d'elle-même : lue à la demande, sa fraîcheur ne serait
 /// jamais recalculée et le bandeau « Serveur injoignable » resterait affiché
@@ -89,10 +85,12 @@ class PlatformConnectivitySource implements ConnectivitySource {
   final Connectivity _connectivity;
 
   @override
-  Future<List<ConnectivityResult>> current() => _connectivity.checkConnectivity();
+  Future<List<ConnectivityResult>> current() =>
+      _connectivity.checkConnectivity();
 
   @override
-  Stream<List<ConnectivityResult>> changes() => _connectivity.onConnectivityChanged;
+  Stream<List<ConnectivityResult>> changes() =>
+      _connectivity.onConnectivityChanged;
 }
 
 final Provider<ConnectivitySource> connectivitySourceProvider =
@@ -126,17 +124,20 @@ final StreamProvider<List<ConnectivityResult>> connectivityTriggerProvider =
       final StreamController<List<ConnectivityResult>> out =
           StreamController<List<ConnectivityResult>>();
       Timer? debounce;
-      ref.listen<AsyncValue<List<ConnectivityResult>>>(connectivityResultsProvider, (
-        AsyncValue<List<ConnectivityResult>>? previous,
-        AsyncValue<List<ConnectivityResult>> next,
-      ) {
-        final List<ConnectivityResult>? results = next.value;
-        if (results == null || previous?.value == null) return;
-        debounce?.cancel();
-        debounce = Timer(kConnectivityDebounce, () {
-          if (!out.isClosed) out.add(results);
-        });
-      });
+      ref.listen<AsyncValue<List<ConnectivityResult>>>(
+        connectivityResultsProvider,
+        (
+          AsyncValue<List<ConnectivityResult>>? previous,
+          AsyncValue<List<ConnectivityResult>> next,
+        ) {
+          final List<ConnectivityResult>? results = next.value;
+          if (results == null || previous?.value == null) return;
+          debounce?.cancel();
+          debounce = Timer(kConnectivityDebounce, () {
+            if (!out.isClosed) out.add(results);
+          });
+        },
+      );
       ref.onDispose(() {
         debounce?.cancel();
         unawaited(out.close());
@@ -154,19 +155,21 @@ bool isUnmeteredLink(List<ConnectivityResult> results) => results.any(
       r == ConnectivityResult.wifi || r == ConnectivityResult.ethernet,
 );
 
-final Provider<CpiConnectivity> connectivityProvider = Provider<CpiConnectivity>((
-  Ref ref,
-) {
-  final CpiConnectivity interface =
-      ref.watch(connectivityInterfaceProvider).value ?? CpiConnectivity.online;
-  if (interface == CpiConnectivity.offline) return CpiConnectivity.offline;
+final Provider<CpiConnectivity> connectivityProvider =
+    Provider<CpiConnectivity>((Ref ref) {
+      final CpiConnectivity interface =
+          ref.watch(connectivityInterfaceProvider).value ??
+          CpiConnectivity.online;
+      if (interface == CpiConnectivity.offline) return CpiConnectivity.offline;
 
-  final bool? validated = ref.watch(networkValidatedProvider).value;
-  if (validated == false) return CpiConnectivity.unreachable;
+      final bool? validated = ref.watch(networkValidatedProvider).value;
+      if (validated == false) return CpiConnectivity.unreachable;
 
-  final DateTime? failedAt = ref.watch(unreachableEvidenceProvider);
-  return failedAt == null ? CpiConnectivity.online : CpiConnectivity.unreachable;
-});
+      final DateTime? failedAt = ref.watch(unreachableEvidenceProvider);
+      return failedAt == null
+          ? CpiConnectivity.online
+          : CpiConnectivity.unreachable;
+    });
 
 CpiConnectivity _classify(List<ConnectivityResult> results) {
   final bool hasInterface = results.any(

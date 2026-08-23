@@ -14,8 +14,10 @@ void main() {
   group('rôles : le miroir suit l\'énumération générée', () {
     test('BANQUE_FINANCE a un libellé, il n\'en avait pas', () {
       expect(
-        const AuthState(status: AuthStatus.authenticated, role: 'BANQUE_FINANCE')
-            .roleLabel,
+        const AuthState(
+          status: AuthStatus.authenticated,
+          role: 'BANQUE_FINANCE',
+        ).roleLabel,
         isNot('BANQUE_FINANCE'),
         reason: 'un utilisateur de banque voyait la chaîne brute du jeton',
       );
@@ -39,10 +41,16 @@ void main() {
 
     test('un rôle inconnu se rend tel quel plutôt que de disparaître', () {
       expect(
-        const AuthState(status: AuthStatus.authenticated, role: 'DIRECTEUR').roleLabel,
+        const AuthState(
+          status: AuthStatus.authenticated,
+          role: 'DIRECTEUR',
+        ).roleLabel,
         'DIRECTEUR',
       );
-      expect(const AuthState(status: AuthStatus.authenticated).roleLabel, isNull);
+      expect(
+        const AuthState(status: AuthStatus.authenticated).roleLabel,
+        isNull,
+      );
     });
   });
 
@@ -62,7 +70,10 @@ void main() {
       expect(
         EnrollmentMethods.all.toSet(),
         EnrollmentMethod.values
-            .where((EnrollmentMethod m) => m != EnrollmentMethod.unknownDefaultOpenApi)
+            .where(
+              (EnrollmentMethod m) =>
+                  m != EnrollmentMethod.unknownDefaultOpenApi,
+            )
             .map((EnrollmentMethod m) => m.value)
             .toSet(),
       );
@@ -72,7 +83,10 @@ void main() {
       expect(
         CallEffects.all.toSet(),
         CallOutcomeEffect.values
-            .where((CallOutcomeEffect e) => e != CallOutcomeEffect.unknownDefaultOpenApi)
+            .where(
+              (CallOutcomeEffect e) =>
+                  e != CallOutcomeEffect.unknownDefaultOpenApi,
+            )
             .map((CallOutcomeEffect e) => e.value)
             .toSet(),
       );
@@ -84,7 +98,8 @@ void main() {
         Phase2Status.values
             .where(
               (Phase2Status s) =>
-                  s != Phase2Status.PENDING && s != Phase2Status.unknownDefaultOpenApi,
+                  s != Phase2Status.PENDING &&
+                  s != Phase2Status.unknownDefaultOpenApi,
             )
             .map((Phase2Status s) => s.value)
             .toSet(),

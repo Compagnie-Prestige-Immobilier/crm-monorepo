@@ -91,7 +91,9 @@ void main() {
       return router;
     }
 
-    testWidgets('/representants/<id> ouvre la fiche', (WidgetTester tester) async {
+    testWidgets('/representants/<id> ouvre la fiche', (
+      WidgetTester tester,
+    ) async {
       await insertRepresentant(
         db,
         id: 'rep-1',
@@ -173,7 +175,9 @@ void main() {
     expect(find.textContaining('+221 78 000 00 01'), findsOneWidget);
     expect(find.textContaining('+221 78 000 00 02'), findsNothing);
     expect(
-      find.text('Aucun prospect. Utilisez « Nouveau prospect » pour en saisir un.'),
+      find.text(
+        'Aucun prospect. Utilisez « Nouveau prospect » pour en saisir un.',
+      ),
       findsNothing,
     );
 
@@ -315,7 +319,9 @@ void main() {
       await teardownTree(tester);
     });
 
-    testWidgets('un autre numéro s\'affiche et se copie', (WidgetTester tester) async {
+    testWidgets('un autre numéro s\'affiche et se copie', (
+      WidgetTester tester,
+    ) async {
       await insertRepresentant(
         db,
         id: 'rep-1',
@@ -353,13 +359,19 @@ void main() {
     /// Surface haute : le fil est en bas d'un `ListView`, et un `ListView` ne
     /// construit pas ce qui est hors du viewport. Sur les 600 dp par défaut,
     /// les assertions ne portaient sur rien.
-    Future<void> mountFiche(WidgetTester tester, {WriteRepository? writes}) async {
+    Future<void> mountFiche(
+      WidgetTester tester, {
+      WriteRepository? writes,
+    }) async {
       tester.view.physicalSize = const Size(1200, 6000);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final ProviderContainer container = await makeContainer(tester, writes: writes);
+      final ProviderContainer container = await makeContainer(
+        tester,
+        writes: writes,
+      );
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
@@ -394,7 +406,9 @@ void main() {
       await teardownTree(tester);
     });
 
-    testWidgets('le fil ne montre que celui de CETTE fiche', (WidgetTester tester) async {
+    testWidgets('le fil ne montre que celui de CETTE fiche', (
+      WidgetTester tester,
+    ) async {
       await insertRepresentant(db, id: 'rep-2', phone: '+221770000002');
       await insertComment(
         db,
@@ -418,10 +432,15 @@ void main() {
 
     // Le commentaire est le seul champ du produit où la saisie libre est
     // légitime ; elle n'est pour autant jamais obligatoire.
-    testWidgets('publier écrit la ligne et vide le champ', (WidgetTester tester) async {
+    testWidgets('publier écrit la ligne et vide le champ', (
+      WidgetTester tester,
+    ) async {
       await mountFiche(tester);
 
-      await tester.enterText(find.byType(TextField), '  Passe par le secrétariat.  ');
+      await tester.enterText(
+        find.byType(TextField),
+        '  Passe par le secrétariat.  ',
+      );
       await tester.pump();
       await tester.ensureVisible(find.text('Publier'));
       await tester.pump();
@@ -436,7 +455,10 @@ void main() {
       expect(fil.single.representantId, 'rep-1');
       expect(fil.single.authorId, 'me');
       expect(fil.single.authorName, 'Awa Sy');
-      expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        isEmpty,
+      );
 
       await teardownTree(tester);
     });
@@ -449,7 +471,10 @@ void main() {
     ) async {
       await mountFiche(tester, writes: _BrokenWrites(db));
 
-      await tester.enterText(find.byType(TextField), 'Passe par le secrétariat.');
+      await tester.enterText(
+        find.byType(TextField),
+        'Passe par le secrétariat.',
+      );
       await tester.pump();
       await tester.ensureVisible(find.text('Publier'));
       await tester.pump();
@@ -466,18 +491,24 @@ void main() {
       await teardownTree(tester);
     });
 
-    testWidgets('rien à publier tant que rien n\'est saisi', (WidgetTester tester) async {
+    testWidgets('rien à publier tant que rien n\'est saisi', (
+      WidgetTester tester,
+    ) async {
       await mountFiche(tester);
 
       expect(
-        tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier')).enabled,
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier'))
+            .enabled,
         isFalse,
       );
 
       await tester.enterText(find.byType(TextField), '   ');
       await tester.pump();
       expect(
-        tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier')).enabled,
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier'))
+            .enabled,
         isFalse,
         reason: 'des espaces ne sont pas un commentaire',
       );
@@ -485,7 +516,9 @@ void main() {
       await tester.enterText(find.byType(TextField), 'Un mot.');
       await tester.pump();
       expect(
-        tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier')).enabled,
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier'))
+            .enabled,
         isTrue,
       );
 
@@ -571,7 +604,9 @@ void main() {
       await teardownTree(tester);
     });
 
-    testWidgets('un bouton distinct ouvre la fiche', (WidgetTester tester) async {
+    testWidgets('un bouton distinct ouvre la fiche', (
+      WidgetTester tester,
+    ) async {
       await insertRepresentant(
         db,
         id: 'rep-1',
@@ -589,7 +624,9 @@ void main() {
       await teardownTree(tester);
     });
 
-    testWidgets('un appui long ouvre la fiche aussi', (WidgetTester tester) async {
+    testWidgets('un appui long ouvre la fiche aussi', (
+      WidgetTester tester,
+    ) async {
       await insertRepresentant(
         db,
         id: 'rep-1',

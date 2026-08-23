@@ -4,10 +4,14 @@ import 'package:dio/dio.dart';
 
 import '../sync/token_store.dart';
 import 'refresh_mutex.dart';
+import 'retry_after.dart';
 import 'session_expired.dart';
 
 class RefreshedTokens {
-  const RefreshedTokens({required this.accessToken, required this.refreshToken});
+  const RefreshedTokens({
+    required this.accessToken,
+    required this.refreshToken,
+  });
 
   final String accessToken;
   final String refreshToken;
@@ -20,11 +24,21 @@ class AuthInterceptor extends Interceptor {
     required Future<RefreshedTokens> Function(String refreshToken) refreshCall,
     void Function()? onSessionExpired,
     RefreshMutex mutex = const NoRefreshMutex(),
+    this.refreshAttempts = 3,
+    this.refreshRetryDelay = const Duration(milliseconds: 500),
   }) : _tokens = tokens,
        _replay = replayDio,
        _refreshCall = refreshCall,
        _onSessionExpired = onSessionExpired,
        _mutex = mutex;
+
+  /// Le renouvellement passe par un Dio SANS réessai, et `RetryInterceptor` ne
+  /// rejoue que les GET. Une réponse perdue sur 2G laissait donc un jeton déjà
+  /// tourné côté serveur : au coup suivant, le serveur y lit un rejeu et révoque
+  /// la famille entière.
+  final int refreshAttempts;
+
+  final Duration refreshRetryDelay;
 
   static const String noAuthFlag = 'cpi.noAuth';
 
@@ -53,7 +67,10 @@ class AuthInterceptor extends Interceptor {
   }
 
   @override
-  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
     final RequestOptions request = err.requestOptions;
     final bool eligible =
         err.response?.statusCode == 401 &&
@@ -75,6 +92,17 @@ class AuthInterceptor extends Interceptor {
           error: expired,
           type: DioExceptionType.badResponse,
           response: err.response,
+        ),
+      );
+      return;
+    } on Object catch (failure) {
+      // Échec SANS refus explicite (verrou occupé, réseau) : la session reste
+      // ouverte et la requête repart plus tard.
+      handler.reject(
+        DioException(
+          requestOptions: request,
+          error: failure,
+          type: DioExceptionType.connectionError,
         ),
       );
       return;
@@ -116,20 +144,49 @@ class AuthInterceptor extends Interceptor {
       await _expire();
       throw const SessionExpired('aucun jeton de renouvellement');
     }
-    try {
-      final RefreshedTokens fresh = await _refreshCall(refresh);
-      await _tokens.save(
-        accessToken: fresh.accessToken,
-        refreshToken: fresh.refreshToken,
-      );
-      return fresh.accessToken;
-    } on DioException catch (e) {
-      final int? status = e.response?.statusCode;
-      if (status == 401 || status == 403) {
-        await _expire();
-        throw SessionExpired(e);
+    for (int attempt = 1; ; attempt++) {
+      try {
+        final RefreshedTokens fresh = await _refreshCall(refresh);
+        await _tokens.save(
+          accessToken: fresh.accessToken,
+          refreshToken: fresh.refreshToken,
+        );
+        return fresh.accessToken;
+      } on DioException catch (e) {
+        if (_isSessionRefused(e)) {
+          await _expire();
+          throw SessionExpired(e);
+        }
+        if (attempt >= refreshAttempts || !_isTransient(e)) rethrow;
+        await Future<void>.delayed(refreshRetryDelay * attempt);
       }
-      rethrow;
+    }
+  }
+
+  /// Un portail captif et un pare-feu répondent 403 en HTML. Vider le coffre sur
+  /// cette réponse déconnecte un commercial dont la session est parfaitement
+  /// valide, file pleine, en plein terrain.
+  static bool _isSessionRefused(DioException e) {
+    final int? status = e.response?.statusCode;
+    if (status == 401) return true;
+    return status == 403 && announcesJson(e.response);
+  }
+
+  static bool _isTransient(DioException e) {
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+      case DioExceptionType.transformTimeout:
+      case DioExceptionType.connectionError:
+        return true;
+      case DioExceptionType.badResponse:
+        final int status = e.response?.statusCode ?? 0;
+        return status >= 500 || status == 408 || status == 425 || status == 429;
+      case DioExceptionType.cancel:
+      case DioExceptionType.badCertificate:
+      case DioExceptionType.unknown:
+        return false;
     }
   }
 

@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/sync_coordinator.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../data/local/database.dart';
 import '../../../ui/async_value_x.dart';
+import '../../../ui/widgets/empty_state.dart';
+import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/sync_badge.dart';
 import '../../auth/auth_state.dart';
 import '../visites_repository.dart';
-import 'visite_form_screen.dart';
 
 class RegistreScreen extends ConsumerWidget {
   const RegistreScreen({super.key});
@@ -25,7 +29,14 @@ class RegistreScreen extends ConsumerWidget {
 
     if (!peutTenirLeRegistre(auth.role)) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Registre des visites')),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(PhosphorIconsRegular.squaresFour),
+            tooltip: 'Projets',
+            onPressed: () => context.go(Routes.home),
+          ),
+          title: const Text('Registre des visites'),
+        ),
         body: Padding(
           padding: const EdgeInsets.all(CpiSpacing.xl),
           child: Center(
@@ -42,6 +53,11 @@ class RegistreScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(PhosphorIconsRegular.squaresFour),
+          tooltip: 'Projets',
+          onPressed: () => context.go(Routes.home),
+        ),
         title: const Text('Registre des visites'),
         actions: const <Widget>[
           OfflineIndicator(),
@@ -55,30 +71,20 @@ class RegistreScreen extends ConsumerWidget {
             Expanded(
               child: registre.whenEchecDAbord(
                 loading: () => const _RegistreEnCours(),
-                error: (Object error, StackTrace _) => ListView(
-                  padding: const EdgeInsets.all(CpiSpacing.md),
-                  children: <Widget>[
-                    BandeauEchec(
-                      message:
-                          'Le registre du jour n\'a pas pu être lu. '
-                          '${messageErreur(error)}',
-                    ),
-                    const SizedBox(height: CpiSpacing.xs),
-                    OutlinedButton.icon(
-                      onPressed: () => ref.invalidate(registreDuJourProvider),
-                      icon: const Icon(
-                        PhosphorIconsRegular.arrowClockwise,
-                        size: 20,
-                      ),
-                      label: const Text('Réessayer'),
-                    ),
-                  ],
+                error: (Object error, StackTrace _) => CpiErrorState(
+                  message:
+                      'Le registre du jour n\'a pas pu être lu. '
+                      '${messageErreur(error)}',
+                  onRetry: () => ref.invalidate(registreDuJourProvider),
                 ),
                 data: (List<Visite> value) => RefreshIndicator(
                   color: theme.colorScheme.primary,
                   onRefresh: () async {
+                    final SyncCoordinator sync = ref.read(
+                      syncCoordinatorProvider.notifier,
+                    );
                     await HapticFeedback.selectionClick();
-                    await ref.read(syncCoordinatorProvider.notifier).run();
+                    await sync.run();
                   },
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(
@@ -115,20 +121,21 @@ class RegistreScreen extends ConsumerWidget {
               ),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
-                border: Border(top: BorderSide(color: context.cpi.borderSubtle)),
+                border: Border(
+                  top: BorderSide(color: context.cpi.borderSubtle),
+                ),
               ),
               child: FilledButton.icon(
                 onPressed: () {
                   HapticFeedback.selectionClick().ignore();
-                  Navigator.of(context)
-                      .push<void>(
-                        MaterialPageRoute<void>(
-                          builder: (BuildContext context) => const VisiteFormScreen(),
-                        ),
-                      )
-                      .ignore();
+                  // Par le routeur, pas par `Navigator` : c'est ce qui rend le
+                  // formulaire mémorisable et son brouillon restaurable.
+                  context.push<void>(Routes.accueilVisiteNew).ignore();
                 },
-                icon: const Icon(PhosphorIconsRegular.userPlus, size: 22),
+                icon: const Icon(
+                  PhosphorIconsRegular.userPlus,
+                  size: CpiIconSize.lg,
+                ),
                 label: const Text('Inscrire un visiteur'),
               ),
             ),
@@ -220,36 +227,11 @@ class _RegistreVide extends StatelessWidget {
   const _RegistreVide();
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: CpiSpacing.xxl),
-      child: Column(
-        children: <Widget>[
-          Icon(
-            PhosphorIconsRegular.clipboardText,
-            size: 48,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: CpiSpacing.sm),
-          Text(
-            'Aucune visite inscrite aujourd\'hui',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: CpiSpacing.xxs),
-          Text(
-            'Inscrivez le premier visiteur avec le bouton du bas.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const CpiEmptyState(
+    icon: PhosphorIconsDuotone.clipboardText,
+    title: 'Aucune visite inscrite aujourd\'hui',
+    message: 'Inscrivez le premier visiteur avec le bouton du bas.',
+  );
 }
 
 class _RegistreEnCours extends StatelessWidget {

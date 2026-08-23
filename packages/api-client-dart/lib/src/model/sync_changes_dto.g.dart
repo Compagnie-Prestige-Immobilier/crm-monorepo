@@ -15,6 +15,12 @@ abstract class _$SyncChangesDtoCWProxy {
 
   SyncChangesDto syndicats(List<SyndicatDto> syndicats);
 
+  SyncChangesDto canauxProvenance(List<CanalProvenanceDto> canauxProvenance);
+
+  SyncChangesDto visiteReferentiels(
+    List<SyncVisiteReferentielDto> visiteReferentiels,
+  );
+
   SyncChangesDto representants(List<RepresentantDto> representants);
 
   SyncChangesDto prospects(List<ProspectDto> prospects);
@@ -36,6 +42,8 @@ abstract class _$SyncChangesDtoCWProxy {
     List<IefDto> iefs,
     List<BanqueDto> banques,
     List<SyndicatDto> syndicats,
+    List<CanalProvenanceDto> canauxProvenance,
+    List<SyncVisiteReferentielDto> visiteReferentiels,
     List<RepresentantDto> representants,
     List<ProspectDto> prospects,
     List<SyncCallCampaignDto> callCampaigns,
@@ -63,6 +71,15 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
   @override
   SyncChangesDto syndicats(List<SyndicatDto> syndicats) =>
       this(syndicats: syndicats);
+
+  @override
+  SyncChangesDto canauxProvenance(List<CanalProvenanceDto> canauxProvenance) =>
+      this(canauxProvenance: canauxProvenance);
+
+  @override
+  SyncChangesDto visiteReferentiels(
+    List<SyncVisiteReferentielDto> visiteReferentiels,
+  ) => this(visiteReferentiels: visiteReferentiels);
 
   @override
   SyncChangesDto representants(List<RepresentantDto> representants) =>
@@ -95,6 +112,8 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
     Object? iefs = const $CopyWithPlaceholder(),
     Object? banques = const $CopyWithPlaceholder(),
     Object? syndicats = const $CopyWithPlaceholder(),
+    Object? canauxProvenance = const $CopyWithPlaceholder(),
+    Object? visiteReferentiels = const $CopyWithPlaceholder(),
     Object? representants = const $CopyWithPlaceholder(),
     Object? prospects = const $CopyWithPlaceholder(),
     Object? callCampaigns = const $CopyWithPlaceholder(),
@@ -118,6 +137,14 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
           ? _value.syndicats
           // ignore: cast_nullable_to_non_nullable
           : syndicats as List<SyndicatDto>,
+      canauxProvenance: canauxProvenance == const $CopyWithPlaceholder()
+          ? _value.canauxProvenance
+          // ignore: cast_nullable_to_non_nullable
+          : canauxProvenance as List<CanalProvenanceDto>,
+      visiteReferentiels: visiteReferentiels == const $CopyWithPlaceholder()
+          ? _value.visiteReferentiels
+          // ignore: cast_nullable_to_non_nullable
+          : visiteReferentiels as List<SyncVisiteReferentielDto>,
       representants: representants == const $CopyWithPlaceholder()
           ? _value.representants
           // ignore: cast_nullable_to_non_nullable
@@ -152,92 +179,112 @@ extension $SyncChangesDtoCopyWith on SyncChangesDto {
 // JsonSerializableGenerator
 // **************************************************************************
 
-SyncChangesDto _$SyncChangesDtoFromJson(Map<String, dynamic> json) =>
-    $checkedCreate('SyncChangesDto', json, ($checkedConvert) {
-      $checkKeys(
-        json,
-        requiredKeys: const [
-          'departements',
-          'iefs',
-          'banques',
-          'syndicats',
-          'representants',
-          'prospects',
-          'callCampaigns',
-          'callTasks',
-          'visites',
-        ],
-      );
-      final val = SyncChangesDto(
-        departements: $checkedConvert(
-          'departements',
-          (v) => (v as List<dynamic>)
-              .map((e) => DepartementDto.fromJson(e as Map<String, dynamic>))
-              .toList(),
-        ),
-        iefs: $checkedConvert(
-          'iefs',
-          (v) => (v as List<dynamic>)
-              .map((e) => IefDto.fromJson(e as Map<String, dynamic>))
-              .toList(),
-        ),
-        banques: $checkedConvert(
-          'banques',
-          (v) => (v as List<dynamic>)
-              .map((e) => BanqueDto.fromJson(e as Map<String, dynamic>))
-              .toList(),
-        ),
-        syndicats: $checkedConvert(
-          'syndicats',
-          (v) => (v as List<dynamic>)
-              .map((e) => SyndicatDto.fromJson(e as Map<String, dynamic>))
-              .toList(),
-        ),
-        representants: $checkedConvert(
-          'representants',
-          (v) => (v as List<dynamic>)
-              .map((e) => RepresentantDto.fromJson(e as Map<String, dynamic>))
-              .toList(),
-        ),
-        prospects: $checkedConvert(
-          'prospects',
-          (v) => (v as List<dynamic>)
-              .map((e) => ProspectDto.fromJson(e as Map<String, dynamic>))
-              .toList(),
-        ),
-        callCampaigns: $checkedConvert(
-          'callCampaigns',
-          (v) => (v as List<dynamic>)
-              .map(
-                (e) => SyncCallCampaignDto.fromJson(e as Map<String, dynamic>),
-              )
-              .toList(),
-        ),
-        callTasks: $checkedConvert(
-          'callTasks',
-          (v) => (v as List<dynamic>)
-              .map((e) => SyncCallTaskDto.fromJson(e as Map<String, dynamic>))
-              .toList(),
-        ),
-        visites: $checkedConvert(
-          'visites',
-          (v) => (v as List<dynamic>)
-              .map((e) => SyncVisiteDto.fromJson(e as Map<String, dynamic>))
-              .toList(),
-        ),
-      );
-      return val;
-    });
+SyncChangesDto _$SyncChangesDtoFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate('SyncChangesDto', json, ($checkedConvert) {
+  $checkKeys(
+    json,
+    requiredKeys: const [
+      'departements',
+      'iefs',
+      'banques',
+      'syndicats',
+      'canauxProvenance',
+      'visiteReferentiels',
+      'representants',
+      'prospects',
+      'callCampaigns',
+      'callTasks',
+      'visites',
+    ],
+  );
+  final val = SyncChangesDto(
+    departements: $checkedConvert(
+      'departements',
+      (v) => (v as List<dynamic>)
+          .map((e) => DepartementDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    iefs: $checkedConvert(
+      'iefs',
+      (v) => (v as List<dynamic>)
+          .map((e) => IefDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    banques: $checkedConvert(
+      'banques',
+      (v) => (v as List<dynamic>)
+          .map((e) => BanqueDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    syndicats: $checkedConvert(
+      'syndicats',
+      (v) => (v as List<dynamic>)
+          .map((e) => SyndicatDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    canauxProvenance: $checkedConvert(
+      'canauxProvenance',
+      (v) => (v as List<dynamic>)
+          .map((e) => CanalProvenanceDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    visiteReferentiels: $checkedConvert(
+      'visiteReferentiels',
+      (v) => (v as List<dynamic>)
+          .map(
+            (e) => SyncVisiteReferentielDto.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
+    ),
+    representants: $checkedConvert(
+      'representants',
+      (v) => (v as List<dynamic>)
+          .map((e) => RepresentantDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    prospects: $checkedConvert(
+      'prospects',
+      (v) => (v as List<dynamic>)
+          .map((e) => ProspectDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    callCampaigns: $checkedConvert(
+      'callCampaigns',
+      (v) => (v as List<dynamic>)
+          .map((e) => SyncCallCampaignDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    callTasks: $checkedConvert(
+      'callTasks',
+      (v) => (v as List<dynamic>)
+          .map((e) => SyncCallTaskDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    visites: $checkedConvert(
+      'visites',
+      (v) => (v as List<dynamic>)
+          .map((e) => SyncVisiteDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+  );
+  return val;
+});
 
-Map<String, dynamic> _$SyncChangesDtoToJson(SyncChangesDto instance) =>
-    <String, dynamic>{
-      'departements': instance.departements.map((e) => e.toJson()).toList(),
-      'iefs': instance.iefs.map((e) => e.toJson()).toList(),
-      'banques': instance.banques.map((e) => e.toJson()).toList(),
-      'syndicats': instance.syndicats.map((e) => e.toJson()).toList(),
-      'representants': instance.representants.map((e) => e.toJson()).toList(),
-      'prospects': instance.prospects.map((e) => e.toJson()).toList(),
-      'callCampaigns': instance.callCampaigns.map((e) => e.toJson()).toList(),
-      'callTasks': instance.callTasks.map((e) => e.toJson()).toList(),
-      'visites': instance.visites.map((e) => e.toJson()).toList(),
-    };
+Map<String, dynamic> _$SyncChangesDtoToJson(
+  SyncChangesDto instance,
+) => <String, dynamic>{
+  'departements': instance.departements.map((e) => e.toJson()).toList(),
+  'iefs': instance.iefs.map((e) => e.toJson()).toList(),
+  'banques': instance.banques.map((e) => e.toJson()).toList(),
+  'syndicats': instance.syndicats.map((e) => e.toJson()).toList(),
+  'canauxProvenance': instance.canauxProvenance.map((e) => e.toJson()).toList(),
+  'visiteReferentiels': instance.visiteReferentiels
+      .map((e) => e.toJson())
+      .toList(),
+  'representants': instance.representants.map((e) => e.toJson()).toList(),
+  'prospects': instance.prospects.map((e) => e.toJson()).toList(),
+  'callCampaigns': instance.callCampaigns.map((e) => e.toJson()).toList(),
+  'callTasks': instance.callTasks.map((e) => e.toJson()).toList(),
+  'visites': instance.visites.map((e) => e.toJson()).toList(),
+};

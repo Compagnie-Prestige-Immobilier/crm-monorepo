@@ -12,26 +12,27 @@ import '../../core/push/push_transport.dart';
 import '../../data/local/database.dart';
 import 'notification_inbox.dart';
 
-
-final Provider<PushTransport> pushTransportProvider = Provider<PushTransport>((Ref ref) {
+final Provider<PushTransport> pushTransportProvider = Provider<PushTransport>((
+  Ref ref,
+) {
   return const NullPushTransport();
 });
 
-final Provider<PushInboxStore> pushInboxStoreProvider = Provider<PushInboxStore>((
-  Ref ref,
-) {
-  return PushInboxStore(ref.watch(appDatabaseProvider));
-});
+final Provider<PushInboxStore> pushInboxStoreProvider =
+    Provider<PushInboxStore>((Ref ref) {
+      return PushInboxStore(ref.watch(appDatabaseProvider));
+    });
 
 final StreamProvider<List<StoredNotification>> notificationsProvider =
     StreamProvider<List<StoredNotification>>((Ref ref) {
       return ref.watch(pushInboxStoreProvider).watchAll();
     });
 
-final StreamProvider<int> unreadNotificationsProvider = StreamProvider<int>((Ref ref) {
+final StreamProvider<int> unreadNotificationsProvider = StreamProvider<int>((
+  Ref ref,
+) {
   return ref.watch(pushInboxStoreProvider).watchUnreadCount();
 });
-
 
 @immutable
 class PendingPushRoute {
@@ -84,7 +85,6 @@ pendingPushRouteProvider =
       PendingPushRouteController.new,
     );
 
-
 class NotificationsCoordinator extends Notifier<bool> {
   StreamSubscription<PushMessage>? _foreground;
   StreamSubscription<PushMessage>? _opened;
@@ -129,7 +129,8 @@ class NotificationsCoordinator extends Notifier<bool> {
     });
 
     _lifecycle = AppLifecycleListener(
-      onResume: () => unawaited(ref.read(notificationInboxProvider).refresh(force: true)),
+      onResume: () =>
+          unawaited(ref.read(notificationInboxProvider).refresh(force: true)),
     );
 
     await _consumeLaunchMessage(transport, inbox);
@@ -157,5 +158,8 @@ class NotificationsCoordinator extends Notifier<bool> {
   }
 }
 
-final NotifierProvider<NotificationsCoordinator, bool> notificationsCoordinatorProvider =
-    NotifierProvider<NotificationsCoordinator, bool>(NotificationsCoordinator.new);
+final NotifierProvider<NotificationsCoordinator, bool>
+notificationsCoordinatorProvider =
+    NotifierProvider<NotificationsCoordinator, bool>(
+      NotificationsCoordinator.new,
+    );

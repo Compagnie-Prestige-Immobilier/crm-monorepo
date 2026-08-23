@@ -55,10 +55,22 @@ void main() {
   /// Les statuts sont ceux que le moteur produit vraiment : la tête part en
   /// `failed` (verdict `invalid` puis `_markFailed`), et chaque prospect en
   /// `pending` (verdict `skippedDependencyFailed` puis `_requeueBlocked`).
-  Future<void> seedRefusedChain({String headStatus = OutboxStatus.failed}) async {
+  Future<void> seedRefusedChain({
+    String headStatus = OutboxStatus.failed,
+  }) async {
     await insertRepresentant(db, id: 'repA', phone: '+221770000001');
-    await insertProspect(db, id: 'pA1', representantId: 'repA', phone: '+221780000001');
-    await insertProspect(db, id: 'pA2', representantId: 'repA', phone: '+221780000002');
+    await insertProspect(
+      db,
+      id: 'pA1',
+      representantId: 'repA',
+      phone: '+221780000001',
+    );
+    await insertProspect(
+      db,
+      id: 'pA2',
+      representantId: 'repA',
+      phone: '+221780000002',
+    );
     await queueOp(
       db,
       id: 'A1',
@@ -164,7 +176,10 @@ void main() {
             'suppression prend OutboxStatus.open : les deux prospects, en '
             '`pending`, étaient invisibles et la boîte disait « cette saisie »',
       );
-      expect(find.text('Cette saisie sera supprimée définitivement.'), findsNothing);
+      expect(
+        find.text('Cette saisie sera supprimée définitivement.'),
+        findsNothing,
+      );
       await unmount(tester);
     });
 
@@ -206,7 +221,12 @@ void main() {
       WidgetTester tester,
     ) async {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
-      await insertProspect(db, id: 'pA1', representantId: 'repA', phone: '+221780000001');
+      await insertProspect(
+        db,
+        id: 'pA1',
+        representantId: 'repA',
+        phone: '+221780000001',
+      );
       await queueOp(
         db,
         id: 'A2',
@@ -264,96 +284,98 @@ void main() {
       expect(find.text('Supprimer cette saisie'), findsOneWidget);
     }
 
-    testWidgets('« Corriger le numéro » ouvre la fiche une fois la feuille fermée', (
-      WidgetTester tester,
-    ) async {
-      // La feuille se dépilait AVANT de naviguer, avec son propre contexte :
-      // l'élément est désactivé, `GoRouter.of` n'y remonte plus rien et le
-      // bouton ne faisait que refermer la feuille.
-      await seedRefusedChain(headStatus: OutboxStatus.conflict);
-      final OutboxData head = await outboxById(db, 'A1');
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      SinglePush.reset();
+    testWidgets(
+      '« Corriger le numéro » ouvre la fiche une fois la feuille fermée',
+      (WidgetTester tester) async {
+        // La feuille se dépilait AVANT de naviguer, avec son propre contexte :
+        // l'élément est désactivé, `GoRouter.of` n'y remonte plus rien et le
+        // bouton ne faisait que refermer la feuille.
+        await seedRefusedChain(headStatus: OutboxStatus.conflict);
+        final OutboxData head = await outboxById(db, 'A1');
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        SinglePush.reset();
 
-      final GoRouter router = GoRouter(
-        initialLocation: '/depart',
-        routes: <RouteBase>[
-          GoRoute(
-            path: '/depart',
-            builder: (BuildContext context, GoRouterState state) => Scaffold(
-              body: Center(
-                child: ElevatedButton(
-                  onPressed: () => showOwnershipSheet(
-                    context: context,
-                    row: head,
-                    lookup: RepresentantLookup(
-                      found: true,
-                      phoneE164: '+221770000001',
-                      representant: representantDto(
-                        id: 'server-rep',
+        final GoRouter router = GoRouter(
+          initialLocation: '/depart',
+          routes: <RouteBase>[
+            GoRoute(
+              path: '/depart',
+              builder: (BuildContext context, GoRouterState state) => Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () => showOwnershipSheet(
+                      context: context,
+                      row: head,
+                      lookup: RepresentantLookup(
+                        found: true,
                         phoneE164: '+221770000001',
+                        representant: representantDto(
+                          id: 'server-rep',
+                          phoneE164: '+221770000001',
+                        ),
+                        ownedByCommercialName: 'Moussa Diop',
                       ),
-                      ownedByCommercialName: 'Moussa Diop',
                     ),
+                    child: const Text('ouvrir'),
                   ),
-                  child: const Text('ouvrir'),
                 ),
               ),
             ),
-          ),
-          GoRoute(
-            path: Routes.newRepresentant,
-            builder: (BuildContext context, GoRouterState state) =>
-                const Scaffold(body: Center(child: Text('FICHE'))),
-          ),
-        ],
-      );
-      addTearDown(router.dispose);
-
-      await paint(
-        tester,
-        ProviderScope(
-          overrides: [
-            appDatabaseProvider.overrideWithValue(db),
-            apiPortProvider.overrideWithValue(FakeApi()),
-            clockProvider.overrideWithValue(FakeClock(t0)),
-            sharedPreferencesProvider.overrideWithValue(prefs),
-            syncCoordinatorProvider.overrideWith(_FrozenCoordinator.new),
+            GoRoute(
+              path: Routes.newRepresentant,
+              builder: (BuildContext context, GoRouterState state) =>
+                  const Scaffold(body: Center(child: Text('FICHE'))),
+            ),
           ],
-          child: MaterialApp.router(
-            theme: AppTheme.light,
-            locale: const Locale('fr'),
-            localizationsDelegates: GlobalMaterialLocalizations.delegates,
-            supportedLocales: const <Locale>[Locale('fr')],
-            routerConfig: router,
+        );
+        addTearDown(router.dispose);
+
+        await paint(
+          tester,
+          ProviderScope(
+            overrides: [
+              appDatabaseProvider.overrideWithValue(db),
+              apiPortProvider.overrideWithValue(FakeApi()),
+              clockProvider.overrideWithValue(FakeClock(t0)),
+              sharedPreferencesProvider.overrideWithValue(prefs),
+              syncCoordinatorProvider.overrideWith(_FrozenCoordinator.new),
+            ],
+            child: MaterialApp.router(
+              theme: AppTheme.light,
+              locale: const Locale('fr'),
+              localizationsDelegates: GlobalMaterialLocalizations.delegates,
+              supportedLocales: const <Locale>[Locale('fr')],
+              routerConfig: router,
+            ),
           ),
-        ),
-      );
+        );
 
-      await tester.tap(find.text('ouvrir'));
-      await paint(tester);
-      await tester.tap(find.text('Corriger le numéro'));
-      await paint(tester);
+        await tester.tap(find.text('ouvrir'));
+        await paint(tester);
+        await tester.tap(find.text('Corriger le numéro'));
+        await paint(tester);
 
-      expect(find.text('FICHE'), findsOneWidget);
-      await unmount(tester);
-    });
+        expect(find.text('FICHE'), findsOneWidget);
+        await unmount(tester);
+      },
+    );
 
-    testWidgets('le propriétaire inconnu est un TÉLÉCONSEILLER, pas un commercial', (
-      WidgetTester tester,
-    ) async {
-      // `commercial` est proscrit de toute chaîne affichée : le vocabulaire du
-      // produit est gardé côté web, et la seule occurrence restante du dépôt
-      // était ce repli.
-      await seedRefusedChain(headStatus: OutboxStatus.conflict);
-      await paint(tester, await sheetHost(ownerName: null));
-      await tester.tap(find.text('ouvrir'));
-      await paint(tester);
+    testWidgets(
+      'le propriétaire inconnu est un TÉLÉCONSEILLER, pas un commercial',
+      (WidgetTester tester) async {
+        // `commercial` est proscrit de toute chaîne affichée : le vocabulaire du
+        // produit est gardé côté web, et la seule occurrence restante du dépôt
+        // était ce repli.
+        await seedRefusedChain(headStatus: OutboxStatus.conflict);
+        await paint(tester, await sheetHost(ownerName: null));
+        await tester.tap(find.text('ouvrir'));
+        await paint(tester);
 
-      expect(find.textContaining('commercial'), findsNothing);
-      expect(find.textContaining('téléconseiller'), findsOneWidget);
-      await unmount(tester);
-    });
+        expect(find.textContaining('commercial'), findsNothing);
+        expect(find.textContaining('téléconseiller'), findsOneWidget);
+        await unmount(tester);
+      },
+    );
 
     testWidgets('un appui ne suffit pas : il faut confirmer', (
       WidgetTester tester,

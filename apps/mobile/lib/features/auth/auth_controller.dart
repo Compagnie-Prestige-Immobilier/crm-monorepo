@@ -144,8 +144,10 @@ class AuthController extends Notifier<AuthState> {
 
   static String _messageFor(ApiException e) => switch (e.code) {
     'invalid_credentials' => 'Identifiant ou mot de passe incorrect.',
-    'account_disabled' => 'Ce compte est désactivé. Contactez votre responsable.',
-    'network' || 'timeout' => 'Réseau indisponible. Réessayez une fois connecté.',
+    'account_disabled' =>
+      'Ce compte est désactivé. Contactez votre responsable.',
+    'network' ||
+    'timeout' => 'Réseau indisponible. Réessayez une fois connecté.',
     _ => e.message ?? 'Connexion impossible pour le moment.',
   };
 }

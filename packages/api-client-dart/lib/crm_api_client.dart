@@ -266,6 +266,7 @@ export 'package:crm_api_client/src/model/sync_pull_response_dto.dart';
 export 'package:crm_api_client/src/model/sync_push_dto.dart';
 export 'package:crm_api_client/src/model/sync_push_response_dto.dart';
 export 'package:crm_api_client/src/model/sync_visite_dto.dart';
+export 'package:crm_api_client/src/model/sync_visite_referentiel_dto.dart';
 export 'package:crm_api_client/src/model/syndicat_dto.dart';
 export 'package:crm_api_client/src/model/time_bucket_dto.dart';
 export 'package:crm_api_client/src/model/time_granularity.dart';

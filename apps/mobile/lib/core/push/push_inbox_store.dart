@@ -38,9 +38,10 @@ class PushInboxStore {
   }) async {
     await _db.transaction(() async {
       for (final PushMessage message in messages) {
-        final StoredNotification? existing = await (_db.select(
-          _db.notifications,
-        )..where((Notifications t) => t.id.equals(message.id))).getSingleOrNull();
+        final StoredNotification? existing =
+            await (_db.select(_db.notifications)
+                  ..where((Notifications t) => t.id.equals(message.id)))
+                .getSingleOrNull();
 
         final DateTime? serverRead = readStates?[message.id];
         final DateTime? localRead = existing?.readAt;
@@ -75,7 +76,9 @@ class PushInboxStore {
     await (_db.update(
       _db.notifications,
     )..where((Notifications t) => t.id.equals(id) & t.readAt.isNull())).write(
-      NotificationsCompanion(readAt: Value<DateTime?>(at ?? DateTime.now().toUtc())),
+      NotificationsCompanion(
+        readAt: Value<DateTime?>(at ?? DateTime.now().toUtc()),
+      ),
     );
   }
 
@@ -83,19 +86,23 @@ class PushInboxStore {
     await (_db.update(
       _db.notifications,
     )..where((Notifications t) => t.readAt.isNull())).write(
-      NotificationsCompanion(readAt: Value<DateTime?>(at ?? DateTime.now().toUtc())),
+      NotificationsCompanion(
+        readAt: Value<DateTime?>(at ?? DateTime.now().toUtc()),
+      ),
     );
   }
 
   Stream<List<StoredNotification>> watchAll() {
-    return (_db.select(_db.notifications)..orderBy(<OrderClauseGenerator<Notifications>>[
-          (Notifications t) => OrderingTerm.desc(t.createdAt),
-        ]))
+    return (_db.select(_db.notifications)
+          ..orderBy(<OrderClauseGenerator<Notifications>>[
+            (Notifications t) => OrderingTerm.desc(t.createdAt),
+          ]))
         .watch();
   }
 
   Stream<int> watchUnreadCount() {
-    return (_db.select(_db.notifications)..where((Notifications t) => t.readAt.isNull()))
+    return (_db.select(_db.notifications)
+          ..where((Notifications t) => t.readAt.isNull()))
         .watch()
         .map((List<StoredNotification> rows) => rows.length);
   }

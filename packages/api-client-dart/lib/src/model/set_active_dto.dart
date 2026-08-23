@@ -18,20 +18,28 @@ part 'set_active_dto.g.dart';
 )
 class SetActiveDto {
   /// Returns a new [SetActiveDto] instance.
-  SetActiveDto({required this.isActive});
+  SetActiveDto({required this.isActive, this.handoverToId});
 
   @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
+
+  /// Compte qui reprend le portefeuille. Exigé si le compte désactivé en a un.
+  @JsonKey(name: r'handoverToId', required: false, includeIfNull: false)
+  final String? handoverToId;
 
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SetActiveDto &&
             runtimeType == other.runtimeType &&
-            equals([isActive], [other.isActive]);
+            equals(
+              [isActive, handoverToId],
+              [other.isActive, other.handoverToId],
+            );
   }
 
   @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([isActive]);
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([isActive, handoverToId]);
 
   factory SetActiveDto.fromJson(Map<String, dynamic> json) =>
       _$SetActiveDtoFromJson(json);
