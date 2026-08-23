@@ -566,6 +566,10 @@ jobs:
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
           flutter analyze
+          # Rien ne gardait la mise en forme d'apps/mobile, et elle avait dérivé
+          # sur 87 fichiers. `lib/` et `test/` seulement : le code engendré
+          # n'est pas écrit à la main et son formateur n'est pas celui-ci.
+          dart format --output=none --set-exit-if-changed lib/ test/
           flutter test
 
   # ---------------------------------------------------------------------------
