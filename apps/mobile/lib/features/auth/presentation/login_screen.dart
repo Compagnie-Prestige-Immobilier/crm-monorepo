@@ -52,171 +52,234 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final AuthState auth = ref.watch(authControllerProvider);
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
-    const Color burgundy = Color(0xFF630210);
+    // Le bordeaux était écrit en dur : sous la coque CHUES, noire et bleue,
+    // l'écran de connexion rendait quand même un fond CPI.
+    final Color brand = theme.colorScheme.primary;
 
-    final TextStyle errorStyle = (theme.textTheme.bodyMedium ?? const TextStyle())
-        .copyWith(color: cpi.destructiveOnDark, fontWeight: FontWeight.w600);
+    final TextStyle errorStyle =
+        (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
+          color: theme.colorScheme.error,
+          fontWeight: FontWeight.w600,
+        );
     final OutlineInputBorder errorBorder = OutlineInputBorder(
       borderRadius: CpiRadius.brMd,
-      borderSide: BorderSide(color: cpi.destructiveOnDark, width: 2),
+      borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
     );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
         statusBarBrightness: Brightness.dark,
-        systemNavigationBarColor: burgundy,
+        systemNavigationBarColor: brand,
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: burgundy,
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (BuildContext context, BoxConstraints constraints) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: CpiSpacing.xl,
-                  vertical: CpiSpacing.xxl,
-                ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - CpiSpacing.giant,
+        backgroundColor: brand,
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: cpiBrandGradient(brand),
+            ),
+          ),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: CpiSpacing.xl,
+                    vertical: CpiSpacing.xxl,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      Center(
-                        child: Image.asset(
-                          'assets/brand/cpi-header.png',
-                          width: 196,
-                          height: 80,
-                          cacheWidth: 392,
-                          fit: BoxFit.contain,
-                          filterQuality: FilterQuality.medium,
-                          semanticLabel: 'CPI',
-                        ),
-                      ),
-                      const SizedBox(height: CpiSpacing.xs),
-                      Text(
-                        'Espace téléconseil',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: cpi.navForeground,
-                        ),
-                      ),
-                      const SizedBox(height: CpiSpacing.xxxl),
-
-                      Form(
-                        key: _formKey,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - CpiSpacing.giant,
+                    ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 480),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: <Widget>[
-                            const _FieldLabel(text: 'Identifiant'),
-                            const SizedBox(height: CpiSpacing.xs),
-                            TextFormField(
-                              controller: _identifier,
-                              autofillHints: const <String>[AutofillHints.username],
-                              textInputAction: TextInputAction.next,
-                              keyboardType: TextInputType.text,
-                              autocorrect: false,
-                              enableSuggestions: false,
-                              textCapitalization: TextCapitalization.none,
-                              style: theme.textTheme.bodyLarge,
-                              decoration: InputDecoration(
-                                hintText: 'nom.prenom ou e-mail',
-                                prefixIcon: const Icon(PhosphorIconsRegular.user),
-                                fillColor: cpi.inputBackground,
-                                errorStyle: errorStyle,
-                                errorBorder: errorBorder,
-                                focusedErrorBorder: errorBorder,
+                            Center(
+                              child: Image.asset(
+                                'assets/brand/cpi-header.png',
+                                width: 196,
+                                height: 80,
+                                cacheWidth: 392,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.medium,
+                                semanticLabel: 'CPI',
                               ),
-                              validator: (String? value) =>
-                                  (value == null || value.trim().isEmpty)
-                                  ? 'Saisissez l\'identifiant.'
-                                  : null,
-                              onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
                             ),
-                            const SizedBox(height: CpiSpacing.md),
-
-                            const _FieldLabel(text: 'Mot de passe'),
                             const SizedBox(height: CpiSpacing.xs),
-                            TextFormField(
-                              controller: _password,
-                              focusNode: _passwordFocus,
-                              autofillHints: const <String>[AutofillHints.password],
-                              obscureText: _obscure,
-                              textInputAction: TextInputAction.done,
-                              style: theme.textTheme.bodyLarge,
-                              decoration: InputDecoration(
-                                hintText: '••••••••',
-                                prefixIcon: const Icon(PhosphorIconsRegular.lockKey),
-                                fillColor: cpi.inputBackground,
-                                suffixIcon: IconButton(
-                                  onPressed: () => setState(() => _obscure = !_obscure),
-                                  tooltip: _obscure
-                                      ? 'Afficher le mot de passe'
-                                      : 'Masquer le mot de passe',
-                                  icon: Icon(
-                                    _obscure
-                                        ? PhosphorIconsRegular.eye
-                                        : PhosphorIconsRegular.eyeSlash,
+                            Text(
+                              'CPI GO',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                color: cpi.navForeground,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: CpiSpacing.xs),
+                            Text(
+                              'Accédez à vos espaces de travail',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: cpi.navForeground.withValues(
+                                  alpha: 0.82,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: CpiSpacing.xl),
+
+                            Card(
+                              color: theme.colorScheme.surface,
+                              child: Padding(
+                                padding: const EdgeInsets.all(CpiSpacing.xl),
+                                child: Form(
+                                  key: _formKey,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: <Widget>[
+                                      const _FieldLabel(text: 'Identifiant'),
+                                      const SizedBox(height: CpiSpacing.xs),
+                                      TextFormField(
+                                        controller: _identifier,
+                                        autofillHints: const <String>[
+                                          AutofillHints.username,
+                                        ],
+                                        textInputAction: TextInputAction.next,
+                                        keyboardType: TextInputType.text,
+                                        autocorrect: false,
+                                        enableSuggestions: false,
+                                        textCapitalization:
+                                            TextCapitalization.none,
+                                        style: theme.textTheme.bodyLarge,
+                                        decoration: InputDecoration(
+                                          hintText: 'nom.prenom ou e-mail',
+                                          prefixIcon: const Icon(
+                                            PhosphorIconsRegular.user,
+                                          ),
+                                          fillColor: cpi.inputBackground,
+                                          errorStyle: errorStyle,
+                                          errorBorder: errorBorder,
+                                          focusedErrorBorder: errorBorder,
+                                        ),
+                                        validator: (String? value) =>
+                                            (value == null ||
+                                                value.trim().isEmpty)
+                                            ? 'Saisissez l\'identifiant.'
+                                            : null,
+                                        onFieldSubmitted: (_) =>
+                                            _passwordFocus.requestFocus(),
+                                      ),
+                                      const SizedBox(height: CpiSpacing.md),
+
+                                      const _FieldLabel(text: 'Mot de passe'),
+                                      const SizedBox(height: CpiSpacing.xs),
+                                      TextFormField(
+                                        controller: _password,
+                                        focusNode: _passwordFocus,
+                                        autofillHints: const <String>[
+                                          AutofillHints.password,
+                                        ],
+                                        obscureText: _obscure,
+                                        textInputAction: TextInputAction.done,
+                                        style: theme.textTheme.bodyLarge,
+                                        decoration: InputDecoration(
+                                          hintText: '••••••••',
+                                          prefixIcon: const Icon(
+                                            PhosphorIconsRegular.lockKey,
+                                          ),
+                                          fillColor: cpi.inputBackground,
+                                          suffixIcon: IconButton(
+                                            onPressed: () => setState(
+                                              () => _obscure = !_obscure,
+                                            ),
+                                            tooltip: _obscure
+                                                ? 'Afficher le mot de passe'
+                                                : 'Masquer le mot de passe',
+                                            icon: Icon(
+                                              _obscure
+                                                  ? PhosphorIconsRegular.eye
+                                                  : PhosphorIconsRegular
+                                                        .eyeSlash,
+                                            ),
+                                          ),
+                                          errorStyle: errorStyle,
+                                          errorBorder: errorBorder,
+                                          focusedErrorBorder: errorBorder,
+                                        ),
+                                        validator: (String? value) =>
+                                            (value == null || value.isEmpty)
+                                            ? 'Saisissez le mot de passe.'
+                                            : null,
+                                        onFieldSubmitted: (_) =>
+                                            unawaited(_submit()),
+                                      ),
+
+                                      const SizedBox(height: CpiSpacing.xs),
+                                      _StaySignedInToggle(
+                                        value: _staySignedIn,
+                                        onChanged: (bool value) => setState(
+                                          () => _staySignedIn = value,
+                                        ),
+                                      ),
+
+                                      if (auth.errorMessage !=
+                                          null) ...<Widget>[
+                                        const SizedBox(height: CpiSpacing.md),
+                                        _ErrorBanner(
+                                          message: auth.errorMessage!,
+                                        ),
+                                      ],
+
+                                      const SizedBox(height: CpiSpacing.xl),
+                                      FilledButton(
+                                        onPressed: auth.isSubmitting
+                                            ? null
+                                            : _submit,
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: cpi.accent,
+                                          foregroundColor: cpi.accentForeground,
+                                          disabledBackgroundColor: cpi.accent
+                                              .withValues(
+                                                alpha: CpiStateOpacity
+                                                    .disabledContainer,
+                                              ),
+                                          disabledForegroundColor:
+                                              cpi.navForeground,
+                                        ),
+                                        child: auth.isSubmitting
+                                            ? SizedBox(
+                                                height: 20,
+                                                width: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2.5,
+                                                      color:
+                                                          cpi.accentForeground,
+                                                    ),
+                                              )
+                                            : const Text('Se connecter'),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                errorStyle: errorStyle,
-                                errorBorder: errorBorder,
-                                focusedErrorBorder: errorBorder,
                               ),
-                              validator: (String? value) =>
-                                  (value == null || value.isEmpty)
-                                  ? 'Saisissez le mot de passe.'
-                                  : null,
-                              onFieldSubmitted: (_) => unawaited(_submit()),
-                            ),
-
-                            const SizedBox(height: CpiSpacing.xs),
-                            _StaySignedInToggle(
-                              value: _staySignedIn,
-                              onChanged: (bool value) =>
-                                  setState(() => _staySignedIn = value),
-                            ),
-
-                            if (auth.errorMessage != null) ...<Widget>[
-                              const SizedBox(height: CpiSpacing.md),
-                              _ErrorBanner(message: auth.errorMessage!),
-                            ],
-
-                            const SizedBox(height: CpiSpacing.xl),
-                            FilledButton(
-                              onPressed: auth.isSubmitting ? null : _submit,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: cpi.accent,
-                                foregroundColor: cpi.accentForeground,
-                                disabledBackgroundColor: cpi.accent.withValues(
-                                  alpha: CpiStateOpacity.disabledContainer,
-                                ),
-                                disabledForegroundColor: cpi.navForeground,
-                              ),
-                              child: auth.isSubmitting
-                                  ? SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        color: cpi.accentForeground,
-                                      ),
-                                    )
-                                  : const Text('Se connecter'),
                             ),
                           ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -231,12 +294,7 @@ class _FieldLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: Theme.of(
-        context,
-      ).textTheme.labelLarge?.copyWith(color: const Color(0xFFFFFFFF)),
-    );
+    return Text(text, style: Theme.of(context).textTheme.labelLarge);
   }
 }
 
@@ -262,7 +320,10 @@ class _StaySignedInToggle extends StatelessWidget {
               child: Checkbox(
                 value: value,
                 onChanged: (bool? v) => onChanged(v ?? false),
-                side: BorderSide(color: cpi.navForeground, width: 2),
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outline,
+                  width: 2,
+                ),
                 fillColor: WidgetStateProperty.resolveWith<Color>((
                   Set<WidgetState> states,
                 ) {
@@ -278,9 +339,7 @@ class _StaySignedInToggle extends StatelessWidget {
             Expanded(
               child: Text(
                 'Rester connecté sur cet appareil',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: const Color(0xFFFFFFFF)),
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
           ],
@@ -309,7 +368,7 @@ class _ErrorBanner extends StatelessWidget {
         children: <Widget>[
           Icon(
             PhosphorIconsRegular.warningCircle,
-            size: 18,
+            size: CpiIconSize.sm,
             color: theme.colorScheme.onErrorContainer,
           ),
           const SizedBox(width: CpiSpacing.xs),

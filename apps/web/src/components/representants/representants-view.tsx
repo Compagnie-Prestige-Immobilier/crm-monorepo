@@ -110,7 +110,10 @@ export function RepresentantsView({
           {canAdminister ? (
             // Un LIEN habillé en bouton : la primitive `Button` de Base UI
             // poserait `role="button"` sur le `<a>`.
-            <Link href="/chues/representants/import" className={buttonVariants({ variant: 'outline' })}>
+            <Link
+              href="/chues/representants/import"
+              className={buttonVariants({ variant: 'outline' })}
+            >
               <UploadIcon aria-hidden="true" />
               Import Excel
             </Link>

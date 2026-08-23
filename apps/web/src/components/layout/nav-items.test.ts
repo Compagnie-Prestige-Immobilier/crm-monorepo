@@ -6,7 +6,11 @@ import {
   coqueHomePath,
   coqueOf,
   coquesForRole,
+  fallbackCoque,
   homePathForRole,
+  INBOX_PATH,
+  INBOX_ROLES,
+  inboxPathFor,
   isNavItemActive,
   navItems,
   navSections,
@@ -501,5 +505,36 @@ describe('navigation de la DIRECTION', () => {
   it('voit au moins tout ce que voit la supervision', () => {
     const visible = new Set(hrefs('DIRECTION', 'chues'));
     expect(hrefs('SUPERVISEUR', 'chues').filter((href) => !visible.has(href))).toEqual([]);
+  });
+});
+
+describe('boîte de réception, hors coque', () => {
+  it('n’est proposée qu’aux rôles dont le garde la sert', () => {
+    // La cloche s'affichait à l'ACCUEIL, dont le garde de l'écran ne voulait
+    // pas : la pastille menait à un refus de permission.
+    expect([...INBOX_ROLES].sort()).toEqual(
+      PANEL_ROLES.filter((role) => role !== 'COMMERCIAL')
+        .slice()
+        .sort(),
+    );
+  });
+
+  it('laisse une barre latérale REMPLIE à chacun d’eux', () => {
+    for (const role of INBOX_ROLES) {
+      const coque = fallbackCoque(role);
+      expect(coque, role).not.toBeNull();
+      expect(navSections(role, coque as Coque), role).not.toEqual([]);
+    }
+  });
+
+  it('porte son propre titre dans la barre supérieure', () => {
+    for (const role of INBOX_ROLES) {
+      expect(navTitle(role, INBOX_PATH)).toBe('Notifications');
+    }
+  });
+
+  it('renvoie l’ADMIN vers le composeur, qui porte le même onglet', () => {
+    expect(inboxPathFor('ADMIN')).toBe('/admin/notifications?onglet=reception');
+    expect(inboxPathFor('ACCUEIL')).toBe(INBOX_PATH);
   });
 });

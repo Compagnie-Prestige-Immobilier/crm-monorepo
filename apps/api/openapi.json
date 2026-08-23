@@ -582,6 +582,16 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "name": "handoverToId",
+            "required": false,
+            "in": "query",
+            "description": "Compte qui reprend le portefeuille.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -17959,6 +17969,11 @@
         "properties": {
           "isActive": {
             "type": "boolean"
+          },
+          "handoverToId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Compte qui reprend le portefeuille. Exigé si le compte désactivé en a un."
           }
         },
         "required": ["isActive"]
@@ -20064,7 +20079,8 @@
           },
           "amountXof": {
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 2147483647
           },
           "durationMonths": {
             "type": "number",
@@ -20346,6 +20362,19 @@
             "maxLength": 120,
             "description": "Profession déclarée. Sert au représentant comme au prospect."
           },
+          "relationStatus": {
+            "description": "Représentant : où en est la relation. Un statut identique à celui déjà en base n’écrit rien.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
+          },
+          "relationReason": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Motif de la bascule, repris dans la chronologie. FACULTATIF POUR TOUJOURS."
+          },
           "etablissement": {
             "type": "string",
             "maxLength": 160,
@@ -20499,7 +20528,7 @@
             "$ref": "#/components/schemas/SyncEntityDataDto"
           },
           "clearedFields": {
-            "description": "Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement.",
+            "description": "Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement, banqueId, syndicatId, representantId.",
             "type": "array",
             "items": {
               "type": "string"
@@ -20609,6 +20638,43 @@
           }
         },
         "required": ["batchId", "serverTime", "results", "nextCursor"]
+      },
+      "VisiteReferentielKind": {
+        "type": "string",
+        "enum": ["entreprises", "directions", "destinataires", "objets"]
+      },
+      "SyncVisiteReferentielDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VisiteReferentielKind"
+              }
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "kind", "code", "label", "isActive", "sortOrder", "updatedAt"]
       },
       "CampaignStatus": {
         "type": "string",
@@ -20829,6 +20895,19 @@
               "$ref": "#/components/schemas/SyndicatDto"
             }
           },
+          "canauxProvenance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CanalProvenanceDto"
+            }
+          },
+          "visiteReferentiels": {
+            "description": "Les quatre listes du registre des visites, réunies : chaque entrée porte sa nature.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncVisiteReferentielDto"
+            }
+          },
           "representants": {
             "type": "array",
             "items": {
@@ -20865,6 +20944,8 @@
           "iefs",
           "banques",
           "syndicats",
+          "canauxProvenance",
+          "visiteReferentiels",
           "representants",
           "prospects",
           "callCampaigns",
@@ -21463,10 +21544,6 @@
           }
         },
         "required": ["entreprises", "directions", "destinataires", "objets"]
-      },
-      "VisiteReferentielKind": {
-        "type": "string",
-        "enum": ["entreprises", "directions", "destinataires", "objets"]
       },
       "VisiteReferentielListDto": {
         "type": "object",

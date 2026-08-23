@@ -5,6 +5,9 @@ import {
   CALL_OUTCOME_LABELS,
   ENROLLMENT_METHOD_LABELS,
   PHASE2_STATUS_LABELS,
+  PROJET_LABELS,
+  PROSPECT_STATUT_LABELS,
+  PROSPECT_TYPE_LABELS,
 } from '../prospects/phase2-labels.js';
 import type { LastAttempt } from '../prospects/last-attempt.js';
 import { toDakarCell } from './dakar.js';
@@ -12,6 +15,9 @@ import { toDakarCell } from './dakar.js';
 export const EXPORT_INCLUDE = {
   banque: { select: { name: true, shortName: true } },
   syndicat: { select: { sigle: true, name: true } },
+  canalProvenance: { select: { label: true } },
+  professionRef: { select: { label: true } },
+  journeys: { select: { projet: true, statut: true }, orderBy: { createdAt: 'asc' } },
   createdBy: { select: { fullName: true } },
   enrollmentCapturedBy: { select: { fullName: true } },
   representant: {
@@ -45,6 +51,23 @@ export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
   { header: 'Nom', key: 'nom', value: (row) => row.nom },
   { header: 'Prénom', key: 'prenom', value: (row) => row.prenom },
   { header: 'Téléphone', key: 'phone', value: (row) => row.phoneE164 },
+  // Les parcours, pas la colonne `projet` : celle-ci ne dit que par où la fiche
+  // est ENTRÉE, et un prospect peut suivre les deux projets à la fois.
+  {
+    header: 'Projets',
+    key: 'projets',
+    value: (row) => row.journeys.map((j) => PROJET_LABELS[j.projet]).join(' + '),
+  },
+  {
+    header: 'Statut',
+    key: 'statut',
+    // Le statut de CHAQUE parcours : la feuille Synthèse compte des convertis
+    // qu'aucune colonne ne permettait de retrouver ligne à ligne.
+    value: (row) =>
+      row.journeys
+        .map((j) => `${PROJET_LABELS[j.projet]} : ${PROSPECT_STATUT_LABELS[j.statut]}`)
+        .join(' · '),
+  },
   { header: 'Banque', key: 'banque', value: (row) => row.banque?.name ?? '' },
   { header: 'Syndicat', key: 'syndicat', value: (row) => row.syndicat?.sigle ?? '' },
   { header: 'Représentant', key: 'representant', value: (row) => row.representant?.fullName ?? '' },
@@ -53,9 +76,37 @@ export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
     key: 'representantPhone',
     value: (row) => row.representant?.phoneE164 ?? '',
   },
-  { header: 'Département', key: 'departement', value: (row) => row.representant?.departement.name ?? '' },
+  {
+    header: 'Département',
+    key: 'departement',
+    value: (row) => row.representant?.departement.name ?? '',
+  },
   { header: 'Commercial', key: 'commercial', value: (row) => row.createdBy.fullName },
   { header: 'Date de saisie', key: 'saisie', isDate: true, value: (row) => row.clientCreatedAt },
+
+  // Colonnes du Grand Public. Sans elles, une fiche GP sortait avec six
+  // colonnes vides d'affilée et AUCUNE de ses propres données : rien ne la
+  // distinguait d'une fiche CHUES incomplète.
+  {
+    header: 'Secteur',
+    key: 'type',
+    value: (row) => (row.type ? PROSPECT_TYPE_LABELS[row.type] : ''),
+  },
+  {
+    header: 'Profession',
+    key: 'profession',
+    value: (row) => row.professionRef?.label ?? row.profession ?? '',
+  },
+  {
+    header: 'Canal de provenance',
+    key: 'canalProvenance',
+    value: (row) => row.canalProvenance?.label ?? '',
+  },
+  {
+    header: 'Durée du système (mois)',
+    key: 'dureeSystemeMois',
+    value: (row) => row.dureeSystemeMois ?? '',
+  },
 
   {
     header: 'Segment',

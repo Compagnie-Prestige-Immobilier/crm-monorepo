@@ -26,7 +26,10 @@ abstract final class AppTheme {
   static const Color _borderFlattened = Color(0xFFECE1E2);
 
   static ColorScheme get colorScheme {
-    return ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light).copyWith(
+    return ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: Brightness.light,
+    ).copyWith(
       primary: _primary,
       onPrimary: _onPrimary,
       primaryContainer: _primaryContainer,
@@ -139,7 +142,11 @@ abstract final class AppTheme {
     );
   }
 
-  static final ThemeData light = _build(colorScheme, CpiColors.light, systemOverlay);
+  static final ThemeData light = _build(
+    colorScheme,
+    CpiColors.light,
+    systemOverlay,
+  );
 
   static final ThemeData chues = _build(
     chuesColorScheme,
@@ -219,7 +226,7 @@ abstract final class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: scheme.primary,
           minimumSize: const Size(0, kCpiMinTouchTarget),
-          side: BorderSide(color: cpi.borderSubtle),
+          side: BorderSide(color: cpi.inputBorder),
           textStyle: text.labelLarge,
           shape: const RoundedRectangleBorder(borderRadius: CpiRadius.brMd),
         ),
@@ -235,7 +242,9 @@ abstract final class AppTheme {
       ),
 
       iconButtonTheme: IconButtonThemeData(
-        style: IconButton.styleFrom(minimumSize: const Size.square(kCpiMinTouchTarget)),
+        style: IconButton.styleFrom(
+          minimumSize: const Size.square(kCpiMinTouchTarget),
+        ),
       ),
 
       inputDecorationTheme: InputDecorationTheme(
@@ -253,7 +262,7 @@ abstract final class AppTheme {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: CpiRadius.brMd,
-          borderSide: BorderSide(color: cpi.borderSubtle),
+          borderSide: BorderSide(color: cpi.inputBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: CpiRadius.brMd,
@@ -271,12 +280,14 @@ abstract final class AppTheme {
 
       checkboxTheme: CheckboxThemeData(
         shape: const RoundedRectangleBorder(borderRadius: CpiRadius.brXs),
-        side: BorderSide(color: cpi.borderSubtle, width: 2),
+        side: BorderSide(color: cpi.inputBorder, width: 2),
       ),
 
       snackBarTheme: SnackBarThemeData(
         backgroundColor: scheme.inverseSurface,
-        contentTextStyle: text.bodyMedium?.copyWith(color: scheme.onInverseSurface),
+        contentTextStyle: text.bodyMedium?.copyWith(
+          color: scheme.onInverseSurface,
+        ),
         behavior: SnackBarBehavior.floating,
         shape: const RoundedRectangleBorder(borderRadius: CpiRadius.brMd),
       ),
@@ -285,7 +296,9 @@ abstract final class AppTheme {
         minVerticalPadding: CpiSpacing.sm,
         iconColor: scheme.onSurfaceVariant,
         titleTextStyle: text.bodyLarge,
-        subtitleTextStyle: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+        subtitleTextStyle: text.bodyMedium?.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
         shape: const RoundedRectangleBorder(borderRadius: CpiRadius.brMd),
       ),
 
@@ -299,16 +312,20 @@ abstract final class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith<TextStyle?>((
           Set<WidgetState> states,
         ) {
-          final TextStyle base = text.labelMedium ?? const TextStyle(fontSize: 14);
+          final TextStyle base =
+              text.labelMedium ?? const TextStyle(fontSize: 14);
           return states.contains(WidgetState.selected)
-              ? base.copyWith(color: scheme.primary, fontWeight: FontWeight.w700)
+              ? base.copyWith(
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w700,
+                )
               : base.copyWith(color: scheme.onSurfaceVariant);
         }),
         iconTheme: WidgetStateProperty.resolveWith<IconThemeData>((
           Set<WidgetState> states,
         ) {
           return IconThemeData(
-            size: 26,
+            size: CpiIconSize.xl,
             color: states.contains(WidgetState.selected)
                 ? scheme.primary
                 : scheme.onSurfaceVariant,

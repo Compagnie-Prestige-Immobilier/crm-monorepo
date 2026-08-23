@@ -255,6 +255,8 @@ model User {
   callAttempts         CallAttempt[]            @relation("CallAttemptPerformedBy")
   journeysConsented    ProspectJourney[]        @relation("ProspectJourneyConsentBy")
   journeysConverted    ProspectJourney[]        @relation("ProspectJourneyConvertedBy")
+  journeysEnrolled     ProspectJourney[]        @relation("ProspectJourneyEnrollmentCapturedBy")
+  journeysClosed       ProspectJourney[]        @relation("ProspectJourneyClosedBy")
   conversionsConfirmed ProspectConversion[]     @relation("ProspectConversionConfirmedBy")
 
   // Campagnes d'appels aux représentants : module séparé, voir plus bas
@@ -525,6 +527,9 @@ model CanalProvenance {
   prospects Prospect[]
 
   @@index([isActive, position])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("canaux_provenance")
 }
 
@@ -703,7 +708,10 @@ model Prospect {
   @@index([syndicatId])
   @@index([statut])
   @@index([clientCreatedAt])
-  @@index([updatedAt, id])
+  // Cet index existe en base sous ce nom, et PARTIEL (`WHERE "deletedAt" IS
+  // NULL`) : sans le `map`, un `migrate dev` le remplacerait par un index plein
+  // sur 500 000 lignes.
+  @@index([updatedAt, id], map: "prospects_phase2_directory")
   @@index([deletedAt])
   // Le segment BDD est calculé par croisement (syndicatId, banqueId) : cet
   // index composite sert le filtrage par segment sur 500 000 lignes sans
@@ -713,6 +721,11 @@ model Prospect {
   @@index([enrollmentMethod])
   @@index([professionId])
   @@index([incomeBandId])
+  // Créés par la migration `20260820160000` et absents d'ici : le prochain
+  // `db:migrate` les aurait SUPPRIMÉS, dont celui du filtre par projet que les
+  // écrans CHUES appliquent systématiquement.
+  @@index([projet])
+  @@index([canalProvenanceId])
   @@map("prospects")
 }
 
@@ -728,6 +741,26 @@ model ProspectJourney {
   consentById String?
   consentBy   User?              @relation("ProspectJourneyConsentBy", fields: [consentById], references: [id], onDelete: SetNull)
 
+  /// Phase 2 par PARCOURS, et non par fiche.
+  ///
+  /// Portée par `Prospect`, elle rendait un prospect définitivement inappelable
+  /// dans le second projet : refusé en CHUES, la campagne Grand Public le tirait
+  /// quand même et chaque tentative revenait en 409, bloquant sur le téléphone
+  /// toute la partition de file de ce prospect.
+  phase2Status           Phase2Status      @default(PENDING)
+  enrollmentMethod       EnrollmentMethod?
+  enrollmentCapturedAt   DateTime?
+  enrollmentCapturedById String?
+  enrollmentCapturedBy   User?             @relation("ProspectJourneyEnrollmentCapturedBy", fields: [enrollmentCapturedById], references: [id], onDelete: SetNull)
+
+  /// Un parcours ne se SUPPRIME pas — ce serait effacer l'historique d'un projet
+  /// réellement suivi. Fermé, il sort des listes, des campagnes et des
+  /// statistiques, et reste lisible sur la fiche.
+  closedAt     DateTime?
+  closedReason String?
+  closedById   String?
+  closedBy     User?     @relation("ProspectJourneyClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+
   convertedAt   DateTime?
   convertedById String?
   convertedBy   User?     @relation("ProspectJourneyConvertedBy", fields: [convertedById], references: [id], onDelete: SetNull)
@@ -740,6 +773,9 @@ model ProspectJourney {
   @@unique([prospectId, projet])
   @@index([projet, statut])
   @@index([projet, consent])
+  // Le tirage des campagnes croise projet, phase 2 et fermeture : sans cet
+  // index il balaie la table entière à chaque aperçu de périmètre.
+  @@index([projet, phase2Status, closedAt])
   @@map("prospect_journeys")
 }
 
@@ -982,6 +1018,9 @@ model CallTask {
   @@index([prospectId])
   // Le PDF « jour N » d'un commercial lit exactement cette clé.
   @@index([campaignId, assignedToId, dayIndex])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("call_tasks")
 }
 
@@ -2040,6 +2079,9 @@ model VisiteEntreprise {
   visites Visite[]
 
   @@index([isActive, sortOrder])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("visite_entreprises")
 }
 
@@ -2063,6 +2105,9 @@ model VisiteDirection {
   visites Visite[]
 
   @@index([isActive, sortOrder])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("visite_directions")
 }
 
@@ -2086,6 +2131,9 @@ model VisiteDestinataire {
   visites Visite[]
 
   @@index([isActive, sortOrder])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("visite_destinataires")
 }
 
@@ -2105,6 +2153,9 @@ model VisiteObjet {
   visites Visite[]
 
   @@index([isActive, sortOrder])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("visite_objets")
 }
 
@@ -2158,5 +2209,8 @@ model Visite {
   @@index([destinataireId])
   @@index([objetId])
   @@index([createdById])
+  // Index du curseur de synchronisation : le pull lit ce flux en
+  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
+  @@index([updatedAt, id])
   @@map("visites")
 }

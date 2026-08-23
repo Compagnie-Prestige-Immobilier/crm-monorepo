@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { Role, segmentAxes, segmentWhere } from '@crm/database';
 import type { Prisma } from '@crm/database';
 import { describe, expect, it } from 'vitest';
@@ -271,5 +273,40 @@ describe('granularité temporelle', () => {
 
     expect(sql()).toContain("date_trunc('day'");
     expect(sql()).not.toContain('DROP TABLE');
+  });
+});
+
+describe('recherche par nom', () => {
+  // L'index GIN est payé à chaque INSERT : s'il cesse d'être emprunté, il ne
+  // reste que le coût. Le test lit la migration pour que la dérive se voie des
+  // deux côtés.
+  const INDEX_SQL = readFileSync(
+    new URL(
+      '../../../../../packages/database/prisma/migrations/20260812141010_phase2_and_bank_finance/migration.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+
+  it('emprunte l’expression exacte de « prospects_nom_prenom_trgm »', () => {
+    const expression = /gin \(\((.+?)\) gin_trgm_ops\)/u.exec(INDEX_SQL)?.[1];
+    expect(expression).toBe(`lower("nom") || ' ' || lower("prenom")`);
+
+    const sql = rendered(prospectConditions(admin, { search: 'Ndiaye' }));
+    expect(sql).toContain(`(lower(p."nom") || ' ' || lower(p."prenom")) LIKE "%ndiaye%"`);
+    expect(sql).not.toContain('ILIKE');
+  });
+
+  it('sans chiffre, ne pose pas de prédicat téléphone toujours vrai', () => {
+    const sql = rendered(prospectConditions(admin, { search: 'Ndiaye' }));
+    expect(sql).not.toContain('p."phoneE164"');
+    expect(sql).not.toContain('"%%"');
+  });
+
+  it('cherche le numéro dès trois chiffres, sous sa forme normalisée', () => {
+    expect(rendered(prospectConditions(admin, { search: '77 123 45 67' }))).toContain(
+      'p."phoneE164" LIKE "%+221771234567%"',
+    );
+    expect(rendered(prospectConditions(admin, { search: '12' }))).not.toContain('p."phoneE164"');
   });
 });

@@ -128,7 +128,7 @@ class _ProjectTile extends StatelessWidget {
                   ),
                   child: Icon(
                     project.icon,
-                    size: 28,
+                    size: CpiIconSize.xxl,
                     color: open ? scheme.onPrimary : scheme.onSurfaceVariant,
                   ),
                 ),
@@ -161,7 +161,7 @@ class _ProjectTile extends StatelessWidget {
                   open
                       ? PhosphorIconsRegular.caretRight
                       : PhosphorIconsRegular.lockSimple,
-                  size: 22,
+                  size: CpiIconSize.lg,
                   color: scheme.onSurfaceVariant,
                 ),
               ],

@@ -67,13 +67,19 @@ void main() {
     expect(regions.first.id, 'reg-tc');
   });
 
-  test('choisir Tambacounda ne laisse que les départements de Tambacounda', () async {
-    final List<Departement> filtres = await repo
-        .watchDepartements(regionId: 'reg-tc')
-        .first;
+  test(
+    'choisir Tambacounda ne laisse que les départements de Tambacounda',
+    () async {
+      final List<Departement> filtres = await repo
+          .watchDepartements(regionId: 'reg-tc')
+          .first;
 
-    expect(filtres.map((Departement d) => d.name), <String>['Bakel', 'Tambacounda']);
-  });
+      expect(filtres.map((Departement d) => d.name), <String>[
+        'Bakel',
+        'Tambacounda',
+      ]);
+    },
+  );
 
   test('sans région, la liste reste complète', () async {
     final List<Departement> tous = await repo.watchDepartements().first;
@@ -84,11 +90,14 @@ void main() {
   // Un appareil qui n'a pas encore rejoué le pull complet du palier v8 porte des
   // départements sans libellé de région. Les rendre quand même afficherait une
   // ligne vide et un filtre qui ne filtre rien.
-  test('un département sans libellé de région ne fabrique pas de région', () async {
-    await db.delete(db.departements).go();
-    await seedDepartement(id: 'dep-1', name: 'Dakar', regionId: 'reg-dk');
+  test(
+    'un département sans libellé de région ne fabrique pas de région',
+    () async {
+      await db.delete(db.departements).go();
+      await seedDepartement(id: 'dep-1', name: 'Dakar', regionId: 'reg-dk');
 
-    expect(await repo.watchRegions().first, isEmpty);
-    expect(await repo.watchDepartements().first, hasLength(1));
-  });
+      expect(await repo.watchRegions().first, isEmpty);
+      expect(await repo.watchDepartements().first, hasLength(1));
+    },
+  );
 }

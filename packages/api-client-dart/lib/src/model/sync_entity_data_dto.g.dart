@@ -37,6 +37,10 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto profession(String? profession);
 
+  SyncEntityDataDto relationStatus(RepresentantRelation? relationStatus);
+
+  SyncEntityDataDto relationReason(String? relationReason);
+
   SyncEntityDataDto etablissement(String? etablissement);
 
   SyncEntityDataDto projet(Projet? projet);
@@ -97,6 +101,8 @@ abstract class _$SyncEntityDataDtoCWProxy {
     WhatsappStatus? whatsappStatus,
     String? whatsappE164,
     String? profession,
+    RepresentantRelation? relationStatus,
+    String? relationReason,
     String? etablissement,
     Projet? projet,
     ProspectType? type,
@@ -175,6 +181,14 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
   @override
   SyncEntityDataDto profession(String? profession) =>
       this(profession: profession);
+
+  @override
+  SyncEntityDataDto relationStatus(RepresentantRelation? relationStatus) =>
+      this(relationStatus: relationStatus);
+
+  @override
+  SyncEntityDataDto relationReason(String? relationReason) =>
+      this(relationReason: relationReason);
 
   @override
   SyncEntityDataDto etablissement(String? etablissement) =>
@@ -267,6 +281,8 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? whatsappStatus = const $CopyWithPlaceholder(),
     Object? whatsappE164 = const $CopyWithPlaceholder(),
     Object? profession = const $CopyWithPlaceholder(),
+    Object? relationStatus = const $CopyWithPlaceholder(),
+    Object? relationReason = const $CopyWithPlaceholder(),
     Object? etablissement = const $CopyWithPlaceholder(),
     Object? projet = const $CopyWithPlaceholder(),
     Object? type = const $CopyWithPlaceholder(),
@@ -348,6 +364,14 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.profession
           // ignore: cast_nullable_to_non_nullable
           : profession as String?,
+      relationStatus: relationStatus == const $CopyWithPlaceholder()
+          ? _value.relationStatus
+          // ignore: cast_nullable_to_non_nullable
+          : relationStatus as RepresentantRelation?,
+      relationReason: relationReason == const $CopyWithPlaceholder()
+          ? _value.relationReason
+          // ignore: cast_nullable_to_non_nullable
+          : relationReason as String?,
       etablissement: etablissement == const $CopyWithPlaceholder()
           ? _value.etablissement
           // ignore: cast_nullable_to_non_nullable
@@ -471,6 +495,15 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
         ),
         whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
         profession: $checkedConvert('profession', (v) => v as String?),
+        relationStatus: $checkedConvert(
+          'relationStatus',
+          (v) => $enumDecodeNullable(
+            _$RepresentantRelationEnumMap,
+            v,
+            unknownValue: RepresentantRelation.unknownDefaultOpenApi,
+          ),
+        ),
+        relationReason: $checkedConvert('relationReason', (v) => v as String?),
         etablissement: $checkedConvert('etablissement', (v) => v as String?),
         projet: $checkedConvert(
           'projet',
@@ -551,6 +584,9 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(
     'whatsappStatus': value,
   if (instance.whatsappE164 case final value?) 'whatsappE164': value,
   if (instance.profession case final value?) 'profession': value,
+  if (_$RepresentantRelationEnumMap[instance.relationStatus] case final value?)
+    'relationStatus': value,
+  if (instance.relationReason case final value?) 'relationReason': value,
   if (instance.etablissement case final value?) 'etablissement': value,
   if (_$ProjetEnumMap[instance.projet] case final value?) 'projet': value,
   if (_$ProspectTypeEnumMap[instance.type] case final value?) 'type': value,
@@ -590,6 +626,14 @@ const _$WhatsappStatusEnumMap = {
   WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
   WhatsappStatus.AUCUN: 'AUCUN',
   WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$RepresentantRelationEnumMap = {
+  RepresentantRelation.INCONNU: 'INCONNU',
+  RepresentantRelation.CONTACTE: 'CONTACTE',
+  RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
+  RepresentantRelation.REFUS: 'REFUS',
+  RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$ProjetEnumMap = {

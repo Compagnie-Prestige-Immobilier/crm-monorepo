@@ -51,7 +51,7 @@ class _ReferentialsBannerState extends ConsumerState<ReferentialsBanner> {
               children: <Widget>[
                 Icon(
                   PhosphorIconsRegular.cloudArrowDown,
-                  size: 18,
+                  size: CpiIconSize.sm,
                   color: cpi.accentText,
                 ),
                 const SizedBox(width: CpiSpacing.xs),
@@ -59,7 +59,9 @@ class _ReferentialsBannerState extends ConsumerState<ReferentialsBanner> {
                   child: Text(
                     'Référentiels non téléchargés : synchronisez pour pouvoir '
                     'enregistrer.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: cpi.accentText),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: cpi.accentText,
+                    ),
                   ),
                 ),
               ],

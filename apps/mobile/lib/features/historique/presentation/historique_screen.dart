@@ -8,13 +8,17 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/sync_coordinator.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
+import '../../../data/repositories/write_repository.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
+import '../../../ui/widgets/empty_state.dart';
+import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/search_field.dart';
 import '../../../ui/widgets/sync_badge.dart';
@@ -57,28 +61,36 @@ class HistoriqueScreen extends ConsumerWidget {
           Expanded(
             child: rows.whenEchecDAbord(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (Object e, StackTrace _) =>
-                  Center(child: Text('Lecture impossible : $e')),
+              error: (Object e, StackTrace _) => CpiErrorState(
+                message:
+                    'La liste des représentants n\'a pas pu être lue. '
+                    '${messageErreur(e)}',
+                onRetry: () => ref.invalidate(representantListProvider),
+              ),
               data: (List<RepresentantSyncViewData> list) {
                 if (list.isEmpty) {
                   return _EmptyHistorique(searching: search.trim().isNotEmpty);
                 }
                 return RefreshIndicator(
                   onRefresh: () async {
+                    final SyncCoordinator sync = ref.read(
+                      syncCoordinatorProvider.notifier,
+                    );
                     await HapticFeedback.selectionClick();
-                    await ref.read(syncCoordinatorProvider.notifier).run();
+                    await sync.run();
                   },
                   child: ListView.builder(
                     padding: const EdgeInsets.only(bottom: CpiSpacing.xxl),
                     physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: list.length,
-                    itemBuilder: (BuildContext context, int index) => CpiListEntrance(
-                      index: index,
-                      child: _RepresentantTile(
-                        key: ValueKey<String>(list[index].id),
-                        data: list[index],
-                      ),
-                    ),
+                    itemBuilder: (BuildContext context, int index) =>
+                        CpiListEntrance(
+                          index: index,
+                          child: _RepresentantTile(
+                            key: ValueKey<String>(list[index].id),
+                            data: list[index],
+                          ),
+                        ),
                   ),
                 );
               },
@@ -114,7 +126,7 @@ class _NewRepresentantBar extends StatelessWidget {
           unawaited(HapticFeedback.selectionClick());
           context.pushOnce(Routes.newRepresentant);
         },
-        icon: const Icon(PhosphorIconsRegular.plus, size: 20),
+        icon: const Icon(PhosphorIconsRegular.plus, size: CpiIconSize.md),
         label: const Text('Nouveau représentant'),
       ),
     );
@@ -150,14 +162,18 @@ class _RepresentantTile extends ConsumerWidget {
       // elle partait en arrière-plan, la ligne quittait l'écran quoi qu'il
       // arrive et un refus de la base ne se voyait nulle part.
       confirmDismiss: (DismissDirection _) async {
+        // La ligne se démonte avec la confirmation : lu après l'`await`, `ref`
+        // appartient à un widget mort et la suppression ne partait jamais.
+        final SyncCoordinator sync = ref.read(syncCoordinatorProvider.notifier);
+        final WriteRepository writes = ref.read(writeRepositoryProvider);
         if (!await _confirmDelete(context, data.fullName)) return false;
         try {
-          await ref.read(writeRepositoryProvider).deleteRepresentant(data.id);
+          await writes.deleteRepresentant(data.id);
         } on Object catch (e) {
           if (context.mounted) _sayFailed(context, e);
           return false;
         }
-        ref.read(syncCoordinatorProvider.notifier).nudge();
+        sync.nudge();
         return true;
       },
       child: ExpansionTile(
@@ -165,7 +181,10 @@ class _RepresentantTile extends ConsumerWidget {
         collapsedShape: const Border(),
         leading: _StatusButton(status: status, entityLabel: data.fullName),
         title: Text(data.fullName, style: theme.textTheme.titleSmall),
-        subtitle: Text(Phone.format(data.phoneE164), style: theme.textTheme.bodySmall),
+        subtitle: Text(
+          Phone.format(data.phoneE164),
+          style: theme.textTheme.bodySmall,
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
@@ -174,17 +193,27 @@ class _RepresentantTile extends ConsumerWidget {
               onPressed: () => context.pushOnce(
                 '${Routes.newRepresentant}?id=${Uri.encodeComponent(data.id)}',
               ),
-              icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 20),
+              icon: const Icon(
+                PhosphorIconsRegular.pencilSimple,
+                size: CpiIconSize.md,
+              ),
             ),
             IconButton(
               tooltip: 'Ajouter des prospects',
               onPressed: () => context.pushOnce(Routes.newProspectFor(data.id)),
-              icon: const Icon(PhosphorIconsRegular.userPlus, size: 20),
+              icon: const Icon(
+                PhosphorIconsRegular.userPlus,
+                size: CpiIconSize.md,
+              ),
             ),
             IconButton(
               tooltip: 'Ouvrir la fiche',
-              onPressed: () => context.pushOnce(Routes.representantDetailFor(data.id)),
-              icon: const Icon(PhosphorIconsRegular.caretRight, size: 20),
+              onPressed: () =>
+                  context.pushOnce(Routes.representantDetailFor(data.id)),
+              icon: const Icon(
+                PhosphorIconsRegular.caretRight,
+                size: CpiIconSize.md,
+              ),
             ),
           ],
         ),
@@ -232,9 +261,12 @@ class _ProspectList extends ConsumerWidget {
         padding: EdgeInsets.all(CpiSpacing.md),
         child: LinearProgressIndicator(),
       ),
-      error: (Object e, StackTrace _) => Padding(
-        padding: const EdgeInsets.all(CpiSpacing.md),
-        child: Text('Lecture impossible : $e'),
+      error: (Object e, StackTrace _) => CpiErrorState(
+        message:
+            'Les prospects de ce représentant n\'ont pas pu être lus. '
+            '${messageErreur(e)}',
+        onRetry: () =>
+            ref.invalidate(prospectsForRepresentantProvider(representantId)),
       ),
       data: (List<ProspectSyncViewData> list) {
         if (list.isEmpty) {
@@ -258,17 +290,28 @@ class _ProspectList extends ConsumerWidget {
                     alignment: Alignment.centerRight,
                     color: context.cpi.syncFailed,
                     padding: const EdgeInsets.only(right: CpiSpacing.lg),
-                    child: const Icon(PhosphorIconsRegular.trash, color: Colors.white),
+                    child: const Icon(
+                      PhosphorIconsRegular.trash,
+                      color: Colors.white,
+                    ),
                   ),
                   confirmDismiss: (DismissDirection _) async {
-                    if (!await _confirm(context, '${p.prenom} ${p.nom}')) return false;
+                    final SyncCoordinator sync = ref.read(
+                      syncCoordinatorProvider.notifier,
+                    );
+                    final WriteRepository writes = ref.read(
+                      writeRepositoryProvider,
+                    );
+                    if (!await _confirm(context, '${p.prenom} ${p.nom}')) {
+                      return false;
+                    }
                     try {
-                      await ref.read(writeRepositoryProvider).deleteProspect(p.id);
+                      await writes.deleteProspect(p.id);
                     } on Object catch (e) {
                       if (context.mounted) _sayFailed(context, e);
                       return false;
                     }
-                    ref.read(syncCoordinatorProvider.notifier).nudge();
+                    sync.nudge();
                     return true;
                   },
                   child: ListTile(
@@ -322,7 +365,7 @@ class _StatusButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (status == SyncStatus.synced) {
-      return SyncStatusIcon(status: status, size: 22);
+      return SyncStatusIcon(status: status, size: CpiIconSize.lg);
     }
     return IconButton(
       tooltip: status.label,
@@ -331,7 +374,11 @@ class _StatusButton extends ConsumerWidget {
         minHeight: kCpiMinTouchTarget,
       ),
       onPressed: () => _explain(context, ref),
-      icon: SyncStatusIcon(status: status, size: 22),
+      icon: SyncStatusIcon(
+        status: status,
+        size: CpiIconSize.lg,
+        labelled: false,
+      ),
     );
   }
 
@@ -343,7 +390,9 @@ class _StatusButton extends ConsumerWidget {
       case SyncStatus.blocked:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Représentant bloqué. Résolvez-le dans « À corriger ».'),
+            content: Text(
+              'Représentant bloqué. Résolvez-le dans « À corriger ».',
+            ),
           ),
         );
       case SyncStatus.pending:
@@ -371,38 +420,22 @@ class _EmptyHistorique extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(CpiSpacing.xl),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Icon(
-            PhosphorIconsDuotone.clockCounterClockwise,
-            size: 56,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: CpiSpacing.md),
-          Text(
-            searching ? 'Aucun résultat' : 'Aucun représentant',
-            style: theme.textTheme.titleSmall,
-          ),
-          const SizedBox(height: CpiSpacing.lg),
-          if (searching)
-            Text(
-              'Vérifiez le nom ou le numéro, ou effacez la recherche.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            )
-          else
-            FilledButton.icon(
-              onPressed: () => context.pushOnce(Routes.newRepresentant),
-              icon: const Icon(PhosphorIconsRegular.plus, size: 20),
-              label: const Text('Nouveau représentant'),
-            ),
-        ],
+    if (searching) {
+      return const CpiEmptyState(
+        icon: PhosphorIconsDuotone.magnifyingGlass,
+        title: 'Aucun résultat',
+        message: 'Vérifiez le nom ou le numéro, ou effacez la recherche.',
+      );
+    }
+    return CpiEmptyState(
+      icon: PhosphorIconsDuotone.clockCounterClockwise,
+      title: 'Aucun représentant',
+      message:
+          'Créez une première fiche pour commencer à saisir des prospects.',
+      action: FilledButton.icon(
+        onPressed: () => context.pushOnce(Routes.newRepresentant),
+        icon: const Icon(PhosphorIconsRegular.plus, size: CpiIconSize.md),
+        label: const Text('Nouveau représentant'),
       ),
     );
   }

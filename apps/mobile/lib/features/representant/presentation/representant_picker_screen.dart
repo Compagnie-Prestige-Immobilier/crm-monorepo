@@ -13,6 +13,7 @@ import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
+import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/search_field.dart';
@@ -27,7 +28,8 @@ class RepresentantPickerScreen extends ConsumerStatefulWidget {
       _RepresentantPickerScreenState();
 }
 
-class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScreen> {
+class _RepresentantPickerScreenState
+    extends ConsumerState<RepresentantPickerScreen> {
   void _setSearch(String value) {
     ref.read(representantPickerSearchProvider.notifier).set(value);
   }
@@ -39,7 +41,8 @@ class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScr
     );
     final String search = ref.watch(representantPickerSearchProvider);
     final Map<String, String> departements = <String, String>{
-      for (final Departement d in ref.watch(departementsProvider(null)).value ?? const [])
+      for (final Departement d
+          in ref.watch(departementsProvider(null)).value ?? const [])
         d.id: d.name,
     };
 
@@ -48,7 +51,10 @@ class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScr
         appBar: AppBar(
           title: const Text('Choisir un représentant'),
           leading: const CpiBackButton(),
-          actions: const <Widget>[OfflineIndicator(), SizedBox(width: CpiSpacing.xs)],
+          actions: const <Widget>[
+            OfflineIndicator(),
+            SizedBox(width: CpiSpacing.xs),
+          ],
         ),
         body: SafeArea(
           child: Column(
@@ -67,7 +73,8 @@ class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScr
               ),
               Expanded(
                 child: rows.whenEchecDAbord(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (Object e, StackTrace _) =>
                       Center(child: Text('Lecture impossible : $e')),
                   data: (List<RepresentantSyncViewData> list) {
@@ -83,13 +90,15 @@ class _RepresentantPickerScreenState extends ConsumerState<RepresentantPickerScr
                             indent: CpiSpacing.md,
                             endIndent: CpiSpacing.md,
                           ),
-                      itemBuilder: (BuildContext context, int index) => CpiListEntrance(
-                        index: index,
-                        child: _RepresentantRow(
-                          data: list[index],
-                          departement: departements[list[index].departementId],
-                        ),
-                      ),
+                      itemBuilder: (BuildContext context, int index) =>
+                          CpiListEntrance(
+                            index: index,
+                            child: _RepresentantRow(
+                              data: list[index],
+                              departement:
+                                  departements[list[index].departementId],
+                            ),
+                          ),
                     );
                   },
                 ),
@@ -150,14 +159,17 @@ class _RepresentantRow extends StatelessWidget {
                     ),
                     child: Row(
                       children: <Widget>[
-                        SyncStatusIcon(status: status, size: 20),
+                        SyncStatusIcon(status: status, size: CpiIconSize.md),
                         const SizedBox(width: CpiSpacing.sm),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: <Widget>[
-                              Text(data.fullName, style: theme.textTheme.titleSmall),
+                              Text(
+                                data.fullName,
+                                style: theme.textTheme.titleSmall,
+                              ),
                               const SizedBox(height: 2),
                               Text(
                                 subtitle,
@@ -170,7 +182,7 @@ class _RepresentantRow extends StatelessWidget {
                         ),
                         Icon(
                           PhosphorIconsRegular.pencilSimple,
-                          size: 20,
+                          size: CpiIconSize.md,
                           color: context.cpi.accentText,
                         ),
                       ],
@@ -184,7 +196,10 @@ class _RepresentantRow extends StatelessWidget {
         IconButton(
           tooltip: 'Ouvrir la fiche',
           onPressed: openDetail,
-          icon: const Icon(PhosphorIconsRegular.caretRight, size: 20),
+          icon: const Icon(
+            PhosphorIconsRegular.caretRight,
+            size: CpiIconSize.md,
+          ),
         ),
         const SizedBox(width: CpiSpacing.xxs),
       ],
@@ -217,7 +232,7 @@ class _CreateBar extends StatelessWidget {
           unawaited(HapticFeedback.selectionClick());
           context.pushOnce(Routes.newRepresentantPrefilled(query));
         },
-        icon: const Icon(PhosphorIconsRegular.plus, size: 20),
+        icon: const Icon(PhosphorIconsRegular.plus, size: CpiIconSize.md),
         label: const Text('Nouveau représentant'),
       ),
     );
@@ -230,40 +245,13 @@ class _Empty extends StatelessWidget {
   final bool searching;
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(CpiSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              searching
-                  ? PhosphorIconsDuotone.magnifyingGlass
-                  : PhosphorIconsDuotone.usersThree,
-              size: 56,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: CpiSpacing.md),
-            Text(
-              searching ? 'Aucun résultat' : 'Aucun représentant',
-              style: theme.textTheme.titleSmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: CpiSpacing.xs),
-            Text(
-              searching
-                  ? 'Vérifiez le nom ou le numéro, ou créez la fiche.'
-                  : 'Créez une première fiche pour commencer à saisir des prospects.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => CpiEmptyState(
+    icon: searching
+        ? PhosphorIconsDuotone.magnifyingGlass
+        : PhosphorIconsDuotone.usersThree,
+    title: searching ? 'Aucun résultat' : 'Aucun représentant',
+    message: searching
+        ? 'Vérifiez le nom ou le numéro, ou créez la fiche.'
+        : 'Créez une première fiche pour commencer à saisir des prospects.',
+  );
 }

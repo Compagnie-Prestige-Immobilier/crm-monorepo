@@ -49,6 +49,8 @@ const ROWS: AttemptRow[] = [
 let parent: string;
 let directory: string;
 
+let sweepQueries = 0;
+
 function serviceFor(rows: AttemptRow[] = ROWS): CallRecordingsService {
   const prisma = {
     callAttempt: {
@@ -56,8 +58,12 @@ function serviceFor(rows: AttemptRow[] = ROWS): CallRecordingsService {
         Promise.resolve(rows.find((row) => row.id === where.id) ?? null),
       // Le balayage cherche l'EXISTENCE, pas la visibilite: un fichier survit a
       // sa ligne, donc la portee demo ne s'applique pas ici.
-      findUnique: ({ where }: { where: { id: string } }) =>
-        Promise.resolve(rows.find((row) => row.id === where.id) ?? null),
+      findMany: ({ where }: { where: { id: { in: string[] } } }) => {
+        sweepQueries += 1;
+        return Promise.resolve(
+          rows.filter((row) => where.id.in.includes(row.id)).map((row) => ({ id: row.id })),
+        );
+      },
     },
   } as unknown as PrismaService;
   return new CallRecordingsService(prisma);
@@ -421,6 +427,22 @@ describe('note vocale, balayage', () => {
     await serviceFor().sweep();
 
     expect(await stored()).toEqual(['journal.txt']);
+  });
+
+  it('interroge la base UNE fois pour tout le repertoire', async () => {
+    const vivants: AttemptRow[] = [];
+    for (let index = 0; index < 200; index += 1) {
+      const id = `attempt-${String(index).padStart(3, '0')}`;
+      await poser(`${id}.m4a`, 1);
+      if (index % 2 === 0) vivants.push({ id, performedById: awa.id });
+    }
+
+    sweepQueries = 0;
+    const bilan = await serviceFor(vivants).sweep();
+
+    expect(sweepQueries).toBe(1);
+    expect(bilan.orphaned).toBe(100);
+    expect(await stored()).toHaveLength(100);
   });
 
   it('ne rompt pas quand le repertoire n’existe pas encore', async () => {

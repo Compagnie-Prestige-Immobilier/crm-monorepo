@@ -25,6 +25,7 @@ describe('DeactivateUserDialog', () => {
   it('nomme le compte visé et son nombre de prospects', () => {
     render(
       <DeactivateUserDialog
+        repreneurs={[]}
         user={user()}
         onOpenChange={vi.fn()}
         pending={false}
@@ -42,6 +43,7 @@ describe('DeactivateUserDialog', () => {
   it('accorde le décompte au singulier', () => {
     render(
       <DeactivateUserDialog
+        repreneurs={[]}
         user={user({ prospectCount: 1 })}
         onOpenChange={vi.fn()}
         pending={false}
@@ -57,6 +59,7 @@ describe('DeactivateUserDialog', () => {
     const onOpenChange = vi.fn();
     render(
       <DeactivateUserDialog
+        repreneurs={[]}
         user={user()}
         onOpenChange={onOpenChange}
         pending={false}
@@ -74,7 +77,8 @@ describe('DeactivateUserDialog', () => {
     const onConfirm = vi.fn();
     render(
       <DeactivateUserDialog
-        user={user()}
+        repreneurs={[]}
+        user={user({ prospectCount: 0 })}
         onOpenChange={vi.fn()}
         pending={false}
         onConfirm={onConfirm}
@@ -86,9 +90,30 @@ describe('DeactivateUserDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  /// Sans repreneur, le portefeuille GÈLE : plus aucun téléconseiller actif ne
+  /// peut lire ni corriger ces fiches.
+  it('refuse de confirmer un portefeuille non repris', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <DeactivateUserDialog
+        repreneurs={[user({ id: 'u-2', fullName: 'Modou Fall' })]}
+        user={user()}
+        onOpenChange={vi.fn()}
+        pending={false}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /Désactiver le compte/ }));
+
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toMatch(/reprend le portefeuille/);
+  });
+
   it('ne rend rien tant qu’aucun compte n’est visé', () => {
     render(
       <DeactivateUserDialog
+        repreneurs={[]}
         user={null}
         onOpenChange={vi.fn()}
         pending={false}

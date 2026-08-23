@@ -27,7 +27,11 @@ bool _canPopHere(BuildContext context) {
 }
 
 class CpiBackButton extends StatelessWidget {
-  const CpiBackButton({super.key, this.fallback = Routes.home, this.tooltip = 'Retour'});
+  const CpiBackButton({
+    super.key,
+    this.fallback = Routes.home,
+    this.tooltip = 'Retour',
+  });
 
   final String fallback;
   final String tooltip;
@@ -43,7 +47,11 @@ class CpiBackButton extends StatelessWidget {
 }
 
 class CpiPopScope extends StatelessWidget {
-  const CpiPopScope({super.key, required this.child, this.fallback = Routes.home});
+  const CpiPopScope({
+    super.key,
+    required this.child,
+    this.fallback = Routes.home,
+  });
 
   final Widget child;
   final String fallback;

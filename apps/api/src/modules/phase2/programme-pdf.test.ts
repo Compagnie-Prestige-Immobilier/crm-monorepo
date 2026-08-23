@@ -1,5 +1,6 @@
 import { PassThrough } from 'node:stream';
 
+import PDFDocument from 'pdfkit';
 import { describe, expect, it } from 'vitest';
 
 import { shortCode } from '../../common/short-code.js';
@@ -11,6 +12,7 @@ import type { Phase2CampaignsService } from './campaigns.service.js';
 import type { Phase2DirectoryService } from './directory.service.js';
 import { Phase2Controller } from './phase2.controller.js';
 import { extractPdfText } from './pdf-text.js';
+import { ENROLLMENT_METHOD_LABELS } from '../prospects/phase2-labels.js';
 import {
   formatDakar,
   programmeFilename,
@@ -144,7 +146,7 @@ describe('writeProgrammePdf', () => {
   it('offre les trois méthodes et les cinq autres issues sur chaque ligne', async () => {
     const text = extractPdfText(await render(DATA));
     const occurrences = (needle: string): number => text.split(needle).length - 1;
-    for (const label of ['Plateforme', 'Physique', 'Voix ou messagerie électronique']) {
+    for (const label of Object.values(ENROLLMENT_METHOD_LABELS)) {
       expect(occurrences(label)).toBe(ROWS.length);
     }
     for (const reason of SYSTEM_OUTCOME_REASONS) {
@@ -315,5 +317,123 @@ describe('le programme téléchargé', () => {
     expect(text).toContain('Boîte vocale');
     expect(text).not.toContain('Motif retiré');
     expect(text).not.toContain('Injoignable');
+  });
+});
+
+interface Placement {
+  readonly x: number;
+  readonly pageY: number;
+  readonly size: number;
+  readonly text: string;
+}
+
+const WIN_ANSI_LOW: Readonly<Record<string, string>> = {
+  b7: '·',
+  c9: 'É',
+  e0: 'à',
+  e9: 'é',
+  85: '…',
+  92: '’',
+  b0: '°',
+};
+
+/** Le PDF non compressé porte chaque texte avec sa position : de quoi mesurer un chevauchement. */
+function placements(pdf: Buffer): Placement[] {
+  const raw = pdf.toString('latin1');
+  const found: Placement[] = [];
+
+  for (const match of raw.matchAll(
+    /1 0 0 1 ([\d.]+) ([\d.]+) Tm\n\/F\d+ ([\d.]+) Tf\n\[(.*?)\] TJ/g,
+  )) {
+    let text = '';
+    for (const literal of (match[4] ?? '').matchAll(/<([0-9a-f]*)>/g)) {
+      const hex = literal[1] ?? '';
+      for (let index = 0; index + 1 < hex.length; index += 2) {
+        const byte = hex.slice(index, index + 2);
+        text += WIN_ANSI_LOW[byte] ?? String.fromCharCode(Number.parseInt(byte, 16));
+      }
+    }
+    found.push({
+      x: Number(match[1]),
+      pageY: PAGE_HEIGHT - Number(match[2]),
+      size: Number(match[3]),
+      text,
+    });
+  }
+
+  return found;
+}
+
+const PAGE_HEIGHT = 595.28;
+const PAGE_WIDTH = 841.89;
+const PAGE_MARGIN = 28;
+
+async function renderRaw(data: ProgrammeData): Promise<Buffer> {
+  const sink = new PassThrough();
+  const chunks: Buffer[] = [];
+  sink.on('data', (chunk: Buffer) => chunks.push(chunk));
+  await writeProgrammePdf(sink, data, { compress: false });
+  return Buffer.concat(chunks);
+}
+
+function helvetica(size: number): InstanceType<typeof PDFDocument> {
+  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: PAGE_MARGIN });
+  doc.font('Helvetica').fontSize(size);
+  return doc;
+}
+
+describe('bandeau : aucune ligne ne recouvre la suivante', () => {
+  it('garde chaque ligne méta dans la largeur et sous la ligne suivante, nom de campagne de 120 caractères', async () => {
+    const pdf = await renderRaw({ ...DATA, campaignName: 'C'.repeat(120) });
+    const meta = placements(pdf).filter((item) => item.size === 11 && item.pageY < 104);
+    const ruler = helvetica(11);
+
+    expect(meta).toHaveLength(3);
+
+    for (const line of meta) {
+      expect(line.x + ruler.widthOfString(line.text)).toBeLessThanOrEqual(PAGE_WIDTH - PAGE_MARGIN);
+    }
+
+    for (const [index, line] of meta.slice(0, -1).entries()) {
+      const next = meta[index + 1];
+      const consumed = ruler.heightOfString(line.text, {
+        width: PAGE_WIDTH - line.x - PAGE_MARGIN,
+      });
+      expect(line.pageY + consumed).toBeLessThanOrEqual(next?.pageY ?? 0);
+    }
+  });
+});
+
+describe('cases à cocher : un référentiel élargi reste dans la page', () => {
+  it('ne pousse aucun libellé hors de la largeur utile avec dix motifs', async () => {
+    const reasons = [
+      ...SYSTEM_OUTCOME_REASONS,
+      ...[
+        'Boîte vocale',
+        'Numéro hors service',
+        'Rappel demandé par le prospect',
+        'Ne parle pas français',
+      ].map((label) => ({ label, effect: CallOutcomeEffect.KEEP_OPEN })),
+    ];
+    const pdf = await renderRaw({ ...DATA, checkboxGroups: prospectCheckboxGroups(reasons) });
+    const ruler = helvetica(9.5);
+
+    const boxes = placements(pdf).filter((item) => item.size === 9.5);
+    expect(boxes.length).toBeGreaterThan(0);
+    for (const item of boxes) {
+      expect(item.x + ruler.widthOfString(item.text)).toBeLessThanOrEqual(PAGE_WIDTH - PAGE_MARGIN);
+    }
+
+    const text = extractPdfText(pdf);
+    expect(text).toContain('Ne parle pas français');
+    expect(text).toContain('Commentaire');
+  });
+});
+
+describe('libellés partagés', () => {
+  it('coche les méthodes avec les libellés de ENROLLMENT_METHOD_LABELS, pas une copie divergente', async () => {
+    const text = extractPdfText(await render(DATA));
+    for (const label of Object.values(ENROLLMENT_METHOD_LABELS)) expect(text).toContain(label);
+    expect(text).not.toContain('Voix ou messagerie');
   });
 });

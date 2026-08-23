@@ -30,7 +30,8 @@ class SummaryCard extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
     final Color accent = accentColor ?? theme.colorScheme.primary;
-    final Color surface = surfaceColor ?? theme.colorScheme.surfaceContainerLowest;
+    final Color surface =
+        surfaceColor ?? theme.colorScheme.surfaceContainerLowest;
 
     return CpiPressable(
       onTap: onTap,
@@ -50,7 +51,7 @@ class SummaryCard extends StatelessWidget {
                 color: accent.withValues(alpha: 0.10),
                 borderRadius: CpiRadius.brMd,
               ),
-              child: Icon(icon, color: accent, size: 22),
+              child: Icon(icon, color: accent, size: CpiIconSize.lg),
             ),
             const SizedBox(width: CpiSpacing.md),
             Expanded(
@@ -74,7 +75,9 @@ class SummaryCard extends StatelessWidget {
                       child: Text(
                         value,
                         key: ValueKey<String>(value),
-                        style: theme.textTheme.headlineSmall?.copyWith(color: accent),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: accent,
+                        ),
                       ),
                     ),
                 ],
@@ -83,7 +86,7 @@ class SummaryCard extends StatelessWidget {
             Icon(
               PhosphorIconsRegular.caretRight,
               color: theme.colorScheme.onSurfaceVariant,
-              size: 20,
+              size: CpiIconSize.md,
             ),
           ],
         ),
@@ -98,7 +101,8 @@ class _CountPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final double height = (theme.textTheme.headlineSmall?.fontSize ?? 26) * 1.15;
+    final double height =
+        (theme.textTheme.headlineSmall?.fontSize ?? 26) * 1.15;
     return SizedBox(
       height: height,
       child: Align(

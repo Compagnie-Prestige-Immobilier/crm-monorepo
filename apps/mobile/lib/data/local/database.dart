@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   /// L'effet d'une tentative saisie avant la v10, déduit de son issue. Sans
   /// cette dérivation, la recopie de table poserait le défaut `KEEP_OPEN`
@@ -45,6 +45,8 @@ class AppDatabase extends _$AppDatabase {
       prospects.projet,
       prospects.type,
       prospects.profession,
+      prospects.dureeSystemeMois,
+      prospects.canalProvenanceId,
     ],
     columnTransformer: <GeneratedColumn<Object>, Expression<Object>>{
       prospects.projet: const Constant<String>('CHUES'),
@@ -165,6 +167,28 @@ class AppDatabase extends _$AppDatabase {
         // n'existait pas encore au palier d'origine.
         await m.createTable(visites);
         await m.createIndex(visitesDateIdx);
+      }
+      if (from < 15 && to >= 15) {
+        await m.createTable(canauxProvenance);
+        await m.createIndex(canauxProvenanceActiveIdx);
+        await m.createTable(visiteReferentiels);
+        await m.createIndex(visiteReferentielsKindIdx);
+        // Venue d'avant la v13, `prospects` y a déjà été recréée dans sa forme
+        // courante : les deux colonnes y sont, et les rajouter échouerait.
+        if (from >= 13) {
+          await m.addColumn(prospects, prospects.dureeSystemeMois);
+          await m.addColumn(prospects, prospects.canalProvenanceId);
+        }
+        await m.createTable(prospectJourneys);
+        await m.createIndex(prospectJourneysProjetIdx);
+        // Les fiches déjà sur l'appareil n'ont aucun parcours : sans cette
+        // reprise, elles disparaîtraient toutes des deux listes de projet à la
+        // mise à jour. Leur colonne `projet` dit par où elles sont entrées.
+        // Une fiche supprimée n'a pas de parcours à rouvrir.
+        await customStatement(
+          'INSERT INTO prospect_journeys (prospect_id, projet, statut) '
+          'SELECT id, projet, statut FROM prospects WHERE deleted_at IS NULL',
+        );
       }
     },
     beforeOpen: (OpeningDetails details) async {

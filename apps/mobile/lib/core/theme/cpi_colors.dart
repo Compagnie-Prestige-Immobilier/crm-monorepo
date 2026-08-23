@@ -26,6 +26,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
     required this.navBorder,
     required this.navRing,
     required this.inputBackground,
+    required this.inputBorder,
     required this.switchTrack,
     required this.borderSubtle,
     required this.chart1,
@@ -66,6 +67,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
     navBorder: Color(0x14FFFFFF),
     navRing: Color(0xFFB05070),
     inputBackground: Color(0xFFF5ECEE),
+    inputBorder: Color(0xFFAB757C),
     switchTrack: Color(0xFFC4A0AA),
     borderSubtle: Color(0x1F630210),
     chart1: Color(0xFF630210),
@@ -107,6 +109,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
     navBorder: Color(0x14FFFFFF),
     navRing: Color(0xFF5B9BFF),
     inputBackground: Color(0xFFEEF1F7),
+    inputBorder: Color(0xFF77869F),
     switchTrack: Color(0xFF9AA6BF),
     borderSubtle: Color(0x1F0B2E6F),
     chart1: Color(0xFF0B2E6F),
@@ -155,6 +158,10 @@ class CpiColors extends ThemeExtension<CpiColors> {
   final Color navRing;
 
   final Color inputBackground;
+
+  /// CONTOUR d'un champ ou d'une case, distinct de [borderSubtle] qui n'est que
+  /// décoratif : WCAG 1.4.11 impose 3:1 contre le fond ET contre le remplissage.
+  final Color inputBorder;
   final Color switchTrack;
   final Color borderSubtle;
 
@@ -172,7 +179,13 @@ class CpiColors extends ThemeExtension<CpiColors> {
   final Color syncFailed;
   final Color syncBlocked;
 
-  List<Color> get chartSeries => <Color>[chart1, chart2, chart3, chart4, chart5];
+  List<Color> get chartSeries => <Color>[
+    chart1,
+    chart2,
+    chart3,
+    chart4,
+    chart5,
+  ];
 
   @override
   CpiColors copyWith({
@@ -199,6 +212,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
     Color? navBorder,
     Color? navRing,
     Color? inputBackground,
+    Color? inputBorder,
     Color? switchTrack,
     Color? borderSubtle,
     Color? chart1,
@@ -238,6 +252,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
       navBorder: navBorder ?? this.navBorder,
       navRing: navRing ?? this.navRing,
       inputBackground: inputBackground ?? this.inputBackground,
+      inputBorder: inputBorder ?? this.inputBorder,
       switchTrack: switchTrack ?? this.switchTrack,
       borderSubtle: borderSubtle ?? this.borderSubtle,
       chart1: chart1 ?? this.chart1,
@@ -283,6 +298,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
       navBorder: l(navBorder, other.navBorder),
       navRing: l(navRing, other.navRing),
       inputBackground: l(inputBackground, other.inputBackground),
+      inputBorder: l(inputBorder, other.inputBorder),
       switchTrack: l(switchTrack, other.switchTrack),
       borderSubtle: l(borderSubtle, other.borderSubtle),
       chart1: l(chart1, other.chart1),

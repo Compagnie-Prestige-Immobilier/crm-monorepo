@@ -57,6 +57,8 @@ class StubApi implements ApiPort {
         iefs: const <IefDto>[],
         banques: const <BanqueDto>[],
         syndicats: const <SyndicatDto>[],
+        canauxProvenance: const <CanalProvenanceDto>[],
+        visiteReferentiels: const <SyncVisiteReferentielDto>[],
         representants: const <RepresentantDto>[],
         prospects: const <ProspectDto>[],
         callCampaigns: const <SyncCallCampaignDto>[],

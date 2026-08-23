@@ -884,6 +884,8 @@ void main() {
         iefs: const <IefDto>[],
         banques: const <BanqueDto>[],
         syndicats: const <SyndicatDto>[],
+        canauxProvenance: const <CanalProvenanceDto>[],
+        visiteReferentiels: const <SyncVisiteReferentielDto>[],
         representants: const <RepresentantDto>[],
         prospects: const <ProspectDto>[],
         callCampaigns: const <SyncCallCampaignDto>[],
@@ -1487,6 +1489,8 @@ PullPage _page({required String cursor, bool hasMore = false}) => PullPage(
     iefs: const <IefDto>[],
     banques: const <BanqueDto>[],
     syndicats: const <SyndicatDto>[],
+    canauxProvenance: const <CanalProvenanceDto>[],
+    visiteReferentiels: const <SyncVisiteReferentielDto>[],
     representants: const <RepresentantDto>[],
     prospects: const <ProspectDto>[],
     callCampaigns: const <SyncCallCampaignDto>[],
@@ -1507,6 +1511,8 @@ PullPage pullPageWithRepresentant(RepresentantDto dto) => PullPage(
     iefs: const <IefDto>[],
     banques: const <BanqueDto>[],
     syndicats: const <SyndicatDto>[],
+    canauxProvenance: const <CanalProvenanceDto>[],
+    visiteReferentiels: const <SyncVisiteReferentielDto>[],
     representants: <RepresentantDto>[dto],
     prospects: const <ProspectDto>[],
     callCampaigns: const <SyncCallCampaignDto>[],
@@ -1593,7 +1599,11 @@ class _GatedPullApi extends FakeApi {
   void release(PullPage page) => _gate.complete(page);
 
   @override
-  Future<PullPage> pull({String? cursor, int limit = 200, required int payloadVersion}) async {
+  Future<PullPage> pull({
+    String? cursor,
+    int limit = 200,
+    required int payloadVersion,
+  }) async {
     if (!entered.isCompleted) entered.complete();
     return _gate.future;
   }

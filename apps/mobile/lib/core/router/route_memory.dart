@@ -17,6 +17,7 @@ class RouteMemory {
   static const List<String> allowList = <String>[
     Routes.home,
     Routes.accueil,
+    Routes.accueilVisiteNew,
     Routes.chues,
     Routes.grandPublic,
     Routes.representants,
@@ -42,10 +43,15 @@ class RouteMemory {
     final Map<String, Object?> record;
     try {
       final Object? decoded = jsonDecode(raw);
-      if (decoded is! Map) throw const FormatException('mémoire de route non objet');
+      if (decoded is! Map) {
+        throw const FormatException('mémoire de route non objet');
+      }
       record = decoded.cast<String, Object?>();
     } on FormatException catch (e) {
-      developer.log('Mémoire de route illisible, effacée : $e', name: 'cpi.route');
+      developer.log(
+        'Mémoire de route illisible, effacée : $e',
+        name: 'cpi.route',
+      );
       unawaitedClear();
       return null;
     }
@@ -54,15 +60,19 @@ class RouteMemory {
 
     final int? stamp = record['at'] as int?;
     if (stamp == null) return null;
-    final DateTime savedAt = DateTime.fromMillisecondsSinceEpoch(stamp, isUtc: true);
-    if ((now ?? DateTime.now().toUtc()).difference(savedAt) > maxAge) return null;
+    final DateTime savedAt = DateTime.fromMillisecondsSinceEpoch(
+      stamp,
+      isUtc: true,
+    );
+    if ((now ?? DateTime.now().toUtc()).difference(savedAt) > maxAge) {
+      return null;
+    }
 
     final Object? location = record['uri'];
     if (location is! String || location.isEmpty) return null;
     if (!isRestorable(location)) return null;
     return location;
   }
-
 
   Future<void> write(String location, {DateTime? now}) async {
     if (await _wouldBuryADraft(location)) return;

@@ -3,6 +3,7 @@ import 'package:cpi_go/core/providers/connectivity.dart';
 import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/sync/api_port.dart';
 import 'package:cpi_go/core/sync/clock.dart';
+import 'package:cpi_go/core/sync/sync_engine.dart';
 import 'package:cpi_go/core/sync/token_store.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:flutter/widgets.dart';
@@ -78,7 +79,9 @@ void main() {
     final ProviderContainer container = buildContainer();
     // Exactement ce que fait `app.dart` dès que la session est ouverte : lire le
     // notifier, rien d'autre. Aucun écran n'est construit.
-    final SyncCoordinator coordinator = container.read(syncCoordinatorProvider.notifier);
+    final SyncCoordinator coordinator = container.read(
+      syncCoordinatorProvider.notifier,
+    );
 
     // Le cycle de démarrage.
     await coordinator.run();
@@ -130,7 +133,9 @@ void main() {
     // exactement le travail que le worker WorkManager fait déjà, une fois,
     // quand le système le permet.
     final ProviderContainer container = buildContainer();
-    final SyncCoordinator coordinator = container.read(syncCoordinatorProvider.notifier);
+    final SyncCoordinator coordinator = container.read(
+      syncCoordinatorProvider.notifier,
+    );
     await Future<void>.delayed(Duration.zero);
     expect(coordinator.isPolling, isTrue);
 
@@ -204,7 +209,9 @@ void main() {
     // il vient d'une requête qu'on faisait de toute façon. `connectivity_plus`
     // ne peut pas le produire, il annonce `mobile` sur un portail captif.
     final ProviderContainer container = buildContainer();
-    final SyncCoordinator coordinator = container.read(syncCoordinatorProvider.notifier);
+    final SyncCoordinator coordinator = container.read(
+      syncCoordinatorProvider.notifier,
+    );
     // Le cycle de démarrage part tout seul dans une micro-tâche : on le laisse
     // finir avant d'armer la panne, sinon il la consomme sur une file vide.
     await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -234,5 +241,49 @@ void main() {
     await coordinator.run();
     expect(container.read(unreachableEvidenceProvider), isNull);
     expect(container.read(connectivityProvider), CpiConnectivity.online);
+  });
+
+  // ═══ L'ANNUAIRE N'AVAIT QU'UN BOUTON POUR SE REMPLIR ═══
+  //
+  // `Phase2DirectorySync.pull` n'était appelé que par un bouton d'écran. Le
+  // téléconseiller parti sans avoir appuyé composait des numéros
+  // « introuvables » toute la journée : l'annuaire est ce qui dit à quel
+  // prospect appartient le numéro qu'il compose.
+
+  test('le cycle de synchronisation remplit l\'annuaire de phase 2', () async {
+    api.directoryPages.add(
+      directoryPage(
+        entries: <Phase2DirectoryEntry>[
+          directoryEntry(prospectId: 'pro-1', phoneE164: '+221770000001'),
+        ],
+      ),
+    );
+
+    final ProviderContainer container = buildContainer();
+    await container.read(syncCoordinatorProvider.notifier).run();
+
+    expect(api.directoryCalls, isNotEmpty);
+    expect(await db.countPhase2Directory().getSingle(), 1);
+  });
+
+  test('un annuaire injoignable ne fait pas échouer le cycle', () async {
+    api.failNextDirectoryPull = const ApiException(
+      'NETWORK',
+      kind: FailureKind.unreachable,
+    );
+
+    final ProviderContainer container = buildContainer();
+    final SyncOutcome outcome = await container
+        .read(syncCoordinatorProvider.notifier)
+        .run();
+
+    expect(outcome.isOk, isTrue);
+  });
+
+  test('une vidange seule ne tire pas l\'annuaire', () async {
+    final ProviderContainer container = buildContainer();
+    await container.read(syncCoordinatorProvider.notifier).run(pull: false);
+
+    expect(api.directoryCalls, isEmpty);
   });
 }

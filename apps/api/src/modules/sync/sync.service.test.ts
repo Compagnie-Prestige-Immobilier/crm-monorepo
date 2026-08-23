@@ -1,5 +1,5 @@
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
-import { Role } from '@crm/database';
+import { RepresentantRelation, Role } from '@crm/database';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -468,6 +468,88 @@ describe('garde anti-squat d’identifiant', () => {
   });
 });
 
+describe('la relation d’un représentant se règle depuis le terrain', () => {
+  const REP = '0198b000-0000-7000-8000-0000000000c1';
+
+  const basculer = (
+    toStatus: RepresentantRelation,
+    extra: Record<string, unknown> = {},
+  ): SyncOperationDto => ({
+    opId: opId(),
+    seq: 0,
+    entity: SyncEntity.REPRESENTANT,
+    op: SyncOp.UPDATE,
+    entityId: REP,
+    clientUpdatedAt: new Date().toISOString(),
+    data: { fullName: 'Rep C', phone: '77 123 45 90', relationStatus: toStatus, ...extra },
+  });
+
+  beforeEach(async () => {
+    await sync.push(alice, batch([createRep(REP, '77 123 45 90')], 'pose'));
+  });
+
+  it('la bascule est écrite et sa chronologie avec', async () => {
+    const result = await sync.push(
+      alice,
+      batch(
+        [
+          basculer(RepresentantRelation.AMBASSADEUR, {
+            relationReason: 'A accepté de présenter ses collègues',
+          }),
+        ],
+        'bascule',
+      ),
+    );
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    expect(db.representants.get(REP)?.relationStatus).toBe('AMBASSADEUR');
+    expect(db.relationChanges).toEqual([
+      expect.objectContaining({
+        representantId: REP,
+        fromStatus: 'INCONNU',
+        toStatus: 'AMBASSADEUR',
+        reason: 'A accepté de présenter ses collègues',
+        source: 'MOBILE',
+      }),
+    ]);
+  });
+
+  // Une file de lignes identiques ferait passer une relation stable pour une
+  // relation agitée.
+  it('reposter le même statut n’écrit aucune ligne d’histoire', async () => {
+    await sync.push(alice, batch([basculer(RepresentantRelation.AMBASSADEUR)], 'un'));
+    await sync.push(alice, batch([basculer(RepresentantRelation.AMBASSADEUR)], 'deux'));
+
+    expect(db.relationChanges).toHaveLength(1);
+  });
+
+  // Une version ancienne du téléphone ne connaît pas le champ. Son silence ne
+  // doit pas remettre la relation à zéro.
+  it('un lot sans le champ laisse la relation en place', async () => {
+    await sync.push(alice, batch([basculer(RepresentantRelation.AMBASSADEUR)], 'un'));
+    await sync.push(
+      alice,
+      batch(
+        [
+          {
+            opId: opId(),
+            seq: 0,
+            entity: SyncEntity.REPRESENTANT,
+            op: SyncOp.UPDATE,
+            entityId: REP,
+            clientUpdatedAt: new Date().toISOString(),
+            data: { fullName: 'Rep C corrigé', phone: '77 123 45 90' },
+          },
+        ],
+        'muet',
+      ),
+    );
+
+    expect(db.representants.get(REP)?.relationStatus).toBe('AMBASSADEUR');
+    expect(db.relationChanges).toHaveLength(1);
+  });
+});
+
 describe('une fiche naît sans banque, sans syndicat et sans représentant', () => {
   const PROSPECT_NU = '0198a000-0000-7000-8000-00000000000a';
 
@@ -502,6 +584,53 @@ describe('une fiche naît sans banque, sans syndicat et sans représentant', () 
     expect(row.projet).toBe('GRAND_PUBLIC');
     expect(row.type).toBe('INFORMEL');
     expect(row.profession).toBe('Mécanicien');
+  });
+
+  // Les listes par projet, les statistiques et les rappels filtrent sur
+  // `prospect_journeys`. Sans parcours, la fiche existe et n'est nulle part.
+  it('la saisie ouvre le parcours du projet', async () => {
+    await sync.push(alice, batch([saisirNu({ projet: 'GRAND_PUBLIC' })]));
+
+    expect([...db.prospectJourneys.values()]).toEqual([
+      expect.objectContaining({
+        prospectId: PROSPECT_NU,
+        projet: 'GRAND_PUBLIC',
+        consent: 'INTERESSE',
+      }),
+    ]);
+  });
+
+  it('sans projet déclaré, le parcours ouvert est celui de CHUES', async () => {
+    await sync.push(alice, batch([saisirNu()]));
+
+    expect([...db.prospectJourneys.values()]).toEqual([
+      expect.objectContaining({ projet: 'CHUES', consent: 'NON_DEMANDE' }),
+    ]);
+  });
+
+  it('rejoindre un second projet ajoute un parcours, il ne remplace pas le premier', async () => {
+    await sync.push(alice, batch([saisirNu()]));
+    const rejoindre: SyncOperationDto = {
+      opId: opId(),
+      seq: 0,
+      entity: SyncEntity.PROSPECT,
+      op: SyncOp.UPDATE,
+      entityId: PROSPECT_NU,
+      clientUpdatedAt: new Date().toISOString(),
+      // Exactement ce que le téléphone envoie pour rejoindre un projet : le
+      // numéro, le projet, rien d'autre.
+      data: { phone: '77 000 00 10', projet: 'GRAND_PUBLIC' },
+    };
+    await sync.push(alice, batch([rejoindre], 'batch-2'));
+
+    expect([...db.prospectJourneys.values()].map((journey) => journey.projet).sort()).toEqual([
+      'CHUES',
+      'GRAND_PUBLIC',
+    ]);
+    // La fiche reste entrée par CHUES : le second projet s'ajoute, il ne
+    // déménage pas la fiche hors du premier.
+    const fiche = db.prospects.get(PROSPECT_NU) as unknown as Record<string, unknown>;
+    expect(fiche.projet ?? 'CHUES').toBe('CHUES');
   });
 });
 
@@ -777,5 +906,59 @@ describe('visite (registre d’accueil, hors ligne)', () => {
     expect(result.body.results[0]?.status).toBe(SyncOpStatus.INVALID);
     expect(result.body.results[0]?.errorCode).toBe('OP_NOT_SUPPORTED');
   });
+});
 
+describe('vider un lien de prospect depuis le terrain', () => {
+  const seedProspect = (): void => {
+    db.prospects.set('prospect-vidage', {
+      id: 'prospect-vidage',
+      nom: 'Fall',
+      prenom: 'Moussa',
+      phoneE164: '+221771000090',
+      rev: 1,
+      statut: 'NOUVEAU',
+      banqueId: '0198d000-0000-7000-8000-000000000001',
+      syndicatId: '0198e000-0000-7000-8000-000000000001',
+      representantId: REP_A,
+      createdById: alice.id,
+      clientCreatedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+    });
+  };
+
+  const majDe = (clearedFields?: string[]): SyncOperationDto => ({
+    opId: opId(),
+    seq: 0,
+    entity: SyncEntity.PROSPECT,
+    op: SyncOp.UPDATE,
+    entityId: 'prospect-vidage',
+    clientUpdatedAt: '2026-08-10T11:00:00.000Z',
+    baseRev: 1,
+    ...(clearedFields ? { clearedFields } : {}),
+    data: { phone: '77 100 00 90' },
+  });
+
+  /// `includeIfNull: false` supprime le `null` avant l'envoi : sans
+  /// `clearedFields`, l'effacement arrivait identique au silence d'un APK
+  /// ancien, et le tirage suivant réécrivait l'ancienne banque.
+  it('déclaré dans clearedFields, le lien passe bien à NULL', async () => {
+    seedProspect();
+
+    const result = await sync.push(alice, batch([majDe(['banqueId'])], 'lot-vidage'));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    expect(db.prospects.get('prospect-vidage')?.banqueId).toBeNull();
+  });
+
+  it('non déclaré, un lien absent du payload reste inchangé', async () => {
+    seedProspect();
+
+    await sync.push(alice, batch([majDe()], 'lot-silence'));
+
+    expect(db.prospects.get('prospect-vidage')?.banqueId).toBe(
+      '0198d000-0000-7000-8000-000000000001',
+    );
+  });
 });

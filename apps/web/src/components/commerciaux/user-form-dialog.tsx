@@ -230,9 +230,7 @@ export function UserFormDialog({
             label="Rôle"
             required
             description={
-              role === undefined
-                ? 'Décide de ce que le compte pourra consulter.'
-                : ROLE_HINTS[role]
+              role === undefined ? 'Décide de ce que le compte pourra consulter.' : ROLE_HINTS[role]
             }
             error={formState.errors.role?.message}
           >

@@ -172,6 +172,48 @@ void main() {
       expect(await drafts.read('d2'), isNull);
     });
 
+    test('un même téléphone reçoit un second parcours sans doublon', () async {
+      final String chuesId = await repo.createProspect(
+        nom: 'Diallo',
+        prenom: 'Mamadou',
+        phoneE164: '+221780000001',
+        projet: 'CHUES',
+        createdById: 'me',
+      );
+
+      final String grandPublicId = await repo.createProspect(
+        nom: 'Diallo',
+        prenom: 'Mamadou',
+        phoneE164: '+221780000001',
+        projet: 'GRAND_PUBLIC',
+        createdById: 'me',
+      );
+
+      expect(grandPublicId, chuesId);
+      final List<Prospect> prospects = await db.select(db.prospects).get();
+      expect(prospects, hasLength(1));
+      // La fiche ne DÉMÉNAGE pas : elle garde son projet d'entrée et gagne un
+      // second parcours. La renommer la retirerait des listes CHUES, où elle a
+      // déjà son historique.
+      expect(prospects.single.projet, 'CHUES');
+      final List<ProspectJourney> parcours = await db
+          .select(db.prospectJourneys)
+          .get();
+      expect(
+        parcours.map((ProspectJourney j) => j.projet).toList()..sort(),
+        <String>['CHUES', 'GRAND_PUBLIC'],
+      );
+      final List<OutboxData> operations = await allOutbox(db);
+      expect(operations, hasLength(2));
+      expect(operations.last.op, 'update');
+      final Map<String, Object?> envoi =
+          jsonDecode(operations.last.payload) as Map<String, Object?>;
+      expect(envoi['projet'], 'GRAND_PUBLIC');
+      // Le serveur refuse toute opération de prospect sans numéro, mise à jour
+      // comprise : l'omettre bloquait le lot en `invalid`, sans retour possible.
+      expect(envoi['phone'], '+221780000001');
+    });
+
     test('une mise à jour connue du serveur emporte sa baseRev', () async {
       await insertRepresentant(
         db,

@@ -32,7 +32,8 @@ abstract final class SinglePush {
 extension SinglePushX on BuildContext {
   void pushOnce(String location) {
     final GoRouter router = GoRouter.of(this);
-    final String current = router.routerDelegate.currentConfiguration.uri.toString();
+    final String current = router.routerDelegate.currentConfiguration.uri
+        .toString();
     if (!SinglePush.shouldNavigate(location, currentLocation: current)) return;
     router.push<Object?>(location).ignore();
   }

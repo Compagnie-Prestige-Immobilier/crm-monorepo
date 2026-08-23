@@ -59,6 +59,16 @@ Future<void> seedReferentials(AppDatabase db) async {
           localUpdatedAt: t0,
         ),
       );
+  await db
+      .into(db.canauxProvenance)
+      .insert(
+        CanauxProvenanceCompanion.insert(
+          id: 'cn-1',
+          code: 'PARRAINAGE',
+          label: 'Parrainage',
+          localUpdatedAt: t0,
+        ),
+      );
 }
 
 /// Donne un libellé de région au département du décor et en ajoute un second
@@ -71,7 +81,8 @@ Future<void> seedRegion(
   String departementId = 'dep-bakel',
   String departementName = 'Bakel',
 }) async {
-  await (db.update(db.departements)..where((Departements t) => t.id.equals('dep-1')))
+  await (db.update(db.departements)
+        ..where((Departements t) => t.id.equals('dep-1')))
       .write(const DepartementsCompanion(regionName: Value<String>('Dakar')));
   await db
       .into(db.departements)
@@ -133,6 +144,7 @@ Future<void> insertProspect(
   String nom = 'Nom',
   String prenom = 'Prénom',
   String createdById = 'me',
+  String projet = 'CHUES',
   DateTime? serverUpdatedAt,
   DateTime? deletedAt,
 }) {
@@ -148,6 +160,7 @@ Future<void> insertProspect(
           banqueId: const Value<String?>('bq-1'),
           syndicatId: const Value<String?>('sy-1'),
           representantId: Value<String?>(representantId),
+          projet: Value<String>(projet),
           createdById: createdById,
           clientCreatedAt: t0,
           localUpdatedAt: t0,
@@ -315,6 +328,8 @@ Future<int> queueOp(
 Future<OutboxData> outboxById(AppDatabase db, String id) =>
     (db.select(db.outbox)..where((Outbox o) => o.id.equals(id))).getSingle();
 
-Future<List<OutboxData>> allOutbox(AppDatabase db) => (db.select(
-  db.outbox,
-)..orderBy(<OrderClauseGenerator<Outbox>>[(Outbox o) => OrderingTerm.asc(o.seq)])).get();
+Future<List<OutboxData>> allOutbox(AppDatabase db) =>
+    (db.select(db.outbox)..orderBy(<OrderClauseGenerator<Outbox>>[
+          (Outbox o) => OrderingTerm.asc(o.seq),
+        ]))
+        .get();

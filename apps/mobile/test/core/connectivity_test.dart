@@ -70,7 +70,10 @@ void main() {
       final _CountingSource source = _CountingSource();
       final ProviderContainer container = containerWith(source);
 
-      container.listen(connectivityInterfaceProvider, (Object? _, Object? _) {});
+      container.listen(
+        connectivityInterfaceProvider,
+        (Object? _, Object? _) {},
+      );
       container.listen(connectivityTriggerProvider, (Object? _, Object? _) {});
       container.listen(connectivityResultsProvider, (Object? _, Object? _) {});
       await pumpEventQueue();
@@ -84,34 +87,42 @@ void main() {
       );
     });
 
-    test('le premier état n\'est pas un changement : rien ne se déclenche', () async {
-      final StreamController<List<ConnectivityResult>> events =
-          StreamController<List<ConnectivityResult>>.broadcast();
-      addTearDown(events.close);
-      final ProviderContainer container = containerWith(
-        _FakeSource(
-          initial: <ConnectivityResult>[ConnectivityResult.wifi],
-          changes: events.stream,
-        ),
-      );
+    test(
+      'le premier état n\'est pas un changement : rien ne se déclenche',
+      () async {
+        final StreamController<List<ConnectivityResult>> events =
+            StreamController<List<ConnectivityResult>>.broadcast();
+        addTearDown(events.close);
+        final ProviderContainer container = containerWith(
+          _FakeSource(
+            initial: <ConnectivityResult>[ConnectivityResult.wifi],
+            changes: events.stream,
+          ),
+        );
 
-      final List<List<ConnectivityResult>> triggers = <List<ConnectivityResult>>[];
-      container.listen<AsyncValue<List<ConnectivityResult>>>(
-        connectivityTriggerProvider,
-        (AsyncValue<List<ConnectivityResult>>? _, AsyncValue<List<ConnectivityResult>> next) {
-          final List<ConnectivityResult>? value = next.value;
-          if (value != null) triggers.add(value);
-        },
-        fireImmediately: true,
-      );
-      await pumpEventQueue();
+        final List<List<ConnectivityResult>> triggers =
+            <List<ConnectivityResult>>[];
+        container.listen<AsyncValue<List<ConnectivityResult>>>(
+          connectivityTriggerProvider,
+          (
+            AsyncValue<List<ConnectivityResult>>? _,
+            AsyncValue<List<ConnectivityResult>> next,
+          ) {
+            final List<ConnectivityResult>? value = next.value;
+            if (value != null) triggers.add(value);
+          },
+          fireImmediately: true,
+        );
+        await pumpEventQueue();
 
-      expect(
-        triggers,
-        isEmpty,
-        reason: 'sinon un cycle complet part à chaque construction de provider',
-      );
-    });
+        expect(
+          triggers,
+          isEmpty,
+          reason:
+              'sinon un cycle complet part à chaque construction de provider',
+        );
+      },
+    );
 
     test('une rafale de bascules ne produit qu\'un déclenchement', () async {
       fakeAsync((FakeAsync async) {
@@ -128,7 +139,8 @@ void main() {
           ],
         );
 
-        final List<List<ConnectivityResult>> triggers = <List<ConnectivityResult>>[];
+        final List<List<ConnectivityResult>> triggers =
+            <List<ConnectivityResult>>[];
         container.listen<AsyncValue<List<ConnectivityResult>>>(
           connectivityTriggerProvider,
           (
@@ -153,7 +165,11 @@ void main() {
         ]);
         async.flushMicrotasks();
 
-        expect(triggers, isEmpty, reason: 'rien avant la fin de l\'anti-rebond');
+        expect(
+          triggers,
+          isEmpty,
+          reason: 'rien avant la fin de l\'anti-rebond',
+        );
         async.elapse(kConnectivityDebounce * 2);
         expect(triggers, hasLength(1));
         expect(triggers.single, <ConnectivityResult>[
@@ -177,29 +193,43 @@ void main() {
               changes: const Stream<List<ConnectivityResult>>.empty(),
             ),
           ),
-          networkValidationProvider.overrideWithValue(_FakeValidation(validated)),
+          networkValidationProvider.overrideWithValue(
+            _FakeValidation(validated),
+          ),
         ],
       );
       addTearDown(container.dispose);
       return container;
     }
 
-    test('un portail captif est annoncé AVANT le premier échec de cycle', () async {
-      // Android a déjà sondé : `NET_CAPABILITY_VALIDATED` est absente. Sans ce
-      // canal, il fallait attendre qu'un cycle de synchronisation échoue pour
-      // que l'écran ose dire quoi que ce soit : l'utilisateur entrait dans la
-      // salle de formation et voyait une application qui se croyait en ligne.
-      final ProviderContainer container = withValidation(false);
-      container.listen(connectivityInterfaceProvider, (Object? _, Object? _) {});
-      container.listen(networkValidatedProvider, (Object? _, Object? _) {});
-      await pumpEventQueue();
+    test(
+      'un portail captif est annoncé AVANT le premier échec de cycle',
+      () async {
+        // Android a déjà sondé : `NET_CAPABILITY_VALIDATED` est absente. Sans ce
+        // canal, il fallait attendre qu'un cycle de synchronisation échoue pour
+        // que l'écran ose dire quoi que ce soit : l'utilisateur entrait dans la
+        // salle de formation et voyait une application qui se croyait en ligne.
+        final ProviderContainer container = withValidation(false);
+        container.listen(
+          connectivityInterfaceProvider,
+          (Object? _, Object? _) {},
+        );
+        container.listen(networkValidatedProvider, (Object? _, Object? _) {});
+        await pumpEventQueue();
 
-      expect(container.read(connectivityProvider), CpiConnectivity.unreachable);
-    });
+        expect(
+          container.read(connectivityProvider),
+          CpiConnectivity.unreachable,
+        );
+      },
+    );
 
     test('un verdict positif laisse l\'application tranquille', () async {
       final ProviderContainer container = withValidation(true);
-      container.listen(connectivityInterfaceProvider, (Object? _, Object? _) {});
+      container.listen(
+        connectivityInterfaceProvider,
+        (Object? _, Object? _) {},
+      );
       container.listen(networkValidatedProvider, (Object? _, Object? _) {});
       await pumpEventQueue();
 
@@ -209,7 +239,10 @@ void main() {
     test('« je ne sais pas encore » ne fait clignoter aucune panne', () async {
       // Juste après un changement d'antenne, la sonde système n'a pas tranché.
       final ProviderContainer container = withValidation(null);
-      container.listen(connectivityInterfaceProvider, (Object? _, Object? _) {});
+      container.listen(
+        connectivityInterfaceProvider,
+        (Object? _, Object? _) {},
+      );
       container.listen(networkValidatedProvider, (Object? _, Object? _) {});
       await pumpEventQueue();
 
@@ -225,47 +258,71 @@ void main() {
               changes: const Stream<List<ConnectivityResult>>.empty(),
             ),
           ),
-          networkValidationProvider.overrideWithValue(const _FakeValidation(false)),
+          networkValidationProvider.overrideWithValue(
+            const _FakeValidation(false),
+          ),
         ],
       );
       addTearDown(container.dispose);
-      container.listen(connectivityInterfaceProvider, (Object? _, Object? _) {});
+      container.listen(
+        connectivityInterfaceProvider,
+        (Object? _, Object? _) {},
+      );
       await pumpEventQueue();
 
       expect(container.read(connectivityProvider), CpiConnectivity.offline);
     });
 
-    test('le canal absent ne fait pas lever : il rend « je ne sais pas »', () async {
-      // Aucun gestionnaire enregistré : c'est l'état d'un test de widget, d'un
-      // aperçu, et de toute plateforme non Android.
-      expect(await const PlatformNetworkValidation().isValidated(), isNull);
-    });
+    test(
+      'le canal absent ne fait pas lever : il rend « je ne sais pas »',
+      () async {
+        // Aucun gestionnaire enregistré : c'est l'état d'un test de widget, d'un
+        // aperçu, et de toute plateforme non Android.
+        expect(await const PlatformNetworkValidation().isValidated(), isNull);
+      },
+    );
   });
 
   group('troisième état : injoignable', () {
-    ProviderContainer online() =>
-        containerWith(
-          _FakeSource(
-            initial: <ConnectivityResult>[ConnectivityResult.mobile],
-            changes: const Stream<List<ConnectivityResult>>.empty(),
-          ),
+    ProviderContainer online() => containerWith(
+      _FakeSource(
+        initial: <ConnectivityResult>[ConnectivityResult.mobile],
+        changes: const Stream<List<ConnectivityResult>>.empty(),
+      ),
+    );
+
+    test(
+      'sans preuve d\'échec, une interface active vaut « en ligne »',
+      () async {
+        final ProviderContainer container = online();
+        container.listen(
+          connectivityInterfaceProvider,
+          (Object? _, Object? _) {},
         );
+        await pumpEventQueue();
+        expect(container.read(connectivityProvider), CpiConnectivity.online);
+      },
+    );
 
-    test('sans preuve d\'échec, une interface active vaut « en ligne »', () async {
-      final ProviderContainer container = online();
-      container.listen(connectivityInterfaceProvider, (Object? _, Object? _) {});
-      await pumpEventQueue();
-      expect(container.read(connectivityProvider), CpiConnectivity.online);
-    });
+    test(
+      'un échec de lien récent rend « injoignable », sans un octet de plus',
+      () async {
+        final ProviderContainer container = online();
+        container.listen(
+          connectivityInterfaceProvider,
+          (Object? _, Object? _) {},
+        );
+        await pumpEventQueue();
 
-    test('un échec de lien récent rend « injoignable », sans un octet de plus', () async {
-      final ProviderContainer container = online();
-      container.listen(connectivityInterfaceProvider, (Object? _, Object? _) {});
-      await pumpEventQueue();
-
-      container.read(unreachableEvidenceProvider.notifier).record(DateTime.now());
-      expect(container.read(connectivityProvider), CpiConnectivity.unreachable);
-    });
+        container
+            .read(unreachableEvidenceProvider.notifier)
+            .record(DateTime.now());
+        expect(
+          container.read(connectivityProvider),
+          CpiConnectivity.unreachable,
+        );
+      },
+    );
 
     test('la preuve expire toute seule : pas d\'icône collée à l\'écran', () {
       // L'ancienne version datait la preuve dans le passé et relisait la
@@ -281,19 +338,31 @@ void main() {
         );
         async.flushMicrotasks();
 
-        container.read(unreachableEvidenceProvider.notifier).record(DateTime.now());
-        expect(container.read(connectivityProvider), CpiConnectivity.unreachable);
+        container
+            .read(unreachableEvidenceProvider.notifier)
+            .record(DateTime.now());
+        expect(
+          container.read(connectivityProvider),
+          CpiConnectivity.unreachable,
+        );
 
         async.elapse(kUnreachableFreshness + const Duration(seconds: 1));
 
-        expect(seen.last, CpiConnectivity.online, reason: 'sans notification, l\'écran garde son bandeau');
+        expect(
+          seen.last,
+          CpiConnectivity.online,
+          reason: 'sans notification, l\'écran garde son bandeau',
+        );
         expect(container.read(connectivityProvider), CpiConnectivity.online);
       });
     });
 
     test('un succès efface la preuve immédiatement', () async {
       final ProviderContainer container = online();
-      container.listen(connectivityInterfaceProvider, (Object? _, Object? _) {});
+      container.listen(
+        connectivityInterfaceProvider,
+        (Object? _, Object? _) {},
+      );
       await pumpEventQueue();
 
       final UnreachableEvidence evidence = container.read(
@@ -304,19 +373,27 @@ void main() {
       expect(container.read(connectivityProvider), CpiConnectivity.online);
     });
 
-    test('aucune interface prime sur tout : c\'est la seule certitude', () async {
-      final ProviderContainer container = containerWith(
-        _FakeSource(
-          initial: <ConnectivityResult>[ConnectivityResult.none],
-          changes: const Stream<List<ConnectivityResult>>.empty(),
-        ),
-      );
-      container.listen(connectivityInterfaceProvider, (Object? _, Object? _) {});
-      await pumpEventQueue();
+    test(
+      'aucune interface prime sur tout : c\'est la seule certitude',
+      () async {
+        final ProviderContainer container = containerWith(
+          _FakeSource(
+            initial: <ConnectivityResult>[ConnectivityResult.none],
+            changes: const Stream<List<ConnectivityResult>>.empty(),
+          ),
+        );
+        container.listen(
+          connectivityInterfaceProvider,
+          (Object? _, Object? _) {},
+        );
+        await pumpEventQueue();
 
-      container.read(unreachableEvidenceProvider.notifier).record(DateTime.now());
-      expect(container.read(connectivityProvider), CpiConnectivity.offline);
-    });
+        container
+            .read(unreachableEvidenceProvider.notifier)
+            .record(DateTime.now());
+        expect(container.read(connectivityProvider), CpiConnectivity.offline);
+      },
+    );
   });
 }
 
@@ -334,8 +411,9 @@ class _CountingSource implements ConnectivitySource {
   int subscriptions = 0;
 
   @override
-  Future<List<ConnectivityResult>> current() async =>
-      <ConnectivityResult>[ConnectivityResult.wifi];
+  Future<List<ConnectivityResult>> current() async => <ConnectivityResult>[
+    ConnectivityResult.wifi,
+  ];
 
   @override
   Stream<List<ConnectivityResult>> changes() {
@@ -345,8 +423,10 @@ class _CountingSource implements ConnectivitySource {
 }
 
 class _FakeSource implements ConnectivitySource {
-  _FakeSource({required this.initial, required Stream<List<ConnectivityResult>> changes})
-    : _changes = changes;
+  _FakeSource({
+    required this.initial,
+    required Stream<List<ConnectivityResult>> changes,
+  }) : _changes = changes;
 
   final List<ConnectivityResult> initial;
   final Stream<List<ConnectivityResult>> _changes;

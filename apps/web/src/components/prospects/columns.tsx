@@ -25,8 +25,10 @@ import {
   PHASE2_STATUS_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
+  statutForProjet,
   type BadgeVariant,
   type Phase2Status,
+  type Projet,
   type ProspectRow,
   type ProspectStatut,
 } from '@/lib/types';
@@ -46,6 +48,8 @@ const PHASE2_VARIANT: Record<Phase2Status, BadgeVariant> = {
 };
 
 export interface ProspectRowActions {
+  /** Projet de l'écran : la colonne « Statut » lit le parcours correspondant. */
+  projet: Projet | null;
   canAdminister: boolean;
   /** Le SUPERVISEUR lit les fiches d'autrui : la colonne d'actions disparaît. */
   readOnly: boolean;
@@ -80,11 +84,10 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       id: 'statut',
       accessorKey: 'statut',
       header: 'Statut',
-      cell: ({ row }) => (
-        <Badge variant={STATUT_VARIANT[row.original.statut]}>
-          {PROSPECT_STATUT_LABELS[row.original.statut]}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const statut = statutForProjet(row.original, actions.projet);
+        return <Badge variant={STATUT_VARIANT[statut]}>{PROSPECT_STATUT_LABELS[statut]}</Badge>;
+      },
     },
     {
       id: 'segment',

@@ -4,6 +4,10 @@ import { Role } from '@crm/database';
 
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { SuggestionsService } from './suggestions.service.js';
 import {
@@ -30,8 +34,11 @@ export class SuggestionsController {
       'Un numéro cité par deux représentants apparaît deux fois : c’est l’information, pas un doublon.',
   })
   @ApiResponse({ status: 200, type: SuggestionListDto })
-  list(@Query() query: SuggestionQueryDto): Promise<SuggestionListDto> {
-    return this.suggestions.list(query);
+  list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: SuggestionQueryDto,
+  ): Promise<SuggestionListDto> {
+    return this.suggestions.list(user, query);
   }
 
   @Patch(':id')
@@ -43,9 +50,10 @@ export class SuggestionsController {
   @ApiResponse({ status: 200, type: SuggestionDto })
   @ApiResponse({ status: 404, type: ApiErrorDto, description: 'SUGGESTION_NOT_FOUND.' })
   setStatus(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateSuggestionStatusDto,
   ): Promise<SuggestionDto> {
-    return this.suggestions.setStatus(id, body.status);
+    return this.suggestions.setStatus(user, id, body.status);
   }
 }

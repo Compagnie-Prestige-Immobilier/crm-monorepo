@@ -31,7 +31,10 @@ class SecureTokenStore implements TokenStore {
   String? get accessToken => _accessToken;
 
   @override
-  Future<void> save({required String accessToken, required String refreshToken}) async {
+  Future<void> save({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
     _accessToken = accessToken;
     if (persistRefreshToken) {
       _volatileRefreshToken = null;
@@ -87,7 +90,13 @@ class SecureTokenStore implements TokenStore {
   }
 
   Future<
-    ({String id, String fullName, String? role, String? email, String? departementId})?
+    ({
+      String id,
+      String fullName,
+      String? role,
+      String? email,
+      String? departementId,
+    })?
   >
   readIdentity() async {
     final String? id = await _storage.read(key: _userIdKey);

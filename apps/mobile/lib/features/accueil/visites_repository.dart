@@ -1,55 +1,52 @@
 import 'package:crm_api_client/crm_api_client.dart';
-import 'package:dio/dio.dart';
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/app_providers.dart';
-import '../../core/sync/api_port.dart';
-import '../../core/sync/dio_api.dart';
 import '../../data/local/database.dart';
 
-/// Les listes de l'accueil (entreprises, objets, directions, destinataires)
-/// restent en ligne : elles alimentent le formulaire, changent rarement, et
-/// leur échec s'affiche déjà à l'écran. Le registre lui-même, lu et écrit hors
-/// ligne, vit dans la table locale `visites` et le moteur de synchronisation.
-abstract interface class VisitesPort {
-  Future<VisiteReferentielsBundleDto> referentiels();
-}
-
-class DioVisitesPort implements VisitesPort {
-  const DioVisitesPort(this._api);
-
-  final VisitesApi _api;
-
-  @override
-  Future<VisiteReferentielsBundleDto> referentiels() =>
-      _send('referentiels', () => _api.listVisiteReferentiels());
-
-  Future<T> _send<T>(String operation, Future<Response<T>> Function() call) async {
-    try {
-      final Response<T> response = await call();
-      final T? body = response.data;
-      if (body == null) {
-        throw const ApiException(
-          'EMPTY_RESPONSE',
-          message: 'Le serveur a répondu sans contenu.',
-          kind: FailureKind.terminal,
-        );
-      }
-      return body;
-    } on DioException catch (error) {
-      throw DioApi.classify(error, operation);
-    }
-  }
-}
-
-final Provider<VisitesPort> visitesPortProvider = Provider<VisitesPort>((Ref ref) {
-  return DioVisitesPort(ref.watch(apiClientProvider).client.getVisitesApi());
-});
-
-final FutureProvider<VisiteReferentielsBundleDto> visiteReferentielsProvider =
-    FutureProvider<VisiteReferentielsBundleDto>((Ref ref) {
-      return ref.watch(visitesPortProvider).referentiels();
+/// Les quatre listes du formulaire, lues en LOCAL : elles descendent par le
+/// pull comme les banques et les syndicats. Les tenir en ligne rendait le
+/// registre lisible hors réseau mais impossible à remplir, ce qui est
+/// exactement l'inverse de ce dont l'accueil a besoin.
+final StreamProvider<VisiteReferentielsBundleDto> visiteReferentielsProvider =
+    StreamProvider<VisiteReferentielsBundleDto>((Ref ref) {
+      final AppDatabase db = ref.watch(appDatabaseProvider);
+      return (db.select(db.visiteReferentiels)
+            ..where((VisiteReferentiels t) => t.isActive.equals(true))
+            ..orderBy(<OrderClauseGenerator<VisiteReferentiels>>[
+              (VisiteReferentiels t) => OrderingTerm.asc(t.sortOrder),
+              (VisiteReferentiels t) => OrderingTerm.asc(t.label),
+            ]))
+          .watch()
+          .map(_bundle);
     });
+
+VisiteReferentielsBundleDto _bundle(List<VisiteReferentiel> rows) {
+  List<VisiteReferentielDto> of(String kind) => rows
+      .where((VisiteReferentiel r) => r.kind == kind)
+      .map(
+        (VisiteReferentiel r) => VisiteReferentielDto(
+          id: r.id,
+          code: r.code,
+          label: r.label,
+          isActive: r.isActive,
+          // Le téléphone ne s'en sert pas : il ne renomme ni ne désactive une
+          // entrée, il la propose. Le champ n'est donc pas synchronisé.
+          isSystem: false,
+          sortOrder: r.sortOrder,
+          updatedAt: r.serverUpdatedAt ?? r.localUpdatedAt,
+        ),
+      )
+      .toList(growable: false);
+
+  return VisiteReferentielsBundleDto(
+    entreprises: of('entreprises'),
+    directions: of('directions'),
+    destinataires: of('destinataires'),
+    objets: of('objets'),
+  );
+}
 
 /// Le registre du jour, lu en local : il tient sans réseau, comme le reste de
 /// l'application. Une inscription hors ligne y apparaît immédiatement, sa
@@ -75,20 +72,13 @@ String heureDakar(DateTime at) {
       '${utc.minute.toString().padLeft(2, '0')}';
 }
 
+/// La DIRECTION relit le registre au panneau, pas au téléphone : `/sync` lui
+/// est fermé (`role-routes.test.ts`), donc lui ouvrir la tuile ne ferait que
+/// promettre une saisie qui ne remonterait jamais.
 final Set<String> _rolesDuRegistre = <String>{
   Role.ADMIN.value,
-  Role.DIRECTION.value,
   Role.ACCUEIL.value,
 };
 
 bool peutTenirLeRegistre(String? role) =>
     role != null && _rolesDuRegistre.contains(role.toUpperCase());
-
-String messageErreur(Object error) {
-  if (error is ApiException) {
-    final String? message = error.message;
-    if (message != null && message.trim().isNotEmpty) return message;
-    return 'Erreur ${error.code}.';
-  }
-  return '$error';
-}

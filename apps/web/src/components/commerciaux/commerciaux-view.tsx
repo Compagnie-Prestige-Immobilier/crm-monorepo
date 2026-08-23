@@ -10,7 +10,7 @@ import {
   SearchIcon,
   UserPlusIcon,
 } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
 import { DeactivateUserDialog } from '@/components/commerciaux/deactivate-user-dialog';
@@ -50,7 +50,7 @@ import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { ROLE_LABELS, type Role, type UserRow } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { ROLES } from '@/lib/user-filters';
 import { cn } from '@/lib/utils';
 
@@ -80,20 +80,16 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
   const searchId = useId();
 
   const { filters, setFilters } = useUserFilters();
-  const [searchDraft, setSearchDraft] = useState(filters.search);
+  const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | undefined>(undefined);
   const [passwordTarget, setPasswordTarget] = useState<UserRow | null>(null);
   const [deactivating, setDeactivating] = useState<UserRow | null>(null);
-
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === filters.search) return;
-    setFilters({ search: debouncedSearch });
-  }, [debouncedSearch, filters.search, setFilters]);
 
   const { data, isPending, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.commerciaux(filters),
@@ -102,8 +98,15 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
   });
 
   const toggleActive = useMutation({
-    mutationFn: ({ user, isActive }: { user: UserRow; isActive: boolean }) =>
-      setUserActive(user.id, isActive),
+    mutationFn: ({
+      user,
+      isActive,
+      handoverToId,
+    }: {
+      user: UserRow;
+      isActive: boolean;
+      handoverToId?: string;
+    }) => setUserActive(user.id, isActive, handoverToId),
     onMutate: async ({ user, isActive }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.commerciaux(filters) });
       const previous = queryClient.getQueryData(queryKeys.commerciaux(filters));
@@ -380,13 +383,18 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
 
       <DeactivateUserDialog
         user={deactivating}
+        repreneurs={data?.items ?? []}
         pending={toggleActive.isPending}
         onOpenChange={(open) => {
           if (!open) setDeactivating(null);
         }}
-        onConfirm={() => {
+        onConfirm={(handoverToId) => {
           if (deactivating !== null) {
-            toggleActive.mutate({ user: deactivating, isActive: false });
+            toggleActive.mutate({
+              user: deactivating,
+              isActive: false,
+              ...(handoverToId === undefined ? {} : { handoverToId }),
+            });
           }
         }}
       />

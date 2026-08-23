@@ -2,6 +2,7 @@ import type { ApiClient, components } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
+import { csvRows } from '@/lib/csv';
 import type { Role } from '@/lib/types';
 
 type Schemas = components['schemas'];
@@ -426,12 +427,6 @@ const CSV_HEADERS = [
   'Reste à faire',
 ];
 
-function csvCell(value: string | number | null): string {
-  if (value === null) return '';
-  const text = typeof value === 'number' ? String(value).replace('.', ',') : value;
-  return /[";\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
-}
-
 export function activityCsv(input: {
   lines: readonly ActivityLine[];
   totals: ActivityTotals;
@@ -497,7 +492,7 @@ export function activityCsv(input: {
   rows.push([]);
   rows.push(['Reste à faire : tâches d’appel ouvertes à l’instant, hors période.']);
 
-  return rows.map((row) => row.map(csvCell).join(';')).join('\r\n');
+  return csvRows(rows);
 }
 
 export function activityCsvFileName(range: ActivityRange): string {

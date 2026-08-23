@@ -10,6 +10,7 @@ import { ImportsService } from './imports.service.js';
 
 class FakeFileStore implements ImportFileStore {
   removed: string[] = [];
+  failOnRemove = false;
 
   save(): Promise<StoredImportFile> {
     return Promise.reject(new Error('non utilisé dans ces cas'));
@@ -17,6 +18,7 @@ class FakeFileStore implements ImportFileStore {
 
   remove(storagePath: string): Promise<void> {
     this.removed.push(storagePath);
+    if (this.failOnRemove) return Promise.reject(new Error('volume indisponible'));
     return Promise.resolve();
   }
 }
@@ -91,6 +93,67 @@ describe('service d’import', () => {
     });
   });
 
+  describe('pagination', () => {
+    it('ne perd ni ne répète une ligne quand deux travaux partagent leur date', async () => {
+      const meme = new Date('2026-08-16T09:00:00.000Z');
+      prisma.jobs.push(
+        fakeJob({ id: 'job-a', createdAt: meme }),
+        fakeJob({ id: 'job-b', createdAt: meme }),
+      );
+
+      const premiere = await service.list({ page: 1, pageSize: 1 });
+      const seconde = await service.list({ page: 2, pageSize: 1 });
+
+      const vus = [...premiere.items, ...seconde.items].map((item) => item.id);
+      expect(new Set(vus).size).toBe(2);
+      expect(vus).toEqual(['job-b', 'job-a']);
+    });
+  });
+
+  describe('reprise d’une application échouée', () => {
+    const failedApply = () =>
+      fakeJob({
+        status: ImportStatus.failed,
+        mode: ImportMode.APPLY,
+        processedRows: 30_000,
+        createdRows: 29_998,
+        skippedRows: 2,
+        errorRows: 4,
+        failureCode: 'IMPORT_FAILED',
+        claimToken: 'jeton-du-mort',
+        claimedAt: NOW,
+      });
+
+    it('remet le travail en file EN GARDANT la position déjà écrite', async () => {
+      prisma.jobs.push(failedApply());
+
+      const dto = await service.apply('job-1', NOW);
+
+      expect(dto.status).toBe(ImportStatus.queued);
+      expect(dto.processedRows).toBe(30_000);
+      expect(dto.createdRows).toBe(29_998);
+      expect(dto.failureCode).toBeNull();
+      expect(prisma.jobs[0]?.claimToken).toBeNull();
+    });
+
+    it('ne reprend pas un travail dont le classeur a expiré', async () => {
+      const job = failedApply();
+      job.expiresAt = new Date(NOW.getTime() - 1_000);
+      prisma.jobs.push(job);
+
+      await expect(service.apply('job-1', NOW)).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.jobs[0]?.status).toBe(ImportStatus.failed);
+    });
+
+    it('ne reprend pas une simulation échouée : elle n’a rien écrit, on la redépose', async () => {
+      prisma.jobs.push(
+        fakeJob({ status: ImportStatus.failed, mode: ImportMode.DRY_RUN, processedRows: 12 }),
+      );
+
+      await expect(service.apply('job-1', NOW)).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
   describe('échéance', () => {
     it('détruit le classeur, clôt le travail et RELÂCHE le jeton', async () => {
       const job = fakeJob({ status: ImportStatus.running, claimToken: 'jeton-en-cours' });
@@ -103,6 +166,17 @@ describe('service d’import', () => {
       expect(files.removed).toEqual(['/tmp/imports/job-1.xlsx']);
       expect(prisma.jobs[0]?.status).toBe(ImportStatus.expired);
       expect(prisma.jobs[0]?.claimToken).toBeNull();
+    });
+
+    it('marque la ligne AVANT de détruire le classeur', async () => {
+      const job = fakeJob({ status: ImportStatus.running });
+      job.expiresAt = new Date(NOW.getTime() - 1_000);
+      prisma.jobs.push(job);
+      files.failOnRemove = true;
+
+      await expect(service.expireDue(NOW)).rejects.toThrow('volume indisponible');
+
+      expect(prisma.jobs[0]?.status).toBe(ImportStatus.expired);
     });
 
     it('ne touche pas à un travail encore valide', async () => {

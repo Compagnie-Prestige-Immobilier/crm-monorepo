@@ -13,15 +13,20 @@ const TELECONSEIL = 'teleconseil';
 const BANQUES = 'banques';
 const CAMPAGNES = 'campagnes';
 
-const VOLETS: readonly string[] = [BANQUES, CAMPAGNES];
-
-export function StatisticsView() {
+/**
+ * `showBanks` : les analyses bancaires n'acceptent AUCUN filtre de projet
+ * (`GET /api/v1/bank-cases/analytics`). Hors CHUES, l'onglet montrerait les
+ * encaissements CHUES sous une autre étiquette : il vaut mieux ne pas l'offrir
+ * que de le remplir d'un chiffre faux.
+ */
+export function StatisticsView({ showBanks = true }: { showBanks?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const volets: readonly string[] = showBanks ? [BANQUES, CAMPAGNES] : [CAMPAGNES];
   const requested = searchParams.get(VOLET_PARAM);
-  const current = requested !== null && VOLETS.includes(requested) ? requested : TELECONSEIL;
+  const current = requested !== null && volets.includes(requested) ? requested : TELECONSEIL;
 
   function select(value: string): void {
     const next = new URLSearchParams(searchParams.toString());
@@ -38,10 +43,12 @@ export function StatisticsView() {
           <HeadsetIcon aria-hidden="true" />
           Téléconseil
         </TabsTrigger>
-        <TabsTrigger value={BANQUES}>
-          <LandmarkIcon aria-hidden="true" />
-          Banques
-        </TabsTrigger>
+        {showBanks ? (
+          <TabsTrigger value={BANQUES}>
+            <LandmarkIcon aria-hidden="true" />
+            Banques
+          </TabsTrigger>
+        ) : null}
         <TabsTrigger value={CAMPAGNES}>
           <MegaphoneIcon aria-hidden="true" />
           Campagnes
@@ -56,7 +63,9 @@ export function StatisticsView() {
       <TabsContent value={TELECONSEIL}>
         {current === TELECONSEIL ? <TeleconseilPanel /> : null}
       </TabsContent>
-      <TabsContent value={BANQUES}>{current === BANQUES ? <BanksPanel /> : null}</TabsContent>
+      {showBanks ? (
+        <TabsContent value={BANQUES}>{current === BANQUES ? <BanksPanel /> : null}</TabsContent>
+      ) : null}
       <TabsContent value={CAMPAGNES}>
         {current === CAMPAGNES ? <CampaignsPanel /> : null}
       </TabsContent>
