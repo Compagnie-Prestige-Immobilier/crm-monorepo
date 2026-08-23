@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:cpi_go/core/network/timeout_profile.dart';
 import 'package:cpi_go/core/sync/api_port.dart';
 import 'package:cpi_go/core/sync/dio_api.dart';
+import 'package:cpi_go/core/sync/outbox_status.dart';
+import 'package:cpi_go/core/sync/sync_engine.dart';
 import 'package:crm_api_client/crm_api_client.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,7 +42,6 @@ void main() {
     test('un délai dépassé est INJOIGNABLE : le serveur n\'a rien refusé', () {
       for (final DioExceptionType type in <DioExceptionType>[
         DioExceptionType.connectionTimeout,
-        DioExceptionType.sendTimeout,
         DioExceptionType.receiveTimeout,
       ]) {
         final ApiException e = DioApi.classify(
@@ -53,6 +54,21 @@ void main() {
         expect(e.code, 'TIMEOUT', reason: '$type');
         expect(e.kind, FailureKind.unreachable, reason: '$type');
       }
+    });
+
+    /// L'envoi expiré porte son PROPRE code : le lot a bien été tenté, et c'est
+    /// ce qui le rend un jour visible plutôt que d'être reconstruit à
+    /// l'identique tous les cycles, indéfiniment, sans compter de tentative.
+    test('un envoi qui expire se distingue d\'un réseau absent', () {
+      final ApiException e = DioApi.classify(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+          type: DioExceptionType.sendTimeout,
+        ),
+        'push',
+      );
+      expect(e.code, ClientErrorCodes.sendTimeout);
+      expect(e.kind, FailureKind.unreachable);
     });
 
     test('un 500 reste un refus du serveur, donc une tentative comptée', () {
@@ -143,6 +159,86 @@ void main() {
         'push',
       );
       expect(e.kind, FailureKind.retryable);
+    });
+
+    /// Sans état distinct, l'APK cesse simplement de recevoir des données et
+    /// n'affiche qu'une erreur générique, sans jamais dire qu'il faut mettre à
+    /// jour.
+    test('un 426 est une mise à jour requise, pas un refus quelconque', () {
+      final ApiException e = DioApi.classify(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v1/sync/pull'),
+          type: DioExceptionType.badResponse,
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/api/v1/sync/pull'),
+            statusCode: DioApi.upgradeRequired,
+            headers: Headers.fromMap(<String, List<String>>{
+              Headers.contentTypeHeader: <String>['application/json'],
+            }),
+            data: <String, Object?>{
+              'code': ServerErrorCodes.appUpdateRequired,
+              'message': 'Installez la mise à jour.',
+            },
+          ),
+        ),
+        'pull',
+      );
+      expect(e.code, ServerErrorCodes.appUpdateRequired);
+      expect(e.kind, FailureKind.appUpdateRequired);
+      expect(e.retryable, isFalse);
+    });
+
+    /// Le refus de validation NOMME les opérations fautives. C'est le seul
+    /// verdict par opération qu'une réponse d'erreur porte, et sans lui une
+    /// seule saisie malformée condamne les cent quatre-vingt-dix-neuf autres.
+    test('un 400 de validation désigne les opérations refusées', () {
+      final ApiException e = DioApi.classify(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+          type: DioExceptionType.badResponse,
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+            statusCode: 400,
+            headers: Headers.fromMap(<String, List<String>>{
+              Headers.contentTypeHeader: <String>['application/json'],
+            }),
+            data: <String, Object?>{
+              'code': 'BAD_REQUEST',
+              'message': 'operations.3.data.nom must be a string',
+              'details': <String>[
+                'operations.3.data.nom must be a string',
+                'operations.3.data.phone must be a string',
+                'operations.11.entityId must be a UUID',
+              ],
+            },
+          ),
+        ),
+        'push',
+      );
+      expect(e.kind, FailureKind.terminal);
+      expect(e.rejectedOperations, <int>[3, 11]);
+    });
+
+    test('un refus qui ne nomme personne ne désigne aucune opération', () {
+      final ApiException e = DioApi.classify(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+          type: DioExceptionType.badResponse,
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: '/api/v1/sync/push'),
+            statusCode: 400,
+            headers: Headers.fromMap(<String, List<String>>{
+              Headers.contentTypeHeader: <String>['application/json'],
+            }),
+            data: <String, Object?>{
+              'code': 'PAYLOAD_VERSION_UNSUPPORTED',
+              'message': 'Format refusé.',
+            },
+          ),
+        ),
+        'push',
+      );
+      expect(e.rejectedOperations, isEmpty);
     });
   });
 
@@ -390,6 +486,27 @@ void main() {
         );
       },
     );
+
+    /// ═══ LE LOT NE POUVAIT PAS PARTIR SUR UN LIEN MONTANT LENT ═══
+    ///
+    /// `sendTimeout` est le budget TOTAL d'émission du corps dans dio 5, pas un
+    /// délai d'inactivité. Laissé aux 30 s de `BaseOptions`, un lot de 512 Ko
+    /// n'a aucune chance sur EDGE : il expirait à chaque cycle, était
+    /// reconstruit à l'identique, et ne devenait jamais visible.
+    test('le push a de quoi émettre son lot sur EDGE', () {
+      const int maxBatchBits = SyncEngine.defaultMaxBatchBytes * 8;
+      // Débit montant réaliste d'un EDGE chargé, en bits par seconde.
+      const int edgeUplink = 20000;
+      expect(
+        TimeoutProfile.push.send,
+        isNotNull,
+        reason: 'sans profil, le push retombe sur les 30 s de BaseOptions',
+      );
+      expect(
+        TimeoutProfile.push.send!.inSeconds,
+        greaterThanOrEqualTo(maxBatchBits ~/ edgeUplink),
+      );
+    });
 
     test('une note vocale garde un délai adapté à son poids', () async {
       final File recording = File(

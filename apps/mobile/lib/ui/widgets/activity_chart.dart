@@ -6,7 +6,11 @@ import '../../core/theme/cpi_tokens.dart';
 
 @immutable
 class ActivityDay {
-  const ActivityDay({required this.day, required this.synced, required this.pending});
+  const ActivityDay({
+    required this.day,
+    required this.synced,
+    required this.pending,
+  });
 
   final DateTime day;
 
@@ -146,7 +150,7 @@ class _LegendDot extends StatelessWidget {
             border: border == null ? null : Border.all(color: border!),
           ),
         ),
-        const SizedBox(width: CpiSpacing.xxs + 2),
+        const SizedBox(width: CpiSpacing.xxsPlus),
         Text(
           label,
           style: theme.textTheme.labelSmall?.copyWith(
@@ -201,14 +205,21 @@ class _BarsPainter extends CustomPainter {
       if (peak == 0 || d.total == 0) continue;
 
       final double fullHeight = size.height * (d.total / peak);
-      final double pendingHeight = d.total == 0 ? 0 : fullHeight * (d.pending / d.total);
+      final double pendingHeight = d.total == 0
+          ? 0
+          : fullHeight * (d.pending / d.total);
       final double syncedHeight = fullHeight - pendingHeight;
 
       if (syncedHeight > 0) {
         paint.color = syncedColor;
         canvas.drawRRect(
           RRect.fromRectAndCorners(
-            Rect.fromLTWH(left, size.height - syncedHeight, barWidth, syncedHeight),
+            Rect.fromLTWH(
+              left,
+              size.height - syncedHeight,
+              barWidth,
+              syncedHeight,
+            ),
             bottomLeft: radius,
             bottomRight: radius,
             topLeft: pendingHeight > 0 ? Radius.zero : radius,

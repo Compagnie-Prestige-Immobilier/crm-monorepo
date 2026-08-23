@@ -48,38 +48,45 @@ void main() {
       expect(b.nextDelay(30), const Duration(minutes: 15));
     });
 
-    test('trente appareils qui se reconnectent ensemble ne se resynchronisent pas', () {
-      // Le scénario réel : une antenne revient, trente téléphones qui ont
-      // accumulé une file repartent dans la même seconde. Avec une gigue
-      // égale, ils réessaient TOUS après au moins `delai/2` : c'est-à-dire à
-      // nouveau ensemble, sur un backhaul qui vient à peine de se rétablir.
-      final Backoff b = Backoff(random: Random(20260812));
-      const int attempts = 8; // plafond : 256 000 ms
-      const int ceiling = 256000;
+    test(
+      'trente appareils qui se reconnectent ensemble ne se resynchronisent pas',
+      () {
+        // Le scénario réel : une antenne revient, trente téléphones qui ont
+        // accumulé une file repartent dans la même seconde. Avec une gigue
+        // égale, ils réessaient TOUS après au moins `delai/2` : c'est-à-dire à
+        // nouveau ensemble, sur un backhaul qui vient à peine de se rétablir.
+        final Backoff b = Backoff(random: Random(20260812));
+        const int attempts = 8; // plafond : 256 000 ms
+        const int ceiling = 256000;
 
-      final List<int> draws = <int>[
-        for (int i = 0; i < 30; i++) b.nextDelay(attempts).inMilliseconds,
-      ];
+        final List<int> draws = <int>[
+          for (int i = 0; i < 30; i++) b.nextDelay(attempts).inMilliseconds,
+        ];
 
-      expect(draws.every((int d) => d >= 0 && d <= ceiling), isTrue);
+        expect(draws.every((int d) => d >= 0 && d <= ceiling), isTrue);
 
-      // Sous gigue égale, AUCUN tirage ne peut tomber sous la moitié. Ici il
-      // en faut plusieurs, et au moins un dans le premier dixième.
-      final int belowHalf = draws.where((int d) => d < ceiling ~/ 2).length;
-      expect(
-        belowHalf,
-        greaterThan(5),
-        reason: 'une gigue égale n\'aurait produit aucun tirage sous la moitié',
-      );
-      expect(
-        draws.reduce(min),
-        lessThan(ceiling ~/ 10),
-        reason: 'le plancher synchronisé de la gigue égale est absent',
-      );
+        // Sous gigue égale, AUCUN tirage ne peut tomber sous la moitié. Ici il
+        // en faut plusieurs, et au moins un dans le premier dixième.
+        final int belowHalf = draws.where((int d) => d < ceiling ~/ 2).length;
+        expect(
+          belowHalf,
+          greaterThan(5),
+          reason:
+              'une gigue égale n\'aurait produit aucun tirage sous la moitié',
+        );
+        expect(
+          draws.reduce(min),
+          lessThan(ceiling ~/ 10),
+          reason: 'le plancher synchronisé de la gigue égale est absent',
+        );
 
-      // Étalement effectif : les tirages ne se massent pas dans un dixième.
-      expect(draws.reduce(max) - draws.reduce(min), greaterThan(ceiling ~/ 2));
-    });
+        // Étalement effectif : les tirages ne se massent pas dans un dixième.
+        expect(
+          draws.reduce(max) - draws.reduce(min),
+          greaterThan(ceiling ~/ 2),
+        );
+      },
+    );
 
     test('la moyenne tend vers la moitié du plafond', () {
       final Backoff b = Backoff(random: Random(7));

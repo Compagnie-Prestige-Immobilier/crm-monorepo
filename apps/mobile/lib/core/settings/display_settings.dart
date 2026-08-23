@@ -81,9 +81,10 @@ class DisplaySettingsController extends Notifier<DisplaySettings> {
 }
 
 final NotifierProvider<DisplaySettingsController, DisplaySettings>
-displaySettingsProvider = NotifierProvider<DisplaySettingsController, DisplaySettings>(
-  DisplaySettingsController.new,
-);
+displaySettingsProvider =
+    NotifierProvider<DisplaySettingsController, DisplaySettings>(
+      DisplaySettingsController.new,
+    );
 
 double resolveTextScaleFactor({
   required TextScaler system,
@@ -94,5 +95,8 @@ double resolveTextScaleFactor({
     kCpiMinTextScale,
     kCpiMaxSystemTextScale,
   );
-  return (systemFactor * choice.factor).clamp(kCpiMinTextScale, kCpiMaxTextScale);
+  return (systemFactor * choice.factor).clamp(
+    kCpiMinTextScale,
+    kCpiMaxTextScale,
+  );
 }

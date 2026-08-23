@@ -6,7 +6,11 @@ import '../../core/router/route_paths.dart';
 import '../../core/theme/app_theme.dart';
 import '../accueil/visites_repository.dart';
 
-const Set<Role> _encadrement = <Role>{Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION};
+const Set<Role> _encadrement = <Role>{
+  Role.ADMIN,
+  Role.SUPERVISEUR,
+  Role.DIRECTION,
+};
 
 enum CpiProject {
   accueil(
@@ -40,7 +44,8 @@ enum CpiProject {
   final String path;
   final IconData icon;
 
-  ThemeData get theme => this == CpiProject.chues ? AppTheme.chues : AppTheme.light;
+  ThemeData get theme =>
+      this == CpiProject.chues ? AppTheme.chues : AppTheme.light;
 
   bool isOpenTo(String? role) {
     final Role parsed = Role.values.firstWhere(
@@ -76,5 +81,6 @@ class ProjectScope extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Theme(data: project.theme, child: child);
+  Widget build(BuildContext context) =>
+      Theme(data: project.theme, child: child);
 }

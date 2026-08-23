@@ -1,12 +1,19 @@
+import 'dart:async';
+
 import 'package:crm_api_client/crm_api_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../../core/drafts/draft_form_mixin.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
+import '../../../core/utils/ids.dart';
+import '../../../data/repositories/draft_repository.dart';
 import '../../auth/auth_state.dart';
+import '../../../ui/widgets/error_state.dart';
 import '../visites_repository.dart';
 
 /// `null` : le choix a été abandonné. `_Choix(null)` : l'entrée a été retirée.
@@ -17,19 +24,23 @@ class _Choix {
 }
 
 class VisiteFormScreen extends ConsumerStatefulWidget {
-  const VisiteFormScreen({super.key});
+  const VisiteFormScreen({super.key, this.draftId});
+
+  final String? draftId;
 
   @override
   ConsumerState<VisiteFormScreen> createState() => _VisiteFormScreenState();
 }
 
-class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
+class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
+    with DraftFormMixin<VisiteFormScreen> {
   final TextEditingController _nom = TextEditingController();
   final TextEditingController _telephone = TextEditingController();
   final TextEditingController _commentaire = TextEditingController();
   final FocusNode _nomFocus = FocusNode();
 
   late DateTime _moment = ref.read(clockProvider).now();
+  late final String _draftId = widget.draftId ?? Ids.newId();
 
   VisiteReferentielDto? _entreprise;
   VisiteReferentielDto? _objet;
@@ -44,10 +55,114 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
   String? _erreurObjet;
 
   @override
+  String get draftId => _draftId;
+
+  @override
+  String get draftFormKey => 'visite.create';
+
+  @override
+  DraftRepository get draftRepository => ref.read(draftRepositoryProvider);
+
+  @override
+  bool get draftIsEmpty =>
+      _nom.text.trim().isEmpty &&
+      _telephone.text.trim().isEmpty &&
+      _commentaire.text.trim().isEmpty &&
+      _entreprise == null &&
+      _objet == null &&
+      _direction == null &&
+      _destinataire == null;
+
+  @override
+  String? draftRouteWithId() => widget.draftId != null
+      ? null
+      : Routes.accueilVisiteNewWithDraft(_draftId);
+
+  @override
+  Map<String, Object?> collectDraftValues() => <String, Object?>{
+    'nom': _nom.text,
+    'telephone': _telephone.text,
+    'commentaire': _commentaire.text,
+    'moment': _moment.toIso8601String(),
+    'entrepriseId': _entreprise?.id,
+    'entrepriseLabel': _entreprise?.label,
+    'objetId': _objet?.id,
+    'objetLabel': _objet?.label,
+    'directionId': _direction?.id,
+    'directionLabel': _direction?.label,
+    'destinataireId': _destinataire?.id,
+    'destinataireLabel': _destinataire?.label,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    for (final TextEditingController c in <TextEditingController>[
+      _nom,
+      _telephone,
+      _commentaire,
+    ]) {
+      c.addListener(markDraftDirty);
+    }
+    unawaited(_restaurer());
+  }
+
+  /// Seul le brouillon d'un PLANTAGE est repris d'office. À l'accueil chaque
+  /// visiteur est une saisie neuve : ressortir une saisie simplement
+  /// interrompue remplirait le formulaire du visiteur précédent.
+  Future<void> _restaurer() async {
+    final DraftSnapshot? snapshot = await draftRepository.read(_draftId);
+    if (snapshot == null || !mounted) return;
+    if (snapshot.age != DraftAge.crash) return;
+    setState(() {
+      _nom.text = (snapshot.values['nom'] as String?) ?? '';
+      _telephone.text = (snapshot.values['telephone'] as String?) ?? '';
+      _commentaire.text = (snapshot.values['commentaire'] as String?) ?? '';
+      _moment =
+          DateTime.tryParse((snapshot.values['moment'] as String?) ?? '') ??
+          _moment;
+      // Les listes ne sont pas encore là : on retient les identifiants et on
+      // les résout contre le référentiel réel, plutôt que de refabriquer des
+      // DTO à partir du brouillon.
+      _aResoudre = snapshot.values;
+    });
+  }
+
+  Map<String, Object?>? _aResoudre;
+
+  void _resoudreChoix(VisiteReferentielsBundleDto bundle) {
+    final Map<String, Object?> valeurs = _aResoudre!;
+    _aResoudre = null;
+    VisiteReferentielDto? parmi(
+      List<VisiteReferentielDto> liste,
+      String champ,
+    ) {
+      final String? id = valeurs['${champ}Id'] as String?;
+      if (id == null) return null;
+      for (final VisiteReferentielDto item in liste) {
+        if (item.id == id) return item;
+      }
+      return null;
+    }
+
+    setState(() {
+      _entreprise = parmi(bundle.entreprises, 'entreprise');
+      _objet = parmi(bundle.objets, 'objet');
+      _direction = parmi(bundle.directions, 'direction');
+      _destinataire = parmi(bundle.destinataires, 'destinataire');
+    });
+  }
+
+  @override
   void dispose() {
-    _nom.dispose();
-    _telephone.dispose();
-    _commentaire.dispose();
+    for (final TextEditingController c in <TextEditingController>[
+      _nom,
+      _telephone,
+      _commentaire,
+    ]) {
+      c.removeListener(markDraftDirty);
+      c.dispose();
+    }
     _nomFocus.dispose();
     super.dispose();
   }
@@ -55,7 +170,10 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
   Future<void> _changerHeure() async {
     final TimeOfDay? choisie = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay(hour: _moment.toUtc().hour, minute: _moment.toUtc().minute),
+      initialTime: TimeOfDay(
+        hour: _moment.toUtc().hour,
+        minute: _moment.toUtc().minute,
+      ),
       helpText: 'Heure de la visite',
     );
     if (choisie == null || !mounted) return;
@@ -90,6 +208,7 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
     );
     if (choix == null || !mounted) return;
     onChoisi(choix.item);
+    markDraftDirty();
   }
 
   Future<void> _enregistrer() async {
@@ -101,7 +220,9 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
 
     setState(() {
       _erreurNom = nom.isEmpty ? 'À renseigner.' : null;
-      _erreurEntreprise = entreprise == null ? 'À choisir dans la liste.' : null;
+      _erreurEntreprise = entreprise == null
+          ? 'À choisir dans la liste.'
+          : null;
       _erreurObjet = objet == null ? 'À choisir dans la liste.' : null;
     });
     if (nom.isEmpty || entreprise == null || objet == null) return;
@@ -135,6 +256,10 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
             comment: commentaire.isEmpty ? null : commentaire,
             createdById: auth.userId ?? '',
           );
+      // La visite est écrite et en file : le brouillon n'a plus rien à sauver,
+      // et le laisser ferait revenir ce visiteur-ci sur la saisie du suivant.
+      discardDraft();
+      unawaited(draftRepository.delete(_draftId));
       if (!mounted) return;
       ref.read(syncCoordinatorProvider.notifier).nudge();
       _nom.clear();
@@ -165,6 +290,17 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
       visiteReferentielsProvider,
     );
     final VisiteReferentielsBundleDto? bundle = listes.value;
+    if (bundle != null && _aResoudre != null) {
+      WidgetsBinding.instance.addPostFrameCallback((Duration _) {
+        if (mounted && _aResoudre != null) _resoudreChoix(bundle);
+      });
+    }
+    // L'entreprise et l'objet sont obligatoires : sans elles, il n'y a rien à
+    // enregistrer, et le bouton doit le montrer avant qu'on le touche.
+    final bool listesUtilisables =
+        bundle != null &&
+        bundle.entreprises.isNotEmpty &&
+        bundle.objets.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Inscrire un visiteur')),
@@ -197,13 +333,16 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
                     ),
                   ),
                   const SizedBox(height: CpiSpacing.md),
-                  if (listes.hasError)
-                    _ListesIndisponibles(
-                      message: messageErreur(listes.error ?? 'Erreur inconnue'),
-                      onReessayer: () => ref.invalidate(visiteReferentielsProvider),
-                    )
-                  else if (bundle == null)
+                  if (bundle == null)
                     const _ListesEnCours()
+                  // L'entreprise et l'objet sont obligatoires : sans elles, la
+                  // fiche ne peut pas être remplie. Les listes descendent par la
+                  // synchronisation, il n'y a donc rien à réessayer en ligne.
+                  else if (bundle.entreprises.isEmpty || bundle.objets.isEmpty)
+                    _ListesIndisponibles(
+                      onSynchroniser: () =>
+                          ref.read(syncCoordinatorProvider.notifier).nudge(),
+                    )
                   else ...<Widget>[
                     _ChampChoix(
                       key: const ValueKey<String>('champ-entreprise'),
@@ -312,26 +451,35 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen> {
               ),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
-                border: Border(top: BorderSide(color: context.cpi.borderSubtle)),
+                border: Border(
+                  top: BorderSide(color: context.cpi.borderSubtle),
+                ),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   if (_echec != null) ...<Widget>[
-                    BandeauEchec(message: _echec!),
+                    CpiFailureBanner(message: _echec!),
                     const SizedBox(height: CpiSpacing.xs),
                   ],
                   FilledButton.icon(
                     key: const ValueKey<String>('visite-enregistrer'),
-                    onPressed: bundle == null || _envoiEnCours ? null : _enregistrer,
+                    onPressed: listesUtilisables && !_envoiEnCours
+                        ? _enregistrer
+                        : null,
                     icon: _envoiEnCours
                         ? const SizedBox.square(
                             dimension: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(PhosphorIconsRegular.checkCircle, size: 22),
+                        : const Icon(
+                            PhosphorIconsRegular.checkCircle,
+                            size: CpiIconSize.lg,
+                          ),
                     label: Text(
-                      _envoiEnCours ? 'Enregistrement…' : 'Enregistrer la visite',
+                      _envoiEnCours
+                          ? 'Enregistrement…'
+                          : 'Enregistrer la visite',
                     ),
                   ),
                 ],
@@ -365,7 +513,7 @@ class _Moment extends StatelessWidget {
         children: <Widget>[
           Icon(
             PhosphorIconsRegular.clock,
-            size: 22,
+            size: CpiIconSize.lg,
             color: theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: CpiSpacing.xs),
@@ -375,7 +523,10 @@ class _Moment extends StatelessWidget {
               style: theme.textTheme.titleMedium,
             ),
           ),
-          TextButton(onPressed: () => onChanger(), child: const Text('Changer')),
+          TextButton(
+            onPressed: () => onChanger(),
+            child: const Text('Changer'),
+          ),
         ],
       ),
     );
@@ -427,7 +578,7 @@ class _ChampChoix extends StatelessWidget {
             ),
             Icon(
               PhosphorIconsRegular.caretDown,
-              size: 20,
+              size: CpiIconSize.md,
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ],
@@ -501,7 +652,7 @@ class _FeuilleDeChoix extends StatelessWidget {
                     trailing: actif
                         ? Icon(
                             PhosphorIconsRegular.check,
-                            size: 20,
+                            size: CpiIconSize.md,
                             color: theme.colorScheme.primary,
                           )
                         : null,
@@ -538,7 +689,11 @@ class _Confirmation extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(PhosphorIconsRegular.checkCircle, size: 22, color: cpi.success),
+          Icon(
+            PhosphorIconsRegular.checkCircle,
+            size: CpiIconSize.lg,
+            color: cpi.success,
+          ),
           const SizedBox(width: CpiSpacing.xs),
           Expanded(
             child: Column(
@@ -554,45 +709,6 @@ class _Confirmation extends StatelessWidget {
                   style: theme.textTheme.bodyMedium,
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class BandeauEchec extends StatelessWidget {
-  const BandeauEchec({super.key, required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(CpiSpacing.sm),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: CpiRadius.brMd,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Icon(
-            PhosphorIconsRegular.warningCircle,
-            size: 20,
-            color: theme.colorScheme.onErrorContainer,
-          ),
-          const SizedBox(width: CpiSpacing.xs),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onErrorContainer,
-              ),
             ),
           ),
         ],
@@ -625,10 +741,9 @@ class _ListesEnCours extends StatelessWidget {
 }
 
 class _ListesIndisponibles extends StatelessWidget {
-  const _ListesIndisponibles({required this.message, required this.onReessayer});
+  const _ListesIndisponibles({required this.onSynchroniser});
 
-  final String message;
-  final VoidCallback onReessayer;
+  final VoidCallback onSynchroniser;
 
   @override
   Widget build(BuildContext context) {
@@ -637,12 +752,17 @@ class _ListesIndisponibles extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        BandeauEchec(message: 'Les listes de l\'accueil manquent. $message'),
+        const CpiFailureBanner(
+          message: 'Les listes de l\'accueil ne sont pas encore descendues.',
+        ),
         const SizedBox(height: CpiSpacing.xs),
         OutlinedButton.icon(
-          onPressed: onReessayer,
-          icon: const Icon(PhosphorIconsRegular.arrowClockwise, size: 20),
-          label: const Text('Réessayer'),
+          onPressed: onSynchroniser,
+          icon: const Icon(
+            PhosphorIconsRegular.arrowClockwise,
+            size: CpiIconSize.md,
+          ),
+          label: const Text('Synchroniser'),
         ),
         const SizedBox(height: CpiSpacing.xxs),
         Text(

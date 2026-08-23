@@ -47,10 +47,19 @@ enum SyncStatus {
 }
 
 class SyncStatusIcon extends StatefulWidget {
-  const SyncStatusIcon({super.key, required this.status, this.size = 18});
+  const SyncStatusIcon({
+    super.key,
+    required this.status,
+    this.size = CpiIconSize.sm,
+    this.labelled = true,
+  });
 
   final SyncStatus status;
   final double size;
+
+  /// Faux quand l'appelant porte déjà l'étiquette (info-bulle, texte visible) :
+  /// nue, l'icône n'apprend rien au commercial qui voit un nuage barré.
+  final bool labelled;
 
   @override
   State<SyncStatusIcon> createState() => _SyncStatusIconState();
@@ -113,8 +122,14 @@ class _SyncStatusIconState extends State<SyncStatusIcon>
       child: icon,
     );
 
-    if (widget.status != SyncStatus.syncing) return switched;
-    return RotationTransition(turns: _controller, child: switched);
+    final Widget rendu = widget.status == SyncStatus.syncing
+        ? RotationTransition(turns: _controller, child: switched)
+        : switched;
+    if (!widget.labelled) return rendu;
+    return Semantics(
+      label: 'État de synchronisation : ${widget.status.label}',
+      child: rendu,
+    );
   }
 }
 
@@ -132,9 +147,17 @@ class SyncStatusChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          SyncStatusIcon(status: status, size: 16),
-          const SizedBox(width: CpiSpacing.xxs + 2),
-          Text(status.label, style: theme.textTheme.labelMedium?.copyWith(color: color)),
+          SyncStatusIcon(status: status, size: CpiIconSize.xs, labelled: false),
+          const SizedBox(width: CpiSpacing.xxsPlus),
+          // « Bloqué par le représentant » débordait : le Row en `min` ne
+          // contraint pas son texte, il faut le rendre compressible.
+          Flexible(
+            child: Text(
+              status.label,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(color: color),
+            ),
+          ),
         ],
       ),
     );

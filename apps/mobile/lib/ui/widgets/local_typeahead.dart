@@ -162,7 +162,9 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
     if (widget.selectedId != null) return null;
     final String query = text.trim();
     if (query.isEmpty) return null;
-    final bool anyMatch = widget.options.any((TypeaheadOption o) => o.matches(query));
+    final bool anyMatch = widget.options.any(
+      (TypeaheadOption o) => o.matches(query),
+    );
     return anyMatch ? null : 'Aucun résultat pour « $query »';
   }
 
@@ -191,7 +193,7 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                 children: <Widget>[
                   Icon(
                     PhosphorIconsRegular.info,
-                    size: 16,
+                    size: CpiIconSize.xs,
                     color: context.cpi.accentText,
                   ),
                   const SizedBox(width: CpiSpacing.xxs),
@@ -224,17 +226,22 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
         final bool settled =
             widget.selectedId != null &&
             widget.options.any(
-              (TypeaheadOption o) => o.id == widget.selectedId && o.label == value.text,
+              (TypeaheadOption o) =>
+                  o.id == widget.selectedId && o.label == value.text,
             );
         // Le choix est pose et rien ne le remet en cause: AUCUNE option. Sinon le
         // libelle retenu se retrouve seul dans la liste, l'overlay se rouvre sur
         // lui des que le champ reprend le focus, et l'utilisateur croit devoir
         // choisir une seconde fois.
-        if (settled && !_browsing) return const Iterable<TypeaheadOption>.empty();
+        if (settled && !_browsing) {
+          return const Iterable<TypeaheadOption>.empty();
+        }
         // Revoir le referentiel: le libelle retenu remplit le champ et ne doit
         // pas filtrer la liste a lui seul.
         if (settled && value.text.trim().isNotEmpty) return widget.options;
-        return widget.options.where((TypeaheadOption o) => o.matches(value.text));
+        return widget.options.where(
+          (TypeaheadOption o) => o.matches(value.text),
+        );
       },
       onSelected: (TypeaheadOption option) {
         setState(() => _browsing = false);
@@ -250,52 +257,55 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
           ) {
             return ValueListenableBuilder<TextEditingValue>(
               valueListenable: textController,
-              builder: (BuildContext context, TextEditingValue value, Widget? _) {
-                final bool hasText = value.text.isNotEmpty;
-                return TextField(
-                  controller: textController,
-                  focusNode: node,
-                  textInputAction: widget.textInputAction,
-                  inputFormatters: widget.maxLength == null
-                      ? null
-                      : <TextInputFormatter>[
-                          LengthLimitingTextInputFormatter(widget.maxLength),
-                        ],
-                  onTap: () => setState(() => _browsing = true),
-                  onChanged: widget.onChanged,
-                  onSubmitted: (String _) => onFieldSubmitted(),
-                  decoration: InputDecoration(
-                    labelText: widget.label,
-                    hintText: widget.hint,
-                    suffixIcon: hasText
-                        ? IconButton(
-                            onPressed: _clear,
-                            tooltip: 'Effacer',
-                            icon: Icon(
-                              PhosphorIconsRegular.xCircle,
-                              size: 20,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          )
-                        : Icon(
-                            PhosphorIconsRegular.caretDown,
-                            size: 20,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                    prefixIcon: widget.selectedId == null
-                        ? null
-                        : Icon(
-                            PhosphorIconsRegular.checkCircle,
-                            size: 20,
-                            color: context.cpi.success,
-                          ),
-                    suffixIconConstraints: const BoxConstraints(
-                      minWidth: kCpiMinTouchTarget,
-                      minHeight: kCpiMinTouchTarget,
-                    ),
-                  ),
-                );
-              },
+              builder:
+                  (BuildContext context, TextEditingValue value, Widget? _) {
+                    final bool hasText = value.text.isNotEmpty;
+                    return TextField(
+                      controller: textController,
+                      focusNode: node,
+                      textInputAction: widget.textInputAction,
+                      inputFormatters: widget.maxLength == null
+                          ? null
+                          : <TextInputFormatter>[
+                              LengthLimitingTextInputFormatter(
+                                widget.maxLength,
+                              ),
+                            ],
+                      onTap: () => setState(() => _browsing = true),
+                      onChanged: widget.onChanged,
+                      onSubmitted: (String _) => onFieldSubmitted(),
+                      decoration: InputDecoration(
+                        labelText: widget.label,
+                        hintText: widget.hint,
+                        suffixIcon: hasText
+                            ? IconButton(
+                                onPressed: _clear,
+                                tooltip: 'Effacer',
+                                icon: Icon(
+                                  PhosphorIconsRegular.xCircle,
+                                  size: CpiIconSize.md,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              )
+                            : Icon(
+                                PhosphorIconsRegular.caretDown,
+                                size: CpiIconSize.md,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                        prefixIcon: widget.selectedId == null
+                            ? null
+                            : Icon(
+                                PhosphorIconsRegular.checkCircle,
+                                size: CpiIconSize.md,
+                                color: context.cpi.success,
+                              ),
+                        suffixIconConstraints: const BoxConstraints(
+                          minWidth: kCpiMinTouchTarget,
+                          minHeight: kCpiMinTouchTarget,
+                        ),
+                      ),
+                    );
+                  },
             );
           },
       optionsViewBuilder:
@@ -311,7 +321,10 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                 borderRadius: CpiRadius.brMd,
                 clipBehavior: Clip.antiAlias,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 280, maxWidth: 480),
+                  constraints: const BoxConstraints(
+                    maxHeight: 280,
+                    maxWidth: 480,
+                  ),
                   child: Scrollbar(
                     child: ListView.builder(
                       padding: EdgeInsets.zero,
@@ -323,7 +336,8 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                         return ListTile(
                           minVerticalPadding: CpiSpacing.sm,
                           selected: current,
-                          selectedTileColor: theme.colorScheme.secondaryContainer,
+                          selectedTileColor:
+                              theme.colorScheme.secondaryContainer,
                           title: Text(option.label),
                           subtitle: option.secondary == null
                               ? null
@@ -331,7 +345,7 @@ class _LocalTypeaheadState extends State<LocalTypeahead> {
                           trailing: current
                               ? Icon(
                                   PhosphorIconsRegular.check,
-                                  size: 18,
+                                  size: CpiIconSize.sm,
                                   color: theme.colorScheme.primary,
                                 )
                               : null,

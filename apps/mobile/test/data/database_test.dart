@@ -143,7 +143,12 @@ void main() {
       // C'est TOUT l'intérêt de l'index partiel : un `UNIQUE` ordinaire
       // réserverait ce numéro à vie et le commercial ne pourrait plus jamais
       // ressaisir la fiche qu'il vient de supprimer par erreur.
-      await _insertRepresentant(db, id: 'r1', phone: '+221770000001', deletedAt: t0);
+      await _insertRepresentant(
+        db,
+        id: 'r1',
+        phone: '+221770000001',
+        deletedAt: t0,
+      );
       await _insertRepresentant(db, id: 'r2', phone: '+221770000001');
       final List<Representant> rows = await db.select(db.representants).get();
       expect(rows, hasLength(2));
@@ -168,10 +173,10 @@ void main() {
 
       // Résolution d'un doublon : le serveur a renvoyé son propre identifiant.
       // Une seule instruction, pas une boucle de rattrapage.
-      await db.customStatement('UPDATE representants SET id = ? WHERE id = ?', <Object?>[
-        'server-uuid',
-        'local-uuid',
-      ]);
+      await db.customStatement(
+        'UPDATE representants SET id = ? WHERE id = ?',
+        <Object?>['server-uuid', 'local-uuid'],
+      );
 
       final List<Prospect> prospects = await db.select(db.prospects).get();
       expect(prospects, hasLength(2));
@@ -180,15 +185,25 @@ void main() {
       });
     });
 
-    test('un représentant référencé ne peut pas être supprimé physiquement', () async {
-      await _insertRepresentant(db, id: 'r1', phone: '+221770000020');
-      await _insertProspect(db, id: 'p1', representantId: 'r1', phone: '+221780000010');
-      expect(
-        () =>
-            db.customStatement('DELETE FROM representants WHERE id = ?', <Object?>['r1']),
-        throwsA(isA<SqliteException>()),
-      );
-    });
+    test(
+      'un représentant référencé ne peut pas être supprimé physiquement',
+      () async {
+        await _insertRepresentant(db, id: 'r1', phone: '+221770000020');
+        await _insertProspect(
+          db,
+          id: 'p1',
+          representantId: 'r1',
+          phone: '+221780000010',
+        );
+        expect(
+          () => db.customStatement(
+            'DELETE FROM representants WHERE id = ?',
+            <Object?>['r1'],
+          ),
+          throwsA(isA<SqliteException>()),
+        );
+      },
+    );
   });
 
   group('representant_sync_view', () {
@@ -214,19 +229,28 @@ void main() {
     test('le statut suit l\'opération de tête', () async {
       await _insertRepresentant(db, id: 'r1', phone: '+221770000032');
       await _queueOp(db, id: 'op1', entityType: 'representant', entityId: 'r1');
-      expect((await db.representantsWithStatus().get()).single.syncStatus, 'pending');
+      expect(
+        (await db.representantsWithStatus().get()).single.syncStatus,
+        'pending',
+      );
 
-      await db.customStatement('UPDATE outbox SET status = ? WHERE id = ?', <Object?>[
+      await db.customStatement(
+        'UPDATE outbox SET status = ? WHERE id = ?',
+        <Object?>['syncing', 'op1'],
+      );
+      expect(
+        (await db.representantsWithStatus().get()).single.syncStatus,
         'syncing',
-        'op1',
-      ]);
-      expect((await db.representantsWithStatus().get()).single.syncStatus, 'syncing');
+      );
 
-      await db.customStatement('UPDATE outbox SET status = ? WHERE id = ?', <Object?>[
+      await db.customStatement(
+        'UPDATE outbox SET status = ? WHERE id = ?',
+        <Object?>['conflict', 'op1'],
+      );
+      expect(
+        (await db.representantsWithStatus().get()).single.syncStatus,
         'conflict',
-        'op1',
-      ]);
-      expect((await db.representantsWithStatus().get()).single.syncStatus, 'conflict');
+      );
     });
 
     test('la tête est la plus ancienne opération non terminée', () async {
@@ -252,7 +276,10 @@ void main() {
       );
       // op2 est plus récente, mais op1 n'est pas passée : c'est elle qui décrit
       // la réalité pour l'utilisateur.
-      expect((await db.representantsWithStatus().get()).single.syncStatus, 'failed');
+      expect(
+        (await db.representantsWithStatus().get()).single.syncStatus,
+        'failed',
+      );
     });
 
     test('une opération terminée ne compte plus', () async {
@@ -269,19 +296,30 @@ void main() {
         entityId: 'r1',
         status: 'done',
       );
-      expect((await db.representantsWithStatus().get()).single.syncStatus, 'synced');
+      expect(
+        (await db.representantsWithStatus().get()).single.syncStatus,
+        'synced',
+      );
     });
   });
 
   group('prospect_sync_view', () {
     setUp(() async {
       await _insertRepresentant(db, id: 'r1', phone: '+221770000040');
-      await _insertProspect(db, id: 'p1', representantId: 'r1', phone: '+221780000020');
+      await _insertProspect(
+        db,
+        id: 'p1',
+        representantId: 'r1',
+        phone: '+221780000020',
+      );
     });
 
     Future<String?> statusOfP1() async {
       final ProspectSyncViewData row =
-          (await db.prospectsForRepresentant(representantId: 'r1', maxRows: 200).get()).single;
+          (await db
+                  .prospectsForRepresentant(representantId: 'r1', maxRows: 200)
+                  .get())
+              .single;
       return row.syncStatus;
     }
 
@@ -361,7 +399,8 @@ void main() {
     test('id reste unique', () async {
       await _queueOp(db, id: 'op1', entityType: 'representant', entityId: 'r1');
       expect(
-        () => _queueOp(db, id: 'op1', entityType: 'representant', entityId: 'r2'),
+        () =>
+            _queueOp(db, id: 'op1', entityType: 'representant', entityId: 'r2'),
         throwsA(isA<SqliteException>()),
       );
     });
@@ -403,10 +442,20 @@ void main() {
         dependencyKey: 'r2',
       );
       // Sans `dependency_key` : sa propre partition, rien ne l'empoisonne.
-      await _queueOp(db, id: 'solo', entityType: 'representant', entityId: 'r3');
+      await _queueOp(
+        db,
+        id: 'solo',
+        entityType: 'representant',
+        entityId: 'r3',
+      );
 
-      final List<OutboxData> claimable = await db.claimableOutbox(maxRows: 50).get();
-      expect(claimable.map((OutboxData o) => o.id), <String>['autre-cle', 'solo']);
+      final List<OutboxData> claimable = await db
+          .claimableOutbox(maxRows: 50)
+          .get();
+      expect(claimable.map((OutboxData o) => o.id), <String>[
+        'autre-cle',
+        'solo',
+      ]);
     });
 
     test('une masse de lignes mortes ne masque pas le travail restant', () async {
@@ -431,43 +480,56 @@ void main() {
         dependencyKey: 'rv',
       );
 
-      final List<OutboxData> claimable = await db.claimableOutbox(maxRows: 10).get();
+      final List<OutboxData> claimable = await db
+          .claimableOutbox(maxRows: 10)
+          .get();
       expect(claimable.map((OutboxData o) => o.id), <String>['vivant']);
     });
 
-    test('countSchedulableOutbox ignore ce qu\'aucun worker ne débloquera', () async {
-      await _queueOp(db, id: 'a', entityType: 'representant', entityId: 'r1');
-      await _queueOp(
-        db,
-        id: 'b',
-        entityType: 'representant',
-        entityId: 'r2',
-        status: 'syncing',
-      );
-      await _queueOp(
-        db,
-        id: 'c',
-        entityType: 'representant',
-        entityId: 'r3',
-        status: 'failed',
-      );
-      await _queueOp(
-        db,
-        id: 'd',
-        entityType: 'representant',
-        entityId: 'r4',
-        status: 'conflict',
-      );
+    test(
+      'countSchedulableOutbox ignore ce qu\'aucun worker ne débloquera',
+      () async {
+        await _queueOp(db, id: 'a', entityType: 'representant', entityId: 'r1');
+        await _queueOp(
+          db,
+          id: 'b',
+          entityType: 'representant',
+          entityId: 'r2',
+          status: 'syncing',
+        );
+        await _queueOp(
+          db,
+          id: 'c',
+          entityType: 'representant',
+          entityId: 'r3',
+          status: 'failed',
+        );
+        await _queueOp(
+          db,
+          id: 'd',
+          entityType: 'representant',
+          entityId: 'r4',
+          status: 'conflict',
+        );
 
-      expect(await db.countPendingOutbox().getSingle(), 4);
-      expect(await db.countSchedulableOutbox().getSingle(), 2);
-    });
+        expect(await db.countPendingOutbox().getSingle(), 4);
+        expect(await db.countSchedulableOutbox().getSingle(), 2);
+        // Les deux compteurs de l'écran se partagent exactement la file : ce
+        // qui partira, et ce qui attend une main. Aucune ligne des deux côtés.
+        expect(await db.countBlockedOutbox().getSingle(), 2);
+      },
+    );
   });
 
   group('compteurs', () {
     test('les lignes supprimées logiquement ne comptent pas', () async {
       await _insertRepresentant(db, id: 'r1', phone: '+221770000050');
-      await _insertRepresentant(db, id: 'r2', phone: '+221770000051', deletedAt: t0);
+      await _insertRepresentant(
+        db,
+        id: 'r2',
+        phone: '+221770000051',
+        deletedAt: t0,
+      );
       expect(await db.countRepresentants().getSingle(), 1);
     });
 
@@ -527,7 +589,9 @@ void main() {
   test('les DATETIME sont stockés en texte ISO-8601', () async {
     await _insertRepresentant(db, id: 'r1', phone: '+221770000060');
     final QueryRow row = await db
-        .customSelect('SELECT typeof(client_created_at) AS t FROM representants')
+        .customSelect(
+          'SELECT typeof(client_created_at) AS t FROM representants',
+        )
         .getSingle();
     // Stockés en secondes UNIX, deux écritures faites dans la même seconde
     // deviendraient indiscernables : or c'est ce que le curseur keyset doit

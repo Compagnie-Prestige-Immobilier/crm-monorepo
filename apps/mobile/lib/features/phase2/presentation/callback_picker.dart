@@ -34,7 +34,10 @@ List<CallbackSlot> callbackSlots(DateTime now) {
   final DateTime monday = nowUtc.add(Duration(days: 8 - nowUtc.weekday));
 
   final List<CallbackSlot> slots = <CallbackSlot>[
-    CallbackSlot('Dans 1 h', _businessTime(inOneHour, inOneHour.hour, inOneHour.minute)),
+    CallbackSlot(
+      'Dans 1 h',
+      _businessTime(inOneHour, inOneHour.hour, inOneHour.minute),
+    ),
     CallbackSlot('Cet après-midi (15 h)', _businessTime(nowUtc, 15)),
     CallbackSlot('Demain 9 h', _businessTime(tomorrow, 9)),
     CallbackSlot('Demain 15 h', _businessTime(tomorrow, 15)),
@@ -106,7 +109,10 @@ class _CallbackPickerState extends State<CallbackPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Quand rappeler ? (facultatif)', style: theme.textTheme.titleSmall),
+        Text(
+          'Quand rappeler ? (facultatif)',
+          style: theme.textTheme.titleSmall,
+        ),
         const SizedBox(height: CpiSpacing.xs),
         Wrap(
           spacing: CpiSpacing.xs,
@@ -114,20 +120,28 @@ class _CallbackPickerState extends State<CallbackPicker> {
           children: <Widget>[
             for (final CallbackSlot slot in slots)
               ChoiceChip(
-                label: Text(slot.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                label: Text(
+                  slot.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 selected: !_wheel && _selected == slot.at,
                 onSelected: (bool on) => _pick(on ? slot.at : null),
               ),
             if (halfHours.isNotEmpty)
               ChoiceChip(
-                avatar: const Icon(PhosphorIconsRegular.clock, size: 16),
+                avatar: const Icon(
+                  PhosphorIconsRegular.clock,
+                  size: CpiIconSize.xs,
+                ),
                 label: const Text(
                   'Autre heure',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 selected: _wheel,
-                onSelected: (bool on) => _pick(on ? halfHours.first.at : null, wheel: on),
+                onSelected: (bool on) =>
+                    _pick(on ? halfHours.first.at : null, wheel: on),
               ),
           ],
         ),
@@ -144,7 +158,8 @@ class _CallbackPickerState extends State<CallbackPicker> {
                 itemExtent: 44,
                 diameterRatio: 1.6,
                 physics: const FixedExtentScrollPhysics(),
-                onSelectedItemChanged: (int i) => _pick(halfHours[i].at, wheel: true),
+                onSelectedItemChanged: (int i) =>
+                    _pick(halfHours[i].at, wheel: true),
                 childDelegate: ListWheelChildBuilderDelegate(
                   childCount: halfHours.length,
                   builder: (BuildContext context, int i) => Center(

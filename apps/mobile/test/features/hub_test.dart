@@ -199,7 +199,7 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('le Grand Public s\'ouvre sans rien promettre de faux', (
+  testWidgets('le Grand Public ouvre sa liste et revient aux projets', (
     WidgetTester tester,
   ) async {
     await open(tester, 'COMMERCIAL');
@@ -208,17 +208,14 @@ void main() {
     await settle(tester);
 
     expect(find.byType(GrandPublicScreen), findsOneWidget);
-    expect(find.textContaining('n\'est pas encore ouvert'), findsOneWidget);
+    expect(find.text('Console d’appel'), findsOneWidget);
+    expect(find.byTooltip('Nouveau prospect'), findsOneWidget);
+    expect(
+      find.text('Synchronisez pour recevoir les prospects à traiter.'),
+      findsOneWidget,
+    );
 
-    // La fleche de retour part d'une pile vide : `popOrHome` doit retomber sur
-    // le hub, et non se redemander son avis jusqu'a figer l'isolat.
-    await tester.tap(find.byTooltip('Retour'));
-    await settle(tester);
-    expect(find.byType(HubScreen), findsOneWidget);
-
-    await tester.tap(tile('Projet Grand Public'));
-    await settle(tester);
-    await tester.tap(find.text('Revenir aux projets'));
+    await tester.tap(find.byTooltip('Projets'));
     await settle(tester);
     expect(find.byType(HubScreen), findsOneWidget);
 
@@ -238,12 +235,19 @@ void main() {
       expect(CpiProject.grandPublic.isOpenTo('ACCUEIL'), isFalse);
     });
 
-    test('la direction et l\'administration passent partout', () {
-      for (final String role in <String>['ADMIN', 'DIRECTION']) {
-        for (final CpiProject project in CpiProject.values) {
-          expect(project.isOpenTo(role), isTrue, reason: '$role sur $project');
-        }
+    test('l\'administration passe partout', () {
+      for (final CpiProject project in CpiProject.values) {
+        expect(project.isOpenTo('ADMIN'), isTrue, reason: 'ADMIN sur $project');
       }
+    });
+
+    /// La direction encadre les deux projets d'enrôlement, mais le comptoir
+    /// n'est pas son poste : `/sync` lui est fermé côté serveur, donc la tuile
+    /// Accueil ne lui donnerait qu'un formulaire sans issue.
+    test('la direction encadre les projets, elle ne tient pas le comptoir', () {
+      expect(CpiProject.chues.isOpenTo('DIRECTION'), isTrue);
+      expect(CpiProject.grandPublic.isOpenTo('DIRECTION'), isTrue);
+      expect(CpiProject.accueil.isOpenTo('DIRECTION'), isFalse);
     });
 
     test('un rôle que cette version ignore garde la coque historique', () {

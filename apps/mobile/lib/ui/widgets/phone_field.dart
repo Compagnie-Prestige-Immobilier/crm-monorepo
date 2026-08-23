@@ -9,14 +9,18 @@ import '../../core/utils/phone.dart';
 class SenegalPhoneFormatter extends TextInputFormatter {
   const SenegalPhoneFormatter();
 
-  static String _digits(String input) => input.replaceAll(RegExp(r'[^0-9]'), '');
+  static String _digits(String input) =>
+      input.replaceAll(RegExp(r'[^0-9]'), '');
 
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final int cursor = newValue.selection.baseOffset.clamp(0, newValue.text.length);
+    final int cursor = newValue.selection.baseOffset.clamp(
+      0,
+      newValue.text.length,
+    );
     String digits = _digits(newValue.text);
     int digitsBeforeCursor = _digits(newValue.text.substring(0, cursor)).length;
 
@@ -92,7 +96,9 @@ class PhoneField extends StatelessWidget {
         final String? error = partial
             ? null
             : (parsed is PhoneInvalid ? parsed.message : null);
-        final String? warning = parsed is PhoneValid ? parsed.warningMessage : null;
+        final String? warning = parsed is PhoneValid
+            ? parsed.warningMessage
+            : null;
 
         return TextField(
           controller: controller,
@@ -113,16 +119,16 @@ class PhoneField extends StatelessWidget {
             helperText: parsed is PhoneValid ? (warning ?? helper) : null,
             helperStyle: warning == null
                 ? null
-                : Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: context.cpi.accentText),
+                : Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.cpi.accentText,
+                  ),
             helperMaxLines: 2,
             suffixIcon: parsed is PhoneValid
                 ? Icon(
                     warning == null
                         ? PhosphorIconsRegular.checkCircle
                         : PhosphorIconsRegular.warningCircle,
-                    size: 20,
+                    size: CpiIconSize.md,
                     color: warning == null
                         ? context.cpi.success
                         : context.cpi.accentText,

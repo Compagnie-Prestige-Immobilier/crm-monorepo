@@ -80,7 +80,8 @@ class _Fiche extends ConsumerWidget {
 
     String? departement;
     for (final Departement d
-        in ref.watch(departementsProvider(null)).value ?? const <Departement>[]) {
+        in ref.watch(departementsProvider(null)).value ??
+            const <Departement>[]) {
       if (d.id == data.departementId) departement = d.name;
     }
 
@@ -124,7 +125,10 @@ class _Fiche extends ConsumerWidget {
             label: 'Département',
             value: departement,
           ),
-        _WhatsappRow(status: data.whatsappStatus, whatsappE164: data.whatsappE164),
+        _WhatsappRow(
+          status: data.whatsappStatus,
+          whatsappE164: data.whatsappE164,
+        ),
         if (profession.isNotEmpty)
           _InfoRow(
             icon: PhosphorIconsRegular.briefcase,
@@ -132,12 +136,18 @@ class _Fiche extends ConsumerWidget {
             value: profession,
           ),
         if (ief != null)
-          _InfoRow(icon: PhosphorIconsRegular.buildings, label: 'IEF', value: ief),
+          _InfoRow(
+            icon: PhosphorIconsRegular.buildings,
+            label: 'IEF',
+            value: ief,
+          ),
         const SizedBox(height: CpiSpacing.lg),
         Text('Notes', style: theme.textTheme.titleSmall),
         const SizedBox(height: CpiSpacing.xxs),
         Text(
-          notes.isEmpty ? 'Aucune note. Ajoutez-en une depuis « Modifier ».' : notes,
+          notes.isEmpty
+              ? 'Aucune note. Ajoutez-en une depuis « Modifier ».'
+              : notes,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: notes.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
           ),
@@ -148,7 +158,7 @@ class _Fiche extends ConsumerWidget {
             unawaited(HapticFeedback.selectionClick());
             context.pushOnce(Routes.newProspectFor(data.id));
           },
-          icon: const Icon(PhosphorIconsRegular.userPlus, size: 20),
+          icon: const Icon(PhosphorIconsRegular.userPlus, size: CpiIconSize.md),
           label: const Text('Nouveau prospect'),
         ),
         const SizedBox(height: CpiSpacing.xs),
@@ -157,7 +167,10 @@ class _Fiche extends ConsumerWidget {
             unawaited(HapticFeedback.selectionClick());
             context.pushOnce(Routes.representantFormFor(data.id));
           },
-          icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 20),
+          icon: const Icon(
+            PhosphorIconsRegular.pencilSimple,
+            size: CpiIconSize.md,
+          ),
           label: const Text('Modifier'),
         ),
         const SizedBox(height: CpiSpacing.lg),
@@ -188,7 +201,8 @@ class RepresentantCommentThread extends ConsumerStatefulWidget {
       _RepresentantCommentThreadState();
 }
 
-class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentThread> {
+class _RepresentantCommentThreadState
+    extends ConsumerState<RepresentantCommentThread> {
   final TextEditingController _controller = TextEditingController();
   bool _sending = false;
   String? _error;
@@ -258,7 +272,7 @@ class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentT
               children: <Widget>[
                 Icon(
                   PhosphorIconsRegular.warningCircle,
-                  size: 18,
+                  size: CpiIconSize.sm,
                   color: theme.colorScheme.error,
                 ),
                 const SizedBox(width: CpiSpacing.xs),
@@ -279,7 +293,10 @@ class _RepresentantCommentThreadState extends ConsumerState<RepresentantCommentT
           alignment: Alignment.centerRight,
           child: FilledButton.icon(
             onPressed: canPublish ? _publish : null,
-            icon: const Icon(PhosphorIconsRegular.paperPlaneTilt, size: 20),
+            icon: const Icon(
+              PhosphorIconsRegular.paperPlaneTilt,
+              size: CpiIconSize.md,
+            ),
             label: const Text('Publier'),
           ),
         ),
@@ -345,10 +362,10 @@ class _RelationChip extends StatelessWidget {
           children: <Widget>[
             Icon(
               PhosphorIconsRegular.handshake,
-              size: 16,
+              size: CpiIconSize.xs,
               color: theme.colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(width: CpiSpacing.xxs + 2),
+            const SizedBox(width: CpiSpacing.xxsPlus),
             Flexible(
               child: Text(
                 relationLabel(status),
@@ -380,7 +397,9 @@ class _WhatsappRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final WhatsappStatus? known = WhatsappStatus.parse(status);
-    final String? autre = known == WhatsappStatus.autreNumero ? whatsappE164 : null;
+    final String? autre = known == WhatsappStatus.autreNumero
+        ? whatsappE164
+        : null;
 
     if (autre != null) {
       return _CopyableRow(
@@ -397,7 +416,9 @@ class _WhatsappRow extends StatelessWidget {
       // disparaître.
       value: known?.label ?? status,
       valueStyle: known == WhatsappStatus.nonDemande
-          ? theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)
+          ? theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            )
           : null,
     );
   }
@@ -434,7 +455,9 @@ class _ProspectList extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: list
               .map((ProspectSyncViewData p) {
-                final SyncStatus status = SyncStatus.parse(p.syncStatus ?? 'draft');
+                final SyncStatus status = SyncStatus.parse(
+                  p.syncStatus ?? 'draft',
+                );
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: CpiSpacing.xs),
                   child: Row(
@@ -442,7 +465,10 @@ class _ProspectList extends ConsumerWidget {
                     children: <Widget>[
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
-                        child: SyncStatusIcon(status: status, size: 20),
+                        child: SyncStatusIcon(
+                          status: status,
+                          size: CpiIconSize.md,
+                        ),
                       ),
                       const SizedBox(width: CpiSpacing.sm),
                       Expanded(
@@ -497,7 +523,11 @@ class _InfoRow extends StatelessWidget {
         children: <Widget>[
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+            child: Icon(
+              icon,
+              size: CpiIconSize.md,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(width: CpiSpacing.sm),
           Expanded(
@@ -570,7 +600,7 @@ class _Missing extends StatelessWidget {
           children: <Widget>[
             Icon(
               PhosphorIconsDuotone.userMinus,
-              size: 56,
+              size: CpiIconSize.display,
               color: theme.colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: CpiSpacing.md),

@@ -7,7 +7,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/background/background_sync.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../auth/auth_controller.dart';
 import '../../../core/providers/sync_coordinator.dart';
+import '../../../core/router/route_memory.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/settings/display_settings.dart';
 import '../../../core/utils/relative_time.dart';
@@ -107,7 +109,10 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                     ),
                   ),
                 ),
-                title: Text(auth.fullName ?? 'Compte', style: theme.textTheme.titleSmall),
+                title: Text(
+                  auth.fullName ?? 'Compte',
+                  style: theme.textTheme.titleSmall,
+                ),
                 subtitle: Text(_profileLine(auth)),
               ),
             ],
@@ -121,7 +126,7 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                   pending == 0
                       ? PhosphorIconsRegular.checkCircle
                       : PhosphorIconsRegular.cloudArrowUp,
-                  size: 26,
+                  size: CpiIconSize.xl,
                   color: pending == 0 ? cpi.success : cpi.accentText,
                 ),
                 title: Text(
@@ -142,7 +147,9 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                   padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
                   child: Text(
                     'Dernière erreur : ${sync.lastError}',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: cpi.syncFailed),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cpi.syncFailed,
+                    ),
                   ),
                 ),
               FilledButton.tonalIcon(
@@ -154,7 +161,9 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                     ? null
                     : () {
                         HapticFeedback.selectionClick().ignore();
-                        unawaited(ref.read(syncCoordinatorProvider.notifier).run());
+                        unawaited(
+                          ref.read(syncCoordinatorProvider.notifier).run(),
+                        );
                       },
                 icon: sync.running
                     ? const SizedBox(
@@ -162,7 +171,10 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(PhosphorIconsRegular.arrowsClockwise, size: 20),
+                    : const Icon(
+                        PhosphorIconsRegular.arrowsClockwise,
+                        size: CpiIconSize.md,
+                      ),
                 label: const Text('Synchroniser maintenant'),
               ),
             ],
@@ -178,7 +190,9 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                 onChanged: (CpiTextScale value) {
                   HapticFeedback.selectionClick().ignore();
                   _persist(
-                    ref.read(displaySettingsProvider.notifier).setTextScale(value),
+                    ref
+                        .read(displaySettingsProvider.notifier)
+                        .setTextScale(value),
                   );
                 },
               ),
@@ -209,20 +223,30 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
                   decoration: BoxDecoration(
                     color: cpi.accentSurface,
                     borderRadius: CpiRadius.brMd,
-                    border: Border.all(color: cpi.accentBorder.withValues(alpha: 0.4)),
+                    border: Border.all(
+                      color: cpi.accentBorder.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: Text(
                     _backgroundDiagnosis,
-                    style: theme.textTheme.bodyMedium?.copyWith(color: cpi.accentText),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cpi.accentText,
+                    ),
                   ),
                 ),
                 const SizedBox(height: CpiSpacing.xs),
               ],
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(PhosphorIconsRegular.batteryCharging, size: 26),
+                leading: const Icon(
+                  PhosphorIconsRegular.batteryCharging,
+                  size: CpiIconSize.xl,
+                ),
                 title: const Text('Autorisations d\'arrière-plan'),
-                trailing: const Icon(PhosphorIconsRegular.caretRight, size: 20),
+                trailing: const Icon(
+                  PhosphorIconsRegular.caretRight,
+                  size: CpiIconSize.md,
+                ),
                 onTap: () => context.pushOnce(Routes.batteryHelp),
               ),
             ],
@@ -233,10 +257,16 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
             children: <Widget>[
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(PhosphorIconsRegular.info, size: 26),
+                leading: const Icon(
+                  PhosphorIconsRegular.info,
+                  size: CpiIconSize.xl,
+                ),
                 title: const Text('À propos'),
                 subtitle: const Text('Version, serveur, support'),
-                trailing: const Icon(PhosphorIconsRegular.caretRight, size: 20),
+                trailing: const Icon(
+                  PhosphorIconsRegular.caretRight,
+                  size: CpiIconSize.md,
+                ),
                 onTap: () => context.pushOnce(Routes.about),
               ),
             ],
@@ -247,7 +277,10 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
             children: <Widget>[
               OutlinedButton.icon(
                 onPressed: () => unawaited(_signOut(pending)),
-                icon: const Icon(PhosphorIconsRegular.signOut, size: 20),
+                icon: const Icon(
+                  PhosphorIconsRegular.signOut,
+                  size: CpiIconSize.md,
+                ),
                 label: const Text('Se déconnecter'),
               ),
             ],
@@ -281,6 +314,13 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
   }
 
   Future<void> _signOut(int pending) async {
+    // Lus AVANT toute attente : la boîte de confirmation puis `signOut`
+    // démontent l'écran, et un `ref` relu après porterait sur un widget mort —
+    // la mémoire de route n'était jamais effacée, la session suivante rouvrait
+    // l'écran du précédent utilisateur.
+    final RouteMemory memoire = ref.read(routeMemoryProvider);
+    final AuthController auth = ref.read(authControllerProvider.notifier);
+
     if (pending > 0) {
       final bool? force = await showDialog<bool>(
         context: context,
@@ -313,14 +353,12 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
       if (force != true) return;
     }
     try {
-      await ref.read(authControllerProvider.notifier).signOut();
-      await ref.read(routeMemoryProvider).clear();
+      await auth.signOut();
+      await memoire.clear();
     } on Object {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Déconnexion impossible. Réessayez.'),
-        ),
+        const SnackBar(content: Text('Déconnexion impossible. Réessayez.')),
       );
     }
   }
@@ -331,9 +369,9 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
     if (name == null || name.trim().isEmpty) return 'C';
     final List<String> parts = name.trim().split(RegExp(r'\s+'));
     if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
+    return (parts.first.characters.first + parts.last.characters.first)
+        .toUpperCase();
   }
-
 }
 
 class _TextScaleChoice extends StatelessWidget {
@@ -351,7 +389,8 @@ class _TextScaleChoice extends StatelessWidget {
       ],
       selected: <CpiTextScale>{value},
       showSelectedIcon: false,
-      onSelectionChanged: (Set<CpiTextScale> selection) => onChanged(selection.first),
+      onSelectionChanged: (Set<CpiTextScale> selection) =>
+          onChanged(selection.first),
     );
   }
 }
