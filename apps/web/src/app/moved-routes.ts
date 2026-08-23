@@ -23,6 +23,22 @@ export const MOVED_ROUTES: Readonly<Record<string, string>> = {
   imports: '/admin/imports',
   parametres: '/admin/parametres',
   notifications: '/admin/notifications',
+
+  // Les trois adresses des rappels quotidiens : `reminders.service.ts` les émet
+  // encore, et elles n'ont jamais eu d'écran de ce nom dans le panel.
+  phase2: '/chues/campagnes',
+  'rep-campaigns': '/chues/campagnes/representants',
+};
+
+/**
+ * Adresses COMPLÈTES dont la racine seule mènerait ailleurs.
+ *
+ * `/phase2/callbacks` est la file des rappels, pas une sous-page des
+ * campagnes : la règle de préfixe l'enverrait sur `/chues/campagnes/callbacks`,
+ * qui n'existe pas.
+ */
+export const MOVED_PATHS: Readonly<Record<string, string>> = {
+  '/phase2/callbacks': '/chues/rappels',
 };
 
 export type SearchParams = Record<string, string | string[] | undefined>;
@@ -37,7 +53,10 @@ export function movedTarget(
   segments: readonly string[] = [],
   search: SearchParams = {},
 ): string | null {
-  const base = MOVED_ROUTES[root];
+  const tail = segments.map((segment) => `/${encodeURIComponent(segment)}`).join('');
+  const exact = MOVED_PATHS[`/${root}${tail}`];
+
+  const base = exact ?? MOVED_ROUTES[root];
   if (base === undefined) return null;
 
   const query = new URLSearchParams();
@@ -46,7 +65,6 @@ export function movedTarget(
     else if (value !== undefined) query.set(key, value);
   }
 
-  const tail = segments.map((segment) => `/${encodeURIComponent(segment)}`).join('');
   const suffix = query.size === 0 ? '' : `?${query.toString()}`;
-  return `${base}${tail}${suffix}`;
+  return `${base}${exact === undefined ? tail : ''}${suffix}`;
 }

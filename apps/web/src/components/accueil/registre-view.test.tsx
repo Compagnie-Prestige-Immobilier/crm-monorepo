@@ -230,6 +230,24 @@ describe('filtres du registre, dans l’adresse', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/accueil?page=2', { scroll: false });
   });
 
+  // La pagination est masquée à l'impression : rien sur le papier n'indiquait
+  // qu'il manquait les 140 visites suivantes.
+  it('dit SUR LE PAPIER quelles visites la feuille porte, et lesquelles manquent', async () => {
+    fetchVisites.mockResolvedValue(page([visite()], { total: 240, pageCount: 3 }));
+    renderWithQuery(<RegistreView />);
+
+    const mention = await screen.findByText(/Page 1 sur 3/u);
+    expect(mention.className).toContain('print:block');
+    expect(mention.textContent).toContain('240');
+  });
+
+  it('ne l’écrit pas quand tout tient sur une feuille', async () => {
+    renderWithQuery(<RegistreView />);
+
+    await screen.findByRole('table');
+    expect(screen.queryByText(/Page 1 sur/u)).toBeNull();
+  });
+
   it('ne propose aucune page à tourner quand le registre tient sur une seule', async () => {
     renderWithQuery(<RegistreView />);
 

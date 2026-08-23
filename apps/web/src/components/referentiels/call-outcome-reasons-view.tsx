@@ -36,17 +36,21 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  CALL_OUTCOME_COLORS,
+  CALL_OUTCOME_COLOR_LABELS,
   CALL_OUTCOME_EFFECTS,
   CALL_OUTCOME_EFFECT_LABELS,
   createCallOutcomeReason,
   fetchCallOutcomeReasons,
   setCallOutcomeReasonActive,
   updateCallOutcomeReason,
+  type CallOutcomeColor,
   type CallOutcomeEffect,
   type CallOutcomeReason,
 } from '@/lib/data/call-outcome-reasons';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import { stageBadgeVariant } from '@/lib/types';
 
 /** Version de charge utile du parc en place. Un motif au-dessus n'y descend pas. */
 const DEPLOYED_PAYLOAD_VERSION = 1;
@@ -99,6 +103,7 @@ export function CallOutcomeReasonsView() {
               <TableHead>Code</TableHead>
               <TableHead>Libellé</TableHead>
               <TableHead>Effet sur le prospect</TableHead>
+              <TableHead>Couleur</TableHead>
               <TableHead>Saisie exigée</TableHead>
               <TableHead>Sur les téléphones</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -191,6 +196,13 @@ function ReasonRow({ reason, onEdit }: { reason: CallOutcomeReason; onEdit: () =
       <TableCell className="text-muted-foreground">
         {CALL_OUTCOME_EFFECT_LABELS[reason.effect]}
       </TableCell>
+      <TableCell>
+        {reason.color === null ? (
+          <span className="text-muted-foreground">Aucune</span>
+        ) : (
+          <Badge variant={stageBadgeVariant(reason.color)}>{colorLabel(reason.color)}</Badge>
+        )}
+      </TableCell>
       <TableCell className="text-muted-foreground">
         {required.length === 0 ? 'Rien' : required.join(', ')}
       </TableCell>
@@ -237,6 +249,7 @@ interface ReasonFormValues {
   code: string;
   label: string;
   effect: CallOutcomeEffect;
+  color: CallOutcomeColor | '';
   requiresComment: boolean;
   requiresCallback: boolean;
   countsAsReached: boolean;
@@ -247,11 +260,26 @@ const EMPTY: ReasonFormValues = {
   code: '',
   label: '',
   effect: 'KEEP_OPEN',
+  color: '',
   requiresComment: false,
   requiresCallback: false,
   countsAsReached: true,
   sortOrder: 100,
 };
+
+const AUCUNE_COULEUR = '';
+
+const COLOR_ITEMS = [
+  { value: AUCUNE_COULEUR, label: 'Aucune' },
+  ...CALL_OUTCOME_COLORS.map((value) => ({ value, label: CALL_OUTCOME_COLOR_LABELS[value] })),
+];
+
+/** Un rôle hors liste vient d'ailleurs : on le montre tel quel plutôt que de le taire. */
+const colorLabel = (color: string): string =>
+  (CALL_OUTCOME_COLOR_LABELS as Record<string, string | undefined>)[color] ?? color;
+
+const isKnownColor = (color: string | null): color is CallOutcomeColor =>
+  color !== null && (CALL_OUTCOME_COLORS as readonly string[]).includes(color);
 
 function ReasonFormDialog({
   open,
@@ -281,6 +309,7 @@ function ReasonFormDialog({
             code: reason.code,
             label: reason.label,
             effect: reason.effect,
+            color: isKnownColor(reason.color) ? reason.color : AUCUNE_COULEUR,
             requiresComment: reason.requiresComment,
             requiresCallback: reason.requiresCallback,
             countsAsReached: reason.countsAsReached,
@@ -290,6 +319,7 @@ function ReasonFormDialog({
   }, [open, reason, reset]);
 
   const effect = watch('effect');
+  const color = watch('color');
 
   const mutation = useMutation({
     mutationFn: (values: ReasonFormValues) =>
@@ -297,6 +327,7 @@ function ReasonFormDialog({
         ? updateCallOutcomeReason(reason.id, {
             label: values.label,
             sortOrder: values.sortOrder,
+            ...(values.color === AUCUNE_COULEUR ? {} : { color: values.color }),
             ...(locked
               ? {}
               : {
@@ -309,6 +340,7 @@ function ReasonFormDialog({
             code: values.code.trim().toUpperCase(),
             label: values.label.trim(),
             effect: values.effect,
+            ...(values.color === AUCUNE_COULEUR ? {} : { color: values.color }),
             requiresComment: values.requiresComment,
             requiresCallback: values.requiresCallback,
             countsAsReached: values.countsAsReached,
@@ -430,13 +462,52 @@ function ReasonFormDialog({
             ) : null}
           </fieldset>
 
-          <Field label="Ordre d’affichage" error={formState.errors.sortOrder?.message}>
+          {/* L'API n'accepte pas de retirer une couleur : « Aucune » laisse en
+              place celle déjà enregistrée. */}
+          <Field
+            label="Couleur"
+            description="Rôle du design system, repris par l’application de terrain."
+          >
+            {(props) => (
+              <Select
+                items={COLOR_ITEMS}
+                value={color}
+                onValueChange={(value) => {
+                  if (value === null) return;
+                  setValue('color', value);
+                }}
+              >
+                <SelectTrigger id={props.id}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COLOR_ITEMS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+
+          <Field label="Ordre d’affichage" required error={formState.errors.sortOrder?.message}>
             {(props) => (
               <Input
                 {...props}
                 type="number"
                 min={0}
-                {...register('sortOrder', { valueAsNumber: true })}
+                {...register('sortOrder', {
+                  // Champ vidé : `valueAsNumber` rend `NaN`, qui part en `null`
+                  // dans le JSON et que la colonne refuse. Le message nomme le
+                  // champ, là où l'API ne rendait qu'un 400 muet.
+                  setValueAs: (raw: unknown) =>
+                    String(raw).trim() === '' ? Number.NaN : Number(raw),
+                  validate: (value: number) =>
+                    Number.isInteger(value) && value >= 0
+                      ? true
+                      : 'Indiquez un entier positif, 0 compris.',
+                })}
               />
             )}
           </Field>

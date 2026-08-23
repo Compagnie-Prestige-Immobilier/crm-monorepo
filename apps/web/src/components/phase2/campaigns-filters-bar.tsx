@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { RotateCcwIcon } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 
 import { AdvancedPanel, type AdvancedChipItem } from '@/components/filters/advanced-panel';
 import { DatePicker } from '@/components/filters/date-picker';
@@ -26,7 +26,7 @@ import {
   type CampaignStatus,
   type FilterOption,
 } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
 
 const STATUS_TABS: readonly { value: 'TOUTES' | CampaignStatus; label: string }[] = [
@@ -51,15 +51,12 @@ export function CampaignsFiltersBar({ projet = 'CHUES' }: { projet?: 'CHUES' | '
     label: user.fullName,
   }));
 
-  const [searchDraft, setSearchDraft] = useState(filters.search);
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === filters.search) return;
-    setFilters({ search: debouncedSearch });
-  }, [debouncedSearch, filters.search, setFilters]);
+  const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
 
   const removeAdvanced = useCallback(
     (key: CampaignAdvancedFilterKey) => {

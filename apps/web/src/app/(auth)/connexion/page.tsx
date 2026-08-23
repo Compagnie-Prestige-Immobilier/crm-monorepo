@@ -87,7 +87,9 @@ export default async function ConnexionPage({
 
           <div className="rail">
             <h1 className="font-display text-h1 font-[800] tracking-[-0.025em]">Connexion</h1>
-            <p className="mt-1.5 text-body text-muted-foreground">Panneau d’administration</p>
+            <p className="mt-1.5 text-body text-muted-foreground">
+              Accédez à vos espaces de travail
+            </p>
           </div>
 
           {expired ? (

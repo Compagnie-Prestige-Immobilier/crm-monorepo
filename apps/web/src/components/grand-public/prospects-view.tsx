@@ -11,7 +11,7 @@ import {
   SlidersHorizontalIcon,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -63,11 +63,12 @@ import { formatDate, formatNumber, formatPhone, withRetired } from '@/lib/format
 import {
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
+  statutForProjet,
   type Paginated,
   type ProspectRow,
   type ProspectStatut,
 } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { cn } from '@/lib/utils';
 
 const STATUT_VARIANT: Record<ProspectStatut, 'secondary' | 'info' | 'success' | 'destructive'> = {
@@ -133,16 +134,12 @@ const STATUT_OPTIONS = PROSPECT_STATUTS.map((statut) => ({
 export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) {
   const { filters, setFilters, resetFilters } = useUrlFilters(FILTERS_ADAPTER);
 
-  const [searchDraft, setSearchDraft] = useState(filters.search);
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === filters.search) return;
-    setFilters({ search: debouncedSearch });
-  }, [debouncedSearch, filters.search, setFilters]);
+  const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
 
   const canaux = useQuery({
     queryKey: grandPublicKeys.canaux,
@@ -471,6 +468,7 @@ function EmptyState({
 
 function Row({ prospect }: { prospect: ProspectRow }) {
   const name = `${prospect.prenom} ${prospect.nom}`.trim();
+  const statut = statutForProjet(prospect, 'GRAND_PUBLIC');
 
   return (
     <TableRow>
@@ -488,9 +486,7 @@ function Row({ prospect }: { prospect: ProspectRow }) {
         </Link>
       </TableCell>
       <TableCell>
-        <Badge variant={STATUT_VARIANT[prospect.statut]}>
-          {PROSPECT_STATUT_LABELS[prospect.statut]}
-        </Badge>
+        <Badge variant={STATUT_VARIANT[statut]}>{PROSPECT_STATUT_LABELS[statut]}</Badge>
       </TableCell>
       <TableCell>
         {prospect.type === null ? <Absent /> : PROSPECT_TYPE_LABELS[prospect.type]}

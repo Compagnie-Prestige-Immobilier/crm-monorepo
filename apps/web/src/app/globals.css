@@ -728,3 +728,27 @@ html.dark:has([data-coque='chues']) {
     scrollbar-color: var(--muted-foreground) transparent;
   }
 }
+
+/*
+ * IMPRESSION DES TABLEAUX.
+ *
+ * `Table` enveloppe chaque tableau dans un conteneur `overflow-x: auto`, et
+ * aucun navigateur ne fragmente un contexte de défilement sur plusieurs
+ * pages : le registre s'arrêtait net au bas de la première feuille. On rend le
+ * conteneur transparent au découpage, on empêche une ligne d'être coupée en
+ * deux, et on répète l'en-tête sur chaque page.
+ */
+@media print {
+  [data-slot='table-container'] {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  [data-slot='table-header'] {
+    display: table-header-group;
+  }
+
+  [data-slot='table-row'] {
+    break-inside: avoid;
+  }
+}

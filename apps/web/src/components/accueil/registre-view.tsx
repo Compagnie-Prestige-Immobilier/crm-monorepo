@@ -10,7 +10,7 @@ import {
   PrinterIcon,
   RotateCcwIcon,
 } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 
 import { VisiteForm } from '@/components/accueil/visite-form';
 import { EmptyState } from '@/components/empty-state';
@@ -55,7 +55,7 @@ import {
 } from '@/lib/data/visites';
 import { formatDate, formatNumber } from '@/lib/format';
 import type { FilterOption } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 
 const ADAPTER: UrlFilterAdapter<VisiteFilters> = {
   parse: parseVisiteFilters,
@@ -91,15 +91,12 @@ export function RegistreView() {
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
   const [commentairesImprimes, setCommentairesImprimes] = useState(true);
 
-  const [searchDraft, setSearchDraft] = useState(filters.search);
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === filters.search) return;
-    setFilters({ search: debouncedSearch });
-  }, [debouncedSearch, filters.search, setFilters]);
+  const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
 
   const referentiels = useQuery({
     queryKey: VISITE_REFERENTIELS_QUERY_KEY,
@@ -265,6 +262,16 @@ export function RegistreView() {
         </Button>
       </div>
 
+      {/* SUR LE PAPIER, dire ce que la feuille contient. La pagination de
+          l'écran est masquée à l'impression, et rien n'indiquait qu'il manquait
+          les visites au-delà de la page en cours. */}
+      {pageCount > 1 ? (
+        <p className="hidden text-[0.75rem] print:block">
+          Page {page} sur {pageCount} — visites {formatNumber(premiere)} à {formatNumber(derniere)}{' '}
+          sur {formatNumber(total)}. Les autres pages s’impriment séparément.
+        </p>
+      ) : null}
+
       {registre.isPending ? (
         <Skeleton className="h-64 w-full" />
       ) : registre.isError ? (
@@ -399,13 +406,11 @@ export function RegistreView() {
           <DialogHeader>
             <DialogTitle>Enregistrer une visite</DialogTitle>
           </DialogHeader>
-          <VisiteForm
-            referentiels={referentiels.data}
-            onSaved={() => {
-              setAjoutOuvert(false);
-              rafraichir();
-            }}
-          />
+          {/* Le dialogue RESTE ouvert : le formulaire se remet en file de
+              lui-même, entreprise conservée, focus sur le nom. Trois visiteurs
+              de la même société s'enregistrent d'affilée, ce que la fermeture
+              automatique rendait impossible. L'accueil ferme quand il a fini. */}
+          <VisiteForm referentiels={referentiels.data} onSaved={rafraichir} />
         </DialogContent>
       </Dialog>
 

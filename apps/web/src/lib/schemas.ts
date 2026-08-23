@@ -95,9 +95,12 @@ export const prospectSchema = z.object({
   nom: z.string().trim().min(1, 'Le nom est obligatoire.').max(120, 'Nom trop long.'),
   prenom: z.string().trim().min(1, 'Le prénom est obligatoire.').max(120, 'Prénom trop long.'),
   phone: z.string().trim().min(1, 'Le téléphone est obligatoire.').max(40, 'Numéro trop long.'),
-  banqueId: z.string().trim().min(1, 'La banque est obligatoire.'),
-  syndicatId: z.string().trim().min(1, 'Le syndicat est obligatoire.'),
-  representantId: z.string().trim().min(1, 'Le représentant est obligatoire.'),
+  // Facultatifs, comme à la création et comme côté serveur : une fiche Grand
+  // Public n'a ni représentant ni syndicat, et les exiger ici rendait toute
+  // modification impossible, jusqu'à la correction d'un prénom.
+  banqueId: z.string().trim(),
+  syndicatId: z.string().trim(),
+  representantId: z.string().trim(),
   statut: z.enum(PROSPECT_STATUTS),
 });
 export type ProspectFormInput = z.infer<typeof prospectSchema>;

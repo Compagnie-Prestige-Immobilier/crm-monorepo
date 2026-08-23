@@ -103,8 +103,8 @@ export function NotificationComposer({
   }, [open]);
 
   const templates = useQuery({
-    queryKey: notificationKeys.templates,
-    queryFn: () => fetchTemplates(),
+    queryKey: notificationKeys.templates(false),
+    queryFn: () => fetchTemplates(false),
     enabled: open,
     staleTime: 60_000,
   });
@@ -131,10 +131,34 @@ export function NotificationComposer({
       ? 'Choisissez une date et une heure à venir.'
       : null;
 
-  const textIssue =
-    title.trim() === '' || body.trim() === '' ? 'Le titre et le corps sont obligatoires.' : null;
+  /**
+   * Les bornes portent sur le texte RENDU, pas sur le gabarit : c'est lui qui
+   * part, et une variable substituée rallonge. Un dépassement renvoyait
+   * l'assistant à l'étape 1 sans qu'aucun champ ne soit marqué.
+   */
+  const titleIssue =
+    title.trim() === ''
+      ? 'Le titre est obligatoire.'
+      : rendered.title.length > TITLE_MAX
+        ? `Le titre rendu fait ${String(rendered.title.length)} caractères, ${String(TITLE_MAX)} au maximum.`
+        : null;
 
-  const blocking = textIssue ?? audienceIssue ?? routeIssue ?? scheduleIssue;
+  const bodyIssue =
+    body.trim() === ''
+      ? 'Le message est obligatoire.'
+      : rendered.body.length > BODY_MAX
+        ? `Le message rendu fait ${String(rendered.body.length)} caractères, ${String(BODY_MAX)} au maximum.`
+        : null;
+
+  // Une variable non renseignée partait EN CLAIR : le destinataire recevait
+  // « Bonjour {{prenom}} ». L'avertissement ne retenait rien.
+  const missingIssue =
+    rendered.missing.length > 0
+      ? `Renseignez ${rendered.missing.join(', ')} : la notification partirait avec le marqueur en clair.`
+      : null;
+
+  const blocking =
+    titleIssue ?? bodyIssue ?? missingIssue ?? audienceIssue ?? routeIssue ?? scheduleIssue;
 
   const previewQuery = audienceQuery(selection);
   const preview = useQuery({
@@ -272,23 +296,27 @@ export function NotificationComposer({
                       )}
                     </Field>
                   ))}
-                  {rendered.missing.length > 0 ? (
-                    <p role="status" className="text-[0.75rem] text-warning">
-                      Non renseignée(s) : {rendered.missing.join(', ')}.
-                    </p>
-                  ) : null}
                 </fieldset>
               ) : null}
+
+              {/* HORS du bloc de gabarit : un marqueur tapé à la main dans le
+                  titre bloque l'envoi lui aussi, et rien ne le disait. */}
+              {missingIssue === null ? null : (
+                <p role="alert" className="text-[0.75rem] text-destructive">
+                  Variable(s) non renseignée(s) : {rendered.missing.join(', ')}. L’envoi reste
+                  bloqué tant qu’elles le sont.
+                </p>
+              )}
 
               <Field
                 label="Titre"
                 required
-                description={`${String(title.length)} / ${String(TITLE_MAX)} caractères`}
+                description={`${String(rendered.title.length)} / ${String(TITLE_MAX)} caractères une fois les variables remplacées`}
+                error={title.trim() === '' ? undefined : (titleIssue ?? undefined)}
               >
                 {(props) => (
                   <Input
                     {...props}
-                    maxLength={TITLE_MAX}
                     value={title}
                     onChange={(event) => {
                       setTitle(event.target.value);
@@ -300,12 +328,12 @@ export function NotificationComposer({
               <Field
                 label="Message"
                 required
-                description={`${String(body.length)} / ${String(BODY_MAX)} caractères`}
+                description={`${String(rendered.body.length)} / ${String(BODY_MAX)} caractères une fois les variables remplacées`}
+                error={body.trim() === '' ? undefined : (bodyIssue ?? undefined)}
               >
                 {(props) => (
                   <Textarea
                     {...props}
-                    maxLength={BODY_MAX}
                     value={body}
                     onChange={(event) => {
                       setBody(event.target.value);

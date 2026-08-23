@@ -24,7 +24,7 @@ import { formatDate, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { PROSPECT_STATUT_LABELS, type ProspectRow } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { cn } from '@/lib/utils';
 
 export function ProspectMergeDialog({
@@ -37,24 +37,23 @@ export function ProspectMergeDialog({
   const queryClient = useQueryClient();
   const searchId = useId();
 
-  const [searchDraft, setSearchDraft] = useState('');
   const [search, setSearch] = useState('');
   const [duplicate, setDuplicate] = useState<ProspectRow | null>(null);
   const [keepOriginal, setKeepOriginal] = useState(true);
 
+  const {
+    draft: searchDraft,
+    setDraft: setSearchDraft,
+    reset: resetSearch,
+  } = useDebouncedSearch(search, setSearch);
+
   useEffect(() => {
     if (prospect === null) return;
-    setSearchDraft('');
+    resetSearch('');
     setSearch('');
     setDuplicate(null);
     setKeepOriginal(true);
-  }, [prospect]);
-
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === search) return;
-    setSearch(debouncedSearch);
-  }, [debouncedSearch, search]);
+  }, [prospect, resetSearch]);
 
   const candidateFilters = { ...EMPTY_FILTERS, search, pageSize: 10 };
 

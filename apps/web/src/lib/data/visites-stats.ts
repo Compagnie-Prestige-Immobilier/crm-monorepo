@@ -2,6 +2,7 @@ import { ApiError } from '@crm/api-client/query';
 import { z } from 'zod';
 
 import { API_PREFIX } from '@/lib/api/config';
+import { csvRows } from '@/lib/csv';
 
 export const MOIS_LABELS = [
   'janvier',
@@ -152,12 +153,6 @@ export function evolution(total: number, precedent: number): number | null {
   return arrondi(((total - precedent) / precedent) * 100);
 }
 
-function csvCell(value: string | number | null): string {
-  if (value === null) return '';
-  const text = typeof value === 'number' ? String(value).replace('.', ',') : value;
-  return /[";\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
-}
-
 export function visitesCsv(stats: VisitesStats, periode: VisitesPeriode): string {
   const rows: (string | number | null)[][] = [[`Visites de ${periodeLabel(periode)}`], []];
 
@@ -181,7 +176,7 @@ export function visitesCsv(stats: VisitesStats, periode: VisitesPeriode): string
   rows.push([]);
   rows.push(['Total', stats.total]);
 
-  return rows.map((row) => row.map(csvCell).join(';')).join('\r\n');
+  return csvRows(rows);
 }
 
 export function visitesCsvFileName(periode: VisitesPeriode): string {
